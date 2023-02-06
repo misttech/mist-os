@@ -4,10 +4,12 @@
 
 //!  Utilities that prints information in a human-readable format.
 
-use {
-    crate::processes_data, anyhow::Result, ffx_writer::Writer, fuchsia_zircon_types as zx_types,
-    processes_data::processed, std::io::Write,
-};
+use crate::processes_data;
+use anyhow::Result;
+use ffx_writer::Writer;
+use fuchsia_zircon_types as zx_types;
+use processes_data::processed;
+use std::io::Write;
 
 /// Print to 'w' a human-readable presentation of `processes_data`.
 pub fn pretty_print_processes_data(

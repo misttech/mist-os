@@ -6,17 +6,15 @@
 //! - acquire and display product bundle information (metadata)
 //! - acquire related data files, such as disk partition images (data)
 
-use {
-    ::gcs::client::{Client, ProgressResponse, ProgressState},
-    anyhow::{anyhow, Context, Result},
-    async_fs::rename,
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_product_get_args::GetCommand,
-    pbms::{make_way_for_output, transfer_download},
-    std::io::{stderr, stdin, stdout},
-    structured_ui,
-};
+use ::gcs::client::{Client, ProgressResponse, ProgressState};
+use anyhow::{anyhow, Context, Result};
+use async_fs::rename;
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_product_get_args::GetCommand;
+use pbms::{make_way_for_output, transfer_download};
+use std::io::{stderr, stdin, stdout};
+use structured_ui;
 
 /// `ffx product get` sub-command.
 #[ffx_plugin("product.experimental")]
@@ -96,7 +94,8 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, tempfile};
+    use super::*;
+    use tempfile;
 
     #[ignore]
     #[should_panic(expected = "downloading via transfer manifest")]

@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_io::Async,
-    errors::{ffx_bail, ffx_error},
-    fuchsia_async::unblock,
-    futures_util::future::FutureExt,
-    futures_util::io::AsyncReadExt,
-    signal_hook::{
-        consts::signal::{SIGINT, SIGTERM},
-        low_level::pipe,
-    },
-    std::ffi::OsStr,
-    std::os::unix::net::UnixStream,
-    std::process::Command,
-    std::sync::{atomic::AtomicBool, Arc},
+use anyhow::{Context, Result};
+use async_io::Async;
+use errors::{ffx_bail, ffx_error};
+use fuchsia_async::unblock;
+use futures_util::{future::FutureExt, io::AsyncReadExt};
+use signal_hook::{
+    consts::signal::{SIGINT, SIGTERM},
+    low_level::pipe,
+};
+use std::{
+    ffi::OsStr,
+    os::unix::net::UnixStream,
+    process::Command,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 mod debug_agent;

@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::prepare,
-    anyhow::{anyhow, Result},
-    fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl_fuchsia_developer_ffx::{FastbootProxy, VariableListenerMarker, VariableListenerRequest},
-    futures::prelude::*,
-    futures::try_join,
-    std::io::Write,
-};
+use crate::common::prepare;
+use anyhow::{anyhow, Result};
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl_fuchsia_developer_ffx::{FastbootProxy, VariableListenerMarker, VariableListenerRequest};
+use futures::{prelude::*, try_join};
+use std::io::Write;
 
 /// Aggregates fastboot variables from a callback listener.
 async fn handle_variables_for_fastboot<W: Write>(

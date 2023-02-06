@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    component_debug::cli::{doctor_cmd_print, doctor_cmd_serialized},
-    component_debug::doctor::RouteReport,
-    errors::FfxError,
-    ffx_component::rcs::{connect_to_realm_explorer, connect_to_route_validator},
-    ffx_component_doctor_args::DoctorCommand,
-    ffx_core::ffx_plugin,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_remotecontrol as rc,
+use anyhow::Result;
+use component_debug::{
+    cli::{doctor_cmd_print, doctor_cmd_serialized},
+    doctor::RouteReport,
 };
+use errors::FfxError;
+use ffx_component::rcs::{connect_to_realm_explorer, connect_to_route_validator};
+use ffx_component_doctor_args::DoctorCommand;
+use ffx_core::ffx_plugin;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[ffx_plugin]
 pub async fn cmd(

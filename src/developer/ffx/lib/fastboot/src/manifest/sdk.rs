@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::{cmd::ManifestParams, file::FileResolver},
-        manifest::{
-            v3::{
-                Condition as ConditionV3, ExplicitOemFile as OemFileV3,
-                FlashManifest as FlashManifestV3, Partition as PartitionV3, Product as ProductV3,
-            },
-            Boot, Flash, Unlock,
+use crate::{
+    common::{cmd::ManifestParams, file::FileResolver},
+    manifest::{
+        v3::{
+            Condition as ConditionV3, ExplicitOemFile as OemFileV3,
+            FlashManifest as FlashManifestV3, Partition as PartitionV3, Product as ProductV3,
         },
+        Boot, Flash, Unlock,
     },
-    anyhow::{bail, Result},
-    async_trait::async_trait,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    fms::Entries,
-    sdk_metadata::{Metadata, OemFile, Partition, Product},
-    std::convert::{From, TryFrom, TryInto},
-    std::default::Default,
-    std::io::Write,
+};
+use anyhow::{bail, Result};
+use async_trait::async_trait;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use fms::Entries;
+use sdk_metadata::{Metadata, OemFile, Partition, Product};
+use std::{
+    convert::{From, TryFrom, TryInto},
+    default::Default,
+    io::Write,
 };
 
 // Wrapper struct so we can convert to a FlashManifest

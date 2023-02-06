@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, ffx_component_sub_command::SubCommand, ffx_core::ffx_command};
+use argh::FromArgs;
+use ffx_component_sub_command::SubCommand;
+use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]

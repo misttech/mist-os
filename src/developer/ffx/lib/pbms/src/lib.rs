@@ -19,32 +19,33 @@
 //! These FMS entry names are suitable to present to the user. E.g. the name of
 //! a product bundle is also the name of the product bundle metadata entry.
 
-use {
-    crate::{
-        pbms::{
-            fetch_product_metadata, get_product_data_from_gcs, local_path_helper,
-            path_from_file_url, pb_dir_name, pb_names_from_path, pbm_repo_list,
-            CONFIG_STORAGE_PATH, GS_SCHEME,
-        },
-        repo_info::RepoInfo,
+use crate::{
+    pbms::{
+        fetch_product_metadata, get_product_data_from_gcs, local_path_helper, path_from_file_url,
+        pb_dir_name, pb_names_from_path, pbm_repo_list, CONFIG_STORAGE_PATH, GS_SCHEME,
     },
-    ::gcs::client::{Client, ProgressResponse},
-    anyhow::{bail, Context, Result},
-    camino::Utf8Path,
-    errors::ffx_bail,
-    fms::Entries,
-    futures::TryStreamExt as _,
-    itertools::Itertools as _,
-    sdk,
-    sdk_metadata::ProductBundle,
-    std::path::{Path, PathBuf},
-    std::str::FromStr,
-    structured_ui::{Presentation, TableRows},
+    repo_info::RepoInfo,
 };
+use ::gcs::client::{Client, ProgressResponse};
+use anyhow::{bail, Context, Result};
+use camino::Utf8Path;
+use errors::ffx_bail;
+use fms::Entries;
+use futures::TryStreamExt as _;
+use itertools::Itertools as _;
+use sdk;
+use sdk_metadata::ProductBundle;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+use structured_ui::{Presentation, TableRows};
 
-pub use crate::gcs::handle_new_access_token;
-pub use crate::pbms::{fetch_data_for_product_bundle_v1, get_product_dir, get_storage_dir};
-pub use crate::transfer_manifest::transfer_download;
+pub use crate::{
+    gcs::handle_new_access_token,
+    pbms::{fetch_data_for_product_bundle_v1, get_product_dir, get_storage_dir},
+    transfer_manifest::transfer_download,
+};
 
 mod gcs;
 mod pbms;

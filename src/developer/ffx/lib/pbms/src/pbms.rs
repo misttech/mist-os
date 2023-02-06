@@ -4,30 +4,28 @@
 
 //! Private functionality for pbms lib.
 
-use {
-    crate::{
-        gcs::{exists_in_gcs, fetch_from_gcs},
-        repo::fetch_package_repository_from_mirrors,
-        repo_info::RepoInfo,
-        AuthFlowChoice,
-    },
-    ::gcs::client::{
-        Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
-    },
-    anyhow::{bail, Context, Result},
-    async_fs::File,
-    fms::{find_product_bundle, Entries},
-    futures::{AsyncWriteExt as _, TryStreamExt as _},
-    hyper::{header::CONTENT_LENGTH, StatusCode},
-    sdk::SdkVersion,
-    sdk_metadata::Metadata,
-    std::{
-        fs,
-        path::{Path, PathBuf},
-    },
-    structured_ui,
-    tempfile::TempDir,
+use crate::{
+    gcs::{exists_in_gcs, fetch_from_gcs},
+    repo::fetch_package_repository_from_mirrors,
+    repo_info::RepoInfo,
+    AuthFlowChoice,
 };
+use ::gcs::client::{
+    Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
+};
+use anyhow::{bail, Context, Result};
+use async_fs::File;
+use fms::{find_product_bundle, Entries};
+use futures::{AsyncWriteExt as _, TryStreamExt as _};
+use hyper::{header::CONTENT_LENGTH, StatusCode};
+use sdk::SdkVersion;
+use sdk_metadata::Metadata;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+use structured_ui;
+use tempfile::TempDir;
 
 pub(crate) const CONFIG_METADATA: &str = "pbms.metadata";
 pub(crate) const CONFIG_STORAGE_PATH: &str = "pbms.storage.path";
@@ -338,9 +336,10 @@ pub(crate) fn pb_dir_name(gcs_url: &url::Url) -> String {
     let mut gcs_url = gcs_url.to_owned();
     gcs_url.set_fragment(None);
 
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hash;
-    use std::hash::Hasher;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
     let mut s = DefaultHasher::new();
     gcs_url.as_str().hash(&mut s);
     let out = s.finish();

@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{fastboot::InterfaceFactory, target::Target},
-    anyhow::{anyhow, bail, Context as _, Result},
-    async_io::Async,
-    async_net::UdpSocket,
-    async_trait::async_trait,
-    byteorder::{BigEndian, ByteOrder},
-    futures::{
-        io::{AsyncRead, AsyncWrite},
-        task::{Context, Poll},
-        Future,
-    },
-    std::io::ErrorKind,
-    std::net::SocketAddr,
-    std::num::Wrapping,
-    std::pin::Pin,
-    std::time::Duration,
-    timeout::timeout,
-    zerocopy::{byteorder::big_endian::U16, ByteSlice, FromBytes, LayoutVerified, Unaligned},
+use crate::{fastboot::InterfaceFactory, target::Target};
+use anyhow::{anyhow, bail, Context as _, Result};
+use async_io::Async;
+use async_net::UdpSocket;
+use async_trait::async_trait;
+use byteorder::{BigEndian, ByteOrder};
+use futures::{
+    io::{AsyncRead, AsyncWrite},
+    task::{Context, Poll},
+    Future,
 };
+use std::{io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
+use timeout::timeout;
+use zerocopy::{byteorder::big_endian::U16, ByteSlice, FromBytes, LayoutVerified, Unaligned};
 
 const HOST_PORT: u16 = 5554;
 const REPLY_TIMEOUT: Duration = Duration::from_millis(500);

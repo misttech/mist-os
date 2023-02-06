@@ -316,8 +316,10 @@ mod test {
     use super::*;
     use crate::ConfigLevel;
     use serde_json::json;
-    use std::fs::{self, File};
-    use std::io::Write;
+    use std::{
+        fs::{self, File},
+        io::Write,
+    };
     use tempfile::TempDir;
 
     #[fuchsia_async::run_singlethreaded(test)]

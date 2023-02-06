@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, diagnostics_data::Severity, ffx_core::ffx_command};
+use argh::FromArgs;
+use diagnostics_data::Severity;
+use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]

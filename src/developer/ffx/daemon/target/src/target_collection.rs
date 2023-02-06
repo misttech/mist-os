@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::target::Target,
-    crate::target::TargetAddrType,
-    crate::MDNS_MAX_AGE,
-    addr::TargetAddr,
-    anyhow::Result,
-    async_trait::async_trait,
-    chrono::Utc,
-    ffx::DaemonError,
-    ffx_daemon_core::events::{self, EventSynthesizer},
-    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo},
-    fidl_fuchsia_developer_ffx as ffx,
-    std::cell::RefCell,
-    std::collections::HashMap,
-    std::fmt::Debug,
-    std::net::IpAddr,
-    std::rc::Rc,
+use crate::{
+    target::{Target, TargetAddrType},
+    MDNS_MAX_AGE,
 };
+use addr::TargetAddr;
+use anyhow::Result;
+use async_trait::async_trait;
+use chrono::Utc;
+use ffx::DaemonError;
+use ffx_daemon_core::events::{self, EventSynthesizer};
+use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
+use fidl_fuchsia_developer_ffx as ffx;
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, rc::Rc};
 
 #[derive(Default)]
 pub struct TargetCollection {
@@ -384,19 +379,18 @@ impl From<TargetAddr> for TargetQuery {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::target::clone_target,
-        crate::target::{TargetAddrEntry, TargetAddrType},
-        chrono::{TimeZone, Utc},
-        ffx_daemon_events::TargetConnectionState,
-        fuchsia_async::Task,
-        futures::prelude::*,
-        std::collections::BTreeSet,
-        std::net::{Ipv4Addr, Ipv6Addr},
-        std::pin::Pin,
-        std::task::{Context, Poll},
-        std::time::Instant,
+    use super::*;
+    use crate::target::{clone_target, TargetAddrEntry, TargetAddrType};
+    use chrono::{TimeZone, Utc};
+    use ffx_daemon_events::TargetConnectionState;
+    use fuchsia_async::Task;
+    use futures::prelude::*;
+    use std::{
+        collections::BTreeSet,
+        net::{Ipv4Addr, Ipv6Addr},
+        pin::Pin,
+        task::{Context, Poll},
+        time::Instant,
     };
 
     #[fuchsia_async::run_singlethreaded(test)]

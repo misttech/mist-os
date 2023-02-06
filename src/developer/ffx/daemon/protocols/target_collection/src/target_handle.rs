@@ -2,26 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::reboot,
-    anyhow::{anyhow, Context as _, Result},
-    diagnostics::{get_streaming_min_timestamp, run_diagnostics_streaming},
-    ffx_daemon_events::{HostPipeErr, TargetEvent},
-    ffx_daemon_target::logger::streamer::GenericDiagnosticsStreamer,
-    ffx_daemon_target::target::Target,
-    ffx_stream_util::TryStreamUtilExt,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_ffx::{self as ffx},
-    fuchsia_async::TimeoutExt,
-    futures::{FutureExt, TryStreamExt},
-    protocols::Context,
-    std::cell::RefCell,
-    std::future::Future,
-    std::pin::Pin,
-    std::rc::Rc,
-    std::time::Duration,
-    tasks::TaskManager,
-};
+use crate::reboot;
+use anyhow::{anyhow, Context as _, Result};
+use diagnostics::{get_streaming_min_timestamp, run_diagnostics_streaming};
+use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_daemon_target::{logger::streamer::GenericDiagnosticsStreamer, target::Target};
+use ffx_stream_util::TryStreamUtilExt;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_developer_ffx::{self as ffx};
+use fuchsia_async::TimeoutExt;
+use futures::{FutureExt, TryStreamExt};
+use protocols::Context;
+use std::{cell::RefCell, future::Future, pin::Pin, rc::Rc, time::Duration};
+use tasks::TaskManager;
 
 // TODO(awdavies): Abstract this to use similar utilities to an actual protocol.
 // This functionally behaves the same with the only caveat being that some
@@ -239,8 +232,10 @@ mod tests {
     use hoist::{Hoist, OvernetInstance};
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
-    use std::net::{IpAddr, SocketAddr};
-    use std::str::FromStr;
+    use std::{
+        net::{IpAddr, SocketAddr},
+        str::FromStr,
+    };
 
     #[test]
     fn test_host_pipe_err_to_fidl_conversion() {

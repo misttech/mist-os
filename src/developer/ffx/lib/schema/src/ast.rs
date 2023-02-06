@@ -13,14 +13,14 @@
 //! * `Variable<Node>`: a variable holding an initially unknown value node,
 //! * `Variable<VariantNode>`: a variable holding an initially unknown variant node.
 
-use {
-    crate::errors::{Error, Result},
-    anyhow::anyhow,
-    serde::{Deserialize, Serialize},
-    std::cell::{Ref, RefCell, RefMut},
-    std::collections::{btree_map::Entry, BTreeMap},
-    std::ops::DerefMut,
-    std::rc::Rc,
+use crate::errors::{Error, Result};
+use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::{btree_map::Entry, BTreeMap},
+    ops::DerefMut,
+    rc::Rc,
 };
 
 /// The AST nodes that are possible for Rust types.

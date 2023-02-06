@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    errors::ffx_error,
-    ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp},
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    fidl_fuchsia_developer_ffx::ListenerProxy,
-    fidl_fuchsia_developer_ffx::TargetQuery,
-    fidl_fuchsia_gpu_agis::ComponentRegistryProxy,
-    fidl_fuchsia_gpu_agis::ObserverProxy,
-    serde::Serialize,
-};
+use anyhow::{anyhow, Result};
+use errors::ffx_error;
+use ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
+use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
+use serde::Serialize;
 
 const GLOBAL_ID: u32 = 1;
 
@@ -166,10 +162,9 @@ async fn agis_impl(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl_fuchsia_developer_ffx::ListenerRequest,
-        fidl_fuchsia_gpu_agis::ComponentRegistryRequest, fidl_fuchsia_gpu_agis::ObserverRequest,
-    };
+    use super::*;
+    use fidl_fuchsia_developer_ffx::ListenerRequest;
+    use fidl_fuchsia_gpu_agis::{ComponentRegistryRequest, ObserverRequest};
 
     const PROCESS_KOID: u64 = 999;
     const PROCESS_NAME: &str = "agis-vtcs-test";

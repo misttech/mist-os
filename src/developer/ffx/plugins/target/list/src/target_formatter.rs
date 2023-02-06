@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    addr::TargetAddr,
-    anyhow::{anyhow, Error, Result},
-    ffx_list_args::{AddressTypes, Format},
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_net::IpAddress,
-    netext::IsLocalAddr,
-    serde::Serialize,
-    serde_json::json,
-    std::cmp::max,
-    std::convert::TryFrom,
-    std::fmt::{self, Display, Write},
+use addr::TargetAddr;
+use anyhow::{anyhow, Error, Result};
+use ffx_list_args::{AddressTypes, Format};
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_net::IpAddress;
+use netext::IsLocalAddr;
+use serde::Serialize;
+use serde_json::json;
+use std::{
+    cmp::max,
+    convert::TryFrom,
+    fmt::{self, Display, Write},
 };
 
 const NAME: &'static str = "NAME";

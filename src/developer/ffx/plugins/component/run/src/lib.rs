@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    component_debug::cli::run_cmd,
-    errors::FfxError,
-    ffx_component::rcs::connect_to_lifecycle_controller,
-    ffx_component_run_args::RunComponentCommand,
-    ffx_core::ffx_plugin,
-    ffx_log::{log_impl, LogOpts},
-    ffx_log_args::LogCommand,
-    fidl_fuchsia_developer_ffx::DiagnosticsProxy,
-    fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::Result;
+use component_debug::cli::run_cmd;
+use errors::FfxError;
+use ffx_component::rcs::connect_to_lifecycle_controller;
+use ffx_component_run_args::RunComponentCommand;
+use ffx_core::ffx_plugin;
+use ffx_log::{log_impl, LogOpts};
+use ffx_log_args::LogCommand;
+use fidl_fuchsia_developer_ffx::DiagnosticsProxy;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[ffx_plugin(DiagnosticsProxy = "daemon::protocol")]
 pub async fn cmd(

@@ -3,22 +3,17 @@
 // found in the LICENSE file.
 
 #![allow(unused_imports, unused_variables, dead_code)]
-use {
-    crate::{fastboot::InterfaceFactory, target::Target},
-    anyhow::{anyhow, bail, Context as _, Result},
-    async_net::TcpStream,
-    async_trait::async_trait,
-    ffx_config::get,
-    futures::{
-        prelude::*,
-        task::{Context, Poll},
-    },
-    std::convert::TryInto,
-    std::io::ErrorKind,
-    std::net::SocketAddr,
-    std::pin::Pin,
-    tracing::debug,
+use crate::{fastboot::InterfaceFactory, target::Target};
+use anyhow::{anyhow, bail, Context as _, Result};
+use async_net::TcpStream;
+use async_trait::async_trait;
+use ffx_config::get;
+use futures::{
+    prelude::*,
+    task::{Context, Poll},
 };
+use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
+use tracing::debug;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";
 

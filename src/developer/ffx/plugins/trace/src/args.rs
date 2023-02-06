@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    ffx_core::ffx_command,
-    fidl_fuchsia_developer_ffx::{Action, Trigger},
-    fidl_fuchsia_tracing::BufferingMode,
-};
+use argh::FromArgs;
+use ffx_core::ffx_command;
+use fidl_fuchsia_developer_ffx::{Action, Trigger};
+use fidl_fuchsia_tracing::BufferingMode;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]

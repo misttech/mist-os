@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_channel::{Receiver, Sender},
-    async_io::Async,
-    async_lock::Mutex,
-    ffx_config::global_env_context,
-    fuchsia_async::Task,
-    futures::{AsyncBufReadExt, AsyncWriteExt, FutureExt, StreamExt},
-    futures_lite::io::BufReader,
-    std::process::{Child, Command, Stdio},
-    symbol_index::ensure_symbol_index_registered,
-};
+use anyhow::{Context, Result};
+use async_channel::{Receiver, Sender};
+use async_io::Async;
+use async_lock::Mutex;
+use ffx_config::global_env_context;
+use fuchsia_async::Task;
+use futures::{AsyncBufReadExt, AsyncWriteExt, FutureExt, StreamExt};
+use futures_lite::io::BufReader;
+use std::process::{Child, Command, Stdio};
+use symbol_index::ensure_symbol_index_registered;
 
 const BARRIER: &str = "<ffx symbolizer>\n";
 
@@ -208,7 +206,8 @@ impl Symbolizer for FakeSymbolizerForTest {
 
 #[cfg(test)]
 mod test {
-    use {super::*, async_channel::bounded};
+    use super::*;
+    use async_channel::bounded;
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fake_symbolizer() {
         let args = vec!["arg".to_string(), "arg2".to_string()];

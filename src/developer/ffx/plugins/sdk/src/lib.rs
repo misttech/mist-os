@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    ffx_config::{query, ConfigLevel},
-    ffx_core::ffx_plugin,
-    ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand},
-    sdk::{Sdk, SdkVersion},
-    std::io::{stdout, Write},
-};
+use anyhow::{Context, Result};
+use ffx_config::{query, ConfigLevel};
+use ffx_core::ffx_plugin;
+use ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
+use sdk::{Sdk, SdkVersion};
+use std::io::{stdout, Write};
 
 #[ffx_plugin()]
 pub async fn exec_sdk(command: SdkCommand) -> Result<()> {

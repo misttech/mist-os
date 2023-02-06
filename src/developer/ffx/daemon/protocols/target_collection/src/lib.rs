@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::target_handle::TargetHandle,
-    anyhow::{anyhow, Result},
-    async_trait::async_trait,
-    chrono::Utc,
-    ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetInfo},
-    ffx_daemon_target::manual_targets,
-    ffx_daemon_target::target::{
-        target_addr_info_to_socketaddr, Target, TargetAddrEntry, TargetAddrType,
-    },
-    ffx_daemon_target::target_collection::TargetCollection,
-    ffx_stream_util::TryStreamUtilExt,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
-    futures::TryStreamExt,
-    protocols::prelude::*,
-    std::net::IpAddr,
-    std::net::{SocketAddr, SocketAddrV4, SocketAddrV6},
-    std::rc::Rc,
-    std::time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-    tasks::TaskManager,
+use crate::target_handle::TargetHandle;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use chrono::Utc;
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetInfo};
+use ffx_daemon_target::{
+    manual_targets,
+    target::{target_addr_info_to_socketaddr, Target, TargetAddrEntry, TargetAddrType},
+    target_collection::TargetCollection,
 };
+use ffx_stream_util::TryStreamUtilExt;
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use futures::TryStreamExt;
+use protocols::prelude::*;
+use std::{
+    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    rc::Rc,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+use tasks::TaskManager;
 
 mod reboot;
 mod target_handle;
@@ -204,19 +203,24 @@ impl FidlProtocol for TargetCollectionProtocol {
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
                 let reader = reader.into_proxy()?;
-                let targets = match query.string_matcher.as_deref() {
-                    None | Some("") => target_collection
-                        .targets()
-                        .into_iter()
-                        .filter_map(
-                            |t| if t.is_connected() { Some(t.as_ref().into()) } else { None },
-                        )
-                        .collect::<Vec<ffx::TargetInfo>>(),
-                    q => match target_collection.get_connected(q) {
-                        Some(t) => vec![t.as_ref().into()],
-                        None => vec![],
-                    },
-                };
+                let targets =
+                    match query.string_matcher.as_deref() {
+                        None | Some("") => target_collection
+                            .targets()
+                            .into_iter()
+                            .filter_map(|t| {
+                                if t.is_connected() {
+                                    Some(t.as_ref().into())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<ffx::TargetInfo>>(),
+                        q => match target_collection.get_connected(q) {
+                            Some(t) => vec![t.as_ref().into()],
+                            None => vec![],
+                        },
+                    };
                 // This was chosen arbitrarily. It's possible to determine a
                 // better chunk size using some FIDL constant math.
                 const TARGET_CHUNK_SIZE: usize = 20;
@@ -543,8 +547,7 @@ mod tests {
     use fidl_fuchsia_net::{IpAddress, Ipv6Address};
     use protocols::testing::FakeDaemonBuilder;
     use serde_json::{json, Map, Value};
-    use std::cell::RefCell;
-    use std::str::FromStr;
+    use std::{cell::RefCell, str::FromStr};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_non_fastboot() {

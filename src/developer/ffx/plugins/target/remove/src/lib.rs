@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, ffx_core::ffx_plugin, ffx_target_remove_args::RemoveCommand,
-    fidl_fuchsia_developer_ffx::TargetCollectionProxy,
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_target_remove_args::RemoveCommand;
+use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
 pub async fn remove(target_collection: TargetCollectionProxy, cmd: RemoveCommand) -> Result<()> {

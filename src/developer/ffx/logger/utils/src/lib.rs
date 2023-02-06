@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorGetNextResult, ArchiveIteratorProxy},
-    futures::stream::{FusedStream, FuturesOrdered, ReadyChunks, Stream, StreamExt},
-    std::future::Future,
-    std::pin::Pin,
-    std::task::Poll,
-};
+use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorGetNextResult, ArchiveIteratorProxy};
+use futures::stream::{FusedStream, FuturesOrdered, ReadyChunks, Stream, StreamExt};
+use std::{future::Future, pin::Pin, task::Poll};
 
 pub mod symbolizer;
 

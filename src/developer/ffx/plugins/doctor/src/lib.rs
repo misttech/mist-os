@@ -2,39 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::constants::*,
-    crate::doctor_ledger::*,
-    crate::ledger_view::*,
-    anyhow::{anyhow, Context, Result},
-    async_lock::Mutex,
-    async_trait::async_trait,
-    doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder},
-    errors::ffx_bail,
-    ffx_config::{environment::EnvironmentContext, keys::TARGET_DEFAULT_KEY, get, global_env_context, print_config},
-    ffx_core::ffx_plugin,
-    ffx_doctor_args::DoctorCommand,
-    fidl::{endpoints::create_proxy, prelude::*},
-    fidl_fuchsia_developer_ffx::{
-        TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
-        TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState,
-        VersionInfo,
-    },
-    fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
-    fuchsia_lockfile::LockfileCreateError,
-    futures::TryStreamExt,
-    serde_json::json,
-    std::sync::Arc,
-    std::{
-        collections::HashSet,
-        io::{stdout, BufWriter, ErrorKind, Write},
-        path::PathBuf,
-        process::Command,
-        time::Duration,
-    },
-    termion::{color, style},
-    timeout::timeout,
+use crate::{constants::*, doctor_ledger::*, ledger_view::*};
+use anyhow::{anyhow, Context, Result};
+use async_lock::Mutex;
+use async_trait::async_trait;
+use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
+use errors::ffx_bail;
+use ffx_config::{
+    environment::EnvironmentContext, get, global_env_context, keys::TARGET_DEFAULT_KEY,
+    print_config,
 };
+use ffx_core::ffx_plugin;
+use ffx_doctor_args::DoctorCommand;
+use fidl::{endpoints::create_proxy, prelude::*};
+use fidl_fuchsia_developer_ffx::{
+    TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
+    TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState, VersionInfo,
+};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use fuchsia_lockfile::LockfileCreateError;
+use futures::TryStreamExt;
+use serde_json::json;
+use std::{
+    collections::HashSet,
+    io::{stdout, BufWriter, ErrorKind, Write},
+    path::PathBuf,
+    process::Command,
+    sync::Arc,
+    time::Duration,
+};
+use termion::{color, style};
+use timeout::timeout;
 
 mod constants;
 mod doctor_ledger;
@@ -1225,33 +1223,33 @@ async fn doctor_summary<W: Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        async_lock::Mutex,
-        async_trait::async_trait,
-        ffx_config::TestEnv,
-        ffx_doctor_test_utils::MockWriter,
-        fidl::endpoints::RequestStream,
-        fidl::endpoints::{spawn_local_stream_handler, ProtocolMarker, Request, ServerEnd},
-        fidl::Channel,
-        fidl_fuchsia_developer_ffx::{
-            DaemonProxy, DaemonRequest, OpenTargetError, RemoteControlState,
-            TargetCollectionRequest, TargetCollectionRequestStream, TargetConnectionError,
-            TargetInfo, TargetRequest, TargetState, TargetType,
+    use super::*;
+    use async_lock::Mutex;
+    use async_trait::async_trait;
+    use ffx_config::TestEnv;
+    use ffx_doctor_test_utils::MockWriter;
+    use fidl::{
+        endpoints::{
+            spawn_local_stream_handler, ProtocolMarker, Request, RequestStream, ServerEnd,
         },
-        fidl_fuchsia_developer_remotecontrol::{
-            IdentifyHostResponse, RemoteControlMarker, RemoteControlRequest,
-        },
-        fuchsia_async as fasync,
-        futures::channel::oneshot::{self, Receiver},
-        futures::future::Shared,
-        futures::{Future, FutureExt, TryFutureExt, TryStreamExt},
-        std::cell::Cell,
-        std::collections::HashSet,
-        std::fmt,
-        std::sync::Arc,
-        tempfile::tempdir,
+        Channel,
     };
+    use fidl_fuchsia_developer_ffx::{
+        DaemonProxy, DaemonRequest, OpenTargetError, RemoteControlState, TargetCollectionRequest,
+        TargetCollectionRequestStream, TargetConnectionError, TargetInfo, TargetRequest,
+        TargetState, TargetType,
+    };
+    use fidl_fuchsia_developer_remotecontrol::{
+        IdentifyHostResponse, RemoteControlMarker, RemoteControlRequest,
+    };
+    use fuchsia_async as fasync;
+    use futures::{
+        channel::oneshot::{self, Receiver},
+        future::Shared,
+        Future, FutureExt, TryFutureExt, TryStreamExt,
+    };
+    use std::{cell::Cell, collections::HashSet, fmt, sync::Arc};
+    use tempfile::tempdir;
 
     const NODENAME: &str = "fake-nodename";
     const UNRESPONSIVE_NODENAME: &str = "fake-nodename-unresponsive";

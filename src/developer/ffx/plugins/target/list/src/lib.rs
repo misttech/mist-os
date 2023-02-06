@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter},
-    anyhow::Result,
-    errors::{ffx_bail, ffx_bail_with_code},
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_list_args::{AddressTypes, ListCommand},
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{
-        TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest,
-        TargetQuery,
-    },
-    futures::TryStreamExt,
-    std::convert::TryFrom,
+use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
+use anyhow::Result;
+use errors::{ffx_bail, ffx_bail_with_code};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_list_args::{AddressTypes, ListCommand};
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{
+    TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetQuery,
 };
+use futures::TryStreamExt;
+use std::convert::TryFrom;
 
 mod target_formatter;
 
@@ -99,17 +96,15 @@ pub async fn list_targets(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        addr::TargetAddr,
-        ffx_list_args::Format,
-        fidl_fuchsia_developer_ffx as ffx,
-        fidl_fuchsia_developer_ffx::{
-            RemoteControlState, TargetInfo as FidlTargetInfo, TargetState, TargetType,
-        },
-        regex::Regex,
-        std::net::IpAddr,
+    use super::*;
+    use addr::TargetAddr;
+    use ffx_list_args::Format;
+    use fidl_fuchsia_developer_ffx as ffx;
+    use fidl_fuchsia_developer_ffx::{
+        RemoteControlState, TargetInfo as FidlTargetInfo, TargetState, TargetType,
     };
+    use regex::Regex;
+    use std::net::IpAddr;
 
     fn tab_list_cmd(nodename: Option<String>) -> ListCommand {
         ListCommand { nodename, format: Format::Tabular, ..Default::default() }

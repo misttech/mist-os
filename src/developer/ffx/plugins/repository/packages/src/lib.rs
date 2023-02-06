@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    chrono::{offset::Utc, DateTime},
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_repository_packages_args::{
-        ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
-    },
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{
-        ListFields, PackageEntryIteratorMarker, RepositoryPackagesIteratorMarker,
-        RepositoryRegistryProxy,
-    },
-    fidl_fuchsia_developer_ffx_ext::{PackageEntry, RepositoryError, RepositoryPackage},
-    humansize::{file_size_opts, FileSize},
-    prettytable::{cell, format::TableFormat, row, Row, Table},
-    std::time::{Duration, SystemTime},
+use anyhow::{Context, Result};
+use chrono::{offset::Utc, DateTime};
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_repository_packages_args::{
+    ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
 };
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{
+    ListFields, PackageEntryIteratorMarker, RepositoryPackagesIteratorMarker,
+    RepositoryRegistryProxy,
+};
+use fidl_fuchsia_developer_ffx_ext::{PackageEntry, RepositoryError, RepositoryPackage};
+use humansize::{file_size_opts, FileSize};
+use prettytable::{cell, format::TableFormat, row, Row, Table};
+use std::time::{Duration, SystemTime};
 
 const MAX_HASH: usize = 11;
 
@@ -275,15 +273,13 @@ mod test {
     use fidl_fuchsia_developer_ffx::PackageEntryIteratorRequest;
 
     use super::*;
-    use {
-        fidl_fuchsia_developer_ffx::{
-            PackageEntry, RepositoryPackage, RepositoryPackagesIteratorRequest,
-            RepositoryRegistryRequest,
-        },
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        prettytable::format::FormatBuilder,
+    use fidl_fuchsia_developer_ffx::{
+        PackageEntry, RepositoryPackage, RepositoryPackagesIteratorRequest,
+        RepositoryRegistryRequest,
     };
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use prettytable::format::FormatBuilder;
 
     fn component(names: Vec<&str>) -> Vec<PackageEntry> {
         names

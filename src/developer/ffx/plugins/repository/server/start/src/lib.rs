@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_repository_server_start_args::StartCommand,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::RepositoryError,
-    fidl_fuchsia_net_ext::SocketAddress,
-    pkg::config as pkg_config,
-    std::io::Write as _,
-};
+use anyhow::{Context as _, Result};
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_repository_server_start_args::StartCommand;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx_ext::RepositoryError;
+use fidl_fuchsia_net_ext::SocketAddress;
+use pkg::config as pkg_config;
+use std::io::Write as _;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn start(
@@ -117,13 +115,11 @@ async fn start_impl(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest},
-        fidl_fuchsia_net as fidl,
-        futures::channel::oneshot::channel,
-        std::{future::Future, net::Ipv4Addr},
-    };
+    use super::*;
+    use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
+    use fidl_fuchsia_net as fidl;
+    use futures::channel::oneshot::channel;
+    use std::{future::Future, net::Ipv4Addr};
 
     // FIXME(http://fxbug.dev/80740): Unfortunately ffx_config is global, and so each of these tests
     // could step on each others ffx_config entries if run in parallel. To avoid this, we will:

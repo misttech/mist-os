@@ -1,32 +1,33 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::fastboot::{
+use crate::{
+    fastboot::{
         boot, continue_boot, erase, flash, get_all_vars, get_staged, get_var, oem, reboot,
         reboot_bootloader, set_active, stage, UploadProgressListener, VariableListener,
     },
-    crate::target::Target,
-    crate::zedboot::reboot_to_bootloader,
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-    async_utils::async_once::Once,
-    fastboot::UploadProgressListener as _,
-    ffx_config::get,
-    ffx_daemon_events::{TargetConnectionState, TargetEvent},
-    fidl::Error as FidlError,
-    fidl_fuchsia_developer_ffx::{
-        FastbootError, FastbootRequest, FastbootRequestStream, RebootError, RebootListenerProxy,
-    },
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy},
-    futures::io::{AsyncRead, AsyncWrite},
-    futures::prelude::*,
-    futures::try_join,
-    selectors::{self, VerboseError},
-    std::rc::Rc,
-    std::time::Duration,
+    target::Target,
+    zedboot::reboot_to_bootloader,
 };
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use async_utils::async_once::Once;
+use fastboot::UploadProgressListener as _;
+use ffx_config::get;
+use ffx_daemon_events::{TargetConnectionState, TargetEvent};
+use fidl::Error as FidlError;
+use fidl_fuchsia_developer_ffx::{
+    FastbootError, FastbootRequest, FastbootRequestStream, RebootError, RebootListenerProxy,
+};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy};
+use futures::{
+    io::{AsyncRead, AsyncWrite},
+    prelude::*,
+    try_join,
+};
+use selectors::{self, VerboseError};
+use std::{rc::Rc, time::Duration};
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
@@ -463,21 +464,21 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        anyhow::bail,
-        fastboot::reply::Reply,
-        fidl::endpoints::{create_endpoints, create_proxy_and_stream},
-        fidl_fuchsia_developer_ffx::{
-            FastbootError, FastbootMarker, FastbootProxy, RebootListenerMarker,
-            RebootListenerRequest, UploadProgressListenerMarker,
-        },
-        futures::task::{Context as fContext, Poll},
-        serial_test::serial,
-        std::io::{BufWriter, Write},
-        std::pin::Pin,
-        tempfile::NamedTempFile,
+    use super::*;
+    use anyhow::bail;
+    use fastboot::reply::Reply;
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
+    use fidl_fuchsia_developer_ffx::{
+        FastbootError, FastbootMarker, FastbootProxy, RebootListenerMarker, RebootListenerRequest,
+        UploadProgressListenerMarker,
     };
+    use futures::task::{Context as fContext, Poll};
+    use serial_test::serial;
+    use std::{
+        io::{BufWriter, Write},
+        pin::Pin,
+    };
+    use tempfile::NamedTempFile;
 
     struct TestTransport {
         replies: Vec<Reply>,

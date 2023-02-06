@@ -2,29 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    errors::ffx_bail,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_trace_args::{TraceCommand, TraceSubCommand},
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy},
-    fidl_fuchsia_tracing::KnownCategory,
-    fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, ProviderSpec, TraceConfig},
-    futures::future::{BoxFuture, FutureExt},
-    lazy_static::lazy_static,
-    regex::Regex,
-    serde::{Deserialize, Serialize},
-    serde_json::Value,
-    std::collections::{BTreeSet, HashMap},
-    std::future::Future,
-    std::io::{stdin, Stdin},
-    std::path::{Component, PathBuf},
-    std::time::Duration,
-    term_grid::Grid,
-    termion::terminal_size,
+use anyhow::{anyhow, Context, Result};
+use errors::ffx_bail;
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_trace_args::{TraceCommand, TraceSubCommand};
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
+use fidl_fuchsia_tracing::KnownCategory;
+use fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, ProviderSpec, TraceConfig};
+use futures::future::{BoxFuture, FutureExt};
+use lazy_static::lazy_static;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{
+    collections::{BTreeSet, HashMap},
+    future::Future,
+    io::{stdin, Stdin},
+    path::{Component, PathBuf},
+    time::Duration,
 };
+use term_grid::Grid;
+use termion::terminal_size;
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -542,20 +542,19 @@ fn canonical_path(output_path: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        errors::ResultExt as _,
-        ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop},
-        ffx_writer::Format,
-        fidl::endpoints::{ControlHandle, Responder},
-        fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
-        fidl_fuchsia_tracing_controller as tracing_controller,
-        futures::TryStreamExt,
-        pretty_assertions::assert_eq,
-        regex::Regex,
-        serde_json::json,
-        std::matches,
-    };
+    use super::*;
+    use errors::ResultExt as _;
+    use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop};
+    use ffx_writer::Format;
+    use fidl::endpoints::{ControlHandle, Responder};
+    use fidl_fuchsia_developer_ffx as ffx;
+    use fidl_fuchsia_tracing as tracing;
+    use fidl_fuchsia_tracing_controller as tracing_controller;
+    use futures::TryStreamExt;
+    use pretty_assertions::assert_eq;
+    use regex::Regex;
+    use serde_json::json;
+    use std::matches;
 
     #[test]
     fn test_canonical_path_has_root() {

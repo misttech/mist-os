@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, async_trait::async_trait, fidl_fuchsia_developer_ffx as ffx,
-    protocols::prelude::*,
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use fidl_fuchsia_developer_ffx as ffx;
+use protocols::prelude::*;
 
 #[ffx_protocol]
 #[derive(Default)]

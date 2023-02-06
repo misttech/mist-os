@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    errors::ffx_bail,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_target_repository_register_args::RegisterCommand,
-    fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget},
-    fidl_fuchsia_developer_ffx_ext::RepositoryError,
-};
+use anyhow::{Context, Result};
+use errors::ffx_bail;
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_target_repository_register_args::RegisterCommand;
+use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget};
+use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn register_cmd(cmd: RegisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -77,14 +75,12 @@ async fn register(
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        ffx_config::ConfigLevel,
-        fidl_fuchsia_developer_ffx::{
-            RepositoryError, RepositoryRegistryRequest, RepositoryStorageType,
-        },
-        fuchsia_async as fasync,
-        futures::channel::oneshot::{channel, Receiver},
+    use ffx_config::ConfigLevel;
+    use fidl_fuchsia_developer_ffx::{
+        RepositoryError, RepositoryRegistryRequest, RepositoryStorageType,
     };
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot::{channel, Receiver};
 
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";

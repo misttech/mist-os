@@ -2,44 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::tunnel::TunnelManager,
-    async_lock::RwLock,
-    async_trait::async_trait,
-    ffx_daemon_core::events::{EventHandler, Status as EventStatus},
-    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo},
-    ffx_daemon_target::target::Target,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget},
-    fidl_fuchsia_net_ext::SocketAddress,
-    fidl_fuchsia_pkg::RepositoryManagerMarker,
-    fidl_fuchsia_pkg_rewrite::EngineMarker,
-    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule},
-    fuchsia_async as fasync,
-    fuchsia_hyper::{new_https_client, HttpsClient},
-    fuchsia_repo::{
-        manager::RepositoryManager,
-        repo_client::RepoClient,
-        repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
-        server::RepositoryServer,
-    },
-    fuchsia_url::RepositoryUrl,
-    fuchsia_zircon_status::Status,
-    futures::{FutureExt as _, StreamExt as _},
-    itertools::Itertools as _,
-    pkg::config as pkg_config,
-    protocols::prelude::*,
-    std::{
-        collections::HashSet,
-        convert::{TryFrom, TryInto},
-        net::SocketAddr,
-        rc::Rc,
-        sync::Arc,
-        time::Duration,
-    },
-    url::Url,
+use crate::tunnel::TunnelManager;
+use async_lock::RwLock;
+use async_trait::async_trait;
+use ffx_daemon_core::events::{EventHandler, Status as EventStatus};
+use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
+use ffx_daemon_target::target::Target;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
+use fidl_fuchsia_net_ext::SocketAddress;
+use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_rewrite::EngineMarker;
+use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
+use fuchsia_async as fasync;
+use fuchsia_hyper::{new_https_client, HttpsClient};
+use fuchsia_repo::{
+    manager::RepositoryManager,
+    repo_client::RepoClient,
+    repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
+    server::RepositoryServer,
 };
+use fuchsia_url::RepositoryUrl;
+use fuchsia_zircon_status::Status;
+use futures::{FutureExt as _, StreamExt as _};
+use itertools::Itertools as _;
+use pkg::config as pkg_config;
+use protocols::prelude::*;
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+    net::SocketAddr,
+    rc::Rc,
+    sync::Arc,
+    time::Duration,
+};
+use url::Url;
 
 mod metrics;
 mod tunnel;
@@ -1295,32 +1293,30 @@ impl EventHandler<TargetEvent> for TargetEventHandler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        addr::TargetAddr,
-        assert_matches::assert_matches,
-        ffx_config::ConfigLevel,
-        fidl::{self, endpoints::Request},
-        fidl_fuchsia_developer_ffx_ext::RepositoryStorageType,
-        fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_pkg::{
-            MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
-        },
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
-        },
-        futures::TryStreamExt,
-        protocols::testing::FakeDaemonBuilder,
-        std::{
-            cell::RefCell,
-            convert::TryInto,
-            fs,
-            future::Future,
-            net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-            rc::Rc,
-            str::FromStr,
-            sync::{Arc, Mutex},
-        },
+    use super::*;
+    use addr::TargetAddr;
+    use assert_matches::assert_matches;
+    use ffx_config::ConfigLevel;
+    use fidl::{self, endpoints::Request};
+    use fidl_fuchsia_developer_ffx_ext::RepositoryStorageType;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_pkg::{
+        MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
+    };
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
+    };
+    use futures::TryStreamExt;
+    use protocols::testing::FakeDaemonBuilder;
+    use std::{
+        cell::RefCell,
+        convert::TryInto,
+        fs,
+        future::Future,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+        rc::Rc,
+        str::FromStr,
+        sync::{Arc, Mutex},
     };
 
     const REPO_NAME: &str = "some-repo";

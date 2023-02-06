@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, errors::ffx_bail, ffx_core::ffx_plugin,
-    ffx_repository_server_stop_args::StopCommand,
-    fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::RepositoryError, pkg::config as pkg_config,
-};
+use anyhow::Result;
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_repository_server_stop_args::StopCommand;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx_ext::RepositoryError;
+use pkg::config as pkg_config;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn stop(_cmd: StopCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -46,15 +47,13 @@ pub async fn stop(_cmd: StopCommand, repos: RepositoryRegistryProxy) -> Result<(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest},
-        fuchsia_async,
-        futures::channel::oneshot::channel,
-        std::{
-            future::Future,
-            sync::{Arc, Mutex},
-        },
+    use super::*;
+    use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
+    use fuchsia_async;
+    use futures::channel::oneshot::channel;
+    use std::{
+        future::Future,
+        sync::{Arc, Mutex},
     };
 
     lazy_static::lazy_static! {

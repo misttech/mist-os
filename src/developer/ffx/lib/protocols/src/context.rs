@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    async_trait::async_trait,
-    ffx_daemon_core::events::Queue,
-    ffx_daemon_events::{DaemonEvent, TargetEvent},
-    ffx_daemon_target::{target::Target, target_collection::TargetCollection},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_diagnostics as diagnostics,
-    selectors::{self, VerboseError},
-    std::rc::Rc,
-};
+use anyhow::{Context as _, Result};
+use async_trait::async_trait;
+use ffx_daemon_core::events::Queue;
+use ffx_daemon_events::{DaemonEvent, TargetEvent};
+use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_diagnostics as diagnostics;
+use selectors::{self, VerboseError};
+use std::rc::Rc;
 
 #[async_trait(?Send)]
 pub trait DaemonProtocolProvider {

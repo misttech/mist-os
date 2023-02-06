@@ -1,11 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, Result},
-    std::net::SocketAddr,
-    std::process::Command,
-};
+use anyhow::{anyhow, Result};
+use std::{net::SocketAddr, process::Command};
 
 static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
     "-F",
@@ -82,8 +79,9 @@ pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<C
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use itertools::Itertools;
     use std::io::BufRead;
-    use {super::*, itertools::Itertools};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_build_ssh_command_ipv4() {

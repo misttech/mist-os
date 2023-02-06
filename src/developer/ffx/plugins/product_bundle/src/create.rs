@@ -5,18 +5,18 @@
 //! Command to create a Product Bundle Metadata (PBM) file from command
 //! line args pass in through `CreateCommand`.
 
-use {
-    anyhow::Result,
-    errors::ffx_error,
-    ffx_product_bundle_args::{CreateCommand, ProductBundleType},
-    fs_extra::dir::CopyOptions,
-    sdk_metadata::{
-        ElementType, EmuManifest, Envelope, FlashManifest, ImageBundle, Manifests, MetadataValue,
-        PackageBundle, ProductBundleV1,
-    },
-    serde::{Deserialize, Serialize},
-    std::fs::{create_dir_all, File, OpenOptions},
-    std::io::BufReader,
+use anyhow::Result;
+use errors::ffx_error;
+use ffx_product_bundle_args::{CreateCommand, ProductBundleType};
+use fs_extra::dir::CopyOptions;
+use sdk_metadata::{
+    ElementType, EmuManifest, Envelope, FlashManifest, ImageBundle, Manifests, MetadataValue,
+    PackageBundle, ProductBundleV1,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    fs::{create_dir_all, File, OpenOptions},
+    io::BufReader,
 };
 
 /// Description of the build info. This is part of product-bundle metadata.
@@ -113,8 +113,7 @@ fn create_product_bundle_for_flash(flash_manifest: &str) -> Result<FlashManifest
 mod test {
     use super::*;
     use ffx_product_bundle_args::ProductBundleTypes;
-    use std::io::Write;
-    use std::path::PathBuf;
+    use std::{io::Write, path::PathBuf};
 
     fn write_file(path: PathBuf, body: &[u8]) {
         let mut tmp = tempfile::NamedTempFile::new().unwrap();

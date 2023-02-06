@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    addr::TargetAddr,
-    anyhow::Result,
-    errors::FfxError,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_get_ssh_address_args::GetSshAddressCommand,
-    fidl_fuchsia_developer_ffx::{
-        DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
-    },
-    std::io::{stdout, Write},
-    std::net::IpAddr,
-    std::time::Duration,
-    timeout::timeout,
+use addr::TargetAddr;
+use anyhow::Result;
+use errors::FfxError;
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_get_ssh_address_args::GetSshAddressCommand;
+use fidl_fuchsia_developer_ffx::{
+    DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
 };
+use std::{
+    io::{stdout, Write},
+    net::IpAddr,
+    time::Duration,
+};
+use timeout::timeout;
 
 // This constant can be removed, and the implementation can assert that a port
 // always comes from the daemon after some transition period (~May '21).

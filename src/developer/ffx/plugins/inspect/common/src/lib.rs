@@ -2,32 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context},
-    async_trait::async_trait,
-    diagnostics_data::Data,
-    errors::ffx_error,
-    ffx_writer::Writer,
-    fidl,
-    fidl::{endpoints::create_proxy, AsyncSocket},
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, RemoteControlProxy,
-        RemoteDiagnosticsBridgeProxy,
-    },
-    fidl_fuchsia_diagnostics::{
-        ClientSelectorConfiguration::{SelectAll, Selectors},
-        SelectorArgument,
-    },
-    fidl_fuchsia_sys2 as fsys2,
-    futures::AsyncReadExt as _,
-    iquery::{
-        commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
-        types::{Error, ToText},
-    },
-    lazy_static::lazy_static,
-    selectors,
-    std::io::Write,
+use anyhow::{anyhow, Context};
+use async_trait::async_trait;
+use diagnostics_data::Data;
+use errors::ffx_error;
+use ffx_writer::Writer;
+use fidl::{self, endpoints::create_proxy, AsyncSocket};
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, RemoteControlProxy,
+    RemoteDiagnosticsBridgeProxy,
 };
+use fidl_fuchsia_diagnostics::{
+    ClientSelectorConfiguration::{SelectAll, Selectors},
+    SelectorArgument,
+};
+use fidl_fuchsia_sys2 as fsys2;
+use futures::AsyncReadExt as _;
+use iquery::{
+    commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
+    types::{Error, ToText},
+};
+use lazy_static::lazy_static;
+use selectors;
+use std::io::Write;
 
 lazy_static! {
     static ref READDIR_TIMEOUT_SECONDS: u64 = 15;

@@ -2,30 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-    chrono::{Local, TimeZone},
-    diagnostics_data::Timestamp,
-    errors::ffx_error,
-    ffx_log_data::{EventType, LogData, LogEntry},
-    ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline},
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_developer_ffx::{
-        DaemonDiagnosticsStreamParameters, DiagnosticsProxy, DiagnosticsStreamError, LogSession,
-        SessionSpec, StreamMode, TimeBound,
-    },
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorProxy, DiagnosticsData,
-    },
-    fuchsia_async::Timer,
-    futures::AsyncReadExt,
-    std::{
-        iter::Iterator,
-        time::{Duration, SystemTime},
-    },
-    timeout::timeout,
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use chrono::{Local, TimeZone};
+use diagnostics_data::Timestamp;
+use errors::ffx_error;
+use ffx_log_data::{EventType, LogData, LogEntry};
+use ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_developer_ffx::{
+    DaemonDiagnosticsStreamParameters, DiagnosticsProxy, DiagnosticsStreamError, LogSession,
+    SessionSpec, StreamMode, TimeBound,
 };
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorProxy, DiagnosticsData,
+};
+use fuchsia_async::Timer;
+use futures::AsyncReadExt;
+use std::{
+    iter::Iterator,
+    time::{Duration, SystemTime},
+};
+use timeout::timeout;
 
 type ArchiveIteratorResult = Result<LogEntry, ArchiveIteratorError>;
 const PIPELINE_SIZE: usize = 1;
@@ -303,15 +301,13 @@ async fn log_entry_from_socket(socket: fidl::Socket) -> Result<LogEntry> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_data::Timestamp,
-        ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse},
-        fidl_fuchsia_developer_ffx::{DiagnosticsMarker, DiagnosticsRequest},
-        fidl_fuchsia_developer_remotecontrol::ArchiveIteratorError,
-        futures::TryStreamExt,
-        std::sync::Arc,
-    };
+    use super::*;
+    use diagnostics_data::Timestamp;
+    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use fidl_fuchsia_developer_ffx::{DiagnosticsMarker, DiagnosticsRequest};
+    use fidl_fuchsia_developer_remotecontrol::ArchiveIteratorError;
+    use futures::TryStreamExt;
+    use std::sync::Arc;
 
     const DEFAULT_TS_NANOS: u64 = 1615535969000000000;
     const BOOT_TS: u64 = 98765432000000000;

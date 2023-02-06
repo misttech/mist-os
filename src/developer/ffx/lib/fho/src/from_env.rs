@@ -9,10 +9,7 @@ use ffx_fidl::DaemonError;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use selectors::{self, VerboseError};
-use std::future::Future;
-use std::pin::Pin;
-use std::time::Duration;
-use std::{rc::Rc, sync::Arc};
+use std::{future::Future, pin::Pin, rc::Rc, sync::Arc, time::Duration};
 
 use crate::FhoEnvironment;
 

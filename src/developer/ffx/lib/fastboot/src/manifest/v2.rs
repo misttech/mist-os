@@ -104,11 +104,13 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::{
-        cmd::{BootParams, Command},
-        IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR,
+    use crate::{
+        common::{
+            cmd::{BootParams, Command},
+            IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR,
+        },
+        test::{setup, TestResolver},
     };
-    use crate::test::{setup, TestResolver};
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::test::*, anyhow::*, std::time::Duration};
+use crate::test::*;
+use anyhow::*;
+use std::time::Duration;
 
 pub(crate) async fn test_get_ssh_address_timeout() -> Result<()> {
     let isolate = new_isolate("get-ssh-address").await?;

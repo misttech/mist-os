@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_diagnostics::{Selector, StringSelector, TreeSelector},
-    lazy_static::lazy_static,
-    proc_macro2::{Punct, Span, TokenStream},
-    quote::{quote, ToTokens},
-    selectors::{self, TreeSelector as _, VerboseError},
-    std::collections::HashMap,
-    syn::{
-        parse::{Parse, ParseStream},
-        punctuated::Punctuated,
-        spanned::Spanned,
-        token::Comma,
-        AngleBracketedGenericArguments, Error, FnArg, GenericArgument, Ident, ItemFn, ItemStruct,
-        Lit, LitStr, Pat, PatIdent, PatType, PathArguments, PathSegment, Token,
-        Type::Path,
-        TypePath,
-    },
+use fidl_fuchsia_diagnostics::{Selector, StringSelector, TreeSelector};
+use lazy_static::lazy_static;
+use proc_macro2::{Punct, Span, TokenStream};
+use quote::{quote, ToTokens};
+use selectors::{self, TreeSelector as _, VerboseError};
+use std::collections::HashMap;
+use syn::{
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::Comma,
+    AngleBracketedGenericArguments, Error, FnArg, GenericArgument, Ident, ItemFn, ItemStruct, Lit,
+    LitStr, Pat, PatIdent, PatType, PathArguments, PathSegment, Token,
+    Type::Path,
+    TypePath,
 };
 
 const ATTRIBUTE_ON_WRONG_PROXY_TYPE: &str = "The ffx attribute for specifying the output type is \
@@ -877,13 +875,11 @@ impl Parse for ProxyMap {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        std::default::Default,
-        syn::{
-            parse::{Parse, ParseStream},
-            parse2, parse_quote, Attribute, ItemType, ReturnType,
-        },
+    use super::*;
+    use std::default::Default;
+    use syn::{
+        parse::{Parse, ParseStream},
+        parse2, parse_quote, Attribute, ItemType, ReturnType,
     };
 
     const TEST_SELECTOR: &str = "core/my_test_component:expose";

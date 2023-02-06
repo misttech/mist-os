@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_debug::lifecycle::{
-        ActionError, CreateError, DestroyError, ResolveError, StartError,
-    },
-    errors::ffx_error,
-    moniker::AbsoluteMoniker,
+use component_debug::lifecycle::{
+    ActionError, CreateError, DestroyError, ResolveError, StartError,
 };
+use errors::ffx_error;
+use moniker::AbsoluteMoniker;
 
 static LIFECYCLE_ERROR_HELP: &'static str =
     "To learn more, see https://fuchsia.dev/go/components/run-errors";

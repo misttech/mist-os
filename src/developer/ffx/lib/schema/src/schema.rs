@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        ast::{ContainerNode, Node, NodeHolder},
-        de::Deserializer,
-        errors::{Error, Result},
-    },
-    anyhow::anyhow,
-    serde::Deserialize,
-    std::collections::{BTreeMap, BTreeSet},
+use crate::{
+    ast::{ContainerNode, Node, NodeHolder},
+    de::Deserializer,
+    errors::{Error, Result},
 };
+use anyhow::anyhow;
+use serde::Deserialize;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A map from type names to an AST node that represents that type.
 pub type Schema = BTreeMap<String, ContainerNode>;

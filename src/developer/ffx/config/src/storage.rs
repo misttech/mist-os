@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::api::query::SelectMode,
-    crate::environment::Environment,
-    crate::nested::{nested_get, nested_remove, nested_set},
-    crate::ConfigLevel,
-    anyhow::{bail, Context, Result},
-    config_macros::include_default,
-    fuchsia_lockfile::Lockfile,
-    futures::{stream::FuturesUnordered, StreamExt},
-    serde::de::DeserializeOwned,
-    serde_json::{Map, Value},
-    std::{
-        fmt,
-        fs::OpenOptions,
-        io::{BufReader, BufWriter, Read, Write},
-        path::{Path, PathBuf},
-    },
-    tracing::error,
+use crate::{
+    api::query::SelectMode,
+    environment::Environment,
+    nested::{nested_get, nested_remove, nested_set},
+    ConfigLevel,
 };
+use anyhow::{bail, Context, Result};
+use config_macros::include_default;
+use fuchsia_lockfile::Lockfile;
+use futures::{stream::FuturesUnordered, StreamExt};
+use serde::de::DeserializeOwned;
+use serde_json::{Map, Value};
+use std::{
+    fmt,
+    fs::OpenOptions,
+    io::{BufReader, BufWriter, Read, Write},
+    path::{Path, PathBuf},
+};
+use tracing::error;
 
 /// The type of a configuration level's mapping.
 pub type ConfigMap = Map<String, Value>;
@@ -362,8 +362,10 @@ mod test {
     use crate::{nested::RecursiveMap, EnvironmentContext};
     use regex::Regex;
     use serde_json::json;
-    use std::collections::HashMap;
-    use std::io::{BufReader, BufWriter};
+    use std::{
+        collections::HashMap,
+        io::{BufReader, BufWriter},
+    };
 
     const ERROR: &'static [u8] = b"0";
 

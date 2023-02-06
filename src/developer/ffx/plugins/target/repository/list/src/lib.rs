@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    ffx_core::ffx_plugin,
-    ffx_target_repository_list_args::ListCommand,
-    fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryStorageType},
-    prettytable::{cell, row, Table},
-    std::{
-        collections::HashMap,
-        io::{stdout, Write},
-    },
+use anyhow::{Context, Result};
+use ffx_core::ffx_plugin;
+use ffx_target_repository_list_args::ListCommand;
+use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryStorageType};
+use prettytable::{cell, row, Table};
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
 };
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
@@ -78,13 +76,11 @@ async fn list_impl<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        fidl_fuchsia_developer_ffx::{
-            RepositoryRegistryRequest, RepositoryTarget, RepositoryTargetsIteratorRequest,
-        },
-        fuchsia_async as fasync,
-        futures::StreamExt,
+    use fidl_fuchsia_developer_ffx::{
+        RepositoryRegistryRequest, RepositoryTarget, RepositoryTargetsIteratorRequest,
     };
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     #[fasync::run_singlethreaded(test)]
     async fn list() {

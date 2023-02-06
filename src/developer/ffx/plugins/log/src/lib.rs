@@ -2,28 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error, Result},
-    async_trait::async_trait,
-    blocking::Unblock,
-    chrono::{Local, TimeZone, Utc},
-    diagnostics_data::{LogsData, Severity, Timestamp},
-    errors::{ffx_bail, ffx_error},
-    ffx_config::get,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand},
-    ffx_log_data::{EventType, LogData, LogEntry},
-    ffx_log_frontend::{exec_log_cmd, LogCommandParameters, LogFormatter},
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{DiagnosticsProxy, StreamMode, TimeBound},
-    fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy},
-    fidl_fuchsia_diagnostics::LogSettingsProxy,
-    futures::{AsyncWrite, AsyncWriteExt},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    std::{fs, iter::Iterator, time::SystemTime},
-    termion::{color, style},
-};
+use anyhow::{anyhow, Context, Error, Result};
+use async_trait::async_trait;
+use blocking::Unblock;
+use chrono::{Local, TimeZone, Utc};
+use diagnostics_data::{LogsData, Severity, Timestamp};
+use errors::{ffx_bail, ffx_error};
+use ffx_config::{get, keys::TARGET_DEFAULT_KEY};
+use ffx_core::ffx_plugin;
+use ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand};
+use ffx_log_data::{EventType, LogData, LogEntry};
+use ffx_log_frontend::{exec_log_cmd, LogCommandParameters, LogFormatter};
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{DiagnosticsProxy, StreamMode, TimeBound};
+use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
+use fidl_fuchsia_diagnostics::LogSettingsProxy;
+use futures::{AsyncWrite, AsyncWriteExt};
+use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+use std::{fs, iter::Iterator, time::SystemTime};
+use termion::{color, style};
 
 mod spam_filter;
 
@@ -715,25 +712,23 @@ async fn log_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_data::{LogsDataBuilder, LogsField, LogsProperty, Timestamp},
-        errors::ResultExt as _,
-        ffx_log_args::DumpCommand,
-        ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse},
-        fidl_fuchsia_developer_ffx::{
-            DaemonDiagnosticsStreamParameters, DiagnosticsRequest, LogSession, SessionSpec,
-        },
-        fidl_fuchsia_developer_remotecontrol::{
-            ArchiveIteratorError, IdentifyHostResponse, RemoteControlRequest,
-        },
-        fidl_fuchsia_diagnostics::{
-            Interest, LogInterestSelector, LogSettingsRequest, Severity as FidlSeverity,
-        },
-        selectors::{parse_component_selector, VerboseError},
-        std::{io::Write, sync::Arc, time::Duration},
-        tempfile::NamedTempFile,
+    use super::*;
+    use diagnostics_data::{LogsDataBuilder, LogsField, LogsProperty, Timestamp};
+    use errors::ResultExt as _;
+    use ffx_log_args::DumpCommand;
+    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use fidl_fuchsia_developer_ffx::{
+        DaemonDiagnosticsStreamParameters, DiagnosticsRequest, LogSession, SessionSpec,
     };
+    use fidl_fuchsia_developer_remotecontrol::{
+        ArchiveIteratorError, IdentifyHostResponse, RemoteControlRequest,
+    };
+    use fidl_fuchsia_diagnostics::{
+        Interest, LogInterestSelector, LogSettingsRequest, Severity as FidlSeverity,
+    };
+    use selectors::{parse_component_selector, VerboseError};
+    use std::{io::Write, sync::Arc, time::Duration};
+    use tempfile::NamedTempFile;
 
     const DEFAULT_TS_NANOS: u64 = 1615535969000000000;
     const BOOT_TS: u64 = 98765432000000000;

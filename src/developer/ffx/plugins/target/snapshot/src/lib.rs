@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    chrono::{Datelike, Local, Timelike},
-    ffx_core::ffx_plugin,
-    ffx_snapshot_args::SnapshotCommand,
-    fidl_fuchsia_feedback::{
-        Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
-    },
-    fidl_fuchsia_io as fio,
-    futures::stream::{FuturesOrdered, StreamExt},
-    std::convert::{TryFrom, TryInto},
-    std::fs,
-    std::io::Write,
-    std::path::{Path, PathBuf},
-    std::time::Duration,
+use anyhow::{anyhow, bail, Context, Result};
+use chrono::{Datelike, Local, Timelike};
+use ffx_core::ffx_plugin;
+use ffx_snapshot_args::SnapshotCommand;
+use fidl_fuchsia_feedback::{
+    Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
+};
+use fidl_fuchsia_io as fio;
+use futures::stream::{FuturesOrdered, StreamExt};
+use std::{
+    convert::{TryFrom, TryInto},
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+    time::Duration,
 };
 
 // read_data reads all of the contents of the given file from the current seek
@@ -226,12 +226,10 @@ fn default_output_dir() -> PathBuf {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot},
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot};
+    use futures::TryStreamExt;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {

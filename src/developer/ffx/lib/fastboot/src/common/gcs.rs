@@ -6,17 +6,14 @@
 //! temporary directory for the flashing algorithm to use. Files are only downloaded on demand so
 //! all files from a flashing manifest are not necessarily downloaded - only the ones needed.
 
-use {
-    crate::common::{done_time, file::FileResolver},
-    anyhow::{anyhow, bail, Context, Result},
-    async_trait::async_trait,
-    chrono::Utc,
-    gcs::{auth::new_access_token, client::Client},
-    sdk_metadata::ProductBundleV1,
-    std::io::Write,
-    std::path::Path,
-    tempfile::{tempdir, TempDir},
-};
+use crate::common::{done_time, file::FileResolver};
+use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
+use chrono::Utc;
+use gcs::{auth::new_access_token, client::Client};
+use sdk_metadata::ProductBundleV1;
+use std::{io::Write, path::Path};
+use tempfile::{tempdir, TempDir};
 
 // Path resolver for GCS files.
 pub struct GcsResolver {

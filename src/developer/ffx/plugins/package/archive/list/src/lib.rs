@@ -85,8 +85,7 @@ mod test {
     use super::*;
     use ffx_package_archive_utils::{test_utils::create_mockreader, MockFarListReader};
     use ffx_writer::Format;
-    use std::collections::HashMap;
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
     #[test]
     fn test_list_empty() -> Result<()> {

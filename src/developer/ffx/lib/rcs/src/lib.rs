@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _, Result},
-    errors,
-    fidl::prelude::*,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_remotecontrol::{
-        ConnectError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
-    },
-    fidl_fuchsia_overnet_protocol::NodeId,
-    futures::StreamExt,
-    futures::TryFutureExt,
-    hoist::{Hoist, OvernetInstance},
-    selectors::VerboseError,
-    std::hash::{Hash, Hasher},
-    std::time::Duration,
-    timeout::timeout,
-    timeout::TimeoutError,
+use anyhow::{anyhow, Context as _, Result};
+use errors;
+use fidl::prelude::*;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_remotecontrol::{
+    ConnectError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
 };
+use fidl_fuchsia_overnet_protocol::NodeId;
+use futures::{StreamExt, TryFutureExt};
+use hoist::{Hoist, OvernetInstance};
+use selectors::VerboseError;
+use std::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
+use timeout::{timeout, TimeoutError};
 
 #[derive(Debug, Clone)]
 pub struct RcsConnection {

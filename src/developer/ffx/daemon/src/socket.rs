@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Result};
-use serde::{Serialize, Deserialize};
-use std::fmt::Display;
-use std::path::PathBuf;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::{fmt::Display, path::PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 enum SocketStatus {
@@ -16,10 +15,14 @@ enum SocketStatus {
 impl Display for SocketStatus {
     fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         use SocketStatus::*;
-        write!(out, "{}", match self {
-            NotPresent => "Not Present",
-            Present => "Present",
-        })
+        write!(
+            out,
+            "{}",
+            match self {
+                NotPresent => "Not Present",
+                Present => "Present",
+            }
+        )
     }
 }
 
@@ -33,12 +36,17 @@ enum PidStatus {
 impl Display for PidStatus {
     fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         use PidStatus::*;
-        write!(out, "{}", match self {
-            NotPresent => "Not Present".to_owned(),
-            NotRunning { pid: Some(pid) } => format!("Present, but not running (last pid: {pid})"),
-            NotRunning { pid: None } => format!("Present, but not valid"),
-            Running { pid } => format!("Present and running (pid: {pid}"),
-        })
+        write!(
+            out,
+            "{}",
+            match self {
+                NotPresent => "Not Present".to_owned(),
+                NotRunning { pid: Some(pid) } =>
+                    format!("Present, but not running (last pid: {pid})"),
+                NotRunning { pid: None } => format!("Present, but not valid"),
+                Running { pid } => format!("Present and running (pid: {pid}"),
+            }
+        )
     }
 }
 
@@ -86,7 +94,9 @@ impl SocketDetails {
         let pid_path = socket_path.with_extension("pid");
 
         // ignore errors trying to read this and just treat them as "no pid"
-        let pid = std::fs::File::open(&pid_path).ok().and_then(|pid_file| serde_json::from_reader(pid_file).ok());
+        let pid = std::fs::File::open(&pid_path)
+            .ok()
+            .and_then(|pid_file| serde_json::from_reader(pid_file).ok());
         let pid_running = pid.and_then(check_if_running);
 
         let socket_status = match socket_path.exists() {

@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::errors::ParseError;
-use crate::types::{FfxFlag, FromEnvAttributes, NamedField, NamedFieldTy};
+use crate::{
+    errors::ParseError,
+    types::{FfxFlag, FromEnvAttributes, NamedField, NamedFieldTy},
+};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::spanned::Spanned;
-use syn::{self, ExprCall};
+use syn::{self, spanned::Spanned, ExprCall};
 
 /// Creates an assert to ensure that a type implements TryFromEnv.
 struct TryFromEnvTypeAssertion<'a> {

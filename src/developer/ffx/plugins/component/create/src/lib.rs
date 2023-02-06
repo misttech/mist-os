@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, component_debug::cli::create_cmd, errors::FfxError,
-    ffx_component::rcs::connect_to_lifecycle_controller,
-    ffx_component_create_args::CreateComponentCommand, ffx_core::ffx_plugin,
-    fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::Result;
+use component_debug::cli::create_cmd;
+use errors::FfxError;
+use ffx_component::rcs::connect_to_lifecycle_controller;
+use ffx_component_create_args::CreateComponentCommand;
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[ffx_plugin]
 pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: CreateComponentCommand) -> Result<()> {

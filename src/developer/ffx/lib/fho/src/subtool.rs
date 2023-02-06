@@ -10,10 +10,9 @@ use ffx_command::{
 };
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use std::os::unix::process::ExitStatusExt;
-use std::process::ExitStatus;
-use std::sync::Arc;
-use std::{fs::File, path::PathBuf};
+use std::{
+    fs::File, os::unix::process::ExitStatusExt, path::PathBuf, process::ExitStatus, sync::Arc,
+};
 
 use crate::{FhoToolMetadata, TryFromEnv};
 
@@ -192,10 +191,7 @@ mod tests {
     use super::*;
     // This keeps the macros from having compiler errors.
     use crate as fho;
-    use crate::testing::*;
-    use crate::FhoDetails;
-    use crate::Only;
-    use crate::SimpleWriter;
+    use crate::{testing::*, FhoDetails, Only, SimpleWriter};
     use async_trait::async_trait;
     use fho_macro::FfxTool;
 

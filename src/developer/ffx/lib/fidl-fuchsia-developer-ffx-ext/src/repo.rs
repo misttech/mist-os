@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    camino::Utf8PathBuf,
-    fidl_fuchsia_developer_ffx as fidl,
-    serde::{Deserialize, Serialize},
-    std::convert::{TryFrom, TryInto},
-    thiserror::Error,
-};
+use camino::Utf8PathBuf;
+use fidl_fuchsia_developer_ffx as fidl;
+use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
+use thiserror::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

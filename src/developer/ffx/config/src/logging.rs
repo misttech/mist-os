@@ -2,25 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    rand::Rng,
-    std::{
-        fs::{create_dir_all, remove_file, rename, File, OpenOptions},
-        io::{ErrorKind, Read, Seek, SeekFrom, Write},
-        path::PathBuf,
-        str::FromStr,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Mutex,
-        },
+use anyhow::{Context as _, Result};
+use rand::Rng;
+use std::{
+    fs::{create_dir_all, remove_file, rename, File, OpenOptions},
+    io::{ErrorKind, Read, Seek, SeekFrom, Write},
+    path::PathBuf,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
     },
-    tracing::Metadata,
-    tracing_subscriber::{
-        filter::{self, LevelFilter},
-        prelude::*,
-        Layer,
-    },
+};
+use tracing::Metadata;
+use tracing_subscriber::{
+    filter::{self, LevelFilter},
+    prelude::*,
+    Layer,
 };
 
 const LOG_DIR: &str = "log.dir";
@@ -272,8 +270,7 @@ where
         event: &tracing::Event<'_>,
     ) -> std::fmt::Result {
         use tracing_log::NormalizeEvent;
-        use tracing_subscriber::fmt::time::FormatTime;
-        use tracing_subscriber::fmt::FormatFields;
+        use tracing_subscriber::fmt::{time::FormatTime, FormatFields};
 
         let normalized_meta = event.normalized_metadata();
         let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());

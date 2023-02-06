@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        ast::{ContainerNode, ContainerNodeEntry, Named, Node, NodeHolder, VariantNode},
-        errors::{Error, Result},
-        schema::Generator,
-    },
-    anyhow::anyhow,
-    serde::de::{DeserializeSeed, IntoDeserializer, Visitor},
-    std::collections::BTreeMap,
+use crate::{
+    ast::{ContainerNode, ContainerNodeEntry, Named, Node, NodeHolder, VariantNode},
+    errors::{Error, Result},
+    schema::Generator,
 };
+use anyhow::anyhow;
+use serde::de::{DeserializeSeed, IntoDeserializer, Visitor};
+use std::collections::BTreeMap;
 
 /// A serde Deserializer that uses the deserialize mechanism to resolve type information into the
 /// schema inside the generator. As a by product, the node will resolve to a value of the desired

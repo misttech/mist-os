@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIp, TargetIpPort},
-    fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address},
-    netext::{scope_id_to_name, IsLocalAddr},
-    std::cmp::Ordering,
-    std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    std::str::FromStr,
+use anyhow::Result;
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIp, TargetIpPort};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
+use netext::{scope_id_to_name, IsLocalAddr};
+use std::{
+    cmp::Ordering,
+    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    str::FromStr,
 };
 
 #[derive(Hash, Clone, Debug, Copy, Eq, PartialEq)]

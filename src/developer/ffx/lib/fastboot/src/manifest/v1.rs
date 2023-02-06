@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        boot::boot,
-        common::{
-            cmd::{ManifestParams, OemFile},
-            file::FileResolver,
-            flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait,
-            Product as ProductTrait, Unlock, MISSING_PRODUCT, UNLOCK_ERR,
-        },
+use crate::{
+    boot::boot,
+    common::{
+        cmd::{ManifestParams, OemFile},
+        file::FileResolver,
+        flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait,
+        Product as ProductTrait, Unlock, MISSING_PRODUCT, UNLOCK_ERR,
     },
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::ffx_bail,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    serde::{Deserialize, Serialize},
-    std::io::Write,
 };
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::ffx_bail;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use serde::{Deserialize, Serialize};
+use std::io::Write;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Product {
@@ -152,8 +150,10 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR};
-    use crate::test::{setup, TestResolver};
+    use crate::{
+        common::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR},
+        test::{setup, TestResolver},
+    };
     use regex::Regex;
     use serde_json::{from_str, json};
     use std::path::PathBuf;

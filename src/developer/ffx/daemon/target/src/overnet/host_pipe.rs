@@ -2,29 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::ssh::build_ssh_command,
-    crate::target::Target,
-    crate::RETRY_DELAY,
-    anyhow::{anyhow, Context, Result},
-    async_io::Async,
-    ffx_daemon_core::events,
-    ffx_daemon_events::{HostPipeErr, TargetEvent},
-    fuchsia_async::{unblock, Task, Timer},
-    futures::io::{copy_buf, AsyncBufRead, BufReader},
-    futures_lite::io::AsyncBufReadExt,
-    futures_lite::stream::StreamExt,
-    hoist::OvernetInstance,
-    std::cell::RefCell,
-    std::collections::VecDeque,
-    std::fmt,
-    std::future::Future,
-    std::io,
-    std::net::SocketAddr,
-    std::process::{Child, Stdio},
-    std::rc::Rc,
-    std::rc::Weak,
-    std::time::Duration,
+use super::ssh::build_ssh_command;
+use crate::{target::Target, RETRY_DELAY};
+use anyhow::{anyhow, Context, Result};
+use async_io::Async;
+use ffx_daemon_core::events;
+use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use fuchsia_async::{unblock, Task, Timer};
+use futures::io::{copy_buf, AsyncBufRead, BufReader};
+use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
+use hoist::OvernetInstance;
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    fmt,
+    future::Future,
+    io,
+    net::SocketAddr,
+    process::{Child, Stdio},
+    rc::{Rc, Weak},
+    time::Duration,
 };
 
 const BUFFER_SIZE: usize = 65536;
@@ -410,8 +407,7 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use assert_matches::assert_matches;
-    use std::rc::Rc;
-    use std::str::FromStr;
+    use std::{rc::Rc, str::FromStr};
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";
 

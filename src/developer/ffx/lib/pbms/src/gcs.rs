@@ -4,18 +4,16 @@
 
 //! Access utilities for gcs metadata.
 
-use {
-    crate::AuthFlowChoice,
-    anyhow::{bail, Context, Result},
-    gcs::{
-        auth,
-        client::{Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult},
-        error::GcsError,
-        gs_url::split_gs_url,
-    },
-    std::path::Path,
-    structured_ui,
+use crate::AuthFlowChoice;
+use anyhow::{bail, Context, Result};
+use gcs::{
+    auth,
+    client::{Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult},
+    error::GcsError,
+    gs_url::split_gs_url,
 };
+use std::path::Path;
+use structured_ui;
 
 /// Return true if the blob is available.
 ///

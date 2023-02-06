@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    ffx_scrutiny_verify_args::component_resolvers::Command,
-    scrutiny_config::{ConfigBuilder, ModelConfig},
-    scrutiny_frontend::{command_builder::CommandBuilder, launcher},
-    serde::{Deserialize, Serialize},
-    std::{collections::HashSet, fs, path::PathBuf},
-};
+use anyhow::{anyhow, Context, Result};
+use ffx_scrutiny_verify_args::component_resolvers::Command;
+use scrutiny_config::{ConfigBuilder, ModelConfig};
+use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, fs, path::PathBuf};
 
 type NodePath = String;
 
@@ -177,7 +175,9 @@ Verification Errors:
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, std::collections::HashMap};
+    use super::*;
+    use assert_matches::assert_matches;
+    use std::collections::HashMap;
 
     #[derive(Debug)]
     struct MockQueryComponentResolvers {

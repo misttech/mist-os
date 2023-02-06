@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    ffx_core_impl::ProxyMap,
-    proc_macro::TokenStream,
-    syn::{parse_macro_input, ItemFn, ItemStruct},
-};
+use ffx_core_impl::ProxyMap;
+use proc_macro::TokenStream;
+use syn::{parse_macro_input, ItemFn, ItemStruct};
 
 #[proc_macro_attribute]
 pub fn ffx_command(_attr: TokenStream, item: TokenStream) -> TokenStream {

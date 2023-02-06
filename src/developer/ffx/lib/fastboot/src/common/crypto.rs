@@ -2,30 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{
-        done_time, file::FileResolver, handle_upload_progress_for_staging, is_locked,
-        map_fidl_error,
-    },
-    anyhow::{anyhow, bail, Result},
-    async_fs::OpenOptions,
-    byteorder::{ByteOrder, LittleEndian},
-    chrono::Utc,
-    errors::{ffx_bail, ffx_error},
-    fidl::endpoints::create_endpoints,
-    fidl_fuchsia_developer_ffx::{FastbootProxy, UploadProgressListenerMarker},
-    futures::{prelude::*, try_join},
-    ring::{
-        rand,
-        signature::{RsaKeyPair, RSA_PKCS1_SHA512},
-    },
-    std::fs::File,
-    std::io::copy,
-    std::io::Write,
-    std::path::{Path, PathBuf},
-    tempfile::tempdir,
-    zip::read::ZipArchive,
+use crate::common::{
+    done_time, file::FileResolver, handle_upload_progress_for_staging, is_locked, map_fidl_error,
 };
+use anyhow::{anyhow, bail, Result};
+use async_fs::OpenOptions;
+use byteorder::{ByteOrder, LittleEndian};
+use chrono::Utc;
+use errors::{ffx_bail, ffx_error};
+use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_developer_ffx::{FastbootProxy, UploadProgressListenerMarker};
+use futures::{prelude::*, try_join};
+use ring::{
+    rand,
+    signature::{RsaKeyPair, RSA_PKCS1_SHA512},
+};
+use std::{
+    fs::File,
+    io::{copy, Write},
+    path::{Path, PathBuf},
+};
+use tempfile::tempdir;
+use zip::read::ZipArchive;
 
 const UNLOCK_CHALLENGE: &str = "vx-get-unlock-challenge";
 

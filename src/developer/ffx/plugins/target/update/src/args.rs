@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, ffx_core::ffx_command};
+use argh::FromArgs;
+use ffx_core::ffx_command;
 
 /// Manage updates: query/set update channel, kick off a check for update, force
 /// an update (to any point, i.e. a downgrade can be requested).

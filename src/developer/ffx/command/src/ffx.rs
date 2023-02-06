@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Error, Result};
-use crate::{FfxContext, MetricsSession};
+use crate::{Error, FfxContext, MetricsSession, Result};
 use anyhow::Context;
 use argh::FromArgs;
 use errors::ffx_error;
-use ffx_config::EnvironmentContext;
-use ffx_config::FfxConfigBacked;
+use ffx_config::{EnvironmentContext, FfxConfigBacked};
 use ffx_daemon_proxy::Injection;
 use ffx_target::TargetKind;
 use ffx_writer::Format;
 use hoist::Hoist;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 pub use ffx_daemon_proxy::DaemonVersionCheck;
 

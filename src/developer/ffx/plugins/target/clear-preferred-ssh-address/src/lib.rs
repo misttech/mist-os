@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    ffx_core::ffx_plugin,
-    ffx_target_clear_preferred_ssh_address_args::ClearPreferredSshAddressCommand,
-    fidl_fuchsia_developer_ffx as ffx,
-};
+use anyhow::{Context as _, Result};
+use ffx_core::ffx_plugin;
+use ffx_target_clear_preferred_ssh_address_args::ClearPreferredSshAddressCommand;
+use fidl_fuchsia_developer_ffx as ffx;
 
 #[ffx_plugin()]
 pub async fn clear_preferred_ssh_address(

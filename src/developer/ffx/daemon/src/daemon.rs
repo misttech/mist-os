@@ -13,10 +13,12 @@ use ffx_daemon_events::{
     DaemonEvent, TargetConnectionState, TargetEvent, TargetInfo, WireTrafficType,
 };
 use ffx_daemon_protocols::create_protocol_register_map;
-use ffx_daemon_target::manual_targets::{Config, ManualTargets};
-use ffx_daemon_target::target::Target;
-use ffx_daemon_target::target_collection::TargetCollection;
-use ffx_daemon_target::zedboot::zedboot_discovery;
+use ffx_daemon_target::{
+    manual_targets::{Config, ManualTargets},
+    target::Target,
+    target_collection::TargetCollection,
+    zedboot::zedboot_discovery,
+};
 use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::{endpoints::ClientEnd, prelude::*};
@@ -25,8 +27,7 @@ use fidl_fuchsia_developer_ffx::{
     RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-use fidl_fuchsia_overnet::Peer;
-use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
+use fidl_fuchsia_overnet::{Peer, ServiceProviderRequest, ServiceProviderRequestStream};
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::{Task, TimeoutExt, Timer};
 use futures::{
@@ -38,13 +39,15 @@ use hoist::{Hoist, OvernetInstance};
 use notify::{RecursiveMode, Watcher};
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
 use rcs::RcsConnection;
-use std::cell::Cell;
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::{
+    cell::Cell,
+    collections::HashSet,
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    path::PathBuf,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 #[cfg(not(target_os = "macos"))]
 use notify::RecommendedWatcher;
@@ -835,22 +838,17 @@ impl Hash for PeerSetElement {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        addr::TargetAddr,
-        assert_matches::assert_matches,
-        chrono::Utc,
-        ffx_daemon_target::target::TargetAddrEntry,
-        ffx_daemon_target::target::TargetAddrType,
-        fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy},
-        fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
-        fidl_fuchsia_overnet_protocol::PeerDescription,
-        fuchsia_async::Task,
-        std::cell::RefCell,
-        std::collections::BTreeSet,
-        std::iter::FromIterator,
-        std::str::FromStr,
-        std::time::SystemTime,
+    use super::*;
+    use addr::TargetAddr;
+    use assert_matches::assert_matches;
+    use chrono::Utc;
+    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType};
+    use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
+    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+    use fidl_fuchsia_overnet_protocol::PeerDescription;
+    use fuchsia_async::Task;
+    use std::{
+        cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::SystemTime,
     };
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {

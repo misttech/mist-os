@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    async_net::TcpListener,
-    async_trait::async_trait,
-    ffx_config::ConfigLevel,
-    fidl, fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_developer_remotecontrol as rcs,
-    fidl_fuchsia_net::SocketAddress,
-    fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
-    futures::{future::join, AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _},
-    protocols::prelude::*,
-    serde::{Deserialize, Serialize},
-    serde_json::{self, Value},
-    std::sync::Arc,
-};
+use anyhow::{Context as _, Result};
+use async_net::TcpListener;
+use async_trait::async_trait;
+use ffx_config::ConfigLevel;
+use fidl;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_remotecontrol as rcs;
+use fidl_fuchsia_net::SocketAddress;
+use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
+use futures::{future::join, AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
+use protocols::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_json::{self, Value};
+use std::sync::Arc;
 
 #[ffx_protocol]
 #[derive(Default)]
@@ -328,7 +328,8 @@ impl FidlProtocol for Forward {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {fidl_fuchsia_diagnostics as diagnostics, protocols::testing::FakeDaemonBuilder};
+    use fidl_fuchsia_diagnostics as diagnostics;
+    use protocols::testing::FakeDaemonBuilder;
 
     #[derive(Default, Clone)]
     struct TestDaemon;

@@ -2,29 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        filter::filter_data_to_lines,
-        screen::{Line, Screen},
-        terminal::{Terminal, Termion},
-    },
-    anyhow::{Context, Result},
-    diagnostics_data::{Inspect, InspectData},
-    ffx_core::ffx_plugin,
-    ffx_inspect_apply_selectors_args::ApplySelectorsCommand,
-    ffx_inspect_common::DiagnosticsBridgeProvider,
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy},
-    iquery::commands::DiagnosticsProvider,
-    std::{
-        fs::read_to_string,
-        io::{stdin, stdout},
-        path::Path,
-    },
-    termion::{
-        event::{Event, Key},
-        input::TermRead,
-        raw::IntoRawMode,
-    },
+use crate::{
+    filter::filter_data_to_lines,
+    screen::{Line, Screen},
+    terminal::{Terminal, Termion},
+};
+use anyhow::{Context, Result};
+use diagnostics_data::{Inspect, InspectData};
+use ffx_core::ffx_plugin;
+use ffx_inspect_apply_selectors_args::ApplySelectorsCommand;
+use ffx_inspect_common::DiagnosticsBridgeProvider;
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use iquery::commands::DiagnosticsProvider;
+use std::{
+    fs::read_to_string,
+    io::{stdin, stdout},
+    path::Path,
+};
+use termion::{
+    event::{Event, Key},
+    input::TermRead,
+    raw::IntoRawMode,
 };
 
 mod filter;

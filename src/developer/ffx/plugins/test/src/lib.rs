@@ -5,26 +5,24 @@
 mod connector;
 mod suite_definition;
 
-use {
-    crate::{connector::RunConnector, suite_definition::TestParamsOptions},
-    anyhow::{anyhow, format_err, Context, Result},
-    either::Either,
-    errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxError},
-    ffx_core::ffx_plugin,
-    ffx_test_args::{ListCommand, RunCommand, TestCommand, TestSubCommand},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_developer_remotecontrol as fremotecontrol,
-    fidl_fuchsia_test_manager as ftest_manager,
-    futures::FutureExt,
-    lazy_static::lazy_static,
-    signal_hook::{
-        consts::signal::{SIGINT, SIGTERM},
-        iterator::Signals,
-    },
-    std::{
-        fmt::Debug,
-        io::{stdout, Write},
-    },
+use crate::{connector::RunConnector, suite_definition::TestParamsOptions};
+use anyhow::{anyhow, format_err, Context, Result};
+use either::Either;
+use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxError};
+use ffx_core::ffx_plugin;
+use ffx_test_args::{ListCommand, RunCommand, TestCommand, TestSubCommand};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
+use fidl_fuchsia_test_manager as ftest_manager;
+use futures::FutureExt;
+use lazy_static::lazy_static;
+use signal_hook::{
+    consts::signal::{SIGINT, SIGTERM},
+    iterator::Signals,
+};
+use std::{
+    fmt::Debug,
+    io::{stdout, Write},
 };
 
 lazy_static! {

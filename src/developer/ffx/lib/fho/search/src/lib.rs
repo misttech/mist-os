@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ffx_command::{FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
-use ffx_command::{FfxContext, MetricsSession, Result};
+use ffx_command::{
+    FfxCommandLine, FfxContext, FfxToolInfo, FfxToolSource, MetricsSession, Result, ToolRunner,
+    ToolSuite,
+};
 use ffx_config::{EnvironmentContext, Sdk};
 use fho_metadata::FhoToolMetadata;
 

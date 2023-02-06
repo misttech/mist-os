@@ -5,28 +5,27 @@ use mdns::protocol::Type;
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::MdnsProtocolInner,
-    anyhow::{Context as _, Result},
-    async_io::Async,
-    async_lock::Mutex,
-    async_net::UdpSocket,
-    ffx_config::get,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address},
-    fuchsia_async::{Task, Timer},
-    futures::FutureExt,
-    mdns::protocol as dns,
-    netext::{get_mcast_interfaces, IsLocalAddr},
-    packet::{InnerPacketBuilder, ParseBuffer},
-    std::collections::HashMap,
-    std::collections::HashSet,
-    std::fmt::Write,
-    std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    std::rc::{Rc, Weak},
-    std::time::Duration,
-    zerocopy::ByteSlice,
+use crate::MdnsProtocolInner;
+use anyhow::{Context as _, Result};
+use async_io::Async;
+use async_lock::Mutex;
+use async_net::UdpSocket;
+use ffx_config::get;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
+use fuchsia_async::{Task, Timer};
+use futures::FutureExt;
+use mdns::protocol as dns;
+use netext::{get_mcast_interfaces, IsLocalAddr};
+use packet::{InnerPacketBuilder, ParseBuffer};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    rc::{Rc, Weak},
+    time::Duration,
 };
+use zerocopy::ByteSlice;
 
 const MDNS_MCAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
 const MDNS_MCAST_V6: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 0x00fb);

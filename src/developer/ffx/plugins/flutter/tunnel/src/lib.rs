@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    diagnostics_data::Inspect,
-    errors::{ffx_error, FfxError},
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_flutter_tunnel_args::TunnelCommand,
-    ffx_flutter_tunnel_ctrlc::wait_for_kill,
-    ffx_inspect_common::DiagnosticsBridgeProvider,
-    fidl_fuchsia_developer_ffx::{DaemonError, TargetAddrInfo, TargetProxy},
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy},
-    fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address},
-    netext::scope_id_to_name,
-    std::net::{IpAddr, Ipv4Addr, SocketAddr},
-    std::process::Command,
-    std::time::Duration,
-    timeout::timeout,
+use anyhow::{anyhow, Context, Result};
+use diagnostics_data::Inspect;
+use errors::{ffx_error, FfxError};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_flutter_tunnel_args::TunnelCommand;
+use ffx_flutter_tunnel_ctrlc::wait_for_kill;
+use ffx_inspect_common::DiagnosticsBridgeProvider;
+use fidl_fuchsia_developer_ffx::{DaemonError, TargetAddrInfo, TargetProxy};
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
+use netext::scope_id_to_name;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    process::Command,
+    time::Duration,
 };
+use timeout::timeout;
 
 pub use port_picker::{pick_unused_port, Port};
 

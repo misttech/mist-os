@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    diagnostics_data::{LogsData, Timestamp},
-    serde::{
-        de::{self as de, Error},
-        Deserialize, Serialize,
-    },
-    std::time::SystemTime,
+use anyhow::{Context, Result};
+use diagnostics_data::{LogsData, Timestamp};
+use serde::{
+    de::{self as de, Error},
+    Deserialize, Serialize,
 };
+use std::time::SystemTime;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum EventType {
@@ -111,10 +109,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity},
-    };
+    use super::*;
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity};
 
     const LOG_ENTRY: &str = r#"
     {

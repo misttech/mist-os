@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{crypto::unlock_device, file::FileResolver, is_locked, MISSING_CREDENTIALS},
-    anyhow::Result,
-    errors::ffx_bail,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    std::io::Write,
-};
+use crate::common::{crypto::unlock_device, file::FileResolver, is_locked, MISSING_CREDENTIALS};
+use anyhow::Result;
+use errors::ffx_bail;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use std::io::Write;
 
 const UNLOCKED: &str = "Target is now unlocked.";
 const UNLOCKED_ERR: &str = "Target is already unlocked.";
@@ -38,9 +36,10 @@ pub async fn unlock<W: Write, F: FileResolver + Sync>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::file::EmptyResolver;
-    use crate::common::LOCKED_VAR;
-    use crate::test::setup;
+    use crate::{
+        common::{file::EmptyResolver, LOCKED_VAR},
+        test::setup,
+    };
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_unlocked_device_throws_err() -> Result<()> {

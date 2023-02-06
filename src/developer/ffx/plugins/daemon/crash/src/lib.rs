@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, ffx_core::ffx_plugin, ffx_crash_args::CrashCommand,
-    fidl_fuchsia_developer_ffx::TestingProxy,
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_crash_args::CrashCommand;
+use fidl_fuchsia_developer_ffx::TestingProxy;
 
 #[ffx_plugin(TestingProxy = "daemon::protocol")]
 pub async fn crash(testing_proxy: TestingProxy, _cmd: CrashCommand) -> Result<()> {
@@ -15,11 +15,9 @@ pub async fn crash(testing_proxy: TestingProxy, _cmd: CrashCommand) -> Result<()
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl_fuchsia_developer_ffx::TestingRequest,
-        std::sync::atomic::{AtomicBool, Ordering},
-    };
+    use super::*;
+    use fidl_fuchsia_developer_ffx::TestingRequest;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_crash_with_no_text() {

@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    blocking::Unblock,
-    ffx_component_run_legacy_args::RunComponentCommand,
-    ffx_core::ffx_plugin,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_sys::{
-        ComponentControllerEvent, ComponentControllerMarker, FileDescriptor, LaunchInfo,
-        LauncherProxy, TerminationReason::*,
-    },
-    futures::StreamExt,
-    signal_hook::{consts::signal::SIGINT, iterator::Signals},
+use anyhow::{anyhow, Context, Result};
+use blocking::Unblock;
+use ffx_component_run_legacy_args::RunComponentCommand;
+use ffx_core::ffx_plugin;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_sys::{
+    ComponentControllerEvent, ComponentControllerMarker, FileDescriptor, LaunchInfo, LauncherProxy,
+    TerminationReason::*,
 };
+use futures::StreamExt;
+use signal_hook::{consts::signal::SIGINT, iterator::Signals};
 
 // TODO(fxbug.dev/53159): refactor fuchsia-runtime so we can use the constant from there on the host,
 // rather than redefining it here.
@@ -161,7 +159,8 @@ async fn run_component_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_sys::LauncherRequest};
+    use super::*;
+    use fidl_fuchsia_sys::LauncherRequest;
 
     fn setup_fake_launcher_service() -> LauncherProxy {
         setup_oneshot_fake_launcher_proxy(|req| {

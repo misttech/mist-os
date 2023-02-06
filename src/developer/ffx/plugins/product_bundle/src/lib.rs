@@ -6,33 +6,31 @@
 //! - acquire and display product bundle information (metadata)
 //! - acquire related data files, such as disk partition images (data)
 
-use {
-    ::gcs::client::Client,
-    anyhow::{bail, Context, Result},
-    errors::ffx_bail,
-    ffx_config::ConfigLevel,
-    ffx_core::ffx_plugin,
-    ffx_product_bundle_args::{
-        CreateCommand, GetCommand, ListCommand, ProductBundleCommand, RemoveCommand, SubCommand,
-    },
-    ffx_writer::Writer,
-    fidl,
-    fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy},
-    fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositoryError, RepositorySpec},
-    fuchsia_url::RepositoryUrl,
-    pbms::{
-        get_images_dir, get_product_data, is_locally_built, is_pb_ready, product_bundle_urls,
-        select_auth, select_product_bundle, update_metadata_all, ListingMode,
-    },
-    std::{
-        convert::TryInto,
-        fs::{read_dir, remove_dir_all},
-        io::{stderr, stdin},
-        path::{Component, Path},
-    },
-    structured_ui::{self, Presentation, Response, SimplePresentation, TableRows, TextUi},
-    url::Url,
+use ::gcs::client::Client;
+use anyhow::{bail, Context, Result};
+use errors::ffx_bail;
+use ffx_config::ConfigLevel;
+use ffx_core::ffx_plugin;
+use ffx_product_bundle_args::{
+    CreateCommand, GetCommand, ListCommand, ProductBundleCommand, RemoveCommand, SubCommand,
 };
+use ffx_writer::Writer;
+use fidl;
+use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
+use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositoryError, RepositorySpec};
+use fuchsia_url::RepositoryUrl;
+use pbms::{
+    get_images_dir, get_product_data, is_locally_built, is_pb_ready, product_bundle_urls,
+    select_auth, select_product_bundle, update_metadata_all, ListingMode,
+};
+use std::{
+    convert::TryInto,
+    fs::{read_dir, remove_dir_all},
+    io::{stderr, stdin},
+    path::{Component, Path},
+};
+use structured_ui::{self, Presentation, Response, SimplePresentation, TableRows, TextUi};
+use url::Url;
 
 mod create;
 

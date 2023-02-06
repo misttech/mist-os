@@ -2,36 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::{
-            cmd::{BootParams, Command, ManifestParams},
-            file::{ArchiveResolver, FileResolver, Resolver, TarResolver},
-            prepare, Boot, Flash, Unlock,
-        },
-        manifest::{
-            sdk::SdkEntries, v1::FlashManifest as FlashManifestV1,
-            v2::FlashManifest as FlashManifestV2, v3::FlashManifest as FlashManifestV3,
-        },
+use crate::{
+    common::{
+        cmd::{BootParams, Command, ManifestParams},
+        file::{ArchiveResolver, FileResolver, Resolver, TarResolver},
+        prepare, Boot, Flash, Unlock,
     },
-    anyhow::{anyhow, Context, Result},
-    assembly_manifest::AssemblyManifest,
-    assembly_partitions_config::{Partition, Slot},
-    async_trait::async_trait,
-    chrono::Utc,
-    errors::{ffx_bail, ffx_error},
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    fms::Entries,
-    pbms::{load_product_bundle, ListingMode},
-    sdk_metadata::{Metadata, ProductBundle, ProductBundleV2},
-    serde::{Deserialize, Serialize},
-    serde_json::{from_value, to_value, Value},
-    std::collections::BTreeMap,
-    std::fs::File,
-    std::io::{BufReader, Read, Write},
-    std::path::PathBuf,
-    termion::{color, style},
+    manifest::{
+        sdk::SdkEntries, v1::FlashManifest as FlashManifestV1,
+        v2::FlashManifest as FlashManifestV2, v3::FlashManifest as FlashManifestV3,
+    },
 };
+use anyhow::{anyhow, Context, Result};
+use assembly_manifest::AssemblyManifest;
+use assembly_partitions_config::{Partition, Slot};
+use async_trait::async_trait;
+use chrono::Utc;
+use errors::{ffx_bail, ffx_error};
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use fms::Entries;
+use pbms::{load_product_bundle, ListingMode};
+use sdk_metadata::{Metadata, ProductBundle, ProductBundleV2};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_value, to_value, Value};
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{BufReader, Read, Write},
+    path::PathBuf,
+};
+use termion::{color, style};
 
 pub mod sdk;
 pub mod v1;

@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
-        DiagnosticsData, InlineData,
-    },
-    futures::TryStreamExt,
-    std::sync::Arc,
+use anyhow::Result;
+use fidl::{endpoints::ServerEnd, prelude::*};
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
+    DiagnosticsData, InlineData,
 };
+use futures::TryStreamExt;
+use std::sync::Arc;
 
 pub struct FakeArchiveIteratorResponse {
     // Note that these are _all_ mutually exclusive.

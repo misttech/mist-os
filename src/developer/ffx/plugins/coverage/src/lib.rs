@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    ffx_core::ffx_plugin,
-    ffx_coverage_args::CoverageCommand,
-    glob::glob,
-    std::{
-        fs::File,
-        path::{Path, PathBuf},
-        process::{Command, Stdio},
-    },
-    symbol_index::{global_symbol_index_path, SymbolIndex},
+use anyhow::{anyhow, Context, Result};
+use ffx_core::ffx_plugin;
+use ffx_coverage_args::CoverageCommand;
+use glob::glob;
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
+use symbol_index::{global_symbol_index_path, SymbolIndex};
 
 // The line found right above build ID in `llvm-profdata show --binary-ids` output.
 const BINARY_ID_LINE: &str = "Binary IDs:";
@@ -270,17 +268,15 @@ fn glob_profraws(test_out_dir: &Path) -> Result<Vec<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        std::{
-            fs::{create_dir, set_permissions, Permissions},
-            io::Write,
-            os::unix::fs::PermissionsExt,
-        },
-        symbol_index::BuildIdDir,
-        tempfile::TempDir,
+    use super::*;
+    use assert_matches::assert_matches;
+    use std::{
+        fs::{create_dir, set_permissions, Permissions},
+        io::Write,
+        os::unix::fs::PermissionsExt,
     };
+    use symbol_index::BuildIdDir;
+    use tempfile::TempDir;
 
     #[test]
     fn test_glob_profraws() {

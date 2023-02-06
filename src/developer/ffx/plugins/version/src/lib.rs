@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    chrono::{Local, Offset, TimeZone},
-    ffx_core::ffx_plugin,
-    ffx_version_args::VersionCommand,
-    fidl_fuchsia_developer_ffx::{self as ffx, VersionInfo},
-    std::fmt::Display,
-    std::io::Write,
-    std::time::Duration,
-    timeout::timeout,
-};
+use anyhow::Result;
+use chrono::{Local, Offset, TimeZone};
+use ffx_core::ffx_plugin;
+use ffx_version_args::VersionCommand;
+use fidl_fuchsia_developer_ffx::{self as ffx, VersionInfo};
+use std::{fmt::Display, io::Write, time::Duration};
+use timeout::timeout;
 
 const UNKNOWN_BUILD_HASH: &str = "(unknown)";
 const DEFAULT_DAEMON_TIMEOUT_MS: u64 = 1500;
@@ -100,16 +96,13 @@ pub async fn version_cmd<W: Write, O: Offset + Display>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        chrono::Utc,
-        fidl_fuchsia_developer_ffx::DaemonRequest,
-        futures::TryStreamExt,
-        futures::{
-            channel::oneshot::{self, Receiver},
-            future::Shared,
-            FutureExt,
-        },
+    use super::*;
+    use chrono::Utc;
+    use fidl_fuchsia_developer_ffx::DaemonRequest;
+    use futures::{
+        channel::oneshot::{self, Receiver},
+        future::Shared,
+        FutureExt, TryStreamExt,
     };
 
     const FAKE_DAEMON_HASH: &str = "fake daemon fake";

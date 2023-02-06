@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    ffx_core::ffx_plugin,
-    ffx_scrutiny_verify_args::{Command, SubCommand},
-    scrutiny_utils::path::relativize_path,
-    std::{fs, io::Write, path::PathBuf},
-};
+use anyhow::{anyhow, bail, Context, Result};
+use ffx_core::ffx_plugin;
+use ffx_scrutiny_verify_args::{Command, SubCommand};
+use scrutiny_utils::path::relativize_path;
+use std::{fs, io::Write, path::PathBuf};
 
 mod bootfs;
 mod component_resolvers;

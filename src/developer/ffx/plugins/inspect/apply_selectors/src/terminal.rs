@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::io::Write,
-    termion::{clear, color, cursor},
-};
+use std::io::Write;
+use termion::{clear, color, cursor};
 
 pub trait Terminal: Write {
     // Get supported terminal size.

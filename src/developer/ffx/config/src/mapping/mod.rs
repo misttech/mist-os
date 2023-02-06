@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    regex::{Captures, Regex},
-    serde_json::Value,
-    std::path::PathBuf,
-};
+use anyhow::Result;
+use regex::{Captures, Regex};
+use serde_json::Value;
+use std::path::PathBuf;
 
 mod cache;
 mod config;
@@ -49,10 +47,16 @@ where
     regex
         .replace_all(value, |caps: &Captures<'_>| {
             // Skip the first one since that'll be the whole string.
-            caps.iter()
-                .skip(1)
-                .map(|cap| cap.map(|c| replacer(c.as_str())))
-                .fold(String::new(), |acc, v| if let Some(Ok(s)) = v { acc + &s } else { acc })
+            caps.iter().skip(1).map(|cap| cap.map(|c| replacer(c.as_str()))).fold(
+                String::new(),
+                |acc, v| {
+                    if let Some(Ok(s)) = v {
+                        acc + &s
+                    } else {
+                        acc
+                    }
+                },
+            )
         })
         .into_owned()
 }

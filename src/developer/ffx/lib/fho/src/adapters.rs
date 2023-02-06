@@ -41,8 +41,10 @@ macro_rules! embedded_plugin {
 
 #[cfg(test)]
 mod tests {
-    use crate::subtool::{FhoHandler, ToolCommand};
-    use crate::testing::*;
+    use crate::{
+        subtool::{FhoHandler, ToolCommand},
+        testing::*,
+    };
     use argh::FromArgs;
     use ffx_command::FfxCommandLine;
     use std::sync::Arc;

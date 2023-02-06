@@ -9,8 +9,10 @@ use analytics::{
 use anyhow::Result;
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
-use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, Instant},
+};
 use tracing;
 
 pub const GA_PROPERTY_ID: &str = "UA-127897021-9";

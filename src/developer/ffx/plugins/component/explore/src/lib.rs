@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, component_debug::cli::explore_cmd, errors::FfxError,
-    ffx_component::rcs::connect_to_realm_explorer,
-    ffx_component_explore_args::ExploreComponentCommand, ffx_core::ffx_plugin,
-    fidl_fuchsia_dash::LauncherProxy, fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::Result;
+use component_debug::cli::explore_cmd;
+use errors::FfxError;
+use ffx_component::rcs::connect_to_realm_explorer;
+use ffx_component_explore_args::ExploreComponentCommand;
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_dash::LauncherProxy;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 // TODO(https://fxbug.dev/102835): This plugin needs E2E tests.
 #[ffx_plugin(LauncherProxy = "core/debug-dash-launcher:expose:fuchsia.dash.Launcher")]

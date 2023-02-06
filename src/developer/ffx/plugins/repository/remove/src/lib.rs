@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, errors::ffx_bail, ffx_core::ffx_plugin,
-    ffx_repository_remove_args::RemoveCommand, fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-};
+use anyhow::Result;
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_repository_remove_args::RemoveCommand;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn remove(cmd: RemoveCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -19,10 +20,9 @@ pub async fn remove(cmd: RemoveCommand, repos: RepositoryRegistryProxy) -> Resul
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        fidl_fuchsia_developer_ffx::RepositoryRegistryRequest, fuchsia_async as fasync,
-        futures::channel::oneshot::channel,
-    };
+    use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot::channel;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_remove() {

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ledger_view::*,
-    anyhow::{anyhow, Result},
-    std::io::Write,
-};
+use crate::ledger_view::*;
+use anyhow::{anyhow, Result};
+use std::io::Write;
 
 const DEFAULT_OUTCOME_VALUE: LedgerOutcome = LedgerOutcome::Success;
 const DEFAULT_OUTCOME_FUNCTION: OutcomeFoldFunction = OutcomeFoldFunction::SuccessToFailure;
@@ -345,7 +343,9 @@ impl<W: Write> DoctorLedger<W> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, ffx_doctor_test_utils::MockWriter, std::fmt};
+    use super::*;
+    use ffx_doctor_test_utils::MockWriter;
+    use std::fmt;
 
     const MODE_VERBOSE: LedgerMode = LedgerMode::Verbose;
     const MODE_NORMAL: LedgerMode = LedgerMode::Normal;

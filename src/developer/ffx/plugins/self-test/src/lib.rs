@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::test::*, anyhow::*, ffx_core::ffx_plugin, ffx_selftest_args::SelftestCommand,
-    std::time::Duration,
-};
+use crate::test::*;
+use anyhow::*;
+use ffx_core::ffx_plugin;
+use ffx_selftest_args::SelftestCommand;
+use std::time::Duration;
 
 mod component;
 mod config;

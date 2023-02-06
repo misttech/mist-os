@@ -17,8 +17,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fidl_fuchsia_developer_ffx::FastbootProxy;
 use serde::{Deserialize, Serialize};
-use std::convert::From;
-use std::io::Write;
+use std::{convert::From, io::Write};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FlashManifest {
@@ -161,8 +160,10 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
-    use crate::test::{setup, TestResolver};
+    use crate::{
+        common::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
+        test::{setup, TestResolver},
+    };
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

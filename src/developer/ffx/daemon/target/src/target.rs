@@ -2,42 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fastboot::get_var,
-    crate::fastboot::network::tcp::TcpNetworkFactory,
-    crate::fastboot::open_interface_with_serial,
-    crate::logger::{streamer::DiagnosticsStreamer, Logger},
-    crate::overnet::host_pipe::{HostAddr, HostPipeConnection, LogBuffer},
-    crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE},
-    addr::TargetAddr,
-    anyhow::{anyhow, bail, Context, Error, Result},
-    async_trait::async_trait,
-    chrono::{DateTime, Utc},
-    ffx::{TargetAddrInfo, TargetIpPort},
-    ffx_daemon_core::events::{self, EventSynthesizer},
-    ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetInfo},
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_ffx::TargetState,
-    fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy},
-    fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet},
-    fuchsia_async::Task,
-    netext::IsLocalAddr,
-    rand::random,
-    rcs::{RcsConnection, RcsConnectionError},
-    std::cell::RefCell,
-    std::cmp::Ordering,
-    std::collections::{BTreeSet, HashSet},
-    std::default::Default,
-    std::fmt,
-    std::fmt::Debug,
-    std::hash::{Hash, Hasher},
-    std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    std::rc::{Rc, Weak},
-    std::sync::Arc,
-    std::time::{Duration, Instant, SystemTime},
-    timeout::timeout,
-    usb_bulk::AsyncInterface as Interface,
+use crate::{
+    fastboot::{get_var, network::tcp::TcpNetworkFactory, open_interface_with_serial},
+    logger::{streamer::DiagnosticsStreamer, Logger},
+    overnet::host_pipe::{HostAddr, HostPipeConnection, LogBuffer},
+    FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
+use addr::TargetAddr;
+use anyhow::{anyhow, bail, Context, Error, Result};
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use ffx::{TargetAddrInfo, TargetIpPort};
+use ffx_daemon_core::events::{self, EventSynthesizer};
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetInfo};
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_ffx::TargetState;
+use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet};
+use fuchsia_async::Task;
+use netext::IsLocalAddr;
+use rand::random;
+use rcs::{RcsConnection, RcsConnectionError};
+use std::{
+    cell::RefCell,
+    cmp::Ordering,
+    collections::{BTreeSet, HashSet},
+    default::Default,
+    fmt,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    rc::{Rc, Weak},
+    sync::Arc,
+    time::{Duration, Instant, SystemTime},
+};
+use timeout::timeout;
+use usb_bulk::AsyncInterface as Interface;
 
 const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 const DEFAULT_SSH_PORT: u16 = 22;
@@ -1149,18 +1149,17 @@ impl PartialEq for Target {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        chrono::TimeZone,
-        ffx::TargetIp,
-        fidl, fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
-        fidl_fuchsia_overnet_protocol::NodeId,
-        futures::prelude::*,
-        hoist::Hoist,
-        std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use chrono::TimeZone;
+    use ffx::TargetIp;
+    use fidl;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+    use fidl_fuchsia_overnet_protocol::NodeId;
+    use futures::prelude::*;
+    use hoist::Hoist;
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
     const DEFAULT_PRODUCT_CONFIG: &str = "core";
     const DEFAULT_BOARD_CONFIG: &str = "x64";

@@ -5,13 +5,13 @@
 use anyhow::{Context as _, Result};
 use fuchsia_async;
 use serde::Serialize;
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::process::Child;
-use std::process::ExitStatus;
-use std::process::Stdio;
-use std::time::SystemTime;
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    path::PathBuf,
+    process::{Child, ExitStatus, Stdio},
+    time::SystemTime,
+};
 use tempfile::TempDir;
 
 #[derive(Debug)]

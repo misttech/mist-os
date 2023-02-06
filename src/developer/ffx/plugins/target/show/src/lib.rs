@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::show::{ShowEntry, ShowValue},
-    addr::TargetAddr,
-    anyhow::{anyhow, bail, Result},
-    ffx_core::ffx_plugin,
-    ffx_target_show_args as args,
-    fidl_fuchsia_boot::ArgumentsProxy,
-    fidl_fuchsia_buildinfo::ProviderProxy,
-    fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy},
-    fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy},
-    fidl_fuchsia_intl::RegulatoryDomain,
-    fidl_fuchsia_update_channelcontrol::ChannelControlProxy,
-    fuchsia_zircon_status::Status,
-    std::io::{stdout, Write},
-    std::time::Duration,
-    timeout::timeout,
+use crate::show::{ShowEntry, ShowValue};
+use addr::TargetAddr;
+use anyhow::{anyhow, bail, Result};
+use ffx_core::ffx_plugin;
+use ffx_target_show_args as args;
+use fidl_fuchsia_boot::ArgumentsProxy;
+use fidl_fuchsia_buildinfo::ProviderProxy;
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
+use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
+use fidl_fuchsia_intl::RegulatoryDomain;
+use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
+use fuchsia_zircon_status::Status;
+use std::{
+    io::{stdout, Write},
+    time::Duration,
 };
+use timeout::timeout;
 
 mod show;
 

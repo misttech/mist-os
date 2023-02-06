@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::test::*, anyhow::*};
+use crate::test::*;
+use anyhow::*;
 
 pub(crate) async fn test_not_enabled() -> Result<()> {
     let isolate = new_isolate("experiment-not-enabled").await?;

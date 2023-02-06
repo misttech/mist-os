@@ -1,34 +1,27 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::target::Target,
-    anyhow::{anyhow, bail, Context, Result},
-    async_channel::bounded,
-    diagnostics_data::{LogsData, Timestamp},
-    ffx_config::get,
-    ffx_log_data::{EventType, LogData, LogEntry},
-    ffx_log_utils::{
-        run_logging_pipeline,
-        symbolizer::{is_symbolizer_context_marker, LogSymbolizer, Symbolizer},
-        OrderedBatchPipeline,
-    },
-    fidl::endpoints::create_proxy,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, InlineData,
-        RemoteDiagnosticsBridgeMarker,
-    },
-    fidl_fuchsia_diagnostics::ClientSelectorConfiguration,
-    futures::{AsyncReadExt, StreamExt, TryFutureExt},
-    selectors::{parse_selector, VerboseError},
-    std::convert::TryInto,
-    std::future::Future,
-    std::rc::Weak,
-    std::sync::Arc,
-    std::time::SystemTime,
-    streamer::GenericDiagnosticsStreamer,
+use crate::target::Target;
+use anyhow::{anyhow, bail, Context, Result};
+use async_channel::bounded;
+use diagnostics_data::{LogsData, Timestamp};
+use ffx_config::get;
+use ffx_log_data::{EventType, LogData, LogEntry};
+use ffx_log_utils::{
+    run_logging_pipeline,
+    symbolizer::{is_symbolizer_context_marker, LogSymbolizer, Symbolizer},
+    OrderedBatchPipeline,
 };
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, InlineData,
+    RemoteDiagnosticsBridgeMarker,
+};
+use fidl_fuchsia_diagnostics::ClientSelectorConfiguration;
+use futures::{AsyncReadExt, StreamExt, TryFutureExt};
+use selectors::{parse_selector, VerboseError};
+use std::{convert::TryInto, future::Future, rc::Weak, sync::Arc, time::SystemTime};
+use streamer::GenericDiagnosticsStreamer;
 
 pub mod streamer;
 
@@ -440,28 +433,26 @@ impl<'a> Logger<'a> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::target::Target,
-        async_channel::{Receiver, Sender},
-        async_lock::Mutex,
-        async_trait::async_trait,
-        ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse},
-        ffx_log_utils::symbolizer::FakeSymbolizerForTest,
-        fidl::endpoints::RequestStream,
-        fidl_fuchsia_developer_remotecontrol::{
-            ArchiveIteratorError, IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy,
-            RemoteControlRequest, RemoteDiagnosticsBridgeRequest,
-            RemoteDiagnosticsBridgeRequestStream, ServiceMatch,
-        },
-        fidl_fuchsia_diagnostics::DataType,
-        fidl_fuchsia_overnet_protocol::NodeId,
-        futures::TryStreamExt,
-        hoist::Hoist,
-        rcs::RcsConnection,
-        std::rc::Rc,
-        streamer::SessionStream,
+    use super::*;
+    use crate::target::Target;
+    use async_channel::{Receiver, Sender};
+    use async_lock::Mutex;
+    use async_trait::async_trait;
+    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use ffx_log_utils::symbolizer::FakeSymbolizerForTest;
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_developer_remotecontrol::{
+        ArchiveIteratorError, IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy,
+        RemoteControlRequest, RemoteDiagnosticsBridgeRequest, RemoteDiagnosticsBridgeRequestStream,
+        ServiceMatch,
     };
+    use fidl_fuchsia_diagnostics::DataType;
+    use fidl_fuchsia_overnet_protocol::NodeId;
+    use futures::TryStreamExt;
+    use hoist::Hoist;
+    use rcs::RcsConnection;
+    use std::rc::Rc;
+    use streamer::SessionStream;
 
     const NODENAME: &str = "nodename-foo";
     const BOOT_TIME: i64 = 98765432123;

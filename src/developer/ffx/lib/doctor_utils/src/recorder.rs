@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    chrono::prelude::*,
-    std::{
-        collections::HashMap,
-        fs::File,
-        io::{copy, Seek, SeekFrom, Write},
-        path::PathBuf,
-    },
-    zip::{
-        write::{FileOptions, ZipWriter},
-        CompressionMethod,
-    },
+use anyhow::{anyhow, Result};
+use chrono::prelude::*;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{copy, Seek, SeekFrom, Write},
+    path::PathBuf,
+};
+use zip::{
+    write::{FileOptions, ZipWriter},
+    CompressionMethod,
 };
 
 const FILE_MAX_BYTES: i64 = 4_000_000; // 4MB
@@ -106,17 +104,15 @@ impl Recorder for DoctorRecorder {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        std::{
-            collections::HashSet,
-            fs::File,
-            io::{Read, Write},
-        },
-        tempfile::tempdir,
-        zip::read::ZipArchive,
+    use super::*;
+    use fuchsia_async as fasync;
+    use std::{
+        collections::HashSet,
+        fs::File,
+        io::{Read, Write},
     };
+    use tempfile::tempdir;
+    use zip::read::ZipArchive;
 
     const FAKE_OUTPUT: &str = "doctor doctor";
     const DOCTOR_OUTPUT_NAME: &str = "doctor_output.txt";

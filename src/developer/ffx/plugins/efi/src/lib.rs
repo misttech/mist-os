@@ -141,12 +141,10 @@ pub async fn command(cmd: EfiCommand) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        ffx_efi_args::{CreateCommand, EfiCommand, EfiSubCommand},
-        std::fs::metadata,
-        tempfile::tempdir,
-    };
+    use super::*;
+    use ffx_efi_args::{CreateCommand, EfiCommand, EfiSubCommand};
+    use std::fs::metadata;
+    use tempfile::tempdir;
 
     fn set_file_content(name: &str, content: &str) -> Result<()> {
         let mut file = File::create(name)?;

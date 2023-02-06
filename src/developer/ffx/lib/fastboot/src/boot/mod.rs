@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{file::FileResolver, map_fidl_error, stage_file},
-    anyhow::{anyhow, Result},
-    byteorder::{ByteOrder, LittleEndian},
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    std::convert::TryInto,
-    std::fs::{metadata, File},
-    std::io::{BufRead, BufReader, BufWriter, Read, Write},
-    std::path::PathBuf,
-    tempfile::{tempdir, TempDir},
+use crate::common::{file::FileResolver, map_fidl_error, stage_file};
+use anyhow::{anyhow, Result};
+use byteorder::{ByteOrder, LittleEndian};
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use std::{
+    convert::TryInto,
+    fs::{metadata, File},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    path::PathBuf,
 };
+use tempfile::{tempdir, TempDir};
 
 const PAGE_SIZE: u32 = 4096;
 const BOOT_MAGIC: &str = "ANDROID!";

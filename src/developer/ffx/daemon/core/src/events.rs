@@ -1,25 +1,25 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, Context as _, Result},
-    async_lock::Mutex,
-    async_trait::async_trait,
-    ffx_stream_util::TryStreamUtilExt,
-    fuchsia_async::Task,
-    futures::prelude::*,
-    pin_project::pin_project,
-    std::cmp::Eq,
-    std::fmt::Debug,
-    std::future::Future,
-    std::hash::Hash,
-    std::pin::Pin,
-    std::rc::{Rc, Weak},
-    std::result,
-    std::task::{Context, Poll},
-    std::time::Duration,
-    timeout::timeout,
+use anyhow::{anyhow, Context as _, Result};
+use async_lock::Mutex;
+use async_trait::async_trait;
+use ffx_stream_util::TryStreamUtilExt;
+use fuchsia_async::Task;
+use futures::prelude::*;
+use pin_project::pin_project;
+use std::{
+    cmp::Eq,
+    fmt::Debug,
+    future::Future,
+    hash::Hash,
+    pin::Pin,
+    rc::{Rc, Weak},
+    result,
+    task::{Context, Poll},
+    time::Duration,
 };
+use timeout::timeout;
 
 pub trait EventTrait: Debug + Sized + Hash + Clone + Eq {}
 impl<T> EventTrait for T where T: Debug + Sized + Hash + Clone + Eq {}

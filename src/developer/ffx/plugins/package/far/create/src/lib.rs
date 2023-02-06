@@ -6,9 +6,7 @@ use anyhow::{Context, Result};
 use ffx_core::ffx_plugin;
 use ffx_package_far_create_args::CreateCommand;
 use fuchsia_archive as far;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::Read;
+use std::{collections::BTreeMap, fs::File, io::Read};
 use walkdir::WalkDir;
 
 #[ffx_plugin("ffx_package")]

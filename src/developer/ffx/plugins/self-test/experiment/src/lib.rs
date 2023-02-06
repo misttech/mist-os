@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::*, ffx_core::ffx_plugin, ffx_selftest_experiment_args::ExperimentCommand};
+use anyhow::*;
+use ffx_core::ffx_plugin;
+use ffx_selftest_experiment_args::ExperimentCommand;
 
 #[ffx_plugin("selftest.experiment")]
 pub async fn experiment(_cmd: ExperimentCommand) -> Result<()> {

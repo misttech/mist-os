@@ -4,8 +4,7 @@
 
 use addr::TargetAddr;
 use rcs::RcsConnection;
-use std::net::SocketAddr;
-use std::time::Instant;
+use std::{net::SocketAddr, time::Instant};
 
 pub trait TryIntoTargetInfo: Sized {
     type Error;

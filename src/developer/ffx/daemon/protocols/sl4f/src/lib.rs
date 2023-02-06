@@ -2,27 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_net::TcpListener,
-    async_trait::async_trait,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_config::{self},
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_sl4f_ffx::{Sl4fBridgeMarker, Sl4fBridgeProxy, Sl4fBridgeRequest},
-    fuchsia_async::Task,
-    fuchsia_repo::server::ConnectionStream,
-    futures::FutureExt as _,
-    futures::TryStreamExt,
-    hyper::{
-        service::{make_service_fn, service_fn},
-        Body, Method, Response, StatusCode,
-    },
-    protocols::prelude::*,
-    std::convert::Infallible,
-    std::net::{IpAddr, Ipv6Addr, SocketAddr},
-    std::str,
-    std::sync::Arc,
+use anyhow::Result;
+use async_net::TcpListener;
+use async_trait::async_trait;
+use ffx_config::{
+    keys::TARGET_DEFAULT_KEY,
+    {self},
+};
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_sl4f_ffx::{Sl4fBridgeMarker, Sl4fBridgeProxy, Sl4fBridgeRequest};
+use fuchsia_async::Task;
+use fuchsia_repo::server::ConnectionStream;
+use futures::{FutureExt as _, TryStreamExt};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Method, Response, StatusCode,
+};
+use protocols::prelude::*;
+use std::{
+    convert::Infallible,
+    net::{IpAddr, Ipv6Addr, SocketAddr},
+    str,
+    sync::Arc,
 };
 
 // The selector that identifies the component running the bridge protocol on the
@@ -130,13 +131,11 @@ impl FidlProtocol for Sl4fBridge {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::Bridge,
-        crate::route_request,
-        async_trait::async_trait,
-        fidl_fuchsia_developer_ffx as ffx,
-        hyper::{Body, Request, StatusCode},
-    };
+    use super::Bridge;
+    use crate::route_request;
+    use async_trait::async_trait;
+    use fidl_fuchsia_developer_ffx as ffx;
+    use hyper::{Body, Request, StatusCode};
 
     struct MockBridgeProxy<'a> {
         resp: &'a str,

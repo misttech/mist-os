@@ -73,8 +73,7 @@ pub mod json {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuchsia_map::json;
-    use crate::processes_data::processed;
+    use crate::{fuchsia_map::json, processes_data::processed};
     use std::collections::{HashMap, HashSet};
 
     #[test]

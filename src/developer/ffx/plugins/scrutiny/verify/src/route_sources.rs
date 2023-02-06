@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error, Result},
-    ffx_scrutiny_verify_args::route_sources::Command,
-    scrutiny_config::{ConfigBuilder, ModelConfig},
-    scrutiny_frontend::{command_builder::CommandBuilder, launcher},
-    scrutiny_plugins::verify::{RouteSourceError, VerifyRouteSourcesResults},
-    serde_json,
-    std::{
-        collections::{HashMap, HashSet},
-        convert::TryFrom,
-        path::PathBuf,
-    },
+use anyhow::{anyhow, Context, Error, Result};
+use ffx_scrutiny_verify_args::route_sources::Command;
+use scrutiny_config::{ConfigBuilder, ModelConfig};
+use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_plugins::verify::{RouteSourceError, VerifyRouteSourcesResults};
+use serde_json;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    path::PathBuf,
 };
 
 struct Query {

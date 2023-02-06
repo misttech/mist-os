@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    ffx_scrutiny_verify_args::static_pkgs::Command,
-    scrutiny_config::{ConfigBuilder, ModelConfig},
-    scrutiny_frontend::{command_builder::CommandBuilder, launcher},
-    scrutiny_plugins::static_pkgs::StaticPkgsCollection,
-    scrutiny_utils::golden::{CompareResult, GoldenFile},
-    std::{collections::HashSet, path::PathBuf},
-};
+use anyhow::{anyhow, Context, Result};
+use ffx_scrutiny_verify_args::static_pkgs::Command;
+use scrutiny_config::{ConfigBuilder, ModelConfig};
+use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_plugins::static_pkgs::StaticPkgsCollection;
+use scrutiny_utils::golden::{CompareResult, GoldenFile};
+use std::{collections::HashSet, path::PathBuf};
 
 const SOFT_TRANSITION_MSG : &str = "
 If you are making a change in fuchsia.git that causes this, you need to perform a soft transition:

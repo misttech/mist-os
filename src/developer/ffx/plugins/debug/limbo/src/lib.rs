@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    ffx_debug_limbo_args::{LimboCommand, LimboSubCommand},
-    fidl_fuchsia_exception::ProcessLimboProxy,
-    fuchsia_zircon_status::Status,
-    fuchsia_zircon_types::{ZX_ERR_NOT_FOUND, ZX_ERR_UNAVAILABLE},
-};
+use anyhow::{Context, Result};
+use ffx_debug_limbo_args::{LimboCommand, LimboSubCommand};
+use fidl_fuchsia_exception::ProcessLimboProxy;
+use fuchsia_zircon_status::Status;
+use fuchsia_zircon_types::{ZX_ERR_NOT_FOUND, ZX_ERR_UNAVAILABLE};
 
 #[ffx_core::ffx_plugin(ProcessLimboProxy = "core/exceptions:expose:fuchsia.exception.ProcessLimbo")]
 pub async fn plugin_main(limbo_proxy: ProcessLimboProxy, cmd: LimboCommand) -> Result<()> {

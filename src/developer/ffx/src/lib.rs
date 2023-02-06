@@ -5,8 +5,7 @@
 use anyhow::Result;
 use ffx_core::ffx_plugin;
 use ffx_lib_args::FfxBuiltIn;
-use std::env;
-use std::process::Command;
+use std::{env, process::Command};
 
 #[ffx_plugin()]
 pub async fn help(_cmd: FfxBuiltIn) -> Result<()> {

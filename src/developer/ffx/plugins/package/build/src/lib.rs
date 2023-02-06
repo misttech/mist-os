@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, errors::ffx_error, ffx_core::ffx_plugin, package_tool::cmd_package_build};
+use anyhow::Result;
+use errors::ffx_error;
+use ffx_core::ffx_plugin;
+use package_tool::cmd_package_build;
 
 pub use ffx_package_build_args::PackageBuildCommand;
 

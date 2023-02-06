@@ -4,16 +4,14 @@
 
 mod allowlist;
 
-use {
-    allowlist::{AllowlistFilter, UnversionedAllowlist, V0Allowlist, V1Allowlist},
-    anyhow::{bail, Context, Result},
-    ffx_scrutiny_verify_args::routes::{default_capability_types, Command},
-    scrutiny_config::{ConfigBuilder, ModelConfig},
-    scrutiny_frontend::{command_builder::CommandBuilder, launcher},
-    scrutiny_plugins::verify::CapabilityRouteResults,
-    serde_json,
-    std::{collections::HashSet, fs, io::Read, path::PathBuf},
-};
+use allowlist::{AllowlistFilter, UnversionedAllowlist, V0Allowlist, V1Allowlist};
+use anyhow::{bail, Context, Result};
+use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
+use scrutiny_config::{ConfigBuilder, ModelConfig};
+use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_plugins::verify::CapabilityRouteResults;
+use serde_json;
+use std::{collections::HashSet, fs, io::Read, path::PathBuf};
 
 struct Query {
     capability_types: Vec<String>,

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::storage::{Config, ConfigMap};
 use crate::{
     environment::{Environment, EnvironmentContext},
+    storage::{Config, ConfigMap},
     BuildOverride,
 };
 use anyhow::{bail, Context, Result};
@@ -12,8 +12,7 @@ use async_lock::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tempfile::{NamedTempFile, TempDir};
@@ -203,7 +202,9 @@ async fn load_config_with_instant(
 // tests
 #[cfg(test)]
 mod test {
-    use {super::*, futures::future::join_all, std::time::Duration};
+    use super::*;
+    use futures::future::join_all;
+    use std::time::Duration;
 
     async fn load(now: Instant, key: &Option<PathBuf>, cache: &Cache) {
         let env = Environment::new_empty(EnvironmentContext::default())

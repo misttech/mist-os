@@ -11,9 +11,10 @@ use nix::{
     sys::socket::{SockaddrLike, SockaddrStorage},
 };
 use regex::Regex;
-use std::ffi::CString;
-use std::net::SocketAddr;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    ffi::CString,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+};
 
 pub trait IsLocalAddr {
     /// is_local_addr returns true if the address is not globally routable.

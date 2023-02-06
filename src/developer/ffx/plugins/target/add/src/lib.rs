@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::{ffx_bail, ffx_error, FfxError},
-    ffx_core::ffx_plugin,
-    ffx_target_add_args::AddCommand,
-    fidl_fuchsia_developer_ffx::{self as ffx, TargetCollectionProxy},
-    fidl_fuchsia_net as net,
-    futures::TryStreamExt,
-    netext::parse_address_parts,
-    std::net::IpAddr,
-};
+use anyhow::Result;
+use errors::{ffx_bail, ffx_error, FfxError};
+use ffx_core::ffx_plugin;
+use ffx_target_add_args::AddCommand;
+use fidl_fuchsia_developer_ffx::{self as ffx, TargetCollectionProxy};
+use fidl_fuchsia_net as net;
+use futures::TryStreamExt;
+use netext::parse_address_parts;
+use std::net::IpAddr;
 
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
 pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand) -> Result<()> {

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::{ffx_bail, ffx_error},
-    fuchsia_url::AbsoluteComponentUrl,
-};
+use anyhow::Result;
+use errors::{ffx_bail, ffx_error};
+use fuchsia_url::AbsoluteComponentUrl;
 
 pub mod format;
 pub mod rcs;

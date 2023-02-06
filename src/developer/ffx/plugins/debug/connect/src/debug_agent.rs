@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    async_net::unix::UnixListener,
-    fuchsia_zircon_status::Status,
-    futures_util::future::FutureExt,
-    futures_util::io::{AsyncReadExt, AsyncWriteExt},
-    std::path::{Path, PathBuf},
-    std::{env, io},
+use anyhow::{anyhow, Result};
+use async_net::unix::UnixListener;
+use fuchsia_zircon_status::Status;
+use futures_util::{
+    future::FutureExt,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
+use std::{
+    env, io,
+    path::{Path, PathBuf},
 };
 
 /// Represents a connectable socket to the remote debug_agent. It's essentially a FIDL socket and a

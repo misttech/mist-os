@@ -1,19 +1,20 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{Context, StreamHandler},
-    anyhow::Result,
-    fidl::server::ServeInner,
-    fuchsia_async::Task,
-    std::cell::RefCell,
-    std::collections::hash_map::Entry,
-    std::collections::HashMap,
-    std::rc::Rc,
-    std::sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-    std::sync::{Arc, Weak},
-    thiserror::Error,
+use crate::{Context, StreamHandler};
+use anyhow::Result;
+use fidl::server::ServeInner;
+use fuchsia_async::Task;
+use std::{
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap},
+    rc::Rc,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Weak,
+    },
 };
+use thiserror::Error;
 
 pub type NameToStreamHandlerMap = HashMap<String, Box<dyn StreamHandler>>;
 type ProtocolHandleMap = HashMap<usize, ProtocolHandle>;

@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    component_debug::cli::{
-        storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd,
-    },
-    errors::FfxError,
-    ffx_component::rcs::connect_to_lifecycle_controller,
-    ffx_component_storage_args::{StorageCommand, SubCommandEnum},
-    ffx_core::ffx_plugin,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
+use anyhow::Result;
+use component_debug::cli::{
+    storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd,
 };
+use errors::FfxError;
+use ffx_component::rcs::connect_to_lifecycle_controller;
+use ffx_component_storage_args::{StorageCommand, SubCommandEnum};
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 
 #[ffx_plugin()]
 pub async fn storage(remote_proxy: RemoteControlProxy, args: StorageCommand) -> Result<()> {

@@ -5,10 +5,12 @@
 use anyhow::Result;
 use core::fmt;
 use serde::Serialize;
-use std::fs::File;
-use std::io::{copy, Cursor, Read, SeekFrom, Write};
-use std::mem;
-use std::path::Path;
+use std::{
+    fs::File,
+    io::{copy, Cursor, Read, SeekFrom, Write},
+    mem,
+    path::Path,
+};
 use tempfile::{NamedTempFile, TempPath};
 
 /// `SparseHeader` represents the header section of a `SparseFile`
@@ -501,11 +503,12 @@ pub async fn build_sparse_files<W: Write>(
 mod test {
     use super::*;
     use crate::test::setup;
-    use rand::rngs::SmallRng;
-    use rand::{RngCore, SeedableRng};
-    use std::io;
-    use std::io::{Cursor, Read};
-    use std::process::Command;
+    use rand::{rngs::SmallRng, RngCore, SeedableRng};
+    use std::{
+        io,
+        io::{Cursor, Read},
+        process::Command,
+    };
 
     const WANT_RAW_BYTES: [u8; 17] = [193, 202, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 49, 50, 51, 52, 53];
 

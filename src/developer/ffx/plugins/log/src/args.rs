@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    chrono::{DateTime, Local},
-    chrono_english::{parse_date_string, Dialect},
-    diagnostics_data::Severity,
-    ffx_core::ffx_command,
-    fidl_fuchsia_developer_ffx::SessionSpec,
-    fidl_fuchsia_diagnostics::{Interest, LogInterestSelector, Severity as FidlSeverity},
-    selectors::{self, VerboseError},
-    std::time::Duration,
-};
+use argh::FromArgs;
+use chrono::{DateTime, Local};
+use chrono_english::{parse_date_string, Dialect};
+use diagnostics_data::Severity;
+use ffx_core::ffx_command;
+use fidl_fuchsia_developer_ffx::SessionSpec;
+use fidl_fuchsia_diagnostics::{Interest, LogInterestSelector, Severity as FidlSeverity};
+use selectors::{self, VerboseError};
+use std::time::Duration;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TimeFormat {
@@ -311,7 +309,8 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
 
 #[cfg(test)]
 mod test {
-    use {super::*, selectors::parse_component_selector};
+    use super::*;
+    use selectors::parse_component_selector;
 
     #[test]
     fn test_session_spec_non_zero() {

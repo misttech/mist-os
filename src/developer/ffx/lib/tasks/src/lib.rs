@@ -13,15 +13,14 @@
 //! For shutdown, the [TaskManager] can be drained to get all instances of
 //! running tasks for either joining them or drop them.
 
-use {
-    fuchsia_async::Task,
-    futures::future::ready,
-    futures::FutureExt,
-    std::cell::{Cell, RefCell},
-    std::collections::HashMap,
-    std::future::Future,
-    std::num::Wrapping,
-    std::rc::Rc,
+use fuchsia_async::Task;
+use futures::{future::ready, FutureExt};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    future::Future,
+    num::Wrapping,
+    rc::Rc,
 };
 
 #[derive(Debug, Default)]

@@ -2,4 +2,4 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use {crate::context::*, crate::ffx_protocol, crate::protocols::*, crate::register::*};
+pub use crate::{context::*, ffx_protocol, protocols::*, register::*};

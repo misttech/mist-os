@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery},
-    ffx_core::ffx_command,
-    std::path::PathBuf,
-};
+use argh::FromArgs;
+use ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery};
+use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 #[ffx_command]
 #[derive(FromArgs, Debug, PartialEq)]

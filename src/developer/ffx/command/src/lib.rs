@@ -4,11 +4,7 @@
 
 use errors::{ffx_error, IntoExitCode};
 use fuchsia_async::TimeoutExt;
-use std::fs::File;
-use std::io::Write;
-use std::process::ExitStatus;
-use std::str::FromStr;
-use std::time::Duration;
+use std::{fs::File, io::Write, process::ExitStatus, str::FromStr, time::Duration};
 
 mod describe;
 mod error;

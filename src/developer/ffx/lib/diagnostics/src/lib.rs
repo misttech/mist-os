@@ -4,21 +4,19 @@
 
 //! Library for Fuchsia device diagnostics utilities.
 
-use {
-    anyhow::Result,
-    diagnostics_data::Timestamp,
-    ffx_daemon_target::logger::streamer::{DiagnosticsStreamer, SessionStream},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_ffx::{
-        DaemonDiagnosticsStreamParameters, DiagnosticsStreamError, TimeBound,
-    },
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
-        DiagnosticsData, InlineData,
-    },
-    futures::{stream::TryStreamExt, AsyncWriteExt},
-    std::sync::Arc,
+use anyhow::Result;
+use diagnostics_data::Timestamp;
+use ffx_daemon_target::logger::streamer::{DiagnosticsStreamer, SessionStream};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_developer_ffx::{
+    DaemonDiagnosticsStreamParameters, DiagnosticsStreamError, TimeBound,
 };
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
+    DiagnosticsData, InlineData,
+};
+use futures::{stream::TryStreamExt, AsyncWriteExt};
+use std::sync::Arc;
 
 pub async fn run_diagnostics_streaming(
     mut log_iterator: SessionStream,

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    analytics::add_custom_event,
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
-    fuchsia_async::{self, TimeoutExt as _},
-    std::{collections::BTreeMap, time::Duration},
-};
+use analytics::add_custom_event;
+use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
+use fuchsia_async::{self, TimeoutExt as _};
+use std::{collections::BTreeMap, time::Duration};
 
 const CATEGORY: &str = "ffx_daemon_repo";
 

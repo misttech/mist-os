@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    component_debug::cli::resolve_cmd,
-    errors::FfxError,
-    ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
-    ffx_component_resolve_args::ComponentResolveCommand,
-    ffx_core::ffx_plugin,
-    fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::Result;
+use component_debug::cli::resolve_cmd;
+use errors::FfxError;
+use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer};
+use ffx_component_resolve_args::ComponentResolveCommand;
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[ffx_plugin]
 pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: ComponentResolveCommand) -> Result<()> {

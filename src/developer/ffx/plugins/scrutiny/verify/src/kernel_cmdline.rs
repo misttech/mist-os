@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    ffx_scrutiny_verify_args::kernel_cmdline::Command,
-    scrutiny_config::{ConfigBuilder, ModelConfig},
-    scrutiny_frontend::{command_builder::CommandBuilder, launcher},
-    scrutiny_plugins::zbi::CmdlineCollection,
-    scrutiny_utils::golden::{CompareResult, GoldenFile},
-    serde_json,
-    std::{
-        collections::HashSet,
-        path::{Path, PathBuf},
-    },
+use anyhow::{anyhow, bail, Context, Result};
+use ffx_scrutiny_verify_args::kernel_cmdline::Command;
+use scrutiny_config::{ConfigBuilder, ModelConfig};
+use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_plugins::zbi::CmdlineCollection;
+use scrutiny_utils::golden::{CompareResult, GoldenFile};
+use serde_json;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
 };
 
 const SOFT_TRANSITION_MSG : &str = "

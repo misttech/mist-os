@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    futures::stream::{FuturesUnordered, StreamExt, TryStream},
-    futures::{future::FusedFuture, Future},
-    pin_project::pin_project,
-    std::mem,
-    std::num::NonZeroUsize,
-    std::pin::Pin,
-    std::task::{Context, Poll},
+use anyhow::Result;
+use futures::{
+    future::FusedFuture,
+    stream::{FuturesUnordered, StreamExt, TryStream},
+    Future,
+};
+use pin_project::pin_project;
+use std::{
+    mem,
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 impl<T: ?Sized + TryStream> TryStreamUtilExt for T where T: TryStream {}
@@ -141,14 +144,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::anyhow,
-        fuchsia_async::Timer,
-        futures::future::ready,
-        futures::stream::{iter, once},
-        std::time::Duration,
+    use super::*;
+    use anyhow::anyhow;
+    use fuchsia_async::Timer;
+    use futures::{
+        future::ready,
+        stream::{iter, once},
     };
+    use std::time::Duration;
 
     async fn sleep_for_a_year() {
         // Attempts to sleep for an entire year.

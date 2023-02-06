@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    async_trait::async_trait,
-    ffx_daemon_target::{fastboot::find_devices, FASTBOOT_CHECK_INTERVAL},
-    ffx_stream_util::TryStreamUtilExt,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_developer_ffx as ffx,
-    fuchsia_async::Task,
-    futures::TryStreamExt,
-    protocols::prelude::*,
-    std::rc::Rc,
-};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use ffx_daemon_target::{fastboot::find_devices, FASTBOOT_CHECK_INTERVAL};
+use ffx_stream_util::TryStreamUtilExt;
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_developer_ffx as ffx;
+use fuchsia_async::Task;
+use futures::TryStreamExt;
+use protocols::prelude::*;
+use std::rc::Rc;
 
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,

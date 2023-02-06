@@ -1,20 +1,21 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::Context,
-    anyhow::{anyhow, Result},
-    async_lock::RwLock,
-    async_trait::async_trait,
-    async_utils::async_once::Once,
-    core::marker::PhantomData,
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Request, RequestStream},
-    fidl::server::ServeInner,
-    futures::future::{LocalBoxFuture, Shared},
-    futures::prelude::*,
-    std::rc::Rc,
-    std::sync::Arc,
+use crate::Context;
+use anyhow::{anyhow, Result};
+use async_lock::RwLock;
+use async_trait::async_trait;
+use async_utils::async_once::Once;
+use core::marker::PhantomData;
+use fidl::{
+    endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Request, RequestStream},
+    server::ServeInner,
 };
+use futures::{
+    future::{LocalBoxFuture, Shared},
+    prelude::*,
+};
+use std::{rc::Rc, sync::Arc};
 
 /// A `FidlProtocol` type represents a protocol that can be run on the FFX
 /// Daemon.

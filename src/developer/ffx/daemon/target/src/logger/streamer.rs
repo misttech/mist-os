@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    async_fs::{create_dir_all, read_dir, remove_dir_all, remove_file, File, OpenOptions},
-    async_lock::{RwLock, RwLockWriteGuard},
-    async_trait::async_trait,
-    diagnostics_data::Timestamp,
-    ffx_config::get,
-    ffx_log_data::{LogData, LogEntry},
-    fidl_fuchsia_developer_ffx::StreamMode,
-    futures::{
-        channel::oneshot,
-        future::{LocalBoxFuture, Shared},
-        FutureExt,
-    },
-    futures_lite::io::{BufReader, Lines},
-    futures_lite::stream::{Stream, StreamExt},
-    futures_lite::{AsyncBufReadExt, AsyncWriteExt},
-    std::{
-        collections::HashMap, convert::TryInto, fmt, io::ErrorKind, iter::Iterator, path::PathBuf,
-        pin::Pin, sync::Arc, task::Poll, time::Duration,
-    },
+use anyhow::{anyhow, Context, Result};
+use async_fs::{create_dir_all, read_dir, remove_dir_all, remove_file, File, OpenOptions};
+use async_lock::{RwLock, RwLockWriteGuard};
+use async_trait::async_trait;
+use diagnostics_data::Timestamp;
+use ffx_config::get;
+use ffx_log_data::{LogData, LogEntry};
+use fidl_fuchsia_developer_ffx::StreamMode;
+use futures::{
+    channel::oneshot,
+    future::{LocalBoxFuture, Shared},
+    FutureExt,
+};
+use futures_lite::{
+    io::{BufReader, Lines},
+    stream::{Stream, StreamExt},
+    AsyncBufReadExt, AsyncWriteExt,
+};
+use std::{
+    collections::HashMap, convert::TryInto, fmt, io::ErrorKind, iter::Iterator, path::PathBuf,
+    pin::Pin, sync::Arc, task::Poll, time::Duration,
 };
 
 /// Location for target logs to be cached
@@ -932,16 +932,13 @@ impl DiagnosticsStreamer<'_> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_data::LogsData,
-        ffx_log_data::LogData,
-        fuchsia_async::TimeoutExt,
-        std::collections::HashMap,
-        std::time::Duration,
-        tempfile::{tempdir, TempDir},
-        timeout::timeout,
-    };
+    use super::*;
+    use diagnostics_data::LogsData;
+    use ffx_log_data::LogData;
+    use fuchsia_async::TimeoutExt;
+    use std::{collections::HashMap, time::Duration};
+    use tempfile::{tempdir, TempDir};
+    use timeout::timeout;
 
     const FAKE_DIR_NAME: &str = "fake_logs";
     const SMALL_MAX_LOG_SIZE: usize = 10;

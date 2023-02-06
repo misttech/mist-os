@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    std::{ffi::OsStr, fs::read_dir, path::PathBuf},
-};
+use anyhow::{Context, Result};
+use std::{ffi::OsStr, fs::read_dir, path::PathBuf};
 
 /// The default configs paths used if 0 paths are given.
 /// These will be prefixed by ${FUCHSIA_DIR} to get the full config file path.

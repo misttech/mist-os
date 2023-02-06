@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {regex::Regex, serde::Deserialize, std::collections::HashMap};
+use regex::Regex;
+use serde::Deserialize;
+use std::collections::HashMap;
 
 // TODO(fxbug.dev/102482): add documentation on fuchsia.dev.
 #[derive(Deserialize, Debug)]

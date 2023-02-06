@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::screen::Line,
-    anyhow::Result,
-    diagnostics_data::InspectData,
-    diagnostics_hierarchy::{self, hierarchy, HierarchyMatcher},
-    difference::{
-        self,
-        Difference::{Add, Rem, Same},
-    },
-    fidl_fuchsia_diagnostics::Selector,
-    selectors::{self, VerboseError},
-    std::{
-        collections::HashSet,
-        convert::TryInto,
-        path::{Path, PathBuf},
-    },
+use crate::screen::Line;
+use anyhow::Result;
+use diagnostics_data::InspectData;
+use diagnostics_hierarchy::{self, hierarchy, HierarchyMatcher};
+use difference::{
+    self,
+    Difference::{Add, Rem, Same},
+};
+use fidl_fuchsia_diagnostics::Selector;
+use selectors::{self, VerboseError};
+use std::{
+    collections::HashSet,
+    convert::TryInto,
+    path::{Path, PathBuf},
 };
 
 pub fn filter_json_schema_by_selectors(

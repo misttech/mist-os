@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, ensure, Context, Result},
-    errors::ffx_bail,
-    fuchsia_async::TimeoutExt,
-    serde_json::Value,
-    std::process::Stdio,
-    std::{future::Future, pin::Pin},
-    std::{io::Write, process::Command, time::Duration},
-    termion::is_tty,
+use anyhow::{anyhow, bail, ensure, Context, Result};
+use errors::ffx_bail;
+use fuchsia_async::TimeoutExt;
+use serde_json::Value;
+use std::{
+    future::Future,
+    io::Write,
+    pin::Pin,
+    process::{Command, Stdio},
+    time::Duration,
 };
+use termion::is_tty;
 
 pub mod asserts;
 

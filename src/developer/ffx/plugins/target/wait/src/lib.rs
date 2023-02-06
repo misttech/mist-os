@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _, Result},
-    errors::FfxError,
-    ffx_core::ffx_plugin,
-    ffx_wait_args::WaitCommand,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
-    futures::future::Either,
-    std::time::Duration,
-    thiserror::Error,
-    timeout::timeout,
-};
+use anyhow::{anyhow, Context as _, Result};
+use errors::FfxError;
+use ffx_core::ffx_plugin;
+use ffx_wait_args::WaitCommand;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use futures::future::Either;
+use std::time::Duration;
+use thiserror::Error;
+use timeout::timeout;
 
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
 pub async fn wait_for_device(
@@ -105,17 +103,15 @@ async fn knock_target(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_developer_ffx::{
-            TargetCollectionMarker, TargetCollectionRequest, TargetRequest, TargetRequestStream,
-        },
-        fidl_fuchsia_developer_remotecontrol::{
-            RemoteControlRequest, RemoteControlRequestStream, ServiceMatch,
-        },
-        futures::TryStreamExt,
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_developer_ffx::{
+        TargetCollectionMarker, TargetCollectionRequest, TargetRequest, TargetRequestStream,
     };
+    use fidl_fuchsia_developer_remotecontrol::{
+        RemoteControlRequest, RemoteControlRequestStream, ServiceMatch,
+    };
+    use futures::TryStreamExt;
 
     fn spawn_remote_control(mut rcs_stream: RemoteControlRequestStream) {
         fuchsia_async::Task::local(async move {

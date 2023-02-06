@@ -8,22 +8,18 @@ mod fuchsia_map;
 mod processes_data;
 mod write_human_readable_output;
 
-use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_process_explorer_args::{Args, QueryCommand},
-    ffx_writer::Writer,
-    fidl_fuchsia_process_explorer::QueryProxy,
-    fuchsia_map::json,
-    fuchsia_zircon_types::zx_koid_t,
-    futures::AsyncReadExt,
-    processes_data::{processed, raw},
-    std::collections::HashSet,
-    std::io::Write,
-    write_human_readable_output::{
-        pretty_print_invalid_koids, pretty_print_processes_data,
-        pretty_print_processes_name_and_koid,
-    },
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_process_explorer_args::{Args, QueryCommand};
+use ffx_writer::Writer;
+use fidl_fuchsia_process_explorer::QueryProxy;
+use fuchsia_map::json;
+use fuchsia_zircon_types::zx_koid_t;
+use futures::AsyncReadExt;
+use processes_data::{processed, raw};
+use std::{collections::HashSet, io::Write};
+use write_human_readable_output::{
+    pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
 
 // TODO(fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.

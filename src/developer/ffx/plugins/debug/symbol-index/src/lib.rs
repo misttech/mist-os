@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, errors::ffx_bail, ffx_core::ffx_plugin, ffx_debug_symbol_index_args::*,
-    std::path::Path, symbol_index::*,
-};
+use anyhow::Result;
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_debug_symbol_index_args::*;
+use std::path::Path;
+use symbol_index::*;
 
 #[ffx_plugin()]
 pub fn symbol_index(cmd: SymbolIndexCommand) -> Result<()> {
@@ -85,7 +87,9 @@ fn resolve_path_from_cwd(relative: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::fs::*, tempfile::TempDir};
+    use super::*;
+    use std::fs::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_list() {

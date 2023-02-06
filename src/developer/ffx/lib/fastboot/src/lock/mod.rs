@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{is_locked, lock_device, prepare, verify_variable_value},
-    anyhow::Result,
-    errors::ffx_bail,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    std::io::Write,
-};
+use crate::common::{is_locked, lock_device, prepare, verify_variable_value};
+use anyhow::Result;
+use errors::ffx_bail;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use std::io::Write;
 
 const LOCKABLE_VAR: &str = "vx-unlockable";
 const EPHEMERAL: &str = "ephemeral";
@@ -35,8 +33,7 @@ pub async fn lock<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> R
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::LOCKED_VAR;
-    use crate::test::setup;
+    use crate::{common::LOCKED_VAR, test::setup};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_locked_device_throws_err() -> Result<()> {

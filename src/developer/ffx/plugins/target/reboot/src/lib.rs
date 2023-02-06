@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Result},
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_reboot_args::RebootCommand,
-    fidl_fuchsia_developer_ffx::{TargetProxy, TargetRebootError, TargetRebootState},
-};
+use anyhow::{bail, Result};
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_reboot_args::RebootCommand;
+use fidl_fuchsia_developer_ffx::{TargetProxy, TargetRebootError, TargetRebootState};
 
 const NETSVC_NOT_FOUND: &str = "The Fuchsia target's netsvc address could not be determined.\n\
                                 If this problem persists, try running `ffx doctor` for diagnostics";
@@ -55,7 +53,8 @@ fn reboot_state(cmd: &RebootCommand) -> Result<TargetRebootState> {
 // tests
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_developer_ffx::TargetRequest};
+    use super::*;
+    use fidl_fuchsia_developer_ffx::TargetRequest;
 
     fn setup_fake_target_server(cmd: RebootCommand) -> TargetProxy {
         setup_fake_target_proxy(move |req| match req {

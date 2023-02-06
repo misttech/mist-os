@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    errors::ffx_bail,
-    ffx_config::get,
-    ffx_core::ffx_plugin,
-    ffx_daemon_log_args::LogCommand,
-    notify::Watcher,
-    std::{
-        collections::VecDeque,
-        fs::File,
-        io::{self, BufRead, BufReader, Seek},
-        path::{Path, PathBuf},
-        sync::{mpsc, Arc, Mutex},
-        time::Duration,
-    },
-    tracing::error,
+use anyhow::{Context, Result};
+use errors::ffx_bail;
+use ffx_config::get;
+use ffx_core::ffx_plugin;
+use ffx_daemon_log_args::LogCommand;
+use notify::Watcher;
+use std::{
+    collections::VecDeque,
+    fs::File,
+    io::{self, BufRead, BufReader, Seek},
+    path::{Path, PathBuf},
+    sync::{mpsc, Arc, Mutex},
+    time::Duration,
 };
+use tracing::error;
 
 #[ffx_plugin()]
 pub async fn daemon(cmd: LogCommand) -> Result<()> {
@@ -193,10 +191,8 @@ impl LogWatcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{fs, io::Write},
-    };
+    use super::*;
+    use std::{fs, io::Write};
 
     fn write_log(file: &mut impl Write, lines: std::ops::Range<usize>) {
         for line_idx in lines {

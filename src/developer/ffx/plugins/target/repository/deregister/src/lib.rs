@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    errors::ffx_bail,
-    ffx_config::keys::TARGET_DEFAULT_KEY,
-    ffx_core::ffx_plugin,
-    ffx_target_repository_deregister_args::DeregisterCommand,
-    fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::RepositoryError,
-};
+use anyhow::{Context, Result};
+use errors::ffx_bail;
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_core::ffx_plugin;
+use ffx_target_repository_deregister_args::DeregisterCommand;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn deregister_cmd(cmd: DeregisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -71,11 +69,9 @@ async fn deregister(
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest},
-        fuchsia_async as fasync,
-        futures::channel::oneshot::{channel, Receiver},
-    };
+    use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot::{channel, Receiver};
 
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";

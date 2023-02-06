@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    run_test_suite_lib::TestParams,
-    std::io::Read,
-    test_list::{ExecutionEntry, FuchsiaComponentExecutionEntry, TestList, TestListEntry},
-};
+use anyhow::{format_err, Result};
+use run_test_suite_lib::TestParams;
+use std::io::Read;
+use test_list::{ExecutionEntry, FuchsiaComponentExecutionEntry, TestList, TestListEntry};
 
 #[derive(Default)]
 pub struct TestParamsOptions {

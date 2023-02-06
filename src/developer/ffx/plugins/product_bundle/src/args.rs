@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs, ffx_core::ffx_command, pbms::AuthFlowChoice, std::path::PathBuf,
-    std::str::FromStr,
-};
+use argh::FromArgs;
+use ffx_core::ffx_command;
+use pbms::AuthFlowChoice;
+use std::{path::PathBuf, str::FromStr};
 
 /// Discover and access product bundle metadata and image data.
 #[ffx_command()]

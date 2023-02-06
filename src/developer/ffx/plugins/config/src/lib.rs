@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    errors::{ffx_bail, ffx_bail_with_code},
-    ffx_config::{
-        api::ConfigError, get, print_config, set_metrics_status, show_metrics_status,
-        BuildOverride, ConfigLevel,
-    },
-    ffx_config_plugin_args::{
-        AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
-        EnvCommand, EnvSetCommand, GetCommand, MappingMode, RemoveCommand, SetCommand, SubCommand,
-    },
-    ffx_core::ffx_plugin,
-    serde_json::Value,
-    std::fs::{File, OpenOptions},
-    std::io::Write,
+use anyhow::{anyhow, Context, Result};
+use errors::{ffx_bail, ffx_bail_with_code};
+use ffx_config::{
+    api::ConfigError, get, print_config, set_metrics_status, show_metrics_status, BuildOverride,
+    ConfigLevel,
+};
+use ffx_config_plugin_args::{
+    AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
+    EnvCommand, EnvSetCommand, GetCommand, MappingMode, RemoveCommand, SetCommand, SubCommand,
+};
+use ffx_core::ffx_plugin;
+use serde_json::Value;
+use std::{
+    fs::{File, OpenOptions},
+    io::Write,
 };
 
 #[ffx_plugin()]
@@ -78,7 +78,9 @@ async fn exec_get<W: Write + Sync>(get_cmd: &GetCommand, writer: W) -> Result<()
                 output(writer, value)
             }
         },
-        None => print_config(writer /*, get_cmd.query().get_build_dir().await.as_deref()*/).await,
+        None => {
+            print_config(writer /*, get_cmd.query().get_build_dir().await.as_deref()*/).await
+        }
     }
 }
 

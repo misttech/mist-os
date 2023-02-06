@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_developer_remotecontrol as fremotecontrol,
-    fidl_fuchsia_test_manager as ftest_manager,
-};
+use anyhow::{Context, Result};
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
+use fidl_fuchsia_test_manager as ftest_manager;
 
 const RUN_BUILDER_SELECTOR: &str = "core/test_manager:expose:fuchsia.test.manager.RunBuilder";
 const QUERY_SELECTOR: &str = "core/test_manager:expose:fuchsia.test.manager.Query";

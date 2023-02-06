@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, Property},
-    errors as _, ffx_inspect_common as _, ffx_writer as _,
-    fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
-        BridgeStreamParameters, DiagnosticsData, InlineData, RemoteControlProxy,
-        RemoteControlRequest, RemoteDiagnosticsBridgeProxy, RemoteDiagnosticsBridgeRequest,
-    },
-    fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode},
-    futures::{StreamExt, TryStreamExt},
-    iquery_test_support,
-    std::sync::Arc,
+use anyhow::Result;
+use diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, Property};
+use errors as _;
+use ffx_inspect_common as _;
+use ffx_writer as _;
+use fidl::{endpoints::ServerEnd, prelude::*};
+use fidl_fuchsia_developer_remotecontrol::{
+    ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker, ArchiveIteratorRequest,
+    BridgeStreamParameters, DiagnosticsData, InlineData, RemoteControlProxy, RemoteControlRequest,
+    RemoteDiagnosticsBridgeProxy, RemoteDiagnosticsBridgeRequest,
 };
+use fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode};
+use futures::{StreamExt, TryStreamExt};
+use iquery_test_support;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct FakeArchiveIteratorResponse {

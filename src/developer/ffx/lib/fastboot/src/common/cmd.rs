@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error, Result},
-    serde::{Deserialize, Serialize},
-    std::default::Default,
-    std::path::{Path, PathBuf},
+use anyhow::{bail, Error, Result};
+use serde::{Deserialize, Serialize};
+use std::{
+    default::Default,
+    path::{Path, PathBuf},
 };
 
 pub(crate) const OEM_FILE_ERROR_MSG: &str =

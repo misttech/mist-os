@@ -10,7 +10,9 @@ pub mod routes;
 pub mod static_pkgs;
 pub mod structured_config;
 
-use {argh::FromArgs, ffx_core::ffx_command, std::path::PathBuf};
+use argh::FromArgs;
+use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]

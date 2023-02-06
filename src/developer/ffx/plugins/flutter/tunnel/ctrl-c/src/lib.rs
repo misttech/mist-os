@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    atomic_waker::AtomicWaker,
-    futures::future::Future,
-    futures::never::Never,
-    futures::task::{Context, Poll},
-    std::pin::Pin,
-    std::sync::atomic::{AtomicBool, Ordering},
-    std::sync::Arc,
+use atomic_waker::AtomicWaker;
+use futures::{
+    future::Future,
+    never::Never,
+    task::{Context, Poll},
+};
+use std::{
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 struct CtrlCInner {

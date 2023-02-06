@@ -2,25 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        Context, DaemonProtocolProvider, FidlProtocol, NameToStreamHandlerMap, ProtocolRegister,
-        StreamHandler,
-    },
-    anyhow::{anyhow, bail, Context as _, Result},
-    async_trait::async_trait,
-    ffx_daemon_events::TargetInfo,
-    ffx_daemon_target::target::Target,
-    ffx_daemon_target::target_collection::TargetCollection,
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
-    fidl::server::ServeInner,
-    fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_developer_remotecontrol as rcs,
-    fidl_fuchsia_diagnostics as diagnostics,
-    futures::future::LocalBoxFuture,
-    futures::prelude::*,
-    std::cell::{Cell, RefCell},
-    std::rc::Rc,
-    std::sync::Arc,
+use crate::{
+    Context, DaemonProtocolProvider, FidlProtocol, NameToStreamHandlerMap, ProtocolRegister,
+    StreamHandler,
+};
+use anyhow::{anyhow, bail, Context as _, Result};
+use async_trait::async_trait;
+use ffx_daemon_events::TargetInfo;
+use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
+use fidl::{
+    endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
+    server::ServeInner,
+};
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_remotecontrol as rcs;
+use fidl_fuchsia_diagnostics as diagnostics;
+use futures::{future::LocalBoxFuture, prelude::*};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
 };
 
 #[derive(Default)]

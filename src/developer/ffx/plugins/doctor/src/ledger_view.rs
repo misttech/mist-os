@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::doctor_ledger::*,
-    std::fmt,
-    termion::{color, style},
-};
+use crate::doctor_ledger::*;
+use std::fmt;
+use termion::{color, style};
 
 const INDENT_STR: &str = "    ";
 

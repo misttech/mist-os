@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    async_lock::Mutex,
-    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_test_proxy_stress::{StressorMarker, StressorProxy},
-    fuchsia_async as fasync,
-    hoist::Hoist,
-    std::path::{Path, PathBuf},
-};
+use anyhow::{anyhow, Result};
+use async_lock::Mutex;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_test_proxy_stress::{StressorMarker, StressorProxy};
+use fuchsia_async as fasync;
+use hoist::Hoist;
+use std::path::{Path, PathBuf};
 
 /// Effectively arbitrarily high timeout. We don't use Duration::MAX here to avoid
 /// overflow errors in underlying libraries.

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context, Result},
-    scrutiny_plugins::verify::{ResultsBySeverity, ResultsForCapabilityType},
-    serde::{de::DeserializeOwned, Deserialize, Serialize},
-    serde_json5::from_reader,
-    std::io::Read,
-};
+use anyhow::{bail, Context, Result};
+use scrutiny_plugins::verify::{ResultsBySeverity, ResultsForCapabilityType};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json5::from_reader;
+use std::io::Read;
 
 /// Data format for allowlists before versioning was introduced.
 pub type UnversionedAllowlistContents = Vec<ResultsForCapabilityType>;

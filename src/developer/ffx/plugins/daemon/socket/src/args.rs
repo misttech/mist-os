@@ -7,7 +7,9 @@ use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "socket", description = "query information about the daemon socket without connecting to it")]
-pub struct SocketCommand {
-
-}
+#[argh(
+    subcommand,
+    name = "socket",
+    description = "query information about the daemon socket without connecting to it"
+)]
+pub struct SocketCommand {}

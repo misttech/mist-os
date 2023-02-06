@@ -9,9 +9,7 @@ use ffx_writer::Writer;
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use serde::Serialize;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
+use std::{fs::File, io::prelude::*, path::PathBuf};
 
 #[ffx_plugin("ffx_package")]
 pub async fn cmd_file_hash(

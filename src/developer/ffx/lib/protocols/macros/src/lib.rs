@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {heck::SnakeCase, proc_macro::TokenStream, quote::format_ident, quote::quote};
+use heck::SnakeCase;
+use proc_macro::TokenStream;
+use quote::{format_ident, quote};
 
 /// Generates the necessary glue code to use your protocol within the daemon.
 ///

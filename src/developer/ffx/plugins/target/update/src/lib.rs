@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    ffx_core::ffx_plugin,
-    ffx_update_args as args,
-    fidl_fuchsia_update::{
-        CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
-    },
-    fidl_fuchsia_update_channelcontrol::ChannelControlProxy,
-    fidl_fuchsia_update_ext::State,
-    futures::prelude::*,
+use anyhow::Error;
+use ffx_core::ffx_plugin;
+use ffx_update_args as args;
+use fidl_fuchsia_update::{
+    CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
+use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
+use fidl_fuchsia_update_ext::State;
+use futures::prelude::*;
 
 /// Main entry point for the `update` subcommand.
 #[ffx_plugin(

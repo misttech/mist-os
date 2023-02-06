@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_inspect_common::run_command,
-    ffx_inspect_list_files_args::ListFilesCommand,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy},
-    iquery::commands as iq,
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_inspect_common::run_command;
+use ffx_inspect_list_files_args::ListFilesCommand;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use iquery::commands as iq;
 
 #[ffx_plugin(
     RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
@@ -28,12 +26,10 @@ pub async fn list_files(
 /// The test fixtures lives in `//src/diagnostics/iquery/test_support`.
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        ffx_inspect_test_utils::{setup_fake_diagnostics_bridge, setup_fake_rcs},
-        ffx_writer::Format,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use ffx_inspect_test_utils::{setup_fake_diagnostics_bridge, setup_fake_rcs};
+    use ffx_writer::Format;
 
     #[fuchsia::test]
     async fn test_list_files_no_parameters() {

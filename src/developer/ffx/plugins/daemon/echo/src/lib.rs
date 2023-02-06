@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_echo_args::EchoCommand,
-    fidl_fuchsia_developer_ffx::EchoProxy,
-    std::io::{stdout, Write},
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_echo_args::EchoCommand;
+use fidl_fuchsia_developer_ffx::EchoProxy;
+use std::io::{stdout, Write};
 
 #[ffx_plugin(EchoProxy = "daemon::protocol")]
 pub async fn echo(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<()> {
@@ -28,7 +26,9 @@ async fn echo_impl<W: Write>(echo_proxy: EchoProxy, cmd: EchoCommand, mut writer
 
 #[cfg(test)]
 mod test {
-    use {super::*, anyhow::Context, fidl_fuchsia_developer_ffx::EchoRequest};
+    use super::*;
+    use anyhow::Context;
+    use fidl_fuchsia_developer_ffx::EchoRequest;
 
     fn setup_fake_service() -> EchoProxy {
         setup_fake_echo_proxy(|req| match req {

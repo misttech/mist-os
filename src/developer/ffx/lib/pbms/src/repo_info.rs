@@ -4,12 +4,10 @@
 
 //! Tracking information for a repository mirror.
 
-use {
-    anyhow::Result,
-    serde::{Deserialize, Serialize},
-    serde_json,
-    std::{fs::File, path::Path},
-};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::{fs::File, path::Path};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct RepoInfo {

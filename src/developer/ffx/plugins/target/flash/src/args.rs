@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    ffx_core::ffx_command,
-    ffx_fastboot::common::cmd::{Command, ManifestParams, OemFile},
-    std::default::Default,
-    std::path::PathBuf,
-};
+use argh::FromArgs;
+use ffx_core::ffx_command;
+use ffx_fastboot::common::cmd::{Command, ManifestParams, OemFile};
+use std::{default::Default, path::PathBuf};
 
 #[ffx_command()]
 #[derive(FromArgs, Default, Debug, Eq, PartialEq)]

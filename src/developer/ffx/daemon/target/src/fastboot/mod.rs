@@ -2,41 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fastboot::{
+use crate::{
+    fastboot::{
         client::{FastbootImpl, InterfaceFactory},
         network::{
             tcp::{TcpNetworkFactory, TcpNetworkInterface},
             udp::{UdpNetworkFactory, UdpNetworkInterface},
         },
     },
-    crate::target::Target,
-    anyhow::{anyhow, bail, Context, Result},
-    async_trait::async_trait,
-    chrono::Duration,
-    fastboot::{
-        command::{ClientVariable, Command},
-        download,
-        reply::Reply,
-        send, send_with_listener, send_with_timeout, upload, SendError,
-    },
-    ffx_config::get,
-    ffx_daemon_events::FastbootInterface,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_developer_ffx::{
-        FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,
-        VariableListenerMarker, VariableListenerProxy,
-    },
-    futures::{
-        io::{AsyncRead, AsyncWrite},
-        lock::Mutex,
-    },
-    lazy_static::lazy_static,
-    std::fs::read,
-    std::rc::Rc,
-    std::{collections::HashSet, convert::TryInto},
-    usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open},
+    target::Target,
 };
+use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
+use chrono::Duration;
+use fastboot::{
+    command::{ClientVariable, Command},
+    download,
+    reply::Reply,
+    send, send_with_listener, send_with_timeout, upload, SendError,
+};
+use ffx_config::get;
+use ffx_daemon_events::FastbootInterface;
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_developer_ffx::{
+    FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,
+    VariableListenerMarker, VariableListenerProxy,
+};
+use futures::{
+    io::{AsyncRead, AsyncWrite},
+    lock::Mutex,
+};
+use lazy_static::lazy_static;
+use std::{collections::HashSet, convert::TryInto, fs::read, rc::Rc};
+use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
 
 pub mod client;
 pub mod network;

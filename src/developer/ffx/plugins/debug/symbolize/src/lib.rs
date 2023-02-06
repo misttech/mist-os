@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    fuchsia_async::unblock,
-    std::process::Command,
-};
+use anyhow::{anyhow, Context, Result};
+use fuchsia_async::unblock;
+use std::process::Command;
 
 #[ffx_core::ffx_plugin()]
 pub async fn symbolize(cmd: ffx_debug_symbolize_args::SymbolizeCommand) -> Result<()> {

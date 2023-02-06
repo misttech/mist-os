@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    daemonize::daemonize,
-    errors::{ffx_error, FfxError},
-    ffx_config::EnvironmentContext,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy},
-    fidl_fuchsia_overnet_protocol::NodeId,
-    futures::prelude::*,
-    hoist::{Hoist, OvernetInstance},
-    std::path::{Path, PathBuf},
-    std::pin::Pin,
-    std::time::Duration,
+use anyhow::{Context, Result};
+use daemonize::daemonize;
+use errors::{ffx_error, FfxError};
+use ffx_config::EnvironmentContext;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
+use fidl_fuchsia_overnet_protocol::NodeId;
+use futures::prelude::*;
+use hoist::{Hoist, OvernetInstance};
+use std::{
+    path::{Path, PathBuf},
+    pin::Pin,
+    time::Duration,
 };
 
 mod constants;

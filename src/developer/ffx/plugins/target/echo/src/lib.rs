@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_target_echo_args::EchoCommand,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    std::io::{stdout, Write},
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_target_echo_args::EchoCommand;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use std::io::{stdout, Write};
 
 #[ffx_plugin()]
 pub async fn echo(rcs_proxy: RemoteControlProxy, cmd: EchoCommand) -> Result<()> {
@@ -32,11 +30,9 @@ async fn echo_impl<W: Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        anyhow::Context,
-        fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest},
-    };
+    use super::*;
+    use anyhow::Context;
+    use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
 
     fn setup_fake_service() -> RemoteControlProxy {
         use futures::TryStreamExt;

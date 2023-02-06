@@ -6,17 +6,17 @@
 //!
 //! This builds upon the lower level /src/lib/transfer_manifest lib.
 
-use {
-    crate::{
-        gcs::{fetch_from_gcs, string_from_gcs},
-        AuthFlowChoice,
-    },
-    ::gcs::client::{Client, ProgressResult, ProgressState},
-    ::gcs::gs_url::split_gs_url,
-    ::transfer_manifest::TransferManifest,
-    anyhow::{Context, Result},
-    structured_ui,
+use crate::{
+    gcs::{fetch_from_gcs, string_from_gcs},
+    AuthFlowChoice,
 };
+use ::gcs::{
+    client::{Client, ProgressResult, ProgressState},
+    gs_url::split_gs_url,
+};
+use ::transfer_manifest::TransferManifest;
+use anyhow::{Context, Result};
+use structured_ui;
 
 /// Download a set of files referenced in the `transfer_manifest_url`.
 ///

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_inspect_common::run_command,
-    ffx_inspect_selectors_args::SelectorsCommand,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy},
-    iquery::commands as iq,
-};
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_inspect_common::run_command;
+use ffx_inspect_selectors_args::SelectorsCommand;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use iquery::commands as iq;
 
 #[ffx_plugin(
     RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
@@ -26,20 +24,18 @@ pub async fn selectors(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        errors::ResultExt as _,
-        ffx_inspect_test_utils::{
-            inspect_bridge_data, make_inspect_with_length, make_inspects_for_lifecycle,
-            setup_fake_diagnostics_bridge, setup_fake_rcs, FakeBridgeData,
-        },
-        ffx_writer::Format,
-        fidl_fuchsia_developer_remotecontrol::BridgeStreamParameters,
-        fidl_fuchsia_diagnostics::{
-            ClientSelectorConfiguration, DataType, SelectorArgument, StreamMode,
-        },
-        std::sync::Arc,
+    use super::*;
+    use errors::ResultExt as _;
+    use ffx_inspect_test_utils::{
+        inspect_bridge_data, make_inspect_with_length, make_inspects_for_lifecycle,
+        setup_fake_diagnostics_bridge, setup_fake_rcs, FakeBridgeData,
     };
+    use ffx_writer::Format;
+    use fidl_fuchsia_developer_remotecontrol::BridgeStreamParameters;
+    use fidl_fuchsia_diagnostics::{
+        ClientSelectorConfiguration, DataType, SelectorArgument, StreamMode,
+    };
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn test_selectors_no_parameters() {

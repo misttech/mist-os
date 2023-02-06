@@ -22,11 +22,9 @@ use fidl_fuchsia_developer_ffx::{
     FastbootProxy, RebootError, RebootListenerMarker, RebootListenerRequest,
     UploadProgressListenerMarker, UploadProgressListenerRequest,
 };
-use futures::prelude::*;
-use futures::try_join;
+use futures::{prelude::*, try_join};
 use sdk::SdkVersion;
-use std::convert::Into;
-use std::io::Write;
+use std::{convert::Into, io::Write};
 use termion::{color, style};
 
 pub const MISSING_CREDENTIALS: &str =

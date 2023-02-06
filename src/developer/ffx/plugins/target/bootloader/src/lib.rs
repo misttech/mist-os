@@ -2,25 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::ffx_bail,
-    ffx_bootloader_args::{
-        BootCommand, BootloaderCommand,
-        SubCommand::{Boot, Info, Lock, Unlock},
-        UnlockCommand,
-    },
-    ffx_core::ffx_plugin,
-    ffx_fastboot::{
-        boot::boot,
-        common::{file::EmptyResolver, from_manifest, prepare},
-        info::info,
-        lock::lock,
-        unlock::unlock,
-    },
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    std::io::{stdin, stdout, Write},
+use anyhow::Result;
+use errors::ffx_bail;
+use ffx_bootloader_args::{
+    BootCommand, BootloaderCommand,
+    SubCommand::{Boot, Info, Lock, Unlock},
+    UnlockCommand,
 };
+use ffx_core::ffx_plugin;
+use ffx_fastboot::{
+    boot::boot,
+    common::{file::EmptyResolver, from_manifest, prepare},
+    info::info,
+    lock::lock,
+    unlock::unlock,
+};
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use std::io::{stdin, stdout, Write};
 
 const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi parameter";
 

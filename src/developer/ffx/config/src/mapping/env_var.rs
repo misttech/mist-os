@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mapping::{postprocess, preprocess, replace_regex as replace};
-use crate::EnvironmentContext;
+use crate::{
+    mapping::{postprocess, preprocess, replace_regex as replace},
+    EnvironmentContext,
+};
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use regex::Regex;

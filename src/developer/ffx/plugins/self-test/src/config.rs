@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{assert, assert_eq, test::*},
-    anyhow::*,
-};
+use crate::{assert, assert_eq, test::*};
+use anyhow::*;
 
 pub(crate) async fn test_env() -> Result<()> {
     let isolate = new_isolate("config-env").await?;

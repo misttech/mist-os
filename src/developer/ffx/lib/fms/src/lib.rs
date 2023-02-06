@@ -6,18 +6,16 @@
 //!
 //! Uses a unique identifier (FMS Name) to lookup SDK Module metadata.
 
-use {
-    anyhow::{bail, Context, Result},
-    glob::glob,
-    sdk_metadata::{from_reader, Metadata, ProductBundleV1, VirtualDevice},
-    std::{
-        collections::HashMap,
-        ffi::OsStr,
-        fmt::{self, Display, Formatter},
-        fs::File,
-        io::{BufReader, Read},
-        path::{Path, PathBuf},
-    },
+use anyhow::{bail, Context, Result};
+use glob::glob;
+use sdk_metadata::{from_reader, Metadata, ProductBundleV1, VirtualDevice};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fmt::{self, Display, Formatter},
+    fs::File,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
 };
 
 /// Manager for finding available SDK Modules for download or ensuring that an
@@ -212,7 +210,8 @@ pub fn find_virtual_devices(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, tempfile::TempDir};
+    use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_entries() {

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::environment::EnvironmentKind;
-use crate::EnvironmentContext;
+use crate::{environment::EnvironmentKind, EnvironmentContext};
 use anyhow::{anyhow, Result};
 use std::{fs::create_dir_all, path::PathBuf};
 

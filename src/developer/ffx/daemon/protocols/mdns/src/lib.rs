@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    async_trait::async_trait,
-    ffx_stream_util::TryStreamUtilExt,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_developer_ffx as ffx,
-    fuchsia_async::Task,
-    futures::TryStreamExt,
-    protocols::prelude::*,
-    std::cell::RefCell,
-    std::collections::HashSet,
-    std::hash::{Hash, Hasher},
-    std::rc::Rc,
-    std::time::Duration,
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use ffx_stream_util::TryStreamUtilExt;
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_developer_ffx as ffx;
+use fuchsia_async::Task;
+use futures::TryStreamExt;
+use protocols::prelude::*;
+use std::{
+    cell::RefCell,
+    collections::HashSet,
+    hash::{Hash, Hasher},
+    rc::Rc,
+    time::Duration,
 };
 
 mod mdns;
@@ -186,8 +186,7 @@ mod tests {
     use lazy_static::lazy_static;
     use packet::{InnerPacketBuilder, Serializer};
     use protocols::testing::FakeDaemonBuilder;
-    use std::net::IpAddr;
-    use std::net::SocketAddr;
+    use std::net::{IpAddr, SocketAddr};
 
     lazy_static! {
         // This is copied from the //fuchsia/lib/src/mdns/rust/src/protocol.rs

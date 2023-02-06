@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Result},
-    async_utils::async_once::Once,
-    ffx_daemon_events::TargetConnectionState,
-    ffx_daemon_target::fastboot::Fastboot,
-    ffx_daemon_target::target::Target,
-    ffx_daemon_target::zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
-    fidl::endpoints::ServerEnd,
-    fidl::Error,
-    fidl_fuchsia_developer_ffx::{
-        self as ffx, RebootListenerRequest, TargetRebootError, TargetRebootResponder,
-        TargetRebootState,
-    },
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason},
-    futures::TryStreamExt,
-    futures::{try_join, TryFutureExt},
-    selectors::{self, VerboseError},
-    std::rc::Rc,
-    tasks::TaskManager,
+use anyhow::{anyhow, bail, Result};
+use async_utils::async_once::Once;
+use ffx_daemon_events::TargetConnectionState;
+use ffx_daemon_target::{
+    fastboot::Fastboot,
+    target::Target,
+    zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
 };
+use fidl::{endpoints::ServerEnd, Error};
+use fidl_fuchsia_developer_ffx::{
+    self as ffx, RebootListenerRequest, TargetRebootError, TargetRebootResponder, TargetRebootState,
+};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use futures::{try_join, TryFutureExt, TryStreamExt};
+use selectors::{self, VerboseError};
+use std::rc::Rc;
+use tasks::TaskManager;
 
 const ADMIN_SELECTOR: &'static str =
     "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
@@ -231,20 +228,17 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::anyhow,
-        fidl::endpoints::{create_proxy_and_stream, RequestStream},
-        fidl_fuchsia_developer_ffx::{
-            FastbootMarker, FastbootProxy, FastbootRequest, TargetMarker, TargetProxy,
-            TargetRequest,
-        },
-        fidl_fuchsia_developer_remotecontrol::{
-            RemoteControlMarker, RemoteControlRequest, ServiceMatch,
-        },
-        fidl_fuchsia_hardware_power_statecontrol::{AdminRequest, AdminRequestStream},
-        std::time::Instant,
+    use super::*;
+    use anyhow::anyhow;
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream};
+    use fidl_fuchsia_developer_ffx::{
+        FastbootMarker, FastbootProxy, FastbootRequest, TargetMarker, TargetProxy, TargetRequest,
     };
+    use fidl_fuchsia_developer_remotecontrol::{
+        RemoteControlMarker, RemoteControlRequest, ServiceMatch,
+    };
+    use fidl_fuchsia_hardware_power_statecontrol::{AdminRequest, AdminRequestStream};
+    use std::time::Instant;
 
     async fn setup_fastboot() -> FastbootProxy {
         let (proxy, mut stream) =

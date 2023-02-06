@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_diagnostics::Selector,
-    selectors::{parse_selector, selector_to_string, VerboseError},
-    serde::{Deserialize, Serialize},
-    std::collections::HashMap,
-    thiserror::Error,
-};
+use fidl_fuchsia_diagnostics::Selector;
+use selectors::{parse_selector, selector_to_string, VerboseError};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum MappingError {
@@ -74,7 +72,8 @@ impl SelectorMappingList {
 
 #[cfg(test)]
 mod test {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     fn tup_to_map(items: Vec<(&str, &str)>) -> HashMap<String, String> {
         items.iter().map(|s| (s.0.to_string(), s.1.to_string())).collect()

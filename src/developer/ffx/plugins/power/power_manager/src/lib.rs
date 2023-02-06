@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, errors::ffx_error, ffx_core::ffx_plugin,
-    fidl_fuchsia_power_manager_debug as fdebug,
-};
+use anyhow::Result;
+use errors::ffx_error;
+use ffx_core::ffx_plugin;
+use fidl_fuchsia_power_manager_debug as fdebug;
 
 #[ffx_plugin(
     fdebug::DebugProxy = "bootstrap/power_manager:expose:fuchsia.power.manager.debug.Debug"

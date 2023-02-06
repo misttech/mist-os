@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::{
-    validate_type,
-    value::{ConfigValue, ValueStrategy},
-    ConfigError,
+use crate::{
+    api::{
+        validate_type,
+        value::{ConfigValue, ValueStrategy},
+        ConfigError,
+    },
+    cache::load_config,
 };
-use crate::cache::load_config;
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{Context, Result};
 use std::{convert::From, io::Write};
@@ -232,8 +234,10 @@ mod test {
     // creates a token stream referencing `ffx_config` on the inside.
     use crate as ffx_config;
     use serde_json::{json, Value};
-    use std::collections::{HashMap, HashSet};
-    use std::path::PathBuf;
+    use std::{
+        collections::{HashMap, HashSet},
+        path::PathBuf,
+    };
 
     #[test]
     fn test_config_levels_make_sense_from_first() {

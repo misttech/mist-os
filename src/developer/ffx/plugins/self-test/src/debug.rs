@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::test::*,
-    anyhow::{ensure, Context, Result},
-    errors::ffx_bail,
-    fuchsia_async::{unblock, TimeoutExt, Timer},
-    regex::Regex,
-    std::fs::{create_dir_all, File},
-    std::io::{BufRead, BufReader},
-    std::io::{Read, Write},
-    std::path::Path,
-    std::process::Stdio,
-    std::sync::mpsc::channel,
-    std::time::Duration,
+use crate::test::*;
+use anyhow::{ensure, Context, Result};
+use errors::ffx_bail;
+use fuchsia_async::{unblock, TimeoutExt, Timer};
+use regex::Regex;
+use std::{
+    fs::{create_dir_all, File},
+    io::{BufRead, BufReader, Read, Write},
+    path::Path,
+    process::Stdio,
+    sync::mpsc::channel,
+    time::Duration,
 };
 
 pub mod include_target {

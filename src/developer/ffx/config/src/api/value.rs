@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::api::{
+use crate::{
+    api::{
         query::{ConfigQuery, SelectMode},
         ConfigError,
     },
-    crate::mapping::{filter, flatten},
-    crate::nested::RecursiveMap,
-    crate::EnvironmentContext,
-    anyhow::anyhow,
-    serde_json::{Map, Value},
-    std::{
-        convert::{From, TryFrom, TryInto},
-        path::PathBuf,
-    },
+    mapping::{filter, flatten},
+    nested::RecursiveMap,
+    EnvironmentContext,
+};
+use anyhow::anyhow;
+use serde_json::{Map, Value};
+use std::{
+    convert::{From, TryFrom, TryInto},
+    path::PathBuf,
 };
 
 const ADDITIVE_RETURN_ERR: &str =

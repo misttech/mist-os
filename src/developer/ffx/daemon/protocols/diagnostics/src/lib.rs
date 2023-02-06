@@ -4,19 +4,15 @@
 
 //! Implementation of the daemon diagnostics streaming protocol.
 
-use {
-    anyhow::bail,
-    anyhow::{Context as _, Result},
-    async_trait::async_trait,
-    diagnostics::{get_streaming_min_timestamp, run_diagnostics_streaming},
-    ffx_daemon_target::logger::streamer::{DiagnosticsStreamer, GenericDiagnosticsStreamer},
-    fidl_fuchsia_developer_ffx as ffx,
-    fuchsia_async::TimeoutExt,
-    futures::FutureExt,
-    protocols::prelude::*,
-    std::sync::Arc,
-    std::time::Duration,
-};
+use anyhow::{bail, Context as _, Result};
+use async_trait::async_trait;
+use diagnostics::{get_streaming_min_timestamp, run_diagnostics_streaming};
+use ffx_daemon_target::logger::streamer::{DiagnosticsStreamer, GenericDiagnosticsStreamer};
+use fidl_fuchsia_developer_ffx as ffx;
+use fuchsia_async::TimeoutExt;
+use futures::FutureExt;
+use protocols::prelude::*;
+use std::{sync::Arc, time::Duration};
 
 #[ffx_protocol(ffx::TargetCollectionMarker)]
 #[derive(Default)]

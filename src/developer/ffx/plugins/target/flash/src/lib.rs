@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    errors::ffx_bail,
-    ffx_config::SshKeyFiles,
-    ffx_core::ffx_plugin,
-    ffx_fastboot::common::{cmd::OemFile, from_manifest},
-    ffx_flash_args::FlashCommand,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    std::io::{stdout, Write},
-};
+use anyhow::{anyhow, Context, Result};
+use errors::ffx_bail;
+use ffx_config::SshKeyFiles;
+use ffx_core::ffx_plugin;
+use ffx_fastboot::common::{cmd::OemFile, from_manifest};
+use ffx_flash_args::FlashCommand;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use std::io::{stdout, Write};
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
@@ -71,8 +69,7 @@ pub async fn flash_plugin_impl<W: Write>(
 mod test {
     use super::*;
     use ffx_fastboot::test::setup;
-    use std::default::Default;
-    use std::path::PathBuf;
+    use std::{default::Default, path::PathBuf};
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::done_time,
-    anyhow::{anyhow, bail, Context, Result},
-    async_trait::async_trait,
-    chrono::Utc,
-    errors::{ffx_bail, ffx_error},
-    flate2::read::GzDecoder,
-    std::fs::{create_dir_all, File},
-    std::io::{copy, Write},
-    std::path::{Path, PathBuf},
-    tar::Archive,
-    tempfile::{tempdir, TempDir},
-    walkdir::WalkDir,
-    zip::read::ZipArchive,
+use crate::common::done_time;
+use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
+use chrono::Utc;
+use errors::{ffx_bail, ffx_error};
+use flate2::read::GzDecoder;
+use std::{
+    fs::{create_dir_all, File},
+    io::{copy, Write},
+    path::{Path, PathBuf},
 };
+use tar::Archive;
+use tempfile::{tempdir, TempDir};
+use walkdir::WalkDir;
+use zip::read::ZipArchive;
 
 #[async_trait(?Send)]
 pub trait FileResolver {

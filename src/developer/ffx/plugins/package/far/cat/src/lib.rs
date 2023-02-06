@@ -6,8 +6,10 @@ use anyhow::{Context, Result};
 use ffx_core::ffx_plugin;
 use ffx_package_far_cat_args::CatCommand;
 use fuchsia_archive as far;
-use std::fs::File;
-use std::io::{self, Write as _};
+use std::{
+    fs::File,
+    io::{self, Write as _},
+};
 
 #[ffx_plugin("ffx_package")]
 pub async fn cmd_cat(cmd: CatCommand) -> Result<()> {

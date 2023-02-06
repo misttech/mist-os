@@ -4,13 +4,11 @@
 
 pub use core_macros::{ffx_command, ffx_plugin};
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, VersionInfo},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, VersionInfo};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 
 /// Exports used in macros
 #[doc(hidden)]

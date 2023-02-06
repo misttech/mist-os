@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    async_lock::RwLock,
-    fidl_fuchsia_developer_remotecontrol as rcs,
-    fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
-    fuchsia_async as fasync,
-    fuchsia_repo::server::ConnectionStream,
-    futures::{channel::mpsc::UnboundedSender, StreamExt as _},
-    protocols::prelude::*,
-    std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration},
-};
+use anyhow::{Context as _, Result};
+use async_lock::RwLock;
+use fidl_fuchsia_developer_remotecontrol as rcs;
+use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
+use fuchsia_async as fasync;
+use fuchsia_repo::server::ConnectionStream;
+use futures::{channel::mpsc::UnboundedSender, StreamExt as _};
+use protocols::prelude::*;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 const TUNNEL_CONNECT_ATTEMPTS: usize = 5;
 const TUNNEL_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -161,7 +159,8 @@ async fn run_tunnel_protocol(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::net::Ipv4Addr};
+    use super::*;
+    use std::net::Ipv4Addr;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_spawning_tunnel() {

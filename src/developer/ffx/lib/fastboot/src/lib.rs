@@ -18,11 +18,13 @@ pub mod test {
     use async_trait::async_trait;
     use fidl::endpoints::{create_proxy_and_stream, Proxy};
     use fidl_fuchsia_developer_ffx::{FastbootProxy, FastbootRequest};
-    use std::collections::HashMap;
-    use std::default::Default;
-    use std::io::Write;
-    use std::path::{Path, PathBuf};
-    use std::sync::{Arc, Mutex};
+    use std::{
+        collections::HashMap,
+        default::Default,
+        io::Write,
+        path::{Path, PathBuf},
+        sync::{Arc, Mutex},
+    };
 
     #[derive(Default)]
     pub struct FakeServiceCommands {

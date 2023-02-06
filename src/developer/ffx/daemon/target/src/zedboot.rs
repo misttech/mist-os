@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    addr::TargetAddr,
-    anyhow::{anyhow, bail, Context as _, Result},
-    async_io::Async,
-    async_net::UdpSocket,
-    ffx_daemon_core::events,
-    ffx_daemon_events::{DaemonEvent, TargetInfo, TryIntoTargetInfo, WireTrafficType},
-    fuchsia_async::{Task, Timer},
-    netext::{get_mcast_interfaces, IsLocalAddr},
-    netsvc_proto::netboot::{
-        NetbootPacket, NetbootPacketBuilder, Opcode, ADVERT_PORT, SERVER_PORT,
-    },
-    packet::{Buf, FragmentedBuffer, InnerPacketBuilder, ParseBuffer, Serializer},
-    std::collections::HashSet,
-    std::net::{IpAddr, Ipv6Addr, SocketAddr},
-    std::num::NonZeroU16,
-    std::sync::{Arc, Weak},
-    std::time::Duration,
-    zerocopy::ByteSlice,
+use addr::TargetAddr;
+use anyhow::{anyhow, bail, Context as _, Result};
+use async_io::Async;
+use async_net::UdpSocket;
+use ffx_daemon_core::events;
+use ffx_daemon_events::{DaemonEvent, TargetInfo, TryIntoTargetInfo, WireTrafficType};
+use fuchsia_async::{Task, Timer};
+use netext::{get_mcast_interfaces, IsLocalAddr};
+use netsvc_proto::netboot::{
+    NetbootPacket, NetbootPacketBuilder, Opcode, ADVERT_PORT, SERVER_PORT,
 };
+use packet::{Buf, FragmentedBuffer, InnerPacketBuilder, ParseBuffer, Serializer};
+use std::{
+    collections::HashSet,
+    net::{IpAddr, Ipv6Addr, SocketAddr},
+    num::NonZeroU16,
+    sync::{Arc, Weak},
+    time::Duration,
+};
+use zerocopy::ByteSlice;
 
 /// Zedboot discovery port (must be a nonzero u16)
 const DISCOVERY_ZEDBOOT_ADVERT_PORT: &str = "discovery.zedboot.advert_port";

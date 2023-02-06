@@ -1,16 +1,16 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-    ffx_daemon::{find_and_connect, is_daemon_running_at_path, spawn_daemon},
-    fidl_fuchsia_developer_ffx::DaemonProxy,
-    fuchsia_async::Timer,
-    hoist::Hoist,
-    std::path::{Path, PathBuf},
-    std::process::Command,
-    std::time::Duration,
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use ffx_daemon::{find_and_connect, is_daemon_running_at_path, spawn_daemon};
+use fidl_fuchsia_developer_ffx::DaemonProxy;
+use fuchsia_async::Timer;
+use hoist::Hoist;
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
 };
 
 const KILL_RETRY_COUNT: usize = 5;

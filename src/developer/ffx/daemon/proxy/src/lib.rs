@@ -317,12 +317,9 @@ mod test {
     };
     use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
     use fuchsia_async::Task;
-    use futures::AsyncReadExt;
-    use futures::FutureExt;
-    use futures::TryStreamExt;
+    use futures::{AsyncReadExt, FutureExt, TryStreamExt};
     use hoist::OvernetInstance;
-    use std::path::PathBuf;
-    use std::sync::Arc;
+    use std::{path::PathBuf, sync::Arc};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_proxy_link_lost() {

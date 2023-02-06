@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{query, BuildOverride};
-use crate::{ConfigLevel, ConfigMap};
+use crate::{query, BuildOverride, ConfigLevel, ConfigMap};
 use anyhow::{bail, Context, Result};
 use errors::ffx_error;
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
@@ -380,8 +379,11 @@ fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
         .context(format!("canonicalizing ffx path {:?}", start_path))?;
 
     loop {
-        path =
-            if let Some(parent) = path.parent() { parent.to_path_buf() } else { return Ok(None) };
+        path = if let Some(parent) = path.parent() {
+            parent.to_path_buf()
+        } else {
+            return Ok(None);
+        };
 
         if path.join("meta").join("manifest.json").exists() {
             return Ok(Some(path));

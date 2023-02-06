@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::{ffx_bail, ffx_error},
-    ffx_component::rcs::connect_to_lifecycle_controller,
-    ffx_core::ffx_plugin,
-    ffx_sl4f_start_args::StartCommand,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_sl4f_ffx::Sl4fBridgeProxy,
-    fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_sys2::LifecycleControllerProxy,
-};
+use anyhow::Result;
+use errors::{ffx_bail, ffx_error};
+use ffx_component::rcs::connect_to_lifecycle_controller;
+use ffx_core::ffx_plugin;
+use ffx_sl4f_start_args::StartCommand;
+use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_component_decl as fdecl;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_sl4f_ffx::Sl4fBridgeProxy;
+use fidl_fuchsia_sys2 as fsys;
+use fidl_fuchsia_sys2::LifecycleControllerProxy;
 
 const COLLECTION_NAME: &'static str = "ffx-laboratory";
 const PARENT_MONIKER: &'static str = "./core";

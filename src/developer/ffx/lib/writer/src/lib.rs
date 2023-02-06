@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    std::io::{stderr, stdout, Write},
-    std::ops::DerefMut,
-    std::sync::{Arc, Mutex, MutexGuard},
+use anyhow::{anyhow, Context, Result};
+use std::{
+    io::{stderr, stdout, Write},
+    ops::DerefMut,
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 /// The valid formats possible to output for machine consumption.

@@ -5,15 +5,13 @@ mod fake_daemon;
 
 pub use fake_daemon::{FakeDaemon, FakeDaemonBuilder};
 
-use {
-    crate::{Context, FidlProtocol},
-    fidl::endpoints::create_endpoints,
-    fidl::endpoints::Proxy,
-    fidl::{endpoints::ProtocolMarker, AsyncChannel},
-    fuchsia_async::Task,
-    std::cell::RefCell,
-    std::rc::Rc,
+use crate::{Context, FidlProtocol};
+use fidl::{
+    endpoints::{create_endpoints, ProtocolMarker, Proxy},
+    AsyncChannel,
 };
+use fuchsia_async::Task;
+use std::{cell::RefCell, rc::Rc};
 
 /// A simple proxy made from a FIDL protocol. This is necessary if your proxy
 /// has some specific state you would like to have control over. You can inspect

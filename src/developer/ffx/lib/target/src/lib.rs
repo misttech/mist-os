@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::FfxError,
-    fidl::{endpoints::create_proxy, prelude::*},
-    fidl_fuchsia_developer_ffx::{
-        DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetProxy, TargetQuery,
-    },
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy},
-    futures::{select, Future, FutureExt},
-    std::time::Duration,
-    timeout::timeout,
+use anyhow::Result;
+use errors::FfxError;
+use fidl::{endpoints::create_proxy, prelude::*};
+use fidl_fuchsia_developer_ffx::{
+    DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetProxy, TargetQuery,
 };
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+use futures::{select, Future, FutureExt};
+use std::time::Duration;
+use timeout::timeout;
 
 #[derive(Debug, Clone)]
 pub enum TargetKind {

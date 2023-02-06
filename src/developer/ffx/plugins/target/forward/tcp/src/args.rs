@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_net::SocketAddress,
-    fidl_fuchsia_net_ext as net_ext, std::net::SocketAddr,
-};
+use argh::FromArgs;
+use ffx_core::ffx_command;
+use fidl_fuchsia_net::SocketAddress;
+use fidl_fuchsia_net_ext as net_ext;
+use std::net::SocketAddr;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]

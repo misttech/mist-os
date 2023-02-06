@@ -2,25 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    async_fs::File,
-    async_lock::{Mutex, MutexGuard},
-    async_trait::async_trait,
-    fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing_controller as trace,
-    fuchsia_async::Task,
-    futures::prelude::*,
-    futures::task::{Context as FutContext, Poll},
-    protocols::prelude::*,
-    std::collections::hash_map::Entry,
-    std::collections::BTreeSet,
-    std::collections::HashMap,
-    std::pin::Pin,
-    std::rc::{Rc, Weak},
-    std::time::{Duration, Instant},
-    tasks::TaskManager,
-    thiserror::Error,
+use anyhow::{Context as _, Result};
+use async_fs::File;
+use async_lock::{Mutex, MutexGuard};
+use async_trait::async_trait;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_tracing_controller as trace;
+use fuchsia_async::Task;
+use futures::{
+    prelude::*,
+    task::{Context as FutContext, Poll},
 };
+use protocols::prelude::*;
+use std::{
+    collections::{hash_map::Entry, BTreeSet, HashMap},
+    pin::Pin,
+    rc::{Rc, Weak},
+    time::{Duration, Instant},
+};
+use tasks::TaskManager;
+use thiserror::Error;
 
 #[derive(Debug)]
 struct TraceTask {

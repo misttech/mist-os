@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    errors::FfxError,
-    ffx_core::ffx_plugin,
-    ffx_triage_args::TriageCommand,
-    ffx_writer::Writer,
-    fidl_fuchsia_feedback::DataProviderProxy,
-    fuchsia_triage::{
-        analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
-    },
-    std::{env, io::Write, path::PathBuf},
-    tempfile::tempdir,
-    triage_app_lib::file_io::{config_from_files, diagnostics_from_directory},
+use anyhow::{anyhow, Context, Result};
+use errors::FfxError;
+use ffx_core::ffx_plugin;
+use ffx_triage_args::TriageCommand;
+use ffx_writer::Writer;
+use fidl_fuchsia_feedback::DataProviderProxy;
+use fuchsia_triage::{
+    analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
 };
+use std::{env, io::Write, path::PathBuf};
+use tempfile::tempdir;
+use triage_app_lib::file_io::{config_from_files, diagnostics_from_directory};
 
 mod config;
 mod snapshot;

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    ffx_config::{self, ConfigLevel},
-    fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget},
-    percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS},
-    serde_json::Value,
-    std::collections::HashMap,
-};
+use anyhow::{anyhow, Context, Result};
+use ffx_config::{self, ConfigLevel};
+use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
+use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
+use serde_json::Value;
+use std::collections::HashMap;
 
 const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
@@ -368,7 +366,10 @@ pub async fn remove_registration(repo_name: &str, target_identifier: &str) -> Re
 
 #[cfg(test)]
 mod tests {
-    use {super::*, maplit::hashmap, serde_json::json, std::future::Future};
+    use super::*;
+    use maplit::hashmap;
+    use serde_json::json;
+    use std::future::Future;
 
     const CONFIG_KEY_ROOT: &str = "repository";
 

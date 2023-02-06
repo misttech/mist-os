@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Result},
-    ffx_core::ffx_plugin,
-    ffx_off_args::OffCommand,
-    fidl::Error as FidlError,
-    fidl_fuchsia_hardware_power_statecontrol::AdminProxy,
-};
+use anyhow::{bail, Result};
+use ffx_core::ffx_plugin;
+use ffx_off_args::OffCommand;
+use fidl::Error as FidlError;
+use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
 
 #[ffx_plugin(
     AdminProxy = "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin"
@@ -36,7 +34,8 @@ pub async fn off(admin_proxy: AdminProxy, _cmd: OffCommand) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_hardware_power_statecontrol::AdminRequest};
+    use super::*;
+    use fidl_fuchsia_hardware_power_statecontrol::AdminRequest;
 
     fn setup_fake_admin_server() -> AdminProxy {
         setup_fake_admin_proxy(|req| match req {

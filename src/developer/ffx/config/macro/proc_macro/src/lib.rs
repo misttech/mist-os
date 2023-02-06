@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Error, Result},
-    proc_macro::TokenStream,
-    quote::quote,
-    serde_json::Value,
-    std::convert::{TryFrom, TryInto},
-    std::env,
+use anyhow::{anyhow, bail, Context, Error, Result};
+use proc_macro::TokenStream;
+use quote::quote;
+use serde_json::Value;
+use std::{
+    convert::{TryFrom, TryInto},
+    env,
 };
 
 const FFX_CONFIG_DEFAULT: &'static str = "ffx_config_default";

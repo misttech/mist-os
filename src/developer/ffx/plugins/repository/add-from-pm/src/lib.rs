@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    errors::{ffx_bail, ffx_error},
-    ffx_core::ffx_plugin,
-    ffx_repository_add_from_pm_args::AddFromPmCommand,
-    fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec},
-    fuchsia_url::RepositoryUrl,
-    std::convert::TryInto,
-};
+use anyhow::{Context, Result};
+use errors::{ffx_bail, ffx_error};
+use ffx_core::ffx_plugin;
+use ffx_repository_add_from_pm_args::AddFromPmCommand;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
+use fuchsia_url::RepositoryUrl;
+use std::convert::TryInto;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -41,13 +39,11 @@ pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) 
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_developer_ffx::{PmRepositorySpec, RepositoryRegistryRequest, RepositorySpec},
-        fuchsia_async as fasync,
-        futures::channel::oneshot::channel,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_developer_ffx::{PmRepositorySpec, RepositoryRegistryRequest, RepositorySpec};
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot::channel;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_add_from_pm() {

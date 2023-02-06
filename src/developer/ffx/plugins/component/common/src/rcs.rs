@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, errors::ffx_error, fidl::endpoints::create_proxy,
-    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon_status::Status,
-};
+use anyhow::Result;
+use errors::ffx_error;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_developer_remotecontrol as rc;
+use fidl_fuchsia_sys2 as fsys;
+use fuchsia_zircon_status::Status;
 
 /// Obtain the root LifecycleController protocol using the RemoteControl protocol.
 pub async fn connect_to_lifecycle_controller(

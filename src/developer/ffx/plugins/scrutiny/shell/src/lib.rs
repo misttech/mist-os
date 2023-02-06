@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    ffx_core::ffx_plugin,
-    ffx_scrutiny_shell_args::ScrutinyShellCommand,
-    scrutiny_config::{ConfigBuilder, LoggingVerbosity, ModelConfig},
-    scrutiny_frontend::launcher,
-};
+use anyhow::Error;
+use ffx_core::ffx_plugin;
+use ffx_scrutiny_shell_args::ScrutinyShellCommand;
+use scrutiny_config::{ConfigBuilder, LoggingVerbosity, ModelConfig};
+use scrutiny_frontend::launcher;
 
 #[ffx_plugin()]
 pub async fn scrutiny_shell(cmd: ScrutinyShellCommand) -> Result<(), Error> {

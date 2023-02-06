@@ -14,8 +14,10 @@ use fuchsia_async::unblock;
 use fuchsia_fs::directory::{open_directory_no_describe, open_file_no_describe};
 use fuchsia_zircon_status::Status;
 use futures::StreamExt;
-use std::io::{BufRead, Write};
-use std::process::Command;
+use std::{
+    io::{BufRead, Write},
+    process::Command,
+};
 use tempfile::{NamedTempFile, TempPath};
 
 // Must be kept in sync with //src/sys/core/core_component_id_index.json5.

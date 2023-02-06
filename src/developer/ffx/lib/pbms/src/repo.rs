@@ -5,30 +5,28 @@
 //! Utilities for downloading fuchsia package repository metadata and blobs from a product bundle
 //! manifest.
 
-use {
-    crate::{
-        pbms::{fetch_bundle_uri, make_remote_url, GS_SCHEME},
-        AuthFlowChoice,
-    },
-    ::gcs::client::{
-        Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
-    },
-    anyhow::{anyhow, bail, Context, Result},
-    camino::Utf8Path,
-    chrono::{DateTime, TimeZone, Utc},
-    fuchsia_hyper::new_https_client,
-    fuchsia_repo::{
-        repo_builder::RepoBuilder,
-        repo_client::RepoClient,
-        repo_keys::RepoKeys,
-        repository::{FileSystemRepository, GcsRepository, HttpRepository, RepoProvider},
-    },
-    futures::{stream::FuturesUnordered, TryStreamExt as _},
-    sdk_metadata::PackageBundle,
-    serde_json::Value,
-    std::path::Path,
-    url::Url,
+use crate::{
+    pbms::{fetch_bundle_uri, make_remote_url, GS_SCHEME},
+    AuthFlowChoice,
 };
+use ::gcs::client::{
+    Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
+};
+use anyhow::{anyhow, bail, Context, Result};
+use camino::Utf8Path;
+use chrono::{DateTime, TimeZone, Utc};
+use fuchsia_hyper::new_https_client;
+use fuchsia_repo::{
+    repo_builder::RepoBuilder,
+    repo_client::RepoClient,
+    repo_keys::RepoKeys,
+    repository::{FileSystemRepository, GcsRepository, HttpRepository, RepoProvider},
+};
+use futures::{stream::FuturesUnordered, TryStreamExt as _};
+use sdk_metadata::PackageBundle;
+use serde_json::Value;
+use std::path::Path;
+use url::Url;
 
 // How many package blobs to download at the same time.
 const PACKAGE_FETCHER_CONCURRENCY: usize = 5;
@@ -436,26 +434,24 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_net::{Ipv4Addr, TcpListener},
-        camino::{Utf8Path, Utf8PathBuf},
-        fuchsia_async::Task,
-        fuchsia_hyper::TcpStream,
-        fuchsia_repo::{
-            repository::{HttpRepository, PmRepository},
-            test_utils,
-        },
-        futures::{FutureExt as _, Stream as _},
-        hyper::{service::service_fn, Body, Request, Response, StatusCode},
-        std::{
-            convert::Infallible,
-            pin::Pin,
-            sync::Arc,
-            task::{Context, Poll},
-        },
-        tuf::metadata::Metadata as _,
+    use super::*;
+    use async_net::{Ipv4Addr, TcpListener};
+    use camino::{Utf8Path, Utf8PathBuf};
+    use fuchsia_async::Task;
+    use fuchsia_hyper::TcpStream;
+    use fuchsia_repo::{
+        repository::{HttpRepository, PmRepository},
+        test_utils,
     };
+    use futures::{FutureExt as _, Stream as _};
+    use hyper::{service::service_fn, Body, Request, Response, StatusCode};
+    use std::{
+        convert::Infallible,
+        pin::Pin,
+        sync::Arc,
+        task::{Context, Poll},
+    };
+    use tuf::metadata::Metadata as _;
 
     struct HyperListener(TcpListener);
 
