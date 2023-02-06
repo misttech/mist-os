@@ -10,7 +10,9 @@ use {
 };
 
 mod address;
+mod device_manager;
 mod fidl_server;
+mod hw;
 mod hypervisor;
 mod memory;
 mod vcpu;

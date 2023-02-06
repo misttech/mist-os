@@ -16,7 +16,10 @@ rustc_binary("vmm_rs") {
 
   sources = [
     "src/address.rs",
+    "src/device_manager.rs",
     "src/fidl_server.rs",
+    "src/hw/memory_device.rs",
+    "src/hw/mod.rs",
     "src/hypervisor.rs",
     "src/main.rs",
     "src/memory.rs",
@@ -38,11 +41,9 @@ rustc_binary("vmm_rs") {
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:vm-device",
   ]
-  test_deps = [
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:parking_lot",
-  ]
+  test_deps = [ "//src/lib/fuchsia-async" ]
 }
 
 fuchsia_component("component") {

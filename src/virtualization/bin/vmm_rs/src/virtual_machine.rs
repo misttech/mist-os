@@ -4,6 +4,7 @@
 
 use {
     crate::address::GuestPhysicalAddress,
+    crate::device_manager::DeviceManager,
     crate::hypervisor::Hypervisor,
     crate::memory::Memory,
     crate::vcpu::Vcpu,
@@ -38,6 +39,7 @@ pub struct VirtualMachine<H: Hypervisor> {
     memory: Memory<H>,
     vcpus: [Option<Vcpu<H>>; MAX_SUPPORTED_VCPUS as usize],
     boot_params: BootParams,
+    devices: DeviceManager<H>,
 }
 
 impl<H: Hypervisor> VirtualMachine<H> {
@@ -53,10 +55,11 @@ impl<H: Hypervisor> VirtualMachine<H> {
         })?;
         memory.map_into_host().map_err(|e| e.into())?;
         memory.map_into_guest(&guest_physical_address_space).map_err(|e| e.into())?;
-
+        let guest = Arc::new(guest);
         Ok(VirtualMachine {
+            devices: DeviceManager::new(hypervisor.clone(), guest.clone()),
             hypervisor,
-            guest: Arc::new(guest),
+            guest,
             guest_physical_address_space,
             memory,
             // Default::default() is only derived for arrays up to 32 elements. This is just a
@@ -102,6 +105,7 @@ impl<H: Hypervisor> VirtualMachine<H> {
         self.vcpus[id] = Some(Vcpu::new(
             self.hypervisor.clone(),
             self.guest.clone(),
+            self.devices.clone(),
             id as u32,
             entry,
             boot_ptr,

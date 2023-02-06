@@ -54,6 +54,21 @@ pub trait Hypervisor: Send + Sync + Clone + 'static {
     /// [zx_guest_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/guest_create) syscall.
     fn guest_create(&self) -> Result<(Self::GuestHandle, Self::AddressSpaceHandle), zx::Status>;
 
+    /// Sets a trap in the guest's port-io space.
+    ///
+    /// # Errors:
+    ///
+    /// The full set of errors can be found in the documentation for the
+    /// [zx_guest_set_trap](https://fuchsia.dev/fuchsia-src/reference/syscalls/guest_set_trap)
+    /// syscall.
+    fn guest_set_io_trap(
+        &self,
+        guest: &Self::GuestHandle,
+        addr: u16,
+        size: u16,
+        key: u64,
+    ) -> Result<(), zx::Status>;
+
     /// Allocates a [zx::Vmo] that can be mapped into the address space for a guest.
     fn allocate_memory(&self, bytes: u64) -> Result<zx::Vmo, zx::Status>;
 
@@ -266,6 +281,15 @@ impl Hypervisor for FuchsiaHypervisor {
     fn guest_create(&self) -> Result<(Self::GuestHandle, Self::AddressSpaceHandle), zx::Status> {
         Ok(zx::Guest::normal(&self.inner.hypervisor_resource)?)
     }
+    fn guest_set_io_trap(
+        &self,
+        guest: &Self::GuestHandle,
+        addr: u16,
+        size: u16,
+        key: u64,
+    ) -> Result<(), zx::Status> {
+        guest.set_io_trap(addr, size, key)
+    }
 
     fn allocate_memory(&self, bytes: u64) -> Result<zx::Vmo, zx::Status> {
         let vmo = zx::Vmo::create(bytes)?;
@@ -325,11 +349,10 @@ impl Hypervisor for FuchsiaHypervisor {
 pub mod testing {
     use {
         super::*,
-        parking_lot::Mutex,
         std::{
             cell::RefCell,
             rc::Rc,
-            sync::{mpsc, Arc},
+            sync::{mpsc, Arc, Condvar, Mutex},
         },
     };
 
@@ -389,7 +412,7 @@ pub mod testing {
         }
 
         pub fn vcpus(&self) -> Vec<MockVcpuController> {
-            self.vcpus.lock().clone()
+            self.vcpus.lock().unwrap().clone()
         }
     }
 
@@ -406,6 +429,10 @@ pub mod testing {
         packet_sender: mpsc::Sender<Result<zx::Packet, zx::Status>>,
         // The initial instruction pointer that the [MockVcpu] was created with.
         initial_ip: usize,
+
+        // A counter that tracks the number of times the vcpu thread has called `vcpu_enter`. Tests can use this
+        // to wait on the count increasing to determine when the vcpu has completed handling a vm-exit.
+        entry_counter: Arc<VcpuEntryCounter>,
     }
 
     impl MockVcpuController {
@@ -419,8 +446,54 @@ pub mod testing {
             self.packet_sender.send(Err(status))
         }
 
+        pub fn send_packet(
+            &self,
+            packet: zx::Packet,
+        ) -> Result<(), mpsc::SendError<Result<zx::Packet, zx::Status>>> {
+            self.packet_sender.send(Ok(packet))
+        }
+
         pub fn initial_ip(&self) -> usize {
             self.initial_ip
+        }
+
+        pub fn entry_counter(&self) -> Arc<VcpuEntryCounter> {
+            Arc::clone(&self.entry_counter)
+        }
+    }
+
+    /// This is a simple wait-able counter that tests can use to block until a VCPU has
+    /// called `Hypervisor::vcpu_enter` a certain number of times.
+    ///
+    /// This is useful to determine when the vcpu has completed handling a vm-exit.
+    #[derive(Debug)]
+    pub struct VcpuEntryCounter {
+        count: Mutex<usize>,
+        signal: Condvar,
+    }
+
+    impl VcpuEntryCounter {
+        pub fn new() -> Arc<Self> {
+            Arc::new(Self { count: Mutex::new(0), signal: Condvar::new() })
+        }
+
+        /// Increments the counter, returning the new value.
+        pub fn increment(&self) -> usize {
+            let mut count = self.count.lock().unwrap();
+            *count = *count + 1;
+            self.signal.notify_all();
+            *count
+        }
+
+        pub fn wait_for_count(&self, target_count: usize) {
+            let mut count = self.count.lock().unwrap();
+            while *count < target_count {
+                count = self.signal.wait(count).unwrap();
+            }
+        }
+
+        pub fn get_count(&self) -> usize {
+            *self.count.lock().unwrap()
         }
     }
 
@@ -428,14 +501,20 @@ pub mod testing {
     pub struct MockVcpu {
         state: RefCell<zx::sys::zx_vcpu_state_t>,
         packet_receiver: mpsc::Receiver<Result<zx::Packet, zx::Status>>,
+        entry_counter: Arc<VcpuEntryCounter>,
     }
 
     impl MockVcpu {
         pub fn new(initial_ip: usize) -> (MockVcpu, MockVcpuController) {
             let (packet_sender, packet_receiver) = mpsc::channel();
+            let entry_counter = VcpuEntryCounter::new();
             (
-                MockVcpu { state: RefCell::new(Default::default()), packet_receiver },
-                MockVcpuController { packet_sender, initial_ip },
+                MockVcpu {
+                    state: RefCell::new(Default::default()),
+                    packet_receiver,
+                    entry_counter: entry_counter.clone(),
+                },
+                MockVcpuController { packet_sender, initial_ip, entry_counter },
             )
         }
     }
@@ -499,7 +578,7 @@ pub mod testing {
         entry: usize,
     ) -> Result<(MockVcpu, MockVcpuController), zx::Status> {
         let (vcpu, controller) = MockVcpu::new(entry);
-        guest.vcpus.lock().push(controller.clone());
+        guest.vcpus.lock().unwrap().push(controller.clone());
         Ok((vcpu, controller))
     }
 
@@ -521,6 +600,7 @@ pub mod testing {
     pub fn mock_vcpu_enter(vcpu: &MockVcpu) -> Result<zx::Packet, zx::Status> {
         // Block-on the packet receiver until the test sends a packet or status return. This allows
         // the test to simulate VM exits using an mpsc channel.
+        vcpu.entry_counter.increment();
         vcpu.packet_receiver.recv().unwrap()
     }
 
@@ -545,37 +625,37 @@ pub mod testing {
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::allocate_memory] is called.
         pub fn on_allocate_memory(&self, behavior: MockBehavior) {
-            self.inner.lock().on_allocate_memory = behavior;
+            self.inner.lock().unwrap().on_allocate_memory = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::guest_create] is called.
         pub fn on_guest_create(&self, behavior: MockBehavior) {
-            self.inner.lock().on_guest_create = behavior;
+            self.inner.lock().unwrap().on_guest_create = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_create] is called.
         pub fn on_vcpu_create(&self, behavior: MockBehavior) {
-            self.inner.lock().on_vcpu_create = behavior;
+            self.inner.lock().unwrap().on_vcpu_create = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_read_state] is called.
         pub fn on_vcpu_read_state(&self, behavior: MockBehavior) {
-            self.inner.lock().on_vcpu_read_state = behavior;
+            self.inner.lock().unwrap().on_vcpu_read_state = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_write_state] is called.
         pub fn on_vcpu_write_state(&self, behavior: MockBehavior) {
-            self.inner.lock().on_vcpu_write_state = behavior;
+            self.inner.lock().unwrap().on_vcpu_write_state = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_enter] is called.
         pub fn on_vcpu_enter(&self, behavior: MockBehavior) {
-            self.inner.lock().on_vcpu_enter = behavior;
+            self.inner.lock().unwrap().on_vcpu_enter = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_kick] is called.
         pub fn on_vcpu_kick(&self, behavior: MockBehavior) {
-            self.inner.lock().on_vcpu_kick = behavior;
+            self.inner.lock().unwrap().on_vcpu_kick = behavior;
         }
     }
 
@@ -588,14 +668,26 @@ pub mod testing {
         fn guest_create(
             &self,
         ) -> Result<(Self::GuestHandle, Self::AddressSpaceHandle), zx::Status> {
-            if let Some(status) = self.inner.lock().on_guest_create.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_guest_create.return_error() {
                 return Err(status);
             }
             mock_guest_create()
         }
+        fn guest_set_io_trap(
+            &self,
+            _guest: &Self::GuestHandle,
+            _address: u16,
+            _size: u16,
+            _key: u64,
+        ) -> Result<(), zx::Status> {
+            // TODO: we could track the set of traps and provide proper errors
+            // here. Otherwise a fake here is not too interesting since trap
+            // packages are synthetically generated in tests anyways.
+            Ok(())
+        }
 
         fn allocate_memory(&self, bytes: u64) -> Result<zx::Vmo, zx::Status> {
-            if let Some(status) = self.inner.lock().on_allocate_memory.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_allocate_memory.return_error() {
                 return Err(status);
             }
             mock_allocate_memory(bytes)
@@ -658,7 +750,7 @@ pub mod testing {
             guest: &Self::GuestHandle,
             entry: usize,
         ) -> Result<(Self::VcpuHandle, Self::VcpuControlHandle), zx::Status> {
-            if let Some(status) = self.inner.lock().on_vcpu_create.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_create.return_error() {
                 return Err(status);
             }
             mock_vcpu_create(guest, entry)
@@ -667,7 +759,7 @@ pub mod testing {
             &self,
             vcpu: &Self::VcpuHandle,
         ) -> Result<zx::sys::zx_vcpu_state_t, zx::Status> {
-            if let Some(status) = self.inner.lock().on_vcpu_read_state.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_read_state.return_error() {
                 return Err(status);
             }
             mock_vcpu_read_state(vcpu)
@@ -677,19 +769,19 @@ pub mod testing {
             vcpu: &Self::VcpuHandle,
             state: &zx::sys::zx_vcpu_state_t,
         ) -> Result<(), zx::Status> {
-            if let Some(status) = self.inner.lock().on_vcpu_write_state.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_write_state.return_error() {
                 return Err(status);
             }
             mock_vcpu_write_state(vcpu, state)
         }
         fn vcpu_enter(&self, vcpu: &Self::VcpuHandle) -> Result<zx::Packet, zx::Status> {
-            if let Some(status) = self.inner.lock().on_vcpu_enter.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_enter.return_error() {
                 return Err(status);
             }
             mock_vcpu_enter(vcpu)
         }
         fn vcpu_kick(&self, vcpu: &Self::VcpuControlHandle) -> Result<(), zx::Status> {
-            if let Some(status) = self.inner.lock().on_vcpu_kick.return_error() {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_kick.return_error() {
                 return Err(status);
             }
             mock_vcpu_kick(vcpu)
