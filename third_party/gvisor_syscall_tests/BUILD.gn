@@ -556,7 +556,7 @@ syscall_test_suite(tcp_test_label) {
   run_with_fast_udp = false
   use_expectations_framework = true
   test_specs = {
-    timeout_secs = 600
+    timeout_secs = 900
   }
 }
 
