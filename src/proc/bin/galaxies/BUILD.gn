@@ -24,10 +24,6 @@ group("release") {
 
 group("tests") {
   if (target_cpu == "x64" && !is_asan) {
-    deps = [
-      "starbionic_test",
-      "starless",
-      "starmium_test",
-    ]
+    deps = [ "starless" ]
   }
 }

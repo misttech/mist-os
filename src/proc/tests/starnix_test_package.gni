@@ -59,39 +59,6 @@ template("starnix_test_package_with_expectations") {
   }
 }
 
-# Define a test package for a linux test running in a starbionic galaxy.
-#
-# The parameters are the same as fuchsia_test_package
-template("starbionic_test_package") {
-  starnix_test_package(target_name) {
-    forward_variables_from(invoker, "*")
-
-    galaxy = "//src/proc/bin/galaxies/starbionic_test"
-  }
-}
-
-# Define a test package with expectations for a linux test running in a starbionic galaxy.
-#
-# The parameters are the same as fuchsia_test_package
-template("starbionic_test_package_with_expectations") {
-  starnix_test_package_with_expectations(target_name) {
-    forward_variables_from(invoker, "*")
-
-    galaxy = "//src/proc/bin/galaxies/starbionic_test"
-  }
-}
-
-# Define a test package for a linux test running in a starmium galaxy.
-#
-# The parameters are the same as fuchsia_test_package
-template("starmium_test_package") {
-  starnix_test_package(target_name) {
-    forward_variables_from(invoker, "*")
-
-    galaxy = "//src/proc/bin/galaxies/starmium_test"
-  }
-}
-
 # Define a test package for a linux test running in a starless galaxy.
 #
 # The parameters are the same as fuchsia_test_package

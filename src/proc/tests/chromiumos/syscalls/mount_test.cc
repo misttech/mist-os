@@ -266,8 +266,7 @@ class ProcMountsTest : public ::testing::Test {
  public:
   void SetUp() override {
     // TODO Ideally the test galaxy should just have /proc mounted by default
-    // (src/proc/bin/galaxies/starmium_test/config.json5) but first the mount
-    // point needs to exist in the image
+    // but first the mount point needs to exist in the image
     // (prebuilt/starnix/chromiumos-image-amd64/system.img).
     std::stringstream ss;
     ss << tmp_ << "/proc";
