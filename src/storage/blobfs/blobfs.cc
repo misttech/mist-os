@@ -721,7 +721,6 @@ zx_status_t Blobfs::AddBlocks(size_t nblocks, RawBitmap* block_map) {
   ZX_DEBUG_ASSERT(abmblks_old <= abmblks);
 
   if (abmblks > blocks_per_slice) {
-    // TODO(planders): Allocate more slices for the block bitmap.
     FX_LOGS(ERROR) << ":AddBlocks needs to increase block bitmap size";
     return ZX_ERR_NO_SPACE;
   }
@@ -855,7 +854,6 @@ std::unique_ptr<BlockDevice> Blobfs::Reset() {
   // XXX This function relies on very subtle orderings and assumptions about the state of the
   // filesystem. Proceed with caution whenever making changes to Blobfs::Reset(), and consult the
   // blame history for the graveyard of bugs past.
-  // TODO(fxbug.dev/56464): simplify the teardown path.
   if (!block_device_) {
     return nullptr;
   }
@@ -871,10 +869,10 @@ std::unique_ptr<BlockDevice> Blobfs::Reset() {
 
   // Write the clean bit.
   if (writability_ == Writability::Writable) {
-    // TODO(fxbug.dev/42174): If blobfs initialization failed, it is possible that the info_mapping_
-    // vmo that we use to send writes to the underlying block device has not been initialized yet.
-    // Change Blobfs::Create ordering to try and get the object into a valid state as soon as
-    // possible and reassess what is needed in the destructor.
+    // NB: If blobfs initialization failed, it is possible that the info_mapping_ vmo that we use to
+    // send writes to the underlying block device has not been initialized yet.
+    // To fix this, we could change Blobfs::Create ordering to try and get the object into a valid
+    // state as soon as possible and reassess what is needed in the destructor.
     if (info_mapping_.start() == nullptr) {
       FX_LOGS(ERROR) << "Cannot write journal clean bit";
     } else {
