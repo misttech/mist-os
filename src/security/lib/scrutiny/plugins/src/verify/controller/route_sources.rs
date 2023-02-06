@@ -62,6 +62,11 @@ pub struct RouteSourcesConfig {
 pub struct RouteSourcesSpec {
     /// Absolute path to the component instance whose routes are to be verified.
     pub target_node_path: NodePath,
+    /// If true, verification of the component instance will be skipped if the
+    /// component instance does not exist in the component tree.
+    /// Allows soft transitions of adding/removing/renaming components.
+    #[serde(default)]
+    pub skip_if_target_node_missing: bool,
     /// Routes that are expected to be present, but do not require verification.
     pub routes_to_skip: Vec<UseSpec>,
     /// Route specification and route source matching information for routes
@@ -548,12 +553,19 @@ impl RouteSourcesController {
         let mut results = HashMap::new();
         for component_routes in config.component_routes.iter() {
             let target_node_path = &component_routes.target_node_path;
-            let target_instance =
-                component_model.get_instance(target_node_path).context(format!(
+            let target_instance = match component_model.get_instance(target_node_path) {
+                Ok(target_instance) => target_instance,
+                Err(routing::error::ComponentInstanceError::InstanceNotFound { .. })
+                    if component_routes.skip_if_target_node_missing =>
+                {
+                    continue
+                }
+                e @ Err(_) => e.context(format!(
                     "{}; target instance: {}",
                     MISSING_TARGET_INSTANCE,
                     target_node_path.clone()
-                ))?;
+                ))?,
+            };
 
             let (_, routes_to_verify) = gather_routes(
                 component_routes,
@@ -1014,6 +1026,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec![]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![],
             }],
@@ -1035,6 +1048,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["does:0", "not:1", "exist:2"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![],
             }],
@@ -1044,6 +1058,58 @@ mod tests {
         // `err.root_cause()` string; `MISSING_TARGET_INSTANCE` is the last context
         // attached to the error, which originates elsewhere.
         assert!(err.to_string().starts_with(MISSING_TARGET_INSTANCE));
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn test_component_routes_missing_target_ignored() -> Result<()> {
+        let data_model = valid_two_instance_two_dir_tree_model(Some(
+            valid_two_instance_two_dir_components_model(None)?,
+        ))?;
+        let controller = RouteSourcesController::default();
+        let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
+        let components = &data_model.get::<Components>()?.entries;
+        // Request checking routes of a component instance that does not exist.
+        let config = RouteSourcesConfig {
+            component_routes: vec![RouteSourcesSpec {
+                target_node_path: NodePath::absolute_from_vec(vec!["does:0", "not:1", "exist:2"]),
+                skip_if_target_node_missing: true,
+                routes_to_skip: vec![],
+                // This route will not be verified but verification itself will succeed because
+                // the target node does not exist in the topology and skip_if_target_node_missing
+                // is true.
+                routes_to_verify: vec![
+                    // config.component_routes[0].routes_to_verify[0]:
+                    // Match route:
+                    //   @one_dir_provider_url
+                    //     -> @root_url
+                    //     -> @one_dir_user_url.
+                    RouteMatch {
+                        target: UseSpec {
+                            type_name: CapabilityTypeName::Directory,
+                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            name: None,
+                        },
+                        source: SourceSpec {
+                            node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
+                            capability: SourceDeclSpec {
+                                // Match complete path with routed subdirs.
+                                path_prefix: Some(
+                                    CapabilityPath::from_str(
+                                        "/data/to/user/provider_subdir/root_subdir/user_subdir",
+                                    )
+                                    .unwrap(),
+                                ),
+                                name: Some("provider_dir".into()),
+                            },
+                        },
+                    },
+                ],
+            }],
+        };
+        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        assert_eq!(result, hashmap! {});
 
         Ok(())
     }
@@ -1061,6 +1127,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![],
             }],
@@ -1084,6 +1151,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1126,6 +1194,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1168,6 +1237,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     // Skip @root_url -> @two_dir_user_url route.
                     UseSpec {
@@ -1240,6 +1310,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     // Skip @root_url -> @two_dir_user_url route.
                     UseSpec {
@@ -1312,6 +1383,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![
                     // config.component_routes[0].routes_to_verify[0]:
@@ -1411,12 +1483,14 @@ mod tests {
                 // Match empty set of routes used by @root_url.
                 RouteSourcesSpec {
                     target_node_path: NodePath::absolute_from_vec(vec![]),
+                    skip_if_target_node_missing: false,
                     routes_to_skip: vec![],
                     routes_to_verify: vec![],
                 },
                 // Match all routes used by @two_dir_user_url.
                 RouteSourcesSpec {
                     target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                    skip_if_target_node_missing: false,
                     routes_to_skip: vec![],
                     routes_to_verify: vec![
                         // config.component_routes[1].routes_to_verify[0]:
@@ -1516,6 +1590,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1565,6 +1640,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1615,6 +1691,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1657,6 +1734,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1697,6 +1775,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![UseSpec {
                     type_name: CapabilityTypeName::Directory,
                     path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
@@ -1761,6 +1840,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
@@ -1816,6 +1896,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![
                     // Intentional error: No match for `/data/from/root`. That
                     // way number of routes to skip + number of routes to verify
@@ -1869,6 +1950,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![
                     // config.component_routes[0].routes_to_verify[0]:
@@ -1953,6 +2035,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![
                     // config.component_routes[0].routes_to_verify[0]:
@@ -2037,6 +2120,7 @@ mod tests {
         let config = RouteSourcesConfig {
             component_routes: vec![RouteSourcesSpec {
                 target_node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                skip_if_target_node_missing: false,
                 routes_to_skip: vec![],
                 routes_to_verify: vec![
                     // config.component_routes[0].routes_to_verify[0]:
