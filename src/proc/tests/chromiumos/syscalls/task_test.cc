@@ -66,7 +66,7 @@ pid_t DoClone3(const clone_args* cl_args, size_t size, int (*func)(void*), void*
       : [cl_args] "r"(cl_args), "m"(*cl_args), [size] "r"(size), [func] "r"(func),
         [param] "r"(param), [clone3] "i"(SYS_clone3), [exit] "i"(SYS_exit)
       : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-        "x14", "x15", "x16", "x17", "x30", "cc", "memory");
+        "x14", "x15", "x16", "x17", "cc", "memory");
 #elif defined(__x86_64__)
   __asm__ volatile(
       "syscall\n"
@@ -149,8 +149,11 @@ TEST(Task, Clone3_ChangeStack) {
   ca.child_tid = reinterpret_cast<uint64_t>(&child_pid_from_clone);
 
   constexpr size_t kStackSize = 0x5000;
-  ca.stack = reinterpret_cast<uint64_t>(
-      mmap(NULL, kStackSize, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  void* stack_addr = mmap(NULL, kStackSize, PROT_WRITE | PROT_READ,
+                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+  ASSERT_NE(MAP_FAILED, stack_addr);
+
+  ca.stack = reinterpret_cast<uint64_t>(stack_addr);
   ca.stack_size = kStackSize;
 
   auto child_pid = DoClone3(&ca, sizeof(ca), &stack_test_func, &child_pid_from_clone);
@@ -168,6 +171,8 @@ TEST(Task, Clone3_ChangeStack) {
   auto exit_status = WEXITSTATUS(wait_status);
   EXPECT_NE(exit_status, kChildErrorExitCode) << "Child process reported state was unexpected.";
   EXPECT_EQ(exit_status, kChildExpectedExitCode) << "Wrong exit code from child process.";
+
+  ASSERT_EQ(0, munmap(stack_addr, kStackSize));
 }
 
 // Forks a child process using the "clone3()" syscall and waits on it, validating some parameters.
