@@ -59,13 +59,7 @@ void AddNonPassingTests(TestMap& tests) {
   SkipTest(tests,
            "AllFamilies/"
            "SocketMultiProtocolInetLoopbackTest."
-           "MultipleBindsAllowedNoListeningReuseAddr/*");
-  SkipTest(tests,
-           "AllFamilies/"
-           "SocketMultiProtocolInetLoopbackTest."
            "DualStackV6AnyReuseAddrListenReservesV4Any/*");
-
-  // Netstack3 does not support TCP (yet).
 
   // Skip tests that will otherwise hang forever.
   // TODO(b/245940107): un-skip some of these when the data path is ready.

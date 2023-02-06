@@ -644,7 +644,6 @@ where
         (state, tag_state, addr)
     }
 
-    #[todo_unused::todo_unused("https://fxbug.dev/120272")]
     pub(crate) fn try_update_sharing(
         self,
         new_sharing_state: AddrState::SharingState,

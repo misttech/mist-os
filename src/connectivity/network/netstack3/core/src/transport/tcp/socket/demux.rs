@@ -36,8 +36,9 @@ use crate::{
         seqnum::WindowSize,
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
-            ListenerId, MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext,
-            SharingState, Sockets, SyncContext, TcpIpTransportContext, TimerId,
+            ListenerAddrState, ListenerId, ListenerSharingState, MaybeClosedConnectionId,
+            MaybeListener, MaybeListenerId, NonSyncContext, Sockets, SyncContext,
+            TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, SocketOptions, UserError,
@@ -161,7 +162,8 @@ fn handle_incoming_packet<I, B, C, SC>(
             // Connections are always searched before listeners because they
             // are more specific.
             AddrVec::Conn(conn_addr) => {
-                if let Some(conn_id) = sockets.socketmap.conns().get_by_addr(&conn_addr).cloned() {
+                if let Some(conn_addr_state) = sockets.socketmap.conns().get_by_addr(&conn_addr) {
+                    let conn_id = conn_addr_state.id();
                     try_handle_incoming_for_connection::<I, SC, C, B>(
                         ip_transport_ctx,
                         ctx,
@@ -180,8 +182,17 @@ fn handle_incoming_packet<I, B, C, SC>(
                 // allocate a new connection entry in the demuxer.
                 // TODO(https://fxbug.dev/101992): Support SYN cookies.
 
-                if let Some(id) = sockets.socketmap.listeners().get_by_addr(&listener_addr).cloned()
+                if let Some(addr_state) = sockets.socketmap.listeners().get_by_addr(&listener_addr)
                 {
+                    let id = match addr_state {
+                        ListenerAddrState::ExclusiveListener(id) => id.clone().into(),
+                        ListenerAddrState::Shared { listener: Some(id), bound: _ } => {
+                            id.clone().into()
+                        }
+                        ListenerAddrState::ExclusiveBound(_)
+                        | ListenerAddrState::Shared { listener: None, bound: _ } => return false,
+                    };
+
                     try_handle_incoming_for_listener::<I, SC, C, B>(
                         ip_transport_ctx,
                         ctx,
@@ -357,7 +368,7 @@ where
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
     let socketmap = &mut sockets.socketmap;
-    let (maybe_listener, SharingState, listener_addr) =
+    let (maybe_listener, sharing, listener_addr) =
         socketmap.listeners().get_by_id(&listener_id).expect("invalid listener_id");
 
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
@@ -429,6 +440,7 @@ where
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
         let socket_options = socket_options.clone();
         let bound_device = bound_device.cloned();
+        let ListenerSharingState { sharing, listening: _ } = *sharing;
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
@@ -449,13 +461,12 @@ where
                     defunct: false,
                     socket_options,
                 },
-                // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
-                SharingState,
+                sharing,
             )
             .expect("failed to create a new connection")
             .id();
         assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
-        let (maybe_listener, _, _): (_, &SharingState, &ListenerAddr<_, _, _>) = sockets
+        let (maybe_listener, _, _): (_, &ListenerSharingState, &ListenerAddr<_, _, _>) = sockets
             .socketmap
             .listeners_mut()
             .get_by_id_mut(&listener_id)
