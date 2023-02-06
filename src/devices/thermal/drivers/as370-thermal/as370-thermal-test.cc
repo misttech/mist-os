@@ -7,11 +7,13 @@
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo-mock.h>
 #include <fuchsia/hardware/power/cpp/banjo-mock.h>
-#include <lib/fake_ddk/fidl-helper.h>
+#include <lib/async-loop/cpp/loop.h>
 
 #include <fbl/algorithm.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
+
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -36,11 +38,14 @@ class As370ThermalTest : public zxtest::Test {
              ddk::PowerProtocolClient(power_.GetProto())) {}
 
   void SetUp() override {
-    ASSERT_OK(messenger_.SetMessageOp(
-        &dut_, [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
-          return static_cast<As370Thermal*>(ctx)->ddk_device_proto_.message(ctx, msg, txn);
-        }));
+    loop_.StartThread();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_thermal::Device>();
+    ASSERT_OK(endpoints.status_value());
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &dut_);
+    client_.Bind(std::move(endpoints->client));
   }
+
+  void TearDown() override { loop_.Shutdown(); }
 
  protected:
   void VerifyAll() {
@@ -48,11 +53,12 @@ class As370ThermalTest : public zxtest::Test {
     ASSERT_NO_FATAL_FAILURE(power_.VerifyAndClear());
   }
 
-  fake_ddk::FidlMessenger messenger_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   ddk_mock::MockMmioRegRegion reg_region_;
   ddk::MockClock clock_;
   ddk::MockPower power_;
   As370Thermal dut_;
+  ThermalClient client_;
 
  private:
   static constexpr ThermalDeviceInfo kThermalDeviceInfo = {
@@ -89,40 +95,37 @@ class As370ThermalTest : public zxtest::Test {
   };
 
   ddk_mock::MockMmioReg reg_array_[8];
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(As370ThermalTest, GetTemperature) {
-  ThermalClient client(std::move(messenger_.local()));
-
   {
     reg_region_[0x14].ReadReturns(0x17ff);
-    auto result = client->GetTemperatureCelsius();
+    auto result = client_->GetTemperatureCelsius();
     EXPECT_OK(result->status);
     EXPECT_TRUE(FloatNear(result->temp, 40.314f));
   }
 
   {
     reg_region_[0x14].ReadReturns(0x182b);
-    auto result = client->GetTemperatureCelsius();
+    auto result = client_->GetTemperatureCelsius();
     EXPECT_OK(result->status);
     EXPECT_TRUE(FloatNear(result->temp, 43.019f));
   }
 }
 
 TEST_F(As370ThermalTest, DvfsOperatingPoint) {
-  ThermalClient client(std::move(messenger_.local()));
-
   {
     // Success, sets operating point 0.
     power_.ExpectRequestVoltage(ZX_OK, 825'000, 825'000);
     clock_.ExpectSetRate(ZX_OK, 400'000'000);
-    auto set_result = client->SetDvfsOperatingPoint(0, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(0, PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 0);
   }
@@ -130,13 +133,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
   {
     // Failure, unable to set exact voltage.
     power_.ExpectRequestVoltage(ZX_OK, 825'000, 900'000);
-    auto set_result = client->SetDvfsOperatingPoint(2, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(2, PowerDomain::kBigClusterPowerDomain);
     EXPECT_NOT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 0);
   }
@@ -145,13 +148,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
     // Failure, unable to set frequency.
     power_.ExpectRequestVoltage(ZX_OK, 825'000, 825'000);
     clock_.ExpectSetRate(ZX_ERR_IO, 1'200'000'000);
-    auto set_result = client->SetDvfsOperatingPoint(2, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(2, PowerDomain::kBigClusterPowerDomain);
     EXPECT_NOT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 0);
   }
@@ -160,13 +163,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
     // Success, sets operating point 4.
     power_.ExpectRequestVoltage(ZX_OK, 900'000, 900'000);
     clock_.ExpectSetRate(ZX_OK, 1'500'000'000);
-    auto set_result = client->SetDvfsOperatingPoint(4, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(4, PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 4);
   }
@@ -174,13 +177,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
   {
     // Failure, unable to set frequency.
     clock_.ExpectSetRate(ZX_ERR_IO, 800'000'000);
-    auto set_result = client->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
     EXPECT_NOT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 4);
   }
@@ -189,13 +192,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
     // Failure, unable to set voltage.
     clock_.ExpectSetRate(ZX_OK, 800'000'000);
     power_.ExpectRequestVoltage(ZX_ERR_IO, 825'000, 0);
-    auto set_result = client->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
     EXPECT_NOT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 4);
   }
@@ -204,13 +207,13 @@ TEST_F(As370ThermalTest, DvfsOperatingPoint) {
     // Success, sets operating point 1.
     clock_.ExpectSetRate(ZX_OK, 800'000'000);
     power_.ExpectRequestVoltage(ZX_OK, 825'000, 825'000);
-    auto set_result = client->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
+    auto set_result = client_->SetDvfsOperatingPoint(1, PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(set_result->status);
     ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   {
-    auto get_result = client->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
+    auto get_result = client_->GetDvfsOperatingPoint(PowerDomain::kBigClusterPowerDomain);
     EXPECT_OK(get_result->status);
     EXPECT_EQ(get_result->op_idx, 1);
   }
