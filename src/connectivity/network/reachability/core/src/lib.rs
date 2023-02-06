@@ -618,13 +618,15 @@ async fn network_layer_state(
         }
     };
 
-    let relevant_routes = device_routes.iter().filter(
-        |fnet_stack::ForwardingEntry { subnet, device_id: _, next_hop: _, metric: _ }| {
+    let relevant_routes: Vec<_> = device_routes
+        .iter()
+        .filter(|fnet_stack::ForwardingEntry { subnet, device_id: _, next_hop: _, metric: _ }| {
             *subnet == UNSPECIFIED_V4 || *subnet == UNSPECIFIED_V6
-        },
-    );
+        })
+        .collect();
 
     let gateway_pingable = relevant_routes
+        .iter()
         .filter_map(
             move |fnet_stack::ForwardingEntry { subnet: _, device_id, next_hop, metric: _ }| {
                 next_hop.as_ref().and_then(|next_hop| {
@@ -686,8 +688,9 @@ async fn network_layer_state(
     // |------------|------------|----------|--------------------------------------|
     // | false      | true       | true     | Invalid state                        |
     // |------------|------------|----------|--------------------------------------|
-    // | true       | false      | false    | If internet is pingable, Internet, or|
-    // |            |            |          | else Local.                          |
+    // | true       | false      | false    | Ping internet when default routes    |
+    // |            |            |          | exist. If internet is pingable,      |
+    // |            |            |          | Internet, or else Local.             |
     // |------------|------------|----------|--------------------------------------|
     // | true       | false      | true     | If internet is pingable, Internet, or|
     // |            |            |          | else Gateway.                        |
@@ -720,17 +723,21 @@ async fn network_layer_state(
             );
             State::None
         }
-        (true, false, gateway_pingable) => {
-            if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
-                if gateway_pingable {
-                    return State::Gateway;
-                }
+        (true, false, false) => {
+            // To ping the internet, we expect there to be a default route.
+            if relevant_routes.is_empty()
+                || !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await
+            {
                 return State::Local;
             }
-            tracing::info!("gateway ARP/ND failing with internet available");
-            if !gateway_pingable {
-                tracing::info!("gateway ping failing with internet available");
+            tracing::info!("gateway ARP/ND and ping failing with internet available");
+            State::Internet
+        }
+        (true, false, true) => {
+            if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
+                return State::Gateway;
             }
+            tracing::info!("gateway ARP/ND failing with internet available");
             State::Internet
         }
         (true, true, gateway_pingable) => {
@@ -1162,6 +1169,30 @@ mod tests {
             .await,
             State::Local,
             "Local only, neighbors responsive with no default route"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table,
+                &FakePing::default(),
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Local,
+            "Local only, neighbors responsive with a default route"
         );
 
         assert_eq!(
