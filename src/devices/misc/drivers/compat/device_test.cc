@@ -950,7 +950,10 @@ TEST_F(DeviceTest, DeviceRebind) {
   ASSERT_EQ(ZX_OK, device.Add(&args, &second_device));
   ASSERT_EQ(ZX_OK, second_device->CreateNode());
 
-  ASSERT_EQ(ZX_OK, device_rebind(second_device));
+  second_device->executor().schedule_task(
+      second_device->RebindToLibname({}).then([](fpromise::result<void, zx_status_t>& status) {
+        ASSERT_TRUE(status.is_ok()) << zx_status_get_string(status.error());
+      }));
   ASSERT_TRUE(test_loop().RunUntilIdle());
   ASSERT_EQ(add_count, 2u);
 }

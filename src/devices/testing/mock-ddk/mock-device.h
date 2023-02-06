@@ -89,7 +89,6 @@ using ConnectCallback = fit::function<zx_status_t(zx::channel)>;
 //   device_get_deadline_profile
 //   device_fidl_transaction_take_ownership
 //   get_root_resource
-//   device_rebind
 // This needs to be a struct, not a class, to match the public definition
 struct MockDevice : public std::enable_shared_from_this<MockDevice> {
  public:

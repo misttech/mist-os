@@ -60,7 +60,6 @@ class DriverHostContext {
   void DeviceUnbindReply(const fbl::RefPtr<zx_device_t>& dev) TA_REQ(api_lock_);
   zx_status_t DeviceBind(const fbl::RefPtr<zx_device_t>& dev, const char* drv_libname)
       TA_REQ(api_lock_);
-  zx_status_t DeviceRebind(const fbl::RefPtr<zx_device_t>& dev) TA_REQ(api_lock_);
   void DeviceSuspendReply(const fbl::RefPtr<zx_device_t>& dev, zx_status_t status,
                           uint8_t out_state) TA_REQ(api_lock_);
   void DeviceResumeReply(const fbl::RefPtr<zx_device_t>& dev, zx_status_t status,

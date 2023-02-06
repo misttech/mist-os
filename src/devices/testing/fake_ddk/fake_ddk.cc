@@ -329,14 +329,6 @@ zx_status_t Bind::DeviceOpenProtocolSessionMultibindable(const zx_device_t* devi
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Bind::DeviceRebind(zx_device_t* device) {
-  if (device != kFakeDevice) {
-    bad_device_ = true;
-  }
-  rebind_called_ = true;
-  return ZX_OK;
-}
-
 const char* Bind::DeviceGetName(zx_device_t* device) {
   if (device != kFakeParent) {
     bad_device_ = true;
@@ -539,14 +531,6 @@ __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_devic
   *fw = ZX_HANDLE_INVALID;
   *size = fake_ddk::kFakeFWSize;
   return ZX_OK;
-}
-
-__EXPORT
-zx_status_t device_rebind(zx_device_t* device) {
-  if (!fake_ddk::Bind::Instance()) {
-    return ZX_OK;
-  }
-  return fake_ddk::Bind::Instance()->DeviceRebind(device);
 }
 
 __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {

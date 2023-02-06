@@ -153,7 +153,6 @@ class Bind {
                                         void* protocol);
   virtual zx_status_t DeviceOpenProtocolSessionMultibindable(const zx_device_t* dev,
                                                              uint32_t proto_id, void* protocol);
-  virtual zx_status_t DeviceRebind(zx_device_t* device);
   virtual const char* DeviceGetName(zx_device_t* device);
   virtual zx_off_t DeviceGetSize(zx_device_t* device);
   virtual uint32_t DeviceGetFragmentCount(zx_device_t* dev);
@@ -188,7 +187,6 @@ class Bind {
                                             size_t buflen, size_t* actual);
   friend zx_status_t(::device_get_metadata_size)(zx_device_t* device, uint32_t type,
                                                  size_t* out_size);
-  friend zx_status_t(::device_rebind)(zx_device_t* device);
   friend uint32_t(::device_get_fragment_count)(zx_device_t* dev);
   friend void(::device_get_fragments)(zx_device_t* dev, composite_device_fragment_t* comp_list,
                                       size_t comp_count, size_t* comp_actual);

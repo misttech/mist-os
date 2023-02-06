@@ -111,9 +111,6 @@ __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_devic
   return ZX_OK;
 }
 
-__EXPORT
-zx_status_t device_rebind(zx_device_t* device) { return ZX_OK; }
-
 __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) { return 0; }
 
 __EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t* comp_list,

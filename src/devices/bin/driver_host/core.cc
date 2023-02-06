@@ -570,23 +570,6 @@ void DriverHostContext::DeviceResumeReply(const fbl::RefPtr<zx_device_t>& dev, z
   }
 }
 
-zx_status_t DriverHostContext::DeviceRebind(const fbl::RefPtr<zx_device_t>& dev) {
-  if (!dev->children().is_empty() || dev->has_composite()) {
-    // note that we want to be rebound when our children are all gone
-    dev->set_flag(DEV_FLAG_WANTS_REBIND);
-    // request that any existing children go away
-    std::ignore = ScheduleUnbindChildren(dev);
-  } else {
-    zx_status_t status = DeviceBind(dev, dev->get_rebind_drv_name().c_str());
-    if (status != ZX_OK) {
-      // Since device binding didn't work, we should reply to an outstanding rebind if it exists;
-      dev->call_rebind_conn_if_exists(status);
-    }
-    return status;
-  }
-  return ZX_OK;
-}
-
 void DriverHostContext::DeviceSystemSuspend(const fbl::RefPtr<zx_device>& dev, uint32_t flags) {
   if (dev->auto_suspend_configured()) {
     dev->ops()->configure_auto_suspend(dev->ctx(), false, DEV_POWER_STATE_D0);

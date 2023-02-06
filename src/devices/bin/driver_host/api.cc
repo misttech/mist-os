@@ -235,13 +235,6 @@ __EXPORT void device_init_reply(zx_device_t* dev, zx_status_t status,
   internal::ContextForApi()->DeviceInitReply(dev_ref, status, args);
 }
 
-__EXPORT zx_status_t device_rebind(zx_device_t* dev) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
-  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  fbl::RefPtr<zx_device_t> dev_ref(dev);
-  return internal::ContextForApi()->DeviceRebind(dev_ref);
-}
-
 __EXPORT void device_async_remove(zx_device_t* dev) {
   ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());

@@ -259,8 +259,6 @@ static inline zx_status_t device_add(zx_device_t* parent, device_add_args_t* arg
 void device_init_reply(zx_device_t* device, zx_status_t status,
                        const device_init_reply_args_t* args);
 
-zx_status_t device_rebind(zx_device_t* device);
-
 // Schedules the removal of the given device and all its descendents. When a device is
 // being removed, its |unbind| hook will be invoked.
 // It is safe to call this as long as the device has not completed its |release| hook.

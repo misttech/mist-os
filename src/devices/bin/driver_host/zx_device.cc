@@ -405,6 +405,24 @@ zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
   return status;
 }
 
+zx_status_t zx_device::Rebind() {
+  DriverHostContext& context = *driver_host_context();
+  fbl::AutoLock lock(&context.api_lock());
+  if (!children().is_empty() || has_composite()) {
+    // note that we want to be rebound when our children are all gone
+    set_flag(DEV_FLAG_WANTS_REBIND);
+    // request that any existing children go away
+    std::ignore = context.ScheduleUnbindChildren(fbl::RefPtr(this));
+    return ZX_OK;
+  }
+  zx_status_t status = context.DeviceBind(fbl::RefPtr(this), get_rebind_drv_name().c_str());
+  if (status != ZX_OK) {
+    // Since device binding didn't work, we should reply to an outstanding rebind if it exists;
+    call_rebind_conn_if_exists(status);
+  }
+  return status;
+}
+
 void zx_device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                     ConnectToDeviceFidlCompleter::Sync& completer) {
   if (vnode.has_value()) {
@@ -435,7 +453,7 @@ void zx_device::Rebind(RebindRequestView request, RebindCompleter::Sync& complet
     completer.Reply(zx::make_result(status));
   });
   // This function will always result in a call to the rebind connector callback.
-  device_rebind(this);
+  std::ignore = Rebind();
 }
 
 void zx_device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {

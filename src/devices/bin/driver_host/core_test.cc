@@ -186,7 +186,7 @@ TEST_F(CoreTest, RebindNoChildren) {
 
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
-  EXPECT_EQ(device_rebind(dev.get()), ZX_OK);
+  EXPECT_OK(dev->Rebind());
   EXPECT_EQ(coordinator_.bind_count(), 1);
 
   // Join the thread running in the background, then run the rest of the tasks locally.
@@ -293,7 +293,7 @@ TEST_F(CoreTest, RebindHasOneChild) {
       parent->add_child(child.get());
       child->set_parent(parent);
 
-      EXPECT_EQ(device_rebind(parent.get()), ZX_OK);
+      EXPECT_OK(parent->Rebind());
       EXPECT_EQ(coordinator_.bind_count(), 0);
       ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
       EXPECT_EQ(unbind_count, 1);
@@ -341,7 +341,7 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
         child->set_parent(parent);
       }
 
-      EXPECT_EQ(device_rebind(parent.get()), ZX_OK);
+      EXPECT_OK(parent->Rebind());
 
       for (auto& child : children) {
         EXPECT_EQ(coordinator_.bind_count(), 0);

@@ -470,6 +470,8 @@ struct zx_device
   DeviceInspect& inspect() { return *inspect_; }
   void FreeInspect() { inspect_.reset(); }
 
+  zx_status_t Rebind();
+
  private:
   zx::result<std::string> GetTopologicalPath();
 

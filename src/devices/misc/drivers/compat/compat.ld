@@ -5,7 +5,6 @@
     /* Compat driver Symbols */
     device_add_from_driver;
     device_init_reply;
-    device_rebind;
     device_async_remove;
     device_unbind_reply;
     device_suspend_reply;
