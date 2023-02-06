@@ -134,6 +134,8 @@ tables_generator_tests_*.txt
 !/third_party/mini_chromium
 !/third_party/crashpad
 /third_party/crashpad/src
+!/third_party/chromiumos-xorg-conf
+/third_party/chromiumos-xorg-conf/src
 
 /tmp/
 /vendor/
