@@ -33,6 +33,10 @@ struct fdf_env_driver_shutdown_observer {
 // Start the driver runtime. This sets up the initial thread that the dispatchers run on.
 zx_status_t fdf_env_start();
 
+// Resets the driver runtime to zero threads. This may only be called when there are no
+// existing dispatchers.
+void fdf_env_reset();
+
 // Same as |fdf_dispatcher_create| but allows setting the driver owner for the dispatcher.
 //
 // |driver| is an opaque pointer to the driver object. It will be used to uniquely identify

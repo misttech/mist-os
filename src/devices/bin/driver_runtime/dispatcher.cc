@@ -1603,6 +1603,12 @@ zx_status_t DispatcherCoordinator::Start() {
   return ZX_OK;
 }
 
+// static
+void DispatcherCoordinator::EnvReset() {
+  DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
+  coordinator.Reset();
+}
+
 void DispatcherCoordinator::Reset() {
   {
     fbl::AutoLock al(&lock_);

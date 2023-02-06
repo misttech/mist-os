@@ -26,6 +26,7 @@ Symbols:
   - { Name: fdf_env_get_current_driver, Type: Func }
   - { Name: fdf_env_register_driver_entry, Type: Func }
   - { Name: fdf_env_register_driver_exit, Type: Func }
+  - { Name: fdf_env_reset, Type: Func }
   - { Name: fdf_env_shutdown_dispatchers_async, Type: Func }
   - { Name: fdf_env_start, Type: Func }
   - { Name: fdf_handle_close, Type: Func }

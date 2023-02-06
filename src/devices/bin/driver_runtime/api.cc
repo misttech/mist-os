@@ -173,6 +173,8 @@ __EXPORT zx_status_t fdf_token_transfer(zx_handle_t token, fdf_handle_t handle) 
 
 __EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordinator::Start(); }
 
+__EXPORT void fdf_env_reset() { return driver_runtime::DispatcherCoordinator::EnvReset(); }
+
 __EXPORT void fdf_env_register_driver_entry(const void* driver) {
   driver_context::PushDriver(driver);
 }

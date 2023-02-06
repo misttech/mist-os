@@ -12,10 +12,13 @@
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
+#include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/event.h>
 #include <lib/zx/interrupt.h>
+
+#include <map>
 
 #include <fbl/string_printf.h>
 #include <perftest/perftest.h>
@@ -32,14 +35,30 @@ class AsyncDispatcher {
     kAsyncLoop,
   };
 
+  // If |use_threads_| is false, the dispatcher will be run on the current thread
+  // until idle,
+  virtual zx_status_t RunUntilIdleIfNoThreads() = 0;
+
   virtual ~AsyncDispatcher() {}
 
   virtual async_dispatcher_t* async_dispatcher() = 0;
+
+ protected:
+  explicit AsyncDispatcher(bool use_threads) : use_threads_(use_threads) {}
+
+  bool use_threads_;
 };
 
 class RuntimeDispatcher : public AsyncDispatcher {
  public:
-  RuntimeDispatcher() {
+  RuntimeDispatcher(bool use_threads) : AsyncDispatcher(use_threads) {
+    if (!use_threads) {
+      // Make sure all dispatchers have completed destruction, otherwise |fdf_env_reset| will
+      // complain.
+      fdf_env_destroy_all_dispatchers();
+      // Reset the runtime to 0 threads.
+      fdf_env_reset();
+    }
     auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
         &fake_driver_, {}, "client",
         [&](fdf_dispatcher_t* dispatcher) { shutdown_completion_.Signal(); });
@@ -47,9 +66,26 @@ class RuntimeDispatcher : public AsyncDispatcher {
     dispatcher_ = *std::move(dispatcher);
   }
 
+  zx_status_t RunUntilIdleIfNoThreads() override {
+    if (!use_threads_) {
+      return fdf_testing_run_until_idle();
+    }
+    return ZX_OK;
+  }
+
   ~RuntimeDispatcher() {
     dispatcher_.ShutdownAsync();
+    ASSERT_OK(RunUntilIdleIfNoThreads());
     ASSERT_OK(shutdown_completion_.Wait());
+
+    // Make sure all dispatchers are destroyed, otherwise |fdf_env_start| will assert.
+    dispatcher_.reset();
+
+    if (!use_threads_) {
+      // We stopped all the runtime threads, so make sure they are up again for the
+      // rest of the benchmarks.
+      ASSERT_OK(fdf_env_start());
+    }
   }
 
   fdf_dispatcher_t* fdf_dispatcher() { return dispatcher_.get(); }
@@ -64,11 +100,20 @@ class RuntimeDispatcher : public AsyncDispatcher {
 
 class AsyncLoop : public AsyncDispatcher {
  public:
-  explicit AsyncLoop(bool enable_irqs) {
+  explicit AsyncLoop(bool use_threads, bool enable_irqs) : AsyncDispatcher(use_threads) {
     async_loop_config_t config = kAsyncLoopConfigNoAttachToCurrentThread;
     config.irq_support = enable_irqs;
     loop_ = std::make_unique<async::Loop>(&config);
-    loop_->StartThread();
+    if (use_threads_) {
+      loop_->StartThread();
+    }
+  }
+
+  zx_status_t RunUntilIdleIfNoThreads() override {
+    if (!use_threads_) {
+      return loop_->RunUntilIdle();
+    }
+    return ZX_OK;
   }
 
   ~AsyncLoop() {
@@ -82,27 +127,29 @@ class AsyncLoop : public AsyncDispatcher {
   std::unique_ptr<async::Loop> loop_;
 };
 
-std::unique_ptr<AsyncDispatcher> CreateAsyncDispatcher(AsyncDispatcher::Type type,
+std::unique_ptr<AsyncDispatcher> CreateAsyncDispatcher(AsyncDispatcher::Type type, bool use_threads,
                                                        bool enable_irqs) {
   switch (type) {
     case AsyncDispatcher::Type::kRuntime:
-      return std::make_unique<RuntimeDispatcher>();
+      return std::make_unique<RuntimeDispatcher>(use_threads);
     case AsyncDispatcher::Type::kAsyncLoop:
-      return std::make_unique<AsyncLoop>(enable_irqs);
+      return std::make_unique<AsyncLoop>(use_threads, enable_irqs);
     default:
       return nullptr;
   }
 }
 
 // Measure the time taken for a task to be posted and completed.
-bool DispatcherTaskTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type) {
-  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, false /* enable_irqs */);
+bool DispatcherTaskTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type,
+                        bool use_threads) {
+  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, use_threads, false /* enable_irqs */);
   FX_CHECK(dispatcher);
 
   while (state->KeepRunning()) {
     libsync::Completion task_completion;
     ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(),
                               [&task_completion] { task_completion.Signal(); }));
+    ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     ASSERT_OK(task_completion.Wait());
   }
 
@@ -110,8 +157,9 @@ bool DispatcherTaskTest(perftest::RepeatState* state, AsyncDispatcher::Type disp
 }
 
 // Measure the time taken for a wait callback to be completed.
-bool DispatcherWaitTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type) {
-  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, false /* enable_irqs */);
+bool DispatcherWaitTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type,
+                        bool use_threads) {
+  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, use_threads, false /* enable_irqs */);
   FX_CHECK(dispatcher);
 
   zx::event event;
@@ -129,6 +177,7 @@ bool DispatcherWaitTest(perftest::RepeatState* state, AsyncDispatcher::Type disp
   while (state->KeepRunning()) {
     ASSERT_OK(wait.Begin(dispatcher->async_dispatcher()));
     ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_0));
+    ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     ASSERT_OK(wait_completion.Wait());
     wait_completion.Reset();
   }
@@ -137,10 +186,10 @@ bool DispatcherWaitTest(perftest::RepeatState* state, AsyncDispatcher::Type disp
 }
 
 // Measure the time taken for a channel read to be completed.
-bool DispatcherChannelReadTest(perftest::RepeatState* state) {
+bool DispatcherChannelReadTest(perftest::RepeatState* state, bool use_threads) {
   constexpr uint32_t kMsgSize = 4096;
 
-  auto dispatcher = std::make_unique<RuntimeDispatcher>();
+  auto dispatcher = std::make_unique<RuntimeDispatcher>(use_threads);
   FX_CHECK(dispatcher);
 
   constexpr uint32_t kTag = 'BNCH';
@@ -179,6 +228,7 @@ bool DispatcherChannelReadTest(perftest::RepeatState* state) {
 
     ASSERT_OK(
         channels->end0.Write(0, arena, msg, kMsgSize, cpp20::span<zx_handle_t>()).status_value());
+    ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     ASSERT_OK(read_completion.Wait());
     read_completion.Reset();
   }
@@ -187,8 +237,9 @@ bool DispatcherChannelReadTest(perftest::RepeatState* state) {
 }
 
 // Measure the time taken for a irq callback to be completed.
-bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type) {
-  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, true /* enable_irqs */);
+bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type,
+                       bool use_threads) {
+  auto dispatcher = CreateAsyncDispatcher(dispatcher_type, use_threads, true /* enable_irqs */);
   FX_CHECK(dispatcher);
 
   zx::interrupt irq_object;
@@ -207,6 +258,7 @@ bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispa
 
   while (state->KeepRunning()) {
     irq_object.trigger(0, zx::time());
+    ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     ASSERT_OK(irq_completion.Wait());
     irq_completion.Reset();
   }
@@ -217,26 +269,41 @@ bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispa
     ASSERT_OK(irq.Cancel());
     unbind_complete.Signal();
   }));
+  ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
   ASSERT_OK(unbind_complete.Wait());
 
   return true;
 }
 
 void RegisterTests() {
-  perftest::RegisterTest("Dispatcher/Runtime/Task", DispatcherTaskTest,
-                         AsyncDispatcher::Type::kRuntime);
-  perftest::RegisterTest("Dispatcher/Runtime/Wait", DispatcherWaitTest,
-                         AsyncDispatcher::Type::kRuntime);
-  perftest::RegisterTest("Dispatcher/Runtime/ChannelRead", DispatcherChannelReadTest);
-  perftest::RegisterTest("Dispatcher/Runtime/Irq", DispatcherIrqTest,
-                         AsyncDispatcher::Type::kRuntime);
+  std::map<AsyncDispatcher::Type, std::string> kDispatcherTypes = {
+      {AsyncDispatcher::Type::kRuntime, "Runtime"},
+      {AsyncDispatcher::Type::kAsyncLoop, "AsyncLoop"},
+  };
 
-  perftest::RegisterTest("Dispatcher/AsyncLoop/Task", DispatcherTaskTest,
-                         AsyncDispatcher::Type::kAsyncLoop);
-  perftest::RegisterTest("Dispatcher/AsyncLoop/Wait", DispatcherWaitTest,
-                         AsyncDispatcher::Type::kAsyncLoop);
-  perftest::RegisterTest("Dispatcher/AsyncLoop/Irq", DispatcherIrqTest,
-                         AsyncDispatcher::Type::kAsyncLoop);
+  std::map<bool, std::string> kUseThreads = {
+      {true, "Threads"},
+      {false, "NoThreads"},
+  };
+
+  for (auto const& [type, dispatcher_name] : kDispatcherTypes) {
+    for (auto const& [use_threads, use_threads_desc] : kUseThreads) {
+      auto task_name = fbl::StringPrintf("Dispatcher/%s/Task/%s", dispatcher_name.c_str(),
+                                         use_threads_desc.c_str());
+      perftest::RegisterTest(task_name.c_str(), DispatcherTaskTest, type, use_threads);
+
+      auto wait_name = fbl::StringPrintf("Dispatcher/%s/Wait/%s", dispatcher_name.c_str(),
+                                         use_threads_desc.c_str());
+      perftest::RegisterTest(wait_name.c_str(), DispatcherWaitTest, type, use_threads);
+
+      auto irq_name = fbl::StringPrintf("Dispatcher/%s/Irq/%s", dispatcher_name.c_str(),
+                                        use_threads_desc.c_str());
+      perftest::RegisterTest(irq_name.c_str(), DispatcherIrqTest, type, use_threads);
+    }
+  }
+  perftest::RegisterTest("Dispatcher/Runtime/ChannelRead/Threads", DispatcherChannelReadTest, true);
+  perftest::RegisterTest("Dispatcher/Runtime/ChannelRead/NoThreads", DispatcherChannelReadTest,
+                         false);
 }
 PERFTEST_CTOR(RegisterTests)
 

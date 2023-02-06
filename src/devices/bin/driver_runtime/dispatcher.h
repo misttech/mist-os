@@ -592,6 +592,7 @@ class DispatcherCoordinator {
                              uint32_t* out_cur_irq_generation_id);
   zx_status_t AddThread();
   static zx_status_t Start();
+  static void EnvReset();
 
   // Resets to 0 threads.
   // Must only be called when there are no outstanding dispatchers.
