@@ -35,7 +35,6 @@ dart_library("client") {
     "src/sl4f_client.dart",
     "src/ssh.dart",
     "src/storage.dart",
-    "src/tiles.dart",
     "src/time.dart",
     "src/trace_processing/metrics/camera_metrics.dart",
     "src/trace_processing/metrics/common.dart",

@@ -34,7 +34,6 @@ pub mod server;
 pub mod setui;
 pub mod system_metrics;
 pub mod temperature;
-pub mod tiles;
 pub mod time;
 pub mod traceutil;
 pub mod tracing;
