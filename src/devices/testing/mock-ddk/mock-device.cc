@@ -86,20 +86,27 @@ void MockDevice::InitOp() { Dispatch(ctx_, ops_->init); }
 void MockDevice::UnbindOp() { Dispatch(ctx_, ops_->unbind); }
 
 void MockDevice::ReleaseOp() {
+  if (!IsRootParent()) {
+    while (!children_.empty()) {
+      children_.front()->ReleaseOp();
+    }
+    parent_->ChildPreReleaseOp(ctx_);
+    parent_->RecordChildPreRelease(ZX_OK);
+  }
+
   Dispatch(ctx_, ops_->release);
-  // Make parent release child now
+
+  // Delete instance from parent's children_ accounting.
   for (auto it = parent_->children_.begin(); it != parent_->children_.end(); ++it) {
     if (it->get() == this) {
       parent_->children_.erase(it);
       return;
     }
   }
-  // Print error: we did not find ourselves!
 }
 
 MockDevice::~MockDevice() {
   while (!children_.empty()) {
-    // This should remove the first child device from children_:
     children_.front()->ReleaseOp();
   }
 }

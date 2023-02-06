@@ -62,7 +62,8 @@ const std::array kStrProps = {
     zx_device_str_prop_t{.key = "key2", .property_value = str_prop_int_val(10)}};
 
 class TestDevice;
-using DeviceType = ddk::Device<TestDevice, ddk::Unbindable, ddk::Initializable, ddk::Suspendable>;
+using DeviceType = ddk::Device<TestDevice, ddk::Unbindable, ddk::Initializable, ddk::Suspendable,
+                               ddk::ChildPreReleaseable>;
 class TestDevice : public DeviceType {
  public:
   TestDevice(zx_device_t* parent) : DeviceType(parent), parent_(parent) {
@@ -196,6 +197,7 @@ class TestDevice : public DeviceType {
     // DdkRelease must delete this before it returns.
     delete this;
   }
+  void DdkChildPreRelease(void*) {}
 
  private:
   zx_device_t* parent_;
@@ -252,6 +254,7 @@ TEST(MockDdk, TestDeviceCalls) {
   child->ReleaseOp();
   // The TestDevice and the MockDevice should now be deleted:
   ASSERT_EQ(0, parent->child_count());
+  ASSERT_TRUE(parent->ChildPreReleaseCalled());
 }
 
 TEST(MockDdk, TestMultipleDevices) {

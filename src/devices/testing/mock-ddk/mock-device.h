@@ -131,6 +131,7 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   REGISTER_CALL_TRACKER(SuspendReply)
   REGISTER_CALL_TRACKER(ResumeReply)
   REGISTER_CALL_TRACKER(Remove)
+  REGISTER_CALL_TRACKER(ChildPreRelease)
 #undef REGISTER_CALL_TRACKER
 
   // Functions for calling into the driver.
