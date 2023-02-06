@@ -77,34 +77,7 @@ namespace async_patterns {
 // The argument will be forwarded from the caller's thread into a heap data
 // structure, and later moved into the thread which would run the dispatcher
 // task asynchronously. Each argument must be safe to send to a different
-// thread:
-//
-// - Value types may be sent via copying or moving. Whether one passes an |Arg|,
-//   |const Arg&|, or |Arg&&| etc on the sending side, the receiving |T| will
-//   have its own uniquely owned instance that they may safely manipulate.
-//
-// - Move-only types such as |std::unique_ptr<Arg>| may be sent via |std::move|.
-//
-// - The constructor or member function of |T| may not take raw pointer or
-//   non-const reference arguments. Sending those may result in use-after-frees
-//   when the dispatcher uses a pointee asynchronously after an unspecified
-//   amount of time. It's not worth the memory safety risks to support the cases
-//   where a pointee outlives the dispatcher that is running tasks for |T|.
-//
-// - If the constructor or member function takes |const Arg&| as an argument,
-//   one may send an instance of |Arg| via copying or moving. The instance will
-//   live until the destination constructor or member function finishes
-//   executing.
-//
-// - When sending a ref-counted pointer such as |std::shared_ptr<Arg>|, both the
-//   sender and the receiver will be able to concurrently access |Arg|. Be sure
-//   to add appropriate synchronization to |Arg|, for example protecting fields
-//   with mutexes. This pattern is called "shared-state concurrency".
-//
-// - These checks are performed for each argument, but there could still be raw
-//   pointers or references inside an object that is sent. One must ensure that
-//   the pointee remain alive until the asynchronous tasks are run, possibly
-//   indefinitely until the dispatcher is destroyed.
+// thread. See |async_patterns::BindForSending| for the detailed requirements.
 //
 // [synchronized-dispatcher]:
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
@@ -116,7 +89,7 @@ class DispatcherBound final {
 
   // Asynchronously constructs |T| on a task posted to |dispatcher|.
   //
-  // See class documentation comments for the requirements on |args|.
+  // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
   // Panics if |dispatcher| cannot fulfill the task (e.g. it is shutdown).
   template <typename... Args>
@@ -130,7 +103,7 @@ class DispatcherBound final {
   // If this object already holds an instance of |T|, that older instance will
   // be asynchronously destroyed on the existing dispatcher it was associated with.
   //
-  // See class documentation comments for the requirements on |args|.
+  // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
   // Panics if either dispatcher cannot fulfill the task (e.g. it is shutdown).
   template <typename... Args>
@@ -143,16 +116,47 @@ class DispatcherBound final {
   // Asynchronously calls |member|, a pointer to member function of |T|, using
   // the provided |args|.
   //
-  // |member| must return void.
+  // If |member| returns void, then |AsyncCall| returns void. The behavior is
+  // fire-and-forget.
   //
-  // See class documentation comments for the requirements on |args|.
+  // If |member| returns some |R| type, then |AsyncCall| returns a builder
+  // object where one must attach an |async_patterns::Callback<R'>| by calling
+  // |Then|. |R'| could be identical to |R| or some other compatible type such
+  // as |const R&|. Typically, the owner will declare a |Receiver| to mint those
+  // callbacks:
+  //
+  //     class Owner {
+  //      public:
+  //       Owner(async_dispatcher_t* owner_dispatcher) : receiver_{this, owner_dispatcher} {
+  //         // Tell |background_| to |DoSomething|, then send back the return
+  //         // value to |Owner| using |receiver_|.
+  //         background_
+  //             .AsyncCall(&Background::DoSomething)
+  //             .Then(receiver_.Once(&Owner::DoneSomething));
+  //       }
+  //
+  //       void DoneSomething(Result result) {
+  //         // |Background::DoSomething| has completed with |result|...
+  //       }
+  //
+  //      private:
+  //       async::Loop background_loop_;
+  //       async_patterns::DispatcherBound<Background> background_{background_loop_.dispatcher()};
+  //       async_patterns::Receiver<Owner> receiver_;
+  //     };
+  //
+  // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
   // Panics if the dispatcher cannot fulfill the task (e.g. it is shutdown).
-  template <typename Member, typename... Args>
+  template <typename Member, typename... Args,
+            typename = std::enable_if_t<std::is_void_v<std::invoke_result_t<Member, Args...>>>>
   void AsyncCall(Member T::*member, Args&&... args) {
-    static_assert(std::is_void_v<std::invoke_result_t<Member, Args...>>,
-                  "|member| must be a pointer to member function that returns void.");
     storage_.AsyncCall<T>(dispatcher_, member, std::forward<Args>(args)...);
+  }
+  template <typename Member, typename... Args,
+            typename = std::enable_if_t<!std::is_void_v<std::invoke_result_t<Member, Args...>>>>
+  auto AsyncCall(Member T::*member, Args&&... args) {
+    return storage_.AsyncCallWithReply<T>(dispatcher_, member, std::forward<Args>(args)...);
   }
 
   // Typically, asynchronous classes would contain internal self-pointers that

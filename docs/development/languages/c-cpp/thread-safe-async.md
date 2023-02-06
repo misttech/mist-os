@@ -232,6 +232,9 @@ them when the receiver object goes out of scope. Here are some approaches:
 - One may use [`async_patterns::DispatcherBound`][dispatcher-bound] to both own
   and make calls to a child object that lives on a different synchronized
   dispatcher.
+- One may use [`async_patterns::Receiver`][receiver] to let other objects make
+  calls on their objects, without forcing an ownership relationship. The calls
+  are silently canceled if the receiver is destroyed.
 <!-- TODO(fxbug.dev/119641): Document other async_patterns helpers when they
      land. -->
 - One may reference count the objects, and pass a weak pointer to the posted
@@ -255,6 +258,7 @@ tasks in Chrome][chrome].
 [async-wait]: /zircon/system/ulib/async/include/lib/async/cpp/wait.h
 [concurrency]: https://slikts.github.io/concurrency-glossary/?id=concurrent-order-independent-vs-sequential
 [dispatcher-bound]: /sdk/lib/async_patterns/cpp/dispatcher_bound.h
+[receiver]: /sdk/lib/async_patterns/cpp/receiver.h
 [driver-threading-model]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#threading-model
 [fdf-dispatcher]: /sdk/lib/driver/runtime/include/lib/fdf/cpp/dispatcher.h
 [thread-safety]: https://en.wikipedia.org/wiki/Thread_safety

@@ -13,6 +13,9 @@
 
 #include <cstdlib>
 
+#include <sdk/lib/async_patterns/cpp/callback.h>
+#include <sdk/lib/async_patterns/cpp/sendable.h>
+
 namespace async_patterns::internal {
 
 // |DispatcherBoundStorage| encapsulates the subtle work of managing memory
@@ -55,8 +58,8 @@ class DispatcherBoundStorage final {
     };
 
     ConstructInternal(dispatcher,
-                      BindFrontMove([ptr](auto&&... args) { new (ptr) T(std::move(args)...); },
-                                    std::forward<Args>(args)...));
+                      BindForSending([ptr](auto&&... args) { new (ptr) T(std::move(args)...); },
+                                     std::forward<Args>(args)...));
   }
 
   template <typename T, typename Member, typename... Args>
@@ -64,38 +67,50 @@ class DispatcherBoundStorage final {
     void* raw_ptr = op_fn_(Operation::kGetPointer);
     T* ptr = static_cast<T*>(raw_ptr);
     CallInternal(dispatcher,
-                 BindFrontMove(cpp20::bind_front(member, ptr), std::forward<Args>(args)...));
+                 BindForSending(cpp20::bind_front(member, ptr), std::forward<Args>(args)...));
   }
 
-  // Similar to |std::bind_front|, but will first forward the |args| into the
-  // lambda capture state, and then move the captured args into |callable| when
-  // invoked later.
-  template <typename Callable, typename... Args>
-  auto BindFrontMove(Callable callable, Args&&... args) {
-    // We package the arguments into a tuple because capturing a template
-    // parameter pack is a C++20 feature.
-    return [callable = std::move(callable),
-            args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-      // The |std::move| inside prevents |callable| from taking |Arg&| arguments.
-      //
-      // ** NOTE TO USERS ** If you get a compiler error pointing to this
-      // vicinity, check the class documentation comments of |DispatcherBound|.
-      // Passing mutable references and raw pointers are not allowed.
-      std::apply(
-          [callable = std::move(callable)](auto&&... args) mutable {
-            auto check_arg = [](auto&& arg) {
-              using Arg = decltype(arg);
-              static_assert(!std::is_pointer_v<cpp20::remove_cvref_t<Arg>>,
-                            "Sending raw pointers is not allowed. "
-                            "See class documentation comments of |DispatcherBound|.");
-              return true;
-            };
-            (void)(check_arg(std::forward<Args>(args)) && ...);
+  template <typename Task>
+  class [[nodiscard]] AsyncCallBuilder {
+   public:
+    template <typename R>
+    void Then(async_patterns::Callback<R> on_result) && {
+      ZX_DEBUG_ASSERT(storage_);
+      static_assert(std::is_invocable_v<decltype(on_result), std::invoke_result_t<Task>>,
+                    "The |async_patterns::Callback<R>| must accept the return value "
+                    "of the |Member| being called.");
+      storage_->CallInternal(dispatcher_,
+                             [task = std::move(task_), on_result = std::move(on_result)]() mutable {
+                               on_result(task());
+                             });
+      storage_ = nullptr;
+    }
 
-            callable(std::move(args)...);
-          },
-          args);
+    AsyncCallBuilder(DispatcherBoundStorage* storage, async_dispatcher_t* dispatcher, Task task)
+        : storage_(storage), dispatcher_(dispatcher), task_(std::move(task)) {}
+
+    ~AsyncCallBuilder() { ZX_DEBUG_ASSERT(!storage_); }
+
+    AsyncCallBuilder(const AsyncCallBuilder&) = delete;
+    AsyncCallBuilder& operator=(const AsyncCallBuilder&) = delete;
+
+    AsyncCallBuilder(AsyncCallBuilder&&) = delete;
+    AsyncCallBuilder& operator=(AsyncCallBuilder&&) = delete;
+
+   private:
+    DispatcherBoundStorage* storage_;
+    async_dispatcher_t* dispatcher_;
+    Task task_;
+  };
+
+  template <typename T, typename Member, typename... Args>
+  auto AsyncCallWithReply(async_dispatcher_t* dispatcher, Member T::*member, Args&&... args) {
+    void* raw_ptr = op_fn_(Operation::kGetPointer);
+    T* ptr = static_cast<T*>(raw_ptr);
+    auto make_task = [&] {
+      return BindForSending(cpp20::bind_front(member, ptr), std::forward<Args>(args)...);
     };
+    return AsyncCallBuilder<decltype(make_task())>(this, dispatcher, make_task());
   }
 
   // Asynchronously destructs the object that was constructed earlier in

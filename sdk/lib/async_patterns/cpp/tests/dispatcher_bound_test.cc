@@ -9,6 +9,7 @@
 #include <thread>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/async_patterns/cpp/receiver.h>
 
 #include "src/lib/testing/predicates/status.h"
 
@@ -257,6 +258,57 @@ TEST_F(DispatcherBound, AsyncCall) {
     EXPECT_EQ("", s);
   }
 #endif
+}
+
+TEST_F(DispatcherBound, AsyncCallWithReply) {
+  class Background {
+   public:
+    explicit Background(std::string base) : base_(std::move(base)) {}
+
+    std::string Concat(const std::string& arg) { return base_ + arg; }
+
+   private:
+    std::string base_;
+  };
+
+  // |Owner| asynchronously tells |Background| to concatenate a string,
+  // and check the result in |DoneConcat|.
+  class Owner {
+   public:
+    explicit Owner(async_dispatcher_t* owner_dispatcher) : receiver_{this, owner_dispatcher} {
+      background_.AsyncCall(&Background::Concat, std::string("def"))
+          .Then(receiver_.Once(&Owner::DoneConcat));
+    }
+
+    bool got_result() const { return got_result_; }
+
+    async::Loop& background_loop() { return background_loop_; }
+
+   private:
+    void DoneConcat(const std::string& result) {
+      EXPECT_FALSE(got_result_);
+      EXPECT_EQ(result, "abcdef");
+      got_result_ = true;
+    }
+
+    async::Loop background_loop_{&kAsyncLoopConfigNeverAttachToThread};
+    async_patterns::DispatcherBound<Background> background_{background_loop_.dispatcher(),
+                                                            std::string("abc")};
+    async_patterns::Receiver<Owner> receiver_;
+    bool got_result_ = false;
+  };
+
+  Owner owner{loop().dispatcher()};
+  EXPECT_FALSE(owner.got_result());
+  // Nothing to process on the main loop.
+  ASSERT_OK(loop().RunUntilIdle());
+  EXPECT_FALSE(owner.got_result());
+  // Background loop should process |Concat| and post back the result.
+  ASSERT_OK(owner.background_loop().RunUntilIdle());
+  EXPECT_FALSE(owner.got_result());
+  // Main loop should process |DoneConcat|.
+  ASSERT_OK(loop().RunUntilIdle());
+  EXPECT_TRUE(owner.got_result());
 }
 
 TEST_F(DispatcherBound, PanicIfShutdown) {

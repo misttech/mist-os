@@ -8,7 +8,11 @@ executable("bin") {
   output_dir = target_out_dir
   output_name = "async_patterns_unittests"
 
-  sources = [ "dispatcher_bound_test.cc" ]
+  sources = [
+    "dispatcher_bound_test.cc",
+    "receiver_test.cc",
+    "task_queue_test.cc",
+  ]
 
   deps = [
     "//sdk/lib/async_patterns/cpp",

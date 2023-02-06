@@ -10,15 +10,24 @@ sdk_source_set("cpp") {
   include_base = "//sdk"
 
   sources = [
+    "callback.h",
     "dispatcher_bound.h",
     "internal/dispatcher_bound_storage.cc",
     "internal/dispatcher_bound_storage.h",
+    "internal/receiver_base.cc",
+    "internal/receiver_base.h",
+    "internal/task_queue.cc",
+    "internal/task_queue.h",
+    "receiver.h",
+    "sendable.h",
   ]
 
   public_deps = [
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   public_configs = [ "//sdk/config" ]
