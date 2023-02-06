@@ -12,6 +12,10 @@ namespace pwrbtn {
 
 namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
 
+fidl::ProtocolHandler<fuchsia_power_button::Monitor> PowerButtonMonitor::Publish() {
+  return bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+}
+
 void PowerButtonMonitor::GetAction(GetActionCompleter::Sync& completer) {
   completer.Reply(action_);
 }
@@ -33,16 +37,19 @@ zx_status_t PowerButtonMonitor::DoAction() {
   }
 }
 
-zx_status_t PowerButtonMonitor::SendButtonEvent(
-    fidl::ServerBindingRef<fuchsia_power_button::Monitor>& binding, ButtonEvent event) {
-  auto result = fidl::WireSendEvent(binding)->OnButtonEvent(
-      fuchsia_power_button::wire::PowerButtonEvent(event));
-  if (!result.ok()) {
-    printf("pwrbtn-monitor: input-watcher: failed to send button event.\n");
-    return result.status();
-  }
-
-  return ZX_OK;
+zx_status_t PowerButtonMonitor::SendButtonEvent(ButtonEvent event) {
+  zx_status_t all_status = ZX_OK;
+  bindings_.ForEachBinding(
+      [event, &all_status](const fidl::ServerBinding<fuchsia_power_button::Monitor>& binding) {
+        auto result = fidl::WireSendEvent(binding)->OnButtonEvent(
+            fuchsia_power_button::wire::PowerButtonEvent(event));
+        if (!result.ok()) {
+          printf("pwrbtn-monitor: failed to send button event: %s\n",
+                 result.FormatDescription().c_str());
+          all_status = result.status();
+        }
+      });
+  return all_status;
 }
 
 zx_status_t PowerButtonMonitor::SendPoweroff() {

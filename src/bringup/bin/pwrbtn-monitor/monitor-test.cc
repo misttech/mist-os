@@ -12,27 +12,7 @@
 using PwrAction = fuchsia_power_button::wire::Action;
 using PwrButtonEvent = fuchsia_power_button::wire::PowerButtonEvent;
 
-class MonitorTest : public zxtest::Test {
- public:
-  MonitorTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
-  void SetUp() override {
-    ASSERT_OK(loop_.StartThread("test-fidl-thread"));
-    auto endpoints = fidl::CreateEndpoints<fuchsia_power_button::Monitor>();
-    ASSERT_OK(endpoints.status_value());
-
-    client_ = fidl::WireSyncClient<fuchsia_power_button::Monitor>(std::move(endpoints->client));
-    binding_ = fidl::ServerBindingRef<fuchsia_power_button::Monitor>(
-        fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &monitor_));
-  }
-
- protected:
-  async::Loop loop_;
-  pwrbtn::PowerButtonMonitor monitor_;
-  fidl::WireSyncClient<fuchsia_power_button::Monitor> client_;
-  std::optional<fidl::ServerBindingRef<fuchsia_power_button::Monitor>> binding_;
-};
-
-class EventHandler : public fidl::WireSyncEventHandler<fuchsia_power_button::Monitor> {
+class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_power_button::Monitor> {
  public:
   EventHandler() = default;
 
@@ -44,30 +24,51 @@ class EventHandler : public fidl::WireSyncEventHandler<fuchsia_power_button::Mon
   PwrButtonEvent e = PwrButtonEvent::Unknown();
 };
 
-TEST_F(MonitorTest, TestSetAction) {
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client_->SetAction(PwrAction::kIgnore);
-  auto resp = client_->GetAction();
-  ASSERT_OK(resp.status());
-  ASSERT_EQ(resp->action, PwrAction::kIgnore);
+class MonitorTest : public zxtest::Test {
+ public:
+  MonitorTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  void SetUp() override {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_power_button::Monitor>();
+    ASSERT_OK(endpoints.status_value());
 
+    client_.Bind(std::move(endpoints->client), loop_.dispatcher(), &event_handler_);
+    monitor_.Publish()(std::move(endpoints->server));
+  }
+
+ protected:
+  async::Loop loop_;
+  pwrbtn::PowerButtonMonitor monitor_{loop_.dispatcher()};
+  fidl::WireClient<fuchsia_power_button::Monitor> client_;
+  EventHandler event_handler_;
+};
+
+TEST_F(MonitorTest, TestSetAction) {
+  client_->SetAction(PwrAction::kIgnore).ThenExactlyOnce([&](auto& resp) {});
+  ASSERT_OK(loop_.RunUntilIdle());
+  client_->GetAction().ThenExactlyOnce([&](auto& resp) {
+    ASSERT_OK(resp.status());
+    ASSERT_EQ(resp->action, PwrAction::kIgnore);
+  });
+  ASSERT_OK(loop_.RunUntilIdle());
   ASSERT_OK(monitor_.DoAction());
 }
 
 TEST_F(MonitorTest, TestGetActionDefault) {
-  auto resp = client_->GetAction();
-  ASSERT_OK(resp.status());
-  ASSERT_EQ(resp->action, PwrAction::kShutdown);
+  client_->GetAction().ThenExactlyOnce([&](auto& resp) {
+    ASSERT_OK(resp.status());
+    ASSERT_EQ(resp->action, PwrAction::kShutdown);
+  });
+  ASSERT_OK(loop_.RunUntilIdle());
 }
 
 TEST_F(MonitorTest, TestSendButtonEvent) {
-  EventHandler event_handler;
-  ASSERT_TRUE(event_handler.e.IsUnknown());
-  ASSERT_NE(event_handler.e, PwrButtonEvent::kPress);
+  ASSERT_OK(loop_.RunUntilIdle());
+  ASSERT_TRUE(event_handler_.e.IsUnknown());
+  ASSERT_NE(event_handler_.e, PwrButtonEvent::kPress);
 
-  ASSERT_OK(monitor_.SendButtonEvent(binding_.value(), PwrButtonEvent::kPress));
-  ASSERT_OK(client_.HandleOneEvent(event_handler));
-  ASSERT_EQ(event_handler.e, PwrButtonEvent::kPress);
+  ASSERT_OK(monitor_.SendButtonEvent(PwrButtonEvent::kPress));
+  ASSERT_OK(loop_.RunUntilIdle());
+  ASSERT_EQ(event_handler_.e, PwrButtonEvent::kPress);
 }
 
 TEST_F(MonitorTest, TestShutdownFailsWithNoService) { ASSERT_NOT_OK(monitor_.DoAction()); }

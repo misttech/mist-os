@@ -15,12 +15,14 @@ class PowerButtonMonitor : public fidl::WireServer<fuchsia_power_button::Monitor
   using ButtonEvent = fuchsia_power_button::wire::PowerButtonEvent;
 
  public:
+  explicit PowerButtonMonitor(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  fidl::ProtocolHandler<fuchsia_power_button::Monitor> Publish();
+
   void GetAction(GetActionCompleter::Sync& completer) override;
   void SetAction(SetActionRequestView view, SetActionCompleter::Sync& completer) override;
 
   // Called when the power button is pressed or released.
-  zx_status_t SendButtonEvent(fidl::ServerBindingRef<fuchsia_power_button::Monitor>& binding,
-                              ButtonEvent event);
+  zx_status_t SendButtonEvent(ButtonEvent event);
 
   // Called when the power button is pressed.
   zx_status_t DoAction();
@@ -28,6 +30,8 @@ class PowerButtonMonitor : public fidl::WireServer<fuchsia_power_button::Monitor
  private:
   static zx_status_t SendPoweroff();
 
+  async_dispatcher_t* dispatcher_;
+  fidl::ServerBindingGroup<fuchsia_power_button::Monitor> bindings_;
   Action action_ = Action::kShutdown;
 };
 

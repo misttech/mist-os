@@ -13,6 +13,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -198,10 +199,8 @@ zx_status_t GetButtonReportEvent(zx::event* event_out, PowerButtonInfo* info_out
 
 // Processes a power button event, dispatches events appropriately to
 // listeners, and quits the execution look if reading a report fails
-void ProcessPowerEvent(
-    zx::event* report_event, pwrbtn::PowerButtonMonitor* monitor,
-    std::unordered_map<size_t, fidl::ServerBindingRef<fuchsia_power_button::Monitor>>* bindings,
-    PowerButtonInfo* info, zx_status_t status, async::Loop* loop) {
+void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* monitor,
+                       PowerButtonInfo* info, zx_status_t status, async::Loop* loop) {
   if (status == ZX_ERR_CANCELED) {
     return;
   }
@@ -228,10 +227,8 @@ void ProcessPowerEvent(
   const size_t byte_index = info->has_report_id_byte + info->bit_offset / 8;
   if (report[byte_index] & (1u << (info->bit_offset % 8))) {
     // Sends a Press event to clients, regardless of the Action set.
-    for (auto& binding : *bindings) {
-      monitor->SendButtonEvent(binding.second,
-                               fuchsia_power_button::wire::PowerButtonEvent::kPress);
-    }
+    // Also keep going to |DoAction| even if button event sending failed.
+    (void)monitor->SendButtonEvent(fuchsia_power_button::wire::PowerButtonEvent::kPress);
 
     auto status = monitor->DoAction();
     if (status != ZX_OK) {
@@ -308,8 +305,7 @@ void RunOomThread() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  zx_status_t status = StdoutToDebuglog::Init();
-  if (status != ZX_OK) {
+  if (StdoutToDebuglog::Init() != ZX_OK) {
     return 1;
   }
 
@@ -318,8 +314,7 @@ int main(int argc, char** argv) {
 
   // Declare some structures needed for the duration of the program, some of
   // these are shared between different tasks.
-  std::unordered_map<size_t, fidl::ServerBindingRef<fuchsia_power_button::Monitor>> bindings;
-  pwrbtn::PowerButtonMonitor monitor;
+  pwrbtn::PowerButtonMonitor monitor{loop.dispatcher()};
   PowerButtonInfo info;
 
   // Create a task which watches for the power button device to appear and then
@@ -327,8 +322,7 @@ int main(int argc, char** argv) {
   zx::event report_event;
   async::Wait pwrbtn_waiter(ZX_HANDLE_INVALID, ZX_USER_SIGNAL_0, 0, nullptr);
 
-  async::TaskClosure button_init([&report_event, &info, &pwrbtn_waiter, &loop, &monitor,
-                                  &bindings]() mutable {
+  async::TaskClosure button_init([&report_event, &info, &pwrbtn_waiter, &loop, &monitor]() mutable {
     zx_status_t status = GetButtonReportEvent(&report_event, &info);
 
     if (status != ZX_OK) {
@@ -338,10 +332,10 @@ int main(int argc, char** argv) {
     }
 
     pwrbtn_waiter.set_object(report_event.get());
-    pwrbtn_waiter.set_handler([&pwrbtn_waiter, &loop, &monitor, &bindings, &info, &report_event](
+    pwrbtn_waiter.set_handler([&pwrbtn_waiter, &loop, &monitor, &info, &report_event](
                                   async_dispatcher_t*, async::Wait*, zx_status_t status,
                                   const zx_packet_signal_t*) mutable {
-      ProcessPowerEvent(&report_event, &monitor, &bindings, &info, status, &loop);
+      ProcessPowerEvent(&report_event, &monitor, &info, status, &loop);
       pwrbtn_waiter.Begin(loop.dispatcher());
     });
 
@@ -358,38 +352,16 @@ int main(int argc, char** argv) {
   // work.
   std::thread oom_thread(RunOomThread);
 
-  async_dispatcher_t* dispatcher = loop.dispatcher();
-  svc::Outgoing outgoing(loop.dispatcher());
-  status = outgoing.ServeFromStartupInfo();
-  if (status != ZX_OK) {
-    printf("pwrbtn-monitor: failed to ServeFromStartupInfo: %s\n", zx_status_get_string(status));
+  component::OutgoingDirectory outgoing{loop.dispatcher()};
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (!result.is_ok()) {
+    printf("pwrbtn-monitor: failed to ServeFromStartupInfo: %s\n", result.status_string());
     return 1;
   }
 
-  size_t n_bindings = 0;
-  status = outgoing.svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_power_button::Monitor>,
-      fbl::MakeRefCounted<fs::Service>(
-          [&monitor, dispatcher, &bindings,
-           &n_bindings](fidl::ServerEnd<fuchsia_power_button::Monitor> request) mutable {
-            fidl::OnUnboundFn<pwrbtn::PowerButtonMonitor> unbound_handler =
-                [&bindings, n_bindings](pwrbtn::PowerButtonMonitor* /*unused*/,
-                                        fidl::UnbindInfo info,
-                                        fidl::ServerEnd<fuchsia_power_button::Monitor> /*unused*/) {
-                  if (info.is_peer_closed()) {
-                    bindings.erase(n_bindings);
-                  }
-                };
-
-            auto binding = fidl::BindServer(dispatcher, std::move(request), &monitor,
-                                            std::move(unbound_handler));
-            bindings.emplace(n_bindings, std::move(binding));
-            ++n_bindings;
-
-            return ZX_OK;
-          }));
-  if (status != ZX_OK) {
-    printf("pwrbtn-monitor: failed to AddEntry: %s\n", zx_status_get_string(status));
+  result = outgoing.AddUnmanagedProtocol<fuchsia_power_button::Monitor>(monitor.Publish());
+  if (!result.is_ok()) {
+    printf("pwrbtn-monitor: failed to AddEntry: %s\n", result.status_string());
     return 1;
   }
 
