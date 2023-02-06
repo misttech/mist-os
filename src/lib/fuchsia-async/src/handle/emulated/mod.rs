@@ -546,6 +546,17 @@ impl Channel {
                         .into_iter()
                         .enumerate()
                         .for_each(|(i, hdl)| handles[i] = MaybeUninit::new(hdl));
+                    if read_side.is_empty() {
+                        match obj
+                            .signal(side, Signals::OBJECT_READABLE, Signals::NONE)
+                            .status_for_self()
+                        {
+                            Err(e) => {
+                                return Poll::Ready(Ok((Err(e), msg_bytes_len, msg_handles_len)))
+                            }
+                            Ok(_) => {}
+                        }
+                    }
                     Poll::Ready(Ok((Ok(()), msg_bytes_len, msg_handles_len)))
                 }
             } else if obj.is_open() {
