@@ -15,7 +15,7 @@ use {
     tracing::*,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_static, pseudo_directory,
+        file::vmo::read_only_static, pseudo_directory,
     },
 };
 

@@ -540,7 +540,7 @@ mod tests {
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::asynchronous::{read_write, simple_init_vmo_with_capacity};
+    use vfs::file::vmo::{read_write, simple_init_vmo_with_capacity};
     use vfs::mut_pseudo_directory;
 
     #[async_trait]

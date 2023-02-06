@@ -415,7 +415,7 @@ mod tests {
         std::{mem, sync::Weak},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::asynchronous::read_only_static, path, pseudo_directory,
+            file::vmo::read_only_static, path, pseudo_directory,
         },
     };
 

@@ -142,7 +142,7 @@ impl TreeBuilder {
     /// ```should_panic
     /// use crate::{
     ///     directory::immutable::simple,
-    ///     file::vmo::asynchronous::read_only_static,
+    ///     file::vmo::read_only_static,
     /// };
     ///
     /// let mut tree = TreeBuilder::empty_dir();
@@ -158,7 +158,7 @@ impl TreeBuilder {
     /// ```
     /// use crate::{
     ///     directory::immutable::simple,
-    ///     file::vmo::asynchronous::read_only_static,
+    ///     file::vmo::read_only_static,
     /// };
     ///
     /// let mut tree = TreeBuilder::empty_dir();
@@ -378,7 +378,7 @@ mod tests {
 
     use crate::{
         directory::{immutable::simple, test_utils::run_server_client},
-        file::vmo::asynchronous::read_only_static,
+        file::vmo::read_only_static,
     };
 
     use {fidl_fuchsia_io as fio, vfs_macros::pseudo_directory};

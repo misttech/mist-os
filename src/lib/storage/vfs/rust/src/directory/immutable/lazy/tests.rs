@@ -21,7 +21,7 @@ use crate::{
         traversal_position::TraversalPosition::{self, End, Name, Start},
     },
     execution_scope::ExecutionScope,
-    file::vmo::asynchronous::{read_only_const, read_only_static},
+    file::vmo::{read_only_const, read_only_static},
 };
 
 use {

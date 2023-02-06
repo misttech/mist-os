@@ -417,7 +417,7 @@ mod tests {
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::asynchronous::test_utils::simple_init_vmo_with_capacity;
+    use vfs::file::test_utils::simple_init_vmo_with_capacity;
     use vfs::file::vmo::read_write;
     use vfs::mut_pseudo_directory;
 

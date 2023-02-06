@@ -86,10 +86,9 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
 
         if path.as_ref() == "missing" {
             let () = scope.clone().spawn(async move {
-                let () = vfs::file::vmo::asynchronous::read_only_const(
-                    self.make_missing_contents().await.as_slice(),
-                )
-                .open(scope, flags, VfsPath::dot(), server_end);
+                let () =
+                    vfs::file::vmo::read_only_const(self.make_missing_contents().await.as_slice())
+                        .open(scope, flags, VfsPath::dot(), server_end);
             });
             return;
         }

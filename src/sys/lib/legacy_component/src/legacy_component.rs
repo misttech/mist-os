@@ -15,7 +15,7 @@ use {
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
         directory::immutable::simple as pfs, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_static, path::Path as VfsPath, pseudo_directory,
+        file::vmo::read_only_static, path::Path as VfsPath, pseudo_directory,
     },
 };
 

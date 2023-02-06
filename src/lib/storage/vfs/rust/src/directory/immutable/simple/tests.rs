@@ -23,7 +23,7 @@ use crate::{
         test_utils::{run_server_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
-    file::vmo::asynchronous::{read_only_static, read_write, simple_init_vmo_with_capacity},
+    file::vmo::{read_only_static, read_write, simple_init_vmo_with_capacity},
     path::Path,
     test_utils::node::open_get_proxy,
     test_utils::{build_flag_combinations, run_client},

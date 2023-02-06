@@ -17,15 +17,8 @@ use crate::{
 };
 
 use crate::{
-    directory::entry::DirectoryEntry,
-    execution_scope::ExecutionScope,
-    file::test_utils::{run_client, run_server_client, test_client, test_server_client},
+    directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::test_utils::*,
     path::Path,
-};
-
-use super::test_utils::{
-    simple_init_vmo, simple_init_vmo_with_capacity, simple_read_only, simple_read_only_with_inode,
-    simple_read_write,
 };
 
 use {
@@ -294,7 +287,7 @@ fn read_write_no_read_flag() {
 #[test]
 /// When the `init_vmo` creates a VMO that is larger then the specified capacity of the file, the
 /// user will be able to access all of the allocated bytes.  More details in
-/// [`file::vmo::asynchronous::NewVmo::capacity`].
+/// [`file::vmo::NewVmo::capacity`].
 fn read_returns_more_than_capacity() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,

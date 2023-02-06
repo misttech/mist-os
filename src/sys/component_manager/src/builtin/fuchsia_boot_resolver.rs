@@ -409,7 +409,7 @@ mod tests {
         std::sync::{Arc, Weak},
         vfs::{
             self, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::asynchronous::read_only_static, pseudo_directory, remote::remote_dir,
+            file::vmo::read_only_static, pseudo_directory, remote::remote_dir,
         },
     };
 

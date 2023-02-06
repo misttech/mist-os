@@ -20,7 +20,7 @@ use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::mutable::connection::io1::MutableConnection;
 use vfs::directory::simple::Simple;
-use vfs::file::vmo::asynchronous as vmo;
+use vfs::file::vmo;
 
 // The location of the added trampolines. The path will be of the form:
 // `/.dash/tools/<package-name>/<trampoline-name>`.

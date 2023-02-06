@@ -12,8 +12,8 @@ use {
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
     vfs::{
         self, directory::entry::DirectoryEntry, directory::immutable::simple as pfs,
-        execution_scope::ExecutionScope, file::vmo::asynchronous::read_only_const,
-        remote::remote_dir, service::host, tree_builder::TreeBuilder,
+        execution_scope::ExecutionScope, file::vmo::read_only_const, remote::remote_dir,
+        service::host, tree_builder::TreeBuilder,
     },
 };
 

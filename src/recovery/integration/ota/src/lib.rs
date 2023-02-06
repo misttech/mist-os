@@ -25,7 +25,7 @@ use mock_omaha_server::OmahaResponse;
 use mock_paver::{MockPaverService, PaverEvent};
 use ota_lib::config::{JsonUpdateConfig, JsonUpdateType};
 use std::{collections::BTreeSet, sync::Arc};
-use vfs::{directory::entry::DirectoryEntry, file::vmo::asynchronous::read_only_const};
+use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_const};
 
 type ProgressRendererSender = mpsc::Sender<frui::ProgressRendererRender2Request>;
 

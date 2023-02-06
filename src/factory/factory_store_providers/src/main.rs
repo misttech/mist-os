@@ -35,7 +35,7 @@ use {
     vfs::{
         directory::{self, entry::DirectoryEntry},
         execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_const,
+        file::vmo::read_only_const,
         tree_builder::TreeBuilder,
     },
 };

@@ -22,7 +22,7 @@ use {
     structopt::StructOpt,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_const, tree_builder::TreeBuilder,
+        file::vmo::read_only_const, tree_builder::TreeBuilder,
     },
 };
 

@@ -23,7 +23,7 @@ use {
             simple::Simple,
         },
         execution_scope::ExecutionScope,
-        file::vmo::asynchronous as vmo,
+        file::vmo,
         path::Path,
         remote::remote_dir,
     },

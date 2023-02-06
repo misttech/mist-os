@@ -12,7 +12,7 @@ use {
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
         directory::immutable::simple as simpledir, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only, path::Path as VfsPath,
+        file::vmo::read_only, path::Path as VfsPath,
     },
 };
 

@@ -857,7 +857,7 @@ mod tests {
                 traversal_position::TraversalPosition,
             },
             execution_scope::ExecutionScope,
-            file::vmo::asynchronous::read_only_static,
+            file::vmo::read_only_static,
             mut_pseudo_directory,
             path::Path,
         },

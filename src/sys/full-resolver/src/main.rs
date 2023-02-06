@@ -252,7 +252,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             execution_scope::ExecutionScope,
-            file::vmo::{asynchronous::read_only_static, read_only_const},
+            file::vmo::{read_only_const, read_only_static},
             path::Path,
             pseudo_directory,
         },

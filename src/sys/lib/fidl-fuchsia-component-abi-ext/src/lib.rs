@@ -63,8 +63,8 @@ mod tests {
         std::sync::Arc,
         version_history::AbiRevision,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope,
-            file::vmo::asynchronous::read_only_static, pseudo_directory, remote::remote_dir,
+            directory::entry::DirectoryEntry, execution_scope, file::vmo::read_only_static,
+            pseudo_directory, remote::remote_dir,
         },
     };
 

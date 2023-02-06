@@ -213,7 +213,7 @@ mod tests {
         maplit::hashmap,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::asynchronous::read_only_static, path::Path as VfsPath, pseudo_directory,
+            file::vmo::read_only_static, path::Path as VfsPath, pseudo_directory,
         },
     };
 

@@ -15,7 +15,7 @@ use {
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::vmo::asynchronous::VmoFile,
+        file::vmo::VmoFile,
     },
 };
 
@@ -155,7 +155,7 @@ async fn create_realm(pkgfs: Directory) -> Result<fuchsia_component_test::RealmI
 
 #[fuchsia::test]
 async fn load_package_firmware_test() -> Result<(), Error> {
-    let firmware_file = vfs::file::vmo::asynchronous::read_only_static(b"this is some firmware\n");
+    let firmware_file = vfs::file::vmo::read_only_static(b"this is some firmware\n");
     let driver_dir = vfs::remote::remote_dir(fuchsia_fs::directory::open_in_namespace(
         "/pkg/driver",
         fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
@@ -168,7 +168,7 @@ async fn load_package_firmware_test() -> Result<(), Error> {
         "/pkg/bind",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?);
-    let base_manifest = vfs::file::vmo::asynchronous::read_only_static(
+    let base_manifest = vfs::file::vmo::read_only_static(
         r#"[{"driver_url": "fuchsia-pkg://fuchsia.com/my-package#meta/ddk-firmware-test-driver.cm"}]"#,
     );
     let my_package = FakePackageVariant::new(
@@ -184,7 +184,7 @@ async fn load_package_firmware_test() -> Result<(), Error> {
         },
         // Hash is arbitrary and is not read in tests, however, some value needs
         // to be provided, otherwise, the driver will fail to load.
-        vfs::file::vmo::asynchronous::read_only_static(
+        vfs::file::vmo::read_only_static(
             "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
         ),
     );

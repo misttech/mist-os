@@ -24,7 +24,7 @@ use crate::{
         mutable::simple::tree_constructor,
         test_utils::{run_server_client, test_server_client, DirentsSameInodeBuilder},
     },
-    file::vmo::asynchronous::read_only_static,
+    file::vmo::read_only_static,
 };
 
 use {

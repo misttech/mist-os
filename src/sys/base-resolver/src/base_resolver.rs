@@ -909,15 +909,15 @@ mod tests {
         vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {
                 "fuchsia.pkg" => vfs::pseudo_directory! {
-                    "subpackages" => vfs::file::vmo::asynchronous::read_only_const(
+                    "subpackages" => vfs::file::vmo::read_only_const(
                         &serde_json::to_vec(&subpackages).unwrap()
                     ),
                 },
                 "fuchsia.abi" => vfs::pseudo_directory! {
                   "abi-revision" => vfs::file::vmo::read_only_static(0u64.to_le_bytes()),
                 },
-                "foo.cm" => vfs::file::vmo::asynchronous::read_only_const(&cm_bytes),
-                "foo-with-config.cm" => vfs::file::vmo::asynchronous::read_only_const(
+                "foo.cm" => vfs::file::vmo::read_only_const(&cm_bytes),
+                "foo-with-config.cm" => vfs::file::vmo::read_only_const(
                     &persist(
                         &mut fdecl::Component {
                             config: Some(fdecl::ConfigSchema {
@@ -932,14 +932,14 @@ mod tests {
                         }
                     ).unwrap()
                 ),
-                "foo-with-config.cvf" => vfs::file::vmo::asynchronous::read_only_const(
+                "foo-with-config.cvf" => vfs::file::vmo::read_only_const(
                     &persist(
                         &mut fconfig::ValuesData {
                             ..fconfig::ValuesData::EMPTY
                         }
                     ).unwrap()
                 ),
-                "foo-with-bad-config.cm" => vfs::file::vmo::asynchronous::read_only_const(
+                "foo-with-bad-config.cm" => vfs::file::vmo::read_only_const(
                     &persist(
                         &mut fdecl::Component {
                             config: Some(fdecl::ConfigSchema {
@@ -949,7 +949,7 @@ mod tests {
                         }
                     ).unwrap()
                 ),
-                "foo-without-config.cm" => vfs::file::vmo::asynchronous::read_only_const(
+                "foo-without-config.cm" => vfs::file::vmo::read_only_const(
                     &persist(
                         &mut fdecl::Component {
                             config: Some(fdecl::ConfigSchema {
@@ -964,7 +964,7 @@ mod tests {
                         }
                     ).unwrap()
                 ),
-                "large.cm" => vfs::file::vmo::asynchronous::read_only_const(
+                "large.cm" => vfs::file::vmo::read_only_const(
                     &persist(
                         &mut fdecl::Component {
                             program: Some(fdecl::Program {
@@ -991,7 +991,7 @@ mod tests {
 
         vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {
-                "subfoo.cm" => vfs::file::vmo::asynchronous::read_only_const(&cm_bytes),
+                "subfoo.cm" => vfs::file::vmo::read_only_const(&cm_bytes),
                 "fuchsia.abi" => vfs::pseudo_directory! {
                   "abi-revision" => vfs::file::vmo::read_only_static(1u64.to_le_bytes()),
                 },

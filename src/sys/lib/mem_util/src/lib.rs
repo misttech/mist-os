@@ -118,7 +118,7 @@ mod tests {
     use vfs::{
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_static,
+        file::vmo::read_only_static,
         pseudo_directory,
         remote::{remote_boxed_with_type, RoutingFn},
     };

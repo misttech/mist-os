@@ -14,8 +14,8 @@ use {
     std::sync::Arc,
     tracing::info,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::asynchronous as vmo, tree_builder::TreeBuilder,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo,
+        tree_builder::TreeBuilder,
     },
 };
 

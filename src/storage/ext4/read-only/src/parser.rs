@@ -49,9 +49,7 @@ use {
         str,
         sync::Arc,
     },
-    vfs::{
-        directory::immutable, file::vmo::asynchronous::read_only_const, tree_builder::TreeBuilder,
-    },
+    vfs::{directory::immutable, file::vmo::read_only_const, tree_builder::TreeBuilder},
     zerocopy::ByteSlice,
 };
 

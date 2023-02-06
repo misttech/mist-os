@@ -44,7 +44,7 @@ use {
     version_history,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_static, path::Path, pseudo_directory, remote::RoutingFn,
+        file::vmo::read_only_static, path::Path, pseudo_directory, remote::RoutingFn,
     },
 };
 
