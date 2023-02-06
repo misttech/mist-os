@@ -7,6 +7,8 @@
 
 #include <cassert>
 #include <string_view>
+#include <type_traits>
+#include <variant>
 
 #include "../constants.h"
 #include "../layout.h"
@@ -15,6 +17,35 @@
 namespace elfldltl::internal {
 
 constexpr std::string_view kTooManyLoads = "too many PT_LOAD segments";
+
+// The std::visit implementation is quite complicated and works in a way that
+// relies on constexpr arrays of function pointers.  This is not reliably
+// compiled to pure PIC as is required in some contexts.
+//
+// This Visit provides a limited implementation that is much simpler.  It's
+// less general than std::visit in that it doesn't handle arbitrary return
+// value types, nor multiple arguments.
+template <typename F, typename V>
+constexpr bool Visit(F&& f, V&& v) {
+  constexpr auto n = std::variant_size_v<std::decay_t<V>>;
+  constexpr auto seq = std::make_index_sequence<n>();
+  return VisitEach(std::forward<F>(f), std::forward<V>(v), seq);
+}
+
+// Helper template for Visit, needed so it can use a fold expression across
+// the variant indices.
+template <typename F, typename V, size_t... I>
+constexpr bool VisitEach(F&& f, V&& v, std::index_sequence<I...>) {
+  static_assert(sizeof...(I) == std::variant_size_v<std::decay_t<V>>);
+  bool result = false;
+  auto visit_one = [&f, &result](auto&& v) {
+    result = std::forward<F>(f)(v);
+    return true;
+  };
+  // Exactly one of these visit_one calls will be evaluated.
+  ((v.index() == I && visit_one(std::get<I>(std::forward<V>(v)))) || ...);
+  return result;
+}
 
 // This is used to implement the LoadInfo::ConstantSegment type below.
 template <typename SegmentType>
@@ -261,29 +292,31 @@ struct LoadSegmentTypes {
   template <class... T, class First>
   static constexpr bool Merge(std::variant<T...>& storage, const First& first,
                               const std::variant<T...>& second) {
-    return std::visit(
-        [&storage, &first](const auto& second) { return Merge(storage, first, second); }, second);
+    return Visit([&storage, &first](const auto& second) { return Merge(storage, first, second); },
+                 second);
   }
 
   template <class... T, class Second>
   static constexpr bool Merge(std::variant<T...>& storage, const std::variant<T...>& first,
                               const Second& second) {
-    return std::visit(
-        [&storage, &second](const auto& first) { return Merge(storage, first, second); }, first);
+    return Visit([&storage, &second](const auto& first) { return Merge(storage, first, second); },
+                 first);
   }
 
   template <class... T>
   static constexpr bool Merge(std::variant<T...>& first, std::variant<T...>& second) {
-    return std::visit(
-        [&storage = first](const auto& first, const auto& second) {
-          return Merge(storage, first, second);
-        },
-        first, second);
+    auto unwrap_first = [&storage = first, &second](const auto& first) {
+      auto unwrap_second = [&storage, &first](const auto& second) {
+        return Merge(storage, first, second);
+      };
+      return Visit(unwrap_second, second);
+    };
+    return Visit(unwrap_first, first);
   }
 
   template <class... T, class Second>
   static constexpr bool Merge(std::variant<T...>& first, const Second& second) {
-    return std::visit(
+    return Visit(
         [&storage = first, &second](const auto& first) { return Merge(storage, first, second); },
         first);
   }

@@ -6,56 +6,75 @@
 
 #include "userboot-elf.h"
 
-#include <elf.h>
-#include <string.h>
-#include <zircon/compiler.h>
+#include <lib/elfldltl/diagnostics.h>
+#include <lib/elfldltl/load.h>
+#include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/static-vector.h>
+#include <lib/elfldltl/vmar-loader.h>
+#include <lib/elfldltl/vmo.h>
+#include <lib/elfldltl/zircon.h>
 #include <zircon/processargs.h>
-#include <zircon/syscalls.h>
 
-#include <iterator>
-
-#include <elfload/elfload.h>
-#include <fbl/algorithm.h>
+#include <cstdint>
+#include <optional>
+#include <string_view>
 
 #include "bootfs.h"
 #include "util.h"
 
+namespace {
+
 #define INTERP_PREFIX "lib/"
 
-static zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& vmar,
-                       const zx::vmo& vmo, uintptr_t* interp_off, size_t* interp_len,
-                       zx::vmar* segments_vmar, size_t* stack_size, bool return_entry) {
-  elf_load_header_t header;
-  uintptr_t phoff;
-  zx_status_t status = elf_load_prepare(vmo.get(), NULL, 0, &header, &phoff);
-  check(log, status, "elf_load_prepare failed");
+constexpr size_t kMaxSegments = 4;
+constexpr size_t kMaxPhdrs = 16;
 
-  elf_phdr_t phdrs[header.e_phnum];
-  status = elf_load_read_phdrs(vmo.get(), phdrs, phoff, header.e_phnum);
-  check(log, status, "elf_load_read_phdrs failed");
+zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& vmar,
+                const zx::vmo& vmo, uintptr_t* interp_off, size_t* interp_len,
+                zx::vmar* segments_vmar, size_t* stack_size, bool return_entry) {
+  auto diag = elfldltl::Diagnostics(
+      elfldltl::PrintfDiagnosticsReport([&log](auto&&... args) { printl(log, args...); },
+                                        "userboot: ", what, ": "),
+      elfldltl::DiagnosticsPanicFlags());
 
-  if (interp_off != NULL && elf_load_find_interp(phdrs, header.e_phnum, interp_off, interp_len))
+  elfldltl::UnownedVmoFile file(vmo.borrow(), diag);
+  auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
+      diag, file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
+  ZX_ASSERT(headers);
+  auto& [ehdr, phdrs_result] = *headers;
+  cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
+
+  std::optional<size_t> stack;
+  std::optional<elfldltl::Elf<>::Phdr> interp;
+  elfldltl::RemoteVmarLoader loader{vmar};
+  elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
+  ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size()),
+                                  elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp),
+                                  elfldltl::PhdrStackObserver<elfldltl::Elf<>>(stack)));
+
+  if (interp_off && interp) {
+    *interp_off = interp->offset;
+    *interp_len = interp->filesz;
     return 0;
-
-  if (stack_size != NULL) {
-    for (size_t i = 0; i < header.e_phnum; ++i) {
-      if (phdrs[i].p_type == PT_GNU_STACK && phdrs[i].p_memsz > 0)
-        *stack_size = phdrs[i].p_memsz;
-    }
   }
 
-  zx_vaddr_t base, entry;
-  zx_handle_t* vmar_ptr = (segments_vmar) ? segments_vmar->reset_and_get_address() : NULL;
-  status = elf_load_map_segments(vmar.get(), &header, phdrs, vmo.get(), vmar_ptr, &base, &entry);
-  check(log, status, "elf_load_map_segments failed");
+  if (stack_size && stack) {
+    *stack_size = *stack;
+  }
+
+  ZX_ASSERT(loader.Load(diag, load_info, vmo.borrow()));
+
+  const uintptr_t entry = ehdr.entry + loader.load_bias();
+  const uintptr_t base = load_info.vaddr_start() + loader.load_bias();
+
+  zx::vmar loaded_vmar = std::move(loader).Commit();
+  if (segments_vmar) {
+    *segments_vmar = std::move(loaded_vmar);
+  }
 
   printl(log, "userboot: loaded %.*s at %p, entry point %p\n", static_cast<int>(what.size()),
          what.data(), (void*)base, (void*)entry);
   return return_entry ? entry : base;
-}
-
-zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx::vmo& vmo) {
-  return load(log, "vDSO", vmar, vmo, NULL, NULL, NULL, NULL, false);
 }
 
 enum loader_bootstrap_handle_index {
@@ -78,10 +97,10 @@ struct loader_bootstrap_message {
   char env[sizeof(LOADER_BOOTSTRAP_ENVIRON)];
 };
 
-static void stuff_loader_bootstrap(const zx::debuglog& log, const zx::process& proc,
-                                   const zx::vmar& root_vmar, const zx::thread& thread,
-                                   const zx::channel& to_child, zx::vmar segments_vmar, zx::vmo vmo,
-                                   zx::channel* loader_svc) {
+void stuff_loader_bootstrap(const zx::debuglog& log, const zx::process& proc,
+                            const zx::vmar& root_vmar, const zx::thread& thread,
+                            const zx::channel& to_child, zx::vmar segments_vmar, zx::vmo vmo,
+                            zx::channel* loader_svc) {
 #if defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
@@ -134,6 +153,12 @@ static void stuff_loader_bootstrap(const zx::debuglog& log, const zx::process& p
 
   zx_status_t status = to_child.write(0, &msg, sizeof(msg), handles, std::size(handles));
   check(log, status, "zx_channel_write of loader bootstrap message failed");
+}
+
+}  // namespace
+
+zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx::vmo& vmo) {
+  return load(log, "vDSO", vmar, vmo, NULL, NULL, NULL, NULL, false);
 }
 
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_view root,

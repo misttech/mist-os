@@ -432,7 +432,6 @@ template <class Elf, PhdrLoadPolicy Policy = PhdrLoadPolicy::kBasic,
 class PhdrLoadObserver
     : public PhdrObserver<PhdrLoadObserver<Elf, Policy, Callback>, ElfPhdrType::kLoad> {
  private:
-  using Base = PhdrSingletonObserver<Elf, ElfPhdrType::kStack>;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
 

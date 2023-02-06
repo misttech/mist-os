@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOAD_H_
 
 #include <array>
+#include <cassert>
 #include <functional>
 #include <optional>
 #include <type_traits>
@@ -347,7 +348,7 @@ class LoadInfo {
         done = check_relro(*data);
       } else if (auto* bss = std::get_if<DataWithZeroFillSegment>(&segment)) {
         done = check_relro(*bss);
-      } else if (diagnostics.extra_checking() && std::visit(is_relro, segment)) {
+      } else if (diagnostics.extra_checking() && internal::Visit(is_relro, segment)) {
         return diagnostics.FormatError("PT_GNU_RELRO applied to non-data segment"sv);
       }
       if (done) {
@@ -387,7 +388,7 @@ class LoadInfo {
   template <typename T, class C>
   static constexpr bool VisitAllOf(T&& visitor, C&& container) {
     for (auto& elt : container) {
-      if (!std::visit(visitor, elt)) {
+      if (!internal::Visit(visitor, elt)) {
         return false;
       }
     }

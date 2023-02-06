@@ -161,6 +161,8 @@ class FixedArrayFromFile {
 
     constexpr operator cpp20::span<T>() { return cpp20::span(data_).subspan(0, size_); }
 
+    constexpr operator cpp20::span<const T>() const { return cpp20::span(data_).subspan(0, size_); }
+
     constexpr operator bool() const { return size_ > 0; }
 
    private:

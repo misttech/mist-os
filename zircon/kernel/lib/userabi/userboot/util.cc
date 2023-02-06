@@ -15,7 +15,7 @@
 #define LOG_PREFIX "userboot: "
 #define LOG_WRITE_FAIL (LOG_PREFIX "Error printing error message.  No error message printed.\n")
 
-static char* hexstring(char* s, size_t len, uint64_t n) {
+static char* hexstring(char* s, size_t len, uint64_t n, bool prefix) {
   char tmp[16];
   char* hex = tmp;
   do {
@@ -23,7 +23,7 @@ static char* hexstring(char* s, size_t len, uint64_t n) {
     n >>= 4;
   } while (n);
 
-  if (len > 2) {
+  if (len > 2 && prefix) {
     *s++ = '0';
     *s++ = 'x';
     len -= 2;
@@ -79,7 +79,12 @@ void vprintl(const zx::debuglog& log, const char* fmt, va_list ap) {
       *p++ = *fmt++;
       continue;
     }
+    bool altflag = false;
+  nextfmt:
     switch (*++fmt) {
+      case '#':
+        altflag = true;
+        goto nextfmt;
       case 's':
         s = va_arg(ap, const char*);
         while (avail && *s) {
@@ -104,6 +109,7 @@ void vprintl(const zx::debuglog& log, const char* fmt, va_list ap) {
         }
         break;
       case 'z':
+      case 'l':
         fmt++;
         switch (*fmt) {
           case 'u':
@@ -135,7 +141,7 @@ void vprintl(const zx::debuglog& log, const char* fmt, va_list ap) {
       case 'x':
         n = va_arg(ap, uint32_t);
       x64print:
-        p = hexstring(p, avail, n);
+        p = hexstring(p, avail, n, altflag);
         break;
       default:
       bad_format:

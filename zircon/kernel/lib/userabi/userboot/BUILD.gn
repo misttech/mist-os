@@ -105,7 +105,6 @@ if (toolchain_environment == "userboot") {
       "//src/zircon/lib/zircon",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/userabi:headers",
-      "//zircon/system/ulib/elfload",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/ldmsg",
       "//zircon/system/ulib/processargs",

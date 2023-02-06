@@ -315,7 +315,7 @@ class Diagnostics {
 template <typename Printer, typename... Prefix>
 constexpr auto PrintfDiagnosticsReport(Printer&& printer, Prefix&&... prefix) {
   return [printer = std::forward<Printer>(printer),
-          prefix = std::forward_as_tuple(std::forward<Prefix>(prefix)...)](auto&&... args) {
+          prefix = std::make_tuple(std::forward<Prefix>(prefix)...)](auto&&... args) {
     internal::Printf(printer, prefix, std::forward<decltype(args)>(args)...);
     return true;
   };
