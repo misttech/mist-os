@@ -273,7 +273,7 @@ group("fancy-regex") {
 }
 
 group("fatfs") {
-  public_deps = [ ":fatfs-v0_4_0" ]
+  public_deps = [ ":fatfs-v0_3_6" ]
 }
 
 group("flate2") {
@@ -4029,10 +4029,10 @@ rust_library("fastrand-v1_4_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("fatfs-v0_4_0") {
+rust_library("fatfs-v0_3_6") {
   crate_name = "fatfs"
   crate_root = "//third_party/rust_crates/forks/fatfs/src/lib.rs"
-  output_name = "fatfs-2449189d41d04e86"
+  output_name = "fatfs-88a1471ee3619a95"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4046,8 +4046,8 @@ rust_library("fatfs-v0_4_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=2449189d41d04e86",
-    "-Cextra-filename=-2449189d41d04e86",
+    "-Cmetadata=88a1471ee3619a95",
+    "-Cextra-filename=-88a1471ee3619a95",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"chrono\"",
     "--cfg=feature=\"default\"",

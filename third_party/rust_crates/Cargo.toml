@@ -95,7 +95,7 @@ event-listener = "2.5.1"
 # it will be imported by valico and the dt-schema tool.
 # Remove this line when valico uses fancy-regex.
 fancy-regex = "0.8"
-fatfs = "0.4.0"
+fatfs = "0.3.6"
 flate2 = { version = "1.0.14", default-features = false, features = ["rust_backend"] }
 futures = "=0.3.19"
 futures-channel = "=0.3.19"

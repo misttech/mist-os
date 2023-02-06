@@ -1172,7 +1172,7 @@ dependencies = [
 
 [[package]]
 name = "fatfs"
-version = "0.4.0"
+version = "0.3.6"
 dependencies = [
  "bitflags",
  "byteorder",

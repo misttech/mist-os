@@ -1,6 +1,6 @@
 [package]
 name = "fatfs"
-version = "0.4.0"
+version = "0.3.6"
 authors = ["Rafał Harabień <rafalh92@outlook.com>"]
 edition = "2018"
 repository = "https://github.com/rafalh/rust-fatfs"
