@@ -163,8 +163,8 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
   size_t bulk_out_max_packet = 0;
 
   if (interface_descriptor->b_num_endpoints < 2) {
-    DEBUG_PRINT(
-        ("UMS:ums_bind wrong number of endpoints: %d\n", interface_descriptor->b_num_endpoints));
+    zxlogf(DEBUG, "UMS:ums_bind wrong number of endpoints: %d",
+           interface_descriptor->b_num_endpoints);
     txn.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -185,7 +185,7 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   if (!is_test_mode_ && (!bulk_in_max_packet || !bulk_out_max_packet)) {
-    DEBUG_PRINT(("UMS:ums_bind could not find endpoints\n"));
+    zxlogf(DEBUG, "UMS:ums_bind could not find endpoints");
     txn.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -216,7 +216,7 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
     return;
   }
   block_devs_ = fbl::Array(raw_array, max_lun + 1);
-  DEBUG_PRINT(("UMS:Max lun is: %u\n", max_lun));
+  zxlogf(DEBUG, "UMS:Max lun is: %u", max_lun);
   max_lun_ = max_lun;
   for (uint8_t lun = 0; lun <= max_lun; lun++) {
     auto dev = fbl::MakeRefCountedChecked<UmsBlockDevice>(
@@ -275,7 +275,7 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
 zx_status_t UsbMassStorageDevice::Reset() {
   // UMS Reset Recovery. See section 5.3.4 of
   // "Universal Serial Bus Mass Storage Class Bulk-Only Transport"
-  DEBUG_PRINT(("UMS: performing reset recovery\n"));
+  zxlogf(DEBUG, "UMS: performing reset recovery");
   // Step 1: Send  Bulk-Only Mass Storage Reset
   zx_status_t status =
       usb_.ControlOut(USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, USB_REQ_RESET, 0,
@@ -283,20 +283,20 @@ zx_status_t UsbMassStorageDevice::Reset() {
   usb_protocol_t usb;
   usb_.GetProto(&usb);
   if (status != ZX_OK) {
-    DEBUG_PRINT(("UMS: USB_REQ_RESET failed %d\n", status));
+    zxlogf(DEBUG, "UMS: USB_REQ_RESET failed: %s", zx_status_get_string(status));
     return status;
   }
   // Step 2: Clear Feature HALT to the Bulk-In endpoint
   constexpr uint8_t request_type = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_ENDPOINT;
   status = usb_.ClearFeature(request_type, USB_ENDPOINT_HALT, bulk_in_addr_, ZX_TIME_INFINITE);
   if (status != ZX_OK) {
-    DEBUG_PRINT(("UMS: clear endpoint halt failed %d\n", status));
+    zxlogf(DEBUG, "UMS: clear endpoint halt failed: %s", zx_status_get_string(status));
     return status;
   }
   // Step 3: Clear Feature HALT to the Bulk-Out endpoint
   status = usb_.ClearFeature(request_type, USB_ENDPOINT_HALT, bulk_out_addr_, ZX_TIME_INFINITE);
   if (status != ZX_OK) {
-    DEBUG_PRINT(("UMS: clear endpoint halt failed %d\n", status));
+    zxlogf(DEBUG, "UMS: clear endpoint halt failed: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
@@ -309,7 +309,7 @@ zx_status_t UsbMassStorageDevice::SendCbw(uint8_t lun, uint32_t transfer_length,
   ums_cbw_t* cbw;
   zx_status_t status = usb_request_mmap(req, (void**)&cbw);
   if (status != ZX_OK) {
-    DEBUG_PRINT(("UMS: usb request mmap failed: %d\n", status));
+    zxlogf(DEBUG, "UMS: usb request mmap failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -353,8 +353,8 @@ zx_status_t UsbMassStorageDevice::ReadCsw(uint32_t* out_residue) {
   } else {
     // FIXME - best way to handle this?
     // print error and then reset device due to it
-    DEBUG_PRINT(
-        ("UMS: CSW verify returned error. Check ums-hw.h csw_status_t for enum = %d\n", csw_error));
+    zxlogf(DEBUG, "UMS: CSW verify returned error. Check ums-hw.h csw_status_t for enum = %d",
+           csw_error);
     Reset();
     return ZX_ERR_INTERNAL;
   }
@@ -366,14 +366,14 @@ csw_status_t UsbMassStorageDevice::VerifyCsw(usb_request_t* csw_request, uint32_
 
   // check signature is "USBS"
   if (letoh32(csw.dCSWSignature) != CSW_SIGNATURE) {
-    DEBUG_PRINT(("UMS:invalid csw sig: %08x \n", letoh32(csw.dCSWSignature)));
+    zxlogf(DEBUG, "UMS:invalid csw sig: %08x", letoh32(csw.dCSWSignature));
     return CSW_INVALID;
   }
 
   // check if tag matches the tag of last CBW
   if (letoh32(csw.dCSWTag) != tag_receive_++) {
-    DEBUG_PRINT(("UMS:csw tag mismatch, expected:%08x got in csw:%08x \n", tag_receive_ - 1,
-                 letoh32(csw.dCSWTag)));
+    zxlogf(DEBUG, "UMS:csw tag mismatch, expected:%08x got in csw:%08x", tag_receive_ - 1,
+           letoh32(csw.dCSWTag));
     return CSW_TAG_MISMATCH;
   }
   // check if success is true or not?
@@ -422,7 +422,7 @@ zx_status_t UsbMassStorageDevice::Inquiry(uint8_t lun, uint8_t* out_data) {
   zx_status_t status =
       SendCbw(lun, UMS_INQUIRY_TRANSFER_LENGTH, USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during Inquiry failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during Inquiry failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -444,7 +444,7 @@ zx_status_t UsbMassStorageDevice::TestUnitReady(uint8_t lun) {
   command.opcode = scsi::Opcode::TEST_UNIT_READY;
   zx_status_t status = SendCbw(lun, 0, USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during TestUnitReady failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during TestUnitReady failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -460,7 +460,7 @@ zx_status_t UsbMassStorageDevice::RequestSense(uint8_t lun, uint8_t* out_data) {
   zx_status_t status =
       SendCbw(lun, UMS_REQUEST_SENSE_TRANSFER_LENGTH, USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during RequestSense failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during RequestSense failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -485,7 +485,7 @@ zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
   command.opcode = scsi::Opcode::READ_CAPACITY_10;
   zx_status_t status = SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during ReadCapacity10 failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during ReadCapacity10 failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -511,7 +511,7 @@ zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
   command.allocation_length = htobe32(sizeof(*out_data));
   zx_status_t status = SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during ReadCapacity16 failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during ReadCapacity16 failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -542,7 +542,7 @@ zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, uint8_t page, void* dat
   // when we receive a stall condition from the device.
   zx_status_t status = SendCbw(lun, transfer_length, USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during ModeSense failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during ModeSense failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -550,7 +550,7 @@ zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, uint8_t page, void* dat
   // read mode sense response
   status = ReadSync(transfer_length);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: ReadSync during ModeSense failed with status %s\n",
+    zxlogf(WARNING, "UMS: ReadSync during ModeSense failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -573,7 +573,7 @@ zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun,
 
   zx_status_t status = SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during ModeSense failed with status %s\n",
+    zxlogf(WARNING, "UMS: SendCbw during ModeSense failed with status %s",
            zx_status_get_string(status));
     return status;
   }
@@ -615,137 +615,74 @@ zx_status_t UsbMassStorageDevice::DataTransfer(Transaction* txn, zx_off_t offset
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::Read(UmsBlockDevice* dev, Transaction* txn) {
+zx_status_t UsbMassStorageDevice::ReadOrWrite(bool is_write, UmsBlockDevice* dev,
+                                              Transaction* txn) {
   const auto& params = dev->GetBlockDeviceParameters();
-  zx_off_t block_offset = txn->op.rw.offset_dev;
-  uint32_t num_blocks = txn->op.rw.length;
+  const zx_off_t block_offset = txn->op.rw.offset_dev;
+  const uint32_t num_blocks = txn->op.rw.length;
   if ((block_offset >= params.total_blocks) ||
       ((params.total_blocks - block_offset) < num_blocks)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-
-  size_t block_size = params.block_size;
-  zx_off_t vmo_offset = txn->op.rw.offset_vmo * block_size;
-  size_t max_blocks = max_transfer_ / block_size;
-  zx_status_t status = ZX_OK;
-  while (status == ZX_OK && num_blocks > 0) {
-    size_t blocks = num_blocks;
-    if (blocks > max_blocks) {
-      blocks = max_blocks;
-    }
-    size_t length = blocks * block_size;
-    // CBW Configuration
-    // Need to use READ_16 if block addresses are greater than 32 bit
-    if (params.total_blocks > UINT32_MAX) {
-      scsi::Read16CDB command = {};
-      command.opcode = scsi::Opcode::READ_16;
-      command.logical_block_address = htobe64(block_offset);
-      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
-      status =
-          SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
-    } else if (blocks <= UINT16_MAX) {
-      scsi::Read10CDB command = {};
-      command.opcode = scsi::Opcode::READ_10;
-      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-      command.transfer_length = htobe16(static_cast<uint16_t>(blocks));
-      status =
-          SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
-    } else {
-      scsi::Read12CDB command = {};
-      command.opcode = scsi::Opcode::READ_12;
-      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
-      status =
-          SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
-    }
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "UMS: SendCbw during Read failed with status %d\n", status);
-      return status;
-    }
-    status = DataTransfer(txn, vmo_offset, length, bulk_in_addr_);
-    if (status != ZX_OK) {
-      return status;
-    }
-    block_offset += blocks;
-    num_blocks -= static_cast<uint32_t>(blocks);
-    vmo_offset += (blocks * block_size);
-
-    // receive CSW
-    uint32_t residue;
-    status = ReadCsw(&residue);
-    if (status == ZX_OK && residue) {
-      zxlogf(ERROR, "unexpected residue in Read");
-      status = ZX_ERR_IO;
-    }
+  const size_t num_bytes = num_blocks * params.block_size;
+  if (num_bytes > params.max_transfer) {
+    zxlogf(ERROR, "Request exceeding max transfer size.");
+    return ZX_ERR_INVALID_ARGS;
   }
 
-  return status;
-}
-
-zx_status_t UsbMassStorageDevice::Write(UmsBlockDevice* dev, Transaction* txn) {
-  const auto& params = dev->GetBlockDeviceParameters();
-  zx_off_t block_offset = txn->op.rw.offset_dev;
-  uint32_t num_blocks = txn->op.rw.length;
-  if ((block_offset >= params.total_blocks) ||
-      ((params.total_blocks - block_offset) < num_blocks)) {
-    return ZX_ERR_OUT_OF_RANGE;
+  uint8_t flags;
+  uint8_t ep_address;
+  if (is_write) {
+    flags = USB_DIR_OUT;
+    ep_address = bulk_out_addr_;
+  } else {
+    flags = USB_DIR_IN;
+    ep_address = bulk_in_addr_;
   }
 
-  size_t block_size = params.block_size;
-  zx_off_t vmo_offset = txn->op.rw.offset_vmo * block_size;
-  size_t max_blocks = max_transfer_ / block_size;
-  zx_status_t status = ZX_OK;
+  // CBW Configuration
+  // Need to use READ_16/WRITE_16 if block addresses are greater than 32 bit
+  zx_status_t status;
+  if (params.total_blocks > UINT32_MAX) {
+    scsi::Read16CDB command = {};  // Struct-wise equivalent to scsi::Write16CDB here.
+    command.opcode = is_write ? scsi::Opcode::WRITE_16 : scsi::Opcode::READ_16;
+    command.logical_block_address = htobe64(block_offset);
+    command.transfer_length = htobe32(static_cast<uint32_t>(num_blocks));
+    status =
+        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
+  } else if (num_blocks <= UINT16_MAX) {
+    scsi::Read10CDB command = {};  // Struct-wise equivalent to scsi::Write10CDB here.
+    command.opcode = is_write ? scsi::Opcode::WRITE_10 : scsi::Opcode::READ_10;
+    command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+    command.transfer_length = htobe16(static_cast<uint16_t>(num_blocks));
+    status =
+        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
+  } else {
+    scsi::Read12CDB command = {};  // Struct-wise equivalent to scsi::Write12CDB here.
+    command.opcode = is_write ? scsi::Opcode::WRITE_12 : scsi::Opcode::READ_12;
+    command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+    command.transfer_length = htobe32(static_cast<uint32_t>(num_blocks));
+    status =
+        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
+  }
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "UMS: SendCbw during %s failed with status %s", is_write ? "Write" : "Read",
+           zx_status_get_string(status));
+    return status;
+  }
 
-  while (status == ZX_OK && num_blocks > 0) {
-    size_t blocks = num_blocks;
-    if (blocks > max_blocks) {
-      blocks = max_blocks;
-    }
-    size_t length = blocks * block_size;
+  zx_off_t vmo_offset = txn->op.rw.offset_vmo * params.block_size;
+  status = DataTransfer(txn, vmo_offset, num_bytes, ep_address);
+  if (status != ZX_OK) {
+    return status;
+  }
 
-    // CBW Configuration
-    // Need to use WRITE_16 if block addresses are greater than 32 bit
-    if (params.total_blocks > UINT32_MAX) {
-      scsi::Write16CDB command = {};
-      command.opcode = scsi::Opcode::WRITE_16;
-      command.logical_block_address = htobe64(block_offset);
-      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
-      status = SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command),
-                       &command);
-    } else if (blocks <= UINT16_MAX) {
-      scsi::Write10CDB command = {};
-      command.opcode = scsi::Opcode::WRITE_10;
-      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-      command.transfer_length = htobe16(static_cast<uint16_t>(blocks));
-      status = SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command),
-                       &command);
-    } else {
-      scsi::Write12CDB command = {};
-      command.opcode = scsi::Opcode::WRITE_12;
-      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
-      status = SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command),
-                       &command);
-    }
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "UMS: SendCbw during Write failed with status %d\n", status);
-      return status;
-    }
-    status = DataTransfer(txn, vmo_offset, length, bulk_out_addr_);
-    if (status != ZX_OK) {
-      return status;
-    }
-    block_offset += blocks;
-    num_blocks -= static_cast<uint32_t>(blocks);
-    vmo_offset += (blocks * block_size);
-
-    // receive CSW
-    uint32_t residue;
-    status = ReadCsw(&residue);
-    if (status == ZX_OK && residue) {
-      zxlogf(ERROR, "unexpected residue in Write");
-      status = ZX_ERR_IO;
-    }
+  // receive CSW
+  uint32_t residue;
+  status = ReadCsw(&residue);
+  if (status == ZX_OK && residue) {
+    zxlogf(ERROR, "unexpected residue in %s", is_write ? "Write" : "Read");
+    status = ZX_ERR_IO;
   }
 
   return status;
@@ -758,7 +695,7 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
   scsi::ReadCapacity10ParameterData data;
   zx_status_t status = ReadCapacity(lun, &data);
   if (status < 0) {
-    zxlogf(ERROR, "read_capacity10 failed: %d", status);
+    zxlogf(ERROR, "read_capacity10 failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -769,7 +706,7 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
     scsi::ReadCapacity16ParameterData data;
     status = ReadCapacity(lun, &data);
     if (status < 0) {
-      zxlogf(ERROR, "read_capacity16 failed: %d", status);
+      zxlogf(ERROR, "read_capacity16 failed: %s", zx_status_get_string(status));
       return status;
     }
 
@@ -789,14 +726,14 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
   scsi::ModeSense6ParameterHeader ms_data;
   status = ModeSense(lun, &ms_data);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ModeSense failed: %d", status);
+    zxlogf(ERROR, "ModeSense failed: %s", zx_status_get_string(status));
     return status;
   }
   unsigned char cache_sense[20];
   status = ModeSense(lun, 0x08, cache_sense, sizeof(cache_sense));
   params = dev->GetBlockDeviceParameters();
   if (status != ZX_OK) {
-    zxlogf(WARNING, "CacheSense failed: %d", status);
+    zxlogf(WARNING, "CacheSense failed: %s", zx_status_get_string(status));
     params.cache_enabled = true;
   } else {
     params.cache_enabled = cache_sense[6] & (1 << 2);
@@ -808,11 +745,11 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
     params.flags &= ~BLOCK_FLAG_READONLY;
   }
 
-  DEBUG_PRINT(("UMS: block size is: 0x%08x\n", params.block_size));
-  DEBUG_PRINT(("UMS: total blocks is: %" PRId64 "\n", params.total_blocks));
-  DEBUG_PRINT(("UMS: total size is: %" PRId64 "\n", params.total_blocks * params.block_size));
-  DEBUG_PRINT(("UMS: read-only: %d removable: %d\n", !!(params.flags & BLOCK_FLAG_READONLY),
-               !!(params.flags & BLOCK_FLAG_REMOVABLE)));
+  zxlogf(DEBUG, "UMS: block size is: 0x%08x", params.block_size);
+  zxlogf(DEBUG, "UMS: total blocks is: %lu", params.total_blocks);
+  zxlogf(DEBUG, "UMS: total size is: %lu", params.total_blocks * params.block_size);
+  zxlogf(DEBUG, "UMS: read-only: %d removable: %d", !!(params.flags & BLOCK_FLAG_READONLY),
+         !!(params.flags & BLOCK_FLAG_REMOVABLE));
   dev->SetBlockDeviceParameters(params);
   return dev->Add();
 }
@@ -844,7 +781,7 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
       if (status == ZX_OK) {
         params.device_added = true;
       } else {
-        zxlogf(ERROR, "UMS: device_add for block device failed %d", status);
+        zxlogf(ERROR, "UMS: device_add for block device failed: %s", zx_status_get_string(status));
       }
     } else if (!ready && params.device_added) {
       dev->DdkAsyncRemove();
@@ -863,7 +800,7 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
     uint8_t inquiry_data[UMS_INQUIRY_TRANSFER_LENGTH];
     status = Inquiry(lun, inquiry_data);
     if (status < 0) {
-      zxlogf(ERROR, "Inquiry failed for lun %d status: %d", lun, status);
+      zxlogf(ERROR, "Inquiry failed for lun %d status: %s", lun, zx_status_get_string(status));
       init_txn.Reply(status);
       return 0;
     }
@@ -915,15 +852,15 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
     zx_status_t status;
     switch (txn->op.command & BLOCK_OP_MASK) {
       case BLOCK_OP_READ:
-        if ((status = Read(dev, txn)) != ZX_OK) {
-          zxlogf(ERROR, "ums: read of %u @ %zu failed: %d", txn->op.rw.length,
-                 txn->op.rw.offset_dev, status);
+        if ((status = ReadOrWrite(/*is_write=*/false, dev, txn)) != ZX_OK) {
+          zxlogf(ERROR, "ums: read of %u @ %zu failed: %s", txn->op.rw.length,
+                 txn->op.rw.offset_dev, zx_status_get_string(status));
         }
         break;
       case BLOCK_OP_WRITE:
-        if ((status = Write(dev, txn)) != ZX_OK) {
-          zxlogf(ERROR, "ums: write of %u @ %zu failed: %d", txn->op.rw.length,
-                 txn->op.rw.offset_dev, status);
+        if ((status = ReadOrWrite(/*is_write=*/true, dev, txn)) != ZX_OK) {
+          zxlogf(ERROR, "ums: write of %u @ %zu failed: %s", txn->op.rw.length,
+                 txn->op.rw.offset_dev, zx_status_get_string(status));
         }
         break;
       case BLOCK_OP_FLUSH:
@@ -931,10 +868,9 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
           scsi::SynchronizeCache10CDB command = {};
           command.opcode = scsi::Opcode::SYNCHRONIZE_CACHE_10;
           command.syncnv_immed = 0;
-          const auto& params = dev->GetBlockDeviceParameters();
           zx_status_t status = SendCbw(params.lun, 0, USB_DIR_OUT, sizeof(command), &command);
           if (status != ZX_OK) {
-            zxlogf(WARNING, "UMS: SendCbw during SynchronizeCache10 failed with status %s\n",
+            zxlogf(WARNING, "UMS: SendCbw during SynchronizeCache10 failed with status %s",
                    zx_status_get_string(status));
             return status;
           }

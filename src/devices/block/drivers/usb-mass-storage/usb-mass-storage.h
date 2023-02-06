@@ -129,8 +129,7 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
 
   zx_status_t DataTransfer(Transaction* txn, zx_off_t offset, size_t length, uint8_t ep_address);
 
-  zx_status_t Read(ums::UmsBlockDevice* dev, Transaction* txn);
-  zx_status_t Write(ums::UmsBlockDevice* dev, Transaction* txn);
+  zx_status_t ReadOrWrite(bool is_write, ums::UmsBlockDevice* dev, Transaction* txn);
 
   zx_status_t AddBlockDevice(fbl::RefPtr<ums::UmsBlockDevice> dev);
 
