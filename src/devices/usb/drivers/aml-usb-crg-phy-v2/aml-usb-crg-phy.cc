@@ -175,6 +175,8 @@ void AmlUsbCrgPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
   auto cleanup = fit::defer([&]() {
     if (completion)
       completion();
+    // If the DdkInit thread is waiting, unblock it.
+    init_cond_.Signal();
   });
 
   if (mode == phy_mode_)
@@ -289,7 +291,7 @@ zx_status_t AmlUsbCrgPhy::AddXhciDevice() {
     return ZX_ERR_BAD_STATE;
   }
 
-  xhci_device_ = std::make_unique<XhciDevice>(zxdev());
+  xhci_device_ = new XhciDevice(zxdev());
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
@@ -318,7 +320,7 @@ zx_status_t AmlUsbCrgPhy::AddUdcDevice() {
     return ZX_ERR_BAD_STATE;
   }
 
-  udc_device_ = std::make_unique<UdcDevice>(zxdev());
+  udc_device_ = new UdcDevice(zxdev());
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_AMLOGIC},
@@ -427,13 +429,19 @@ void AmlUsbCrgPhy::DdkInit(ddk::InitTxn txn) {
   }
 
   irq_thread_created_ = true;
-  int rc = thrd_create_with_name(
-      &irq_thread_,
-      [](void* arg) -> int { return reinterpret_cast<AmlUsbCrgPhy*>(arg)->IrqThread(); },
-      reinterpret_cast<void*>(this), "amlogic-usb-thread");
-  if (rc != thrd_success) {
-    irq_thread_created_ = false;
-    return txn.Reply(ZX_ERR_INTERNAL);  // This will schedule the device to be unbound.
+  {
+    fbl::AutoLock lock(&lock_);
+    int rc = thrd_create_with_name(
+        &irq_thread_,
+        [](void* arg) -> int { return reinterpret_cast<AmlUsbCrgPhy*>(arg)->IrqThread(); },
+        reinterpret_cast<void*>(this), "amlogic-usb-thread");
+    if (rc != thrd_success) {
+      irq_thread_created_ = false;
+      lock.release();
+      return txn.Reply(ZX_ERR_INTERNAL);  // This will schedule the device to be unbound.
+    }
+    // Wait until the IrqThread sets the given mode.
+    init_cond_.Wait(&lock_);
   }
   return txn.Reply(ZX_OK);
 }
@@ -459,10 +467,10 @@ void AmlUsbCrgPhy::DdkUnbind(ddk::UnbindTxn txn) {
 void AmlUsbCrgPhy::DdkChildPreRelease(void* child_ctx) {
   fbl::AutoLock lock(&lock_);
   // devmgr will own the device until it is destroyed.
-  if (xhci_device_ && (child_ctx == xhci_device_.get())) {
-    [[maybe_unused]] auto* dev = xhci_device_.release();
-  } else if (udc_device_ && (child_ctx == udc_device_.get())) {
-    [[maybe_unused]] auto* dev = udc_device_.release();
+  if (xhci_device_ && (child_ctx == xhci_device_)) {
+    xhci_device_ = nullptr;
+  } else if (udc_device_ && (child_ctx == udc_device_)) {
+    udc_device_ = nullptr;
   } else {
     zxlogf(ERROR, "AmlUsbCrgPhy::DdkChildPreRelease unexpected child ctx %p", child_ctx);
   }

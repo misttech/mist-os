@@ -16,6 +16,7 @@
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
+#include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
 
@@ -90,12 +91,15 @@ class AmlUsbCrgPhy : public AmlUsbCrgPhyType,
 
   fbl::Mutex lock_;
 
+  // Synchronizes DdkInit with the IrqThread().
+  fbl::ConditionVariable init_cond_;
+
   // Magic numbers for PLL from metadata
   uint32_t pll_settings_[8];
 
-  // Device node for binding XHCI driver.
-  std::unique_ptr<XhciDevice> xhci_device_ __TA_GUARDED(lock_);
-  std::unique_ptr<UdcDevice> udc_device_ __TA_GUARDED(lock_);
+  // Device nodes for child devices. The resources pointed at are managed by the DDK.
+  XhciDevice* xhci_device_ __TA_GUARDED(lock_) = nullptr;
+  UdcDevice* udc_device_ __TA_GUARDED(lock_) = nullptr;
 
   UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
   usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.
