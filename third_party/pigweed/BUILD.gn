@@ -16,6 +16,11 @@ source_set("pw_bluetooth") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_intrusive_ptr") {
+  public_deps = [ "src/pw_intrusive_ptr" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
 source_set("pw_random") {
   public_deps = [ "src/pw_random" ]
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
