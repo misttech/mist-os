@@ -4,7 +4,6 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.test/cpp/wire.h>
-#include <fuchsia/hardware/test/c/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver-integration-test/fixture.h>
@@ -41,49 +40,16 @@ void CheckTransaction(const board_test::DeviceEntry& entry, const char* device_f
   // Wait for the driver to be created
   zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), device_fs);
   ASSERT_OK(channel.status_value());
-
-  // Get a FIDL channel to the device
-  zx::channel driver_channel = std::move(channel.value());
-
-  // The method does not define a request payload, so the message should be a header only.
-  fidl_message_header_t hdr;
-  std::memset(&hdr, 0, sizeof(hdr));
-  zx_txid_t first_txid = 1;
-  fidl::InitTxnHeader(&hdr, first_txid, fuchsia_hardware_test_DeviceGetChannelOrdinal,
-                      fidl::MessageDynamicFlags::kStrictMethod);
-  ASSERT_OK(driver_channel.write(0, &hdr, sizeof(hdr), nullptr, 0));
-  ASSERT_OK(driver_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
-
-  std::memset(&hdr, 0, sizeof(hdr));
-  zx_txid_t second_txid = 2;
-  fidl::InitTxnHeader(&hdr, second_txid, fuchsia_hardware_test_DeviceGetChannelOrdinal,
-                      fidl::MessageDynamicFlags::kStrictMethod);
-  ASSERT_OK(driver_channel.write(0, &hdr, sizeof(hdr), nullptr, 0));
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<fuchsia_hardware_test::Device>(std::move(channel.value()))};
 
   // If the transaction incorrectly closes the sent handles, it will cause a policy violation.
-  // Waiting for the channel to be readable once isn't enough, there is still a very small amount
-  // of time before the transaction destructor runs. A second read ensures that the first
-  // succeeded. If a policy violation occurs, the second read below will fail as the driver
-  // channel will have been closed.
-  auto msg_bytes = std::make_unique<uint8_t[]>(ZX_CHANNEL_MAX_MSG_BYTES);
-  auto msg_handles = std::make_unique<zx_handle_t[]>(ZX_CHANNEL_MAX_MSG_HANDLES);
-  uint32_t actual_bytes = 0;
-  uint32_t actual_handles = 0;
-
-  status = driver_channel.read(0, msg_bytes.get(), msg_handles.get(), ZX_CHANNEL_MAX_MSG_BYTES,
-                               ZX_CHANNEL_MAX_MSG_HANDLES, &actual_bytes, &actual_handles);
-  if (status == ZX_ERR_SHOULD_WAIT) {
-    ASSERT_OK(driver_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
-  } else {
-    ASSERT_OK(status);
-  }
-
-  status = driver_channel.read(0, msg_bytes.get(), msg_handles.get(), ZX_CHANNEL_MAX_MSG_BYTES,
-                               ZX_CHANNEL_MAX_MSG_HANDLES, &actual_bytes, &actual_handles);
-  if (status == ZX_ERR_SHOULD_WAIT) {
-    ASSERT_OK(driver_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
-  } else {
-    ASSERT_OK(status);
+  // Calling the API once isn't enough, there is still a very small amount of time before the
+  // transaction destructor runs. A second call ensures that the first succeeded. If a policy
+  // violation occurs, the second call below will fail as the driver channel will have been closed.
+  for (uint32_t i = 0; i < 2; i++) {
+    fidl::WireResult result = client->GetChannel();
+    ASSERT_OK(result.status());
   }
 }
 

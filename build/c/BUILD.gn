@@ -76,7 +76,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/serial/drivers/usb-cdc-acm:usb-cdc-acm-driver",
     "//src/devices/sysmem/tests/sysmem/fuzz:sysmem_fuzzer_bin",
     "//src/devices/sysmem/tests/sysmem/fuzz:sysmem_fuzzer_multi_bin",
-    "//src/devices/tests/ddk-fidl-test",
     "//src/devices/tests/ddk-power:ddk-power-test-child-driver",
     "//src/devices/tests/isolateddevmgr",
     "//src/devices/tests/sysdev:sysdev-driver",
