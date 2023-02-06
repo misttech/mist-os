@@ -513,6 +513,10 @@ zx_status_t Nvme::Init() {
   return ZX_OK;
 }
 
+void Nvme::RemoveNamespace(Namespace* ns) {
+  namespaces_.erase(std::remove(namespaces_.begin(), namespaces_.end(), ns), namespaces_.end());
+}
+
 zx_status_t Nvme::AddDevice() {
   auto cleanup = fit::defer([&] { DdkRelease(); });
 

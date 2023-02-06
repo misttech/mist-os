@@ -162,6 +162,9 @@ zx::result<Namespace*> Namespace::Bind(Nvme* controller, uint32_t namespace_id) 
 
 void Namespace::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
+
+  controller_->RemoveNamespace(this);
+
   driver_shutdown_ = true;
   if (io_thread_started_) {
     sync_completion_signal(&io_signal_);

@@ -43,6 +43,7 @@ class Nvme : public DeviceType {
 
   static zx_status_t Bind(void* ctx, zx_device_t* dev);
   zx_status_t AddDevice();
+  void RemoveNamespace(Namespace* ns);
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
