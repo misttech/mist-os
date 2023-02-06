@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BOARD_LIB_ACPI_MANAGER_FUCHSIA_H_
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async/cpp/executor.h>
+#include <lib/fit/function.h>
 
 #include "src/devices/board/lib/acpi/manager.h"
 
@@ -16,22 +16,9 @@ namespace acpi {
 class FuchsiaManager : public Manager {
  public:
   FuchsiaManager(acpi::Acpi* acpi, iommu::IommuManagerInterface* iommu, zx_device_t* acpi_root)
-      : Manager(acpi, iommu, acpi_root),
-        loop_(&kAsyncLoopConfigNeverAttachToThread),
-        executor_(loop_.dispatcher()) {}
-
-  ~FuchsiaManager() override { loop_.Shutdown(); }
-
-  zx_status_t StartFidlLoop() override { return loop_.StartThread("acpi-fidl-thread"); }
-
-  async_dispatcher_t* fidl_dispatcher() override { return loop_.dispatcher(); }
-  async::Executor& executor() override { return executor_; }
-
- private:
-  async::Loop loop_;
-  async::Executor executor_;
+      : Manager(acpi, iommu, acpi_root) {}
 };
 
 }  // namespace acpi
 
-#endif
+#endif  // SRC_DEVICES_BOARD_LIB_ACPI_MANAGER_FUCHSIA_H_

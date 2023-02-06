@@ -48,7 +48,7 @@ class Manager {
   // Infer information about devices based on their relationships.
   acpi::status<> ConfigureDiscoveredDevices();
   // Publish devices to driver manager.
-  acpi::status<> PublishDevices(zx_device_t* platform_bus);
+  acpi::status<> PublishDevices(zx_device_t* platform_bus, async_dispatcher_t* device_dispatcher);
 
   // For devices: get the next unique BTI ID.
   uint32_t GetNextBtiId() { return next_bti_++; }
@@ -65,15 +65,11 @@ class Manager {
   zx_status_t DereferencePowerResources(const std::vector<ACPI_HANDLE>& power_resource_handles);
 
   // For internal and unit test use only.
-  virtual zx_status_t StartFidlLoop() { return ZX_ERR_NOT_SUPPORTED; }
   DeviceBuilder* LookupDevice(ACPI_HANDLE handle);
 
   Acpi* acpi() { return acpi_; }
   zx_device_t* acpi_root() { return acpi_root_; }
   iommu::IommuManagerInterface* iommu_manager() { return iommu_manager_; }
-
-  virtual async_dispatcher_t* fidl_dispatcher() = 0;
-  virtual async::Executor& executor() = 0;
 
  private:
   friend acpi_host_test::AcpiHostTest;

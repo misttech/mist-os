@@ -112,6 +112,7 @@ fuchsia_driver("platform-bus-x86-driver") {
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
     "//third_party/acpica",
+    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/driver-unit-test",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hid",

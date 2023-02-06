@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/errors.h>
 
 #include <cstdint>
@@ -17,6 +18,7 @@
 #include <zxtest/zxtest.h>
 
 #include "fidl/fuchsia.hardware.acpi/cpp/markers.h"
+#include "lib/async-loop/testing/cpp/real_loop.h"
 #include "lib/ddk/device.h"
 #include "src/devices/board/lib/acpi/manager-fuchsia.h"
 #include "src/devices/board/lib/acpi/manager.h"
@@ -138,21 +140,20 @@ class AddressSpaceHandlerServer
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_acpi::AddressSpaceHandler>> ref_;
 };
 
-class AcpiDeviceTest : public zxtest::Test {
+class AcpiDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
   AcpiDeviceTest()
       : mock_root_(MockDevice::FakeRootParent()), manager_(&acpi_, &iommu_, mock_root_.get()) {}
 
-  void SetUp() override {
-    acpi_.SetDeviceRoot(std::make_unique<acpi::test::Device>("\\"));
-    ASSERT_OK(manager_.StartFidlLoop());
-  }
+  void SetUp() override { acpi_.SetDeviceRoot(std::make_unique<acpi::test::Device>("\\")); }
 
   void TearDown() override {
     for (auto& child : mock_root_->children()) {
       device_async_remove(child.get());
     }
-    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get()));
+
+    PerformBlockingWork(
+        [this] { ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get(), dispatcher())); });
   }
 
   zx_device_t* HandOffToDdk(std::unique_ptr<acpi::Device> device) {
@@ -175,13 +176,13 @@ class AcpiDeviceTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_acpi::Device>();
     ASSERT_OK(endpoints.status_value());
 
-    fidl::BindServer(manager_.fidl_dispatcher(), std::move(endpoints->server),
+    fidl::BindServer(dispatcher(), std::move(endpoints->server),
                      dev->GetDeviceContext<acpi::Device>());
-    fidl_client_.Bind(std::move(endpoints->client));
+    fidl_client_.Bind(std::move(endpoints->client), dispatcher());
   }
 
   acpi::DeviceArgs Args(void* handle) {
-    return acpi::DeviceArgs(mock_root_.get(), &manager_, handle);
+    return acpi::DeviceArgs(mock_root_.get(), &manager_, dispatcher(), handle);
   }
 
   ACPI_HANDLE AddPowerResource(const std::string& name, uint8_t system_level,
@@ -198,7 +199,7 @@ class AcpiDeviceTest : public zxtest::Test {
   acpi::FuchsiaManager manager_;
   acpi::test::MockAcpi acpi_;
   NullIommuManager iommu_;
-  fidl::WireSyncClient<fuchsia_hardware_acpi::Device> fidl_client_;
+  fidl::WireClient<fuchsia_hardware_acpi::Device> fidl_client_;
 };
 
 TEST_F(AcpiDeviceTest, TestGetBusId) {
@@ -206,10 +207,13 @@ TEST_F(AcpiDeviceTest, TestGetBusId) {
       Args(ACPI_ROOT_OBJECT).SetBusMetadata(std::vector<uint8_t>(), acpi::BusType::kI2c, 37)));
   SetUpFidlServer(std::move(device));
 
-  auto result = fidl_client_->GetBusId();
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_EQ(result->value()->bus_id, 37);
+  fidl_client_->GetBusId().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result->is_ok());
+    ASSERT_EQ(result->value()->bus_id, 37);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestAcquireGlobalLockAccessDenied) {
@@ -221,10 +225,13 @@ TEST_F(AcpiDeviceTest, TestAcquireGlobalLockAccessDenied) {
 
   SetUpFidlServer(std::move(device));
 
-  auto result = fidl_client_->AcquireGlobalLock();
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kAccess);
+  fidl_client_->AcquireGlobalLock().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kAccess);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 // _GLK method exists, but returns zero.
@@ -238,10 +245,13 @@ TEST_F(AcpiDeviceTest, TestAcquireGlobalLockAccessDeniedButMethodExists) {
 
   SetUpFidlServer(std::move(device));
 
-  auto result = fidl_client_->AcquireGlobalLock();
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kAccess);
+  fidl_client_->AcquireGlobalLock().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kAccess);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestAcquireGlobalLockImplicitRelease) {
@@ -254,29 +264,36 @@ TEST_F(AcpiDeviceTest, TestAcquireGlobalLockImplicitRelease) {
 
   SetUpFidlServer(std::move(device));
 
-  sync_completion_t acquired;
-  sync_completion_t running;
+  bool first_acquired = false;
+  bool second_acquired = false;
   {
-    auto result = fidl_client_->AcquireGlobalLock();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok(), "ACPI error %d", static_cast<uint32_t>(result->error_value()));
+    fidl::ClientEnd<fuchsia_hardware_acpi::GlobalLock> lock_handle;
 
-    std::thread thread([&acquired, &running, this]() {
-      sync_completion_signal(&running);
-      ASSERT_TRUE(fidl_client_->AcquireGlobalLock().ok());
-      sync_completion_signal(&acquired);
+    fidl_client_->AcquireGlobalLock().Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok(), "ACPI error %d", static_cast<uint32_t>(result->error_value()));
+      lock_handle = std::move(result->value()->handle);
+      first_acquired = true;
+      QuitLoop();
     });
-    // Make sure thread keeps running when it goes out of scope.
-    thread.detach();
+    RunLoop();
 
-    ASSERT_OK(sync_completion_wait(&running, ZX_TIME_INFINITE));
-    ASSERT_STATUS(sync_completion_wait(&acquired, ZX_MSEC(50)), ZX_ERR_TIMED_OUT);
+    fidl_client_->AcquireGlobalLock().Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok(), "ACPI error %d", static_cast<uint32_t>(result->error_value()));
+      second_acquired = true;
+      QuitLoop();
+    });
+    // Polling is required, because |GlobalLockHandle| spawns extra threads to
+    // acquire the ACPI Global Lock, uncontrolled by the dispatcher.
+    EXPECT_TRUE(RunLoopWithTimeout(zx::msec(50)));
+    EXPECT_FALSE(second_acquired);
 
-    // result, which holds the GlobalLock ClientEnd, will go out of scope here
+    // GlobalLock ClientEnd will go out of scope here
     // and close the channel, which should release the global lock.
   }
-
-  ASSERT_OK(sync_completion_wait(&acquired, ZX_TIME_INFINITE));
+  RunLoop();
+  EXPECT_TRUE(second_acquired);
 }
 
 TEST_F(AcpiDeviceTest, TestInstallNotifyHandler) {
@@ -284,26 +301,31 @@ TEST_F(AcpiDeviceTest, TestInstallNotifyHandler) {
   acpi::test::Device* hnd = test_dev.get();
   acpi_.GetDeviceRoot()->AddChild(std::move(test_dev));
   auto device = std::make_unique<acpi::Device>(Args(hnd));
-  async::Loop server_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   SetUpFidlServer(std::move(device));
-  sync_completion_t done;
+  fpromise::bridge<void, void> server_done;
+  fpromise::bridge<void, void> client_done;
   std::unique_ptr<NotifyHandlerServer> server;
   auto client = NotifyHandlerServer::CreateAndServe(
       [&](uint32_t type, NotifyHandlerServer::HandleCompleter::Sync& completer) {
         ASSERT_EQ(type, 32);
         completer.Reply();
-        sync_completion_signal(&done);
+        server_done.completer.complete_ok();
       },
-      manager_.fidl_dispatcher(), &server);
+      dispatcher(), &server);
 
-  auto result = fidl_client_->InstallNotifyHandler(
-      fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_FALSE(result->is_error());
+  fidl_client_
+      ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                             std::move(client))
+      .Then([&](auto& result) {
+        ASSERT_OK(result.status());
+        ASSERT_FALSE(result->is_error());
+        client_done.completer.complete_ok();
+      });
+  EXPECT_TRUE(RunPromise(client_done.consumer.promise()).is_ok());
 
   hnd->Notify(32);
-  sync_completion_wait(&done, ZX_TIME_INFINITE);
+  EXPECT_TRUE(RunPromise(server_done.consumer.promise()).is_ok());
 }
 
 TEST_F(AcpiDeviceTest, TestNotifyHandlerDropsEvents) {
@@ -311,7 +333,6 @@ TEST_F(AcpiDeviceTest, TestNotifyHandlerDropsEvents) {
   acpi::test::Device* hnd = test_dev.get();
   acpi_.GetDeviceRoot()->AddChild(std::move(test_dev));
   auto device = std::make_unique<acpi::Device>(Args(hnd));
-  async::Loop server_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   SetUpFidlServer(std::move(device));
   size_t received_events = 0;
@@ -325,18 +346,23 @@ TEST_F(AcpiDeviceTest, TestNotifyHandlerDropsEvents) {
         received_events++;
         sync_completion_signal(&received);
       },
-      manager_.fidl_dispatcher(), &server);
+      dispatcher(), &server);
 
-  auto result = fidl_client_->InstallNotifyHandler(
-      fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_FALSE(result->is_error());
+  fidl_client_
+      ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                             std::move(client))
+      .Then([&](auto& result) {
+        ASSERT_OK(result.status());
+        ASSERT_FALSE(result->is_error());
+        QuitLoop();
+      });
+  RunLoop();
 
   zx_status_t status = ZX_OK;
   for (size_t i = 0; i < 2000; i++) {
     sync_completion_reset(&received);
     hnd->Notify(32);
-    status = sync_completion_wait(&received, ZX_MSEC(500));
+    status = PerformBlockingWork([&] { return sync_completion_wait(&received, ZX_MSEC(500)); });
     if (status == ZX_ERR_TIMED_OUT) {
       break;
     }
@@ -357,44 +383,52 @@ TEST_F(AcpiDeviceTest, RemoveAndAddNotifyHandler) {
   acpi::test::Device* hnd = test_dev.get();
   acpi_.GetDeviceRoot()->AddChild(std::move(test_dev));
   auto device = std::make_unique<acpi::Device>(Args(hnd));
-  async::Loop server_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   SetUpFidlServer(std::move(device));
   std::vector<NotifyHandlerServer::HandleCompleter::Async> completers;
   std::unique_ptr<NotifyHandlerServer> server;
-  sync_completion_t received;
+  fpromise::bridge<void, void> received;
   auto handler = [&](uint32_t type, NotifyHandlerServer::HandleCompleter::Sync& completer) {
     completer.Reply();
-    sync_completion_signal(&received);
+    received.completer.complete_ok();
   };
 
   {
-    auto client = NotifyHandlerServer::CreateAndServe(handler, manager_.fidl_dispatcher(), &server);
-    auto result = fidl_client_->InstallNotifyHandler(
-        fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-    ASSERT_OK(result.status());
-    ASSERT_FALSE(result->is_error(), "error %d", static_cast<uint32_t>(result->error_value()));
+    auto client = NotifyHandlerServer::CreateAndServe(handler, dispatcher(), &server);
+    fidl_client_
+        ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                               std::move(client))
+        .Then([&](auto& result) {
+          ASSERT_OK(result.status());
+          ASSERT_FALSE(result->is_error(), "error %d",
+                       static_cast<uint32_t>(result->error_value()));
+          QuitLoop();
+        });
+    RunLoop();
   }
 
   // Destroy the server, which will close the channel.
   server.reset();
 
   // Wait for the async close event to propagate.
-  while (hnd->HasNotifyHandler()) {
-    zx::nanosleep(zx::deadline_after(zx::msec(100)));
-  }
+  RunLoopUntil([&] { return !hnd->HasNotifyHandler(); });
 
   // Try installing a new handler.
   {
-    auto client = NotifyHandlerServer::CreateAndServe(handler, manager_.fidl_dispatcher(), &server);
-    auto result = fidl_client_->InstallNotifyHandler(
-        fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-    ASSERT_OK(result.status());
-    ASSERT_FALSE(result->is_error());
+    auto client = NotifyHandlerServer::CreateAndServe(handler, dispatcher(), &server);
+    fidl_client_
+        ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                               std::move(client))
+        .Then([&](auto& result) {
+          ASSERT_OK(result.status());
+          ASSERT_FALSE(result->is_error());
+          QuitLoop();
+        });
+    RunLoop();
   }
 
   hnd->Notify(32);
-  sync_completion_wait(&received, ZX_TIME_INFINITE);
+  EXPECT_TRUE(RunPromise(received.consumer.promise()).is_ok());
 }
 
 TEST_F(AcpiDeviceTest, ReceiveEventAfterUnbind) {
@@ -403,27 +437,31 @@ TEST_F(AcpiDeviceTest, ReceiveEventAfterUnbind) {
   acpi_.GetDeviceRoot()->AddChild(std::move(test_dev));
   auto device = std::make_unique<acpi::Device>(Args(hnd));
   auto ptr = device.get();
-  async::Loop server_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   SetUpFidlServer(std::move(device));
-  sync_completion_t done;
   std::unique_ptr<NotifyHandlerServer> server;
   auto client = NotifyHandlerServer::CreateAndServe(
       [&](uint32_t type, NotifyHandlerServer::HandleCompleter::Sync& completer) {
         ASSERT_EQ(type, 32);
         completer.Reply();
-        sync_completion_signal(&done);
       },
-      manager_.fidl_dispatcher(), &server);
+      dispatcher(), &server);
 
-  auto result = fidl_client_->InstallNotifyHandler(
-      fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_FALSE(result->is_error());
+  fidl_client_
+      ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                             std::move(client))
+      .Then([&](auto& result) {
+        ASSERT_OK(result.status());
+        ASSERT_FALSE(result->is_error());
+        QuitLoop();
+      });
+  RunLoop();
 
   device_async_remove(ptr->zxdev());
-  ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get()));
-  ASSERT_FALSE(hnd->HasNotifyHandler());
+  PerformBlockingWork([&] {
+    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get(), dispatcher()));
+    ASSERT_FALSE(hnd->HasNotifyHandler());
+  });
 }
 
 TEST_F(AcpiDeviceTest, TestRemoveNotifyHandler) {
@@ -431,27 +469,34 @@ TEST_F(AcpiDeviceTest, TestRemoveNotifyHandler) {
   acpi::test::Device* hnd = test_dev.get();
   acpi_.GetDeviceRoot()->AddChild(std::move(test_dev));
   auto device = std::make_unique<acpi::Device>(Args(hnd));
-  async::Loop server_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   SetUpFidlServer(std::move(device));
-  sync_completion_t done;
   std::unique_ptr<NotifyHandlerServer> server;
   auto client = NotifyHandlerServer::CreateAndServe(
       [&](uint32_t type, NotifyHandlerServer::HandleCompleter::Sync& completer) {
         ASSERT_EQ(type, 32);
         completer.Reply();
-        sync_completion_signal(&done);
       },
-      manager_.fidl_dispatcher(), &server);
+      dispatcher(), &server);
 
-  auto result = fidl_client_->InstallNotifyHandler(
-      fuchsia_hardware_acpi::wire::NotificationMode::kSystem, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_FALSE(result->is_error());
-  ASSERT_TRUE(hnd->HasNotifyHandler());
+  {
+    fidl_client_
+        ->InstallNotifyHandler(fuchsia_hardware_acpi::wire::NotificationMode::kSystem,
+                               std::move(client))
+        .Then([&](auto& result) {
+          ASSERT_OK(result.status());
+          ASSERT_FALSE(result->is_error());
+          ASSERT_TRUE(hnd->HasNotifyHandler());
+          QuitLoop();
+        });
+    RunLoop();
+  }
 
-  (void)fidl_client_->RemoveNotifyHandler();
-  ASSERT_FALSE(hnd->HasNotifyHandler());
+  {
+    fidl_client_->RemoveNotifyHandler().Then([&](auto& result) { QuitLoop(); });
+    RunLoop();
+    ASSERT_FALSE(hnd->HasNotifyHandler());
+  }
 }
 
 TEST_F(AcpiDeviceTest, TestAddressHandlerInstall) {
@@ -466,12 +511,17 @@ TEST_F(AcpiDeviceTest, TestAddressHandlerInstall) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_acpi::AddressSpaceHandler>();
   ASSERT_OK(endpoints.status_value());
 
-  auto [server, client] = AddressSpaceHandlerServer::CreateAndServe(manager_.fidl_dispatcher());
+  auto [server, client] = AddressSpaceHandlerServer::CreateAndServe(dispatcher());
 
-  auto result = fidl_client_->InstallAddressSpaceHandler(
-      fuchsia_hardware_acpi::wire::AddressSpace::kEc, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
+  fidl_client_
+      ->InstallAddressSpaceHandler(fuchsia_hardware_acpi::wire::AddressSpace::kEc,
+                                   std::move(client))
+      .Then([&](auto& result) {
+        ASSERT_OK(result.status());
+        ASSERT_TRUE(result->is_ok());
+        QuitLoop();
+      });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestAddressHandlerReadWrite) {
@@ -486,23 +536,33 @@ TEST_F(AcpiDeviceTest, TestAddressHandlerReadWrite) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_acpi::AddressSpaceHandler>();
   ASSERT_OK(endpoints.status_value());
 
-  auto [server, client] = AddressSpaceHandlerServer::CreateAndServe(manager_.fidl_dispatcher());
+  auto [server, client] = AddressSpaceHandlerServer::CreateAndServe(dispatcher());
 
-  auto result = fidl_client_->InstallAddressSpaceHandler(
-      fuchsia_hardware_acpi::wire::AddressSpace::kEc, std::move(client));
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
+  fidl_client_
+      ->InstallAddressSpaceHandler(fuchsia_hardware_acpi::wire::AddressSpace::kEc,
+                                   std::move(client))
+      .Then([&](auto& result) {
+        ASSERT_OK(result.status());
+        ASSERT_TRUE(result->is_ok());
+        QuitLoop();
+      });
+  RunLoop();
 
-  server->data_.resize(256, 0);
-  UINT64 value = 0xff;
-  ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_READ, 0, 64, &value).status_value(), AE_OK);
-  ASSERT_EQ(value, 0);
-  value = 0xdeadbeefd00dfeed;
-  ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_WRITE, 0, 64, &value).status_value(),
-            AE_OK);
-  value = 0;
-  ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_READ, 0, 64, &value).status_value(), AE_OK);
-  ASSERT_EQ(value, 0xdeadbeefd00dfeed);
+  // |AddressSpaceOp| makes blocking FIDL calls.
+  PerformBlockingWork([&, &server = server] {
+    server->data_.resize(256, 0);
+    UINT64 value = 0xff;
+    ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_READ, 0, 64, &value).status_value(),
+              AE_OK);
+    ASSERT_EQ(value, 0);
+    value = 0xdeadbeefd00dfeed;
+    ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_WRITE, 0, 64, &value).status_value(),
+              AE_OK);
+    value = 0;
+    ASSERT_EQ(hnd->AddressSpaceOp(ACPI_ADR_SPACE_EC, ACPI_READ, 0, 64, &value).status_value(),
+              AE_OK);
+    ASSERT_EQ(value, 0xdeadbeefd00dfeed);
+  });
 }
 
 TEST_F(AcpiDeviceTest, TestInitializePowerManagementNoSupportedStates) {
@@ -1452,9 +1512,12 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceFadt) {
     ASSERT_FALSE(gpe.enabled);
   }
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result->is_ok());
+    QuitLoop();
+  });
+  RunLoop();
 
   // Check that only device 2 is set as a wake source.
   for (acpi::test::WakeGpe gpe : wake_gpes) {
@@ -1533,9 +1596,12 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceBlockDevice) {
     ASSERT_FALSE(gpe.enabled);
   }
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok(), "ACPI error %d", static_cast<uint32_t>(result->error_value()));
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result->is_ok(), "ACPI error %d", static_cast<uint32_t>(result->error_value()));
+    QuitLoop();
+  });
+  RunLoop();
 
   // Check that only device 1 is set as a wake source.
   for (acpi::test::WakeGpe gpe : wake_gpes) {
@@ -1589,10 +1655,13 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceWithPowerResources) {
   ASSERT_EQ(mock_power_device1->sta(), 0);
   ASSERT_EQ(mock_power_device2->sta(), 0);
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_TRUE(gpe.enabled);
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(gpe.enabled);
+    QuitLoop();
+  });
+  RunLoop();
 
   // Power resources are on.
   ASSERT_EQ(mock_power_device1->sta(), 1);
@@ -1619,10 +1688,13 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceUnsupportedSleepState) {
 
   SetUpFidlServer(std::make_unique<acpi::Device>(Args(hnd)));
 
-  auto result = fidl_client_->SetWakeDevice(4);
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kNotSupported);
+  fidl_client_->SetWakeDevice(4).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kNotSupported);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongObjectSize) {
@@ -1647,10 +1719,13 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongObjectSize) {
   // Wake device 1 is the one we will set as a wake source
   SetUpFidlServer(std::make_unique<acpi::Device>(Args(hnd)));
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongEventInfo) {
@@ -1684,10 +1759,13 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongEventInfo) {
   // Wake device 1 is the one we will set as a wake source
   SetUpFidlServer(std::make_unique<acpi::Device>(Args(wake_dev_ref_hnd)));
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+    QuitLoop();
+  });
+  RunLoop();
 }
 
 TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongEventInfoType) {
@@ -1713,8 +1791,11 @@ TEST_F(AcpiDeviceTest, TestSetWakeDeviceWrongEventInfoType) {
   // Wake device 1 is the one we will set as a wake source
   SetUpFidlServer(std::make_unique<acpi::Device>(Args(hnd)));
 
-  auto result = fidl_client_->SetWakeDevice(3);
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+  fidl_client_->SetWakeDevice(3).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(result->error_value(), fuchsia_hardware_acpi::wire::Status::kBadData);
+    QuitLoop();
+  });
+  RunLoop();
 }

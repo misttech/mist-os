@@ -104,7 +104,7 @@ class DeviceBuilder {
   }
 
   // Creates an actual device from this DeviceBuilder, returning a pointer to its zx_device_t.
-  zx::result<zx_device_t*> Build(acpi::Manager* acpi);
+  zx::result<zx_device_t*> Build(acpi::Manager* acpi, async_dispatcher_t* device_dispatcher);
 
   // Set the bus type of this device. A device can only have a single bus type.
   void SetBusType(BusType t) {
@@ -160,7 +160,8 @@ class DeviceBuilder {
   // Build a composite for this device that binds to all of its parents.
   // For instance, if a device had an i2c and spi resource, this would generate a composite device
   // that binds to the i2c device, the spi device, and the acpi device.
-  zx::result<> BuildComposite(acpi::Manager* acpi, std::vector<zx_device_str_prop_t>& str_props);
+  zx::result<> BuildComposite(acpi::Manager* acpi, std::vector<zx_device_str_prop_t>& str_props,
+                              async_dispatcher_t* device_dispatcher);
   // Get bind instructions for the |child_index|th child of this bus.
   // Used by |BuildComposite| to generate the bus bind rules.
   std::vector<zx_bind_inst_t> GetFragmentBindInsnsForChild(size_t child_index);

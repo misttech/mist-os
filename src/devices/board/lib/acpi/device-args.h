@@ -41,6 +41,7 @@ inline const char* BusTypeToString(BusType t) {
 struct DeviceArgs {
   zx_device_t* parent_;
   acpi::Manager* manager_;
+  async_dispatcher_t* dispatcher_;
   ACPI_HANDLE handle_;
 
   // Bus metadata
@@ -51,8 +52,9 @@ struct DeviceArgs {
   // PCI metadata
   std::vector<pci_bdf_t> bdfs_;
 
-  DeviceArgs(zx_device_t* parent, acpi::Manager* manager, ACPI_HANDLE handle)
-      : parent_(parent), manager_(manager), handle_(handle) {}
+  DeviceArgs(zx_device_t* parent, acpi::Manager* manager, async_dispatcher_t* dispatcher,
+             ACPI_HANDLE handle)
+      : parent_(parent), manager_(manager), dispatcher_(dispatcher), handle_(handle) {}
   DeviceArgs(DeviceArgs&) = delete;
 
   DeviceArgs& SetBusMetadata(std::vector<uint8_t> metadata, BusType bus_type, uint32_t bus_id) {
@@ -68,4 +70,5 @@ struct DeviceArgs {
 };
 
 }  // namespace acpi
-#endif
+
+#endif  // SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_ARGS_H_

@@ -4,7 +4,9 @@
 
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_H_
+
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding.h>
 #include <lib/fpromise/promise.h>
@@ -106,13 +108,15 @@ class Device : public DeviceType,
   explicit Device(DeviceArgs& args)
       : DeviceType{args.parent_},
         manager_{args.manager_},
+        dispatcher_{args.dispatcher_},
+        executor_{dispatcher_},
         acpi_{manager_->acpi()},
         acpi_handle_{args.handle_},
         metadata_{std::move(args.metadata_)},
         bus_type_{args.bus_type_},
         bus_id_{args.bus_id_},
         pci_bdfs_{std::move(args.bdfs_)},
-        outgoing_{component::OutgoingDirectory(args.manager_->fidl_dispatcher())} {}
+        outgoing_{component::OutgoingDirectory(dispatcher_)} {}
 
   // DDK mix-in impls.
   void DdkRelease() { delete this; }
@@ -197,6 +201,8 @@ class Device : public DeviceType,
   }
 
   acpi::Manager* manager_;
+  async_dispatcher_t* dispatcher_;
+  async::Executor executor_;
   acpi::Acpi* acpi_;
   // Handle to the corresponding ACPI node
   ACPI_HANDLE acpi_handle_;

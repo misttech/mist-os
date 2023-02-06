@@ -116,14 +116,15 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
   return acpi::ok();
 }
 
-acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus) {
+acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus,
+                                       async_dispatcher_t* device_dispatcher) {
   for (auto handle : device_publish_order_) {
     DeviceBuilder* d = LookupDevice(handle);
     if (d == nullptr) {
       continue;
     }
 
-    auto status = d->Build(this);
+    auto status = d->Build(this, device_dispatcher);
     if (status.is_error()) {
       return acpi::error(AE_ERROR);
     }
@@ -137,15 +138,6 @@ acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus) {
       }
     }
   }
-#ifdef __Fuchsia__
-  // only start the FIDL thread when we know this is going to work
-  zx_status_t result = StartFidlLoop();
-  if (result != ZX_OK) {
-    zxlogf(ERROR, "Failed to launch thread for ACPI FIDL requests: %d", result);
-    return acpi::error(AE_ERROR);
-  }
-#endif
-
   return acpi::ok();
 }
 

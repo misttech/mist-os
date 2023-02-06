@@ -76,7 +76,7 @@ class AcpiHostTest : public testing::Test {
 
  protected:
   acpi::AcpiImpl acpi_;
-  acpi::Device root_device_{acpi::DeviceArgs(nullptr, &manager_, ACPI_ROOT_OBJECT)};
+  acpi::Device root_device_{acpi::DeviceArgs(nullptr, &manager_, nullptr, ACPI_ROOT_OBJECT)};
   acpi::HostManager manager_{&acpi_, root_device_.zxdev()};
   std::unordered_map<ACPI_PHYSICAL_ADDRESS, uint8_t> fake_mmio_;
 };
@@ -86,7 +86,7 @@ TEST_F(AcpiHostTest, DeviceIsChildOfScopeTest) {
 
   ASSERT_EQ(AE_OK, manager_.DiscoverDevices().status_value());
   ASSERT_EQ(AE_OK, manager_.ConfigureDiscoveredDevices().status_value());
-  ASSERT_EQ(AE_OK, manager_.PublishDevices(nullptr).status_value());
+  ASSERT_EQ(AE_OK, manager_.PublishDevices(nullptr, nullptr).status_value());
 
   auto root_hnd = manager_.acpi()->GetHandle(nullptr, "\\");
   ASSERT_EQ(AE_OK, root_hnd.status_value());

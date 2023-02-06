@@ -103,7 +103,7 @@ zx_status_t publish_acpi_devices(acpi::Manager* manager, zx_device_t* platform_b
   if (result.is_error()) {
     zxlogf(INFO, "configure failed");
   }
-  result = manager->PublishDevices(platform_bus);
+  result = manager->PublishDevices(platform_bus, fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   // Now walk the ACPI namespace looking for devices we understand, and publish
   // them.  For now, publish only the first PCI bus we encounter.

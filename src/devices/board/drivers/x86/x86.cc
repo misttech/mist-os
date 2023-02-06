@@ -53,6 +53,9 @@ X86::~X86() {
 }
 
 zx_status_t X86::DoInit() {
+  // Create the ACPI manager.
+  acpi_manager_ = std::make_unique<acpi::FuchsiaManager>(acpi_.get(), &iommu_manager_, zxdev());
+
   zx_status_t status = SysmemInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SysmemInit() failed: %d", __func__, status);
@@ -212,8 +215,6 @@ zx_status_t X86::Bind() {
              zx_status_get_string(result->error_value()));
     }
   }
-  // Create the ACPI manager.
-  acpi_manager_ = std::make_unique<acpi::FuchsiaManager>(acpi_.get(), &iommu_manager_, zxdev());
 
   return ZX_OK;
 }

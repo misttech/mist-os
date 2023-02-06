@@ -18,13 +18,10 @@ class HostManager : public Manager {
       : Manager(acpi, &iommu_manager_, acpi_root) {}
   ~HostManager() override {}
 
-  async_dispatcher_t* fidl_dispatcher() override { return nullptr; }
-  async::Executor& executor() override { abort(); }
-
  private:
   NullIommuManager iommu_manager_;
 };
 
 }  // namespace acpi
 
-#endif
+#endif  // SRC_DEVICES_BOARD_LIB_ACPI_MANAGER_HOST_H_

@@ -103,7 +103,7 @@ void AcpiArm64::DdkInit(ddk::InitTxn txn) {
     if (status.is_error()) {
       zxlogf(ERROR, "configure failed: %d", status.error_value());
     }
-    status = manager_->PublishDevices(parent_);
+    status = manager_->PublishDevices(parent_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
     if (status.is_error()) {
       zxlogf(ERROR, "publish devices failed: %d", status.error_value());
     }

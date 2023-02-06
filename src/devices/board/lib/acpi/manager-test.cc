@@ -13,6 +13,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "lib/async-loop/testing/cpp/real_loop.h"
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/manager-fuchsia.h"
 #include "src/devices/board/lib/acpi/test/mock-acpi.h"
@@ -75,7 +76,7 @@ static void ExpectProps(acpi::DeviceBuilder* b, std::vector<zx_device_prop_t> ex
   ASSERT_EQ(left, 0);
 }
 
-class AcpiManagerTest : public zxtest::Test {
+class AcpiManagerTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
   AcpiManagerTest()
       : mock_root_(MockDevice::FakeRootParent()), manager_(&acpi_, &iommu_, mock_root_.get()) {}
@@ -94,11 +95,12 @@ class AcpiManagerTest : public zxtest::Test {
     ret = manager_.ConfigureDiscoveredDevices();
     ASSERT_TRUE(ret.is_ok());
 
-    ret = manager_.PublishDevices(mock_root_.get());
+    ret = manager_.PublishDevices(mock_root_.get(), device_loop_.dispatcher());
     ASSERT_TRUE(ret.is_ok());
   }
 
  protected:
+  async::Loop device_loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> mock_root_;
   acpi::test::MockAcpi acpi_;
   acpi::FuchsiaManager manager_;
@@ -504,4 +506,8 @@ TEST_F(AcpiManagerTest, TestInterruptsMakeFragments) {
   }
 
   ASSERT_EQ(0, expected.size());
+
+  device_async_remove(mock_root_.get());
+  ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get()));
+  mock_root_.reset();
 }

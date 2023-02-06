@@ -45,6 +45,7 @@ shared_fuchsia_deps = [
   "//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
   "//zircon/system/ulib/fidl-async:fidl-async-cpp",
+  "//zircon/system/ulib/sync:sync-cpp",
   "//zircon/system/ulib/zircon-internal",
 ]
 
@@ -129,6 +130,7 @@ test("acpi-test") {
            "test:mock-acpi",
            "//src/devices/testing/fake-resource",
            "//src/devices/testing/mock-ddk",
+           "//zircon/system/ulib/async-loop/testing:async-loop-testing",
            "//zircon/system/ulib/zxtest",
          ]
 

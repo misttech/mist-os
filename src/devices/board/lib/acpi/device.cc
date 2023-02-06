@@ -235,7 +235,7 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
                      std::move(address_handler_finished).value_or(fpromise::make_ok_promise()))
                      .discard_result()
                      .and_then([txn = std::move(txn)]() mutable { txn.Reply(); });
-  manager_->executor().schedule_task(std::move(promise));
+  executor_.schedule_task(std::move(promise));
 }
 
 void Device::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) {
@@ -315,8 +315,7 @@ void Device::AcpiConnectServer(zx::channel server) {
   }
 
   status = fidl::BindSingleInFlightOnly(
-      manager_->fidl_dispatcher(),
-      fidl::ServerEnd<fuchsia_hardware_acpi::Device>(std::move(server)), this);
+      dispatcher_, fidl::ServerEnd<fuchsia_hardware_acpi::Device>(std::move(server)), this);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind channel: %s", zx_status_get_string(status));
   }
@@ -324,8 +323,7 @@ void Device::AcpiConnectServer(zx::channel server) {
 
 zx::result<zx::channel> Device::PrepareOutgoing() {
   auto result = outgoing_.AddService<fuchsia_hardware_acpi::Service>(
-      fuchsia_hardware_acpi::Service::InstanceHandler(
-          {.device = bind_handler(manager_->fidl_dispatcher())}));
+      fuchsia_hardware_acpi::Service::InstanceHandler({.device = bind_handler(dispatcher_)}));
   if (result.is_error()) {
     return result.take_error();
   }
@@ -887,7 +885,7 @@ void Device::InstallNotifyHandler(InstallNotifyHandlerRequestView request,
                 std::make_unique<NotifyEventHandler>(this, std::move(bridge.completer));
 
             fidl::WireSharedClient<fuchsia_hardware_acpi::NotifyHandler> client(
-                std::move(handler), manager_->fidl_dispatcher(), std::move(notify_event_handler));
+                std::move(handler), dispatcher_, std::move(notify_event_handler));
             notify_handler_ = std::move(client);
             auto status = acpi_->InstallNotifyHandler(
                 acpi_handle_, mode, Device::DeviceObjectNotificationHandler, this);
@@ -900,7 +898,7 @@ void Device::InstallNotifyHandler(InstallNotifyHandlerRequestView request,
             async_completer.ReplySuccess();
           })
           .box();
-  manager_->executor().schedule_task(std::move(promise));
+  executor_.schedule_task(std::move(promise));
 }
 
 void Device::DeviceObjectNotificationHandler(ACPI_HANDLE object, uint32_t value, void* context) {
@@ -962,7 +960,7 @@ void Device::AcquireGlobalLock(AcquireGlobalLockCompleter::Sync& completer) {
     return;
   }
 
-  GlobalLockHandle::Create(acpi_, manager_->fidl_dispatcher(), completer.ToAsync());
+  GlobalLockHandle::Create(acpi_, dispatcher_, completer.ToAsync());
 }
 
 ACPI_STATUS Device::AddressSpaceHandler(uint32_t function, ACPI_PHYSICAL_ADDRESS physical_address,
@@ -1035,7 +1033,7 @@ void Device::InstallAddressSpaceHandler(InstallAddressSpaceHandlerRequestView re
 
   fpromise::bridge<void> bridge;
   fidl::WireSharedClient<fuchsia_hardware_acpi::AddressSpaceHandler> client(
-      std::move(request->handler), manager_->fidl_dispatcher(),
+      std::move(request->handler), dispatcher_,
       fidl::AnyTeardownObserver::ByCallback(
           [this, ctx = std::move(ctx), space, completer = std::move(bridge.completer)]() mutable {
             std::scoped_lock lock(address_handler_lock_);

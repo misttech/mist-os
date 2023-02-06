@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/markers.h>
 
 namespace acpi {
+
 void GlobalLockHandle::Create(
     acpi::Acpi* acpi, async_dispatcher_t* dispatcher,
     fidl::WireServer<fuchsia_hardware_acpi::Device>::AcquireGlobalLockCompleter::Async completer,

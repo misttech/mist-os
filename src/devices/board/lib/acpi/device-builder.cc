@@ -157,7 +157,8 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
   return result;
 }
 
-zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
+zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager,
+                                              async_dispatcher_t* device_dispatcher) {
   if (parent_->zx_device_ == nullptr) {
     zxlogf(ERROR, "Parent has not been added to the tree yet!");
     return zx::error(ZX_ERR_BAD_STATE);
@@ -166,7 +167,7 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
     zxlogf(ERROR, "This device (%s) has already been built!", name());
     return zx::error(ZX_ERR_BAD_STATE);
   }
-  DeviceArgs device_args(parent_->zx_device_, manager, handle_);
+  DeviceArgs device_args(parent_->zx_device_, manager, device_dispatcher, handle_);
   if (HasBusId() && bus_type_ != BusType::kPci) {
     zx::result<std::vector<uint8_t>> metadata = FidlEncodeMetadata();
     if (metadata.is_error()) {
@@ -206,7 +207,7 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
 
   for (uint32_t i = 0; i < irq_count_; i++) {
 #ifdef __Fuchsia__
-    auto result = IrqFragment::Create(manager->fidl_dispatcher(), *acpi_dev, i, device_id_);
+    auto result = IrqFragment::Create(device_dispatcher, *acpi_dev, i, device_id_);
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to construct IRQ fragment: %d", result.status_value());
       return result.take_error();
@@ -214,7 +215,7 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
 #endif
   }
 
-  auto status = BuildComposite(manager, str_props_for_ddkadd);
+  auto status = BuildComposite(manager, str_props_for_ddkadd, device_dispatcher);
   if (status.is_error()) {
     zxlogf(WARNING, "failed to publish composite acpi device '%s-composite': %d", name(),
            status.error_value());
@@ -284,7 +285,8 @@ zx::result<std::vector<uint8_t>> DeviceBuilder::FidlEncodeMetadata() {
 }
 
 zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
-                                           std::vector<zx_device_str_prop_t>& str_props) {
+                                           std::vector<zx_device_str_prop_t>& str_props,
+                                           async_dispatcher_t* device_dispatcher) {
   if (parent_->GetBusType() == BusType::kPci) {
     // If a device is on a PCI bus, the PCI bus driver will publish a composite device, so we
     // don't try to publish a composite.
@@ -408,7 +410,7 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   // TODO(fxbug.dev/79923): re-enable this in tests once mock_ddk supports composites.
   auto composite_name = fbl::StringPrintf("%s-composite", name());
   // Don't worry about any metadata, since it's present in the "acpi" parent.
-  DeviceArgs args(parent_->zx_device_, manager, handle_);
+  DeviceArgs args(parent_->zx_device_, manager, device_dispatcher, handle_);
   auto composite_device = std::make_unique<Device>(args);
   status = composite_device->DdkAddComposite(composite_name.data(), &composite_desc);
 
