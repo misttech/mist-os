@@ -173,9 +173,17 @@ size_t RouteCache::KeyHasher::operator()(const Key& k) const {
   return h;
 }
 
-std::list<RouteCache::Key>::iterator RouteCache::LruAddToFrontLocked(const Key& k) {
+void RouteCache::LruAddToFront(const Key& k, std::list<Key>::iterator& lru) {
   lru_.push_front(k);
-  return lru_.begin();
+  lru = lru_.begin();
+}
+
+void RouteCache::LruMoveToFront(const Key& k, std::list<Key>::iterator& lru) {
+  if (lru == lru_.begin()) {
+    return;
+  }
+  lru_.erase(lru);
+  LruAddToFront(k, lru);
 }
 
 using RouteCacheResult = fit::result<ErrOrOutCode, uint32_t>;
@@ -192,7 +200,8 @@ RouteCacheResult RouteCache::Get(
   wait_items[ERR_WAIT_ITEM_IDX] = err_wait_item;
 
   while (true) {
-    std::optional<uint32_t> maximum_size;
+    std::optional<Key> cache_key;
+    std::optional<std::reference_wrapper<Value>> cache_value;
     uint32_t num_wait_items = ERR_WAIT_ITEM_IDX + 1;
     const std::optional<SocketAddress>& addr_to_lookup =
         remote_addr.has_value() ? remote_addr : connected_;
@@ -202,16 +211,12 @@ RouteCacheResult RouteCache::Get(
     // to check for errors in that case (since the socket might have been
     // connected by another process).
     if (addr_to_lookup.has_value()) {
-      const Key key = {
+      const Key& key = cache_key.emplace(Key{
           .remote_addr = addr_to_lookup.value(),
           .local_iface_and_addr = local_iface_and_addr,
-      };
+      });
       if (auto it = cache_.find(key); it != cache_.end()) {
-        Value& value = it->second;
-
-        // Mark this entry in the cache as the most recently-used.
-        lru_.erase(value.lru);
-        value.lru = LruAddToFrontLocked(key);
+        const Value& value = cache_value.emplace(it->second);
 
         ZX_ASSERT_MSG(value.eventpairs.size() + 1 <= ZX_WAIT_MANY_MAX_ITEMS,
                       "number of wait_items (%lu) exceeds maximum allowed (%zu)",
@@ -223,7 +228,6 @@ RouteCacheResult RouteCache::Get(
           };
           num_wait_items++;
         }
-        maximum_size = value.maximum_size;
       }
     }
 
@@ -241,8 +245,13 @@ RouteCacheResult RouteCache::Get(
         }
       } break;
       case ZX_ERR_TIMED_OUT: {
-        if (maximum_size.has_value()) {
-          return fit::success(maximum_size.value());
+        if (cache_value.has_value()) {
+          ZX_ASSERT_MSG(cache_key.has_value(),
+                        "cache_key was not set even though we retrieved an entry from the cache");
+          // Mark this entry in the cache as the most recently-used.
+          Value& value = cache_value.value();
+          LruMoveToFront(cache_key.value(), value.lru);
+          return fit::success(value.maximum_size);
         }
       } break;
       default:
@@ -313,11 +322,19 @@ RouteCacheResult RouteCache::Get(
         .remote_addr = addr_to_store.value(),
         .local_iface_and_addr = local_iface_and_addr,
     };
-    cache_[key] = {
-        .eventpairs = std::move(eventpairs),
-        .maximum_size = res.maximum_size(),
-        .lru = LruAddToFrontLocked(key),
-    };
+    // Add the entry to the cache and set its eventpairs and maximum size to
+    // those returned by SendMsgPreflight. If the entry is newly added to the
+    // cache, add it to the front of the LRU list; if it already existed in the
+    // cache, move it to the front.
+    auto [it, inserted] = cache_.try_emplace(key);
+    Value& value = it->second;
+    value.eventpairs = std::move(eventpairs);
+    value.maximum_size = res.maximum_size();
+    if (inserted) {
+      LruAddToFront(key, value.lru);
+    } else {
+      LruMoveToFront(key, value.lru);
+    }
 
     if (!remote_addr.has_value()) {
       connected_ = addr_to_store.value();

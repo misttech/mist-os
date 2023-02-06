@@ -96,7 +96,8 @@ class RouteCache {
     std::list<Key>::iterator lru;
   };
 
-  std::list<Key>::iterator LruAddToFrontLocked(const Key& k) __TA_REQUIRES(lock_);
+  void LruAddToFront(const Key& k, std::list<Key>::iterator& lru) __TA_REQUIRES(lock_);
+  void LruMoveToFront(const Key& k, std::list<Key>::iterator& lru) __TA_REQUIRES(lock_);
 
   std::unordered_map<Key, Value, KeyHasher> cache_ __TA_GUARDED(lock_);
   std::list<Key> lru_ __TA_GUARDED(lock_);

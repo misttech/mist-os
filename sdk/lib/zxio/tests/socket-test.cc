@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <arpa/inet.h>
+#include <fidl/fuchsia.net/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket.packet/cpp/wire_test_base.h>
 #include <fidl/fuchsia.posix.socket.raw/cpp/wire_test_base.h>
 #include <fidl/fuchsia.posix.socket/cpp/wire_test_base.h>
@@ -18,6 +19,7 @@
 
 #include "sdk/lib/zxio/dgram_cache.h"
 #include "sdk/lib/zxio/private.h"
+#include "sdk/lib/zxio/socket_address.h"
 #include "sdk/lib/zxio/tests/test_socket_server.h"
 
 namespace fnet = fuchsia_net;
@@ -242,6 +244,20 @@ TEST_F(DatagramSocketTest, CreateWithType) {
 
 class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::DatagramSocket> {
  public:
+  DatagramSocketServer() {
+    constexpr char kConnectedAddr[] = "192.0.2.99";
+    constexpr uint16_t kConnectedPort = 45678;
+
+    struct sockaddr_in sockaddr;
+    sockaddr.sin_family = AF_INET;
+    if (inet_pton(AF_INET, kConnectedAddr, &sockaddr.sin_addr) != 1) {
+      ADD_FAILURE() << "failed to create IPv4 sockaddr from addr " << kConnectedAddr << " and port "
+                    << kConnectedPort;
+    }
+    sockaddr.sin_port = htons(kConnectedPort);
+    connected_addr_.LoadSockAddr(reinterpret_cast<struct sockaddr*>(&sockaddr), sizeof(sockaddr));
+  }
+
   [[nodiscard]] bool TakeGetErrorCalled() { return get_error_called_.exchange(false); }
 
   [[nodiscard]] bool TakeSendMsgPreflightCalled() {
@@ -250,7 +266,13 @@ class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::D
 
   void InvalidateClientCache() {
     std::lock_guard lock(lock_);
-    ASSERT_OK(zx::eventpair::create(0u, &cache_local_, &cache_peer_));
+    ASSERT_NO_FATAL_FAILURE(InvalidateClientCacheLocked());
+  }
+
+  void SetConnectedAddress(SocketAddress addr) {
+    std::lock_guard lock(lock_);
+    connected_addr_ = addr;
+    ASSERT_NO_FATAL_FAILURE(InvalidateClientCacheLocked());
   }
 
   static constexpr fposix::wire::Errno kSocketError = fposix::wire::Errno::kEio;
@@ -273,7 +295,9 @@ class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::D
     if (request->has_to()) {
       response_builder.to(request->to());
     } else {
-      response_builder.to(ConnectedAddr(alloc));
+      std::lock_guard lock(lock_);
+      connected_addr_.WithFIDL(
+          [&response_builder](fnet::wire::SocketAddress address) { response_builder.to(address); });
     }
     zx::result<zx::eventpair> event = DuplicateCachePeer();
     ASSERT_OK(event.status_value()) << "failed to duplicate peer event for cache invalidation";
@@ -289,18 +313,6 @@ class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::D
   }
 
  private:
-  fnet::wire::SocketAddress ConnectedAddr(fidl::AnyArena& alloc) {
-    static constexpr fidl::Array<uint8_t, 4> kConnectedAddr = {192, 0, 2, 99};
-    static constexpr uint16_t kConnectedPort = 45678;
-    return fnet::wire::SocketAddress::WithIpv4(alloc, fnet::wire::Ipv4SocketAddress{
-                                                          .address =
-                                                              {
-                                                                  .addr = kConnectedAddr,
-                                                              },
-                                                          .port = kConnectedPort,
-                                                      });
-  }
-
   zx::result<zx::eventpair> DuplicateCachePeer() {
     std::lock_guard lock(lock_);
     zx::eventpair dup;
@@ -310,17 +322,22 @@ class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::D
     return zx::ok(std::move(dup));
   }
 
+  void InvalidateClientCacheLocked() __TA_REQUIRES(lock_) {
+    ASSERT_OK(zx::eventpair::create(0u, &cache_local_, &cache_peer_));
+  }
+
   std::atomic<bool> get_error_called_;
   std::atomic<bool> send_msg_preflight_called_;
 
   std::mutex lock_;
+  SocketAddress connected_addr_ __TA_GUARDED(lock_);
   zx::eventpair cache_local_ __TA_GUARDED(lock_);
   zx::eventpair cache_peer_ __TA_GUARDED(lock_);
 };
 
 class DatagramSocketRouteCacheTest : public zxtest::Test {
  public:
-  void SetUp() final {
+  void SetUp() override {
     ASSERT_OK(zx::eventpair::create(0u, &error_local_, &error_peer_));
     ASSERT_NO_FATAL_FAILURE(server_.InvalidateClientCache());
 
@@ -508,6 +525,167 @@ TEST_F(DatagramSocketRouteCacheTest, LruDiscardedGetCallsPreflight) {
   ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
 
   ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(addrs[0]));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+}
+
+TEST_F(DatagramSocketRouteCacheTest, CacheEntryRefreshUpdatesLru) {
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  constexpr uint16_t kEphemeralPortStart = 32768;
+
+  // Trigger a SendMsgPreflight by attempting to retrieve a new address from the
+  // cache.
+  std::optional<SocketAddress> to;
+  ASSERT_NO_FATAL_FAILURE(MakeSockAddrV4(static_cast<uint16_t>(kEphemeralPortStart), to));
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(to));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+
+  // Invalidate the eventpair associated with that cache entry.
+  ASSERT_NO_FATAL_FAILURE(server_.InvalidateClientCache());
+
+  // Get the same address from the cache and assert that the cache calls
+  // SendMsgPreflight again, because the eventpair has been invalidated. At this
+  // point, the invalidated entry should have been overwritten in the cache AND
+  // removed from the LRU list.
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(to));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+
+  // Now get (kMaxEntries + 1) more addresses in order to fill the cache and
+  // cause the 2 least-recently-used entries to be evicted from both the cache
+  // and LRU list. This ensures that a 1-1 mapping between LRU elements and
+  // cache elements is maintained; a dangling LRU node will cause the cache to
+  // attempt to remove a nonexistent entry and panic.
+  for (size_t i = 1; i <= RouteCache::kMaxEntries + 1; i++) {
+    std::optional<SocketAddress> to;
+    ASSERT_NO_FATAL_FAILURE(MakeSockAddrV4(static_cast<uint16_t>(kEphemeralPortStart + i), to));
+    ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(to));
+    ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+  }
+}
+
+class DatagramSocketRouteCacheLruTest : public DatagramSocketRouteCacheTest {
+ public:
+  void SetUp() final {
+    DatagramSocketRouteCacheTest::SetUp();
+    ASSERT_NO_FATAL_FAILURE(
+        MakeSockAddrV4(static_cast<uint16_t>(kEphemeralPortStart), first_entry_));
+  }
+
+  void InsertFirstEntry() {
+    ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+    ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+  }
+
+  void InsertEntries(size_t entries, uint16_t starting_port) {
+    for (size_t i = 0; i < entries; i++) {
+      std::optional<SocketAddress> to;
+      ASSERT_NO_FATAL_FAILURE(MakeSockAddrV4(static_cast<uint16_t>(starting_port + i), to));
+      ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(to));
+      ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+    }
+  }
+
+ protected:
+  static constexpr uint16_t kEphemeralPortStart = 32768;
+  std::optional<SocketAddress> first_entry_;
+};
+
+TEST_F(DatagramSocketRouteCacheLruTest, MovedToFrontOfLruWhenEntryStillValid) {
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  // Insert enough entries that the cache is full and the first entry is the
+  // least recently used, and therefore on the verge of eviction.
+  ASSERT_NO_FATAL_FAILURE(InsertFirstEntry());
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(RouteCache::kMaxEntries - 1, kEphemeralPortStart + 1));
+
+  // Retrieving the first entry from the cache should move it to the front of
+  // the LRU list without the need for a SendMsgPreflight call, since the
+  // eventpair is still valid.
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+
+  // Insert one more entry, causing the least recently used entry to be evicted
+  // from the cache.
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(1, kEphemeralPortStart + RouteCache::kMaxEntries));
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+}
+
+TEST_F(DatagramSocketRouteCacheLruTest, MovedToFrontOfLruWhenEntryRefreshed) {
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  // Insert enough entries that the cache is full and the first entry is the
+  // least recently used, and therefore on the verge of eviction.
+  ASSERT_NO_FATAL_FAILURE(InsertFirstEntry());
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(RouteCache::kMaxEntries - 1, kEphemeralPortStart + 1));
+
+  // Retrieving the first entry from the cache should move it to the front of
+  // the LRU list after a successful SendMsgPreflight call, since the eventpair
+  // was invalidated.
+  ASSERT_NO_FATAL_FAILURE(server_.InvalidateClientCache());
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+
+  // Insert one more entry, causing the least recently used entry to be evicted
+  // from the cache.
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(1, kEphemeralPortStart + RouteCache::kMaxEntries));
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+}
+
+TEST_F(DatagramSocketRouteCacheLruTest, NotMovedToFrontOfLruWhenErrorSignaled) {
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  // Insert enough entries that the cache is full and the first entry is the
+  // least recently used, and therefore on the verge of eviction.
+  ASSERT_NO_FATAL_FAILURE(InsertFirstEntry());
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(RouteCache::kMaxEntries - 1, kEphemeralPortStart + 1));
+
+  // Retrieving the first entry from the cache should *not* move it to the front
+  // of the LRU list if an error was signaled on the socket.
+  ASSERT_OK(error_local_.signal_peer(0, fsocket::wire::kSignalDatagramError));
+  zx_wait_item_t error_wait_item{
+      .handle = error_peer_.get(),
+      .waitfor = fsocket::wire::kSignalDatagramError,
+  };
+  RouteCache::Result result = cache_.Get(first_entry_, std::nullopt, error_wait_item, client_);
+  ASSERT_TRUE(result.is_error());
+  ASSERT_TRUE(server_.TakeGetErrorCalled());
+  ASSERT_OK(zx::eventpair::create(0u, &error_local_, &error_peer_));
+
+  // Insert one more entry, causing the least recently used entry to be evicted
+  // from the cache.
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(1, kEphemeralPortStart + RouteCache::kMaxEntries));
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+}
+
+TEST_F(DatagramSocketRouteCacheLruTest, OnlyReturnedAddrMovedToFrontOfLru) {
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  std::optional<SocketAddress> connected_addr;
+  constexpr uint16_t kArbitraryPort = 44444;
+  ASSERT_NO_FATAL_FAILURE(MakeSockAddrV4(kArbitraryPort, connected_addr));
+  ASSERT_NO_FATAL_FAILURE(server_.SetConnectedAddress(connected_addr.value()));
+
+  ASSERT_NO_FATAL_FAILURE(InsertFirstEntry());
+
+  // Get the connected address, which is not already in the cache.
+  std::optional<SocketAddress> addr_nullopt;
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(addr_nullopt));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+
+  // Connect to a new address, but one that is already in the cache from before.
+  ASSERT_NO_FATAL_FAILURE(server_.SetConnectedAddress(first_entry_.value()));
+
+  // Get the connected address again. This means that the call to
+  // SendMsgPreflight will return a different address than the cache currently
+  // thinks is connected. The newly connected address (already in the cache)
+  // should be moved to the front of the LRU list, but the previously connected
+  // one should *not*.
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(addr_nullopt));
+  ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
+
+  // Insert enough entries to fill the cache and evict one entry.
+  ASSERT_NO_FATAL_FAILURE(InsertEntries(RouteCache::kMaxEntries - 1, kEphemeralPortStart + 1));
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(first_entry_));
+  ASSERT_FALSE(server_.TakeSendMsgPreflightCalled());
+  ASSERT_NO_FATAL_FAILURE(GetFromCacheAssertSuccess(connected_addr));
   ASSERT_TRUE(server_.TakeSendMsgPreflightCalled());
 }
 
