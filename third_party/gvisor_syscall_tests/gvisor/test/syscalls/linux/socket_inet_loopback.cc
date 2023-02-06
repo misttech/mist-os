@@ -736,7 +736,7 @@ TEST_P(SocketInetLoopbackTest, TCPNonBlockingConnectClose) {
         .events = POLLIN | POLLRDHUP,
     };
     // Use a large timeout to accomodate for retransmitted FINs.
-    constexpr int kTimeout = 30000;
+    constexpr int kTimeout = 120000;
     int n = poll(&pfd, 1, kTimeout);
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
@@ -1411,7 +1411,7 @@ TEST_P(SocketInetReusePortTest, TcpPortReuseMultiThread) {
     ASSERT_NO_ERRNO(SetAddrPort(connector.family(), &conn_addr, port));
   }
 
-  std::atomic<int> connects_received = ATOMIC_VAR_INIT(0);
+  std::atomic<int> connects_received(0);
   std::unique_ptr<ScopedThread> listen_thread[kThreadCount];
   int accept_counts[kThreadCount] = {};
   // TODO(avagin): figure how to not disable S/R for the whole test.
@@ -1520,7 +1520,7 @@ TEST_P(SocketInetReusePortTest, UdpPortReuseMultiThread) {
   }
 
   constexpr int kConnectAttempts = 10000;
-  std::atomic<int> packets_received = ATOMIC_VAR_INIT(0);
+  std::atomic<int> packets_received(0);
   std::unique_ptr<ScopedThread> receiver_thread[kThreadCount];
   int packets_per_socket[kThreadCount] = {};
   // TODO(avagin): figure how to not disable S/R for the whole test.
