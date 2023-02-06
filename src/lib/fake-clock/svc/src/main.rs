@@ -17,7 +17,7 @@ use futures::{
 };
 use tracing::{debug, error, warn};
 
-use std::collections::{hash_map, BinaryHeap, HashMap};
+use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 
@@ -80,6 +80,7 @@ struct StopPoint {
     event_type: DeadlineEventType,
 }
 
+#[derive(Debug)]
 struct PendingDeadlineExpireEvent {
     deadline_id: DeadlineId,
     deadline: zx::Time,
@@ -115,6 +116,7 @@ struct FakeClock<T> {
     pending_events: BinaryHeap<PendingEvent>,
     registered_events: HashMap<zx::Koid, RegisteredEvent>,
     pending_named_deadlines: BinaryHeap<PendingDeadlineExpireEvent>,
+    ignored_deadline_ids: HashSet<DeadlineId>,
     registered_stop_points: HashMap<StopPoint, zx::EventPair>,
     observer: T,
 }
@@ -141,6 +143,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
             pending_events: BinaryHeap::new(),
             registered_events: HashMap::new(),
             pending_named_deadlines: BinaryHeap::new(),
+            ignored_deadline_ids: HashSet::new(),
             registered_stop_points: HashMap::new(),
             observer: T::new(),
         }
@@ -169,7 +172,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
             match stop_point_eventpair.signal_peer(zx::Signals::NONE, zx::Signals::EVENT_SIGNALED) {
                 Ok(()) => true,
                 Err(zx::Status::PEER_CLOSED) => {
-                    debug!("Got PEER_COSED while signaling a named event");
+                    debug!("Got PEER_CLOSED while signaling a named event");
                     false
                 }
                 Err(e) => {
@@ -327,6 +330,10 @@ impl<T: FakeClockObserver> FakeClock<T> {
         let () = self.pending_named_deadlines.push(pending_deadline);
     }
 
+    fn add_ignored_deadline(&mut self, ignored_deadline: DeadlineId) {
+        let _ = self.ignored_deadline_ids.insert(ignored_deadline);
+    }
+
     fn increment(&mut self, increment: &Increment) {
         let dur = match increment {
             Increment::Determined(d) => *d,
@@ -438,6 +445,12 @@ async fn handle_control_events<T: FakeClockObserver>(
                     )
                 }
             }
+            FakeClockControlRequest::IgnoreNamedDeadline { deadline_id, responder } => {
+                debug!("Ignoring named deadline with id {:?}", deadline_id);
+                let mut mc = mock_clock.lock().unwrap();
+                mc.add_ignored_deadline(deadline_id);
+                responder.send()
+            }
         }
     })
     .await
@@ -480,7 +493,12 @@ async fn handle_events<T: FakeClockObserver>(
                     stop_free_running(&mock_clock);
                 }
 
-                let deadline = mock_clock.lock().unwrap().time + zx::Duration::from_nanos(duration);
+                let deadline = if mock_clock.lock().unwrap().ignored_deadline_ids.contains(&id) {
+                    zx::Time::INFINITE
+                } else {
+                    mock_clock.lock().unwrap().time + zx::Duration::from_nanos(duration)
+                };
+
                 let expiration_point =
                     PendingDeadlineExpireEvent { deadline_id: id, deadline: deadline };
                 mock_clock.lock().unwrap().add_named_deadline(expiration_point);
@@ -542,8 +560,9 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_testing::{FakeClockControlMarker, FakeClockMarker};
     use fuchsia_zircon::Koid;
-    use futures::channel::mpsc;
+    use futures::{channel::mpsc, pin_mut};
     use named_timer::DeadlineId;
 
     const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("component_1", "code_1");
@@ -585,6 +604,17 @@ mod tests {
             }));
             assert!(allowed.contains(&mock_clock.time.into_nanos()));
         }
+    }
+
+    #[fuchsia::test]
+    fn test_add_ignored_deadline() {
+        let mut mock_clock = FakeClock::<()>::new();
+        mock_clock.add_ignored_deadline(DEADLINE_ID.into());
+        assert_eq!(mock_clock.ignored_deadline_ids, HashSet::from([DEADLINE_ID.into()]));
+
+        // Attempt to add the same deadline again, which should result in a no-op.
+        mock_clock.add_ignored_deadline(DEADLINE_ID.into());
+        assert_eq!(mock_clock.ignored_deadline_ids, HashSet::from([DEADLINE_ID.into()]));
     }
 
     fn check_signaled(e: &zx::EventPair) -> bool {
@@ -919,5 +949,60 @@ mod tests {
             event_type: DeadlineEventType::Expired
         }));
         assert!(check_signaled(&client_event_2));
+    }
+
+    #[fuchsia::test]
+    async fn test_ignore_named_deadline() {
+        let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
+
+        let (fake_clock_proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<FakeClockMarker>()
+                .expect("failed to connect to fake clock");
+        let fake_clock_server_fut = handle_events(clock_handle.clone(), stream);
+        pin_mut!(fake_clock_server_fut);
+
+        let (fake_clock_control_proxy, control_stream) =
+            fidl::endpoints::create_proxy_and_stream::<FakeClockControlMarker>()
+                .expect("failed to connect to fake clock control");
+        let fake_clock_control_server_fut =
+            handle_control_events(clock_handle.clone(), control_stream);
+        pin_mut!(fake_clock_control_server_fut);
+
+        let server =
+            futures::future::try_join(fake_clock_server_fut, fake_clock_control_server_fut);
+        let client = async move {
+            fake_clock_control_proxy.pause().await.expect("failed to pause the clock");
+
+            fake_clock_control_proxy
+                .ignore_named_deadline(&mut DEADLINE_ID.into())
+                .await
+                .expect("failed to ignore deadline");
+
+            // Set an arbitrary time to see if it is replaced with zx::Time::INFINITE.
+            let deadline_time_millis = 10;
+            let deadline = fake_clock_proxy
+                .create_named_deadline(
+                    &mut DEADLINE_ID.into(),
+                    deadline_time_millis.millis().into_nanos(),
+                )
+                .await
+                .expect("failed to create named deadline");
+
+            assert_eq!(deadline, zx::Time::INFINITE.into_nanos());
+            Ok(())
+        };
+
+        let (((), ()), ()) =
+            futures::future::try_join(server, client).await.expect("client should finish first");
+
+        // Confirm there is a deadline in the list and that the deadline is infinite.
+        assert_eq!(clock_handle.lock().unwrap().pending_named_deadlines.len(), 1);
+        assert_eq!(
+            clock_handle.lock().unwrap().pending_named_deadlines.pop().unwrap(),
+            PendingDeadlineExpireEvent {
+                deadline_id: DEADLINE_ID.into(),
+                deadline: zx::Time::INFINITE,
+            }
+        );
     }
 }

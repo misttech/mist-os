@@ -121,4 +121,9 @@ closed protocol FakeClockControl {
     }) -> () error zx.status;
     /// Pauses free-running increments on the fake clock.
     strict Pause() -> ();
+    /// Instructs the fake clock to make deadlines named `deadline_id` never expire.
+    /// This is a no-op if `deadline_id` is already in the ignored set.
+    strict IgnoreNamedDeadline(struct {
+        deadline_id fuchsia.testing.deadline.DeadlineId;
+    }) -> ();
 };
