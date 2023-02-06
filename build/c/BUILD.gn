@@ -81,7 +81,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/thermal/bin/thermal-cli:thermal-cli-test-bin",
     "//src/devices/usb/bin/usb-fwloader",
     "//src/devices/usb/bin/usbctl",
-    "//src/devices/usb/bin/xdc-test",
     "//src/devices/usb/drivers/usb-peripheral:usb-peripheral-driver",
     "//src/devices/usb/drivers/usb-peripheral:usb-peripheral-unittest-bin",
     "//src/devices/usb/tests/usb",
