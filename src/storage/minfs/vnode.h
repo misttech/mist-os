@@ -118,8 +118,6 @@ class VnodeMinfs : public fs::Vnode,
   virtual uint64_t GetSize() const = 0;
 
   // Returns if the node is a directory.
-  // TODO(fxbug.dev/39864): This function is used only within minfs to implement unlinking and
-  // renaming. Consider replacing this with the more general |Vnode::GetProtocols|.
   virtual bool IsDirectory() const = 0;
 
   // Sets the new size of the vnode.
