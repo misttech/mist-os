@@ -246,6 +246,10 @@ mod tests {
         routing_test_helpers::component_id_index::make_index_file,
     };
 
+    fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
+        handle.wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::from_nanos(0)).is_ok()
+    }
+
     #[fuchsia::test]
     async fn read_all_properties() {
         // Create index.
@@ -398,8 +402,8 @@ mod tests {
         );
 
         // Test runners don't provide an out dir or a runtime dir
-        assert!(execution.out_dir.is_none());
-        assert!(execution.runtime_dir.is_none());
+        assert!(is_closed(execution.out_dir.unwrap()));
+        assert!(is_closed(execution.runtime_dir.unwrap()));
     }
 
     #[fuchsia::test]
@@ -490,8 +494,8 @@ mod tests {
         assert!(resolved.pkg_dir.is_some());
 
         let execution = resolved.execution.unwrap();
-        assert!(execution.out_dir.is_none());
-        assert!(execution.runtime_dir.is_none());
+        assert!(is_closed(execution.out_dir.unwrap()));
+        assert!(is_closed(execution.runtime_dir.unwrap()));
 
         component_a.stop_instance_internal(false).await.unwrap();
 
@@ -579,8 +583,8 @@ mod tests {
         assert!(resolved.pkg_dir.is_some());
 
         let execution = resolved.execution.unwrap();
-        assert!(execution.out_dir.is_none());
-        assert!(execution.runtime_dir.is_none());
+        assert!(is_closed(execution.out_dir.unwrap()));
+        assert!(is_closed(execution.runtime_dir.unwrap()));
 
         component_a.stop_instance_internal(false).await.unwrap();
 
@@ -653,7 +657,7 @@ mod tests {
         assert!(resolved_dirs.pkg_dir.is_some());
 
         let execution_dirs = resolved_dirs.execution_dirs.unwrap();
-        assert!(execution_dirs.out_dir.is_none());
-        assert!(execution_dirs.runtime_dir.is_none());
+        assert!(is_closed(execution_dirs.out_dir.unwrap()));
+        assert!(is_closed(execution_dirs.runtime_dir.unwrap()));
     }
 }
