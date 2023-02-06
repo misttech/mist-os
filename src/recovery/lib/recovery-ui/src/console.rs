@@ -123,6 +123,14 @@ impl ViewAssistant for ConsoleViewAssistant {
         Ok(())
     }
 
+    fn setup(&mut self, context: &ViewAssistantContext) -> Result<(), Error> {
+        // Store width so we know where to wrap text.
+        let target_size = context.size;
+        self.layout_width = Some(target_size.width.into());
+
+        Ok(())
+    }
+
     // Adds text provided by ConsoleMessage::AddText message as a Console line.
     fn handle_message(&mut self, message: Message) {
         if let Some(console_message) = message.downcast_ref::<ConsoleMessages>() {

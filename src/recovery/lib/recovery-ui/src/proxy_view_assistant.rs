@@ -85,6 +85,9 @@ impl ProxyViewAssistant {
 #[cfg_attr(test, automock)]
 impl ViewAssistant for ProxyViewAssistant {
     fn setup(&mut self, context: &ViewAssistantContext) -> Result<(), Error> {
+        if let Some(console) = self.console_view_assistant.as_mut() {
+            console.setup(context)?;
+        }
         self.view_assistant_stack.front_mut().unwrap().setup(context)
     }
 
