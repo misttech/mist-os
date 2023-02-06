@@ -153,8 +153,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return status;
   }
 
-  auto result = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(handle))
-                    ->WaitForBuffersAllocated();
+  fidl::WireResult result =
+      fidl::WireCall(fidl::UnownedClientEnd<sysmem::BufferCollection>(zx::unowned_channel(handle)))
+          ->WaitForBuffersAllocated();
   if (!result.ok()) {
     return result.status();
   }
@@ -490,7 +491,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, zx_unowned_handle_t collection) {
+    const image_t* config, zx_unowned_handle_t handle) {
+  fidl::UnownedClientEnd<sysmem::BufferCollection> collection{handle};
   sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
   if (config->type == IMAGE_TYPE_CAPTURE) {
@@ -559,15 +561,14 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   // Set priority to 10 to override the Vulkan driver name priority of 5, but be less than most
   // application priorities.
   constexpr uint32_t kNamePriority = 10;
-  auto name_res = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(collection))
-                      ->SetName(kNamePriority, fidl::StringView::FromExternal(buffer_name));
+  fidl::OneWayStatus name_res =
+      fidl::WireCall(collection)
+          ->SetName(kNamePriority, fidl::StringView::FromExternal(buffer_name));
   if (!name_res.ok()) {
     DISP_ERROR("Failed to set name: %d", name_res.status());
     return name_res.status();
   }
-  auto res = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(collection))
-                 ->SetConstraints(true, constraints);
-
+  fidl::OneWayStatus res = fidl::WireCall(collection)->SetConstraints(true, constraints);
   if (!res.ok()) {
     DISP_ERROR("Failed to set constraints: %d", res.status());
     return res.status();
@@ -594,16 +595,16 @@ void AmlogicDisplay::DisplayCaptureImplSetDisplayCaptureInterface(
   capture_active_id_ = INVALID_ID;
 }
 
-zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(zx_unowned_handle_t collection,
-                                                                    uint32_t index,
-                                                                    uint64_t* out_capture_handle) {
+zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
+    zx_unowned_handle_t collection_handle, uint32_t index, uint64_t* out_capture_handle) {
+  fidl::UnownedClientEnd<sysmem::BufferCollection> collection{
+      zx::unowned_channel(collection_handle)};
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
   fbl::AutoLock lock(&capture_lock_);
-  auto result = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(collection))
-                    ->WaitForBuffersAllocated();
+  fidl::WireResult result = fidl::WireCall(collection)->WaitForBuffersAllocated();
   if (!result.ok()) {
     return result.status();
   }

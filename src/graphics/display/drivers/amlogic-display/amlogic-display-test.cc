@@ -126,19 +126,19 @@ class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
 TEST(AmlogicDisplay, SysmemRequirements) {
   amlogic_display::AmlogicDisplay display(nullptr);
   display.SetFormatSupportCheck([](auto) { return true; });
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
+  ASSERT_OK(buffer_collection_endpoints);
 
   MockBufferCollection collection(
       {sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8});
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   image_t image = {};
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(
+      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
 
-  EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
+      &image, buffer_collection_endpoints->client.handle()->get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
@@ -150,18 +150,18 @@ TEST(AmlogicDisplay, SysmemRequirements_BgraOnly) {
   display.SetFormatSupportCheck([](zx_pixel_format_t format) {
     return format == ZX_PIXEL_FORMAT_RGB_x888 || format == ZX_PIXEL_FORMAT_ARGB_8888;
   });
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
+  ASSERT_OK(buffer_collection_endpoints);
 
   MockBufferCollection collection({sysmem::wire::PixelFormatType::kBgra32});
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   image_t image = {};
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(
+      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
 
-  EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
+      &image, buffer_collection_endpoints->client.handle()->get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
@@ -199,22 +199,22 @@ TEST(AmlogicDisplay, FloatToFixed2_10) {
 TEST(AmlogicDisplay, NoLeakCaptureCanvas) {
   amlogic_display::AmlogicDisplay display(nullptr);
   display.SetFormatSupportCheck([](auto) { return true; });
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
+  ASSERT_OK(buffer_collection_endpoints);
 
   MockBufferCollection collection(
       {sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8});
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(
+      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
   loop.StartThread("sysmem-thread");
   FakeCanvasProtocol canvas;
   display.SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient(&canvas.get_protocol()));
 
   uint64_t capture_handle;
-  EXPECT_OK(
-      display.DisplayCaptureImplImportImageForCapture(client_channel.get(), 0, &capture_handle));
+  EXPECT_OK(display.DisplayCaptureImplImportImageForCapture(
+      buffer_collection_endpoints->client.handle()->get(), 0, &capture_handle));
   EXPECT_OK(display.DisplayCaptureImplReleaseCapture(capture_handle));
 
   canvas.CheckThatNoEntriesInUse();

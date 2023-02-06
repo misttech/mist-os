@@ -76,8 +76,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-driver",
     "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-test-bin",
     "//src/graphics/display/bin/dsiutil",
-    "//src/graphics/display/drivers/amlogic-display:amlogic-display-test",
-    "//src/graphics/display/drivers/amlogic-display:common_srcs",
     "//src/graphics/display/drivers/display:shared",
     "//src/graphics/display/drivers/display/tests:base",
     "//src/graphics/display/drivers/display/tests:display-core-unittests",

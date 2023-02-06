@@ -119,23 +119,22 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent) {
     zxlogf(ERROR, "Could not get hdmi fragment");
     return ZX_ERR_INTERNAL;
   }
-  zx::channel client_end, server_end;
-  zx_status_t status;
-  if ((status = zx::channel::create(0, &client_end, &server_end)) != ZX_OK) {
-    zxlogf(ERROR, "Could not create channel %d\n", status);
-    return status;
+
+  zx::result hdmi_endpoints = fidl::CreateEndpoints<fuchsia_hardware_hdmi::Hdmi>();
+  if (hdmi_endpoints.is_error()) {
+    zxlogf(ERROR, "Could not create channel %s\n", hdmi_endpoints.status_string());
+    return hdmi_endpoints.error_value();
   }
-  hdmi.Connect(std::move(server_end));
+  hdmi.Connect(hdmi_endpoints->server.TakeChannel());
 
   fbl::AllocChecker ac;
-  hdmi_.hdmi_host =
-      fbl::make_unique_checked<amlogic_display::HdmiHost>(&ac, parent, std::move(client_end));
+  hdmi_.hdmi_host = fbl::make_unique_checked<amlogic_display::HdmiHost>(
+      &ac, parent, std::move(hdmi_endpoints->client));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  status = hdmi_.hdmi_host->Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not initialize HDMI host %d\n", status);
+  if (zx_status_t status = hdmi_.hdmi_host->Init(); status != ZX_OK) {
+    zxlogf(ERROR, "Could not initialize HDMI host %s\n", zx_status_get_string(status));
     return status;
   }
 
