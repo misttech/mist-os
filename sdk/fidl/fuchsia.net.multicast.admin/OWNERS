@@ -1,6 +1,5 @@
 include /src/connectivity/network/OWNERS  # Netstack team can +2
 
 ghanan@google.com
-nahurley@google.com
 
 # COMPONENT: NetworkStack

@@ -3,8 +3,6 @@ include /src/connectivity/wlan/drivers/OWNERS
 
 # For network-device changes.
 brunodalbo@google.com
-hanjh@google.com
-nahurley@google.com
 peterjohnston@google.com
 
 # Driver Framework Team for refactoring.
