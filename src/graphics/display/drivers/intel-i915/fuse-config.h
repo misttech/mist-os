@@ -19,7 +19,7 @@ namespace i915 {
 //    Configuration stored in other spaces, such as the Video BIOS Table, is
 //    outside this class' responsibility.
 struct FuseConfig {
-  static FuseConfig ReadFrom(fdf::MmioBuffer& mmio_space, int device_id);
+  static FuseConfig ReadFrom(fdf::MmioBuffer& mmio_space, uint16_t device_id);
 
   // Logs non-default configuration, such as disabled hardware units.
   void Log();

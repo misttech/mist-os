@@ -530,7 +530,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_TcColdCannotBlock) {
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026, value) << "Unexpected command"; });
   fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback(
       [&]() -> uint64_t { return 0x0000'0026; });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback([&](uint32_t data) {
+  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback([&](uint64_t data) {
     if (data == 0x0000'0000) {
       // The driver makes TCCOLD block request first.
       EXPECT_FALSE(tccold_unblock_requested);
@@ -736,7 +736,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_FailureOnBailout) {
     return most_recent_tccold_request_is_block ? 0x0000'0026 : 0x8000'0026;
   });
   fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback(
-      [&](uint32_t data) { most_recent_tccold_request_is_block = (data == 0x0000'0000); });
+      [&](uint64_t data) { most_recent_tccold_request_is_block = (data == 0x0000'0000); });
   fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback(
       [&]() -> uint64_t { return 0x0000'0000; });
 
@@ -835,7 +835,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Failure_TcColdCannotUnblock) {
           .addr() /
       sizeof(uint32_t);
   bool safe_mode_enabled = false;
-  fake_mmio_regs[safe_state_reg_index].SetWriteCallback([&](uint32_t value) {
+  fake_mmio_regs[safe_state_reg_index].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(value, 0x0000'0000u);
     safe_mode_enabled = true;
   });

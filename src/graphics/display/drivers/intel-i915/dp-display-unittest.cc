@@ -14,7 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer-manager.h"
-#include "src/graphics/display/drivers/intel-i915/ddi.h"
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/fake-dpcd-channel.h"
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
@@ -25,8 +24,6 @@
 #include "src/graphics/display/drivers/intel-i915/power.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
-#include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
-#include "src/graphics/display/drivers/intel-i915/registers.h"
 
 namespace i915 {
 
@@ -303,7 +300,7 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesSouthBacklightRegister) {
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
-  EXPECT_FLOAT_EQ(0.5, display->GetBacklightBrightness());
+  EXPECT_DOUBLE_EQ(0.5, display->GetBacklightBrightness());
 }
 
 // Tests that the brightness value is obtained from the related eDP DPCD registers when supported.
@@ -325,7 +322,7 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesDpcd) {
 
   auto display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
-  EXPECT_FLOAT_EQ(1.0, display->GetBacklightBrightness());
+  EXPECT_DOUBLE_EQ(1.0, display->GetBacklightBrightness());
 
   // Set the brightness to 20%.
   fake_dpcd()->registers[dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB] = kDpcdBrightness20 & 0xFF;
@@ -333,7 +330,7 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesDpcd) {
 
   display = MakeDisplay(DdiId::DDI_A);
   ASSERT_NE(nullptr, display);
-  EXPECT_FLOAT_EQ(0.2, display->GetBacklightBrightness());
+  EXPECT_DOUBLE_EQ(0.20000000298023224, display->GetBacklightBrightness());
 }
 
 }  // namespace

@@ -251,7 +251,7 @@ enum class PchPanelPowerState : int {
 class PchEngine {
  public:
   // `mmio_buffer` must outlive this instance.
-  PchEngine(fdf::MmioBuffer* mmio_buffer, int device_id);
+  PchEngine(fdf::MmioBuffer* mmio_buffer, uint16_t device_id);
 
   PchEngine(const PchEngine&) = delete;
   PchEngine(PchEngine&&) = delete;
@@ -413,7 +413,7 @@ class PchEngine {
   fdf::MmioBuffer* const mmio_buffer_;
 
   // GPU device ID used throughout the driver. Not the PCH's device ID.
-  const int device_id_;
+  const uint16_t device_id_;
 
   registers::PchRawClock clock_;
   registers::PchChicken1 misc_;

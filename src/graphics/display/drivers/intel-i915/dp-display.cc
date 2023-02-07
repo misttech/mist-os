@@ -488,7 +488,7 @@ bool DpCapabilities::ProcessSupportedLinkRates(DpcdChannel* dp_aux) {
     std::array<uint8_t, kBufferSize> link_rates;
     if (dp_aux->DpcdRead(dpcd::DPCD_SUPPORTED_LINK_RATE_START, link_rates.data(), kBufferSize)) {
       for (size_t i = 0; i < link_rates.size(); i += 2) {
-        uint16_t value = link_rates[i] | (static_cast<uint16_t>(link_rates[i + 1]) << 8);
+        uint16_t value = link_rates[i] | (static_cast<uint16_t>(link_rates[i + 1] << 8));
 
         // From the eDP specification: "A table entry containing the value 0 indicates that the
         // entry and all entries at higher DPCD addressess contain invalid link rates."
@@ -735,9 +735,11 @@ bool DpDisplay::DpcdHandleAdjustRequest(dpcd::TrainingLaneSet* training,
 }
 
 void DpDisplay::ConfigureVoltageSwingKabyLake(size_t phy_config_index) {
+  ZX_DEBUG_ASSERT_MSG(phy_config_index <= std::numeric_limits<uint32_t>::max(),
+                      "%zu overflows uint32_t", phy_config_index);
   registers::DdiRegs ddi_regs(ddi_id());
   auto buffer_control = ddi_regs.BufferControl().ReadFrom(mmio_space());
-  buffer_control.set_display_port_phy_config_kaby_lake(phy_config_index);
+  buffer_control.set_display_port_phy_config_kaby_lake(static_cast<uint32_t>(phy_config_index));
   buffer_control.WriteTo(mmio_space());
 }
 

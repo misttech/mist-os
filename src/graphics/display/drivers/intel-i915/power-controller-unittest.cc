@@ -941,7 +941,8 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsSuccess) {
 
   const zx::result<std::array<uint8_t, 8>> result = power_controller.GetRawMemoryLatencyDataUs();
   ASSERT_TRUE(result.is_ok()) << result.status_string();
-  EXPECT_THAT(result.value(), testing::ElementsAre(0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48));
+  constexpr uint8_t kExpected[] = {0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48};
+  EXPECT_THAT(result.value(), testing::ElementsAreArray(kExpected));
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneFailure) {

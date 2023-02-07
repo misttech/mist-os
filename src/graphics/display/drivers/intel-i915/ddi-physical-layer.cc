@@ -585,8 +585,12 @@ DdiPhysicalLayer::PhysicalLayerInfo TypeCDdiTigerLake::ReadPhysicalLayerInfo() c
       break;
     case TypeCLiveState::kTypeCHotplugDisplay:
       physical_layer_info.connection_type = ConnectionType::kTypeCDisplayPortAltMode;
-      physical_layer_info.max_allowed_dp_lane_count =
-          dp_sp.display_port_assigned_tx_lane_count(ddi_id());
+      physical_layer_info.max_allowed_dp_lane_count = [&]() {
+        size_t count = dp_sp.display_port_assigned_tx_lane_count(ddi_id());
+        ZX_DEBUG_ASSERT_MSG(count <= std::numeric_limits<uint8_t>::max(), "%lu overflows uint8_t",
+                            count);
+        return static_cast<uint8_t>(count);
+      }();
       break;
     case TypeCLiveState::kThunderboltHotplugDisplay:
       physical_layer_info.connection_type = ConnectionType::kTypeCThunderbolt;

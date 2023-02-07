@@ -485,9 +485,9 @@ TEST(PipeScalerCoefficientDataFormat, ToCanonical) {
 }
 
 TEST(PipeScalerCoefficients, Write) {
-  constexpr size_t kNumCoefficients = size_t{17} * 7;
+  constexpr uint16_t kNumCoefficients = 17 * 7;
   std::vector<registers::PipeScalerCoefficientFormat> coefficients(kNumCoefficients);
-  for (size_t i = 0; i < kNumCoefficients; i++) {
+  for (uint16_t i = 0; i < kNumCoefficients; i++) {
     coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 
@@ -515,9 +515,9 @@ TEST(PipeScalerCoefficients, Write) {
 }
 
 TEST(PipeScalerCoefficients, Read) {
-  constexpr size_t kNumCoefficients = size_t{17} * 7;
+  constexpr uint16_t kNumCoefficients = 17 * 7;
   std::vector<registers::PipeScalerCoefficientFormat> expected_coefficients(kNumCoefficients);
-  for (size_t i = 0; i < kNumCoefficients; i++) {
+  for (uint16_t i = 0; i < kNumCoefficients; i++) {
     expected_coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 

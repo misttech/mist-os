@@ -81,7 +81,7 @@ FuseConfig ReadFuseConfigSkylake(fdf::MmioBuffer& mmio_space) {
 
 }  // namespace
 
-FuseConfig FuseConfig::ReadFrom(fdf::MmioBuffer& mmio_space, int device_id) {
+FuseConfig FuseConfig::ReadFrom(fdf::MmioBuffer& mmio_space, uint16_t device_id) {
   if (is_tgl(device_id))
     return ReadFuseConfigTigerLake(mmio_space);
   if (is_skl(device_id) || is_kbl(device_id))

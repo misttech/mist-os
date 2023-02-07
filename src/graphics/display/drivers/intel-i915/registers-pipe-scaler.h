@@ -490,7 +490,7 @@ class PipeScalerWindowPosition : public hwreg::RegisterBase<PipeScalerWindowPosi
 // Tiger Lake: IHD-OS-TGL-Vol 2d-12.21, Page 868.
 // Lakefield: IHD-OS-LKF-Vol 2d-5.21, Page 899.
 class PipeScalerCoefficientFormat
-    : public hwreg::RegisterBase<PipeScalerCoefficientFormat, uint16_t> {
+    : public hwreg::RegisterBase<PipeScalerCoefficientFormat, uint32_t> {
  public:
   // Sign bit.
   DEF_BIT(15, is_negative);

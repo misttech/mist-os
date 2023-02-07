@@ -240,7 +240,7 @@ class Controller : public DeviceType,
   //
   // This number depends on the display engine and the number of DBUF slices
   // that are powered up.
-  int DataBufferBlockCount() const;
+  uint16_t DataBufferBlockCount() const;
 
   zx_device_t* zx_gpu_dev_ = nullptr;
   zx_device_t* display_controller_dev_ = nullptr;

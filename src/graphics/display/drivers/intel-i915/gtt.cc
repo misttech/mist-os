@@ -252,7 +252,12 @@ void GttRegionImpl::SetRotation(uint32_t rotation, const image_t& image) {
   constexpr uint32_t kRotatedFlag = (1 << 1);
 
   uint64_t mask = is_rotated_ ? kRotatedFlag : 0;
-  uint32_t width = bytes_per_row() / get_tile_byte_width(image.type, image.pixel_format);
+  uint32_t width = [&]() {
+    uint64_t width = bytes_per_row() / get_tile_byte_width(image.type, image.pixel_format);
+    ZX_DEBUG_ASSERT_MSG(width <= std::numeric_limits<uint32_t>::max(), "%lu overflows uint32_t",
+                        width);
+    return static_cast<uint32_t>(width);
+  }();
   uint32_t height = height_in_tiles(image.type, image.height, image.pixel_format);
 
   auto mmio_space = &gtt_->buffer_.value();

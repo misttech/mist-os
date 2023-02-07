@@ -96,7 +96,7 @@ bool operator==(const PchPanelPowerTarget& lhs, const PchPanelPowerTarget& rhs) 
                          rhs.brightness_pwm_counter_on);
 }
 
-PchEngine::PchEngine(fdf::MmioBuffer* mmio_buffer, int device_id)
+PchEngine::PchEngine(fdf::MmioBuffer* mmio_buffer, uint16_t device_id)
     : mmio_buffer_(mmio_buffer), device_id_(device_id) {
   ZX_DEBUG_ASSERT(mmio_buffer);
 
@@ -576,8 +576,7 @@ PchPanelParameters PchEngine::PanelParameters() const {
       //
       // The second multiplication result fits in 35 bits, because `multiplier`
       // fits in 20 bits, and the first multiplication result fits in 15 bits.
-      .power_cycle_delay_micros =
-          static_cast<int64_t>(raw_power_cycle_delay * int32_t{1'000}) * multiplier,
+      .power_cycle_delay_micros = static_cast<int64_t>(raw_power_cycle_delay * 1'000) * multiplier,
 
       .backlight_pwm_frequency_hz = backlight_pwm_frequency_hz,
 

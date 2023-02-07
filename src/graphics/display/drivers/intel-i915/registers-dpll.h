@@ -8,6 +8,7 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <limits>
 
 #include <hwreg/bitfields.h>
 
@@ -553,7 +554,13 @@ class DisplayPllDcoDividersKabyLake
   // The Q divider must be 1 (disabled) if the K divider is not 2. This
   // requirement is also stated as ensuring a 50% duty cycle for this divider.
   uint8_t q_p1_divider() const {
-    return (q_p1_divider_select_enabled()) ? q_p1_divider_select() : 1;
+    if (!q_p1_divider_select_enabled()) {
+      return 1;
+    }
+    ValueType value = q_p1_divider_select();
+    ZX_DEBUG_ASSERT_MSG(value <= std::numeric_limits<uint8_t>::max(), "%u overflows uint8_t",
+                        value);
+    return static_cast<uint8_t>(value);
   }
 
   // See `q_p1_divider()` for details.
@@ -861,7 +868,13 @@ class DisplayPllDcoDividersTigerLake
   // The Q divider must be 1 (disabled) if the K divider is not 2. This
   // requirement is also stated as ensuring a 50% duty cycle for this divider.
   uint8_t q_p1_divider() const {
-    return (q_p1_divider_select_enabled()) ? q_p1_divider_select() : 1;
+    if (!q_p1_divider_select_enabled()) {
+      return 1;
+    }
+    ValueType value = q_p1_divider_select();
+    ZX_DEBUG_ASSERT_MSG(value <= std::numeric_limits<uint8_t>::max(), "%u overflows uint8_t",
+                        value);
+    return static_cast<uint8_t>(value);
   }
 
   // See `q_p1_divider()` for details.

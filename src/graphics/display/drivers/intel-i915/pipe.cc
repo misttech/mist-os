@@ -232,8 +232,8 @@ void Pipe::ResetPlanes() {
   registers::PipeRegs pipe_regs(pipe_id());
 
   // Disable planes, bottom color, and cursor
-  const size_t plane_count = platform_ == registers::Platform::kTigerLake ? 7 : 3;
-  for (size_t i = 0; i < plane_count; i++) {
+  const int32_t plane_count = platform_ == registers::Platform::kTigerLake ? 7 : 3;
+  for (int32_t i = 0; i < plane_count; i++) {
     pipe_regs.PlaneControl(i).FromValue(0).WriteTo(mmio_space_);
     pipe_regs.PlaneSurface(i).FromValue(0).WriteTo(mmio_space_);
   }
@@ -518,7 +518,14 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
       primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
     plane_width = primary->src_frame.width;
     plane_height = primary->src_frame.height;
-    stride = region.bytes_per_row() / get_tile_byte_width(image->type, image->pixel_format);
+    stride =
+        [&]() {
+          uint64_t stride =
+              region.bytes_per_row() / get_tile_byte_width(image->type, image->pixel_format);
+          ZX_DEBUG_ASSERT_MSG(stride <= std::numeric_limits<uint32_t>::max(),
+                              "%lu overflows uint32_t", stride);
+          return static_cast<uint32_t>(stride);
+        }(),
     x_offset = primary->src_frame.x_pos;
     y_offset = primary->src_frame.y_pos;
   } else {

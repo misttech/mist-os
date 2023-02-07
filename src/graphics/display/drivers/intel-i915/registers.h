@@ -7,10 +7,11 @@
 
 #include <zircon/assert.h>
 
+#include <limits>
+
 #include <hwreg/bitfields.h>
 
-#include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
-#include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
+#include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
 namespace registers {
 
@@ -356,12 +357,18 @@ class PowerWellControl : public hwreg::RegisterBase<PowerWellControl, uint32_t> 
  public:
   hwreg::BitfieldRef<uint32_t> power_request(size_t index) {
     ZX_DEBUG_ASSERT(index & 1);
-    return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), index, index);
+    ZX_DEBUG_ASSERT_MSG(index <= std::numeric_limits<uint32_t>::max(), "%zu overflows uint32_t",
+                        index);
+    const uint32_t i = static_cast<uint32_t>(index);
+    return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), i, i);
   }
 
   hwreg::BitfieldRef<uint32_t> power_state(size_t index) {
     ZX_DEBUG_ASSERT((index & 1) == 0);
-    return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), index, index);
+    ZX_DEBUG_ASSERT_MSG(index <= std::numeric_limits<uint32_t>::max(), "%zu overflows uint32_t",
+                        index);
+    const uint32_t i = static_cast<uint32_t>(index);
+    return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), i, i);
   }
 
   hwreg::BitfieldRef<uint32_t> ddi_io_power_request_skylake(i915::DdiId ddi_id) {
@@ -527,7 +534,7 @@ class FuseStatus : public hwreg::RegisterBase<FuseStatus, uint32_t> {
   DEF_BIT(23, pg4_dist_status);  // Only for Icy lake or higher gen
   DEF_BIT(22, pg5_dist_status);  // Only for Tiger lake or higher gen
 
-  uint32_t dist_status(size_t index) {
+  uint32_t dist_status(uint32_t index) {
     ZX_DEBUG_ASSERT(index >= 0 && index <= 31);
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), index, index).get();
   }

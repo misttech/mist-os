@@ -11,7 +11,6 @@
 #include <unordered_set>
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
-#include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
@@ -51,9 +50,12 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
 
     if (!PollUntil(
             [&] {
+              ZX_DEBUG_ASSERT_MSG(
+                  power_well_info.fuse_dist_bit_index <= std::numeric_limits<uint32_t>::max(),
+                  "%zu overflows uint32_t", power_well_info.fuse_dist_bit_index);
               return registers::FuseStatus::Get()
                   .ReadFrom(mmio_space)
-                  .dist_status(power_well_info.fuse_dist_bit_index);
+                  .dist_status(static_cast<uint32_t>(power_well_info.fuse_dist_bit_index));
             },
             zx::usec(1), timeout_for_fuse_state_us)) {
       zxlogf(ERROR, "Power well (%s) distribution failed", power_well_info.name);

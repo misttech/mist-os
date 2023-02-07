@@ -135,8 +135,10 @@ void DdiAuxChannel::WriteRequestForTesting(const Request& request) {
   WriteRequestHeader(request.command, request.address, request.op_size);
   WriteRequestData(request.data);
 
+  // WriteRequestData asserts that request.data.size() is <= kMaxOpSize.
+  static_assert(kMaxOpSize + 4 <= std::numeric_limits<uint32_t>::max());
   // Transact() will call WriteTo() after setting more fields.
-  aux_control_.set_message_size(4 + request.data.size());
+  aux_control_.set_message_size(static_cast<uint32_t>(4 + request.data.size()));
 }
 
 bool DdiAuxChannel::WaitForTransactionComplete() {

@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <future>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -41,7 +42,6 @@
 
 #include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
-#include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
@@ -58,7 +58,6 @@
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe-scaler.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
-#include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 
@@ -463,7 +462,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
 
 void Controller::ResetPipePlaneBuffers(PipeId pipe_id) {
   fbl::AutoLock lock(&plane_buffers_lock_);
-  const int data_buffer_block_count = DataBufferBlockCount();
+  const uint16_t data_buffer_block_count = DataBufferBlockCount();
   for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
     plane_buffers_[pipe_id][plane_num].start = data_buffer_block_count;
   }
@@ -833,7 +832,7 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
     for (unsigned i = 0; i < size; i++) {
       added_displays[i] = display_devices_[i].get();
     }
-    CallOnDisplaysChanged(added_displays, size, NULL, 0);
+    CallOnDisplaysChanged(added_displays, size, nullptr, 0);
   }
 }
 
@@ -951,7 +950,12 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, zx_unow
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint32_t length = ImageFormatImageSize(format.value());
+  const uint32_t length = [&]() {
+    const uint64_t length = ImageFormatImageSize(format.value());
+    ZX_DEBUG_ASSERT_MSG(length <= std::numeric_limits<uint32_t>::max(), "%lu overflows uint32_t",
+                        length);
+    return static_cast<uint32_t>(length);
+  }();
 
   ZX_DEBUG_ASSERT(length >= width_in_tiles(image->type, image->width, image->pixel_format) *
                                 height_in_tiles(image->type, image->height, image->pixel_format) *
@@ -1054,7 +1058,7 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
 
 uint16_t Controller::CalculateBuffersPerPipe(size_t active_pipe_count) {
   ZX_ASSERT(active_pipe_count < PipeIds<registers::Platform::kKabyLake>().size());
-  return static_cast<uint16_t>(DataBufferBlockCount() / active_pipe_count);
+  return DataBufferBlockCount() / active_pipe_count;
 }
 
 bool Controller::CalculateMinimumAllocations(
@@ -1171,7 +1175,7 @@ void Controller::UpdateAllocations(
   // Do the actual allocation, using the buffers that are assigned to each pipe.
   {
     fbl::AutoLock lock(&plane_buffers_lock_);
-    const int data_buffer_block_count = DataBufferBlockCount();
+    const uint16_t data_buffer_block_count = DataBufferBlockCount();
     for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
          pipe_num++) {
       uint16_t start = pipe_buffers_[pipe_num].start;
@@ -1682,7 +1686,7 @@ bool Controller::CalculatePipeAllocation(
   return true;
 }
 
-int Controller::DataBufferBlockCount() const {
+uint16_t Controller::DataBufferBlockCount() const {
   // Data buffer sizes are documented in the "Display Buffer Programming" >
   // "Display Buffer Size" section in the display engine PRMs.
 
@@ -1690,14 +1694,14 @@ int Controller::DataBufferBlockCount() const {
   // 892 blocks.
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 page 167
   // Skylake: IHD-OS-KBL-Vol 12-1.17 page 164
-  static constexpr int kKabyLakeDataBufferBlockCount = 892;
+  static constexpr uint16_t kKabyLakeDataBufferBlockCount = 892;
 
   // Tiger Lake display engines have two DBUF slice with 1024 blocks each.
   // TODO(fxbug.dev/111716): We should be able to use 2048 blocks, since we
   // power up both slices.
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 page 297
   // DG1: IHD-OS-DG1-Vol 12-2.21 page 250
-  static constexpr int kTigerLakeDataBufferBlockCount = 1023;
+  static constexpr uint16_t kTigerLakeDataBufferBlockCount = 1023;
 
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
 }
@@ -2019,7 +2023,11 @@ void Controller::GpuRelease() {
 
 // I2C methods
 
-uint32_t Controller::GetBusCount() { return ddis_.size() * 2; }
+uint32_t Controller::GetBusCount() {
+  const size_t size = ddis_.size() * 2;
+  ZX_DEBUG_ASSERT_MSG(size <= std::numeric_limits<uint32_t>::max(), "%zu overflows uint32_t", size);
+  return static_cast<uint32_t>(size);
+}
 
 static constexpr size_t kMaxTxSize = 255;
 zx_status_t Controller::GetMaxTransferSize(uint32_t bus_id, size_t* out_size) {

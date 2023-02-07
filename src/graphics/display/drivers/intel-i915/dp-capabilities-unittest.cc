@@ -224,7 +224,7 @@ TEST(TglDpCapabilitiesTest, LinkRateTableMaxEntries) {
   std::vector<uint16_t> input;
   std::vector<uint32_t> output;
   for (unsigned i = 1; i <= kMaxLinkRateTableEntries; i++) {
-    input.push_back(kConversionFactor * i);
+    input.push_back(static_cast<uint16_t>(kConversionFactor * i));
     output.push_back(i);
   }
   fake_dpcd.PopulateLinkRateTable(std::move(input));
