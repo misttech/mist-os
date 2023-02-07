@@ -21,6 +21,23 @@ type Configuration = table {
 
         /// Controls whether or not IPv4 multicast packets may be forwarded.
         2: multicast_forwarding bool;
+
+        /// Controls IGMP configuration.
+        3: igmp @generated_name("IgmpConfiguration") table {
+            /// Indicates the version of IGMP to be performed.
+            ///
+            /// Note that the stack may perform lower versioned IGMP as required
+            /// for backwards compatibility with other nodes on the network per
+            /// IGMP requirements.
+            1: version @generated_name("IgmpVersion") flexible enum : uint8 {
+                /// IGMPv1.
+                V1 = 1;
+                /// IGMPv2.
+                V2 = 2;
+                /// IGMPv3.
+                V3 = 3;
+            };
+        };
     };
 
     /// The IPv6 configuration for an interface.
@@ -33,6 +50,21 @@ type Configuration = table {
 
         /// Controls whether or not IPv6 multicast packets may be forwarded.
         2: multicast_forwarding bool;
+
+        /// Controls MLD configuration.
+        3: mld @generated_name("MldConfiguration") table {
+            /// Indicates the version of MLD to be performed.
+            ///
+            /// Note that the stack may perform lower versioned MLD as required
+            /// for backwards compatibility with other nodes on the network per
+            /// MLD requirements.
+            1: version @generated_name("MldVersion") flexible enum : uint8 {
+                /// MLDv1.
+                V1 = 1;
+                /// MLDv2.
+                V2 = 2;
+            };
+        };
     };
 };
 
@@ -109,7 +141,14 @@ protocol Control {
         config Configuration;
     }) -> (struct {
         previous_config Configuration;
-    }) error flexible enum {};
+    }) error flexible enum {
+        /// Indicates that the provided value for `config.ipv4.igmp.version` is
+        /// unsupported.
+        IPV4_IGMP_VERSION_UNSUPPORTED = 1;
+        /// Indicates that the provided value for `config.ipv6.mld.version` is
+        /// unsupported.
+        IPV6_MLD_VERSION_UNSUPPORTED = 2;
+    };
 
     /// Gets a snapshot of the interface's configuration.
     ///
