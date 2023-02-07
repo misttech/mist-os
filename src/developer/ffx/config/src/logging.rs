@@ -28,7 +28,7 @@ const LOG_ENABLED: &str = "log.enabled";
 const LOG_TARGET_LEVELS: &str = "log.target_levels";
 const LOG_LEVEL: &str = "log.level";
 pub const LOG_PREFIX: &str = "ffx";
-const TIME_FORMAT: &str = "%b %d %H:%M:%S";
+const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
 
 static LOG_ENABLED_FLAG: AtomicBool = AtomicBool::new(true);
 
