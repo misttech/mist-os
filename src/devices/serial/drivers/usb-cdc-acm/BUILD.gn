@@ -31,7 +31,7 @@ fuchsia_driver("usb-cdc-acm-driver") {
     "//sdk/banjo/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
@@ -41,10 +41,6 @@ fuchsia_driver("usb-cdc-acm-driver") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_driver_component("usb-cdc-acm") {

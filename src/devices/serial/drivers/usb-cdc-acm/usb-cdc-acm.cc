@@ -5,7 +5,7 @@
 #include "usb-cdc-acm.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/serial/c/fidl.h>
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 
@@ -340,7 +340,7 @@ zx_status_t UsbCdcAcmDevice::Bind() {
     return status;
   }
 
-  serial_port_info_.serial_class = fuchsia_hardware_serial_Class_GENERIC;
+  serial_port_info_.serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric);
 
   status = DdkAdd("usb-cdc-acm");
   if (status != ZX_OK) {

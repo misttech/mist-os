@@ -4,10 +4,10 @@
 
 #include "aml-uart.h"
 
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serial/c/fidl.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -161,7 +161,7 @@ class AmlUartHarness : public zxtest::Test {
  public:
   void SetUp() override {
     static constexpr serial_port_info_t kSerialInfo = {
-        .serial_class = fuchsia_hardware_serial_Class_BLUETOOTH_HCI,
+        .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci),
         .serial_vid = PDEV_VID_BROADCOM,
         .serial_pid = PDEV_PID_BCM43458,
     };
@@ -192,7 +192,7 @@ class AmlUartHarness : public zxtest::Test {
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
   serial_port_info_t info;
   ASSERT_OK(Device().SerialImplAsyncGetInfo(&info));
-  ASSERT_EQ(info.serial_class, fuchsia_hardware_serial_Class_BLUETOOTH_HCI);
+  ASSERT_EQ(info.serial_class, fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci));
   ASSERT_EQ(info.serial_pid, PDEV_PID_BCM43458);
   ASSERT_EQ(info.serial_vid, PDEV_VID_BROADCOM);
 }

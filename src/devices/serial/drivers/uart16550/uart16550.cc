@@ -4,8 +4,8 @@
 
 #include "uart16550.h"
 
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serial/c/fidl.h>
 #include <fuchsia/hardware/serialimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/inout.h>
@@ -30,7 +30,7 @@ static constexpr uint8_t kDefaultConfig =
     SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
 
 static constexpr serial_port_info_t kInfo = {
-    .serial_class = fuchsia_hardware_serial_Class_GENERIC,
+    .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric),
     .serial_vid = 0,
     .serial_pid = 0,
 };

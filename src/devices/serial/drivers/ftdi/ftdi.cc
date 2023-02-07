@@ -5,7 +5,7 @@
 #include "ftdi.h"
 
 #include <fcntl.h>
-#include <fuchsia/hardware/serial/c/fidl.h>
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
@@ -420,7 +420,7 @@ zx_status_t FtdiDevice::Bind() {
     return FtdiBindFail(status);
   }
 
-  serial_port_info_.serial_class = fuchsia_hardware_serial_Class_GENERIC;
+  serial_port_info_.serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric);
 
   status = DdkAdd("ftdi-uart");
   if (status != ZX_OK) {

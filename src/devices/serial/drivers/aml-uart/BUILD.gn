@@ -62,7 +62,7 @@ test("aml-uart-test-bin") {
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
     "//sdk/lib/fit",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/lib/device-protocol-platform-device",
@@ -80,10 +80,6 @@ test("aml-uart-test-bin") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_unittest_package("aml-uart-test") {

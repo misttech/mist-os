@@ -38,7 +38,7 @@ template("define_common_lib") {
     sources = [ "uart16550.cc" ]
     deps = [
       ":uart16550_bind",
-      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
+      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
     ]
     public_deps = [
       "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
@@ -56,10 +56,6 @@ template("define_common_lib") {
       public_deps += [ "//zircon/system/ulib/hwreg:hwreg-mock" ]
       public_configs = [ ":testing.config" ]
     }
-
-    # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-    # Consider switching to the C++ bindings. See linked bug for details.
-    configs += [ "//build/c:fidl-deprecated-c-bindings" ]
   }
 }
 
