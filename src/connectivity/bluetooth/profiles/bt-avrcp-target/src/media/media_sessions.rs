@@ -276,11 +276,7 @@ impl MediaSessionsInner {
 
     /// Update outstanding notification responders for the active session.
     pub fn update_notification_responders(&mut self) {
-        let state = if let Some(state) = self.get_active_session() {
-            state.clone()
-        } else {
-            return;
-        };
+        let Some(state) = self.get_active_session() else { return };
         let curr_value: Notification = state.session_info().into();
 
         self.notifications = self
@@ -355,12 +351,9 @@ impl MediaSessionsInner {
         //
         // For all other event_ids, use the provided `current` parameter, and the `response_timeout`
         // is not needed.
-        let active_session = match self.get_active_session() {
-            None => {
+        let Some(active_session) = self.get_active_session() else {
                 responder.send(&mut Err(fidl_avrcp::TargetAvcError::RejectedNoAvailablePlayers))?;
                 return Ok(None);
-            }
-            Some(session) => session,
         };
         let (current_values, response_timeout) = match (event_id, pos_change_interval) {
             (fidl_avrcp::NotificationEvent::TrackPosChanged, 0) => {

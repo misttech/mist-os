@@ -6,7 +6,7 @@ use std::{collections::vec_deque, iter::FromIterator};
 
 use crate::types::MAX_NOTIFICATION_EVENT_QUEUE_SIZE;
 
-#[allow(unused)]
+#[cfg(test)]
 /// Mutable Iterator over the elements in a `BoundedQueue`
 type IterMut<'a, T> = vec_deque::IterMut<'a, T>;
 

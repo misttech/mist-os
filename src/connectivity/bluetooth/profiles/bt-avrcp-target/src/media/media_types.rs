@@ -43,18 +43,16 @@ fn media_timeline_fn_to_position(t: TimelineFunction, current_time: i64) -> Opti
     Some(time_nanos_to_millis(position_nanos))
 }
 
-pub fn media_repeat_mode_to_avrcp(
-    src: fidl_media::RepeatMode,
-) -> Option<fidl_avrcp::RepeatStatusMode> {
+pub fn media_repeat_mode_to_avrcp(src: fidl_media::RepeatMode) -> fidl_avrcp::RepeatStatusMode {
     match src {
-        fidl_media::RepeatMode::Off => Some(fidl_avrcp::RepeatStatusMode::Off),
-        fidl_media::RepeatMode::Group => Some(fidl_avrcp::RepeatStatusMode::GroupRepeat),
-        fidl_media::RepeatMode::Single => Some(fidl_avrcp::RepeatStatusMode::SingleTrackRepeat),
+        fidl_media::RepeatMode::Off => fidl_avrcp::RepeatStatusMode::Off,
+        fidl_media::RepeatMode::Group => fidl_avrcp::RepeatStatusMode::GroupRepeat,
+        fidl_media::RepeatMode::Single => fidl_avrcp::RepeatStatusMode::SingleTrackRepeat,
     }
 }
 
-pub fn avrcp_repeat_mode_to_media(src: fidl_avrcp::RepeatStatusMode) -> fidl_media::RepeatMode {
-    match src {
+pub fn avrcp_repeat_mode_to_media(mode: fidl_avrcp::RepeatStatusMode) -> fidl_media::RepeatMode {
+    match mode {
         fidl_avrcp::RepeatStatusMode::SingleTrackRepeat => fidl_media::RepeatMode::Single,
         fidl_avrcp::RepeatStatusMode::GroupRepeat
         | fidl_avrcp::RepeatStatusMode::AllTrackRepeat => fidl_media::RepeatMode::Group,
@@ -62,11 +60,11 @@ pub fn avrcp_repeat_mode_to_media(src: fidl_avrcp::RepeatStatusMode) -> fidl_med
     }
 }
 
-pub fn media_shuffle_mode_to_avrcp(src: bool) -> Option<fidl_avrcp::ShuffleMode> {
-    if src {
-        Some(fidl_avrcp::ShuffleMode::AllTrackShuffle)
+pub fn media_shuffle_mode_to_avrcp(shuffle_enabled: bool) -> fidl_avrcp::ShuffleMode {
+    if shuffle_enabled {
+        fidl_avrcp::ShuffleMode::AllTrackShuffle
     } else {
-        Some(fidl_avrcp::ShuffleMode::Off)
+        fidl_avrcp::ShuffleMode::Off
     }
 }
 
@@ -79,14 +77,14 @@ pub fn avrcp_shuffle_mode_to_media(src: fidl_avrcp::ShuffleMode) -> bool {
 
 pub fn media_player_state_to_playback_status(
     src: fidl_media::PlayerState,
-) -> Option<fidl_avrcp::PlaybackStatus> {
+) -> fidl_avrcp::PlaybackStatus {
     match src {
-        fidl_media::PlayerState::Idle => Some(fidl_avrcp::PlaybackStatus::Stopped),
-        fidl_media::PlayerState::Playing => Some(fidl_avrcp::PlaybackStatus::Playing),
+        fidl_media::PlayerState::Idle => fidl_avrcp::PlaybackStatus::Stopped,
+        fidl_media::PlayerState::Playing => fidl_avrcp::PlaybackStatus::Playing,
         fidl_media::PlayerState::Paused | fidl_media::PlayerState::Buffering => {
-            Some(fidl_avrcp::PlaybackStatus::Paused)
+            fidl_avrcp::PlaybackStatus::Paused
         }
-        fidl_media::PlayerState::Error => Some(fidl_avrcp::PlaybackStatus::Error),
+        fidl_media::PlayerState::Error => fidl_avrcp::PlaybackStatus::Error,
     }
 }
 
@@ -105,7 +103,7 @@ pub(crate) struct ValidPlayStatus {
 }
 
 impl ValidPlayStatus {
-    #[allow(unused)]
+    #[cfg(test)]
     pub(crate) fn new(
         song_length: Option<u32>,
         song_position: Option<u32>,
@@ -146,7 +144,7 @@ impl ValidPlayStatus {
             self.song_position = rate.current_position();
         }
         if let Some(state) = player_state {
-            self.playback_status = media_player_state_to_playback_status(state);
+            self.playback_status = Some(media_player_state_to_playback_status(state));
         }
     }
 }
@@ -273,7 +271,7 @@ impl ValidPlayerApplicationSettings {
     }
 
     /// Returns true if the player application settings contains unsupported settings.
-    pub fn unsupported_settings_set(&self) -> bool {
+    pub fn has_unsupported_settings(&self) -> bool {
         self.equalizer.is_some() || self.scan_mode.is_some()
     }
 
@@ -293,12 +291,12 @@ impl ValidPlayerApplicationSettings {
 
     /// Update the `repeat_status_mode` from a change in MediaPlayer.
     pub fn update_repeat_status_mode(&mut self, repeat_mode: fidl_media::RepeatMode) {
-        self.repeat_status_mode = media_repeat_mode_to_avrcp(repeat_mode);
+        self.repeat_status_mode = Some(media_repeat_mode_to_avrcp(repeat_mode));
     }
 
     /// Update the `shuffle_mode` from a change in MediaPlayer.
     pub fn update_shuffle_mode(&mut self, shuffle_mode: bool) {
-        self.shuffle_mode = media_shuffle_mode_to_avrcp(shuffle_mode);
+        self.shuffle_mode = Some(media_shuffle_mode_to_avrcp(shuffle_mode));
     }
 
     /// Sets the `repeat_status_mode`.
@@ -325,21 +323,13 @@ impl From<fidl_avrcp::PlayerApplicationSettings> for ValidPlayerApplicationSetti
 
 impl From<ValidPlayerApplicationSettings> for fidl_avrcp::PlayerApplicationSettings {
     fn from(src: ValidPlayerApplicationSettings) -> fidl_avrcp::PlayerApplicationSettings {
-        let mut setting = fidl_avrcp::PlayerApplicationSettings::EMPTY;
-        if let Some(eq) = src.equalizer {
-            setting.equalizer = Some(eq.into());
+        fidl_avrcp::PlayerApplicationSettings {
+            equalizer: src.equalizer.map(Into::into),
+            repeat_status_mode: src.repeat_status_mode.map(Into::into),
+            shuffle_mode: src.shuffle_mode.map(Into::into),
+            scan_mode: src.scan_mode.map(Into::into),
+            ..fidl_avrcp::PlayerApplicationSettings::EMPTY
         }
-        if let Some(rsm) = src.repeat_status_mode {
-            setting.repeat_status_mode = Some(rsm.into());
-        }
-        if let Some(shm) = src.shuffle_mode {
-            setting.shuffle_mode = Some(shm.into());
-        }
-        if let Some(scm) = src.scan_mode {
-            setting.scan_mode = Some(scm.into());
-        }
-
-        setting
     }
 }
 
@@ -730,7 +720,7 @@ mod tests {
     /// Tests correctness of clearing a field.
     fn test_player_application_settings() {
         let mut settings = ValidPlayerApplicationSettings::new(None, None, None, None);
-        assert_eq!(settings.unsupported_settings_set(), false);
+        assert_eq!(settings.has_unsupported_settings(), false);
 
         let repeat_mode = Some(fidl_media::RepeatMode::Group);
         let shuffle_mode = Some(true);
@@ -740,7 +730,7 @@ mod tests {
         let expected_shuffle_mode = Some(fidl_avrcp::ShuffleMode::AllTrackShuffle);
         assert_eq!(expected_repeat_mode, settings.repeat_status_mode);
         assert_eq!(expected_shuffle_mode, settings.shuffle_mode);
-        assert_eq!(settings.unsupported_settings_set(), false);
+        assert_eq!(settings.has_unsupported_settings(), false);
 
         settings.update_player_application_settings(None, None);
         assert_eq!(expected_repeat_mode, settings.repeat_status_mode);
@@ -829,100 +819,82 @@ mod tests {
     ///   b. The calculated song position is negative, and clamped at 0.
     fn test_timeline_fn_to_song_position() {
         // 1. Normal case, media is playing.
-        let mut timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at beginning of media.
-        timeline_fn.subject_time = 0;
-        // Monotonic clock time at beginning of media (nanos).
-        timeline_fn.reference_time = 500000000;
-        // Playback rate = 1, normal playback.
-        timeline_fn.subject_delta = 1;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 0,           // Playback started at beginning of media.
+            reference_time: 500000000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 1,          // Normal playback rate
+            reference_delta: 1,        // Normal playback rate
+        };
         // Current time of the system (nanos).
         let curr_time = 520060095;
-        let expected_position = 20; // 20060095 / 1000000 = 520millis
-
         let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
+        let expected_position = 20; // 20060095 / 1000000 = 520millis
         assert_eq!(song_position, Some(expected_position));
 
         // 2. Normal case, media is paused.
-        timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at some random time.
-        timeline_fn.subject_time = 534912992;
-        // Monotonic clock time at beginning of media.
-        timeline_fn.reference_time = 500000000;
-        // Playback rate = 0, it's paused.
-        timeline_fn.subject_delta = 0;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 534912992,   // Playback started at a random time.
+            reference_time: 500000000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 0,          // Paused playback rate
+            reference_delta: 1,        // Paused playback rate
+        };
         // Current time of the system.
         let curr_time = 500060095;
+        let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
         // The expected position of media should be when it was started (subject_time), since
         // it's paused.
         let expected_position = 534; // 534973087 / 1000000 = 534 millis.
-
-        let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
         assert_eq!(song_position, Some(expected_position));
 
         // 3. Invalid case, `reference_delta` = 0, which violates the MediaSession contract.
-        timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at some random time.
-        timeline_fn.subject_time = 534912992;
-        // Monotonic clock time at beginning of media.
-        timeline_fn.reference_time = 500000000;
-        // Playback rate = 0, it's paused.
-        timeline_fn.subject_delta = 0;
-        timeline_fn.reference_delta = 0;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 534912992,   // Playback started at a random time.
+            reference_time: 500000000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 0,          // Paused playback rate
+            reference_delta: 0,        // Invalid playback rate
+        };
         // Current time of the system.
         let curr_time = 500060095;
-
         let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
         assert!(song_position.is_none());
 
         // 4. Fast-forward case, the ratio is > 1, so the media is in fast-forward mode.
-        timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at some random time.
-        timeline_fn.subject_time = 500;
-        // Monotonic clock time at beginning of media.
-        timeline_fn.reference_time = 500000000;
-        // Playback rate = 2, fast-forward.
-        timeline_fn.subject_delta = 2;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 500,         // Playback started at a random time.
+            reference_time: 500000000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 2,          // Fast-forward playback rate
+            reference_delta: 1,        // Fast-forward playback rate
+        };
         // Current time of the system.
         let curr_time = 500760095;
-        let expected_position = 1; // 1520690 / 1000000 = 1 millis
-
         let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
+        let expected_position = 1; // 1520690 / 1000000 = 1 millis
         assert_eq!(song_position, Some(expected_position));
 
         // 5a. Future reference time, but the calculated position is positive.
-        timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at some random time.
-        timeline_fn.subject_time = 123456789;
-        // Monotonic clock time at beginning of media.
-        timeline_fn.reference_time = 500010000;
-        // Normal playback rate.
-        timeline_fn.subject_delta = 1;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 123456789,   // Playback started at a random time.
+            reference_time: 500010000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 1,          // Normal playback rate
+            reference_delta: 1,        // Normal playback rate
+        };
         // Current time of the system.
         let curr_time = 500000000;
-        let expected_position = 123; //  -10000 + 123456789 = 123446789 nanos = 123ms
-
         let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
+        let expected_position = 123; //  -10000 + 123456789 = 123446789 nanos = 123ms
         assert_eq!(song_position, Some(expected_position));
 
         // 5b. Future reference time, but the calculated position is negative.
-        timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at some random time.
-        timeline_fn.subject_time = 0;
-        // Monotonic clock time at beginning of media.
-        timeline_fn.reference_time = 500010000;
-        // Normal playback rate.
-        timeline_fn.subject_delta = 1;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 0,           // Playback started at a random time.
+            reference_time: 500010000, // Monotonic clock time at beginning of media (nanos).
+            subject_delta: 1,          // Normal playback rate
+            reference_delta: 1,        // Normal playback rate
+        };
         // Current time of the system.
         let curr_time = 500000000;
-        let expected_position = 0; //  -10000 + 0 = -10000 -> capped at 0.
-
         let song_position = media_timeline_fn_to_position(timeline_fn, curr_time);
+        let expected_position = 0; //  -10000 + 0 = -10000 -> capped at 0.
         assert_eq!(song_position, Some(expected_position));
     }
 
@@ -930,29 +902,21 @@ mod tests {
     /// Tests conversion from Media RepeatMode to RepeatStatusMode
     fn test_media_repeat_mode_conversion() {
         let mode = fidl_media::RepeatMode::Off;
-        assert_eq!(media_repeat_mode_to_avrcp(mode), Some(fidl_avrcp::RepeatStatusMode::Off));
+        assert_eq!(media_repeat_mode_to_avrcp(mode), fidl_avrcp::RepeatStatusMode::Off);
         let mode = fidl_media::RepeatMode::Group;
-        assert_eq!(
-            media_repeat_mode_to_avrcp(mode),
-            Some(fidl_avrcp::RepeatStatusMode::GroupRepeat)
-        );
+        assert_eq!(media_repeat_mode_to_avrcp(mode), fidl_avrcp::RepeatStatusMode::GroupRepeat);
         let mode = fidl_media::RepeatMode::Single;
         assert_eq!(
             media_repeat_mode_to_avrcp(mode),
-            Some(fidl_avrcp::RepeatStatusMode::SingleTrackRepeat)
+            fidl_avrcp::RepeatStatusMode::SingleTrackRepeat
         );
     }
 
     #[fuchsia::test]
     /// Tests conversion from Media Shuffle flag to  ShuffleMode
     fn test_media_shuffle_mode_conversion() {
-        let mode = true;
-        assert_eq!(
-            media_shuffle_mode_to_avrcp(mode),
-            Some(fidl_avrcp::ShuffleMode::AllTrackShuffle)
-        );
-        let mode = false;
-        assert_eq!(media_shuffle_mode_to_avrcp(mode), Some(fidl_avrcp::ShuffleMode::Off));
+        assert_eq!(media_shuffle_mode_to_avrcp(true), fidl_avrcp::ShuffleMode::AllTrackShuffle);
+        assert_eq!(media_shuffle_mode_to_avrcp(false), fidl_avrcp::ShuffleMode::Off);
     }
 
     #[fuchsia::test]
@@ -961,28 +925,25 @@ mod tests {
         let state = fidl_media::PlayerState::Idle;
         assert_eq!(
             media_player_state_to_playback_status(state),
-            Some(fidl_avrcp::PlaybackStatus::Stopped)
+            fidl_avrcp::PlaybackStatus::Stopped
         );
         let state = fidl_media::PlayerState::Playing;
         assert_eq!(
             media_player_state_to_playback_status(state),
-            Some(fidl_avrcp::PlaybackStatus::Playing)
+            fidl_avrcp::PlaybackStatus::Playing
         );
         let state = fidl_media::PlayerState::Paused;
         assert_eq!(
             media_player_state_to_playback_status(state),
-            Some(fidl_avrcp::PlaybackStatus::Paused)
+            fidl_avrcp::PlaybackStatus::Paused
         );
         let state = fidl_media::PlayerState::Buffering;
         assert_eq!(
             media_player_state_to_playback_status(state),
-            Some(fidl_avrcp::PlaybackStatus::Paused)
+            fidl_avrcp::PlaybackStatus::Paused
         );
         let state = fidl_media::PlayerState::Error;
-        assert_eq!(
-            media_player_state_to_playback_status(state),
-            Some(fidl_avrcp::PlaybackStatus::Error)
-        );
+        assert_eq!(media_player_state_to_playback_status(state), fidl_avrcp::PlaybackStatus::Error);
     }
 
     #[fuchsia::test]

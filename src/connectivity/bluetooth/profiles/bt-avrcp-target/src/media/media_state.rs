@@ -57,30 +57,29 @@ impl MediaState {
         requested_settings: ValidPlayerApplicationSettings,
     ) -> Result<ValidPlayerApplicationSettings, fidl_avrcp::TargetAvcError> {
         // Currently, MediaSession only supports RepeatStatusMode and ShuffleMode.
-        if requested_settings.unsupported_settings_set() {
+        if requested_settings.has_unsupported_settings() {
             return Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter);
         }
 
         let mut set_settings = ValidPlayerApplicationSettings::default();
-        if let Some(repeat_mode) = requested_settings.repeat_status_mode() {
-            let requested_repeat_mode: fidl_media::RepeatMode =
-                avrcp_repeat_mode_to_media(repeat_mode);
-            match self.session_control.set_repeat_mode(requested_repeat_mode) {
-                Ok(_) => {
-                    set_settings
-                        .set_repeat_status_mode(media_repeat_mode_to_avrcp(requested_repeat_mode));
-                }
-                Err(_) => return Err(fidl_avrcp::TargetAvcError::RejectedInternalError),
-            }
+        if let Some(requested_repeat_mode) =
+            requested_settings.repeat_status_mode().map(avrcp_repeat_mode_to_media)
+        {
+            self.session_control
+                .set_repeat_mode(requested_repeat_mode)
+                .map_err(|_| fidl_avrcp::TargetAvcError::RejectedInternalError)?;
+            set_settings
+                .set_repeat_status_mode(Some(media_repeat_mode_to_avrcp(requested_repeat_mode)));
         };
 
-        if let Some(shuffle_mode) = requested_settings.shuffle_mode() {
-            let requested_shuffle_mode: bool = avrcp_shuffle_mode_to_media(shuffle_mode);
-            match self.session_control.set_shuffle_mode(requested_shuffle_mode) {
-                Ok(_) => set_settings
-                    .set_shuffle_mode(media_shuffle_mode_to_avrcp(requested_shuffle_mode)),
-                Err(_) => return Err(fidl_avrcp::TargetAvcError::RejectedInternalError),
-            }
+        if let Some(requested_shuffle_mode) =
+            requested_settings.shuffle_mode().map(avrcp_shuffle_mode_to_media)
+        {
+            self.session_control
+                .set_shuffle_mode(requested_shuffle_mode)
+                .map_err(|_| fidl_avrcp::TargetAvcError::RejectedInternalError)?;
+            set_settings
+                .set_shuffle_mode(Some(media_shuffle_mode_to_avrcp(requested_shuffle_mode)));
         };
 
         Ok(set_settings)
