@@ -263,7 +263,7 @@ mod tests {
     use {
         super::*,
         crate::hw::MemoryDevice,
-        crate::hypervisor::testing::{MockBehavior, MockHypervisor},
+        crate::hypervisor::testing::{MockBehavior, MockGuest, MockHypervisor, MockVcpuController},
         std::sync::{Arc, Mutex},
         vm_device::bus::PioRange,
     };
@@ -287,6 +287,65 @@ mod tests {
         #[cfg(test)]
         pub fn take_join_handle(&mut self) -> Option<JoinHandle<Result<(), zx::Status>>> {
             self.join_handle.take()
+        }
+
+        /// Returns the [Hypervisor::ControlHandle] for the running vcpu.
+        ///
+        /// Returns a reference to the control handle if the vcpu is running. If the vcpu is not running
+        /// (and thus has no control handle) [None] is returned.
+        pub fn control_handle(&self) -> Option<&H::VcpuControlHandle> {
+            if let VcpuState::Running { control_handle } = &self.state {
+                Some(control_handle)
+            } else {
+                None
+            }
+        }
+    }
+
+    struct TestFixture {
+        hypervisor: MockHypervisor,
+        guest: Arc<MockGuest>,
+        devices: DeviceManager<MockHypervisor>,
+    }
+
+    impl TestFixture {
+        pub fn new() -> Self {
+            let hypervisor = MockHypervisor::new();
+            let (guest, _address_space) = hypervisor.guest_create().unwrap();
+            let guest = Arc::new(guest);
+            let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
+            Self { hypervisor, guest, devices }
+        }
+
+        pub fn create_vcpu(
+            &self,
+            id: u32,
+            entry: GuestPhysicalAddress,
+            boot_ptr: u64,
+        ) -> Vcpu<MockHypervisor> {
+            Vcpu::new(
+                self.hypervisor.clone(),
+                self.guest.clone(),
+                self.devices.clone(),
+                id,
+                entry,
+                boot_ptr,
+            )
+        }
+
+        pub async fn create_and_start_vcpu(
+            &self,
+            id: u32,
+            entry: GuestPhysicalAddress,
+            boot_ptr: u64,
+        ) -> (Vcpu<MockHypervisor>, MockVcpuController) {
+            let mut vcpu = self.create_vcpu(id, entry, boot_ptr);
+            assert_eq!(vcpu.start().await, zx::Status::OK);
+
+            // Unwrap here because this should only be None if the vcpu is not
+            // running.
+            let control_handle = vcpu.control_handle().unwrap().clone();
+            (vcpu, control_handle)
         }
     }
 
@@ -322,93 +381,71 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create() {
-        let hypervisor = MockHypervisor::new();
-        let (guest, _address_space) = hypervisor.guest_create().unwrap();
-        let guest = Arc::new(guest);
-        let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
-        let mut vcpu = Vcpu::new(hypervisor.clone(), guest.clone(), devices, 0, 0, 0);
+        let test = TestFixture::new();
+
+        let mut vcpu = test.create_vcpu(0, 0, 0);
+
         assert_eq!(vcpu.start().await, zx::Status::OK);
-        assert_eq!(guest.vcpus().len(), 1);
+        assert_eq!(test.guest.vcpus().len(), 1);
     }
 
     #[fuchsia::test]
     async fn test_vcpu_shutdown() {
-        let hypervisor = MockHypervisor::new();
-        let (guest, _address_space) = hypervisor.guest_create().unwrap();
-        let guest = Arc::new(guest);
-        let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
-        let mut vcpu = Vcpu::new(hypervisor.clone(), guest.clone(), devices, 0, 0, 0);
-        assert_eq!(vcpu.start().await, zx::Status::OK);
-
-        // Expect the vcpu was created successfully.
-        let vcpus = guest.vcpus();
-        assert_eq!(vcpus.len(), 1);
+        let test = TestFixture::new();
 
         // When zx_vcpu_enter returns [zx::Status::CANCELED], this indicates a graceful shutdown. As a result we
         // expect the backing vcpu thread to exit and return zx::Status::OK in this situation.
+        let (mut vcpu, vcpu_controller) = test.create_and_start_vcpu(0, 0, 0).await;
         let join_handle = vcpu.take_join_handle().expect("Failed to obtain vcpu JoinHandle");
-        vcpus[0].send_status(zx::Status::CANCELED).unwrap();
+
+        vcpu_controller.send_status(zx::Status::CANCELED).unwrap();
         assert_eq!(Ok(()), join_handle.join().expect("Failed to join vcpu thread."));
     }
 
     #[fuchsia::test]
     async fn test_vcpu_threads_are_named_correctly() {
-        let hypervisor = MockHypervisor::new();
-        let (guest, _address_space) = hypervisor.guest_create().unwrap();
-        let guest = Arc::new(guest);
-        let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
+        let test = TestFixture::new();
 
         // Start several vcpus.
         let mut vcpus = Vec::new();
         for vcpu_id in 0..4 {
-            let mut vcpu =
-                Vcpu::new(hypervisor.clone(), guest.clone(), devices.clone(), vcpu_id, 0, 0);
-            assert_eq!(vcpu.start().await, zx::Status::OK);
-            vcpus.push(vcpu);
+            vcpus.push(test.create_and_start_vcpu(vcpu_id, 0, 0).await);
         }
 
-        let vcpu_controllers = guest.vcpus();
-        assert_eq!(vcpu_controllers.len(), vcpus.len());
         for vcpu_id in 0..4 {
             let thread_name =
-                vcpus[vcpu_id].thread_name().expect("Unable to read vcpu thread name");
+                vcpus[vcpu_id].0.thread_name().expect("Unable to read vcpu thread name");
             assert_eq!(thread_name, format!("vcpu-{}", vcpu_id));
         }
     }
 
     #[fuchsia::test]
     async fn test_vcpu_pio_write() {
-        let hypervisor = MockHypervisor::new();
-        let (guest, _address_space) = hypervisor.guest_create().unwrap();
-        let guest = Arc::new(guest);
+        let test = TestFixture::new();
 
         // Create a test device on the PIO bus.
-        let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
         let ram_device = Arc::new(Mutex::new(MemoryDevice::ram_bytes(100)));
-        devices
+        test.devices
             .register_pio(PioRange::new(PioAddress(0x1000), 100).unwrap(), ram_device.clone())
             .unwrap();
 
         // Create and start a vcpu.
-        let mut vcpu = Vcpu::new(hypervisor.clone(), guest.clone(), devices, 0, 0, 0);
-        assert_eq!(vcpu.start().await, zx::Status::OK);
+        let (_vcpu, vcpu_controller) = test.create_and_start_vcpu(0, 0, 0).await;
 
         // Simulate an IO trap by sending a port packet to the vcpu.
-        let vcpus = guest.vcpus();
-        assert_eq!(vcpus.len(), 1);
         let io_packet = zx::GuestIoPacket::from_raw(zx::sys::zx_packet_guest_io_t {
             port: 0x1000,
             access_size: 1,
             input: false,
             data: [0xab, 0xcd, 0xef, 0x12],
         });
-        vcpus[0]
+        vcpu_controller
             .send_packet(zx::Packet::from_guest_io_packet(0, zx::sys::ZX_OK, io_packet))
             .unwrap();
 
         // Once the vcpu has called vcpu_enter for the second time we know it should have handled
         // the trap.
-        vcpus[0].entry_counter().wait_for_count(2);
+        vcpu_controller.entry_counter().wait_for_count(2);
         // Expect the first byte to be written but not the others.
         assert_eq!(ram_device.lock().unwrap().as_slice()[0], 0xab);
         assert_eq!(ram_device.lock().unwrap().as_slice()[1], 0x00);
@@ -416,37 +453,25 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_vcpu_pio_write_unmapped_address() {
-        let hypervisor = MockHypervisor::new();
-        let (guest, _address_space) = hypervisor.guest_create().unwrap();
-        let guest = Arc::new(guest);
+        let test = TestFixture::new();
 
         // Create and start a vcpu.
-        let mut vcpu = Vcpu::new(
-            hypervisor.clone(),
-            guest.clone(),
-            DeviceManager::new(hypervisor.clone(), guest.clone()),
-            0,
-            0,
-            0,
-        );
-        assert_eq!(vcpu.start().await, zx::Status::OK);
+        let (mut vcpu, vcpu_controller) = test.create_and_start_vcpu(0, 0, 0).await;
 
         // Send an IO trap to an address with no device mapping.
-        let vcpus = guest.vcpus();
-        assert_eq!(vcpus.len(), 1);
         let io_packet = zx::GuestIoPacket::from_raw(zx::sys::zx_packet_guest_io_t {
             port: 0x1000,
             access_size: 1,
             input: false,
             data: [0, 0, 0, 0],
         });
-        vcpus[0]
+        vcpu_controller
             .send_packet(zx::Packet::from_guest_io_packet(0, zx::sys::ZX_OK, io_packet))
             .unwrap();
 
         // Expect the vcpu to exit in response to the unhandled trap.
         let join_handle = vcpu.take_join_handle().expect("Failed to obtain vcpu JoinHandle");
         assert_eq!(join_handle.join().unwrap(), Err(zx::Status::NOT_FOUND));
-        assert_eq!(vcpus[0].entry_counter().get_count(), 1);
+        assert_eq!(vcpu_controller.entry_counter().get_count(), 1);
     }
 }
