@@ -1095,6 +1095,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         id: ListenerId<I>,
         reuse: bool,
     ) -> Result<(), SetReuseAddrError>;
+    fn reuseaddr(&self, id: SocketId<I>) -> bool;
 }
 
 impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
@@ -1814,6 +1815,46 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
     ) -> Result<(), SetReuseAddrError> {
         set_reuseaddr_maybe_listener(true, self, id.into(), reuse)
     }
+
+    fn reuseaddr(&self, id: SocketId<I>) -> bool {
+        get_reuseaddr(self, id.into())
+    }
+}
+
+fn get_reuseaddr<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
+    sync_ctx: &SC,
+    id: SocketId<I>,
+) -> bool {
+    sync_ctx.with_tcp_sockets(|sockets| {
+        let Sockets { port_alloc: _, inactive, socketmap } = sockets;
+        let maybe_listener_id = match id {
+            SocketId::Unbound(id) => {
+                let Unbound { sharing, bound_device: _, buffer_sizes: _, socket_options: _ } =
+                    inactive.get(id.into()).expect("invalid socket ID");
+                return match sharing {
+                    SharingState::Exclusive => false,
+                    SharingState::ReuseAddress => true,
+                };
+            }
+            SocketId::Bound(id) => id.into(),
+            SocketId::Listener(id) => id.into(),
+            SocketId::Connection(id) => {
+                let (_, sharing, _): (&Connection<_, _, _, _, _, _>, _, &ConnAddr<_, _, _, _>) =
+                    id.get_from_socketmap(socketmap);
+                return match sharing {
+                    SharingState::Exclusive => false,
+                    SharingState::ReuseAddress => true,
+                };
+            }
+        };
+        let (_, sharing, _): &(MaybeListener<_, _>, _, ListenerAddr<_, _, _>) =
+            socketmap.listeners().get_by_id(&maybe_listener_id).expect("invalid socket ID");
+        let ListenerSharingState { sharing, listening: _ } = sharing;
+        return match sharing {
+            SharingState::Exclusive => false,
+            SharingState::ReuseAddress => true,
+        };
+    })
 }
 
 fn set_reuseaddr_maybe_listener<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
@@ -2396,6 +2437,20 @@ where
         |(IpInvariant((sync_ctx, reuse)), id)| {
             SocketHandler::set_reuseaddr_listener(sync_ctx, id, reuse)
         },
+    )
+}
+
+/// Gets the POSIX SO_REUSEADDR socket option on a socket.
+pub fn reuseaddr<I, C>(mut sync_ctx: &SyncCtx<C>, id: impl Into<SocketId<I>>) -> bool
+where
+    I: IpExt,
+    C: crate::NonSyncContext,
+{
+    let id = id.into();
+    I::map_ip(
+        (IpInvariant(&mut sync_ctx), id),
+        |(IpInvariant(sync_ctx), id)| SocketHandler::reuseaddr(sync_ctx, id),
+        |(IpInvariant(sync_ctx), id)| SocketHandler::reuseaddr(sync_ctx, id),
     )
 }
 

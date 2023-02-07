@@ -39,7 +39,7 @@ use netstack3_core::{
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
-            remove_unbound, send_buffer_size, set_bound_device, set_connection_device,
+            remove_unbound, reuseaddr, send_buffer_size, set_bound_device, set_connection_device,
             set_listener_device, set_reuseaddr_bound, set_reuseaddr_listener,
             set_reuseaddr_unbound, set_send_buffer_size, set_unbound_device, shutdown_conn,
             shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError, BoundId,
@@ -921,6 +921,17 @@ where
         }
     }
 
+    async fn reuse_address(&self) -> bool {
+        let mut guard = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut *guard;
+        match self.id {
+            SocketId::Unbound(id, _) => reuseaddr(sync_ctx, id),
+            SocketId::Bound(id, _) => reuseaddr(sync_ctx, id),
+            SocketId::Listener(id) => reuseaddr(sync_ctx, id),
+            SocketId::Connection(id, _) => reuseaddr(sync_ctx, id),
+        }
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -984,7 +995,7 @@ where
                 responder_send!(responder, &mut self.set_reuse_address(value).await);
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, &mut Ok(self.reuse_address().await));
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
                 // TODO(https://fxbug.dev/103982): Retrieve the error.
