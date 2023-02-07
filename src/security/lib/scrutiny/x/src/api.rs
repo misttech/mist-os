@@ -229,39 +229,101 @@ pub trait DataSource: Debug {
 
 impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePath> {
     fn eq(&self, other: &dyn DataSource<SourcePath = SourcePath>) -> bool {
-        if self.kind() != other.kind() || self.version() != other.version() {
+        // Cope with boxed type returned by `data_source.parent()` using anscestor variables.
+        let mut a_anscestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
+        let mut b_anscestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
+
+        // Move `a` and `b` up to the root of the data source tree.
+        loop {
+            // Inspect either latest anscestor or initial values.
+            let a: &dyn DataSource<SourcePath = SourcePath> = match a_anscestor.as_ref() {
+                Some(a) => a.as_ref(),
+                None => self,
+            };
+            let b: &dyn DataSource<SourcePath = SourcePath> = match b_anscestor.as_ref() {
+                Some(b) => b.as_ref(),
+                None => other,
+            };
+
+            // Move up anscestor tree, return early, or break at root of tree.
+            match (a.parent(), b.parent()) {
+                (Some(a_parent), Some(b_parent)) => {
+                    a_anscestor = Some(a_parent);
+                    b_anscestor = Some(b_parent);
+                }
+                (None, Some(_)) | (Some(_), None) => {
+                    return false;
+                }
+                (None, None) => {
+                    break;
+                }
+            }
+        }
+
+        // Directly (shallow) compare root before working entirely in terms of boxed descendants.
+        let a = match a_anscestor.as_ref() {
+            Some(a) => a.as_ref(),
+            None => self,
+        };
+        let b = match b_anscestor.as_ref() {
+            Some(b) => b.as_ref(),
+            None => other,
+        };
+        if a.kind() != b.kind() || a.version() != b.version() {
             return false;
         }
-
-        match (self.parent(), other.parent()) {
-            (Some(p1), Some(p2)) => {
-                return p1 == p2;
-            }
+        match (a.path(), b.path()) {
             (None, Some(_)) | (Some(_), None) => return false,
             (None, None) => {}
-        }
-
-        match (self.path(), other.path()) {
-            (None, Some(_)) | (Some(_), None) => return false,
-            (None, None) => {}
-            (Some(self_path), Some(other_path)) => {
-                if self_path.as_ref() != other_path.as_ref() {
+            (Some(a_path), Some(b_path)) => {
+                if a_path.as_ref() != b_path.as_ref() {
                     return false;
                 }
             }
         }
 
-        let mut self_children = self.children();
-        let mut other_children = other.children();
+        // Compare a queues of boxed descendants of `a` and `b`.
+        let mut a_descendants: Vec<_> = a.children().collect();
+        let mut a_idx = 0;
+        let mut b_descendants: Vec<_> = b.children().collect();
+        let mut b_idx = 0;
         loop {
-            let self_current_child = self_children.next();
-            let other_current_child = other_children.next();
-            if self_current_child != other_current_child {
-                return false;
-            }
-            if self_current_child == None {
+            // Break end-of-queues (i.e., no more descendants to compare).
+            if a_idx >= a_descendants.len() {
                 break;
             }
+            if b_idx >= b_descendants.len() {
+                break;
+            }
+
+            // Directly compare current descendants.
+            let a = &a_descendants[a_idx];
+            let b = &b_descendants[b_idx];
+            if a.kind() != b.kind() || a.version() != b.version() {
+                return false;
+            }
+            match (a.path(), b.path()) {
+                (None, Some(_)) | (Some(_), None) => return false,
+                (None, None) => {}
+                (Some(a_path), Some(b_path)) => {
+                    if a_path.as_ref() != b_path.as_ref() {
+                        return false;
+                    }
+                }
+            }
+
+            // Add children of current descendant to queues.
+            a_descendants.extend(a.children());
+            b_descendants.extend(b.children());
+
+            // Exit early if descendant counts don't match.
+            if a_descendants.len() != b_descendants.len() {
+                return false;
+            }
+
+            // Advance to next items in parallel queues.
+            a_idx += 1;
+            b_idx += 1;
         }
 
         true
@@ -270,11 +332,13 @@ impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePa
 
 /// Kinds of artifacts that may constitute a source of truth for a [`Scrutiny`] instance reasoning
 /// about a built Fuchsia system.
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataSourceKind {
     /// A product bundle directory that contains various artifacts at known paths within the
     /// directory.
     ProductBundle,
+    /// A TUF repository containing metadata and blobs.
+    TUFRepository,
     /// A blobfs archive (typically named "blob.blk" in Fuchsia builds). For details about blobfs
     /// itself, see https://fuchsia.dev/fuchsia-src/concepts/filesystems/blobfs.
     BlobfsArchive,
@@ -300,7 +364,7 @@ pub enum DataSourceKind {
 
 /// A version identifier associated with an artifact or unit of software used to interpret
 /// artifacts.
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataSourceVersion {
     /// Either no version information is available, or the information was malformed.
     Unknown,
@@ -772,4 +836,428 @@ pub trait ComponentInstanceCapability {
             >,
         >,
     >;
+}
+
+mod tests {
+    use super::DataSource;
+    use super::DataSourceKind;
+    use super::DataSourceVersion;
+    use std::cell::RefCell;
+    use std::fmt::Debug;
+    use std::marker::PhantomData;
+    use std::path::Path;
+    use std::rc::Rc;
+    use std::rc::Weak;
+
+    trait MutableDataSource: DataSource
+    where
+        Self::SourcePath: AsRef<Path> + Debug,
+    {
+        fn add_child(&mut self, child: SharedDataSource<Self::SourcePath>);
+    }
+
+    #[derive(Clone, Debug)]
+    struct SharedDataSource<SourcePath: AsRef<Path> + Debug>(
+        Rc<RefCell<dyn MutableDataSource<SourcePath = SourcePath>>>,
+        PhantomData<SourcePath>,
+    );
+
+    impl<SourcePath: AsRef<Path> + Debug> SharedDataSource<SourcePath> {
+        fn new<MDS: MutableDataSource<SourcePath = SourcePath> + 'static>(
+            data_source: MDS,
+        ) -> Self {
+            let data_source: Rc<RefCell<dyn MutableDataSource<SourcePath = SourcePath>>> =
+                Rc::new(RefCell::new(data_source));
+            Self(data_source, PhantomData)
+        }
+
+        fn from_raw(
+            data_source: Rc<RefCell<dyn MutableDataSource<SourcePath = SourcePath>>>,
+        ) -> Self {
+            Self(data_source, PhantomData)
+        }
+
+        fn downgrade(self) -> ParentDataSource<SourcePath> {
+            ParentDataSource::from_raw(Rc::downgrade(&self.0))
+        }
+    }
+
+    impl<SourcePath: AsRef<Path> + Debug> DataSource for SharedDataSource<SourcePath> {
+        type SourcePath = SourcePath;
+
+        fn kind(&self) -> DataSourceKind {
+            self.0.borrow().kind()
+        }
+
+        fn parent(&self) -> Option<Box<dyn DataSource<SourcePath = Self::SourcePath>>> {
+            self.0.borrow().parent()
+        }
+
+        fn children(
+            &self,
+        ) -> Box<dyn Iterator<Item = Box<dyn DataSource<SourcePath = Self::SourcePath>>>> {
+            self.0.borrow().children()
+        }
+
+        fn path(&self) -> Option<Self::SourcePath> {
+            self.0.borrow().path()
+        }
+
+        fn version(&self) -> DataSourceVersion {
+            self.0.borrow().version()
+        }
+    }
+
+    impl<SourcePath: AsRef<Path> + Debug> MutableDataSource for SharedDataSource<SourcePath> {
+        fn add_child(&mut self, child: SharedDataSource<Self::SourcePath>) {
+            self.0.borrow_mut().add_child(child);
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct ParentDataSource<SourcePath: AsRef<Path> + Debug>(
+        Weak<RefCell<dyn MutableDataSource<SourcePath = SourcePath>>>,
+        PhantomData<SourcePath>,
+    );
+
+    impl<SourcePath: AsRef<Path> + Debug> ParentDataSource<SourcePath> {
+        fn from_raw(
+            data_source: Weak<RefCell<dyn MutableDataSource<SourcePath = SourcePath>>>,
+        ) -> Self {
+            Self(data_source, PhantomData)
+        }
+
+        fn upgrade(self) -> Option<SharedDataSource<SourcePath>> {
+            self.0.upgrade().map(SharedDataSource::from_raw)
+        }
+    }
+
+    #[derive(Debug)]
+    struct DataSourceRoot {
+        kind: DataSourceKind,
+        version: DataSourceVersion,
+        path: Option<&'static str>,
+        children: Vec<SharedDataSource<&'static str>>,
+    }
+
+    impl DataSourceRoot {
+        fn new(
+            kind: DataSourceKind,
+            version: DataSourceVersion,
+            path: Option<&'static str>,
+        ) -> SharedDataSource<&'static str> {
+            SharedDataSource::<&'static str>::new(Self { kind, version, path, children: vec![] })
+        }
+    }
+
+    impl DataSource for DataSourceRoot {
+        type SourcePath = &'static str;
+
+        fn kind(&self) -> DataSourceKind {
+            self.kind.clone()
+        }
+
+        fn parent(&self) -> Option<Box<dyn DataSource<SourcePath = Self::SourcePath>>> {
+            None
+        }
+
+        fn children(
+            &self,
+        ) -> Box<dyn Iterator<Item = Box<dyn DataSource<SourcePath = Self::SourcePath>>>> {
+            Box::new(self.children.clone().into_iter().map(|child| {
+                let child: Box<dyn DataSource<SourcePath = Self::SourcePath>> = Box::new(child);
+                child
+            }))
+        }
+
+        fn path(&self) -> Option<Self::SourcePath> {
+            self.path.clone()
+        }
+
+        fn version(&self) -> DataSourceVersion {
+            self.version.clone()
+        }
+    }
+
+    impl MutableDataSource for DataSourceRoot {
+        fn add_child(&mut self, child: SharedDataSource<Self::SourcePath>) {
+            self.children.push(child);
+        }
+    }
+
+    #[derive(Debug)]
+    struct DataSourceChild {
+        parent: ParentDataSource<&'static str>,
+        kind: DataSourceKind,
+        version: DataSourceVersion,
+        path: Option<&'static str>,
+        children: Vec<SharedDataSource<&'static str>>,
+    }
+
+    impl DataSourceChild {
+        fn new(
+            mut parent: SharedDataSource<&'static str>,
+            kind: DataSourceKind,
+            version: DataSourceVersion,
+            path: Option<&'static str>,
+        ) -> SharedDataSource<&'static str> {
+            let data_source_child =
+                Self { parent: parent.clone().downgrade(), kind, version, path, children: vec![] };
+            let shared_data_source = SharedDataSource::<&'static str>::new(data_source_child);
+            parent.add_child(shared_data_source.clone());
+            shared_data_source
+        }
+    }
+
+    impl DataSource for DataSourceChild {
+        type SourcePath = &'static str;
+
+        fn kind(&self) -> DataSourceKind {
+            self.kind.clone()
+        }
+
+        fn parent(&self) -> Option<Box<dyn DataSource<SourcePath = Self::SourcePath>>> {
+            let parent =
+                self.parent.clone().upgrade().expect("DataSourceChild's parent not dropped");
+            let parent: Box<dyn DataSource<SourcePath = Self::SourcePath>> = Box::new(parent);
+            Some(parent)
+        }
+
+        fn children(
+            &self,
+        ) -> Box<dyn Iterator<Item = Box<dyn DataSource<SourcePath = Self::SourcePath>>>> {
+            Box::new(self.children.clone().into_iter().map(|child| {
+                let child: Box<dyn DataSource<SourcePath = Self::SourcePath>> = Box::new(child);
+                child
+            }))
+        }
+
+        fn path(&self) -> Option<Self::SourcePath> {
+            self.path.clone()
+        }
+
+        fn version(&self) -> DataSourceVersion {
+            self.version.clone()
+        }
+    }
+
+    impl MutableDataSource for DataSourceChild {
+        fn add_child(&mut self, child: SharedDataSource<Self::SourcePath>) {
+            self.children.push(child);
+        }
+    }
+
+    #[fuchsia::test]
+    fn test_data_source_eq() {
+        fn expect(
+            a: Box<dyn DataSource<SourcePath = &'static str>>,
+            b: Box<dyn DataSource<SourcePath = &'static str>>,
+            eq: bool,
+        ) {
+            if eq {
+                assert_eq!(&a, &b);
+            } else {
+                assert_ne!(&a, &b);
+            }
+
+            let mut a_children = a.children();
+            let mut b_children = b.children();
+            loop {
+                match (a_children.next(), b_children.next()) {
+                    (Some(a_child), Some(b_child)) => expect(a_child, b_child, eq),
+                    _ => break,
+                }
+            }
+        }
+
+        fn reference_tree() -> SharedDataSource<&'static str> {
+            let root = DataSourceRoot::new(
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::FvmVolume,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            let _grandchild_1 = DataSourceChild::new(
+                child_1.clone(),
+                DataSourceKind::BlobDirectory,
+                DataSourceVersion::Unknown,
+                Some("/pb/test.fuchsia.com/blobs"),
+            );
+            root
+        }
+
+        fn diff_child2_kind_tree() -> SharedDataSource<&'static str> {
+            let root = DataSourceRoot::new(
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                // Divergence: FVM misclassified as blobfs volume.
+                DataSourceKind::BlobfsArchive,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            let _grandchild_1 = DataSourceChild::new(
+                child_1.clone(),
+                DataSourceKind::BlobDirectory,
+                DataSourceVersion::Unknown,
+                Some("/pb/test.fuchsia.com/blobs"),
+            );
+            root
+        }
+
+        fn diff_repo_blobs_path_tree() -> SharedDataSource<&'static str> {
+            let root = DataSourceRoot::new(
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::FvmVolume,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            let _grandchild_1 = DataSourceChild::new(
+                child_1.clone(),
+                DataSourceKind::BlobDirectory,
+                DataSourceVersion::Unknown,
+                // Divergence: Different path to repository blobs.
+                Some("/pb/test.fuchsia.com/test_blobs"),
+            );
+            root
+        }
+
+        fn diff_missing_grandchild_tree() -> SharedDataSource<&'static str> {
+            let root = DataSourceRoot::new(
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let _child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::FvmVolume,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            // Divergence: No grandchild under repository.
+            root
+        }
+
+        fn diff_extra_root_tree() -> SharedDataSource<&'static str> {
+            // Divergence: `reference_tree()` is a subtree under an additional root node.
+            let extra_root =
+                DataSourceRoot::new(DataSourceKind::Unknown, DataSourceVersion::Unknown, None);
+            let root = DataSourceChild::new(
+                extra_root.clone(),
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::FvmVolume,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            let _grandchild_1 = DataSourceChild::new(
+                child_1.clone(),
+                DataSourceKind::BlobDirectory,
+                DataSourceVersion::Unknown,
+                Some("/pb/test.fuchsia.com/blobs"),
+            );
+            extra_root
+        }
+
+        fn diff_extra_descendant_tree() -> SharedDataSource<&'static str> {
+            let root = DataSourceRoot::new(
+                DataSourceKind::ProductBundle,
+                DataSourceVersion::Unknown,
+                Some("/pb"),
+            );
+            let child_1 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::TUFRepository,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            let _child_2 = DataSourceChild::new(
+                root.clone(),
+                DataSourceKind::FvmVolume,
+                DataSourceVersion::Unknown,
+                Some("/pb/fvm.blk"),
+            );
+            let grandchild_1 = DataSourceChild::new(
+                child_1.clone(),
+                DataSourceKind::BlobDirectory,
+                DataSourceVersion::Unknown,
+                Some("/pb/test.fuchsia.com/blobs"),
+            );
+            // Divergence: `grandchild_1` has a child.
+            let _great_grandchild_1 = DataSourceChild::new(
+                grandchild_1.clone(),
+                DataSourceKind::Unknown,
+                DataSourceVersion::Unknown,
+                None,
+            );
+            root
+        }
+
+        expect(Box::new(reference_tree()), Box::new(reference_tree()), true);
+        expect(Box::new(reference_tree()), Box::new(diff_child2_kind_tree()), false);
+        expect(Box::new(reference_tree()), Box::new(diff_repo_blobs_path_tree()), false);
+        expect(Box::new(reference_tree()), Box::new(diff_missing_grandchild_tree()), false);
+        expect(Box::new(reference_tree()), Box::new(diff_extra_descendant_tree()), false);
+
+        // The subtree rooted in the first (and only) child of `diff_extra_root_tree` is identical
+        // to `reference_tree`, but should not be treated as equal due to the additional parent
+        // above.
+        let reference: Box<dyn DataSource<SourcePath = &'static str>> = Box::new(reference_tree());
+        let extra_root = diff_extra_root_tree();
+        let almost_same_as_reference = extra_root.children().next().unwrap();
+
+        // Sanity check: Shallowly compare `reference` and `almost_same_as_reference`.
+        assert_eq!(reference.kind(), almost_same_as_reference.kind());
+        assert_eq!(reference.version(), almost_same_as_reference.version());
+        assert_eq!(reference.path().unwrap(), almost_same_as_reference.path().unwrap());
+
+        expect(reference, almost_same_as_reference, false);
+    }
 }
