@@ -114,15 +114,6 @@ func NewFfxInstance(
 		return nil, fmt.Errorf("wrapperFfxInstance.SetLogLevel(%q) = %w", ffxutil.Warn, err)
 	}
 
-	if err := wrapperFfxInstance.ConfigSet(ctx, "overnet.cso", "disabled"); err != nil {
-		return nil, fmt.Errorf(
-			"wrapperFfxInstance.ConfigSet(%q, %q) = %w",
-			"overnet.cso",
-			"disabled",
-			err,
-		)
-	}
-
 	fmt.Printf("====== Choosing FFX target: %s ======\n", options.Target)
 	return &wrapperFfxInstance, nil
 }
