@@ -25,7 +25,8 @@ fn list(cmd: ListCommand, global_symbol_index_path: &str) -> Result<()> {
     } else {
         SymbolIndex::load(global_symbol_index_path)?
     };
-    Ok(println!("{:#?}", &index))
+    serde_json::to_writer_pretty(std::io::stdout(), &index)?;
+    Ok(println!())
 }
 
 fn add(cmd: AddCommand, global_symbol_index_path: &str) -> Result<()> {
