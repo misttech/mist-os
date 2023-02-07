@@ -6,10 +6,10 @@
 
 #include <fuchsia/hardware/clock/cpp/banjo-mock.h>
 #include <fuchsia/hardware/power/cpp/banjo-mock.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev.h>
-#include <lib/fake_ddk/fake_ddk.h>
-#include <lib/fake_ddk/fidl-helper.h>
 
 #include <memory>
 #include <vector>
@@ -21,6 +21,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_cpu {
 
@@ -85,29 +86,6 @@ class FakeMmio {
 
   std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
-};
-
-class Bind : public fake_ddk::Bind {
- public:
-  Bind() : fake_ddk::Bind() {}
-
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    if (parent != fake_ddk::kFakeParent || !args || args->proto_id != ZX_PROTOCOL_CPU_CTRL ||
-        args->ctx == nullptr) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    devices_.push_back(std::unique_ptr<AmlCpu>(static_cast<AmlCpu*>(args->ctx)));
-    return ZX_OK;
-  }
-
-  const std::vector<std::unique_ptr<AmlCpu>>& get_devices() { return devices_; }
-
-  size_t num_devices_added() const { return devices_.size(); }
-
- private:
-  std::vector<std::unique_ptr<AmlCpu>> devices_;
 };
 
 class FakePowerDevice : public ddk::PowerProtocol<FakePowerDevice, ddk::base_protocol> {
@@ -177,39 +155,23 @@ class AmlCpuBindingTest : public zxtest::Test {
     });
     pdev_.set_mmio(0, mmio_.mmio_info());
 
-    static constexpr size_t kNumBindFragments = 5;
+    root_ = MockDevice::FakeRootParent();
+    root_->SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
 
-    fbl::Array<fake_ddk::FragmentEntry> fragments(new fake_ddk::FragmentEntry[kNumBindFragments],
-                                                  kNumBindFragments);
-    fragments[0].name = "pdev";
-    fragments[0].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_PDEV, *reinterpret_cast<const fake_ddk::Protocol*>(pdev_.proto())});
+    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    root_->AddProtocol(ZX_PROTOCOL_POWER, pwr_.proto()->ops, pwr_.proto()->ctx, "power-01");
+    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk0_.proto()->ops, clk0_.proto()->ctx,
+                       "clock-pll-div16-01");
+    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk1_.proto()->ops, clk1_.proto()->ctx,
+                       "clock-cpu-div16-01");
+    root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk2_.proto()->ops, clk2_.proto()->ctx,
+                       "clock-cpu-scaler-01");
 
-    fragments[1].name = "power-01";
-    fragments[1].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_POWER, *reinterpret_cast<const fake_ddk::Protocol*>(pwr_.proto())});
-
-    fragments[2].name = "clock-pll-div16-01";
-    fragments[2].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_CLOCK, *reinterpret_cast<const fake_ddk::Protocol*>(clk0_.proto())});
-
-    fragments[3].name = "clock-cpu-div16-01";
-    fragments[3].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_CLOCK, *reinterpret_cast<const fake_ddk::Protocol*>(clk1_.proto())});
-
-    fragments[4].name = "clock-cpu-scaler-01";
-    fragments[4].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_CLOCK, *reinterpret_cast<const fake_ddk::Protocol*>(clk2_.proto())});
-
-    ddk_.SetFragments(std::move(fragments));
-
-    ddk_.SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
+    root_->SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
   }
 
-  zx_device_t* parent() { return fake_ddk::FakeParent(); }
-
  protected:
-  Bind ddk_;
+  std::shared_ptr<MockDevice> root_;
   fake_pdev::FakePDev pdev_;
   FakeMmio mmio_;
 
@@ -220,11 +182,11 @@ class AmlCpuBindingTest : public zxtest::Test {
 };
 
 TEST_F(AmlCpuBindingTest, TrivialBinding) {
-  ddk_.SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
-                   sizeof(kOperatingPointsMetadata));
+  root_->SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
+                     sizeof(kOperatingPointsMetadata));
 
-  ASSERT_OK(AmlCpu::Create(nullptr, parent()));
-  ASSERT_EQ(ddk_.num_devices_added(), 1);
+  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_EQ(root_->child_count(), 1);
 }
 
 TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
@@ -237,16 +199,14 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
       {.freq_hz = MHZ(1), .volt_uv = 300'000, .pd_id = kPdArmA53},
   };
 
-  ddk_.SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
-                   sizeof(kOperatingPointsMetadata));
+  root_->SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
+                     sizeof(kOperatingPointsMetadata));
 
-  ASSERT_OK(AmlCpu::Create(nullptr, parent()));
-  ASSERT_EQ(ddk_.num_devices_added(), 1);
+  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_EQ(root_->child_count(), 1);
 
-  const auto& devices = ddk_.get_devices();
-  ASSERT_EQ(devices.size(), 1);
-
-  const auto& dev = devices[0];
+  MockDevice* child = root_->GetLatestChild();
+  AmlCpu* dev = child->GetDeviceContext<AmlCpu>();
 
   uint32_t out_state;
   EXPECT_OK(dev->DdkSetPerformanceState(0, &out_state));
@@ -265,17 +225,7 @@ class AmlCpuTest : public AmlCpu {
       : AmlCpu(nullptr, std::move(plldiv16), std::move(cpudiv16), std::move(cpuscaler),
                std::move(pwr), operating_points, core_count) {}
 
-  static zx_status_t MessageOp(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-    return static_cast<AmlCpuTest*>(ctx)->ddk_device_proto_.message(ctx, msg, txn);
-  }
-  zx_status_t InitTest() { return messenger_.SetMessageOp(this, AmlCpuTest::MessageOp); }
-
-  zx::channel& GetMessengerChannel() { return messenger_.local(); }
-
   zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
-
- private:
-  fake_ddk::FidlMessenger messenger_;
 };
 
 class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
@@ -285,10 +235,10 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
              ddk::ClockProtocolClient(cpu_clock_.GetProto()),
              ddk::ClockProtocolClient(scaler_clock_.GetProto()),
              ddk::PowerProtocolClient(power_.GetProto()), kTestOperatingPoints, kTestCoreCount),
+        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         operating_points_(kTestOperatingPoints) {}
 
   void SetUp() override {
-    ASSERT_OK(dut_.InitTest());
     // Notes on AmlCpu Initialization:
     //  + Should enable the CPU and PLL clocks.
     //  + Should initially assume that the device is in it's lowest performance state.
@@ -309,7 +259,11 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
 
     ASSERT_OK(dut_.Init());
 
-    cpu_client_ = CpuCtrlClient(std::move(dut_.GetMessengerChannel()));
+    auto endpoints = fidl::CreateEndpoints<fuchsia_cpuctrl::Device>();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &dut_);
+    loop_.StartThread("aml-cpu-test-thread");
+
+    cpu_client_.Bind(std::move(endpoints->client));
   }
 
  protected:
@@ -327,6 +281,8 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
 
   AmlCpuTest dut_;
   CpuCtrlClient cpu_client_;
+
+  async::Loop loop_;
 
   const std::vector<operating_point_t> operating_points_;
 };

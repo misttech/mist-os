@@ -89,7 +89,6 @@ zx_library("fake_ddk") {
     "//src/camera/drivers/controller/test/*",
     "//src/connectivity/ethernet/drivers/virtio/*",
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
-    "//src/devices/cpu/drivers/aml-cpu/*",
     "//src/devices/nand/drivers/aml-rawnand/tests/*",
     "//src/devices/nand/drivers/nand/tests/*",
     "//src/devices/nand/drivers/skip-block/*",
