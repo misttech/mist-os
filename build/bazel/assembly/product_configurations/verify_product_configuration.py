@@ -31,7 +31,8 @@ def normalize_platform(config, root_dir):
         platform["additional_serial_log_tags"] = []
 
 
-def normalize_product(config, root_dir, extra_files_read):
+def normalize_product(
+        config, root_dir, extra_files_read, config_data_to_ignore):
     if "product" not in config:
         return
 
@@ -67,7 +68,13 @@ def normalize_product(config, root_dir, extra_files_read):
                     pkg["config_data"] = []
                     continue
 
+                new_config_data = []
                 for config_data in pkg["config_data"]:
+                    pkg_name_and_destination = pkg["name"] + ":" + config_data[
+                        "destination"]
+                    if pkg_name_and_destination in config_data_to_ignore:
+                        continue
+
                     # Config data source can have different paths, but they
                     # should have consistent content, so replace them with a
                     # file hash for comparison.
@@ -76,6 +83,9 @@ def normalize_product(config, root_dir, extra_files_read):
                     config_data["package_name"] = pkg["name"]
                     config_data["source_sha1"] = file_sha1(p)
                     extra_files_read.append(p)
+                    new_config_data.append(config_data)
+
+                pkg["config_data"] = new_config_data
 
             packages[pkg_set].sort(key=lambda x: x["name"])
 
@@ -87,9 +97,9 @@ def normalize_product(config, root_dir, extra_files_read):
     return
 
 
-def normalize(config, root_dir, extra_files_read):
+def normalize(config, root_dir, extra_files_read, config_data_to_ignore):
     normalize_platform(config, root_dir)
-    normalize_product(config, root_dir, extra_files_read)
+    normalize_product(config, root_dir, extra_files_read, config_data_to_ignore)
 
 
 def main():
@@ -108,15 +118,27 @@ def main():
         help="Directory where paths in --product_config2 are relative to",
         required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
+    parser.add_argument(
+        "--config_data_to_ignore",
+        nargs='*',
+        default=[],
+        help="""List of config data entries that the verification should ignore.
+            The entries should be of the form [package_name]:[destination]""",
+        required=False)
     parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+
     args = parser.parse_args()
 
     product_config_json1 = json.load(args.product_config1)
     product_config_json2 = json.load(args.product_config2)
 
     extra_files_read = []
-    normalize(product_config_json1, args.root_dir1, extra_files_read)
-    normalize(product_config_json2, args.root_dir2, extra_files_read)
+    normalize(
+        product_config_json1, args.root_dir1, extra_files_read,
+        args.config_data_to_ignore)
+    normalize(
+        product_config_json2, args.root_dir2, extra_files_read,
+        args.config_data_to_ignore)
 
     canon1 = json.dumps(
         product_config_json1, sort_keys=True, indent=2).splitlines()

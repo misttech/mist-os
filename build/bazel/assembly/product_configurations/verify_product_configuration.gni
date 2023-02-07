@@ -26,6 +26,10 @@ import("//build/bazel/bazel_workspace.gni")
 #    The Bazel target generating the product config used in comparison.
 #    Type: string (Bazel label)
 #
+#  config_data_to_ignore (optional)
+#    List of config_data to ignore in the comparison. Each entry
+#    should be of the following form: "[package_name]:[destination path]".
+#
 #  deps
 #  testonly
 #  visibility
@@ -100,5 +104,10 @@ template("verify_product_configuration") {
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
+
+    if (defined(invoker.config_data_to_ignore)) {
+      args += [ "--config_data_to_ignore" ]
+      args += invoker.config_data_to_ignore
+    }
   }
 }

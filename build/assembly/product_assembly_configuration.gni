@@ -62,6 +62,7 @@ import("//build/group_with_inputs.gni")
 #   [scope] This is the product configuration scope
 #
 # GN Usual:
+#   deps
 #   testonly
 #   visibility
 template("product_assembly_configuration") {
