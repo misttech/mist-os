@@ -7,7 +7,6 @@ executable("usbctl") {
   deps = [
     "//sdk/banjo/fuchsia.hardware.usb.modeswitch:fuchsia.hardware.usb.modeswitch_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_c",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//src/devices/usb/lib/usb",
@@ -24,8 +23,4 @@ executable("usbctl") {
   # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
   # See linked bug for details.
   configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
