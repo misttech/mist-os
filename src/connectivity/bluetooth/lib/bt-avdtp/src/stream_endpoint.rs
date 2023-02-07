@@ -159,7 +159,7 @@ impl StreamEndpoint {
     ) -> StreamEndpoint {
         StreamEndpoint {
             id: info.id().clone(),
-            capabilities: capabilities,
+            capabilities,
             media_type: info.media_type().clone(),
             endpoint_type: info.endpoint_type().clone(),
             state: StreamState::Idle,

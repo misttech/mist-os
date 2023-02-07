@@ -346,18 +346,27 @@ impl Peer {
         async move {
             let codec_params =
                 capabilities.iter().find(|x| x.is_codec()).ok_or(avdtp::Error::InvalidState)?;
-            let local_id = {
-                let strong = PeerInner::upgrade(peer.clone())?;
-                let stream_id = strong.lock().find_compatible_local(codec_params, &remote_id)?;
-                stream_id
+            let (local_id, local_capabilities) = {
+                let peer = PeerInner::upgrade(peer.clone())?;
+                let lock = peer.lock();
+                let stream = lock.find_compatible_local(codec_params, &remote_id)?;
+                (stream.local_id().clone(), stream.capabilities().clone())
             };
 
-            trace!("Starting stream {local_id} to remote {remote_id} with {capabilities:?}");
+            let local_categories: HashSet<_> =
+                local_capabilities.iter().map(ServiceCapability::category).collect();
+            // Filter things out if they don't have a match in the local capabilities.
+            let shared_capabilities: Vec<ServiceCapability> = capabilities
+                .into_iter()
+                .filter(|cap| local_categories.contains(&cap.category()))
+                .collect();
 
-            avdtp.set_configuration(&remote_id, &local_id, &capabilities).await?;
+            trace!("Starting stream {local_id} to remote {remote_id} with {shared_capabilities:?}");
+
+            avdtp.set_configuration(&remote_id, &local_id, &shared_capabilities).await?;
             {
                 let strong = PeerInner::upgrade(peer.clone())?;
-                strong.lock().set_opening(&local_id, &remote_id, capabilities.clone())?;
+                strong.lock().set_opening(&local_id, &remote_id, shared_capabilities)?;
             }
             avdtp.open(&remote_id).await?;
 
@@ -708,20 +717,19 @@ impl PeerInner {
         avdtp.suspend(to_suspend).right_future()
     }
 
-    /// Finds a stream in the local stream set which is compatible with the codec parameters.
+    /// Finds a stream in the local stream set which is compatible with the remote_id given the codec config.
     /// Returns the local stream ID if found, or OutOfRange if one could not be found.
     pub fn find_compatible_local(
         &self,
         codec_params: &ServiceCapability,
         remote_id: &StreamEndpointId,
-    ) -> avdtp::Result<StreamEndpointId> {
+    ) -> avdtp::Result<&StreamEndpoint> {
         let config = codec_params.try_into()?;
         let our_direction = self.remote_endpoint(remote_id).map(|e| e.endpoint_type().opposite());
         self.local
             .compatible(config)
-            .filter(|s| our_direction.map(|d| &d == s.endpoint().endpoint_type()).unwrap_or(true))
-            .map(|s| s.endpoint().local_id().clone())
-            .next()
+            .find(|s| our_direction.map_or(true, |d| &d == s.endpoint().endpoint_type()))
+            .map(|s| s.endpoint())
             .ok_or(avdtp::Error::OutOfRange)
     }
 
@@ -1585,7 +1593,10 @@ mod tests {
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
-        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        match exec.run_until_stalled(&mut start_future) {
+            Poll::Pending => {}
+            x => panic!("Expected pending, but got {x:?}"),
+        };
 
         receive_simple_accept(&remote, 0x03); // Set Configuration
 
@@ -1721,6 +1732,101 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_peer_stream_start_strips_unsupported_local_capabilities() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (remote, _, _, peer) = setup_peer_test(false);
+        let remote = avdtp::Peer::new(remote);
+        let mut remote_events = remote.take_request_stream();
+
+        // Respond as if we have a single SBC Source Stream
+        fn remote_handle_request(req: avdtp::Request) {
+            let expected_stream_id: StreamEndpointId = 4_u8.try_into().unwrap();
+            let res = match req {
+                avdtp::Request::Discover { responder } => {
+                    let infos = [avdtp::StreamInformation::new(
+                        expected_stream_id,
+                        false,
+                        avdtp::MediaType::Audio,
+                        avdtp::EndpointType::Source,
+                    )];
+                    responder.send(&infos)
+                }
+                avdtp::Request::GetAllCapabilities { stream_id, responder }
+                | avdtp::Request::GetCapabilities { stream_id, responder } => {
+                    assert_eq!(expected_stream_id, stream_id);
+                    let caps = vec![
+                        ServiceCapability::MediaTransport,
+                        // We don't have a local delay-reporting, so this shouldn't be requested.
+                        ServiceCapability::DelayReporting,
+                        ServiceCapability::MediaCodec {
+                            media_type: avdtp::MediaType::Audio,
+                            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+                            codec_extra: vec![0x11, 0x45, 51, 250],
+                        },
+                    ];
+                    responder.send(&caps[..])
+                }
+                avdtp::Request::Open { responder, stream_id } => {
+                    assert_eq!(expected_stream_id, stream_id);
+                    responder.send()
+                }
+                avdtp::Request::SetConfiguration {
+                    responder,
+                    local_stream_id,
+                    remote_stream_id,
+                    capabilities,
+                } => {
+                    assert_eq!(local_stream_id, expected_stream_id);
+                    // This is the "sink" local stream id.
+                    assert_eq!(remote_stream_id, 2_u8.try_into().unwrap());
+                    // Make sure we didn't request a DelayReport since the local Sink doesn't
+                    // support it.
+                    assert!(!capabilities.contains(&ServiceCapability::DelayReporting));
+                    responder.send()
+                }
+                x => panic!("Unexpected request: {:?}", x),
+            };
+            res.expect("should be able to respond");
+        }
+
+        // Need to discover the remote streams first, or the stream start will not work.
+        let collect_capabilities_fut = peer.collect_capabilities();
+        pin_mut!(collect_capabilities_fut);
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
+
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a discovery request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a get_capabilities request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_ready());
+
+        // Try to start the stream.  It should continue to configure and connect.
+        let remote_seid = 4_u8.try_into().unwrap();
+
+        let codec_params = ServiceCapability::MediaCodec {
+            media_type: avdtp::MediaType::Audio,
+            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+            codec_extra: vec![0x11, 0x45, 51, 51],
+        };
+        let start_future =
+            peer.stream_start(remote_seid, vec![codec_params, ServiceCapability::DelayReporting]);
+        pin_mut!(start_future);
+
+        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a set_configuration request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have an open request").unwrap());
+    }
+
+    #[fuchsia::test]
     fn test_peer_stream_start_fails_wrong_direction() {
         let mut exec = fasync::TestExecutor::new();
 
@@ -1829,7 +1935,10 @@ mod tests {
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
-        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        match exec.run_until_stalled(&mut start_future) {
+            Poll::Pending => {}
+            x => panic!("was expecting pending but got {x:?}"),
+        };
 
         receive_simple_accept(&remote, 0x03); // Set Configuration
 
@@ -1839,8 +1948,7 @@ mod tests {
 
         match exec.run_until_stalled(&mut start_future) {
             Poll::Pending => {}
-            Poll::Ready(Err(e)) => panic!("Expected to be pending but error: {:?}", e),
-            Poll::Ready(Ok(_)) => panic!("Expected to be pending but finished!"),
+            Poll::Ready(x) => panic!("Expected to be pending but {x:?}"),
         };
 
         // Should connect the media channel after open.

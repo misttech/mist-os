@@ -344,9 +344,9 @@ pub struct CodecNegotiation {
 }
 
 impl CodecNegotiation {
-    /// Make a new codec negotation set using `codecs` as an ordered list "ideal" capabilities.
-    /// Capabilities earlier in the list are preferred if compatable when selecting.
-    /// When selcting endpoings, ones of `direction` are chosen over ones other directions.
+    /// Make a new codec negotiation set using `codecs` as an ordered list "ideal" capabilities.
+    /// Capabilities earlier in the list are preferred if compatible when selecting.
+    /// When selecting endpoints, ones of `direction` are chosen over ones other directions.
     /// Returns an error if any of the capabilities provided can't be negotiated, or aren't codecs.
     pub fn build(
         codecs: Vec<ServiceCapability>,
