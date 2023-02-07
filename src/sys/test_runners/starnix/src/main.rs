@@ -4,6 +4,7 @@
 
 mod gtest;
 mod helpers;
+mod results_parser;
 mod runner;
 mod test_suite;
 

@@ -4,6 +4,7 @@
 
 use {
     crate::helpers::*,
+    crate::results_parser::*,
     anyhow::{anyhow, Error},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -23,19 +24,19 @@ const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
 
 const LIST_TESTS_ARG: &str = "list_tests";
 const FILTER_ARG: &str = "filter=";
-const OUTPUT_ARG: &str = "output=json:/test_data/";
+const OUTPUT_PATH: &str = "/test_data/";
 
 pub enum TestType {
     Gtest,
     Gunit,
+    GtestXmlOutput,
     Unknown,
 }
 
 impl TestType {
     pub fn is_gtest_like(&self) -> bool {
         match self {
-            TestType::Gtest => true,
-            TestType::Gunit => true,
+            TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => true,
             _ => false,
         }
     }
@@ -50,6 +51,7 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
         Some(fdata::DictionaryValue::Str(value)) => match value.as_str() {
             "gtest" => TestType::Gtest,
             "gunit" => TestType::Gunit,
+            "gtest_xml_output" => TestType::GtestXmlOutput,
             _ => TestType::Unknown,
         },
         _ => TestType::Unknown,
@@ -67,7 +69,7 @@ pub async fn handle_case_iterator_for_gtests(
     let test_type = test_type(start_info.program.as_ref().unwrap());
     let list_tests_arg = format_arg(&test_type, LIST_TESTS_ARG)?;
     let output_file_name = unique_filename();
-    let output_path = format!("{}{}", OUTPUT_ARG, output_file_name);
+    let output_path = format!("output=json:{}{}", OUTPUT_PATH, output_file_name);
     let output_arg = format_arg(&test_type, &output_path)?;
     replace_program_args(
         vec![list_tests_arg, output_arg],
@@ -173,8 +175,15 @@ pub async fn run_gtest_cases(
     }
 
     let output_file_name = unique_filename();
-    let output_path = format!("{}{}", OUTPUT_ARG, output_file_name);
-    let output_arg = format_arg(&test_type, &output_path)?;
+    let output_format = match test_type {
+        TestType::Gtest | TestType::Gunit => "json",
+        TestType::GtestXmlOutput => "xml",
+        TestType::Unknown => panic!("unexpected type"),
+    };
+    let output_arg = format_arg(
+        &test_type,
+        &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
+    )?;
     append_program_args(
         vec![test_filter_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
@@ -194,8 +203,7 @@ pub async fn run_gtest_cases(
         .expect("Failed to read test result file.")
         .to_string();
     read_content = read_content.trim().to_string();
-    let test_list: TestOutput =
-        serde_json::from_str(&read_content).expect("Failed to parse test results.");
+    let test_list = parse_results(test_type, &read_content)?;
 
     for suite in &test_list.testsuites {
         for test in &suite.testsuite {
@@ -231,7 +239,7 @@ pub async fn run_gtest_cases(
 
 fn format_arg(test_type: &TestType, test_arg: &str) -> Result<String, Error> {
     match test_type {
-        TestType::Gtest => Ok(format!("--gtest_{}", test_arg)),
+        TestType::Gtest | TestType::GtestXmlOutput => Ok(format!("--gtest_{}", test_arg)),
         TestType::Gunit => Ok(format!("--gunit_{}", test_arg)),
         TestType::Unknown => Err(anyhow!("Unknown test type")),
     }

@@ -38,12 +38,14 @@ rustc_binary("bin") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
+    "//third_party/rust_crates:xml-rs",
   ]
 
   sources = [
     "src/gtest.rs",
     "src/helpers.rs",
     "src/main.rs",
+    "src/results_parser.rs",
     "src/runner.rs",
     "src/test_suite.rs",
   ]

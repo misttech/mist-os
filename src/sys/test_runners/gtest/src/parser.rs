@@ -64,7 +64,7 @@ struct ListTestResult {
 }
 
 /// Provides info about test case failure if any.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct Failure {
     pub failure: String,
 }
@@ -72,7 +72,7 @@ pub struct Failure {
 /// Provides info about individual test executions.
 /// Example: For test FOO.Bar, this contains info about Bar.
 /// Please refer to documentation of `TestOutput` for details.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct IndividualTestOutput {
     pub name: String,
     pub status: IndividualTestOutputStatus,
@@ -87,9 +87,10 @@ pub struct IndividualTestOutput {
 /// Describes whether a test was run or skipped.
 ///
 /// Refer to [`TestSuiteOutput`] documentation for schema details.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum IndividualTestOutputStatus {
+    #[default]
     Run,
     NotRun,
 }
@@ -97,7 +98,7 @@ pub enum IndividualTestOutputStatus {
 /// Provides info about individual test suites.
 /// Refer to [gtest documentation] for output structure.
 /// [gtest documentation]: https://github.com/google/googletest/blob/2002f267f05be6f41a3d458954414ba2bfa3ff1d/googletest/docs/advanced.md#generating-a-json-report
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TestSuiteOutput {
     pub name: String,
     pub tests: usize,
@@ -110,7 +111,7 @@ pub struct TestSuiteOutput {
 /// Provides info test and the its run result.
 /// Example: For test FOO.Bar, this contains info about FOO.
 /// Please refer to documentation of `TestSuiteOutput` for details.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TestOutput {
     pub testsuites: Vec<TestSuiteOutput>,
 }
