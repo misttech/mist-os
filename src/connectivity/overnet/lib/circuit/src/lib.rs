@@ -242,6 +242,16 @@ impl Node {
         Ok(())
     }
 
+    /// Test function to copy all routes toward one node as routes to another node.
+    #[cfg(test)]
+    pub async fn route_via(&self, to: &str, via: &str) {
+        let to = EncodableString::try_from(to.to_owned()).unwrap();
+        let via = EncodableString::try_from(via.to_owned()).unwrap();
+        let mut peers = self.peers.lock().await;
+        let new_list = peers.peers.get(&via).unwrap().clone();
+        peers.peers.insert(to, new_list);
+    }
+
     /// Connect to another node.
     ///
     /// This establishes the internal state to link this node directly to another one, there by
@@ -282,7 +292,8 @@ impl Node {
         let protocol = self.protocol.clone();
         let (new_stream_receiver_sender, new_stream_receiver_receiver) = oneshot::channel();
         let (control_reader_sender, control_reader_receiver) = oneshot::channel();
-        let new_streams_loop = self.handle_new_streams(new_stream_receiver_receiver);
+        let new_streams_loop =
+            self.handle_new_streams(new_stream_receiver_receiver, new_stream_sender.clone());
         let control_stream_loop =
             self.handle_control_stream(control_reader_receiver, new_stream_sender.clone(), quality);
 
@@ -420,8 +431,12 @@ impl Node {
 
     /// Handles requests for new streams. The `new_stream_receiver` provides a reader and writer for
     /// every stream that gets established to or through this node, as well as a `Result` sender so
-    /// we can indicate if we have any trouble handling this stream. We read a bit of protocol
-    /// header from each incoming stream and either accept it or forward it to another peer.
+    /// we can indicate if we have any trouble handling this stream. The `new_stream_sender` allows
+    /// us to connect back to the connecting node. If we don't have routing info for the incoming
+    /// node we will establish a new route via that stream when the connection arrives.
+    ///
+    /// For each incoming stream, we read a bit of protocol header out of it and either accept it or
+    /// forward it to another peer.
     ///
     /// The returned future will poll until the back end hangs up the other end of the receiver.
     fn handle_new_streams(
@@ -429,10 +444,13 @@ impl Node {
         new_stream_receiver_receiver: oneshot::Receiver<
             UnboundedReceiver<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
         >,
+        new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
     ) -> impl Future<Output = ()> {
         let peers = Arc::clone(&self.peers);
         let incoming_stream_sender = self.incoming_stream_sender.clone();
+        let new_peer_sender = self.new_peer_sender.clone();
         let node_id = self.node_id.clone();
+
         async move {
             let mut new_stream_receiver = if let Ok(x) = new_stream_receiver_receiver.await {
                 x
@@ -467,6 +485,18 @@ impl Node {
                             connect_to_peer(Arc::clone(&peers), reader, writer, &dest).await?;
                         } else {
                             let src = reader.read_protocol_message::<EncodableString>().await?;
+                            {
+                                let mut peers = peers.lock().await;
+                                let peer_list =
+                                    peers.peers.entry(src.clone()).or_insert_with(Vec::new);
+                                if !peer_list.iter().any(|x| x.0.same_receiver(&new_stream_sender))
+                                {
+                                    peer_list.push((new_stream_sender.clone(), Quality::UNKNOWN));
+                                    let _ = new_peer_sender.unbounded_send(src.to_string());
+                                    peers.increment_generation();
+                                }
+                            }
+
                             incoming_stream_sender
                                 .unbounded_send((reader, writer, src.to_string()))
                                 .map_err(|_| Error::ConnectionClosed)?;

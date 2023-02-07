@@ -157,6 +157,8 @@ impl Quality {
     pub const NETWORK: Quality = Quality(20);
     /// Worst quality value.
     pub const WORST: Quality = Quality(u8::MAX - 1);
+    /// Unknonwn quality value.
+    pub const UNKNOWN: Quality = Quality::WORST;
 
     /// Add two quality values together. If we are routing a stream across two links, we can add the
     /// quality of those links to get the quality of the combined link the stream is on.

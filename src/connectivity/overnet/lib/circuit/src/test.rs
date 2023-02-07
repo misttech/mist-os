@@ -317,6 +317,94 @@ async fn connection_test_with_router() {
 }
 
 #[fuchsia::test]
+async fn connection_test_with_injected_route() {
+    let (new_peer_sender_a, new_peers_a) = unbounded();
+    let (new_peer_sender_b, new_peers_b) = unbounded();
+    let (incoming_streams_sender_a, streams_a) = unbounded();
+    let (incoming_streams_sender_b, streams_b) = unbounded();
+    let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
+    let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
+    let (new_peer_sender_router, mut new_peers_router) = unbounded();
+    let (incoming_streams_sender_router, _streams_router) = unbounded();
+    let router =
+        Node::new("router", "test", new_peer_sender_router, incoming_streams_sender_router)
+            .unwrap();
+
+    let _conn_a = fasync::Task::spawn(connect_nodes(&a, &router).await);
+    let _conn_b = fasync::Task::spawn(connect_nodes(&b, &router).await);
+
+    let new_peer_1 = new_peers_router.next().await.unwrap();
+    let new_peer_2 = new_peers_router.next().await.unwrap();
+    assert!([new_peer_1.as_str(), new_peer_2.as_str()].contains(&"a"));
+    assert!([new_peer_1.as_str(), new_peer_2.as_str()].contains(&"b"));
+
+    let a_task = async move {
+        let mut new_peers = new_peers_a;
+        let new_peer = new_peers.next().await.unwrap();
+        assert_eq!("router", &new_peer);
+
+        a.route_via("b", "router").await;
+
+        let (_reader, peer_writer) = stream::stream();
+        let (peer_reader, writer) = stream::stream();
+        a.connect_to_peer(peer_reader, peer_writer, "b").await.unwrap();
+
+        writer
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+
+        let mut streams = streams_a;
+        let (reader, _writer, from) = streams.next().await.unwrap();
+        assert_eq!("b", &from);
+
+        reader
+            .read(8, |buf| {
+                assert_eq!(&[9, 10, 11, 12, 13, 14, 15, 16], &buf);
+                Ok(((), 8))
+            })
+            .await
+            .unwrap();
+    };
+
+    let b_task = async move {
+        let mut new_peers = new_peers_b;
+        let new_peer = new_peers.next().await.unwrap();
+        assert_eq!("router", &new_peer);
+
+        let mut streams = streams_b;
+        let (reader, _writer, from) = streams.next().await.unwrap();
+        assert_eq!("a", &from);
+
+        reader
+            .read(8, |buf| {
+                assert_eq!(&[1, 2, 3, 4, 5, 6, 7, 8], &buf);
+                Ok(((), 8))
+            })
+            .await
+            .unwrap();
+
+        let (_reader, peer_writer) = stream::stream();
+        let (peer_reader, writer) = stream::stream();
+        b.connect_to_peer(peer_reader, peer_writer, "a").await.unwrap();
+
+        writer
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[9, 10, 11, 12, 13, 14, 15, 16]);
+                Ok(8)
+            })
+            .unwrap();
+    };
+
+    futures::pin_mut!(a_task);
+    futures::pin_mut!(b_task);
+
+    futures::future::join(a_task, b_task).await;
+}
+
+#[fuchsia::test]
 async fn connection_node_test() {
     let (new_peer_sender_a, mut new_peers) = unbounded();
     let (new_peer_sender_b, _new_peers_b) = unbounded();
