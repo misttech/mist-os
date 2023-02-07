@@ -63,8 +63,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/performance/ktrace_provider:bin",
     "//src/power/thermd:bin",
     "//src/sys/early_boot_instrumentation:coverage-source",
-    "//src/virtualization/bin/vmm/device:block",
-    "//src/virtualization/bin/vmm/device/virtio_magma:magma_image",
     "//zircon/kernel/lib/userabi/userboot/*",
     "//zircon/system/ulib/c/sanitizers",
     "//zircon/system/ulib/image-format",
