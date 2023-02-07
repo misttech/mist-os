@@ -54,8 +54,10 @@
             'INSPECT:core/wlanstack:root:latest_active_client_iface',
             'INSPECT:wlanstack.cmx:root/device_events',
             'INSPECT:core/wlanstack:root/device_events',
+            'INSPECT:core/wlandevicemonitor:root/device_events',
             'INSPECT:wlanstack.cmx:root/device_events:*',
             'INSPECT:core/wlanstack:root/device_events:*',
+            'INSPECT:core/wlandevicemonitor:root/device_events:*',
         ],
     },
     {
@@ -67,6 +69,9 @@
             'INSPECT:core/wlanstack:root/iface-*/last_pulse/status:status_str',
             'INSPECT:core/wlanstack:root/iface-*/last_pulse:last_link_up',
             'INSPECT:core/wlanstack:root/iface-*/last_pulse:last_updated',
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse/status:status_str',
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse:last_link_up',
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse:last_updated',
         ],
     },
     {
