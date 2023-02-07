@@ -22,7 +22,7 @@
 #include "mali_register_io.h"
 #include "msd.h"
 #include "msd_defs.h"
-#include "platform_device.h"
+#include "parent_device.h"
 #include "platform_interrupt.h"
 #include "platform_semaphore.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
@@ -59,7 +59,7 @@ class MsdArmDevice : public msd::Device,
   void set_inspect(inspect::Node node) { inspect_ = std::move(node); }
 
   bool Init(void* device_handle);
-  bool Init(std::unique_ptr<magma::PlatformDevice> platform_device,
+  bool Init(std::unique_ptr<ParentDevice> platform_device,
             std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
   std::shared_ptr<MsdArmConnection> OpenArmConnection(msd_client_id_t client_id);
@@ -303,7 +303,7 @@ class MsdArmDevice : public msd::Device,
   std::mutex schedule_mutex_;
   __TA_GUARDED(schedule_mutex_) std::vector<std::shared_ptr<MsdArmAtom>> atoms_to_schedule_;
 
-  std::unique_ptr<magma::PlatformDevice> platform_device_;
+  std::unique_ptr<ParentDevice> parent_device_;
   std::unique_ptr<mali::RegisterIo> register_io_;
   std::unique_ptr<magma::PlatformInterrupt> gpu_interrupt_;
   std::unique_ptr<magma::PlatformInterrupt> job_interrupt_;

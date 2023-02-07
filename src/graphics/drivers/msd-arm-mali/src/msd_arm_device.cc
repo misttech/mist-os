@@ -194,7 +194,7 @@ void MsdArmDevice::Destroy() {
 
 bool MsdArmDevice::Init(void* device_handle) {
   DLOG("Init");
-  auto platform_device = magma::PlatformDevice::Create(device_handle);
+  auto platform_device = ParentDevice::Create(static_cast<zx_device_t*>(device_handle));
   if (!platform_device)
     return DRETF(false, "Failed to initialize device");
   auto bus_mapper = magma::PlatformBusMapper::Create(platform_device->GetBusTransactionInitiator());
@@ -203,17 +203,17 @@ bool MsdArmDevice::Init(void* device_handle) {
   return Init(std::move(platform_device), std::move(bus_mapper));
 }
 
-bool MsdArmDevice::Init(std::unique_ptr<magma::PlatformDevice> platform_device,
+bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
                         std::unique_ptr<magma::PlatformBusMapper> bus_mapper) {
   DLOG("Init platform_device");
   zx_status_t status = loop_.StartThread("device-loop-thread");
   if (status != ZX_OK)
     return DRETF(false, "FAiled to create device loop thread");
-  platform_device_ = std::move(platform_device);
+  parent_device_ = std::move(platform_device);
   bus_mapper_ = std::move(bus_mapper);
   InitInspect();
 
-  std::unique_ptr<magma::PlatformMmio> mmio = platform_device_->CpuMapMmio(
+  std::unique_ptr<magma::PlatformMmio> mmio = parent_device_->CpuMapMmio(
       kMmioIndexRegisters, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE);
   if (!mmio)
     return DRETF(false, "failed to map registers");
@@ -233,7 +233,7 @@ bool MsdArmDevice::Init(std::unique_ptr<magma::PlatformDevice> platform_device,
 #endif
 
   arm_mali_protocol mali_proto;
-  if (platform_device_->GetProtocol(ZX_PROTOCOL_ARM_MALI, &mali_proto)) {
+  if (parent_device_->GetProtocol(ZX_PROTOCOL_ARM_MALI, &mali_proto)) {
     mali_protocol_client_ = ddk::ArmMaliProtocolClient(&mali_proto);
     DASSERT(mali_protocol_client_.is_valid());
     mali_protocol_client_.GetProperties(&mali_properties_);
@@ -445,7 +445,7 @@ int MsdArmDevice::DeviceThreadLoop() {
   DLOG("DeviceThreadLoop starting thread 0x%lx", device_thread_id_->id());
 
   const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      platform_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.device");
+      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.device");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -524,7 +524,7 @@ int MsdArmDevice::GpuInterruptThreadLoop() {
   DLOG("GPU Interrupt thread started");
 
   const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      platform_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt");
+      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -632,7 +632,7 @@ int MsdArmDevice::JobInterruptThreadLoop() {
   DLOG("Job Interrupt thread started");
 
   const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      platform_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.job-interrupt");
+      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.job-interrupt");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -800,7 +800,7 @@ int MsdArmDevice::MmuInterruptThreadLoop() {
   DLOG("MMU Interrupt thread started");
 
   const bool applied_role = magma::PlatformThreadHelper::SetRole(
-      platform_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt");
+      parent_device_->GetDeviceHandle(), "fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt");
   if (!applied_role) {
     DLOG("Failed to get higher priority!");
   }
@@ -843,15 +843,15 @@ bool MsdArmDevice::InitializeInterrupts() {
   auto clear_flags = registers::GpuIrqFlags::GetIrqClear().FromValue(0xffffffff);
   clear_flags.WriteTo(register_io_.get());
 
-  gpu_interrupt_ = platform_device_->RegisterInterrupt(kInterruptIndexGpu);
+  gpu_interrupt_ = parent_device_->RegisterInterrupt(kInterruptIndexGpu);
   if (!gpu_interrupt_)
     return DRETF(false, "failed to register GPU interrupt");
 
-  job_interrupt_ = platform_device_->RegisterInterrupt(kInterruptIndexJob);
+  job_interrupt_ = parent_device_->RegisterInterrupt(kInterruptIndexJob);
   if (!job_interrupt_)
     return DRETF(false, "failed to register JOB interrupt");
 
-  mmu_interrupt_ = platform_device_->RegisterInterrupt(kInterruptIndexMmu);
+  mmu_interrupt_ = parent_device_->RegisterInterrupt(kInterruptIndexMmu);
   if (!mmu_interrupt_)
     return DRETF(false, "failed to register MMU interrupt");
 
@@ -1580,7 +1580,7 @@ std::shared_ptr<DeviceRequest::Reply> MsdArmDevice::RunTaskOnDeviceThread(FitCal
 }
 
 void MsdArmDevice::SetCurrentThreadToDefaultPriority() {
-  magma::PlatformThreadHelper::SetRole(platform_device_->GetDeviceHandle(), "fuchsia.default");
+  magma::PlatformThreadHelper::SetRole(parent_device_->GetDeviceHandle(), "fuchsia.default");
 }
 
 MsdArmDevice::InspectEvent::InspectEvent(inspect::Node* parent, std::string type) {

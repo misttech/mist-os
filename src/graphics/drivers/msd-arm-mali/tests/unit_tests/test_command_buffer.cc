@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/platform_semaphore.h"
 #include "sys_driver_cpp/magma_driver.h"
@@ -223,11 +223,7 @@ class Test {
 
     msd_drv_->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
-    platform_device_ = TestPlatformDevice::GetInstance();
-    if (!platform_device_)
-      DLOG("TestCommandBuffer: No platform device");
-    void* device_handle = platform_device_ ? platform_device_->GetDeviceHandle() : nullptr;
-    auto msd_dev = msd_drv_->CreateDevice(device_handle);
+    auto msd_dev = msd_drv_->CreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return DRETP(nullptr, "failed to create msd device");
     auto msd_connection_t = msd_dev->Open(0);
@@ -248,7 +244,6 @@ class Test {
   }
 
   std::unique_ptr<msd::Driver> msd_drv_;
-  magma::PlatformDevice* platform_device_;
   std::shared_ptr<MagmaSystemDevice> system_dev_;
   std::unique_ptr<MagmaSystemConnection> connection_;
 };

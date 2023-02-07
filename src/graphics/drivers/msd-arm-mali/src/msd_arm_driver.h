@@ -11,6 +11,7 @@
 
 #include "magma_util/macros.h"
 #include "msd.h"
+#include "parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 
 class MsdArmDriver : public msd::Driver {
@@ -34,7 +35,7 @@ class MsdArmDriver : public msd::Driver {
   inspect::Node& root_node() { return root_node_; }
 
   std::unique_ptr<MsdArmDevice> CreateDeviceForTesting(
-      std::unique_ptr<magma::PlatformDevice> platform_device,
+      std::unique_ptr<ParentDevice> parent_device,
       std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
  private:

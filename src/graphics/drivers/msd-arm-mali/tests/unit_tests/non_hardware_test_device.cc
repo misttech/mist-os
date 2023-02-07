@@ -16,6 +16,7 @@
 #include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_driver.h"
+#include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
 namespace {
@@ -59,23 +60,13 @@ class FakePlatformInterrupt : public magma::PlatformInterrupt {
   bool signaled_ = false;
 };
 
-class FakePlatformDevice : public magma::PlatformDevice {
+class FakeParentDevice : public ParentDevice {
  public:
-  void* GetDeviceHandle() override { return nullptr; }
+  FakeParentDevice() : ParentDevice({}, {}) {}
 
-  uint32_t GetMmioCount() const override { return 1; }
+  zx_device_t* GetDeviceHandle() override { return nullptr; }
 
   bool GetProtocol(uint32_t proto_id, void* proto_out) override { return false; }
-
-  std::unique_ptr<magma::PlatformHandle> GetBusTransactionInitiator() const override {
-    return nullptr;
-  }
-
-  magma::Status LoadFirmware(const char* filename,
-                             std::unique_ptr<magma::PlatformBuffer>* firmware_out,
-                             uint64_t* size_out) const override {
-    return MAGMA_STATUS_UNIMPLEMENTED;
-  }
 
   virtual std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
       unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) override {
@@ -92,9 +83,9 @@ class FakePlatformDevice : public magma::PlatformDevice {
     return std::make_unique<FakePlatformInterrupt>();
   }
 };
-class FakePlatformDeviceWithProtocol : public FakePlatformDevice {
+class FakeParentDeviceWithProtocol : public FakeParentDevice {
  public:
-  FakePlatformDeviceWithProtocol(uint32_t proto_id, std::vector<uint8_t> metadata)
+  FakeParentDeviceWithProtocol(uint32_t proto_id, std::vector<uint8_t> metadata)
       : proto_id_(proto_id), metadata_(metadata) {}
   bool GetProtocol(uint32_t proto_id, void* proto_out) override {
     if (proto_id != proto_id_)
@@ -117,7 +108,7 @@ class TestNonHardwareMsdArmDevice {
  public:
   std::unique_ptr<MsdArmDevice> MakeTestDevice() {
     auto device = std::make_unique<MsdArmDevice>();
-    device->Init(std::make_unique<FakePlatformDevice>(), std::make_unique<MockBusMapper>());
+    device->Init(std::make_unique<FakeParentDevice>(), std::make_unique<MockBusMapper>());
     return device;
   }
 
@@ -369,7 +360,7 @@ class TestNonHardwareMsdArmDevice {
 
   void Inspect() {
     auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakePlatformDevice>(),
+    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
                                                  std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
@@ -401,7 +392,7 @@ class TestNonHardwareMsdArmDevice {
 
   void MaliProtocol() {
     auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakePlatformDevice>(),
+    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
                                                  std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
     EXPECT_FALSE(device->IsProtectedModeSupported());
@@ -413,15 +404,15 @@ class TestNonHardwareMsdArmDevice {
     std::vector<uint8_t> proto_vec(sizeof(mali_proto));
     memcpy(proto_vec.data(), &mali_proto, proto_vec.size());
 
-    device = driver->CreateDeviceForTesting(std::make_unique<FakePlatformDeviceWithProtocol>(
-                                                ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
-                                            std::make_unique<MockBusMapper>());
+    device = driver->CreateDeviceForTesting(
+        std::make_unique<FakeParentDeviceWithProtocol>(ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
+        std::make_unique<MockBusMapper>());
     EXPECT_TRUE(device->IsProtectedModeSupported());
   }
 
   void ResetOnStart() {
     auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakePlatformDevice>(),
+    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
                                                  std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
@@ -456,9 +447,9 @@ class TestNonHardwareMsdArmDevice {
     std::vector<uint8_t> proto_vec(sizeof(mali_proto));
     memcpy(proto_vec.data(), &mali_proto, proto_vec.size());
 
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakePlatformDeviceWithProtocol>(
-                                                     ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
-                                                 std::make_unique<MockBusMapper>());
+    auto device = driver->CreateDeviceForTesting(
+        std::make_unique<FakeParentDeviceWithProtocol>(ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
+        std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
     EXPECT_TRUE(device->IsProtectedModeSupported());
     EXPECT_TRUE(got_start_exit_protected_);
