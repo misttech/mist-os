@@ -1,0 +1,169 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // Netstack3 does not have complete support for multicast sockets.
+                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
+                "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
+                // Netstack3 does not support SO_REUSEADDR and only partially supports
+                // SO_REUSEPORT for UDP sockets.
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.NoReusePortFollowingReusePort/TCP",
+                // Netstack3 does not support dual-stack sockets.
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedLoopbackOnlyReservesV4/*",
+                // Netstack3 does not fully support TCP (yet).
+                "All/SocketInetLoopbackTest.TCP/*",
+                "All/SocketInetLoopbackTest.TCPInfoState/*",
+                "All/SocketInetLoopbackTest.TCPListenCloseConnectingRead/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdownConnectingRead/*",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/ListenV4Any_ConnectV4Any",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
+                // Netstack3 does not have complete support for multicast sockets.
+                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
+                "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.PortReuseTwoSockets/TCP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
+                // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
+                // backlog exactly as Linux does.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                // Netstack3 does not interpret listener backlog exactly as Linux does.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4Loopback",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Skip tests run by loopback_tcp_accept_backlog_listen_* targets
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/Listen*",
+                // Skip tests run by loopback_tcp_accept_backlog target
+                "All/SocketInetLoopbackTest.TCPBacklog/*",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/*",
+                // Skip tests run by loopback_tcp_accept target
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
+                "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
+                "All/SocketInetLoopbackTest.TCPDeferAccept/*",
+                "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
+
+                // Netstack3 does not support SO_REUSEADDR and only partially supports
+                // SO_REUSEPORT for UDP sockets.
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
+                // Netstack3 does not support dual-stack sockets.
+                "All/DualStackSocketTest.AddressOperations/*",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV4Loopback",
+                // Cases fail on TCP.
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrDoesNotReserveV4Any/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyWithListenReservesEverything/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrListenReservesV4Any/*",
+                // Skip tests that will otherwise hang forever.
+                // TODO(b/245940107): un-skip some of these when the data path is ready.
+                "All/SocketInetLoopbackTest.TCPResetAfterClose/*",
+                "All/SocketInetLoopbackTest.TCPListenClose/*",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/*",
+                // TODO(https://fxbug.dev/118516): This test sometimes times out in CI.
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+                // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
+                // backlog exactly as Linux does.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Loopback",
+                // Netstack3 does not interpret listener backlog exactly as Linux does.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any",
+            ],
+        },
+    ],
+}

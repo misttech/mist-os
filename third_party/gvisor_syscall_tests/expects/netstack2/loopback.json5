@@ -1,0 +1,51 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // https://fxbug.dev/35593
+                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
+                // https://fxbug.dev/44151
+                "All/DualStackSocketTest.AddressOperations/V4Any*",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindConnectSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindSendToConnect",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Skip tests run by loopback_tcp_accept_backlog_listen_* targets.
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/Listen*",
+                // Skip tests run by loopback_tcp_accept_backlog target.
+                "All/SocketInetLoopbackTest.TCPBacklog/*",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/*",
+                // Skip tests run by loopback_tcp_accept target.
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
+                "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
+                "All/SocketInetLoopbackTest.TCPDeferAccept/*",
+                "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
+
+                // https://fxbug.dev/112593
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+                // https://fxbug.dev/35596
+                // Deadlock? Test makes no progress even when run in isolation.
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
+                // https://fxbug.dev/35596
+                // Deadlock? Test makes no progress even when run in isolation.
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/*",
+                // https://fxbug.dev/35596
+                // Deadlock? Test makes no progress even when run in isolation.
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
+            ],
+        },
+    ],
+}
