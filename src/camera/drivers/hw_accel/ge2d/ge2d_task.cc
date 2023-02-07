@@ -4,7 +4,7 @@
 
 #include "ge2d_task.h"
 
-#include <fuchsia/sysmem/c/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
@@ -76,7 +76,8 @@ zx_status_t Ge2dTask::AllocCanvasId(const image_format_2_t* image_format, zx_han
     return status;
   }
 
-  if (image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_NV12) {
+  if (image_format->pixel_format.type !=
+      static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12)) {
     canvas_ids.canvas_idx[kUVComponent] = ScopedCanvasId();
     return ZX_OK;
   }
@@ -94,8 +95,10 @@ zx_status_t Ge2dTask::AllocCanvasId(const image_format_2_t* image_format, zx_han
 zx_status_t Ge2dTask::AllocInputCanvasIds(const buffer_collection_info_2_t* input_buffer_collection,
                                           const image_format_2_t* input_image_format,
                                           bool enable_write) {
-  if (input_image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_NV12 &&
-      input_image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_R8G8B8A8) {
+  if (input_image_format->pixel_format.type !=
+          static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12) &&
+      input_image_format->pixel_format.type !=
+          static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (((input_image_format->display_height % 2) != 0) || (input_image_format->bytes_per_row == 0)) {
@@ -135,8 +138,10 @@ zx_status_t Ge2dTask::AllocInputCanvasIds(const buffer_collection_info_2_t* inpu
 zx_status_t Ge2dTask::AllocOutputCanvasIds(
     const buffer_collection_info_2_t* output_buffer_collection,
     const image_format_2_t* output_image_format) {
-  if (output_image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_NV12 &&
-      output_image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_R8G8B8A8) {
+  if (output_image_format->pixel_format.type !=
+          static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12) &&
+      output_image_format->pixel_format.type !=
+          static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (((output_image_format->display_height % 2) != 0) ||
@@ -340,7 +345,8 @@ zx_status_t Ge2dTask::InitializeWatermarkImages(
   for (uint32_t i = 0; i < image_format_table_count; i++) {
     wm_.push_back({});
     auto& wm = wm_.back();
-    if (wm_info[i].wm_image_format.pixel_format.type != fuchsia_sysmem_PixelFormatType_R8G8B8A8) {
+    if (wm_info[i].wm_image_format.pixel_format.type !=
+        static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8)) {
       FX_LOGST(ERROR, kTag) << "Image format type not supported";
       return ZX_ERR_NOT_SUPPORTED;
     }

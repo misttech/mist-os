@@ -42,8 +42,9 @@ class Ge2dDeviceTest : public zxtest::Test {
     EXPECT_OK(camera::DestroyContiguousBufferCollection(output_buffer_collection_));
   }
 
-  void SetupInput(uint32_t input_format = fuchsia_sysmem_PixelFormatType_NV12,
-                  uint32_t output_format = fuchsia_sysmem_PixelFormatType_NV12) {
+  void SetupInput(
+      uint32_t input_format = static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12),
+      uint32_t output_format = static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12)) {
     uint32_t buffer_collection_count = 2;
     ASSERT_OK(
         camera::GetImageFormat(output_image_format_table_[0], output_format, kWidth, kHeight));
@@ -119,9 +120,9 @@ class Ge2dDeviceTest : public zxtest::Test {
 
   void SetupWatermarkInfo() {
     image_format_2_t watermark_image_format;
-    ASSERT_OK(camera::GetImageFormat(watermark_image_format,
-                                     fuchsia_sysmem_PixelFormatType_R8G8B8A8, kWatermarkWidth,
-                                     kWatermarkHeight));
+    ASSERT_OK(camera::GetImageFormat(
+        watermark_image_format, static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8),
+        kWatermarkWidth, kWatermarkHeight));
 
     watermark_info_.wm_image_format = watermark_image_format;
     watermark_info_.loc_x = kWatermarkHorizontalOffset;
@@ -320,7 +321,7 @@ void CheckEqual(zx_handle_t vmo_a, zx_handle_t vmo_b, const image_format_2_t& fo
 
 uint8_t* GetPointerToPixel(void* base, const image_format_2_t& format, uint32_t x, uint32_t y,
                            uint32_t plane = 0) {
-  if (format.pixel_format.type == fuchsia_sysmem_PixelFormatType_NV12) {
+  if (format.pixel_format.type == static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12)) {
     if (plane == 0) {
       return static_cast<uint8_t*>(base) + format.bytes_per_row * y + x;
     } else {
@@ -662,11 +663,13 @@ TEST_F(Ge2dDeviceTest, Scale2x) {
 
 TEST_F(Ge2dDeviceTest, NV12ToRgba) {
   SetupCallbacks();
-  SetupInput(fuchsia_sysmem_PixelFormatType_NV12, fuchsia_sysmem_PixelFormatType_R8G8B8A8);
+  SetupInput(static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12),
+             static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8));
 
   image_format_2_t input_image_format;
-  ASSERT_OK(camera::GetImageFormat(input_image_format, fuchsia_sysmem_PixelFormatType_NV12, kWidth,
-                                   kHeight));
+  ASSERT_OK(camera::GetImageFormat(input_image_format,
+                                   static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12),
+                                   kWidth, kHeight));
 
   // Pure red in YUV.
   WriteConstantColorToVmo(input_buffer_collection_.buffers[0].vmo, 82, 90, 240, input_image_format);
@@ -792,7 +795,8 @@ TEST_F(Ge2dDeviceTest, RemoveTask) {
 // except for setting alpha to 0xff.
 TEST_F(Ge2dDeviceTest, RgbaToRgba) {
   SetupCallbacks();
-  SetupInput(fuchsia_sysmem_PixelFormatType_R8G8B8A8, fuchsia_sysmem_PixelFormatType_R8G8B8A8);
+  SetupInput(static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8),
+             static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8));
 
   WriteConstantRgbaToVmo(input_buffer_collection_.buffers[0].vmo, 1, 2, 3, 4,
                          output_image_format_table_[0]);
@@ -841,7 +845,8 @@ static void DuplicateWatermarkInfo(const water_mark_info_t& input, const zx::vmo
 // Test that a watermark with 0 alpha doesn't change the input (when copying RGBA to RGBA)
 TEST_F(Ge2dDeviceTest, RGBABlankWatermark) {
   SetupCallbacks();
-  SetupInput(fuchsia_sysmem_PixelFormatType_R8G8B8A8, fuchsia_sysmem_PixelFormatType_R8G8B8A8);
+  SetupInput(static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8),
+             static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8));
   SetupWatermarkInfo();
 
   WriteConstantRgbaToVmo(input_buffer_collection_.buffers[0].vmo, 0x00, 0xff, 0x00, 0xff,
@@ -889,7 +894,8 @@ TEST_F(Ge2dDeviceTest, RGBABlankWatermark) {
 // Test that a semi-transparent changes colors in the expected way (when copying RGBA to RGBA).
 TEST_F(Ge2dDeviceTest, RGBARedWatermark) {
   SetupCallbacks();
-  SetupInput(fuchsia_sysmem_PixelFormatType_R8G8B8A8, fuchsia_sysmem_PixelFormatType_R8G8B8A8);
+  SetupInput(static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8),
+             static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8));
   SetupWatermarkInfo();
 
   WriteConstantRgbaToVmo(input_buffer_collection_.buffers[0].vmo, 0, 0xff, 0, 0,

@@ -460,8 +460,10 @@ void Ge2dDevice::InitializeScaler(uint32_t input_width, uint32_t input_height,
 void Ge2dDevice::SetupInputOutputFormats(bool scaling_enabled, const image_format_2_t& input_format,
                                          const image_format_2_t& output_format,
                                          const image_format_2_t& src2_format) {
-  bool is_src_nv12 = input_format.pixel_format.type == fuchsia_sysmem_PixelFormatType_NV12;
-  bool is_dst_nv12 = output_format.pixel_format.type == fuchsia_sysmem_PixelFormatType_NV12;
+  bool is_src_nv12 = input_format.pixel_format.type ==
+                     static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12);
+  bool is_dst_nv12 = output_format.pixel_format.type ==
+                     static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12);
   // When using NV12 output DST1 gets Y and DST2 gets CbCr.
   GenCtrl0::Get()
       .FromValue(0)
