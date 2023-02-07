@@ -56,6 +56,7 @@ FuchsiaStorageConfigInfo = provider(
     doc = "Platform configuration options for the storage area.",
     fields = {
         "live_usb_enabled": "Whether live_usb should be enabled",
+        "configure_fshost": "Whether to configure fshost using Assembly",
     },
 )
 

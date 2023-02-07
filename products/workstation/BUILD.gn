@@ -24,6 +24,7 @@ workstation_platform_config = {
   }
   storage = {
     live_usb_enabled = true
+    configure_fshost = false
   }
 }
 

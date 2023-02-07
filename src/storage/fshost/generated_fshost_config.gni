@@ -79,6 +79,7 @@ template("generated_fshost_config") {
     cm_label = ":$_manifest_target"
     values = {
       # Defaults
+      # LINT.IfChange
       apply_limits_to_ramdisk = false
       blobfs = true
       blobfs_max_bytes = 0
@@ -97,6 +98,8 @@ template("generated_fshost_config") {
       no_zxcrypt = false
       ramdisk_prefix = "/dev/sys/platform/00:00:2d/ramctl/"
       sandbox_decompression = true
+
+      # LINT.ThenChange(//src/lib/assembly/platform_configuration/src/subsystems/storage.rs)
 
       # Parameters from //build/images/fvm.gni
       fvm_slice_size = fvm_slice_size

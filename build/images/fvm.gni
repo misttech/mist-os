@@ -28,7 +28,10 @@ declare_args() {
   # FVM. A very small slice size may lead to decreased throughput. A very large
   # slice size may lead to wasted space. The selected default size of 8mb is
   # selected for conservation of space, rather than performance.
+  # LINT.IfChange
   fvm_slice_size = 8388608
+
+  # LINT.ThenChange(//src/storage/fshost/generated_fshost_config.gni)
 
   # Number of slices reserved by FVM for internal usage. A reservation
   # partition will be added to the FVM image, containing this many slices.

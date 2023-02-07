@@ -134,7 +134,6 @@ if (is_fuchsia) {
     testonly = fuchsia_zbi_testonly
     generate_fvm = true
     board_name = board_name
-    fshost_config = board_fshost_config
 
     check_production_tag = check_production_eligibility
 
@@ -145,6 +144,12 @@ if (is_fuchsia) {
 
     # Use the GN arg for including shell commands.
     include_shell_commands = include_shell_commands_package
+
+    # Use the GN arg for skipping the fshost configuration in GN
+    skip_fshost = assembly_fshost
+    if (!assembly_fshost) {
+      fshost_config = board_fshost_config
+    }
 
     if (images_config_label != false) {
       assembly_images_config_label = images_config_label

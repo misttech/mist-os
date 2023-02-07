@@ -18,6 +18,46 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("empty_live_usb");
         }
 
+        if storage_config.configure_fshost {
+            builder.platform_bundle("fshost_fxfs");
+
+            let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;
+            fshost_config_builder
+                // LINT.IfChange
+                .field("apply_limits_to_ramdisk", false)?
+                .field("blobfs", true)?
+                .field("blobfs_max_bytes", 0)?
+                .field("bootpart", true)?
+                .field("check_filesystems", true)?
+                .field("data", true)?
+                .field("data_max_bytes", 0)?
+                .field("disable_block_watcher", false)?
+                .field("factory", false)?
+                .field("fvm", true)?
+                .field("fvm_ramdisk", false)?
+                .field("gpt", true)?
+                .field("gpt_all", false)?
+                .field("mbr", false)?
+                .field("netboot", false)?
+                .field("no_zxcrypt", false)?
+                .field("ramdisk_prefix", "/dev/sys/platform/00:00:2d/ramctl/")?
+                .field("sandbox_decompression", true)?
+                .field("format_data_on_corruption", true)?
+                .field("blobfs_initial_inodes", 0)?
+                .field("blobfs_use_deprecated_padded_format", false)?
+                .field("allow_legacy_data_partition_names", false)?
+                .field("use_disk_based_minfs_migration", false)?
+                .field("nand", false)?
+                // LINT.ThenChange(//src/storage/fshost/generated_fshost_config.gni)
+                // LINT.IfChange
+                .field("fvm_slice_size", 8388608)?;
+            // LINT.ThenChange(//build/images/fvm.gni)
+
+            fshost_config_builder
+                .field("data_filesystem_format", "fxfs")?
+                .field("use_native_fxfs_crypto", true)?;
+        }
+
         Ok(())
     }
 }

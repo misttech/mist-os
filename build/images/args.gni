@@ -172,6 +172,10 @@ declare_args() {
   # assembled_system().  See documentation there.
   include_shell_commands_package = false
 
+  # Skip configuring fshost in GN and do it via Assembly instead.
+  # Used as a parameter to assembled_system().
+  assembly_fshost = false
+
   # When set, include the corresponding Bazel assembly targets in this build.
   bazel_assembly_targets = []
 }

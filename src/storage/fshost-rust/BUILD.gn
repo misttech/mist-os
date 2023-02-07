@@ -98,25 +98,46 @@ fuchsia_test_package("fshost_rust_tests") {
   test_components = [ ":fshost_rust_tests_component" ]
 }
 
-fshost_component_and_config("fshost_rust_fxfs_component") {
-  # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
-  # changes behavior to create a non-bootable fshost if testly is set to true.
-  testonly = false
+# Default component for inclusion in the fshost_fxfs AIB
+# This is flattened out from the logic in fshost_component_and_config()
+# in fshost.gni.
+cmc_merge("fshost_rust_fxfs_component.cml") {
+  sources = [
+    "//src/storage/fshost/meta/base_fshost.cml",
+    "//src/storage/fshost/meta/config.cml",
+    "//src/storage/fshost/meta/core_fshost.cml",
+    "//src/storage/fshost/meta/fxfs_fshost.cml",
+  ]
+}
 
-  # Correct the component name since the target_name is per-image.
+fuchsia_component_manifest("fshost_rust_fxfs_component") {
+  _target_outputs = get_target_outputs(":fshost_rust_fxfs_component.cml")
   component_name = "fshost"
+  manifest = _target_outputs[0]
+  deps = [ ":fshost_rust_fxfs_component.cml" ]
+}
 
-  options = {
-    # Use the defaults from the build args set in generated_fshost_config.gni
-    data_filesystem_format = "fxfs"
-
-    # Use the rust implementation of fshost based on the global GN arg.
-    use_rust_port = true
+# TODO(fxbug.dev/121326): bootfs_files_for_assembly() doesn't work for renamed_binary() yet, workaround
+group("fshost-rust-assembly-bootfs") {
+  deps = [ ":fshost-rust" ]
+  metadata = {
+    distribution_entries_barrier = []
+    distribution_entries = [
+      {
+        source = rebase_path("$root_out_dir/fshost_rust", root_build_dir)
+        destination = "bin/fshost"
+      },
+    ]
   }
 }
 
 bootfs_files_for_assembly("fshost_rust_fxfs_bootfs") {
-  deps = [ ":fshost_rust_fxfs_component" ]
+  deps = [
+    ":fshost-rust-assembly-bootfs",
+    ":fshost_rust_fxfs_component",
+    "//src/storage/fxfs:fxfs_component",
+    "//src/storage/fxfs-crypt",
+  ]
 }
 
 group("tests") {

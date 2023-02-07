@@ -10,4 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct StorageConfig {
     #[serde(default)]
     pub live_usb_enabled: bool,
+
+    #[serde(default)]
+    pub configure_fshost: bool,
 }
