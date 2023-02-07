@@ -137,6 +137,7 @@ if (is_host) {
       "test/trace_processing_test_data/id2_async.json",
       "test/trace_processing_test_data/input_latency.json",
       "test/trace_processing_test_data/memory_metric.json",
+      "test/trace_processing_test_data/memory_no_bandwidth.json",
       "test/trace_processing_test_data/model.json",
       "test/trace_processing_test_data/power_metric.json",
       "test/trace_processing_test_data/scenic.json",

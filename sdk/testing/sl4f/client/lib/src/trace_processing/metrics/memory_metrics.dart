@@ -18,14 +18,18 @@ class _Results {
   late List<double> mmuMemory;
   late List<double> ipcMemory;
 
-  late Map<String, List<double>> bandwidthChannels;
-  late List<double> totalBandwidth;
-  late List<double> bandwidthUsage;
+  _BandwidthResults? bandwidth;
+}
+
+class _BandwidthResults {
+  late Map<String, List<double>> channels;
+  late List<double> total;
+  late List<double> usage;
 }
 
 double _sum(Iterable<num> seq) => seq.fold(0.0, (a, b) => a + b);
 
-_Results? _memoryMetrics(Model model, bool excludeBandwidth) {
+_Results? _memoryMetrics(Model model) {
   final memoryMonitorEvents =
       filterEvents(getAllEvents(model), category: 'memory_monitor');
   if (memoryMonitorEvents.isEmpty) {
@@ -76,13 +80,11 @@ _Results? _memoryMetrics(Model model, bool excludeBandwidth) {
     final double usedMemory = totalMemory - freeMemory;
     return usedMemory;
   });
-  if (excludeBandwidth) {
-    return _Results()
-      ..totalSystemMemory = usedMemoryValues.toList()
-      ..vmoMemory = vmoMemoryValues.toList()
-      ..mmuMemory = mmuMemoryValues.toList()
-      ..ipcMemory = ipcMemoryValues.toList();
-  }
+  final results = _Results()
+    ..totalSystemMemory = usedMemoryValues.toList()
+    ..vmoMemory = vmoMemoryValues.toList()
+    ..mmuMemory = mmuMemoryValues.toList()
+    ..ipcMemory = ipcMemoryValues.toList();
 
   final bandwidthUsageEvents = filterEventsTyped<CounterEvent>(
       memoryMonitorEvents,
@@ -90,9 +92,9 @@ _Results? _memoryMetrics(Model model, bool excludeBandwidth) {
   if (bandwidthUsageEvents.isEmpty) {
     final duration = getTotalTraceDuration(model);
     _log.warning(
-        'Could not find any allocated memory events. Perhaps the trace '
+        'Could not find any memory bandwidth events. Perhaps the trace '
         'duration (${duration.toMilliseconds()} milliseconds) is too short.');
-    return null;
+    return results;
   }
 
   final bandwidthChannels = <String, List<double>>{};
@@ -118,20 +120,16 @@ _Results? _memoryMetrics(Model model, bool excludeBandwidth) {
       (totalBandwidthValue, freeBandwidthValue) =>
           (100.0 * totalBandwidthValue) /
           (totalBandwidthValue + freeBandwidthValue));
-  return _Results()
-    ..totalSystemMemory = usedMemoryValues.toList()
-    ..vmoMemory = vmoMemoryValues.toList()
-    ..mmuMemory = mmuMemoryValues.toList()
-    ..ipcMemory = ipcMemoryValues.toList()
-    ..bandwidthChannels = bandwidthChannels
-    ..totalBandwidth = totalBandwidthValues.toList()
-    ..bandwidthUsage = bandwidthUsagePercentValues.toList();
+  results.bandwidth = _BandwidthResults()
+    ..channels = bandwidthChannels
+    ..total = totalBandwidthValues.toList()
+    ..usage = bandwidthUsagePercentValues.toList();
+  return results;
 }
 
 List<TestCaseResults> memoryMetricsProcessor(
     Model model, Map<String, dynamic> extraArgs) {
-  final excludeBandwidth = extraArgs['exclude_bandwidth'] ?? false;
-  final results = _memoryMetrics(model, excludeBandwidth);
+  final results = _memoryMetrics(model);
   if (results == null) {
     return [];
   }
@@ -144,20 +142,22 @@ List<TestCaseResults> memoryMetricsProcessor(
         'Average MMU Overhead Memory in bytes: ${computeMean(results.mmuMemory)}')
     ..info('Average IPC Memory in bytes: ${computeMean(results.ipcMemory)}');
 
-  if (!excludeBandwidth) {
+  // Assign the bandwidth results to a local to allow type promotion to occur.
+  final bandwidthResults = results.bandwidth;
+  if (bandwidthResults != null) {
     _log
-      ..info(
-          'Average Total Memory Bandwidth Usage in bytes: ${computeMean(results.totalBandwidth)}')
-      ..info(
-          'Average Memory Bandwidth Usage in percent: ${computeMean(results.bandwidthUsage)}');
-    for (final entry in results.bandwidthChannels.entries) {
+      ..info('Average Total Memory Bandwidth Usage in bytes: '
+          '${computeMean(bandwidthResults.total)}')
+      ..info('Average Memory Bandwidth Usage in percent: '
+          '${computeMean(bandwidthResults.usage)}');
+    for (final entry in bandwidthResults.channels.entries) {
       _log.info(
           'Average ${entry.key} bandwidth usage in bytes: ${computeMean(entry.value)}');
     }
     _log.info([
-      'Total bandwidth: ${(computeMean(results.totalBandwidth) / 1024).round()} KB/s',
-      'usage: ${computeMean(results.bandwidthUsage).toStringAsFixed(2)}%',
-      for (final entry in results.bandwidthChannels.entries)
+      'Total bandwidth: ${(computeMean(bandwidthResults.total) / 1024).round()} KB/s',
+      'usage: ${computeMean(bandwidthResults.usage).toStringAsFixed(2)}%',
+      for (final entry in bandwidthResults.channels.entries)
         '${entry.key}: ${(computeMean(entry.value) / 1024).round()} KB/s',
     ].join(', '));
   }
@@ -181,18 +181,18 @@ List<TestCaseResults> memoryMetricsProcessor(
     TestCaseResults(
         'MMU Overhead Memory', Unit.bytes, results.mmuMemory.toList()),
     TestCaseResults('IPC Memory', Unit.bytes, results.ipcMemory.toList()),
-    if (!excludeBandwidth)
+    if (bandwidthResults != null)
       for (final entry
-          in results.bandwidthChannels.entries.toList()
+          in bandwidthResults.channels.entries.toList()
             ..sort((a, b) => a.key.compareTo(b.key)))
         TestCaseResults('${_toMetricName(entry.key)} Memory Bandwidth Usage',
             Unit.bytes, entry.value.toList()),
-    if (!excludeBandwidth)
+    if (bandwidthResults != null)
       TestCaseResults('Total Memory Bandwidth Usage', Unit.bytes,
-          results.totalBandwidth.toList()),
-    if (!excludeBandwidth)
+          bandwidthResults.total.toList()),
+    if (bandwidthResults != null)
       TestCaseResults('Memory Bandwidth Usage', Unit.percent,
-          results.bandwidthUsage.toList())
+          bandwidthResults.usage.toList())
   ];
 }
 
@@ -204,7 +204,7 @@ Memory
 
 ''');
 
-  final results = _memoryMetrics(model, false);
+  final results = _memoryMetrics(model);
   if (results != null) {
     buffer
       ..write('total_system_memory:\n')
@@ -215,17 +215,20 @@ Memory
       ..write(describeValues(results.mmuMemory, indent: 2))
       ..write('ipc_memory:\n')
       ..write(describeValues(results.ipcMemory, indent: 2));
-    for (final entry in results.bandwidthChannels.entries) {
+    final bandwidthResults = results.bandwidth;
+    if (bandwidthResults != null) {
+      for (final entry in bandwidthResults.channels.entries) {
+        buffer
+          ..write('${entry.key}_memory_bandwidth_usage:\n')
+          ..write(describeValues(entry.value, indent: 2));
+      }
       buffer
-        ..write('${entry.key}_memory_bandwidth_usage:\n')
-        ..write(describeValues(entry.value, indent: 2));
+        ..write('total_memory_bandwidth_usage:\n')
+        ..write(describeValues(bandwidthResults.total, indent: 2))
+        ..write('memory_bandwidth_usage:\n')
+        ..write(describeValues(bandwidthResults.usage, indent: 2))
+        ..write('\n');
     }
-    buffer
-      ..write('total_memory_bandwidth_usage:\n')
-      ..write(describeValues(results.totalBandwidth, indent: 2))
-      ..write('memory_bandwidth_usage:\n')
-      ..write(describeValues(results.bandwidthUsage, indent: 2))
-      ..write('\n');
   }
   return buffer.toString();
 }
