@@ -15,6 +15,7 @@ use core::{
     num::{NonZeroU64, NonZeroU8},
     time::Duration,
 };
+use nonzero_ext::nonzero;
 
 use assert_matches::assert_matches;
 use log::{debug, error, trace};
@@ -25,10 +26,9 @@ use net_types::{
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng as _, RngCore};
 
+pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
-    algorithm::{
-        generate_opaque_interface_identifier, OpaqueIidNonce, STABLE_IID_SECRET_KEY_BYTES,
-    },
+    algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{CounterContext, InstantContext, RngContext, TimerContext, TimerHandler},
     error::{ExistsError, NotFoundError},
     ip::{
@@ -878,6 +878,35 @@ pub struct TemporarySlaacAddressConfiguration {
     /// be initialized from a random number generator before generating any
     /// temporary addresses.
     pub secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES],
+}
+
+impl TemporarySlaacAddressConfiguration {
+    /// Default TEMP_VALID_LIFETIME specified by [RFC 8981 Section 3.8].
+    ///
+    /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
+    pub const DEFAULT_TEMP_VALID_LIFETIME: NonZeroDuration = // 2 days
+        NonZeroDuration::from_nonzero_secs(nonzero!(2 * 24 * 60 * 60u64));
+
+    /// Default TEMP_PREFERRED_LIFETIME specified by [RFC 8981 Section 3.8].
+    ///
+    /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
+    pub const DEFAULT_TEMP_PREFERRED_LIFETIME: NonZeroDuration = // 1 day
+        NonZeroDuration::from_nonzero_secs(nonzero!(1 * 24 * 60 * 60u64));
+
+    /// Default TEMP_IDGEN_RETRIES specified by [RFC 8981 Section 3.8].
+    ///
+    /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
+    pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
+
+    /// Constructs a new instance with default values and the given secret key.
+    pub fn default_with_secret_key(secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES]) -> Self {
+        Self {
+            temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
+            temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
+            temp_idgen_retries: Self::DEFAULT_TEMP_IDGEN_RETRIES,
+            secret_key,
+        }
+    }
 }
 
 /// The configuration for SLAAC.

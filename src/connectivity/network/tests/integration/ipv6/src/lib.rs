@@ -191,7 +191,11 @@ async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn sends_router_solicitations(test_name: &str, sub_test_name: &str, forwarding: bool) {
+async fn sends_router_solicitations<N: Netstack>(
+    test_name: &str,
+    sub_test_name: &str,
+    forwarding: bool,
+) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
@@ -306,7 +310,11 @@ async fn sends_router_solicitations(test_name: &str, sub_test_name: &str, forwar
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, forwarding: bool) {
+async fn slaac_with_privacy_extensions<N: Netstack>(
+    test_name: &str,
+    sub_test_name: &str,
+    forwarding: bool,
+) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -413,7 +421,7 @@ async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, for
 /// If no remote node has any interest in an address the netstack is attempting to assign to
 /// an interface, DAD should succeed.
 #[netstack_test]
-async fn duplicate_address_detection(name: &str) {
+async fn duplicate_address_detection<N: Netstack>(name: &str) {
     /// Adds `ipv6_consts::LINK_LOCAL_ADDR` to the interface and makes sure a Neighbor Solicitation
     /// message is transmitted by the netstack for DAD.
     ///
@@ -723,7 +731,7 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
 }
 
 #[netstack_test]
-async fn slaac_regeneration_after_dad_failure(name: &str) {
+async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     // Expects an NS message for DAD within timeout and returns the target address of the message.
     async fn expect_ns_message_in(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
@@ -975,7 +983,7 @@ async fn sends_mld_reports(name: &str) {
 }
 
 #[netstack_test]
-async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
+async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, realm, _netstack, iface, _fake_ep) =
         setup_network(&sandbox, name, None).await.expect("error setting up networking");

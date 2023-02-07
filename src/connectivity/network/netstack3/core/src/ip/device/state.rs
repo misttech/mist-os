@@ -292,6 +292,13 @@ pub struct Ipv6DeviceConfiguration {
     pub ip_config: IpDeviceConfiguration,
 }
 
+impl Ipv6DeviceConfiguration {
+    /// The default `MAX_RTR_SOLICITATIONS` value from [RFC 4861 section 10].
+    ///
+    /// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
+    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = nonzero!(3u8);
+}
+
 /// The state common to all IPv6 devices.
 pub(crate) struct Ipv6DeviceState<I: Instant> {
     /// The time between retransmissions of Neighbor Solicitation messages to a

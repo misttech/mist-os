@@ -15,7 +15,7 @@ pub(crate) use port_alloc::*;
 
 /// The length in bytes of the `secret_key` argument to
 /// [`generate_opaque_interface_identifier`].
-pub(crate) const STABLE_IID_SECRET_KEY_BYTES: usize = 32;
+pub const STABLE_IID_SECRET_KEY_BYTES: usize = 32;
 
 /// Computes an opaque interface identifier (IID) using the algorithm in [RFC
 /// 7217 Section 5].
