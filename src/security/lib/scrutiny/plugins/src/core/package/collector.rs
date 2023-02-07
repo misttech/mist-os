@@ -12,7 +12,7 @@ use {
             },
             package::{
                 is_cf_v1_manifest, is_cf_v2_manifest,
-                reader::{PackageReader, PackagesFromUpdateReader},
+                reader::{read_package_definition, PackageReader, PackagesFromUpdateReader},
             },
             util::types::{
                 ComponentManifest, PackageDefinition, PartialPackageDefinition, ServiceMapping,
@@ -21,7 +21,7 @@ use {
         },
         static_pkgs::StaticPkgsCollection,
     },
-    anyhow::{anyhow, Context, Result},
+    anyhow::{anyhow, bail, Context, Result},
     cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
     cm_fidl_validator,
     fidl::encoding::unpersist,
@@ -38,11 +38,14 @@ use {
     scrutiny_utils::{
         artifact::{ArtifactReader, FileArtifactReader},
         bootfs::BootfsReader,
+        key_value::parse_key_value,
+        url::from_package_name_variant_path,
         zbi::{ZbiReader, ZbiType},
     },
     serde_json::Value,
     std::{
         collections::{HashMap, HashSet},
+        io::Cursor,
         path::{Path, PathBuf},
         str,
         sync::Arc,
@@ -61,6 +64,10 @@ static RECOVERY_ZBI_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("recovery")
 static RECOVERY_ZBI_SIGNED_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("recovery.signed"));
 static IMAGES_JSON_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("images.json"));
 static IMAGES_JSON_ORIG_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("images.json.orig"));
+
+// The path to the package index file for bootfs packages in gendir and
+// in the bootfs.
+const BOOTFS_PACKAGE_INDEX: &str = "data/bootfs_packages";
 
 // The root v2 component manifest.
 pub const ROOT_RESOURCE: &str = "meta/root.cm";
@@ -444,9 +451,8 @@ impl PackageDataCollector {
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         pkg: &PackageDefinition,
-        static_pkgs: &'a Option<Vec<StaticPackageDescription<'a>>>,
+        source: &ComponentSource,
     ) -> Result<()> {
-        let source = Self::get_non_bootfs_pkg_source(pkg, static_pkgs)?;
         // Extract V1 and V2 components from the packages.
         for (path, cm) in &pkg.cms {
             let path_str = path.to_str().ok_or_else(|| {
@@ -629,109 +635,171 @@ impl PackageDataCollector {
         manifests: &mut Vec<Manifest>,
         zbi: &Zbi,
     ) -> Result<()> {
+        let mut package_index_found = false;
+
         for (file_name, file_data) in &zbi.bootfs {
-            if file_name.ends_with(".cm") {
-                info!(%file_name, "Extracting bootfs manifest");
-                let url = BootUrl::new_resource("/".to_string(), file_name.to_string())?;
-                let url = Url::parse(&url.to_string()).with_context(|| {
-                    format!("Failed to convert boot URL to standard URL: {}", url)
-                })?;
-                let cm_base64 = base64::encode(&file_data);
-                if let Ok(cm_decl) = unpersist::<fdecl::Component>(&file_data) {
-                    if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
-                        warn!(%file_name, %err, "Invalid cm");
-                    } else {
-                        // Retrieve this component's config values, if any.
-                        let cvf_bytes = if let Some(schema) = cm_decl.config {
-                            match schema
-                                .value_source
-                                .as_ref()
-                                .context("getting value source from config schema")?
-                            {
-                                fdecl::ConfigValueSource::PackagePath(pkg_path) => {
-                                    zbi.bootfs.get(pkg_path).cloned()
-                                }
-                                other => {
-                                    anyhow::bail!("Unsupported config value source {:?}.", other);
-                                }
-                            }
-                        } else {
-                            None
-                        };
+            if file_name == BOOTFS_PACKAGE_INDEX {
+                // Ensure that we only find a single package index file in bootfs.
+                if package_index_found {
+                    bail!("Multiple bootfs package index files found");
+                }
+                package_index_found = true;
 
-                        let mut cap_uses = Vec::new();
-                        if let Some(uses) = cm_decl.uses {
-                            for use_ in uses {
-                                match &use_ {
-                                    fdecl::Use::Protocol(protocol) => {
-                                        if let Some(source_name) = &protocol.source_name {
-                                            cap_uses.push(Capability::Protocol(
-                                                ProtocolCapability::new(source_name.clone()),
-                                            ));
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        if let Some(exposes) = cm_decl.exposes {
-                            for expose in exposes {
-                                match &expose {
-                                    fdecl::Expose::Protocol(protocol) => {
-                                        if let Some(source_name) = &protocol.source_name {
-                                            if let Some(fdecl::Ref::Self_(_)) = &protocol.source {
-                                                service_map
-                                                    .insert(source_name.clone(), url.clone());
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
+                let bootfs_pkg_index_contents = std::str::from_utf8(&file_data)?;
+                let bootfs_pkg_index = parse_key_value(bootfs_pkg_index_contents)?;
+                Self::extract_bootfs_packaged_data(
+                    component_id,
+                    service_map,
+                    components,
+                    manifests,
+                    zbi,
+                    bootfs_pkg_index,
+                )?;
+            } else if file_name.ends_with(".cm") {
+                Self::extract_bootfs_unpackaged_data(
+                    component_id,
+                    service_map,
+                    components,
+                    manifests,
+                    zbi,
+                    file_name,
+                    file_data,
+                )?;
+            }
+        }
 
-                        // The root manifest is special semantically as it offers from its parent
-                        // which is outside of the component model. So in this case offers
-                        // should also be captured.
-                        if file_name == ROOT_RESOURCE {
-                            if let Some(offers) = cm_decl.offers {
-                                for offer in offers {
-                                    match &offer {
-                                        fdecl::Offer::Protocol(protocol) => {
-                                            if let Some(source_name) = &protocol.source_name {
-                                                if let Some(fdecl::Ref::Parent(_)) =
-                                                    &protocol.source
-                                                {
-                                                    service_map
-                                                        .insert(source_name.clone(), url.clone());
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    }
+        Ok(())
+    }
+
+    fn extract_bootfs_unpackaged_data(
+        component_id: &mut i32,
+        service_map: &mut ServiceMapping,
+        components: &mut HashMap<Url, Component>,
+        manifests: &mut Vec<Manifest>,
+        zbi: &Zbi,
+        file_name: &str,
+        file_data: &Vec<u8>,
+    ) -> Result<()> {
+        info!(%file_name, "Extracting bootfs manifest");
+        let url = BootUrl::new_resource("/".to_string(), file_name.to_string())?;
+        let url = Url::parse(&url.to_string())
+            .with_context(|| format!("Failed to convert boot URL to standard URL: {}", url))?;
+        let cm_base64 = base64::encode(&file_data);
+        if let Ok(cm_decl) = unpersist::<fdecl::Component>(&file_data) {
+            if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
+                warn!(%file_name, %err, "Invalid cm");
+            } else {
+                // Retrieve this component's config values, if any.
+                let cvf_bytes = if let Some(schema) = cm_decl.config {
+                    match schema
+                        .value_source
+                        .as_ref()
+                        .context("getting value source from config schema")?
+                    {
+                        fdecl::ConfigValueSource::PackagePath(pkg_path) => {
+                            zbi.bootfs.get(pkg_path).cloned()
+                        }
+                        other => {
+                            anyhow::bail!("Unsupported config value source {:?}.", other);
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                let mut cap_uses = Vec::new();
+                if let Some(uses) = cm_decl.uses {
+                    for use_ in uses {
+                        match &use_ {
+                            fdecl::Use::Protocol(protocol) => {
+                                if let Some(source_name) = &protocol.source_name {
+                                    cap_uses.push(Capability::Protocol(ProtocolCapability::new(
+                                        source_name.clone(),
+                                    )));
                                 }
                             }
+                            _ => {}
                         }
-
-                        // Add the components directly from the ZBI.
-                        *component_id += 1;
-                        components.insert(
-                            url.clone(),
-                            Component {
-                                id: *component_id,
-                                url: url,
-                                version: 2,
-                                source: ComponentSource::ZbiBootfs,
-                            },
-                        );
-                        manifests.push(Manifest {
-                            component_id: *component_id,
-                            manifest: ManifestData::Version2 { cm_base64, cvf_bytes },
-                            uses: cap_uses,
-                        });
                     }
                 }
+                if let Some(exposes) = cm_decl.exposes {
+                    for expose in exposes {
+                        match &expose {
+                            fdecl::Expose::Protocol(protocol) => {
+                                if let Some(source_name) = &protocol.source_name {
+                                    if let Some(fdecl::Ref::Self_(_)) = &protocol.source {
+                                        service_map.insert(source_name.clone(), url.clone());
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                // The root manifest is special semantically as it offers from its parent
+                // which is outside of the component model. So in this case offers
+                // should also be captured.
+                if file_name == ROOT_RESOURCE {
+                    if let Some(offers) = cm_decl.offers {
+                        for offer in offers {
+                            match &offer {
+                                fdecl::Offer::Protocol(protocol) => {
+                                    if let Some(source_name) = &protocol.source_name {
+                                        if let Some(fdecl::Ref::Parent(_)) = &protocol.source {
+                                            service_map.insert(source_name.clone(), url.clone());
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                // Add the components directly from the ZBI.
+                *component_id += 1;
+                components.insert(
+                    url.clone(),
+                    Component {
+                        id: *component_id,
+                        url: url,
+                        version: 2,
+                        source: ComponentSource::ZbiBootfs,
+                    },
+                );
+                manifests.push(Manifest {
+                    component_id: *component_id,
+                    manifest: ManifestData::Version2 { cm_base64, cvf_bytes },
+                    uses: cap_uses,
+                });
             }
+        }
+
+        Ok(())
+    }
+
+    fn extract_bootfs_packaged_data(
+        component_id: &mut i32,
+        service_map: &mut ServiceMapping,
+        components: &mut HashMap<Url, Component>,
+        manifests: &mut Vec<Manifest>,
+        zbi: &Zbi,
+        package_index: HashMap<String, String>,
+    ) -> Result<()> {
+        for (name_and_variant, merkle) in package_index {
+            let package_path = format!("blob/{}", merkle);
+            let url = from_package_name_variant_path(name_and_variant)?;
+            let far_cursor = Cursor::new(zbi.bootfs.get(&package_path).unwrap());
+            let package_def = read_package_definition(&url, far_cursor)?;
+            Self::extract_package_data(
+                component_id,
+                service_map,
+                components,
+                manifests,
+                &package_def,
+                &ComponentSource::ZbiBootfs,
+            )?;
         }
 
         Ok(())
@@ -923,13 +991,14 @@ impl PackageDataCollector {
             };
             packages.push(package);
 
+            let source = Self::get_non_bootfs_pkg_source(pkg, static_pkgs)?;
             Self::extract_package_data(
                 &mut component_id,
                 &mut service_map,
                 &mut components,
                 &mut manifests,
                 &pkg,
-                &static_pkgs,
+                &source,
             )?;
         }
 
