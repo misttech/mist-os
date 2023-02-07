@@ -11,6 +11,7 @@ executable("bin") {
   sources = [
     "dispatcher_bound_test.cc",
     "receiver_test.cc",
+    "sendable_test.cc",
     "task_queue_test.cc",
   ]
 

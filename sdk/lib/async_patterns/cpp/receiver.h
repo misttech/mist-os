@@ -76,6 +76,7 @@ class Receiver : private internal::ReceiverBase {
   Callback<Args...> Once(Callable&& callable, fit::parameter_pack<Args...>) {
     return Callback<Args...>{task_queue_handle(), [callable = std::forward<Callable>(callable),
                                                    owner = owner_](Args... args) mutable {
+                               internal::CheckArguments<Args...>::Check();
                                callable(owner, std::forward<Args>(args)...);
                              }};
   }

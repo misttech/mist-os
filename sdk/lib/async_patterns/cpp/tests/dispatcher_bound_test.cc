@@ -53,6 +53,8 @@ class ThreadAffine {
   // The following are a bunch of thread-affine operations that take different
   // kinds of data types and exercised in the tests later.
 
+  void NoArg() { EXPECT_EQ(expected_, std::this_thread::get_id()); }
+
   void Add(int a, int b, const ArcAtomic& result) {
     EXPECT_EQ(expected_, std::this_thread::get_id());
     result->store(a + b);
@@ -185,6 +187,11 @@ TEST_F(DispatcherBound, AsyncCall) {
   EXPECT_OK(loop().RunUntilIdle());
 
   {
+    obj.AsyncCall(&ThreadAffine::NoArg);
+    EXPECT_OK(loop().RunUntilIdle());
+  }
+
+  {
     auto result = make_arc_atomic();
     obj.AsyncCall(&ThreadAffine::Add, 1, 2, result);
     EXPECT_EQ(0, result->load());
@@ -217,6 +224,17 @@ TEST_F(DispatcherBound, AsyncCall) {
     EXPECT_EQ("", s);
   }
 
+  // Copy a |T&| to a receiver that expects a |const T&|.
+  {
+    std::optional<std::string> s = std::string{"abc"};
+    std::string& s_ref = s.value();
+    obj.AsyncCall(&ThreadAffine::PassConstReference, s_ref);
+    // After firing the async call, the queued call should have its own private
+    // copy of |s|, so it should be allowed to destroy our |s| here.
+    s.reset();
+    EXPECT_OK(loop().RunUntilIdle());
+  }
+
   // Move a |T| to a receiver that expects a |T|.
   {
     std::vector<int> v{1, 2, 3};
@@ -235,6 +253,16 @@ TEST_F(DispatcherBound, AsyncCall) {
     EXPECT_OK(loop().RunUntilIdle());
     EXPECT_EQ(3u, v2_ref.size());
   }
+
+  // Calling a function that consumes a move-only type with |T&| is not allowed.
+#if 0
+  {
+    std::unique_ptr p = std::make_unique<int>(42);
+    obj.AsyncCall(&ThreadAffine::PassMoveOnly, p);
+    EXPECT_EQ(nullptr, p);
+    EXPECT_OK(loop().RunUntilIdle());
+  }
+#endif
 
   // Pass-through a |T&| to a receiver that expects a |T&| is not supported.
 #if 0
@@ -278,6 +306,12 @@ TEST_F(DispatcherBound, AsyncCallWithReply) {
     explicit Owner(async_dispatcher_t* owner_dispatcher) : receiver_{this, owner_dispatcher} {
       background_.AsyncCall(&Background::Concat, std::string("def"))
           .Then(receiver_.Once(&Owner::DoneConcat));
+
+      // Passing incompatible types is not allowed.
+#if 0
+      background_.AsyncCall(&Background::Concat, std::string("def"))
+          .Then(receiver_.Once([] (Owner*, int not_a_string) {}));
+#endif
     }
 
     bool got_result() const { return got_result_; }

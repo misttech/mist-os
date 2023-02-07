@@ -8,6 +8,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/async_patterns/cpp/internal/dispatcher_bound_storage.h>
 #include <lib/fit/function.h>
+#include <lib/fit/function_traits.h>
 #include <lib/stdcompat/functional.h>
 #include <zircon/assert.h>
 
@@ -148,15 +149,21 @@ class DispatcherBound final {
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
   // Panics if the dispatcher cannot fulfill the task (e.g. it is shutdown).
-  template <typename Member, typename... Args,
-            typename = std::enable_if_t<std::is_void_v<std::invoke_result_t<Member, Args...>>>>
-  void AsyncCall(Member T::*member, Args&&... args) {
-    storage_.AsyncCall<T>(dispatcher_, member, std::forward<Args>(args)...);
-  }
-  template <typename Member, typename... Args,
-            typename = std::enable_if_t<!std::is_void_v<std::invoke_result_t<Member, Args...>>>>
+  template <typename Member, typename... Args>
   auto AsyncCall(Member T::*member, Args&&... args) {
-    return storage_.AsyncCallWithReply<T>(dispatcher_, member, std::forward<Args>(args)...);
+    using invoke_result = std::invoke_result<Member, Args...>;
+    constexpr bool kIsInvocable = std::is_invocable_v<Member, Args...>;
+    static_assert(kIsInvocable,
+                  "|Member| must be callable with the provided |Args|. "
+                  "Check that you specified each argument correctly to the |member| function.");
+    if constexpr (kIsInvocable) {
+      CheckArgs(typename fit::callable_traits<Member>::args{});
+      if constexpr (std::is_void_v<typename invoke_result::type>) {
+        return storage_.AsyncCall<T>(dispatcher_, member, std::forward<Args>(args)...);
+      } else {
+        return storage_.AsyncCallWithReply<T>(dispatcher_, member, std::forward<Args>(args)...);
+      }
+    }
   }
 
   // Typically, asynchronous classes would contain internal self-pointers that
@@ -188,6 +195,11 @@ class DispatcherBound final {
   bool has_value() const { return storage_.has_value(); }
 
  private:
+  template <typename... Args>
+  constexpr void CheckArgs(fit::parameter_pack<Args...>) {
+    internal::CheckArguments<Args...>::Check();
+  }
+
   async_dispatcher_t* dispatcher_;
   internal::DispatcherBoundStorage storage_;
 };

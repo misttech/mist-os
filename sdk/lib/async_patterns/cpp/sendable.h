@@ -56,18 +56,44 @@ namespace async_patterns {
 //
 template <typename Callable, typename... Args>
 auto BindForSending(Callable callable, Args&&... args) {
+  // An individual |Arg| in |Args| is either an l-value reference or an r-value
+  // reference, due to universal reference rules.
+  //
+  // Therefore, this check ensures the callable matches its arguments. If the
+  // user passes an l-value to a move-only argument, the |is_invocable| will
+  // fail, because it will try to invoke a function taking |Arg| with |Arg&|.
+  static_assert(std::is_invocable_v<Callable, Args...>,
+                "The |Callable| function must be invocable with argument |Args|. "
+                "Check that the arguments provided are correct. "
+                "For example, did you call a function that consumes a move-only type |Foo| "
+                "with an argument type of |Foo&| instead of |Foo&&|?");
+
   // We package the arguments into a tuple because capturing a template
   // parameter pack is a C++20 feature.
+  //
+  // |make_tuple| moves |Arg&&| into |Arg|, and copies |const Arg&| into |Arg|.
+  // c.f. https://en.cppreference.com/w/cpp/utility/tuple/make_tuple
+  // The behavior of |make_tuple| w.r.t. |Arg&| is not relevant here since we
+  // disallow sending non-const references.
   return [callable = std::move(callable),
           args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
     // The |std::move| inside prevents |callable| from taking |Arg&| arguments.
+    // Unfortunately, unlike pointer arguments, there is no good way to reject
+    // non-const l-value references, because the universal reference rules will
+    // make |Arg| an l-value reference even when the user provided |Arg| by
+    // value. We should instead check that the underlying |callable| don't
+    // _also_ accept an l-value reference -- library code using |BindForSending|
+    // should use |internal::CheckArguments| on the relevant member function.
+    // Here, as an extra safety measure, we always move each |arg| into the
+    // call. A non-const l-value reference will not be able to bind to a
+    // non-const r-value reference.
     //
     // ** NOTE TO USERS ** If you get a compiler error pointing to this
     // vicinity, check the documentation comments of |BindForSending|.
     // Passing mutable references and raw pointers are not allowed.
     return std::apply(
         [callable = std::move(callable)](auto&&... args) mutable {
-          auto check_arg = [](auto&& arg) {
+          constexpr auto check_arg = [](auto&& arg) {
             using Arg = decltype(arg);
             static_assert(!std::is_pointer_v<cpp20::remove_cvref_t<Arg>>,
                           "Sending raw pointers is not allowed. "
@@ -81,6 +107,30 @@ auto BindForSending(Callable callable, Args&&... args) {
         args);
   };
 }
+
+namespace internal {
+
+template <typename Arg>
+constexpr void CheckOneArg() {
+  static_assert(!std::is_lvalue_reference_v<Arg> || std::is_const_v<std::remove_reference_t<Arg>>,
+                "Sending non-const l-value references is not allowed. "
+                "See class documentation comments of |BindForSending|.");
+}
+
+template <typename... Args>
+struct CheckArguments {
+  static constexpr void Check() {}
+};
+
+template <typename Arg, typename... Rest>
+struct CheckArguments<Arg, Rest...> {
+  static constexpr void Check() {
+    CheckOneArg<Arg>();
+    CheckArguments<Rest...>::Check();
+  }
+};
+
+}  // namespace internal
 
 }  // namespace async_patterns
 

@@ -76,14 +76,18 @@ class DispatcherBoundStorage final {
     template <typename R>
     void Then(async_patterns::Callback<R> on_result) && {
       ZX_DEBUG_ASSERT(storage_);
-      static_assert(std::is_invocable_v<decltype(on_result), std::invoke_result_t<Task>>,
+      constexpr bool kReceiverMatchesReturnValue =
+          std::is_invocable_v<decltype(on_result), std::invoke_result_t<Task>>;
+      static_assert(kReceiverMatchesReturnValue,
                     "The |async_patterns::Callback<R>| must accept the return value "
                     "of the |Member| being called.");
-      storage_->CallInternal(dispatcher_,
-                             [task = std::move(task_), on_result = std::move(on_result)]() mutable {
-                               on_result(task());
-                             });
-      storage_ = nullptr;
+      if constexpr (kReceiverMatchesReturnValue) {
+        storage_->CallInternal(
+            dispatcher_, [task = std::move(task_), on_result = std::move(on_result)]() mutable {
+              on_result(task());
+            });
+        storage_ = nullptr;
+      }
     }
 
     AsyncCallBuilder(DispatcherBoundStorage* storage, async_dispatcher_t* dispatcher, Task task)
