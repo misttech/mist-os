@@ -1172,8 +1172,12 @@ where
             fposix_socket::StreamSocketRequest::GetIpv6MulticastLoopback { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetIpv6Only { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
+                // TODO(https://fxbug.dev/21198): support dual-stack sockets.
+                responder_send!(
+                    responder,
+                    &mut value.then_some(()).ok_or(fposix::Errno::Eopnotsupp)
+                );
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
