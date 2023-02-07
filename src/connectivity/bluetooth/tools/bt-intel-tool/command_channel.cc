@@ -8,7 +8,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
-#include <lib/fdio/unsafe.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/event.h>
 #include <lib/zx/time.h>
@@ -23,48 +22,34 @@
 
 namespace {
 
-zx::channel GetCommandChannel(int fd) {
-  fdio_t* hci_io = fdio_unsafe_fd_to_io(fd);
-  assert(hci_io);
-
+zx::channel GetCommandChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
-  zx_status_t status = zx::channel::create(0, &ours, &theirs);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
               << zx_status_get_string(status) << std::endl;
     return ours;
   }
 
-  status = fuchsia_hardware_bluetooth_HciOpenCommandChannel(fdio_unsafe_borrow_channel(hci_io),
-                                                            theirs.release());
-  fdio_unsafe_release(hci_io);
-
-  if (status != ZX_OK) {
-    std::cerr << "hci: Failed to obtain command channel handle: " << zx_status_get_string(status)
+  const fidl::OneWayStatus result = client->OpenCommandChannel(std::move(theirs));
+  if (!result.ok()) {
+    std::cerr << "hci: Failed to obtain command channel handle: " << result.status_string()
               << std::endl;
     assert(!ours.is_valid());
   }
   return ours;
 }
 
-zx::channel GetAclChannel(int fd) {
-  fdio_t* hci_io = fdio_unsafe_fd_to_io(fd);
-  assert(hci_io);
-
+zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
-  zx_status_t status = zx::channel::create(0, &ours, &theirs);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
               << zx_status_get_string(status) << std::endl;
     return ours;
   }
 
-  status = fuchsia_hardware_bluetooth_HciOpenAclDataChannel(fdio_unsafe_borrow_channel(hci_io),
-                                                            theirs.release());
-  fdio_unsafe_release(hci_io);
-
-  if (status != ZX_OK) {
-    std::cerr << "hci: Failed to obtain ACL channel handle: " << zx_status_get_string(status)
+  const fidl::OneWayStatus result = client->OpenAclDataChannel(std::move(theirs));
+  if (!result.ok()) {
+    std::cerr << "hci: Failed to obtain ACL channel handle: " << result.status_string()
               << std::endl;
     assert(!ours.is_valid());
   }
@@ -73,13 +58,9 @@ zx::channel GetAclChannel(int fd) {
 
 }  // namespace
 
-CommandChannel::CommandChannel(const std::string& hcidev_path)
-    : valid_(false), event_callback_(nullptr) {
-  hci_fd_.reset(open(hcidev_path.c_str(), O_RDWR));
-  if (!bool(hci_fd_)) {
-    return;
-  }
-  cmd_channel_ = GetCommandChannel(hci_fd_.get());
+CommandChannel::CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> device)
+    : valid_(false), event_callback_(nullptr), client_(std::move(device)) {
+  cmd_channel_ = GetCommandChannel(client_);
   cmd_channel_wait_.set_object(cmd_channel_.get());
   cmd_channel_wait_.set_trigger(ZX_CHANNEL_READABLE);
   zx_status_t status = cmd_channel_wait_.Begin(async_get_default_dispatcher());
@@ -89,7 +70,7 @@ CommandChannel::CommandChannel(const std::string& hcidev_path)
     return;
   }
 
-  acl_channel_ = GetAclChannel(hci_fd_.get());
+  acl_channel_ = GetAclChannel(client_);
   acl_channel_wait_.set_object(acl_channel_.get());
   acl_channel_wait_.set_trigger(ZX_CHANNEL_READABLE);
   status = acl_channel_wait_.Begin(async_get_default_dispatcher());
@@ -120,7 +101,8 @@ void CommandChannel::SendCommand(const ::bt::PacketView<::bt::hci_spec::CommandH
     channel = &acl_channel_;
   }
 
-  zx_status_t status = channel->write(0, command.data().data(), command.size(), nullptr, 0);
+  zx_status_t status =
+      channel->write(0, command.data().data(), static_cast<uint32_t>(command.size()), nullptr, 0);
   if (status < 0) {
     std::cerr << "CommandChannel: Failed to send command: " << zx_status_get_string(status)
               << std::endl;
@@ -192,8 +174,9 @@ void CommandChannel::HandleChannelReady(const zx::channel& channel, async_dispat
       return;
     }
     auto packet_bytes = packet->mutable_view()->mutable_data();
-    zx_status_t read_status = channel.read(0u, packet_bytes.mutable_data(), nullptr,
-                                           packet_bytes.size(), 0, &read_size, nullptr);
+    zx_status_t read_status =
+        channel.read(0u, packet_bytes.mutable_data(), nullptr,
+                     static_cast<uint32_t>(packet_bytes.size()), 0, &read_size, nullptr);
     if (read_status < 0) {
       std::cerr << "CommandChannel: Failed to read event bytes: "
                 << zx_status_get_string(read_status) << std::endl;

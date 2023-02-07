@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/driver.h>
 #include <sys/stat.h>
 
@@ -13,10 +14,7 @@
 
 #include "command_channel.h"
 #include "commands.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/transport.h"
 #include "src/connectivity/bluetooth/tools/lib/command_dispatcher.h"
 #include "src/lib/fxl/command_line.h"
 
@@ -58,8 +56,15 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
+  zx::result device = component::Connect<fuchsia_hardware_bluetooth::Hci>(hci_dev_path);
+  if (device.is_error()) {
+    std::cout << "Failed to connect to " << hci_dev_path << ": " << device.status_string()
+              << std::endl;
+    return EXIT_FAILURE;
+  }
+
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  CommandChannel channel(hci_dev_path);
+  CommandChannel channel(std::move(device.value()));
 
   bluetooth_tools::CommandDispatcher dispatcher;
   bt_intel::RegisterCommands(&channel, &dispatcher);

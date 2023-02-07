@@ -5,13 +5,11 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_TOOLS_BT_INTEL_TOOL_COMMAND_CHANNEL_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_TOOLS_BT_INTEL_TOOL_COMMAND_CHANNEL_H_
 
-#include <fuchsia/hardware/bluetooth/c/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
-
-#include <fbl/unique_fd.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
 
@@ -20,8 +18,7 @@
 // returning complete and valid event packets on to the event handler set.
 class CommandChannel {
  public:
-  // |hcidev_path| is a path to the hci device (e.g. /dev/class/bt-hci/000)
-  explicit CommandChannel(const std::string& hcidev_path);
+  explicit CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> device);
   ~CommandChannel();
 
   // Indicates whether this channel is valid.  This should be checked after
@@ -59,7 +56,7 @@ class CommandChannel {
 
   bool valid_;
   EventCallback event_callback_;
-  fbl::unique_fd hci_fd_;
+  fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> client_;
   zx::channel cmd_channel_;
   async::WaitMethod<CommandChannel, &CommandChannel::OnCmdChannelReady> cmd_channel_wait_{this};
   zx::channel acl_channel_;
