@@ -4,7 +4,6 @@
 
 #include "dsi-dw.h"
 
-#include <fuchsia/sysmem/c/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
