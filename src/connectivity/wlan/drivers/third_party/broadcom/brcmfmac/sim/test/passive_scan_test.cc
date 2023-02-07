@@ -133,7 +133,7 @@ void PassiveScanTestInterface::OnScanResult(const wlan_fullmac_scan_result_t* re
 }
 
 constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW40, .secondary80 = 0};
 constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 

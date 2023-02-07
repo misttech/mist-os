@@ -2581,7 +2581,7 @@ static void brcmf_iedump(uint8_t* ies, size_t total_len) {
   }
 }
 
-static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
+static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, uint32_t chn_bw,
                                      const uint8_t* bssid, uint16_t capability, uint16_t interval,
                                      uint8_t* ie, size_t ie_len, int16_t rssi_dbm) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
@@ -2603,8 +2603,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
   result.bss.beacon_period = 0;
   result.bss.capability_info = capability;
   result.bss.channel.primary = (uint8_t)channel;
-  // TODO(fxbug.dev/80231): This probably shouldn't be hardcoded.
-  result.bss.channel.cbw = CHANNEL_BANDWIDTH_CBW20;
+  result.bss.channel.cbw = chn_bw;
   result.bss.rssi_dbm = std::min<int16_t>(0, std::max<int16_t>(-255, rssi_dbm));
   result.bss.ies_list = ie;
   result.bss.ies_count = ie_len;
@@ -2629,6 +2628,7 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   uint8_t* notify_ie;
   size_t notify_ielen;
   int16_t notify_rssi_dbm;
+  uint32_t notify_chn_bw;
 
   if (bi->length > WL_BSS_INFO_MAX) {
     BRCMF_ERR("Bss info is larger than buffer. Discarding");
@@ -2648,17 +2648,40 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   notify_ie = (uint8_t*)bi + bi->ie_offset;
   notify_ielen = bi->ie_length;
   notify_rssi_dbm = (int16_t)bi->RSSI;
+  switch (bi->chanspec & WL_CHANSPEC_BW_MASK) {
+    case WL_CHANSPEC_BW_20:
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW20;
+      break;
+    case WL_CHANSPEC_BW_40:
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW40;
+      break;
+    case WL_CHANSPEC_BW_80:
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW80;
+      break;
+    case WL_CHANSPEC_BW_160:
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW160;
+      break;
+    case WL_CHANSPEC_BW_8080:
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW80P80;
+      break;
+    default:
+      BRCMF_WARN("Invalid channel BW in scan result chanspec: 0x%x", bi->chanspec);
+      // Should this be dropped?
+      notify_chn_bw = CHANNEL_BANDWIDTH_CBW20;
+  }
 
   BRCMF_DBG(CONN,
             "Scan result received  BSS: " FMT_MAC
-            "  Channel: %3d  Capability: %#6x  Beacon interval: %5d  Signal: %4d",
-            FMT_MAC_ARGS(bi->BSSID), channel, notify_capability, notify_interval, notify_rssi_dbm);
+            "  Channel: %3d  chanspec: 0x%x Capability: %#6x  Beacon interval: %5d  Signal: %4d",
+            FMT_MAC_ARGS(bi->BSSID), channel, bi->chanspec, notify_capability, notify_interval,
+            notify_rssi_dbm);
   if (BRCMF_IS_ON(CONN) && BRCMF_IS_ON(BYTES)) {
     brcmf_iedump(notify_ie, notify_ielen);
   }
 
-  brcmf_return_scan_result(ndev, (uint8_t)channel, (const uint8_t*)bi->BSSID, notify_capability,
-                           notify_interval, notify_ie, notify_ielen, notify_rssi_dbm);
+  brcmf_return_scan_result(ndev, (uint8_t)channel, notify_chn_bw, (const uint8_t*)bi->BSSID,
+                           notify_capability, notify_interval, notify_ie, notify_ielen,
+                           notify_rssi_dbm);
 
   return ZX_OK;
 }
