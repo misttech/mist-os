@@ -53,10 +53,6 @@ source_set("hsv_color_source") {
     "hsv_generator.h",
   ]
   public_deps = [ ":image_format_rgba" ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 source_set("image_format_rgba") {
@@ -70,10 +66,6 @@ source_set("image_format_rgba") {
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 executable("blc_unittest_bin") {
@@ -92,10 +84,6 @@ executable("hsv_generator_unittest_bin") {
     ":hsv_color_source",
     "//src/lib/fxl/test:gtest_main",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 executable("image_format_rgba_unittest_bin") {
@@ -106,10 +94,6 @@ executable("image_format_rgba_unittest_bin") {
     ":image_format_rgba",
     "//src/lib/fxl/test:gtest_main",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 executable("raw12_writer_unittest_bin") {
