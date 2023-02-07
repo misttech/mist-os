@@ -23,6 +23,7 @@
         {
             protocol: [
                 "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
             ],
             from: "#hwinfo",

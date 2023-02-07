@@ -10,8 +10,9 @@
     use: [
         {
             protocol: [
-                // To retrieve Board/Product info.
+                // To retrieve Board/Device/Product info.
                 "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
 
                 // To open and accept sockets for our Web-based UI.
