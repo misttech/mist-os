@@ -7,7 +7,7 @@
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <unistd.h>
 
-#include <ddk/metadata/init-step.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/pwm/drivers/aml-pwm-init/aml-pwm-init-bind.h"
@@ -36,7 +36,7 @@ zx_status_t PwmInitDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   zx_device_prop_t props[] = {
-      {BIND_INIT_STEP, 0, BIND_INIT_STEP_PWM},
+      {BIND_INIT_STEP, 0, bind_fuchsia_pwm::BIND_INIT_STEP_PWM},
   };
   status = dev->DdkAdd(ddk::DeviceAddArgs("aml-pwm-init")
                            .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)

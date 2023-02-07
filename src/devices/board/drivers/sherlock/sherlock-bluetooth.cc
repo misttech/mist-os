@@ -15,7 +15,6 @@
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
 
-#include <ddk/metadata/init-step.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
 

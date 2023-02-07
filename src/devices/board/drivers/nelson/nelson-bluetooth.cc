@@ -15,7 +15,6 @@
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
 
-#include <ddk/metadata/init-step.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 

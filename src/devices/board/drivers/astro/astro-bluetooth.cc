@@ -15,7 +15,6 @@
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
 
-#include <ddk/metadata/init-step.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro.h"

@@ -11,7 +11,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/zircon-internal/align.h>
 
-#include <ddk/metadata/init-step.h>
 #include <fbl/algorithm.h>
 #include <hwreg/bitfields.h>
 #include <soc/aml-common/aml-sdmmc.h>

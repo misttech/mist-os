@@ -15,7 +15,6 @@
 
 #include <optional>
 
-#include <ddk/metadata/init-step.h>
 #include <fbl/algorithm.h>
 #include <hwreg/bitfields.h>
 #include <soc/aml-common/aml-sdmmc.h>

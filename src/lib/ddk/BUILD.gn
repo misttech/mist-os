@@ -84,7 +84,6 @@ library_headers("ddk-metadata-headers") {
     "ddk/metadata/clock.h",
     "ddk/metadata/display.h",
     "ddk/metadata/gpio.h",
-    "ddk/metadata/init-step.h",
     "ddk/metadata/lights.h",
     "ddk/metadata/nand.h",
     "ddk/metadata/power.h",
