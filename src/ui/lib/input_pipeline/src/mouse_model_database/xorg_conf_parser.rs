@@ -17,11 +17,11 @@ use nom::{
 use {nom_locate::LocatedSpan, std::fmt, thiserror::Error};
 
 #[derive(Debug, PartialEq)]
-struct MouseModel {
-    identifier: String,
-    vendor_id: String,
-    product_id: String,
-    cpi: u32,
+pub(super) struct MouseModel {
+    pub(super) identifier: String,
+    pub(super) vendor_id: String,
+    pub(super) product_id: String,
+    pub(super) cpi: u32,
 }
 
 #[derive(Debug, PartialEq)]
@@ -243,7 +243,7 @@ fn parse_section(
     Ok((rest, Some(mouse_model)))
 }
 
-fn parse_xorg_file(
+pub(super) fn parse_xorg_file(
     input: NomSpan<'_>,
 ) -> IResult<NomSpan<'_>, Vec<MouseModel>, XOrgConfParserError> {
     let res = helper::many_until_eof(helper::skip_ws_or_comment(parse_section))(input);

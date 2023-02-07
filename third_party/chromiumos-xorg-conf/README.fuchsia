@@ -1,0 +1,7 @@
+Name: chromiumos xorg-conf
+License: BSD
+License File: src/LICENSE
+Upstream Git: https://chromium.googlesource.com/chromiumos/platform/xorg-conf/
+Description:
+
+ChromiumOS's xorg conf files for input device.
