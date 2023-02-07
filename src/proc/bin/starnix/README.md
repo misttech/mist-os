@@ -262,7 +262,7 @@ Starnix is integrated with Fuchsia's tracing system. To start a trace with an in
 buffer size, run:
 
 ```
-ffx trace start --categories starnix --buffer-size 16
+ffx trace start --categories "kernel:meta,starnix" --buffer-size 16
 ```
 
 Trace files can be visualized and queried with Perfetto. For example, to see the average
