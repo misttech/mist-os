@@ -45,6 +45,14 @@ pub enum Feature {
 
     // Allows dynamic child name lengths to exceed the default limit.
     AllowLongNames,
+
+    // Allow tests to resolve non-hermetic packages. This requires EnableAllowNonHermeticPackagesFeature
+    // to be enabled.
+    AllowNonHermeticPackages,
+
+    // Enable AllowNonHermeticPackages feature. This helps us to only enable
+    // this in-tree.
+    EnableAllowNonHermeticPackagesFeature,
 }
 
 impl FromStr for Feature {
@@ -53,6 +61,10 @@ impl FromStr for Feature {
         match s {
             "hub" => Ok(Feature::Hub),
             "allow_long_names" => Ok(Feature::AllowLongNames),
+            "allow_non_hermetic_packages" => Ok(Feature::AllowNonHermeticPackages),
+            "enable_allow_non_hermetic_packages_feature" => {
+                Ok(Feature::EnableAllowNonHermeticPackagesFeature)
+            }
             _ => Err(format!("unrecognized feature \"{}\"", s)),
         }
     }
@@ -63,6 +75,10 @@ impl fmt::Display for Feature {
         f.write_str(match self {
             Feature::Hub => "hub",
             Feature::AllowLongNames => "allow_long_names",
+            Feature::AllowNonHermeticPackages => "allow_non_hermetic_packages",
+            Feature::EnableAllowNonHermeticPackagesFeature => {
+                "enable_allow_non_hermetic_packages_feature"
+            }
         })
     }
 }
@@ -75,12 +91,21 @@ mod tests {
     fn feature_is_parsed() {
         assert_eq!(Feature::Hub, "hub".parse::<Feature>().unwrap());
         assert_eq!(Feature::AllowLongNames, "allow_long_names".parse::<Feature>().unwrap());
+        assert_eq!(
+            Feature::AllowNonHermeticPackages,
+            "allow_non_hermetic_packages".parse::<Feature>().unwrap()
+        );
     }
 
     #[test]
     fn feature_is_printed() {
         assert_eq!("hub", Feature::Hub.to_string());
         assert_eq!("allow_long_names", Feature::AllowLongNames.to_string());
+        assert_eq!("allow_non_hermetic_packages", Feature::AllowNonHermeticPackages.to_string());
+        assert_eq!(
+            "enable_allow_non_hermetic_packages_feature",
+            Feature::EnableAllowNonHermeticPackagesFeature.to_string()
+        );
     }
 
     #[test]

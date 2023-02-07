@@ -162,6 +162,12 @@ struct ValidationContext<'a> {
     all_capability_names: HashSet<cml::Name>,
 }
 
+// Facet key for fuchsia.test
+const TEST_FACET_KEY: &'static str = "fuchsia.test";
+
+// Facet key for deprecated-allowed-packages.
+const TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: &'static str = "deprecated-allowed-packages";
+
 impl<'a> ValidationContext<'a> {
     fn new(
         document: &'a cml::Document,
@@ -340,6 +346,50 @@ impl<'a> ValidationContext<'a> {
         // Check that required use decls are present
         self.validate_required_use_decls()?;
 
+        self.validate_facets()?;
+
+        Ok(())
+    }
+
+    fn validate_facets(&self) -> Result<(), Error> {
+        let enable_allow_non_hermetic_packages =
+            self.features.has(&Feature::EnableAllowNonHermeticPackagesFeature);
+        if enable_allow_non_hermetic_packages {
+            let allow_non_hermetic_packages = self.features.has(&Feature::AllowNonHermeticPackages);
+            let deprecated_allowed_packages = match &self.document.facets {
+                Some(m) => {
+                    if let Some(test_facet) = m.get(TEST_FACET_KEY) {
+                        match test_facet {
+                            serde_json::Value::Object(m) => {
+                                m.contains_key(TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY)
+                            }
+                            facet => {
+                                return Err(Error::validate(format!(
+                                    "'{TEST_FACET_KEY}' is not an object: {facet:?}"
+                                )))
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                }
+                None => false,
+            };
+            if deprecated_allowed_packages && !allow_non_hermetic_packages {
+                return Err(Error::validate(format!(
+                    "restricted_feature '{}' should be present with facet '{}'",
+                    Feature::AllowNonHermeticPackages,
+                    TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY
+                )));
+            }
+            if allow_non_hermetic_packages && !deprecated_allowed_packages {
+                return Err(Error::validate(format!(
+                    "Remove restricted_feature '{}' as manifest does not contain facet '{}'",
+                    Feature::AllowNonHermeticPackages,
+                    TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -6838,6 +6888,114 @@ mod tests {
             Err(Error::RestrictedFeature(s)) if s == "allow_long_names"
         ),
     }
+
+    // Tests validate_facets function without the feature set
+    test_validate_cml! {
+        test_valid_empty_facets(
+            json!({
+                "facets": {}
+            }),
+            Ok(())
+        ),
+        test_valid_empty_fuchsia_test_facet(
+            json!({
+                "facets": {TEST_FACET_KEY: {}}
+            }),
+            Ok(())
+        ),
+
+        test_valid_allowed_pkg_without_feature(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: [ "some_pkg" ]
+                    }
+                }
+            }),
+            Ok(())
+        ),
+    }
+
+    // Tests validate_facets function with the feature disabled.
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::AllowNonHermeticPackages]), {
+        test_valid_empty_facets_with_feature_disabled(
+            json!({
+                "facets": {}
+            }),
+            Ok(())
+        ),
+        test_valid_empty_fuchsia_test_facet_with_feature_disabled(
+            json!({
+                "facets": {TEST_FACET_KEY: {}}
+            }),
+            Ok(())
+        ),
+
+        test_valid_allowed_pkg_with_feature_disabled(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: [ "some_pkg" ]
+                    }
+                }
+            }),
+            Ok(())
+        ),
+    }}
+
+    // Tests validate_facets function with the feature enabled.
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::EnableAllowNonHermeticPackagesFeature]), {
+        test_valid_empty_facets_with_feature_enabled(
+            json!({
+                "facets": {}
+            }),
+            Ok(())
+        ),
+        test_valid_empty_fuchsia_test_facet_with_feature_enabled(
+            json!({
+                "facets": {TEST_FACET_KEY: {}}
+            }),
+            Ok(())
+        ),
+
+        test_invalid_allowed_pkg_with_feature_enabled(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: [ "some_pkg" ]
+                    }
+                }
+            }),
+            Err(err) if err.to_string().contains(&Feature::AllowNonHermeticPackages.to_string())
+        ),
+    }}
+
+    // Tests validate_facets function with the feature enabled and allowed pkg feature set.
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::EnableAllowNonHermeticPackagesFeature, Feature::AllowNonHermeticPackages]), {
+        test_invalid_empty_facets_with_feature_enabled(
+            json!({
+                "facets": {}
+            }),
+            Err(err) if err.to_string().contains(&Feature::AllowNonHermeticPackages.to_string())
+        ),
+        test_invalid_empty_fuchsia_test_facet_with_feature_enabled(
+            json!({
+                "facets": {TEST_FACET_KEY: {}}
+            }),
+            Err(err) if err.to_string().contains(&Feature::AllowNonHermeticPackages.to_string())
+        ),
+
+        test_valid_allowed_pkg_with_feature_enabled(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: [ "some_pkg" ]
+                    }
+                }
+            }),
+            Ok(())
+        ),
+    }}
 
     test_validate_cmx! {
         test_cmx_err_empty_json(

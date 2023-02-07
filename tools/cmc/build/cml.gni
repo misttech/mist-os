@@ -117,6 +117,12 @@ template("cm") {
     # restrict out of tree.
     restricted_features += [ "hub" ]
 
+    # Enables feature allow_non_hermetic_packages. This allows us disable the
+    # feature in OOT builds.
+    # TODO(fxbug.dev/118042): Uncomment once all the tests are ported to
+    # allow_non_hermetic_packages feature
+    # restricted_features += [ "enable_allow_non_hermetic_packages_feature" ]
+
     # Opt-in to the requested restricted_features.
     args += [ "--features" ] + restricted_features
 

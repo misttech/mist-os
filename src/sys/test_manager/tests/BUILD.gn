@@ -87,6 +87,8 @@ fuchsia_unittest_package("test_manager_test") {
     "//src/sys/test_manager:test_manager_cmp",
   ]
 
+  restricted_features = [ "allow_non_hermetic_packages" ]
+
   # There's expected error logs that happen during the test such as not resolving an instance when
   # testing that we fail to execute a test with an unknown URL.
   test_specs = {
@@ -97,6 +99,7 @@ fuchsia_unittest_package("test_manager_test") {
 }
 
 fuchsia_unittest_package("test_manager_stress_test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/test_manager_stress_test.cml"
   deps = [
     ":test_manager_stress_test_bin",

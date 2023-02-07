@@ -21,3 +21,20 @@ group("allow_long_names") {
     "//tools/cmc:*",
   ]
 }
+
+# The allowlist of test components that can resolve non-hermetic packages.
+# Don't add any more dependencies to this. See
+# https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#hermetic-resolver
+group("allow_non_hermetic_packages") {
+  visibility = [
+    "//src/connectivity/bluetooth/lib/fuchsia-audio-codec:*",
+    "//src/connectivity/network/testing/netemul/guest/test:*",
+    "//src/sys/test_manager/tests:*",
+    "//src/sys/test_manager/tests/nonhermetic_packaged_tests:*",
+  ]
+}
+
+# The allowlist of components that can use the "enable_allow_non_hermetic_packages_feature" feature in CML.
+group("enable_allow_non_hermetic_packages_feature") {
+  # Available to all components in fuchsia.git
+}

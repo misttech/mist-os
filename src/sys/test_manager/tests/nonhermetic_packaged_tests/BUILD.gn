@@ -19,6 +19,7 @@ rustc_test("echo_test_bin") {
 }
 
 fuchsia_test_component("echo_test_specific_package") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [ ":echo_test_bin" ]
   manifest = "meta/echo_test-allow-specific-package.cml"
 }

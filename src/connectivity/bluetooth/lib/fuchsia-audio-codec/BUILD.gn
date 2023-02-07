@@ -52,6 +52,7 @@ resource("test-data") {
 }
 
 fuchsia_test_component("fuchsia-audio-codec-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/fuchsia-audio-codec-lib-test.cml"
   deps = [ ":fuchsia-audio-codec_test" ]
 }

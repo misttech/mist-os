@@ -32,6 +32,7 @@ rustc_test("guest") {
 }
 
 fuchsia_test_component("netemul-guest-self-test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/netemul-guest-self-test.cml"
   deps = [ ":guest" ]
 }
