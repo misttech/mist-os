@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/sysmem/c/fidl.h>
 #include <inttypes.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
