@@ -18,8 +18,10 @@ use ffx_emulator_config::{
 use ffx_emulator_start_args::StartCommand;
 use pbms::{load_product_bundle, ListingMode};
 use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
-use std::str::FromStr;
-use std::{collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, time::Duration};
+use std::{
+    collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, str::FromStr,
+    time::Duration,
+};
 
 /// Lists the virtual device spec names in the specified product.
 pub(crate) async fn list_virtual_devices(
@@ -74,10 +76,10 @@ async fn apply_command_line_options(
 ) -> Result<EmulatorConfiguration> {
     // Clone any fields that can simply copy over.
     emu_config.host.acceleration = cmd.accel.clone();
-    emu_config.host.networking = cmd.net.clone();
 
     // Process any values that are Options, have Auto values, or need any transformation.
     emu_config.host.gpu = GpuType::from_str(&cmd.gpu().await?)?;
+    emu_config.host.networking = NetworkingMode::from_str(&cmd.net().await?)?;
 
     if let Some(log) = &cmd.log {
         // It'd be nice to canonicalize this path, to clean up relative bits like "..", but the
@@ -295,7 +297,7 @@ mod tests {
             log: Some(PathBuf::from("/path/to/log")),
             monitor: false,
             name: "SomeName".to_string(),
-            net: NetworkingMode::Tap,
+            net: Some("tap".to_string()),
             verbose: true,
             ..Default::default()
         };

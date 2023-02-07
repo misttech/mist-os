@@ -6,7 +6,7 @@ use argh::FromArgs;
 use ffx_config::FfxConfigBacked;
 use ffx_core::ffx_command;
 use ffx_emulator_common::host_is_mac;
-use ffx_emulator_config::{AccelerationMode, NetworkingMode};
+use ffx_emulator_config::AccelerationMode;
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -131,9 +131,11 @@ pub struct StartCommand {
     /// specify the networking mode for the emulator. Allowed values are "none" which disables
     /// networking, "tap" which attaches to a Tun/Tap interface, "user" which sets up mapped ports
     /// via SLiRP, and "auto" which will check the host system's capabilities and select "tap" if
-    /// it is available and "user" otherwise. Default is "auto".
-    #[argh(option, default = "NetworkingMode::Auto")]
-    pub net: NetworkingMode,
+    /// it is available and "user" otherwise. Default is "auto". This can be overridden by
+    /// running `ffx config set emu.net <type>`.
+    #[argh(option)]
+    #[ffx_config_default(key = "emu.net", default = "auto")]
+    pub net: Option<String>,
 
     /// specify a host port mapping for user-networking mode. Ignored in other networking modes.
     /// Syntax is "--port-map <portname>:<port>". The <portname> must be one of those specified in
