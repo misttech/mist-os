@@ -10,7 +10,6 @@
 
 #include <asm/ioctls.h>
 #include <asm/poll.h>
-#include <asm/prctl.h>
 #include <asm/sigcontext.h>
 #include <asm/signal.h>
 #include <asm/socket.h>
@@ -52,6 +51,10 @@
 #include <linux/unistd.h>
 #include <linux/wait.h>
 #include <linux/xattr.h>
+
+#ifdef __x86_64__
+#include <asm/prctl.h>
+#endif
 
 #include "stub/missing_includes.h"
 

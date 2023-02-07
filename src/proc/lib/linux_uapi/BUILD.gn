@@ -6,11 +6,21 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("linux_uapi") {
   edition = "2021"
-  sources = [
-    "src/lib.rs",
-    "src/x86_64.rs",
-    "src/x86_64_types.rs",
-  ]
+
+  sources = [ "src/lib.rs" ]
+  if (current_cpu == "x64") {
+    sources += [
+      "src/x86_64.rs",
+      "src/x86_64_types.rs",
+    ]
+  } else if (current_cpu == "arm64") {
+    sources += [
+      "src/arm64.rs",
+      "src/arm64_types.rs",
+    ]
+  } else {
+    assert(false, "Need uapi definition for the '$current_cpu` architecture")
+  }
 
   deps = [ "//third_party/rust_crates:zerocopy" ]
 

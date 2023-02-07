@@ -16,7 +16,7 @@ use fuchsia_zircon::{
     sys::{ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK},
     zx_status_t, HandleBased,
 };
-use linux_uapi::x86_64::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_void};
+use linux_uapi::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_void};
 use std::{ffi::CStr, pin::Pin};
 use zxio::{
     msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_storage_t,

@@ -11,8 +11,8 @@ use zerocopy::{AsBytes, FromBytes};
 use crate::mm::PAGE_SIZE;
 use crate::types::UserAddress;
 
-#[cfg(target_arch = "x86_64")]
-use linux_uapi::x86_64 as uapi;
+use linux_uapi as uapi;
+
 pub use uapi::*;
 
 pub type dev_t = uapi::__kernel_old_dev_t;
