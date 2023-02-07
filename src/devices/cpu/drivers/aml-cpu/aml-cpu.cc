@@ -134,18 +134,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
     return op_points.error_value();
   }
 
-  // Make sure we have the right number of fragments.
-  const uint32_t fragment_count = device_get_fragment_count(parent);
-  zxlogf(DEBUG, "%s: GetFragmentCount = %u", __func__, fragment_count);
-  if ((perf_doms->size() * fragments_per_pf_domain) + 1 != fragment_count) {
-    zxlogf(ERROR,
-           "%s: Expected %lu fragments for each %lu performance domains for a total of %lu "
-           "fragments but got %u instead",
-           __func__, fragments_per_pf_domain, perf_doms->size(),
-           perf_doms->size() * fragments_per_pf_domain, fragment_count);
-    return ZX_ERR_INTERNAL;
-  }
-
   const uint32_t cpu_version_packed = mmio_buffer->Read32(cpu_version_offset);
 
   // Build and publish each performance domain.
