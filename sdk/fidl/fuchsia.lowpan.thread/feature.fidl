@@ -9,7 +9,7 @@ using fuchsia.lowpan;
 ///
 /// This table describes what OpenThread features are enabled or disabled
 /// for a given interface. See the [`Feature`] protocol for more information.
-@available(added=12)
+@available(added=11)
 type FeatureConfig = table {
     /// Determines if TREL is enabled or disabled.
     1: trel_enabled bool;
@@ -23,7 +23,7 @@ type FeatureConfig = table {
 
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.
 @discoverable
-@available(added=12)
+@available(added=11)
 protocol FeatureConnector {
     /// Connects to the [`Feature`] protocol on the
     /// named LoWPAN device.
@@ -49,7 +49,7 @@ protocol FeatureConnector {
 
 /// Protocol for fetching and updating the OpenThread feature configuration
 /// for a specific LoWPAN interface.
-@available(added=12)
+@available(added=11)
 protocol Feature {
     /// Updates the current OpenThread feature configuration for this
     /// interface.

@@ -32,6 +32,54 @@
         "name": "fuchsia.lowpan.thread/DatasetConnector"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Feature.GetFeatureConfig",
+        "ordinal": "3076391112764831249",
+        "type": "() -> (fuchsia.lowpan.thread/FeatureConfig config)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Feature.UpdateFeatureConfig",
+        "ordinal": "3252908478979834896",
+        "type": "(fuchsia.lowpan.thread/FeatureConfig config) -> ()"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/Feature"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.nat64_enabled",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.srp_replication_enabled",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.trel_enabled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.lowpan.thread/FeatureConfig"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/FeatureConnector.Connect",
+        "ordinal": "5120311771156547493",
+        "type": "(string:32 name,server_end:fuchsia.lowpan.thread/Feature server_end)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/FeatureConnector"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.lowpan.thread/MAX_DATASET_TLV_LEN",
         "type": "uint8",
