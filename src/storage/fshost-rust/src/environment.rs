@@ -177,7 +177,7 @@ impl Environment for FshostEnvironment {
         }
 
         // Potentially read the data off the disk in cases where we want to migrate the data.
-        // TODO(fxbug.dev/109293): This is good enough for the ram-based migration, but the
+        // TODO(fxbug.dev/120317): This is good enough for the ram-based migration, but the
         // disk-based migration wants to be able to deactivate the zxcrypt partition after
         // mounting. This will probably require a minor refactor to the launcher code.
         let copied_data = match (device.content_format().await?, format, self.config.no_zxcrypt) {
