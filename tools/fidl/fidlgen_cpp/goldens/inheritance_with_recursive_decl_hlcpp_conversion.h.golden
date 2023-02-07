@@ -10,6 +10,7 @@
 #include <fidl/test.inheritancewithrecursivedecl/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/inheritancewithrecursivedecl/cpp/fidl.h>
 
 namespace fidl {
@@ -46,6 +47,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::inheritancewithrecurs
     return fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Parent>;
+  static inline fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Parent> Convert(fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Parent>> {
+  using NaturalType = fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent>;
+  static inline fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent> Convert(fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Parent>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_inheritancewithrecursivedecl::Child>> {
   using HLCPPType = fidl::InterfaceHandle<::test::inheritancewithrecursivedecl::Child>;
@@ -75,6 +96,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::inheritancewithrecurs
   using NaturalType = fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>;
   static inline fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> Convert(fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Child>&& c) {
     return fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Child>;
+  static inline fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Child> Convert(fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Child> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Child>> {
+  using NaturalType = fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child>;
+  static inline fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child> Convert(fidl::InterfaceRequestHandler<::test::inheritancewithrecursivedecl::Child>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

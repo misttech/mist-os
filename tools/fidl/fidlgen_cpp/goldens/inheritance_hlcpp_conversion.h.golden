@@ -10,6 +10,7 @@
 #include <fidl/test.inheritance/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/inheritance/cpp/fidl.h>
 
 namespace fidl {
@@ -46,6 +47,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::inheritance::super>> 
     return fidl::ServerEnd<::test_inheritance::Super>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_inheritance::Super>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::inheritance::super>;
+  static inline fidl::InterfaceRequestHandler<::test::inheritance::super> Convert(fidl::ProtocolHandler<::test_inheritance::Super>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::inheritance::super> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::inheritance::super>> {
+  using NaturalType = fidl::ProtocolHandler<::test_inheritance::Super>;
+  static inline fidl::ProtocolHandler<::test_inheritance::Super> Convert(fidl::InterfaceRequestHandler<::test::inheritance::super>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_inheritance::Super> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_inheritance::Sub>> {
   using HLCPPType = fidl::InterfaceHandle<::test::inheritance::sub>;
@@ -75,6 +96,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::inheritance::sub>> {
   using NaturalType = fidl::ServerEnd<::test_inheritance::Sub>;
   static inline fidl::ServerEnd<::test_inheritance::Sub> Convert(fidl::InterfaceRequest<::test::inheritance::sub>&& c) {
     return fidl::ServerEnd<::test_inheritance::Sub>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_inheritance::Sub>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::inheritance::sub>;
+  static inline fidl::InterfaceRequestHandler<::test::inheritance::sub> Convert(fidl::ProtocolHandler<::test_inheritance::Sub>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::inheritance::sub> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::inheritance::sub>> {
+  using NaturalType = fidl::ProtocolHandler<::test_inheritance::Sub>;
+  static inline fidl::ProtocolHandler<::test_inheritance::Sub> Convert(fidl::InterfaceRequestHandler<::test::inheritance::sub>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_inheritance::Sub> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

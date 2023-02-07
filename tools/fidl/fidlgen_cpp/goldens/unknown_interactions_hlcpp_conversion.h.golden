@@ -12,6 +12,7 @@
   #include <test/unknowninteractions/cpp/fidl.h>
 
   #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+  #include <lib/fidl/cpp/wire/service_handler.h>
   #include <lib/fidl/cpp/hlcpp_conversion.h>
 
   
@@ -52,6 +53,26 @@ namespace internal {
         return fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsProtocol>(c.TakeChannel());
       }
     };
+
+    template<>
+    struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsProtocol>> {
+      using HLCPPType = fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsProtocol>;
+      static inline fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsProtocol> Convert(fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsProtocol>&& c) {
+        return [c = std::move(c)](fidl::InterfaceRequest<::test::unknowninteractions::UnknownInteractionsProtocol> r) {
+          c(::fidl::HLCPPToNatural(r));
+        };
+      }
+    };
+
+    template<>
+    struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsProtocol>> {
+      using NaturalType = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsProtocol>;
+      static inline fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsProtocol> Convert(fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsProtocol>&& c) {
+        return [c = std::move(c)](fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsProtocol> r) {
+          c(::fidl::NaturalToHLCPP(r));
+        };
+      }
+    };
     template<>
     struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>> {
       using HLCPPType = fidl::InterfaceHandle<::test::unknowninteractions::UnknownInteractionsAjarProtocol>;
@@ -83,6 +104,26 @@ namespace internal {
         return fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>(c.TakeChannel());
       }
     };
+
+    template<>
+    struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>> {
+      using HLCPPType = fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsAjarProtocol>;
+      static inline fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsAjarProtocol> Convert(fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>&& c) {
+        return [c = std::move(c)](fidl::InterfaceRequest<::test::unknowninteractions::UnknownInteractionsAjarProtocol> r) {
+          c(::fidl::HLCPPToNatural(r));
+        };
+      }
+    };
+
+    template<>
+    struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsAjarProtocol>> {
+      using NaturalType = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>;
+      static inline fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol> Convert(fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsAjarProtocol>&& c) {
+        return [c = std::move(c)](fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol> r) {
+          c(::fidl::NaturalToHLCPP(r));
+        };
+      }
+    };
     template<>
     struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>> {
       using HLCPPType = fidl::InterfaceHandle<::test::unknowninteractions::UnknownInteractionsClosedProtocol>;
@@ -112,6 +153,26 @@ namespace internal {
       using NaturalType = fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>;
       static inline fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol> Convert(fidl::InterfaceRequest<::test::unknowninteractions::UnknownInteractionsClosedProtocol>&& c) {
         return fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>(c.TakeChannel());
+      }
+    };
+
+    template<>
+    struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>> {
+      using HLCPPType = fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsClosedProtocol>;
+      static inline fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsClosedProtocol> Convert(fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>&& c) {
+        return [c = std::move(c)](fidl::InterfaceRequest<::test::unknowninteractions::UnknownInteractionsClosedProtocol> r) {
+          c(::fidl::HLCPPToNatural(r));
+        };
+      }
+    };
+
+    template<>
+    struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsClosedProtocol>> {
+      using NaturalType = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>;
+      static inline fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol> Convert(fidl::InterfaceRequestHandler<::test::unknowninteractions::UnknownInteractionsClosedProtocol>&& c) {
+        return [c = std::move(c)](fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol> r) {
+          c(::fidl::NaturalToHLCPP(r));
+        };
       }
     };
 

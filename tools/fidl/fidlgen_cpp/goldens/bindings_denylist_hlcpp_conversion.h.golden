@@ -11,6 +11,7 @@
 #include <fidl/test.dependent/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/bindingsdenylist/cpp/fidl.h>
 
 namespace fidl {
@@ -47,6 +48,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::Onl
     return fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>;
+  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>> {
+  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
+  static inline fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>> {
   using HLCPPType = fidl::InterfaceHandle<::test::bindingsdenylist::OnlyCppAndDeps>;
@@ -76,6 +97,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::Onl
   using NaturalType = fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>;
   static inline fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps> Convert(fidl::InterfaceRequest<::test::bindingsdenylist::OnlyCppAndDeps>&& c) {
     return fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyCppAndDeps>;
+  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyCppAndDeps> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::OnlyCppAndDeps> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyCppAndDeps>> {
+  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps>;
+  static inline fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyCppAndDeps>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 template <>
@@ -109,6 +150,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::Den
     return fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::DenyEachBinding>;
+  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::DenyEachBinding> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::DenyEachBinding> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::DenyEachBinding>> {
+  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding>;
+  static inline fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::DenyEachBinding>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_bindingsdenylist::Allowed>> {
   using HLCPPType = fidl::InterfaceHandle<::test::bindingsdenylist::Allowed>;
@@ -140,6 +201,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::All
     return fidl::ServerEnd<::test_bindingsdenylist::Allowed>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::Allowed>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::Allowed>;
+  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::Allowed> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::Allowed>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::Allowed> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::Allowed>> {
+  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::Allowed>;
+  static inline fidl::ProtocolHandler<::test_bindingsdenylist::Allowed> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::Allowed>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::Allowed> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_bindingsdenylist::ImportsSameNameContext>> {
   using HLCPPType = fidl::InterfaceHandle<::test::bindingsdenylist::ImportsSameNameContext>;
@@ -169,6 +250,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::Imp
   using NaturalType = fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>;
   static inline fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext> Convert(fidl::InterfaceRequest<::test::bindingsdenylist::ImportsSameNameContext>&& c) {
     return fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::ImportsSameNameContext>;
+  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::ImportsSameNameContext> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::ImportsSameNameContext> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::ImportsSameNameContext>> {
+  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext>;
+  static inline fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::ImportsSameNameContext>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

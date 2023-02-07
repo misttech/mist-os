@@ -11,6 +11,7 @@
 #include <fidl/test.placementofattributes/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/placementofattributes/cpp/fidl.h>
 
 namespace fidl {
@@ -54,6 +55,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::placementofattributes
   using NaturalType = fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>;
   static inline fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> Convert(fidl::InterfaceRequest<::test::placementofattributes::ExampleProtocol>&& c) {
     return fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::placementofattributes::ExampleProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::placementofattributes::ExampleProtocol> Convert(fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::placementofattributes::ExampleProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::placementofattributes::ExampleProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol>;
+  static inline fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol> Convert(fidl::InterfaceRequestHandler<::test::placementofattributes::ExampleProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

@@ -11,6 +11,7 @@
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/protocolpayloads/cpp/fidl.h>
 
 namespace fidl {
@@ -45,6 +46,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocolpayloads::Mai
   using NaturalType = fidl::ServerEnd<::test_protocolpayloads::MainProtocol>;
   static inline fidl::ServerEnd<::test_protocolpayloads::MainProtocol> Convert(fidl::InterfaceRequest<::test::protocolpayloads::MainProtocol>&& c) {
     return fidl::ServerEnd<::test_protocolpayloads::MainProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocolpayloads::MainProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocolpayloads::MainProtocol> Convert(fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocolpayloads::MainProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocolpayloads::MainProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocolpayloads::MainProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocolpayloads::MainProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

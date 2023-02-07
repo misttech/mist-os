@@ -10,6 +10,7 @@
 #include <fidl/test.protocols/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/protocols/cpp/fidl.h>
 
 namespace fidl {
@@ -51,6 +52,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::WithAndWit
     return fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::WithAndWithoutRequestResponse>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::WithAndWithoutRequestResponse> Convert(fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::WithAndWithoutRequestResponse> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::WithAndWithoutRequestResponse>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse>;
+  static inline fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse> Convert(fidl::InterfaceRequestHandler<::test::protocols::WithAndWithoutRequestResponse>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::WithErrorSyntax>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::WithErrorSyntax>;
@@ -80,6 +101,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::WithErrorS
   using NaturalType = fidl::ServerEnd<::test_protocols::WithErrorSyntax>;
   static inline fidl::ServerEnd<::test_protocols::WithErrorSyntax> Convert(fidl::InterfaceRequest<::test::protocols::WithErrorSyntax>&& c) {
     return fidl::ServerEnd<::test_protocols::WithErrorSyntax>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::WithErrorSyntax>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::WithErrorSyntax>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::WithErrorSyntax> Convert(fidl::ProtocolHandler<::test_protocols::WithErrorSyntax>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::WithErrorSyntax> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::WithErrorSyntax>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::WithErrorSyntax>;
+  static inline fidl::ProtocolHandler<::test_protocols::WithErrorSyntax> Convert(fidl::InterfaceRequestHandler<::test::protocols::WithErrorSyntax>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::WithErrorSyntax> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 template <>
@@ -113,6 +154,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::ChannelPro
     return fidl::ServerEnd<::test_protocols::ChannelProtocol>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::ChannelProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::ChannelProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::ChannelProtocol> Convert(fidl::ProtocolHandler<::test_protocols::ChannelProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::ChannelProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::ChannelProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::ChannelProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocols::ChannelProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocols::ChannelProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::ChannelProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::Transitional>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::Transitional>;
@@ -142,6 +203,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::Transition
   using NaturalType = fidl::ServerEnd<::test_protocols::Transitional>;
   static inline fidl::ServerEnd<::test_protocols::Transitional> Convert(fidl::InterfaceRequest<::test::protocols::Transitional>&& c) {
     return fidl::ServerEnd<::test_protocols::Transitional>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::Transitional>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::Transitional>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::Transitional> Convert(fidl::ProtocolHandler<::test_protocols::Transitional>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::Transitional> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::Transitional>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::Transitional>;
+  static inline fidl::ProtocolHandler<::test_protocols::Transitional> Convert(fidl::InterfaceRequestHandler<::test::protocols::Transitional>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::Transitional> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 template <>
@@ -175,6 +256,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::Discoverab
     return fidl::ServerEnd<::test_protocols::DiscoverableProtocol>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::DiscoverableProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::DiscoverableProtocol> Convert(fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::DiscoverableProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocols::DiscoverableProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::DiscoverableProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::AnotherDiscoverableProtocol>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::AnotherDiscoverableProtocol>;
@@ -204,6 +305,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::AnotherDis
   using NaturalType = fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>;
   static inline fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol> Convert(fidl::InterfaceRequest<::test::protocols::AnotherDiscoverableProtocol>&& c) {
     return fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::AnotherDiscoverableProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::AnotherDiscoverableProtocol> Convert(fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::AnotherDiscoverableProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::AnotherDiscoverableProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocols::AnotherDiscoverableProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 template <>
@@ -237,6 +358,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::HandleRigh
     return fidl::ServerEnd<::test_protocols::HandleRightsProtocol>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::HandleRightsProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::HandleRightsProtocol> Convert(fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::HandleRightsProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::HandleRightsProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocols::HandleRightsProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::HandleRightsProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::WithProtocolEnds>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::WithProtocolEnds>;
@@ -266,6 +407,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::WithProtoc
   using NaturalType = fidl::ServerEnd<::test_protocols::WithProtocolEnds>;
   static inline fidl::ServerEnd<::test_protocols::WithProtocolEnds> Convert(fidl::InterfaceRequest<::test::protocols::WithProtocolEnds>&& c) {
     return fidl::ServerEnd<::test_protocols::WithProtocolEnds>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::WithProtocolEnds>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::WithProtocolEnds>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::WithProtocolEnds> Convert(fidl::ProtocolHandler<::test_protocols::WithProtocolEnds>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::WithProtocolEnds> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::WithProtocolEnds>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::WithProtocolEnds>;
+  static inline fidl::ProtocolHandler<::test_protocols::WithProtocolEnds> Convert(fidl::InterfaceRequestHandler<::test::protocols::WithProtocolEnds>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::WithProtocolEnds> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 template <>
@@ -299,6 +460,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::ManyParame
     return fidl::ServerEnd<::test_protocols::ManyParameters>(c.TakeChannel());
   }
 };
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::ManyParameters>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::ManyParameters>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::ManyParameters> Convert(fidl::ProtocolHandler<::test_protocols::ManyParameters>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::ManyParameters> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::ManyParameters>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::ManyParameters>;
+  static inline fidl::ProtocolHandler<::test_protocols::ManyParameters> Convert(fidl::InterfaceRequestHandler<::test::protocols::ManyParameters>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::ManyParameters> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocols::MethodWithUnion>> {
   using HLCPPType = fidl::InterfaceHandle<::test::protocols::MethodWithUnion>;
@@ -328,6 +509,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocols::MethodWith
   using NaturalType = fidl::ServerEnd<::test_protocols::MethodWithUnion>;
   static inline fidl::ServerEnd<::test_protocols::MethodWithUnion> Convert(fidl::InterfaceRequest<::test::protocols::MethodWithUnion>&& c) {
     return fidl::ServerEnd<::test_protocols::MethodWithUnion>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocols::MethodWithUnion>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocols::MethodWithUnion>;
+  static inline fidl::InterfaceRequestHandler<::test::protocols::MethodWithUnion> Convert(fidl::ProtocolHandler<::test_protocols::MethodWithUnion>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocols::MethodWithUnion> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocols::MethodWithUnion>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocols::MethodWithUnion>;
+  static inline fidl::ProtocolHandler<::test_protocols::MethodWithUnion> Convert(fidl::InterfaceRequestHandler<::test::protocols::MethodWithUnion>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocols::MethodWithUnion> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

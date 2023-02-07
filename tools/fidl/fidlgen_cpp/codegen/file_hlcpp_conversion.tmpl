@@ -27,6 +27,7 @@
   #include <{{ .Library | Filename "HLCPPHeader" }}>
 
   #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+  #include <lib/fidl/cpp/wire/service_handler.h>
   #include <lib/fidl/cpp/hlcpp_conversion.h>
 
   {{ range .Dependencies -}}
@@ -79,6 +80,26 @@
       using NaturalType = fidl::ServerEnd<{{ .Wire }}>;
       static inline fidl::ServerEnd<{{ .Wire }}> Convert(fidl::InterfaceRequest<{{ .HLCPP }}>&& c) {
         return fidl::ServerEnd<{{ .Wire }}>(c.TakeChannel());
+      }
+    };
+
+    template<>
+    struct NaturalToHLCPPTraits<fidl::ProtocolHandler<{{ .Wire }}>> {
+      using HLCPPType = fidl::InterfaceRequestHandler<{{ .HLCPP }}>;
+      static inline fidl::InterfaceRequestHandler<{{ .HLCPP }}> Convert(fidl::ProtocolHandler<{{ .Wire }}>&& c) {
+        return [c = std::move(c)](fidl::InterfaceRequest<{{ .HLCPP }}> r) {
+          c(::fidl::HLCPPToNatural(r));
+        };
+      }
+    };
+
+    template<>
+    struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<{{ .HLCPP }}>> {
+      using NaturalType = fidl::ProtocolHandler<{{ .Wire }}>;
+      static inline fidl::ProtocolHandler<{{ .Wire }}> Convert(fidl::InterfaceRequestHandler<{{ .HLCPP }}>&& c) {
+        return [c = std::move(c)](fidl::ServerEnd<{{ .Wire }}> r) {
+          c(::fidl::NaturalToHLCPP(r));
+        };
       }
     };
   {{- end }}

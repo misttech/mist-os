@@ -10,6 +10,7 @@
 #include <fidl/test.nullable/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/nullable/cpp/fidl.h>
 
 namespace fidl {
@@ -44,6 +45,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::nullable::SimpleProto
   using NaturalType = fidl::ServerEnd<::test_nullable::SimpleProtocol>;
   static inline fidl::ServerEnd<::test_nullable::SimpleProtocol> Convert(fidl::InterfaceRequest<::test::nullable::SimpleProtocol>&& c) {
     return fidl::ServerEnd<::test_nullable::SimpleProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_nullable::SimpleProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::nullable::SimpleProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::nullable::SimpleProtocol> Convert(fidl::ProtocolHandler<::test_nullable::SimpleProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::nullable::SimpleProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::nullable::SimpleProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_nullable::SimpleProtocol>;
+  static inline fidl::ProtocolHandler<::test_nullable::SimpleProtocol> Convert(fidl::InterfaceRequestHandler<::test::nullable::SimpleProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_nullable::SimpleProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

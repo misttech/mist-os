@@ -10,6 +10,7 @@
 #include <fidl/test.doccomments/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/doccomments/cpp/fidl.h>
 
 namespace fidl {
@@ -61,6 +62,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::doccomments::Interfac
   using NaturalType = fidl::ServerEnd<::test_doccomments::Interface>;
   static inline fidl::ServerEnd<::test_doccomments::Interface> Convert(fidl::InterfaceRequest<::test::doccomments::Interface>&& c) {
     return fidl::ServerEnd<::test_doccomments::Interface>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_doccomments::Interface>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::doccomments::Interface>;
+  static inline fidl::InterfaceRequestHandler<::test::doccomments::Interface> Convert(fidl::ProtocolHandler<::test_doccomments::Interface>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::doccomments::Interface> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::doccomments::Interface>> {
+  using NaturalType = fidl::ProtocolHandler<::test_doccomments::Interface>;
+  static inline fidl::ProtocolHandler<::test_doccomments::Interface> Convert(fidl::InterfaceRequestHandler<::test::doccomments::Interface>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_doccomments::Interface> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 

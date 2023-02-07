@@ -11,6 +11,7 @@
 #include <fidl/test.errorsyntax/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/errorsyntax/cpp/fidl.h>
 
 namespace fidl {
@@ -45,6 +46,26 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::errorsyntax::ExampleU
   using NaturalType = fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>;
   static inline fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> Convert(fidl::InterfaceRequest<::test::errorsyntax::ExampleUseOfErrorSyntax>&& c) {
     return fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::errorsyntax::ExampleUseOfErrorSyntax>;
+  static inline fidl::InterfaceRequestHandler<::test::errorsyntax::ExampleUseOfErrorSyntax> Convert(fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::errorsyntax::ExampleUseOfErrorSyntax> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::errorsyntax::ExampleUseOfErrorSyntax>> {
+  using NaturalType = fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>;
+  static inline fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax> Convert(fidl::InterfaceRequestHandler<::test::errorsyntax::ExampleUseOfErrorSyntax>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
   }
 };
 
