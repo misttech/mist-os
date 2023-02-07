@@ -5,10 +5,8 @@
 use anyhow::{bail, Result};
 use cfg_if::cfg_if;
 use mockall::automock;
-use nix::{
-    ifaddrs::{getifaddrs, InterfaceAddress, InterfaceAddressIterator},
-    net::if_::InterfaceFlags,
-};
+use nix::ifaddrs::{getifaddrs, InterfaceAddress, InterfaceAddressIterator};
+use nix::net::if_::InterfaceFlags;
 
 // TODO(fxbug.dev/100022): Make this configurable.
 // The interface name, "qemu", provided here used to be provided by the qemu

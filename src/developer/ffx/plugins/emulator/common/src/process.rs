@@ -7,12 +7,10 @@
 use anyhow::{bail, Result};
 use nix;
 use shared_child::SharedChild;
-use std::{
-    convert::TryInto,
-    sync::atomic::{AtomicBool, Ordering},
-    sync::Arc,
-    thread, time,
-};
+use std::convert::TryInto;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::{thread, time};
 
 /// Monitors a shared process for the interrupt signal.
 ///

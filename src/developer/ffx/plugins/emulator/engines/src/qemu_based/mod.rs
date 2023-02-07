@@ -5,13 +5,11 @@
 //! The qemu_base module encapsulates traits and functions specific
 //! for engines using QEMU as the emulator platform.
 
-use crate::{
-    arg_templates::process_flag_template,
-    finalize_port_mapping,
-    qemu_based::comms::{spawn_pipe_thread, QemuSocket},
-    serialization::SerializingEngine,
-    show_output,
-};
+use crate::arg_templates::process_flag_template;
+use crate::finalize_port_mapping;
+use crate::qemu_based::comms::{spawn_pipe_thread, QemuSocket};
+use crate::serialization::SerializingEngine;
+use crate::show_output;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use cfg_if::cfg_if;
@@ -31,18 +29,16 @@ use ffx_emulator_config::{
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::Serialize;
 use shared_child::SharedChild;
-use std::{
-    env, fs,
-    fs::File,
-    io::{stderr, Write},
-    net::{IpAddr, Ipv4Addr, Shutdown},
-    ops::Sub,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-    sync::{mpsc::channel, Arc},
-    time::Duration,
-};
+use std::env;
+use std::fs::{self, File};
+use std::io::{stderr, Write};
+use std::net::{IpAddr, Ipv4Addr, Shutdown};
+use std::ops::Sub;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str;
+use std::sync::{mpsc::channel, Arc};
+use std::time::Duration;
 
 #[cfg(test)]
 use mockall::automock;

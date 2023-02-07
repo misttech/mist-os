@@ -17,10 +17,8 @@ use ffx_emulator_config::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::get_host_tool;
 

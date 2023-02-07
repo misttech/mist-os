@@ -6,13 +6,11 @@ use anyhow::{bail, Context, Result};
 use ffx_emulator_config::EmulatorConfiguration;
 use ffx_emulator_engines::process_flags_from_str;
 use serde_json;
-use std::{
-    env::{temp_dir, var},
-    fs::File,
-    io::{Read, Write},
-    process::Command,
-    str,
-};
+use std::env::{temp_dir, var};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::process::Command;
+use std::str;
 
 const TEMP_FILE_HEADER: &'static str = r#"
 {{! This is a comment. Anything contained in double-brackets like these will be ignored. }}

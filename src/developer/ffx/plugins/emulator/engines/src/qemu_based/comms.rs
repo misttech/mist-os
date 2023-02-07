@@ -14,15 +14,13 @@
 //! exposed.
 
 use anyhow::{Context, Result};
-use std::{
-    env,
-    ffi::OsStr,
-    io::{Read, Write},
-    os::unix::net::UnixStream,
-    path::PathBuf,
-    sync::mpsc::Sender,
-    thread::{spawn, JoinHandle},
-};
+use std::env;
+use std::ffi::OsStr;
+use std::io::{Read, Write};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+use std::sync::mpsc::Sender;
+use std::thread::{spawn, JoinHandle};
 
 trait CommsBackend<T>
 where
