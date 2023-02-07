@@ -110,7 +110,6 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
     "//src/devices/lib/block",
     "//src/devices/lib/dev-operation",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/storage-metrics",
   ]
 }

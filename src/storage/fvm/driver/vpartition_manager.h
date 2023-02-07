@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/block/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>

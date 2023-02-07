@@ -14,7 +14,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/channel.h>

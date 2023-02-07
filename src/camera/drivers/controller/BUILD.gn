@@ -86,7 +86,6 @@ source_set("source") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/trace",

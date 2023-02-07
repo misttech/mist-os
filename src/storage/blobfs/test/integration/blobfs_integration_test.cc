@@ -18,7 +18,6 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/service/cpp/reader.h>

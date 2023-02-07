@@ -10,7 +10,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/device.h>
-#include <lib/fidl-utils/bind.h>
 #include <threads.h>
 
 #include <memory>

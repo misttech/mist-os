@@ -5,7 +5,6 @@
 #include "buffer_collection_token.h"
 
 #include <lib/ddk/trace/event.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/zx/channel.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>

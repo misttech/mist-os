@@ -13,7 +13,6 @@
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/platform-device.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
 #include <stdio.h>

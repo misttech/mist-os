@@ -33,7 +33,6 @@ fuchsia_driver("ramdisk-driver") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",

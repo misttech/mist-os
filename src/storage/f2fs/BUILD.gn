@@ -123,7 +123,6 @@ static_library("f2fs") {
       "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-      "//zircon/system/ulib/fidl-utils",
       "//zircon/system/ulib/inspect",
       "//zircon/system/ulib/sync",
       "//zircon/system/ulib/trace",

@@ -70,7 +70,6 @@ source_set("shared") {
     "//src/storage/gpt",
     "//third_party/boringssl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",

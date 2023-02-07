@@ -113,7 +113,6 @@ test("blobfs_unittest") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/storage/operation",
     "//zircon/system/ulib/sync",

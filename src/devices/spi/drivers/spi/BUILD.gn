@@ -82,7 +82,6 @@ test("spi-test-bin") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/spi",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",

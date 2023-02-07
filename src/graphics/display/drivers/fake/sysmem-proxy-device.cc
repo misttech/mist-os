@@ -13,7 +13,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/sync/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>

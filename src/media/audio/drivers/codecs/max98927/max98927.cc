@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/fidl-utils/bind.h>
 #include <zircon/assert.h>
 
 #include <memory>

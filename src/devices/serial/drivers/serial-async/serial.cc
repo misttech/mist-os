@@ -8,7 +8,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fit/function.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/time.h>

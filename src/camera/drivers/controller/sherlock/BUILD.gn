@@ -36,7 +36,6 @@ source_set("config") {
     "//src/camera/drivers/controller/configs",
     "//src/camera/lib/formatting",
     "//src/camera/lib/stream_utils:stream_configs",
-    "//zircon/system/ulib/fidl-utils",
   ]
 }
 

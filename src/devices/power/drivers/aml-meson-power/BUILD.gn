@@ -80,7 +80,6 @@ test("aml-meson-power-test-bin") {
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",

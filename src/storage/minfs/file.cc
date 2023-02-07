@@ -27,7 +27,6 @@
 #include "zircon/assert.h"
 
 #ifdef __Fuchsia__
-#include <lib/fidl-utils/bind.h>
 #include <zircon/syscalls.h>
 
 #include <utility>

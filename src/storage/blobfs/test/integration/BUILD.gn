@@ -109,7 +109,6 @@ test("blobfs_integration") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <fuchsia/hardware/block/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
 #include <lib/operation/block.h>
 #include <lib/sync/completion.h>

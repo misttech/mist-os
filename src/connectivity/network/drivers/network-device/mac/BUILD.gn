@@ -20,7 +20,6 @@ ddk_source_split("mac") {
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/fidl-utils",
   ]
 }
 

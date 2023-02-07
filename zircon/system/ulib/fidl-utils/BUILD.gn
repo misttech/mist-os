@@ -19,4 +19,12 @@ zx_library("fidl-utils") {
     "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/zx",
   ]
+
+  # TODO(https://fxbug.dev/116293): This library is deprecated.
+  # This library only supports the C bindings.
+  # Consider using the new C++ FIDL bindings instead of the C bindings.
+  visibility = [
+    "//src/lib/fidl/c/simple_tests:bin",
+    "//zircon/system/utest/fidl-utils",
+  ]
 }

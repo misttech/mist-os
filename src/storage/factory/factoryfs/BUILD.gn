@@ -59,7 +59,6 @@ test("factoryfs_unit") {
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/storage/operation",
     "//zircon/system/ulib/sync",

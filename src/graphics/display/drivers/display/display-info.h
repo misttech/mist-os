@@ -10,7 +10,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <functional>

@@ -5,7 +5,6 @@
 #include "src/devices/block/drivers/core/block-device.h"
 
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/operation/block.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>

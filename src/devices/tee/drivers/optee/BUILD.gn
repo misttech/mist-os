@@ -49,7 +49,6 @@ source_set("optee_lib") {
     "//sdk/fidl/fuchsia.tee.manager:fuchsia.tee.manager_cpp_wire",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
-    "//zircon/system/ulib/fidl-utils",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings

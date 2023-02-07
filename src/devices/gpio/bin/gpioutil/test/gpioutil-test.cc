@@ -7,7 +7,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl-async/cpp/bind.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <zxtest/zxtest.h>

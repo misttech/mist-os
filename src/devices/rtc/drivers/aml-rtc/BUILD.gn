@@ -32,7 +32,6 @@ fuchsia_driver("aml-rtc-driver") {
     "//src/devices/rtc/lib/rtc:rtc_llcpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/fidl-utils",
   ]
 }
 

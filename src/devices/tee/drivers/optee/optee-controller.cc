@@ -10,7 +10,6 @@
 #include <lib/ddk/io-buffer.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/zx/clock.h>

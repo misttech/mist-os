@@ -59,7 +59,6 @@ test("test") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/svc",

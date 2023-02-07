@@ -16,7 +16,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/operation/block.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/fifo.h>
