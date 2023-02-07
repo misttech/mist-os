@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef SRC_DEVICES_THERMAL_BIN_THERMAL_CLI_THERMAL_CLI_H_
+#define SRC_DEVICES_THERMAL_BIN_THERMAL_CLI_THERMAL_CLI_H_
 
-#include <lib/zx/channel.h>
-#include <memory>
+#include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
 
 class ThermalCli {
  public:
-  ThermalCli(zx::channel channel) : channel_(std::move(channel)) {}
+  explicit ThermalCli(fidl::ClientEnd<fuchsia_hardware_thermal::Device> device)
+      : device_(std::move(device)) {}
 
   zx_status_t PrintTemperature();
   zx_status_t FanLevelCommand(const char* value);
-  int FrequencyCommand(uint32_t cluster, const char* value);
+  zx_status_t FrequencyCommand(fuchsia_hardware_thermal::wire::PowerDomain cluster,
+                               const char* value);
 
  private:
-  zx::channel channel_;
+  const fidl::WireSyncClient<fuchsia_hardware_thermal::Device> device_;
 };
+
+#endif  // SRC_DEVICES_THERMAL_BIN_THERMAL_CLI_THERMAL_CLI_H_

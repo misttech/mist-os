@@ -9,15 +9,11 @@ executable("thermal-cli") {
   sources = [ "main.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_c",
-    "//sdk/lib/fdio",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 source_set("common") {
@@ -26,15 +22,11 @@ source_set("common") {
     "thermal-cli.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_c",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 test("thermal-cli-test-bin") {
@@ -43,18 +35,12 @@ test("thermal-cli-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_c",
-    "//sdk/lib/fdio",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-utils",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_unittest_package("thermal-cli-test") {

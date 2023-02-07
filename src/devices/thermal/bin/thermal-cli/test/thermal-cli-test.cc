@@ -4,26 +4,26 @@
 
 #include "thermal-cli.h"
 
-#include <fuchsia/hardware/thermal/c/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-utils/bind.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <zxtest/zxtest.h>
 
-class ThermalCliTest : public zxtest::Test {
+namespace {
+
+class ThermalCliTest : public zxtest::Test,
+                       public fidl::WireServer<fuchsia_hardware_thermal::Device> {
  public:
   ThermalCliTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
-    zx::channel server;
-    ASSERT_OK(zx::channel::create(0, &client_, &server));
-    fidl_bind(loop_.dispatcher(), server.release(),
-              reinterpret_cast<fidl_dispatch_t*>(fuchsia_hardware_thermal_Device_dispatch), this,
-              &ops_);
     loop_.StartThread("thermal-cli-test-loop");
   }
 
-  zx::channel GetClient() { return std::move(client_); }
+  void SetUp() override {
+    zx::result server = fidl::CreateEndpoints(&client_);
+    ASSERT_OK(server);
+    fidl::BindServer(loop_.dispatcher(), std::move(server.value()), this);
+  }
 
   mock_function::MockFunction<zx_status_t>& MockGetTemperatureCelsius() {
     return mock_GetTemperatureCelsius_;
@@ -35,108 +35,101 @@ class ThermalCliTest : public zxtest::Test {
     return mock_SetFanLevel_;
   }
 
-  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal_PowerDomain>&
+  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal::wire::PowerDomain>&
   MockGetDvfsInfo() {
     return mock_GetDvfsInfo_;
   }
 
-  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal_PowerDomain>&
+  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal::wire::PowerDomain>&
   MockGetDvfsOperatingPoint() {
     return mock_GetDvfsOperatingPoint_;
   }
 
-  mock_function::MockFunction<zx_status_t, uint16_t, fuchsia_hardware_thermal_PowerDomain>&
+  mock_function::MockFunction<zx_status_t, uint16_t, fuchsia_hardware_thermal::wire::PowerDomain>&
   MockSetDvfsOperatingPoint() {
     return mock_SetDvfsOperatingPoint_;
   }
 
  protected:
-  using Binder = fidl::Binder<ThermalCliTest>;
+  void GetInfo(GetInfoCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
+  }
 
-  zx_status_t GetInfo(fidl_txn_t* txn) { return ZX_ERR_NOT_SUPPORTED; }
+  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
+  }
 
-  zx_status_t GetDeviceInfo(fidl_txn_t* txn) { return ZX_ERR_NOT_SUPPORTED; }
+  void GetDvfsInfo(GetDvfsInfoRequestView request, GetDvfsInfoCompleter::Sync& completer) override {
+    mock_GetDvfsInfo_.Call(request->power_domain);
 
-  zx_status_t GetDvfsInfo(fuchsia_hardware_thermal_PowerDomain power_domain, fidl_txn_t* txn) {
-    mock_GetDvfsInfo_.Call(power_domain);
-
-    fuchsia_hardware_thermal_OperatingPointEntry entry0{
+    fuchsia_hardware_thermal::wire::OperatingPointEntry entry0{
         .freq_hz = 100,
         .volt_uv = 42,
     };
-    fuchsia_hardware_thermal_OperatingPointEntry entry1{
+    fuchsia_hardware_thermal::wire::OperatingPointEntry entry1{
         .freq_hz = 200,
         .volt_uv = 42,
     };
-    fuchsia_hardware_thermal_OperatingPoint op_info{
+    fuchsia_hardware_thermal::wire::OperatingPoint op_info{
         .opp = {entry0, entry1},
         .latency = 42,
         .count = 2,
     };
-    return fuchsia_hardware_thermal_DeviceGetDvfsInfo_reply(txn, ZX_OK, &op_info);
+    completer.Reply(ZX_OK, fidl::ObjectView<decltype(op_info)>::FromExternal(&op_info));
   }
 
-  zx_status_t GetTemperatureCelsius(fidl_txn_t* txn) {
+  void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override {
     zx_status_t status = mock_GetTemperatureCelsius_.Call();
-    return fuchsia_hardware_thermal_DeviceGetTemperatureCelsius_reply(txn, status, 0);
+    completer.Reply(status, 0);
   }
 
-  zx_status_t GetStateChangeEvent(fidl_txn_t* txn) { return ZX_ERR_NOT_SUPPORTED; }
-
-  zx_status_t GetStateChangePort(fidl_txn_t* txn) { return ZX_ERR_NOT_SUPPORTED; }
-
-  zx_status_t SetTripCelsius(uint32_t id, int32_t temp, fidl_txn_t* txn) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
   }
 
-  zx_status_t GetDvfsOperatingPoint(fuchsia_hardware_thermal_PowerDomain power_domain,
-                                    fidl_txn_t* txn) {
-    mock_GetDvfsOperatingPoint_.Call(power_domain);
-    return fuchsia_hardware_thermal_DeviceGetDvfsOperatingPoint_reply(txn, ZX_OK, 1);
+  void GetStateChangePort(GetStateChangePortCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
   }
 
-  zx_status_t SetDvfsOperatingPoint(uint16_t op_idx,
-                                    fuchsia_hardware_thermal_PowerDomain power_domain,
-                                    fidl_txn_t* txn) {
-    mock_SetDvfsOperatingPoint_.Call(op_idx, power_domain);
-    return fuchsia_hardware_thermal_DeviceSetDvfsOperatingPoint_reply(txn, ZX_OK);
+  void SetTripCelsius(SetTripCelsiusRequestView request,
+                      SetTripCelsiusCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t GetFanLevel(fidl_txn_t* txn) {
+  void GetDvfsOperatingPoint(GetDvfsOperatingPointRequestView request,
+                             GetDvfsOperatingPointCompleter::Sync& completer) override {
+    mock_GetDvfsOperatingPoint_.Call(request->power_domain);
+    completer.Reply(ZX_OK, 1);
+  }
+
+  void SetDvfsOperatingPoint(SetDvfsOperatingPointRequestView request,
+                             SetDvfsOperatingPointCompleter::Sync& completer) override {
+    mock_SetDvfsOperatingPoint_.Call(request->op_idx, request->power_domain);
+    completer.Reply(ZX_OK);
+  }
+
+  void GetFanLevel(GetFanLevelCompleter::Sync& completer) override {
     zx_status_t status = mock_GetFanLevel_.Call();
-    return fuchsia_hardware_thermal_DeviceGetFanLevel_reply(txn, status, 0);
+    completer.Reply(status, 0);
   }
 
-  zx_status_t SetFanLevel(uint32_t fan_level, fidl_txn_t* txn) {
-    zx_status_t status = mock_SetFanLevel_.Call(fan_level);
-    return fuchsia_hardware_thermal_DeviceSetFanLevel_reply(txn, status);
+  void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override {
+    zx_status_t status = mock_SetFanLevel_.Call(request->fan_level);
+    completer.Reply(status);
   }
 
   async::Loop loop_;
-  zx::channel client_;
+  fidl::ClientEnd<fuchsia_hardware_thermal::Device> client_;
 
   mock_function::MockFunction<zx_status_t> mock_GetTemperatureCelsius_;
   mock_function::MockFunction<zx_status_t> mock_GetFanLevel_;
   mock_function::MockFunction<zx_status_t, uint32_t> mock_SetFanLevel_;
-  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal_PowerDomain> mock_GetDvfsInfo_;
-  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal_PowerDomain>
+  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal::wire::PowerDomain>
+      mock_GetDvfsInfo_;
+  mock_function::MockFunction<zx_status_t, fuchsia_hardware_thermal::wire::PowerDomain>
       mock_GetDvfsOperatingPoint_;
-  mock_function::MockFunction<zx_status_t, uint16_t, fuchsia_hardware_thermal_PowerDomain>
+  mock_function::MockFunction<zx_status_t, uint16_t, fuchsia_hardware_thermal::wire::PowerDomain>
       mock_SetDvfsOperatingPoint_;
-
-  static constexpr fuchsia_hardware_thermal_Device_ops_t ops_ = {
-      .GetTemperatureCelsius = Binder::BindMember<&ThermalCliTest::GetTemperatureCelsius>,
-      .GetInfo = Binder::BindMember<&ThermalCliTest::GetInfo>,
-      .GetDeviceInfo = Binder::BindMember<&ThermalCliTest::GetDeviceInfo>,
-      .GetDvfsInfo = Binder::BindMember<&ThermalCliTest::GetDvfsInfo>,
-      .GetStateChangeEvent = Binder::BindMember<&ThermalCliTest::GetStateChangeEvent>,
-      .GetStateChangePort = Binder::BindMember<&ThermalCliTest::GetStateChangePort>,
-      .SetTripCelsius = Binder::BindMember<&ThermalCliTest::SetTripCelsius>,
-      .GetDvfsOperatingPoint = Binder::BindMember<&ThermalCliTest::GetDvfsOperatingPoint>,
-      .SetDvfsOperatingPoint = Binder::BindMember<&ThermalCliTest::SetDvfsOperatingPoint>,
-      .GetFanLevel = Binder::BindMember<&ThermalCliTest::GetFanLevel>,
-      .SetFanLevel = Binder::BindMember<&ThermalCliTest::SetFanLevel>,
-  };
 };
 
 TEST_F(ThermalCliTest, Temperature) {
@@ -191,11 +184,11 @@ TEST_F(ThermalCliTest, GetOperatingPoint) {
   ThermalCli thermal_cli(std::move(client_));
 
   MockGetDvfsInfo().ExpectCall(ZX_OK,
-                               fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+                               fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   MockGetDvfsOperatingPoint().ExpectCall(
-      ZX_OK, fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+      ZX_OK, fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   EXPECT_OK(thermal_cli.FrequencyCommand(
-      fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, nullptr));
+      fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, nullptr));
   MockGetDvfsInfo().VerifyAndClear();
   MockGetDvfsOperatingPoint().VerifyAndClear();
 }
@@ -204,11 +197,11 @@ TEST_F(ThermalCliTest, SetOperatingPoint) {
   ThermalCli thermal_cli(std::move(client_));
 
   MockGetDvfsInfo().ExpectCall(ZX_OK,
-                               fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+                               fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   MockSetDvfsOperatingPoint().ExpectCall(
-      ZX_OK, 1, fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+      ZX_OK, 1, fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   EXPECT_OK(thermal_cli.FrequencyCommand(
-      fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, "200"));
+      fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, "200"));
   MockGetDvfsInfo().VerifyAndClear();
   MockSetDvfsOperatingPoint().VerifyAndClear();
 }
@@ -217,10 +210,10 @@ TEST_F(ThermalCliTest, FrequencyNotFound) {
   ThermalCli thermal_cli(std::move(client_));
 
   MockGetDvfsInfo().ExpectCall(ZX_OK,
-                               fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+                               fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   MockSetDvfsOperatingPoint().ExpectNoCall();
   EXPECT_EQ(thermal_cli.FrequencyCommand(
-                fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, "300"),
+                fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, "300"),
             ZX_ERR_NOT_FOUND);
   MockGetDvfsInfo().VerifyAndClear();
   MockSetDvfsOperatingPoint().VerifyAndClear();
@@ -230,19 +223,21 @@ TEST_F(ThermalCliTest, InvalidFrequency) {
   ThermalCli thermal_cli(std::move(client_));
 
   MockGetDvfsInfo()
-      .ExpectCall(ZX_OK, fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN)
-      .ExpectCall(ZX_OK, fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN)
-      .ExpectCall(ZX_OK, fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN);
+      .ExpectCall(ZX_OK, fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain)
+      .ExpectCall(ZX_OK, fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain)
+      .ExpectCall(ZX_OK, fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain);
   MockSetDvfsOperatingPoint().ExpectNoCall();
   EXPECT_EQ(thermal_cli.FrequencyCommand(
-                fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, "123abcd"),
+                fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, "123abcd"),
             ZX_ERR_INVALID_ARGS);
   EXPECT_EQ(thermal_cli.FrequencyCommand(
-                fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, "-1"),
+                fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, "-1"),
             ZX_ERR_INVALID_ARGS);
   EXPECT_EQ(thermal_cli.FrequencyCommand(
-                fuchsia_hardware_thermal_PowerDomain_BIG_CLUSTER_POWER_DOMAIN, "4294967295"),
+                fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain, "4294967295"),
             ZX_ERR_INVALID_ARGS);
   MockGetDvfsInfo().VerifyAndClear();
   MockSetDvfsOperatingPoint().VerifyAndClear();
 }
+
+}  // namespace
