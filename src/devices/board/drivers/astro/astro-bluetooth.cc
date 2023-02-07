@@ -4,9 +4,9 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/gpioimpl/c/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serial/c/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/reg.h>
@@ -39,7 +39,7 @@ static const std::vector<fpbus::Irq> bt_uart_irqs{
 };
 
 static const serial_port_info_t bt_uart_serial_info = {
-    .serial_class = fuchsia_hardware_serial_Class_BLUETOOTH_HCI,
+    .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci),
     .serial_vid = PDEV_VID_BROADCOM,
     .serial_pid = PDEV_PID_BCM43458,
 };

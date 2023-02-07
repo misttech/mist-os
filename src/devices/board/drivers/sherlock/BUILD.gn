@@ -502,9 +502,8 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp_wire",
       "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp_wire",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
-      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
+      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
       "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
-      "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
       "//sdk/lib/driver/component/cpp:cpp",
       "//src/connectivity/openthread/lib/ot-radio",
       "//src/devices/bind/fuchsia:fuchsia_cpp",
@@ -547,10 +546,6 @@ template("sherlock_driver") {
     # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
-
-    # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-    # Consider switching to the C++ bindings. See linked bug for details.
-    configs += [ "//build/c:fidl-deprecated-c-bindings" ]
   }
 
   fuchsia_driver_component(target_name) {

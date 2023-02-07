@@ -46,16 +46,6 @@ config("fidl-deprecated-c-bindings") {
 
     # TODO(https://fxbug.dev/111342): Remove.
     "//src/devices/block/drivers/ums-function:ums-function-driver",
-    "//src/devices/board/drivers/astro:astro-driver",
-    "//src/devices/board/drivers/av400:av400-driver",
-    "//src/devices/board/drivers/buckeye:buckeye-driver",
-    "//src/devices/board/drivers/nelson:nelson-driver",
-    "//src/devices/board/drivers/nelson:nelson-module-driver",
-    "//src/devices/board/drivers/sherlock:sherlock-dai-test-driver",
-    "//src/devices/board/drivers/sherlock:sherlock-driver",
-    "//src/devices/board/drivers/sherlock:sherlock-factory-driver",
-    "//src/devices/board/drivers/sherlock:sherlock_driver",
-    "//src/devices/board/drivers/vim3:vim3-driver",
     "//src/devices/clock/bin/clock",
     "//src/devices/i2c/drivers/intel-i2c:intel-i2c-driver",
     "//src/devices/nand/bin/nand-util",
