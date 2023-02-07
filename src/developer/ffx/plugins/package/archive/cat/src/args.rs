@@ -11,13 +11,11 @@ use std::path::PathBuf;
 #[argh(
     subcommand,
     name = "cat",
-    description = "write the contents of <far_path> inside the Fuchia package archive file to stdout"
+    description = "write the contents of <far_path> inside the Fuchsia package archive file to stdout"
 )]
 pub struct CatCommand {
     #[argh(positional, description = "package archive")]
     pub archive: PathBuf,
     #[argh(positional, description = "path of the file within the archive to write")]
     pub far_path: PathBuf,
-    #[argh(switch, description = "treat filename as a blob hash", long = "as-hash")]
-    pub as_hash: bool,
 }

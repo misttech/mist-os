@@ -27,13 +27,7 @@ fn extract_implementation<W: std::io::Write>(
 
     let mut extract_list: Vec<ArchiveEntry> = vec![];
     for filepath in cmd.far_paths {
-        if let Some(entry) = entries.iter().find(|x| {
-            if cmd.as_hash {
-                x.path == filepath.to_string_lossy()
-            } else {
-                x.name == filepath.to_string_lossy()
-            }
-        }) {
+        if let Some(entry) = entries.iter().find(|x| x.name == filepath.to_string_lossy()) {
             extract_list.push(entry.clone());
         } else {
             ffx_bail!(
@@ -51,8 +45,7 @@ fn extract_implementation<W: std::io::Write>(
     }
 
     for entry in extract_list {
-        let destpath =
-            if cmd.as_hash { dest_dir.join(&entry.path) } else { dest_dir.join(&entry.name) };
+        let destpath = dest_dir.join(&entry.name);
         if cmd.verbose {
             writeln!(writer, "{}", destpath.to_string_lossy())?;
         }
@@ -72,84 +65,13 @@ mod test {
     use super::*;
     use ffx_package_archive_utils::{
         test_utils::{
-            create_mockreader, test_contents, BLOB1, BLOB2, DATA_SOME_FILE_BLOB,
-            DATA_SOME_FILE_PATH, LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH, RUN_ME_BLOB, RUN_ME_PATH,
+            create_mockreader, test_contents, BLOB2, DATA_SOME_FILE_BLOB, DATA_SOME_FILE_PATH,
+            LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH, RUN_ME_BLOB, RUN_ME_PATH,
         },
         MockFarListReader,
     };
     use std::{path::PathBuf, str};
     use tempfile::Builder;
-
-    #[test]
-    fn test_extract_blob() -> Result<()> {
-        let tmp_out_dir = Builder::new().prefix("test_extract").tempdir()?;
-        let tmp_out_path = tmp_out_dir.into_path();
-        let cmd = ExtractCommand {
-            archive: PathBuf::from("some.far"),
-            far_paths: vec![PathBuf::from(BLOB1)],
-            output_dir: tmp_out_path.clone(),
-            as_hash: true,
-            verbose: false,
-        };
-
-        let mut output: Vec<u8> = vec![];
-
-        let mock_reader: MockFarListReader = create_mockreader();
-
-        let expected_contents = vec![(BLOB1, test_contents(BLOB1))];
-        let expected_output = "";
-
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mock_reader);
-
-        extract_implementation(cmd, &mut output, &mut boxed_reader)?;
-        assert_eq!(expected_output, str::from_utf8(&output)?);
-
-        for (blob, contents) in expected_contents {
-            let extracted_path = tmp_out_path.join(blob);
-            let actual_contents = fs::read_to_string(extracted_path)?;
-            assert_eq!(actual_contents, str::from_utf8(&contents)?);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_extract_blob_verbose() -> Result<()> {
-        let tmp_out_dir = Builder::new().prefix("test_extract").tempdir()?;
-        let tmp_out_path = tmp_out_dir.into_path();
-
-        let cmd = ExtractCommand {
-            archive: PathBuf::from("some.far"),
-            far_paths: vec![PathBuf::from(BLOB1), PathBuf::from(BLOB2)],
-            output_dir: tmp_out_path.clone(),
-            as_hash: true,
-            verbose: true,
-        };
-
-        let mut output: Vec<u8> = vec![];
-
-        let mock_reader: MockFarListReader = create_mockreader();
-
-        let expected_contents = vec![(BLOB1, test_contents(BLOB1)), (BLOB2, test_contents(BLOB2))];
-        let expected_output = format!(
-            "{}\n{}\n",
-            tmp_out_path.join(BLOB1).to_string_lossy(),
-            tmp_out_path.join(BLOB2).to_string_lossy()
-        );
-
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mock_reader);
-
-        extract_implementation(cmd, &mut output, &mut boxed_reader)?;
-        assert_eq!(expected_output, str::from_utf8(&output)?);
-
-        for (blob, contents) in expected_contents {
-            let extracted_path = tmp_out_path.join(blob);
-            let actual_contents = fs::read_to_string(extracted_path)?;
-            assert_eq!(actual_contents, str::from_utf8(&contents)?);
-        }
-
-        Ok(())
-    }
 
     #[test]
     fn test_extract_filename() -> Result<()> {
@@ -159,7 +81,6 @@ mod test {
         let cmd = ExtractCommand {
             archive: PathBuf::from("some.far"),
             far_paths: vec![PathBuf::from(LIB_RUN_SO_PATH)],
-            as_hash: false,
             output_dir: tmp_out_path.clone(),
             verbose: false,
         };
@@ -194,7 +115,6 @@ mod test {
         let cmd = ExtractCommand {
             archive: PathBuf::from("some.far"),
             far_paths: vec![],
-            as_hash: false,
             output_dir: tmp_out_path.clone(),
             verbose: true,
         };

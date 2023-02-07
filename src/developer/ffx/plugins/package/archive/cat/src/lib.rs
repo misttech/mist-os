@@ -24,9 +24,7 @@ fn cat_implementation<W: std::io::Write>(
     let file_name = cmd.far_path.to_string_lossy();
 
     let entries = read_file_entries(reader)?;
-    if let Some(entry) =
-        entries.iter().find(|x| if cmd.as_hash { x.path == file_name } else { x.name == file_name })
-    {
+    if let Some(entry) = entries.iter().find(|x| x.name == file_name) {
         let data = reader.read_entry(entry)?;
         writer.write_all(&data)?;
     } else {
@@ -37,42 +35,19 @@ fn cat_implementation<W: std::io::Write>(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use ffx_package_archive_utils::{
-        test_utils::{create_mockreader, test_contents, BLOB1, LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH},
+        test_utils::{create_mockreader, test_contents, LIB_RUN_SO_BLOB, LIB_RUN_SO_PATH},
         MockFarListReader,
     };
     use std::path::PathBuf;
-
-    #[test]
-    fn test_cat_blob() -> Result<()> {
-        let cmd = CatCommand {
-            archive: PathBuf::from("some.far"),
-            far_path: PathBuf::from(BLOB1),
-            as_hash: true,
-        };
-
-        let mut output: Vec<u8> = vec![];
-
-        let mock_reader: MockFarListReader = create_mockreader();
-
-        let expected = test_contents(BLOB1);
-
-        let mut boxed_reader: Box<dyn FarListReader> = Box::from(mock_reader);
-
-        cat_implementation(cmd, &mut output, &mut boxed_reader)?;
-        assert_eq!(expected, output);
-
-        Ok(())
-    }
 
     #[test]
     fn test_cat_filename() -> Result<()> {
         let cmd = CatCommand {
             archive: PathBuf::from("some.far"),
             far_path: PathBuf::from(LIB_RUN_SO_PATH),
-            as_hash: false,
         };
 
         let mut output: Vec<u8> = vec![];

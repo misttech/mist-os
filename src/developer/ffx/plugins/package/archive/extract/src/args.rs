@@ -32,6 +32,4 @@ pub struct ExtractCommand {
     pub archive: PathBuf,
     #[argh(positional, description = "files to extract")]
     pub far_paths: Vec<PathBuf>,
-    #[argh(switch, description = "treat filenames as blob hashes", long = "as-hash")]
-    pub as_hash: bool,
 }
