@@ -56,10 +56,7 @@ sdk_documentation("meta") {
 }
 
 go_library("go_meta") {
-  deps = [
-    "//third_party/golibs:github.com/xeipuuv/gojsonschema",
-    "//third_party/golibs:go.uber.org/multierr",
-  ]
+  deps = [ "//third_party/golibs:github.com/xeipuuv/gojsonschema" ]
   sources = [
               "product_bundle_container.go",
               "product_bundle_container_test.go",
@@ -68,10 +65,7 @@ go_library("go_meta") {
 
 go_test("go_meta_tests") {
   library = ":go_meta"
-  deps = [
-    "//third_party/golibs:github.com/google/go-cmp",
-    "//third_party/golibs:go.uber.org/multierr",
-  ]
+  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }
 
 verify_json_schemas("verify_json_schemas") {

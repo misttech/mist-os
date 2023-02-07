@@ -11,7 +11,6 @@ import (
 	"regexp"
 
 	"github.com/xeipuuv/gojsonschema"
-	"go.uber.org/multierr"
 )
 
 const (
@@ -78,7 +77,7 @@ func ValidateProductBundleContainer(pbmContainer ProductBundleContainer) error {
 	}
 	var errs error
 	for _, desc := range result.Errors() {
-		errs = multierr.Append(errs, errors.New(desc.String()))
+		errs = errors.Join(errs, errors.New(desc.String()))
 	}
 	return errs
 }

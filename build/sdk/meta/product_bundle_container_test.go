@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"go.uber.org/multierr"
 )
 
-func compareMultierr(lhs, rhs error) bool {
-	return (lhs == nil && rhs == nil) || (lhs != nil && rhs != nil && cmp.Equal(lhs.Error(), rhs.Error()))
+func compareErrors(lhs, rhs error) bool {
+	return (lhs == nil && rhs == nil) ||
+		(lhs != nil && rhs != nil && cmp.Equal(lhs.Error(), rhs.Error()))
 }
 
 func TestValidateProductBundleContainer(t *testing.T) {
@@ -167,11 +167,12 @@ func TestValidateProductBundleContainer(t *testing.T) {
 		t.Fatalf("json.Unmarshal(_, %T): %s", &invalidPBMContainer, err)
 	}
 
-	var want error
-	want = multierr.Append(want, errors.New("data.fms_entries: Array must have at least 1 items"))
-	want = multierr.Append(want, errors.New("(root): Must validate all the schemas (allOf)"))
+	want := errors.Join(
+		errors.New("data.fms_entries: Array must have at least 1 items"),
+		errors.New("(root): Must validate all the schemas (allOf)"),
+	)
 
-	if diff := cmp.Diff(want, ValidateProductBundleContainer(invalidPBMContainer), cmp.Comparer(compareMultierr)); diff != "" {
+	if diff := cmp.Diff(want, ValidateProductBundleContainer(invalidPBMContainer), cmp.Comparer(compareErrors)); diff != "" {
 		t.Errorf("ValidateProductBundleContainer() error mismatch (-want +got):\n%s", diff)
 	}
 }
