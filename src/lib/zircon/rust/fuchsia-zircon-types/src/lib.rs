@@ -374,10 +374,7 @@ multiconst!(u32, [
     #[cfg(target_arch = "x86_64")]
     ZX_PROP_REGISTER_FS               = 4;
 
-    // Argument is the value of ld.so's _dl_debug_addr, a uintptr_t. If the
-    // property is set to the magic value of ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET
-    // on process startup, ld.so will trigger a debug breakpoint immediately after
-    // setting the property to the correct value.
+    // Argument is the value of ld.so's _dl_debug_addr, a uintptr_t.
     ZX_PROP_PROCESS_DEBUG_ADDR        = 5;
 
     // Argument is the base address of the vDSO mapping (or zero), a uintptr_t.
@@ -452,8 +449,6 @@ multiconst!(zx_rsrc_system_base_t, [
     ZX_RSRC_SYSTEM_MEXEC_BASE       = 6;
     ZX_RSRC_SYSTEM_ENERGY_INFO_BASE = 7;
 ]);
-
-pub const ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET: usize = 1;
 
 // clock ids
 multiconst!(zx_clock_t, [

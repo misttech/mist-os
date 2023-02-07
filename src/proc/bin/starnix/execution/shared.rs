@@ -10,7 +10,7 @@ use fidl_fuchsia_starnix_developer as fstardev;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, sys::ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET, AsHandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use process_builder::elf_parse;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -252,16 +252,7 @@ pub fn copy_process_debug_addr(
 ) -> Result<(), Errno> {
     let source_debug_addr =
         source_process.get_debug_addr().map_err(|err| from_status_like_fdio!(err))?;
-    let target_debug_addr =
-        target_process.get_debug_addr().map_err(|err| from_status_like_fdio!(err))?;
 
-    // TODO: Handle the case where either of the debug address requires to set an interrupt.
-    if source_debug_addr == ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET as u64 {
-        return Ok(());
-    }
-    if target_debug_addr == ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET as u64 {
-        return Ok(());
-    }
     match target_process.set_debug_addr(&source_debug_addr) {
         Err(zx::Status::ACCESS_DENIED) => {}
         status => status.map_err(|err| from_status_like_fdio!(err))?,

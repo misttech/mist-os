@@ -1827,32 +1827,13 @@ __NO_SAFESTACK static void* dls3(zx_handle_t exec_vmo, const char* argv0, const 
   debug.r_ldbase = ldso.l_map.l_addr;
   debug.r_state = 0;
 
-  // Check if the process has to issue a debug trap after this load.
   // If setting ZX_PROP_PROCESS_DEBUG_ADDR fails, crashlogger backtraces, debugger
   // sessions, etc. will be problematic, but this isn't fatal.
-  //
-  // TODO(dje): Is there a way to detect we're here because of being
-  // an injected process (launchpad_start_injected)? IWBN to print a
-  // warning here but launchpad_start_injected can trigger this.
-
-  // Fallback to the previous magic number approach.
-  //
-  // The ZX_PROP_PROCESS_DEBUG_ADDR being set to 1 on startup is a signal
-  // to issue a debug breakpoint after setting the property to signal to a
-  // debugger that the property is now valid.
-  intptr_t existing_debug_addr = 0;
-  status = _zx_object_get_property(__zircon_process_self, ZX_PROP_PROCESS_DEBUG_ADDR,
-                                   &existing_debug_addr, sizeof(existing_debug_addr));
-
-  bool break_after_set =
-      (status == ZX_OK) && (existing_debug_addr == ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET);
-
-  // Once we already checked for the magic number, we set the correct value for the property.
   _zx_object_set_property(__zircon_process_self, ZX_PROP_PROCESS_DEBUG_ADDR, &_dl_debug_addr,
                           sizeof(_dl_debug_addr));
 
-  // First check if the user is using ZX_PROP_PROCESS_BREAK_ON_LOAD.
-  if (should_break_on_load() || break_after_set) {
+  // Check if the process has to issue a debug trap.
+  if (should_break_on_load()) {
     debug_break();
   }
 
