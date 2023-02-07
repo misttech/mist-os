@@ -45,8 +45,6 @@ struct PartitionInfo {
 
 const PartitionInfo* GetPartitionInfo(Partition partition) {
   static std::unordered_map<Partition, PartitionInfo> map = {
-      // TODO(fxbug.dev/52708): add support for bootloader A/B/R once we have devices
-      // ready for it. For now just default to bootloader_a.
       {Partition::kBootloaderA, PartitionInfo{.name = GPT_BOOTLOADER_A_NAME,
                                               .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
                                               .legacy_name = GUID_EFI_NAME,
