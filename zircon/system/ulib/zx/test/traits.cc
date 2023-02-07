@@ -4,7 +4,8 @@
 
 #include <assert.h>
 #include <fcntl.h>
-#include <fuchsia/boot/c/fidl.h>
+#include <fidl/fuchsia.boot/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/time.h>
 #include <lib/test-exceptions/exception-handling.h>
@@ -270,12 +271,11 @@ TEST(TraitsTestCase, FifoTraits) {
 }
 
 TEST(TraitsTestCase, DebugLogTraits) {
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
-  constexpr char kWriteOnlyLogPath[] = "/svc/" fuchsia_boot_WriteOnlyLog_Name;
-  ASSERT_OK(fdio_service_connect(kWriteOnlyLogPath, remote.release()));
-  zx::debuglog debuglog;
-  ASSERT_OK(fuchsia_boot_WriteOnlyLogGet(local.get(), debuglog.reset_and_get_address()));
+  zx::result local = component::Connect<fuchsia_boot::WriteOnlyLog>();
+  ASSERT_OK(local.status_value());
+  auto result = fidl::WireCall(*local)->Get();
+  ASSERT_OK(result.status());
+  zx::debuglog debuglog = std::move(result->log);
 
   ASSERT_NO_FATAL_FAILURE(Duplicating(debuglog));
   ASSERT_NO_FATAL_FAILURE(GetChild(debuglog));
