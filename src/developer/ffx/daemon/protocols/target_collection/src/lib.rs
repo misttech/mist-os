@@ -51,6 +51,7 @@ impl Default for TargetCollectionProtocol {
     }
 }
 
+#[tracing::instrument]
 async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
     tracing::info!("Checking if target at addr: {addr:?} in fastboot over tcp");
     let tclone = Target::new_with_fastboot_addrs(
@@ -76,6 +77,7 @@ async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
     }
 }
 
+#[tracing::instrument(skip(manual_targets, tc))]
 async fn add_manual_target(
     manual_targets: Rc<dyn manual_targets::ManualTargets>,
     tc: &TargetCollection,
@@ -123,6 +125,7 @@ async fn add_manual_target(
     target
 }
 
+#[tracing::instrument(skip(manual_targets, tc))]
 async fn remove_manual_target(
     manual_targets: Rc<dyn manual_targets::ManualTargets>,
     tc: &TargetCollection,
@@ -142,6 +145,7 @@ async fn remove_manual_target(
 }
 
 impl TargetCollectionProtocol {
+    #[tracing::instrument(skip(self, tc))]
     async fn load_manual_targets(&self, tc: &TargetCollection) {
         // The FFX config value for a manual target contains a target ID (typically the IP:PORT
         // combo) and a timeout (which is None, if the target is indefinitely persistent).
@@ -197,7 +201,7 @@ impl FidlProtocol for TargetCollectionProtocol {
     type Protocol = ffx::TargetCollectionMarker;
     type StreamHandler = FidlStreamHandler<Self>;
 
-    #[tracing::instrument(level = "info", skip(self, cx))]
+    #[tracing::instrument(skip(self, cx))]
     async fn handle(&self, cx: &Context, req: ffx::TargetCollectionRequest) -> Result<()> {
         let target_collection = cx.get_target_collection().await?;
         match req {
@@ -466,6 +470,7 @@ impl FidlProtocol for TargetCollectionProtocol {
     }
 }
 
+#[tracing::instrument(skip(tc))]
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
     if let Some(ref serial) = target.serial {
         tracing::trace!("Found new target via fastboot: {}", serial);
@@ -483,6 +488,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
     });
 }
 
+#[tracing::instrument(skip(tc))]
 fn handle_mdns_event(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) {
     let ssh_address = t.ssh_address;
     let mut t = TargetInfo {

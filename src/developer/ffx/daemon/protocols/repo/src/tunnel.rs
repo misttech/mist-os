@@ -33,6 +33,7 @@ impl TunnelManager {
     }
 
     /// Spawn a repository tunnel to `target_nodename`.
+    #[tracing::instrument(skip(self, cx))]
     pub(crate) async fn start_tunnel(&self, cx: &Context, target_nodename: String) -> Result<()> {
         // Exit early if we already have a tunnel set up for this source.
         {
@@ -77,6 +78,7 @@ impl TunnelManager {
     }
 }
 
+#[tracing::instrument(skip(cx))]
 async fn create_tunnel_stream(
     cx: &Context,
     target_nodename: &str,
@@ -123,6 +125,7 @@ async fn create_tunnel_stream(
     Err(anyhow::anyhow!("failed to bind to tunnel port on target {:?}", target_nodename))
 }
 
+#[tracing::instrument(skip(tunnel_stream, server_sink))]
 async fn run_tunnel_protocol(
     target_nodename: &str,
     tunnel_stream: rcs::ForwardCallbackRequestStream,

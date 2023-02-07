@@ -32,7 +32,7 @@ impl ToString for TargetKind {
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument(level = "info")]
+#[tracing::instrument]
 pub async fn get_remote_proxy(
     target: Option<TargetKind>,
     is_default_target: bool,
@@ -86,7 +86,7 @@ pub async fn get_remote_proxy(
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument(level = "info")]
+#[tracing::instrument]
 pub fn open_target_with_fut<'a>(
     target: Option<TargetKind>,
     is_default_target: bool,

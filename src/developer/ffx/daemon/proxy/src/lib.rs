@@ -70,7 +70,7 @@ impl Injection {
         self.target.is_none()
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     async fn init_remote_proxy(&self) -> Result<RemoteControlProxy> {
         let daemon_proxy = self.daemon_factory().await?;
         let target = self.target.clone();
@@ -78,7 +78,7 @@ impl Injection {
         get_remote_proxy(target, self.is_default_target(), daemon_proxy, proxy_timeout).await
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument]
     async fn fastboot_factory_inner(&self) -> Result<FastbootProxy> {
         let daemon_proxy = self.daemon_factory().await?;
         let target = self.target.clone();
@@ -94,7 +94,7 @@ impl Injection {
         Ok(fastboot_proxy)
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     async fn target_factory_inner(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let daemon_proxy = self.daemon_factory().await?;
@@ -122,7 +122,7 @@ impl Injection {
 impl Injector for Injection {
     // This could get called multiple times by the plugin system via multiple threads - so make sure
     // the spawning only happens one thread at a time.
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy> {
         let context = ffx_config::global_env_context()
             .context("Trying to initialize daemon with no global context")?;
@@ -138,7 +138,7 @@ impl Injector for Injection {
             .map(|proxy| proxy.clone())
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>> {
         let context = ffx_config::global_env_context()
             .context("Trying to initialize daemon with no global context")?;
@@ -156,7 +156,7 @@ impl Injector for Injection {
         Ok(result)
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument]
     async fn fastboot_factory(&self) -> Result<FastbootProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
@@ -166,6 +166,7 @@ impl Injector for Injection {
         })?
     }
 
+    #[tracing::instrument]
     async fn target_factory(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
@@ -175,7 +176,7 @@ impl Injector for Injection {
         })?
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
@@ -211,6 +212,7 @@ enum DaemonStart {
     DoNotAutoStart,
 }
 
+#[tracing::instrument]
 async fn init_daemon_proxy(
     autostart: DaemonStart,
     hoist: Hoist,

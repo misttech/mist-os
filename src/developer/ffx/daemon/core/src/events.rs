@@ -37,6 +37,7 @@ pub trait EventSynthesizer<T: EventTrait> {
 /// Leaves a log for debugging.
 #[async_trait(?Send)]
 impl<T: EventTrait> EventSynthesizer<T> for Weak<dyn EventSynthesizer<T>> {
+    #[tracing::instrument(skip(self))]
     async fn synthesize_events(&self) -> Vec<T> {
         let this = match self.upgrade() {
             Some(t) => t,
@@ -77,7 +78,7 @@ struct Dispatcher<T: EventTrait + 'static> {
 }
 
 impl<T: EventTrait + 'static> Dispatcher<T> {
-    #[tracing::instrument(level = "info", skip(inner))]
+    #[tracing::instrument(skip(inner))]
     async fn handler_helper(
         event: T,
         inner: Rc<DispatcherInner<T>>,
@@ -108,6 +109,7 @@ impl<T: EventTrait + 'static> Dispatcher<T> {
             .await
     }
 
+    #[tracing::instrument(skip(handler))]
     fn new(handler: impl EventHandler<T> + 'static) -> Self {
         let (event_in, queue) = async_channel::unbounded::<T>();
         let inner = Rc::new(DispatcherInner { handler: Box::new(handler), event_in });
@@ -256,6 +258,7 @@ impl<T: 'static + EventTrait> Queue<T> {
     /// Before this happens, though, the event dispatcher associated with this
     /// `EventHandler<_>` will send a list of synthesized events to the handler
     /// derived from the internal state.
+    #[tracing::instrument(skip(self, handler))]
     pub async fn add_handler(&self, handler: impl EventHandler<T> + 'static) {
         // Locks the handlers so that they cannot receive events, then obtains
         // the state as it will (hopefully) not have had any updates after
@@ -299,6 +302,7 @@ impl<T: 'static + EventTrait> Queue<T> {
     }
 
     /// The async version of `wait_for` (See: `wait_for`).
+    #[tracing::instrument(skip(self, predicate))]
     pub async fn wait_for_async<F1>(
         &self,
         timeout_opt: Option<Duration>,
@@ -337,6 +341,7 @@ impl<T> Processor<T>
 where
     T: EventTrait + 'static,
 {
+    #[tracing::instrument(skip(self))]
     async fn dispatch(&self, event: T) {
         let mut handlers = self.handlers.lock().await;
 
@@ -353,6 +358,7 @@ where
     }
 
     /// Consumes the processor and then runs until all instances of the Queue are closed.
+    #[tracing::instrument(skip(self))]
     async fn process(mut self) {
         if let Some(rx) = self.inner_rx.take() {
             rx.for_each(|event| self.dispatch(event)).await;

@@ -34,6 +34,7 @@ fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
 }
 
 /// Tries to report the given unexpected error to analytics if appropriate
+#[tracing::instrument(skip(err))]
 pub async fn report_bug(err: &impl std::fmt::Display) {
     // TODO(66918): make configurable, and evaluate chosen time value.
     if let Err(e) = analytics::add_crash_event(&format!("{}", err), None)
@@ -47,6 +48,7 @@ pub async fn report_bug(err: &impl std::fmt::Display) {
     }
 }
 
+#[tracing::instrument]
 pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     let cmd = ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help)?;
     let app = &cmd.global;

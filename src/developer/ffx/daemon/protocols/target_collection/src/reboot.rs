@@ -79,7 +79,7 @@ impl RebootController {
         Ok(proxy)
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     pub(crate) async fn spawn_fastboot(
         &self,
         fastboot: ServerEnd<ffx::FastbootMarker>,
@@ -95,7 +95,7 @@ impl RebootController {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     pub(crate) async fn reboot(
         &self,
         state: TargetRebootState,
@@ -209,6 +209,7 @@ impl RebootController {
     }
 }
 
+#[tracing::instrument]
 pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootResponder) -> Result<()> {
     match e {
         Error::ClientChannelClosed { .. } => {

@@ -555,7 +555,7 @@ impl Target {
     ///
     ///   RCS  ->   MDNS          =>  RCS (does not drop RCS state)
     ///   *    ->   Disconnected  =>  Manual if the device is manual
-    #[tracing::instrument(level = "info", skip(func))]
+    #[tracing::instrument(skip(func))]
     pub fn update_connection_state<F>(&self, func: F)
     where
         F: FnOnce(TargetConnectionState) -> TargetConnectionState + Sized,
@@ -803,7 +803,7 @@ impl Target {
         }
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     pub fn from_identify(identify: IdentifyHostResponse) -> Result<Rc<Self>, Error> {
         // TODO(raggi): allow targets to truly be created without a nodename.
         let nodename = match identify.nodename {
@@ -847,7 +847,7 @@ impl Target {
         Ok(target)
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     pub async fn from_rcs_connection(rcs: RcsConnection) -> Result<Rc<Self>, RcsConnectionError> {
         let identify_result =
             timeout(Duration::from_millis(IDENTIFY_HOST_TIMEOUT_MILLIS), rcs.proxy.identify_host())
@@ -900,7 +900,7 @@ impl Target {
         self.preferred_ssh_address.borrow_mut().take();
     }
 
-    #[tracing::instrument(level = "info")]
+    #[tracing::instrument]
     pub fn run_host_pipe(self: &Rc<Self>) {
         if self.host_pipe.borrow().is_some() {
             return;
@@ -933,6 +933,7 @@ impl Target {
         self.host_pipe.borrow().is_some()
     }
 
+    #[tracing::instrument]
     pub fn run_logger(self: &Rc<Self>) {
         if self.logger.borrow().is_none() {
             let logger = Rc::downgrade(&self.logger);
@@ -950,6 +951,7 @@ impl Target {
         self.logger.borrow().is_some()
     }
 
+    #[tracing::instrument]
     pub async fn init_remote_proxy(self: &Rc<Self>) -> Result<RemoteControlProxy> {
         // Ensure auto-connect has at least started.
         self.run_host_pipe();
@@ -974,6 +976,7 @@ impl Target {
     /// Check the current target state, and if it is a state that expires (such
     /// as mdns) perform the appropriate state transition. The daemon target
     /// collection expiry loop calls this function regularly.
+    #[tracing::instrument]
     pub fn expire_state(&self) {
         self.update_connection_state(|current_state| {
             let expire_duration = match current_state {
@@ -1043,6 +1046,7 @@ impl Target {
 }
 
 impl From<&Target> for ffx::TargetInfo {
+    #[tracing::instrument]
     fn from(target: &Target) -> Self {
         let (product_config, board_config) = target
             .build_config()

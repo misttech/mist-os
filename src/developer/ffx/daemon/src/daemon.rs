@@ -97,7 +97,7 @@ impl DaemonEventHandler {
         Self { hoist, target_collection }
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
         let rcs = match RcsConnection::new(self.hoist.clone(), &mut NodeId { id: node_id }) {
             Ok(rcs) => rcs,
@@ -128,7 +128,7 @@ impl DaemonEventHandler {
         target.run_logger();
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer_lost(&self, node_id: u64) {
         if let Some(target) = self
             .target_collection
@@ -140,6 +140,7 @@ impl DaemonEventHandler {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_fastboot(&self, t: TargetInfo) {
         tracing::trace!(
             "Found new target via fastboot: {}",
@@ -154,6 +155,7 @@ impl DaemonEventHandler {
         });
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_zedboot(&self, t: TargetInfo) {
         tracing::trace!(
             "Found new target via zedboot: {}",
@@ -265,6 +267,7 @@ impl DaemonProtocolProvider for Daemon {
 
 #[async_trait(?Send)]
 impl EventHandler<DaemonEvent> for DaemonEventHandler {
+    #[tracing::instrument(skip(self))]
     async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
         tracing::info!("! DaemonEvent::{:?}", event);
 
@@ -359,6 +362,7 @@ impl Daemon {
         self.serve(&context, hoist, quit_tx, quit_rx).await.context("Serving clients")
     }
 
+    #[tracing::instrument(skip(self))]
     async fn log_startup_info(&self, context: &EnvironmentContext) -> Result<()> {
         let pid = std::process::id();
         let buildid = context.daemon_version_string()?;
@@ -425,6 +429,7 @@ impl Daemon {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn start_ascendd(&mut self, hoist: &Hoist) -> Result<()> {
         // Start the ascendd socket only after we have registered our protocols.
         tracing::info!("Starting ascendd");
@@ -449,6 +454,7 @@ impl Daemon {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn start_socket_watch(&self, quit_tx: mpsc::Sender<()>) -> Result<RecommendedWatcher> {
         let socket_path = self.socket_path.clone();
         let socket_dir = self.socket_path.parent().context("Getting parent directory of socket")?;
@@ -565,6 +571,7 @@ impl Daemon {
             .await
     }
 
+    #[tracing::instrument(skip(self, quit_tx, stream))]
     async fn handle_requests_from_stream(
         &self,
         quit_tx: &mpsc::Sender<()>,
@@ -618,6 +625,7 @@ impl Daemon {
         .detach();
     }
 
+    #[tracing::instrument(skip(queue))]
     fn handle_overnet_peers(
         queue: &events::Queue<DaemonEvent>,
         known_peers: HashSet<PeerSetElement>,
@@ -661,6 +669,7 @@ impl Daemon {
         new_peers
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_request(
         &self,
         quit_tx: &mpsc::Sender<()>,
@@ -721,6 +730,7 @@ impl Daemon {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn serve(
         &self,
         context: &EnvironmentContext,
@@ -823,6 +833,7 @@ impl Daemon {
 // PeerSetElement wraps an overnet Peer object for inclusion in a Set
 // or other collection reliant on Eq and HAsh, using the NodeId as the
 // discriminator.
+#[derive(Debug)]
 struct PeerSetElement(Peer);
 impl PartialEq for PeerSetElement {
     fn eq(&self, other: &Self) -> bool {

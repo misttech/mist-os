@@ -121,7 +121,7 @@ impl TargetCollection {
         to_update
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     pub fn merge_insert(&self, new_target: Rc<Target>) -> Rc<Target> {
         // Drop non-manual loopback address entries, as matching against
         // them could otherwise match every target in the collection.
@@ -196,7 +196,7 @@ impl TargetCollection {
     /// several targets in the collection when the query starts, a
     /// DaemonError::TargetAmbiguous error is returned. The matcher is converted to a
     /// TargetQuery for matching, and follows the TargetQuery semantics.
-    #[tracing::instrument(level = "info", skip(self))]
+    #[tracing::instrument(skip(self))]
     pub async fn wait_for_match(&self, matcher: Option<String>) -> Result<Rc<Target>, DaemonError> {
         // If there's nothing to match against, unblock on the first target.
         tracing::info!("Using matcher: {:?}", matcher);
@@ -249,6 +249,7 @@ impl TargetCollection {
         self.get_connected(matcher).ok_or(DaemonError::TargetNotFound)
     }
 
+    #[tracing::instrument(skip(self, tq))]
     pub fn get_connected<TQ>(&self, tq: TQ) -> Option<Rc<Target>>
     where
         TQ: Into<TargetQuery>,
@@ -346,6 +347,7 @@ impl From<&str> for TargetQuery {
 impl From<String> for TargetQuery {
     /// If the string can be parsed as some kind of IP address, will attempt to
     /// match based on that, else fall back to the nodename or serial matches.
+    #[tracing::instrument]
     fn from(s: String) -> Self {
         if s == "" {
             return Self::First;

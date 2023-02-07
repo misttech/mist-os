@@ -117,6 +117,7 @@ pub async fn find_and_connect(hoist: &Hoist, socket_path: PathBuf) -> Result<Dae
         .context("connecting to the ffx daemon")
 }
 
+#[tracing::instrument]
 pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     use std::process::Stdio;
 
@@ -154,6 +155,7 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
 ////////////////////////////////////////////////////////////////////////////////
 // start
 
+#[tracing::instrument]
 pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
     // Not strictly necessary check, but improves log output for diagnostics
     match std::fs::metadata(socket_path) {

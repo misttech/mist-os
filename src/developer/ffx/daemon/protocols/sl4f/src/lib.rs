@@ -63,6 +63,7 @@ impl Bridge for BridgeProxy {
 }
 
 /// Routes incoming requests to host-side SL4F server.
+#[tracing::instrument(skip(bridge, request))]
 pub async fn route_request<B: Bridge>(
     bridge: B,
     request: hyper::Request<hyper::Body>,
@@ -96,6 +97,7 @@ impl FidlProtocol for Sl4fBridge {
 
     // When the SL4F plugin is first called, it will run this function. Start the host-side server
     // that serves HTTP/JSON requests from the host-side clients.
+    #[tracing::instrument(skip(self, cx))]
     async fn start(&mut self, cx: &Context) -> Result<()> {
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), SERVER_PORT);
         let listener = TcpListener::bind(&addr).await?;
