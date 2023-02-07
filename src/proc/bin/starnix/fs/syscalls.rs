@@ -1347,6 +1347,28 @@ pub fn sys_timerfd_create(
 ) -> Result<FdNumber, Errno> {
     let timer_file_clock = match clock_id {
         CLOCK_MONOTONIC | CLOCK_BOOTTIME => TimerFileClock::Monotonic,
+        CLOCK_BOOTTIME_ALARM => {
+            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
+                return error!(EPERM);
+            }
+            // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
+            not_implemented!(
+                current_task,
+                "timerfd_create: CLOCK_BOOTTIME_ALARM is mapped to CLOCK_BOOTTIME"
+            );
+            TimerFileClock::Monotonic
+        }
+        CLOCK_REALTIME_ALARM => {
+            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
+                return error!(EPERM);
+            }
+            // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
+            not_implemented!(
+                current_task,
+                "timerfd_create: CLOCK_REALTIME_ALARM is mapped to CLOCK_REALTIME"
+            );
+            TimerFileClock::Realtime
+        }
         CLOCK_REALTIME => TimerFileClock::Realtime,
         _ => return error!(EINVAL),
     };
