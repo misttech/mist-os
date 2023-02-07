@@ -11,7 +11,9 @@ use futures::StreamExt as _;
 use net_declare::{net_ip_v4, std_ip_v4};
 use net_types::ip::{self as net_types_ip};
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::{interfaces, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
+use netstack_testing_common::{
+    interfaces, realms::Netstack2, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::{
@@ -30,8 +32,8 @@ async fn sends_igmp_reports(name: &str) {
     const MULTICAST_ADDR: std::net::Ipv4Addr = std_ip_v4!("224.1.2.3");
 
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
-    let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up network");
+    let (_network, realm, iface, fake_ep) =
+        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
 
     let addr = net::Ipv4Address { addr: INTERFACE_ADDR.octets() };
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(

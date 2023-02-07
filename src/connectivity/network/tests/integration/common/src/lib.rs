@@ -18,7 +18,6 @@ pub mod realms;
 
 use component_events::events::EventStream;
 use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_zircon as zx;
 
@@ -208,20 +207,18 @@ pub async fn get_inspect_data(
 }
 
 /// Sets up a realm with a network with no required services.
-pub async fn setup_network<'a>(
+pub async fn setup_network<'a, N: realms::Netstack>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
     metric: Option<u32>,
 ) -> Result<(
     netemul::TestNetwork<'a>,
     netemul::TestRealm<'a>,
-    fnetstack::NetstackProxy,
     netemul::TestInterface<'a>,
     netemul::TestFakeEndpoint<'a>,
-)>
-where
-{
-    setup_network_with(sandbox, name, metric, std::iter::empty::<fnetemul::ChildDef>()).await
+)> {
+    setup_network_with::<N, _>(sandbox, name, metric, std::iter::empty::<fnetemul::ChildDef>())
+        .await
 }
 
 /// Sets up a realm with required services and a network used for tests
@@ -230,7 +227,7 @@ where
 /// Returns the network, realm, netstack client, interface (added to the
 /// netstack and up) and a fake endpoint used to read and write raw ethernet
 /// packets.
-pub async fn setup_network_with<'a, I>(
+pub async fn setup_network_with<'a, N: realms::Netstack, I>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
     metric: Option<u32>,
@@ -238,7 +235,6 @@ pub async fn setup_network_with<'a, I>(
 ) -> Result<(
     netemul::TestNetwork<'a>,
     netemul::TestRealm<'a>,
-    fnetstack::NetstackProxy,
     netemul::TestInterface<'a>,
     netemul::TestFakeEndpoint<'a>,
 )>
@@ -248,7 +244,7 @@ where
 {
     let network = sandbox.create_network(name).await.context("failed to create network")?;
     let realm = sandbox
-        .create_netstack_realm_with::<realms::Netstack2, _, _>(name, children)
+        .create_netstack_realm_with::<N, _, _>(name, children)
         .context("failed to create netstack realm")?;
     // It is important that we create the fake endpoint before we join the
     // network so no frames transmitted by Netstack are lost.
@@ -263,11 +259,7 @@ where
         .await
         .context("failed to configure networking")?;
 
-    let netstack = realm
-        .connect_to_protocol::<fnetstack::NetstackMarker>()
-        .context("failed to connect to netstack protocol")?;
-
-    Ok((network, realm, netstack, iface, fake_ep))
+    Ok((network, realm, iface, fake_ep))
 }
 
 /// Pauses the fake clock in the given realm.

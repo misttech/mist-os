@@ -191,17 +191,13 @@ async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn sends_router_solicitations<N: Netstack>(
-    test_name: &str,
-    sub_test_name: &str,
-    forwarding: bool,
-) {
+async fn sends_router_solicitations(test_name: &str, sub_test_name: &str, forwarding: bool) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, _realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up network");
+    let (_network, _realm, iface, fake_ep) =
+        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
@@ -310,16 +306,12 @@ async fn sends_router_solicitations<N: Netstack>(
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn slaac_with_privacy_extensions<N: Netstack>(
-    test_name: &str,
-    sub_test_name: &str,
-    forwarding: bool,
-) {
+async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, forwarding: bool) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up network");
+    let (_network, realm, iface, fake_ep) =
+        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
@@ -421,7 +413,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
 /// If no remote node has any interest in an address the netstack is attempting to assign to
 /// an interface, DAD should succeed.
 #[netstack_test]
-async fn duplicate_address_detection<N: Netstack>(name: &str) {
+async fn duplicate_address_detection(name: &str) {
     /// Adds `ipv6_consts::LINK_LOCAL_ADDR` to the interface and makes sure a Neighbor Solicitation
     /// message is transmitted by the netstack for DAD.
     ///
@@ -508,8 +500,8 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     }
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up network");
+    let (_network, realm, iface, fake_ep) =
+        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
 
     let debug_control = realm
         .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
@@ -652,8 +644,10 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     const METRIC: u32 = 200;
-    let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, Some(METRIC)).await.expect("failed to setup network");
+    let (_network, realm, iface, fake_ep) =
+        setup_network::<Netstack2>(&sandbox, name, Some(METRIC))
+            .await
+            .expect("failed to setup network");
 
     let stack =
         realm.connect_to_protocol::<net_stack::StackMarker>().expect("failed to get stack proxy");
@@ -772,10 +766,14 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     }
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network_with(&sandbox, name, None, &[KnownServiceProvider::SecureStash])
-            .await
-            .expect("error setting up network");
+    let (_network, realm, iface, fake_ep) = setup_network_with::<Netstack2, _>(
+        &sandbox,
+        name,
+        None,
+        &[KnownServiceProvider::SecureStash],
+    )
+    .await
+    .expect("error setting up network");
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
@@ -878,8 +876,9 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
 #[netstack_test]
 async fn sends_mld_reports(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
-    let (_network, _realm, _netstack, iface, fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up networking");
+    let (_network, _realm, iface, fake_ep) = setup_network::<Netstack2>(&sandbox, name, None)
+        .await
+        .expect("error setting up networking");
 
     // Add an address so we join the address's solicited node multicast group.
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
@@ -983,10 +982,11 @@ async fn sends_mld_reports(name: &str) {
 }
 
 #[netstack_test]
-async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
+async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
-    let (_network, realm, _netstack, iface, _fake_ep) =
-        setup_network(&sandbox, name, None).await.expect("error setting up networking");
+    let (_network, realm, iface, _fake_ep) = setup_network::<Netstack2>(&sandbox, name, None)
+        .await
+        .expect("error setting up networking");
 
     let interfaces_state = &realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
