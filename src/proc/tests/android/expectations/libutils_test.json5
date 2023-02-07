@@ -1,0 +1,40 @@
+// Copyright 2023 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "FileMap.*",
+                "SingletonTest.*",
+                "LooperTest.PollOnce_WhenCallbackAddedTwice_OnlySecondCallbackShouldBeInvoked",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                "errors.unwrap_or_fatal",
+                "SharedBufferTest.alloc_death",
+                "SharedBufferTest.editResize_death",
+                "StrongPointer/0.AssertStrongRefExists",
+                "StrongPointer/1.AssertStrongRefExists",
+                "Timers.systemTime_invalid",
+                "UnicodeTest.InvalidUtf8OverreadDetected",
+                "VectorTest.SetCapacity_Overflow",
+                "VectorTest._grow_OverflowBufferAlloc",
+                "VectorTest._grow_OverflowSize",
+                "VectorTest.removeItemsAt_overflow",
+                "VectorTest._grow_OverflowCapacityDoubling",
+                "RefBase.AssertWeakRefExistsDeath",
+                "RefBase.DoubleOwnershipDeath",
+            ],
+        },
+    ],
+}

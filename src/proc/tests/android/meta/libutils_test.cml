@@ -4,11 +4,11 @@
 {
     include: [
         "//src/proc/tests/android/meta/bionic_galaxy.shard.cml",
-        "//src/proc/tests/starnix_test.shard.cml",
+        "//src/proc/tests/starnix_test_with_expectations.shard.cml",
     ],
     program: {
         binary: "/vendor/data/nativetest64/libutils_test/libutils_test",
-        args: [ "--gtest_filter=LooperTest.PollOnce_WhenNon*:LooperTest.PollOnce_WhenZero*:LooperTest.AddFd*:LooperTest.RemoveFd*:LooperTest.SendMessage*:LooperTest.RemoveMessage*:LooperTest.MultiThreaded*" ],
         user: "root:x:0:0",
+        test_type: "gtest",
     },
 }

@@ -44,9 +44,10 @@ fuchsia_test_component_with_expectations("adbd_test") {
   ]
 }
 
-fuchsia_test_component("libutils_test") {
+fuchsia_test_component_with_expectations("libutils_test") {
   manifest = "meta/libutils_test.cml"
-  deps = [ "//src/proc/tests:starnix_test" ]
+  expectations = "expectations/libutils_test.json5"
+  deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
 }
 
 resource("starnix_testcases_image") {
