@@ -11,19 +11,15 @@ source_set("camera-task") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.camerahwaccel:fuchsia.hardware.camerahwaccel_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//src/camera/lib/vmo_pool_wrapper",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }

@@ -4,8 +4,8 @@
 
 #include "src/camera/drivers/test_utils/fake_buffer_collection.h"
 
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
-#include <fuchsia/sysmem/c/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/zx/bti.h>
@@ -27,7 +27,8 @@ TEST(CreateContiguousBufferCollectionInfo2, CreatesCollection2) {
   buffer_collection_info_2_t buffer_collection;
   image_format_2_t image_format;
 
-  EXPECT_EQ(GetImageFormat(image_format, fuchsia_sysmem_PixelFormatType_NV12, kWidth, kHeight),
+  EXPECT_EQ(GetImageFormat(image_format, fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12),
+                           kWidth, kHeight),
             ZX_OK);
   ASSERT_EQ(CreateContiguousBufferCollectionInfo(buffer_collection, image_format, bti.get(),
                                                  kNumberOfBuffers),
@@ -54,7 +55,8 @@ TEST(CreateContiguousBufferCollectionInfo2, FailsOnBadHandle) {
   buffer_collection_info_2_t buffer_collection;
   image_format_2_t image_format;
 
-  EXPECT_EQ(GetImageFormat(image_format, fuchsia_sysmem_PixelFormatType_NV12, kWidth, kHeight),
+  EXPECT_EQ(GetImageFormat(image_format, fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12),
+                           kWidth, kHeight),
             ZX_OK);
   EXPECT_EQ(camera::CreateContiguousBufferCollectionInfo(buffer_collection, image_format,
                                                          bti_handle, kNumberOfBuffers),

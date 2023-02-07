@@ -4,7 +4,7 @@
 
 #include "src/camera/drivers/hw_accel/task/task.h"
 
-#include <fuchsia/sysmem/c/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
 #include <zircon/pixelformat.h>
@@ -20,8 +20,10 @@ namespace generictask {
 static bool IsBufferCollectionValid(const buffer_collection_info_2_t* buffer_collection,
                                     const image_format_2_t* image_format) {
   return !(buffer_collection == nullptr || buffer_collection->buffer_count == 0 ||
-           (image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_NV12 &&
-            image_format->pixel_format.type != fuchsia_sysmem_PixelFormatType_R8G8B8A8));
+           (image_format->pixel_format.type !=
+                fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12) &&
+            image_format->pixel_format.type !=
+                fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kR8G8B8A8)));
 }
 
 zx_status_t GenericTask::GetInputBufferPhysAddr(uint32_t input_buffer_index,

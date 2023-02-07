@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/image-format/image_format.h>

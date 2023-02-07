@@ -4,6 +4,7 @@
 
 #include "fake_buffer_collection.h"
 
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/image-format/image_format.h>
 #include <lib/syslog/cpp/macros.h>
@@ -38,14 +39,14 @@ static void GetFakeBufferSettings(buffer_collection_info_2_t& buffer_collection,
 
 zx_status_t GetImageFormat(image_format_2_t& image_format, uint32_t pixel_format_type,
                            uint32_t width, uint32_t height) {
-  image_format = {
+  image_format = image_format_2_t{
       .pixel_format =
           {
               .type = pixel_format_type,
               .has_format_modifier = false,
               .format_modifier =
                   {
-                      .value = fuchsia_sysmem_FORMAT_MODIFIER_NONE,
+                      .value = fuchsia_sysmem::kFormatModifierNone,
                   },
           },
       .coded_width = width,
@@ -55,7 +56,7 @@ zx_status_t GetImageFormat(image_format_2_t& image_format, uint32_t pixel_format
       .layers = 1,
       .color_space =
           {
-              .type = fuchsia_sysmem_ColorSpaceType_SRGB,
+              .type = fidl::ToUnderlying(fuchsia_sysmem::ColorSpaceType::kSrgb),
           },
       .has_pixel_aspect_ratio = false,
       .pixel_aspect_ratio_width = 1,
