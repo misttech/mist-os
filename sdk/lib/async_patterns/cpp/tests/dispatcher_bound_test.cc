@@ -345,13 +345,49 @@ TEST_F(DispatcherBound, AsyncCallWithReply) {
   EXPECT_TRUE(owner.got_result());
 }
 
-TEST_F(DispatcherBound, PanicIfShutdown) {
+TEST_F(DispatcherBound, SynchronouslyRunIfShutdown) {
   loop().Shutdown();
-  async_patterns::DispatcherBound<ThreadAffine> obj;
-  auto count = make_arc_atomic();
-  ASSERT_DEATH(obj.emplace(loop().dispatcher(), loop_thread_id(), count),
-               "The \\|async_dispatcher_t\\| was shut down before creating, making calls, or "
-               "destroying an \\|async_patterns::DispatcherBound\\|. This is not allowed.");
+  auto object_count = make_arc_atomic();
+  {
+    async_patterns::DispatcherBound<ThreadAffine> obj;
+    EXPECT_EQ(0, object_count->load());
+    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    EXPECT_EQ(1, object_count->load());
+
+    auto result = make_arc_atomic();
+    obj.AsyncCall(&ThreadAffine::Add, 1, 2, result);
+    EXPECT_EQ(3, result->load());
+  }
+  EXPECT_EQ(0, object_count->load());
+}
+
+TEST_F(DispatcherBound, ShutdownAfterConstruction) {
+  auto object_count = make_arc_atomic();
+  {
+    async_patterns::DispatcherBound<ThreadAffine> obj;
+    EXPECT_EQ(0, object_count->load());
+    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    loop().Shutdown();
+    EXPECT_EQ(1, object_count->load());
+  }
+  EXPECT_EQ(0, object_count->load());
+}
+
+TEST_F(DispatcherBound, ShutdownAfterAsyncCall) {
+  auto object_count = make_arc_atomic();
+  {
+    async_patterns::DispatcherBound<ThreadAffine> obj;
+    EXPECT_EQ(0, object_count->load());
+    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    loop().RunUntilIdle();
+    EXPECT_EQ(1, object_count->load());
+
+    auto result = make_arc_atomic();
+    obj.AsyncCall(&ThreadAffine::Add, 1, 2, result);
+    loop().Shutdown();
+    EXPECT_EQ(3, result->load());
+  }
+  EXPECT_EQ(0, object_count->load());
 }
 
 TEST_F(DispatcherBound, DispatcherOutlivesDispatcherBound) {

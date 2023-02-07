@@ -92,7 +92,7 @@ class DispatcherBound final {
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
-  // Panics if |dispatcher| cannot fulfill the task (e.g. it is shutdown).
+  // If the dispatcher is shutdown, |T| will be synchronously constructed.
   template <typename... Args>
   explicit DispatcherBound(async_dispatcher_t* dispatcher, Args&&... args)
       : dispatcher_(dispatcher) {
@@ -105,8 +105,6 @@ class DispatcherBound final {
   // be asynchronously destroyed on the existing dispatcher it was associated with.
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
-  //
-  // Panics if either dispatcher cannot fulfill the task (e.g. it is shutdown).
   template <typename... Args>
   void emplace(async_dispatcher_t* dispatcher, Args&&... args) {
     reset();
@@ -148,7 +146,7 @@ class DispatcherBound final {
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
-  // Panics if the dispatcher cannot fulfill the task (e.g. it is shutdown).
+  // The task will be synchronously called if the dispatcher is shutdown.
   template <typename Member, typename... Args>
   auto AsyncCall(Member T::*member, Args&&... args) {
     using invoke_result = std::invoke_result<Member, Args...>;
@@ -177,13 +175,13 @@ class DispatcherBound final {
   // If |has_value|, asynchronously destroys the managed |T| on a task
   // posted to the dispatcher.
   //
-  // Panics if the dispatcher cannot fulfill the task (e.g. it is shutdown).
+  // If the dispatcher is shutdown, |T| will be synchronously destroyed.
   ~DispatcherBound() { reset(); }
 
   // If |has_value|, asynchronously destroys the managed |T| on a task
   // posted to the dispatcher.
   //
-  // Panics if the dispatcher cannot fulfill the task (e.g. it is shutdown).
+  // If the dispatcher is shutdown, |T| will be synchronously destroyed.
   void reset() {
     if (!has_value()) {
       return;

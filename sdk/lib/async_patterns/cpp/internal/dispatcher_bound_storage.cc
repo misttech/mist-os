@@ -19,12 +19,11 @@ class SelfDeletingTask : public async_task_t {
     auto* t = new SelfDeletingTask(dispatcher, std::move(task));
     zx_status_t status = async_post_task(dispatcher, t);
     if (status != ZX_OK) {
-      delete t;
       if (status == ZX_ERR_BAD_STATE) {
-        ZX_PANIC(
-            "The |async_dispatcher_t| was shut down before creating, making calls, or destroying "
-            "an |async_patterns::DispatcherBound|. This is not allowed.");
+        SelfDeletingTask::Invoke(dispatcher, t, ZX_ERR_BAD_STATE);
+        return;
       }
+      delete t;
       if (status == ZX_ERR_NOT_SUPPORTED) {
         ZX_PANIC("The |async_dispatcher_t| must support task posting.");
       }
