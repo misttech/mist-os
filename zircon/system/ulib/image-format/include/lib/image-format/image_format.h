@@ -9,7 +9,9 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#if defined(FIDL_ALLOW_DEPRECATED_C_BINDINGS)
 #include <fuchsia/sysmem/c/fidl.h>
+#endif
 #include <lib/fpromise/result.h>
 #include <zircon/pixelformat.h>
 
@@ -112,8 +114,10 @@ fpromise::result<fuchsia_sysmem2::wire::PixelFormat> ImageFormatConvertZxToSysme
     fidl::AnyArena& allocator, zx_pixel_format_t zx_pixel_format);
 fpromise::result<fuchsia_sysmem::wire::PixelFormat> ImageFormatConvertZxToSysmem_v1(
     fidl::AnyArena& allocator, zx_pixel_format_t zx_pixel_format);
+#if defined(FIDL_ALLOW_DEPRECATED_C_BINDINGS)
 bool ImageFormatConvertZxToSysmem(zx_pixel_format_t zx_pixel_format,
                                   fuchsia_sysmem_PixelFormat* pixel_format_out);
+#endif
 
 fpromise::result<fuchsia_sysmem2::ImageFormat> ImageConstraintsToFormat(
     const fuchsia_sysmem2::ImageFormatConstraints& constraints, uint32_t width, uint32_t height);
