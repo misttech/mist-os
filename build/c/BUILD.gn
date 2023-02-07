@@ -105,7 +105,6 @@ config("fidl-deprecated-c-bindings") {
     "//zircon/system/ulib/image-format/test:image-format-test",
     "//zircon/system/ulib/kcounter",
     "//zircon/system/ulib/kernel-debug",
-    "//zircon/system/ulib/profile",
     "//zircon/system/ulib/zx/test:zx",
     "//zircon/system/utest/fidl-utils",
   ]
