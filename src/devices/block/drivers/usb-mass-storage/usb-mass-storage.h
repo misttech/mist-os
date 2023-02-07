@@ -94,6 +94,8 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbMassStorageDevice);
 
  private:
+  zx_status_t ExecuteCommandSync(uint8_t lun, iovec cdb, bool is_write, iovec data);
+
   zx_status_t Reset();
 
   // Sends a Command Block Wrapper (command portion of request)
@@ -109,9 +111,7 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
   // Validates the command index and signature of a command status wrapper.
   csw_status_t VerifyCsw(usb_request_t* csw_request, uint32_t* out_residue);
 
-  void QueueRead(uint16_t transfer_length);
-
-  zx_status_t ReadSync(uint16_t transfer_length);
+  zx_status_t ReadSync(size_t transfer_length);
 
   zx_status_t Inquiry(uint8_t lun, uint8_t* out_data);
 
