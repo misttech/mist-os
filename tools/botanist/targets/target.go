@@ -608,8 +608,8 @@ func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) 
 			}
 		}()
 	}
-	// TODO(https://fxbug.dev/111922): Remove following comment once we don't run a subcommand.
-	// We wait until targets have started before running the subcommand against the zeroth one.
+
+	// We wait until targets have started before running testrunner against the zeroth one.
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targetSlice {
 		t := t
