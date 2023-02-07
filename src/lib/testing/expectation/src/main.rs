@@ -220,71 +220,73 @@ impl ExpectationsComparer {
                 )?;
         }
 
-        let case_stream = {
-            let (listener, listener_request_stream) = fidl::endpoints::create_request_stream()
-                .context("error creating run listener request stream")?;
-            suite_proxy
-                .run(
-                    &mut not_skipped.into_iter().map(|(invocation, _outcome)| invocation),
-                    options,
-                    listener,
-                )
-                .context("error calling original test component's fuchsia.test/Suite#Run")?;
-            listener_request_stream
-                .try_take_while(|request| {
-                    futures::future::ok(!matches!(
-                        request,
-                        fidl_fuchsia_test::RunListenerRequest::OnFinished { control_handle: _ }
-                    ))
-                })
-                .map_err(anyhow::Error::new)
-                .and_then(|request| match request {
-                    fidl_fuchsia_test::RunListenerRequest::OnFinished { control_handle: _ } => {
-                        unreachable!()
-                    }
-                    fidl_fuchsia_test::RunListenerRequest::OnTestCaseStarted {
-                        invocation,
-                        std_handles,
-                        listener,
-                        control_handle: _,
-                    } => {
-                        async move {
-                            Ok((
-                                CaseStart { invocation, std_handles },
-                                listener
-                                    .into_stream()
-                                    .context("error getting CaseListener request stream")?
-                                    .map_ok(
-                                        |fidl_fuchsia_test::CaseListenerRequest::Finished {
-                                             result,
-                                             control_handle: _,
-                                         }| CaseEnd {
-                                            result,
-                                        },
-                                    )
-                                    .map_err(anyhow::Error::new),
-                            ))
-                        }
-                    }
-                })
-        };
-
         let failures = futures::lock::Mutex::new(Vec::new());
 
-        {
-            let listener_proxy = &listener_proxy;
-            let failures = &failures;
-            case_stream
-                .try_for_each_concurrent(None, |(start, end_stream)| async move {
-                    if let Some(result) =
-                        self.handle_case(listener_proxy, start, end_stream).await?
-                    {
-                        failures.lock().await.push(result);
-                    }
-                    Ok(())
-                })
-                .await
-                .context("error handling test case stream")?;
+        if !not_skipped.is_empty() {
+            let case_stream = {
+                let (listener, listener_request_stream) = fidl::endpoints::create_request_stream()
+                    .context("error creating run listener request stream")?;
+                suite_proxy
+                    .run(
+                        &mut not_skipped.into_iter().map(|(invocation, _outcome)| invocation),
+                        options,
+                        listener,
+                    )
+                    .context("error calling original test component's fuchsia.test/Suite#Run")?;
+                listener_request_stream
+                    .try_take_while(|request| {
+                        futures::future::ok(!matches!(
+                            request,
+                            fidl_fuchsia_test::RunListenerRequest::OnFinished { control_handle: _ }
+                        ))
+                    })
+                    .map_err(anyhow::Error::new)
+                    .and_then(|request| match request {
+                        fidl_fuchsia_test::RunListenerRequest::OnFinished { control_handle: _ } => {
+                            unreachable!()
+                        }
+                        fidl_fuchsia_test::RunListenerRequest::OnTestCaseStarted {
+                            invocation,
+                            std_handles,
+                            listener,
+                            control_handle: _,
+                        } => {
+                            async move {
+                                Ok((
+                                    CaseStart { invocation, std_handles },
+                                    listener
+                                        .into_stream()
+                                        .context("error getting CaseListener request stream")?
+                                        .map_ok(
+                                            |fidl_fuchsia_test::CaseListenerRequest::Finished {
+                                                 result,
+                                                 control_handle: _,
+                                             }| {
+                                                CaseEnd { result }
+                                            },
+                                        )
+                                        .map_err(anyhow::Error::new),
+                                ))
+                            }
+                        }
+                    })
+            };
+
+            {
+                let listener_proxy = &listener_proxy;
+                let failures = &failures;
+                case_stream
+                    .try_for_each_concurrent(None, |(start, end_stream)| async move {
+                        if let Some(result) =
+                            self.handle_case(listener_proxy, start, end_stream).await?
+                        {
+                            failures.lock().await.push(result);
+                        }
+                        Ok(())
+                    })
+                    .await
+                    .context("error handling test case stream")?;
+            }
         }
 
         listener_proxy.on_finished().context("error calling listener_proxy.on_finished()")?;
