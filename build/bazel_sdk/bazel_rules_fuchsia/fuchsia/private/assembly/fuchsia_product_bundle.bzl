@@ -404,7 +404,7 @@ def _fuchsia_product_bundle_impl(ctx):
     }
 
     # Gather all the inputs.
-    inputs = [partitions_configuration, ffx_tool] + ctx.files.product_image + get_ffx_product_bundle_inputs(fuchsia_toolchain)
+    inputs = ctx.files.partitions_config + ctx.files.product_image + get_ffx_product_bundle_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -477,8 +477,7 @@ fuchsia_product_bundle = rule(
     toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
     attrs = {
         "partitions_config": attr.label(
-            doc = "Partitions config to use, can be a fuchsia_partitions_configuration target, or a JSON file",
-            allow_single_file = [".json"],
+            doc = "Partitions config to use",
             mandatory = True,
         ),
         "product_image": attr.label(

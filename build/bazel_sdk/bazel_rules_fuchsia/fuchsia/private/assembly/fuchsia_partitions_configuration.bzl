@@ -39,7 +39,7 @@ def _fuchsia_partitions_configuration(ctx):
     ctx.actions.write(partitions_config_file, json.encode(partitions_config))
 
     return [
-        DefaultInfo(files = depset(direct = [partitions_config_file] + ctx.files.bootstrap_partitions + ctx.files.bootloader_partitions)),
+        DefaultInfo(files = depset(direct = [partitions_config_file] + ctx.files.bootstrap_partitions + ctx.files.bootloader_partitions + ctx.files.unlock_credentials)),
         FuchsiaAssemblyConfigInfo(config = partitions_config_file),
     ]
 
