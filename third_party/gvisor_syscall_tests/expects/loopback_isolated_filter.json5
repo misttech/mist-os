@@ -1,4 +1,3 @@
-
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -9,6 +8,7 @@
             matchers: [
                 // Skip tests run by loopback_isolated_tcp_fin_wait target.
                 "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
+
                 // Skip tests run by loopback_isolated_tcp_linger_timeout target.
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
             ],
