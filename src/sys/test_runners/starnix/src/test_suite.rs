@@ -65,17 +65,17 @@ pub async fn handle_suite_requests(
 
                 let run_listener_proxy =
                     listener.into_proxy().context("Can't convert run listener channel to proxy")?;
-                if test_type.is_gtest_like() {
-                    run_gtest_cases(
-                        tests,
-                        test_start_info,
-                        &run_listener_proxy,
-                        &starnix_kernel,
-                        &test_type,
-                    )
-                    .await?;
-                } else {
-                    if !tests.is_empty() {
+                if !tests.is_empty() {
+                    if test_type.is_gtest_like() {
+                        run_gtest_cases(
+                            tests,
+                            test_start_info,
+                            &run_listener_proxy,
+                            &starnix_kernel,
+                            &test_type,
+                        )
+                        .await?;
+                    } else {
                         run_test_case(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
