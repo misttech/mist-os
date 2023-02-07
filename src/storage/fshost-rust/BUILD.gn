@@ -137,6 +137,7 @@ bootfs_files_for_assembly("fshost_rust_fxfs_bootfs") {
     ":fshost_rust_fxfs_component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs-crypt",
+    "//src/storage/memfs:memfs_component",
   ]
 }
 
