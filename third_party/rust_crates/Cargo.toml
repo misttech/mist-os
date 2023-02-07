@@ -289,6 +289,7 @@ crossterm = "0.19"
 concurrent-queue = "1.2.2"
 easy-parallel = "3.1"
 fs_extra = "1.2.0"
+fuse3 = { version = "0.5.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.3"
 hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
@@ -359,6 +360,7 @@ windows-sys = { path = "empty/windows-sys" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 fatfs = { path = "forks/fatfs" }
+fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
 # FIXME(121001): Revert once pull request is accepted and rolled into a crates.io release.
@@ -630,9 +632,9 @@ rustflags = []
 group_visibility = { import = "//third_party/rust_crates/private_visibility.gni", variable = "private_visibility" }
 
 
-# TODO(fxbug.dev/106164) This manual configuration enables the "rt" and "net"
-# features on non-Fuchsia targets. It should be removed once gnaw supports
-# target-specific features.
+# TODO(fxbug.dev/106164) This manual configuration enables the "rt", "net"
+# "fs", "macro" and "sync" features on non-Fuchsia targets. It should be
+# removed once gnaw supports target-specific features.
 [gn.package.tokio."1.19.2".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
@@ -646,6 +648,8 @@ deps = [
 ]
 rustflags = [
   "--cfg=feature=\\\"libc\\\"",
+  "--cfg=feature=\\\"fs\\\"",
+  "--cfg=feature=\\\"macro\\\"",
   "--cfg=feature=\\\"mio\\\"",
   "--cfg=feature=\\\"net\\\"",
   "--cfg=feature=\\\"num_cpus\\\"",
@@ -653,6 +657,7 @@ rustflags = [
   "--cfg=feature=\\\"rt\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
   "--cfg=feature=\\\"socket2\\\"",
+  "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",
   "--cfg=feature=\\\"winapi\\\"",
 ]

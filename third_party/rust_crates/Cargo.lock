@@ -817,6 +817,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cstr"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aa998c33a6d3271e3678950a22134cd7dd27cef86dee1b611b5b14207d1d90b"
+dependencies = [
+ "proc-macro2 1.0.39",
+ "quote 1.0.18",
+]
+
+[[package]]
 name = "csv"
 version = "1.1.3"
 dependencies = [
@@ -1338,6 +1348,7 @@ dependencies = [
  "fatfs",
  "flate2",
  "fs_extra",
+ "fuse3",
  "futures",
  "futures-channel",
  "futures-core",
@@ -1529,6 +1540,26 @@ dependencies = [
  "zerocopy",
  "zip",
  "zstd",
+]
+
+[[package]]
+name = "fuse3"
+version = "0.5.1"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bytes",
+ "cstr",
+ "futures-channel",
+ "futures-core",
+ "futures-util",
+ "libc",
+ "nix",
+ "serde",
+ "slab",
+ "tokio",
+ "tracing",
+ "which",
 ]
 
 [[package]]

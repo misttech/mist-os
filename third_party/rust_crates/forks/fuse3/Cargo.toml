@@ -1,0 +1,60 @@
+[package]
+name = "fuse3"
+version = "0.5.1"
+authors = ["Sherlock Holo <sherlockya@gmail.com>"]
+edition = "2021"
+readme = "README.md"
+keywords = ["fuse", "filesystem", "system", "bindings"]
+categories = ["api-bindings", "filesystem"]
+license = "MIT"
+repository = "https://github.com/Sherlock-Holo/fuse3"
+description = "FUSE user-space library async version implementation."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = [".", "examples"]
+
+[features]
+tokio-runtime = ["tokio"]
+async-std-runtime = ["async-std", "async-io"]
+file-lock = []
+unprivileged = ["which"]
+doc = ["file-lock", "unprivileged", "tokio-runtime"]
+
+[dependencies]
+futures-util = { version = "0.3", features = ["sink"] }
+futures-channel = { version = "0.3", features = ["sink"] }
+futures-core = { version = "0.3.0" }
+async-trait = "0.1"
+cstr = "0.2"
+libc = "0.2"
+bincode = "1"
+serde = { version = "1", features = ["derive"] }
+nix = { version = "0.26", default-features = false, features = ["fs", "mount", "socket", "user" ] }
+which = { version = "4", optional = true }
+# tokio-stream = { version = "0.1", features = ["fs"], optional = true }
+async-io = { version = "1", optional = true }
+bytes = "1"
+slab = "0.4"
+tracing = "0.1"
+
+[dependencies.async-std]
+version = "1"
+features = ["unstable"]
+optional = true
+
+[dependencies.tokio]
+version = "=1.19.2"
+# features = ["fs", "rt", "sync", "net", "macros"]
+# features = ["fs"]
+optional = true
+
+[package.metadata.docs.rs]
+features = [ "doc" ]
+targets = [
+  "i686-unknown-freebsd",
+  "i686-unknown-linux-gnu",
+  "x86_64-unknown-freebsd",
+  "x86_64-unknown-linux-gnu",
+]

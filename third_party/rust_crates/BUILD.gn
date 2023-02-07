@@ -286,6 +286,12 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+if (!(current_os == "fuchsia")) {
+  group("fuse3") {
+    public_deps = [ ":fuse3-v0_5_1" ]
+  }
+}
+
 group("futures") {
   public_deps = [ ":futures-v0_3_19" ]
 }
@@ -3135,6 +3141,28 @@ rust_library("crypto-mac-v0_11_1") {
   visibility = [ ":*" ]
 }
 
+rust_proc_macro("cstr-v0_2_11") {
+  crate_name = "cstr"
+  crate_root = "//third_party/rust_crates/vendor/cstr-0.2.11/src/lib.rs"
+  output_name = "cstr-196d60c30dc5c128"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_39" ]
+  deps += [ ":quote-v1_0_18" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=196d60c30dc5c128",
+    "-Cextra-filename=-196d60c30dc5c128",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("csv-v1_1_3") {
   crate_name = "csv"
   crate_root = "//third_party/rust_crates/ask2patch/csv/src/lib.rs"
@@ -4307,6 +4335,44 @@ rust_library("fuchsia-cprng-v0_1_1") {
     "--edition=2018",
     "-Cmetadata=2003c73715c7fc44",
     "-Cextra-filename=-2003c73715c7fc44",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("fuse3-v0_5_1") {
+  crate_name = "fuse3"
+  crate_root = "//third_party/rust_crates/forks/fuse3/src/lib.rs"
+  output_name = "fuse3-164da290d0714cc5"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":async-trait-v0_1_56($host_toolchain)" ]
+  deps += [ ":bincode-v1_3_3" ]
+  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":cstr-v0_2_11($host_toolchain)" ]
+  deps += [ ":futures-channel-v0_3_19" ]
+  deps += [ ":futures-core-v0_3_19" ]
+  deps += [ ":futures-util-v0_3_19" ]
+  deps += [ ":libc-v0_2_138" ]
+  deps += [ ":nix-v0_26_2" ]
+  deps += [ ":serde-v1_0_147" ]
+  deps += [ ":slab-v0_4_7" ]
+  deps += [ ":tokio-v1_19_2" ]
+  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":which-v4_0_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=164da290d0714cc5",
+    "-Cextra-filename=-164da290d0714cc5",
+    "--cfg=feature=\"tokio\"",
+    "--cfg=feature=\"tokio-runtime\"",
+    "--cfg=feature=\"unprivileged\"",
+    "--cfg=feature=\"which\"",
   ]
 
   visibility = [ ":*" ]
@@ -11172,6 +11238,8 @@ rust_library("tokio-v1_19_2") {
   if (!(current_os == "fuchsia")) {
     rustflags += [
       "--cfg=feature=\"libc\"",
+      "--cfg=feature=\"fs\"",
+      "--cfg=feature=\"macro\"",
       "--cfg=feature=\"mio\"",
       "--cfg=feature=\"net\"",
       "--cfg=feature=\"num_cpus\"",
@@ -11179,6 +11247,7 @@ rust_library("tokio-v1_19_2") {
       "--cfg=feature=\"rt\"",
       "--cfg=feature=\"rt-multi-thread\"",
       "--cfg=feature=\"socket2\"",
+      "--cfg=feature=\"sync\"",
       "--cfg=feature=\"time\"",
       "--cfg=feature=\"winapi\"",
     ]
