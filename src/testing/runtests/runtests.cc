@@ -72,6 +72,7 @@ int main(int argc, char** argv) {
   const char* output_dir = GetOutputDir(argc, argv);
 
   // Start Log Listener.
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   std::unique_ptr<runtests::LogExporter> log_exporter_ptr;
   if (output_dir != nullptr) {
     int error = runtests::MkDirAll(output_dir);
@@ -81,12 +82,18 @@ int main(int argc, char** argv) {
     }
 
     runtests::ExporterLaunchError exporter_error;
-    log_exporter_ptr = runtests::LaunchLogExporter(runtests::JoinPath(output_dir, kSyslogFileName),
-                                                   &exporter_error);
+    log_exporter_ptr = runtests::LaunchLogExporter(
+        loop.dispatcher(), runtests::JoinPath(output_dir, kSyslogFileName), &exporter_error);
     // Don't fail if logger service is not available because it is only
-    // available in garnet layer and above.
-    if (!log_exporter_ptr && exporter_error != runtests::CONNECT_TO_LOGGER_SERVICE) {
-      printf("Error: Failed to launch log listener: %d", exporter_error);
+    // available in core and above.
+    if (!log_exporter_ptr &&
+        exporter_error != runtests::ExporterLaunchError::CONNECT_TO_LOGGER_SERVICE) {
+      printf("Error: Failed to launch log listener: %d\n", exporter_error);
+      return -1;
+    }
+    if (zx_status_t status = loop.StartThread(); status != ZX_OK) {
+      printf("Error: Failed to start log exporter: %d (%s).\n", status,
+             zx_status_get_string(status));
       return -1;
     }
   }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fuchsia/logger/c/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -20,109 +20,22 @@
 #include <runtests-utils/log-exporter.h>
 
 namespace runtests {
-namespace {
 
-fuchsia_logger::wire::LogMessage ToLLCPP(fuchsia_logger_LogMessage* log_message) {
-  const fidl_vector_t& tags = log_message->tags;
-  const fidl_string_t& msg = log_message->msg;
-  return {
-      .pid = log_message->pid,
-      .tid = log_message->tid,
-      .time = log_message->time,
-      .severity = log_message->severity,
-      .dropped_logs = log_message->dropped_logs,
-      // 🤞 fidl::StringView has the same layout as fidl_string_t.
-      .tags = fidl::VectorView<fidl::StringView>::FromExternal(
-          static_cast<fidl::StringView*>(tags.data), tags.count),
-      .msg = fidl::StringView::FromExternal(msg.data, msg.size),
-  };
-}
-
-}  // namespace
-
-LogExporter::LogExporter(zx::channel channel, FILE* output_file)
-    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      channel_(std::move(channel)),
-      wait_(this, channel_.get(), ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED),
-      output_file_(output_file) {
-  wait_.Begin(loop_.dispatcher());
-}
+LogExporter::LogExporter(FILE* output_file, async_dispatcher_t* dispatcher,
+                         fidl::ServerEnd<fuchsia_logger::LogListenerSafe> channel,
+                         ErrorHandler error_handler, FileErrorHandler file_error_handler)
+    : file_error_handler_(std::move(file_error_handler)),
+      output_file_(output_file),
+      binding_(dispatcher, std::move(channel), this,
+               [error_handler = std::move(error_handler)](fidl::UnbindInfo info) {
+                 if (error_handler != nullptr) {
+                   error_handler(info.status());
+                 }
+               }) {}
 
 LogExporter::~LogExporter() {
-  // Quit so that current work is completed and loop can stop.
-  loop_.Quit();
-
-  // wait for current work to be completed.
-  loop_.JoinThreads();
-
-  // Run one more time until there are no more messages.
-  loop_.ResetQuit();
-  RunUntilIdle();
-
-  // Shutdown
-  loop_.Shutdown();
   if (output_file_ != nullptr) {
     fclose(output_file_);
-  }
-}
-
-zx_status_t LogExporter::StartThread() { return loop_.StartThread(); }
-
-zx_status_t LogExporter::RunUntilIdle() { return loop_.RunUntilIdle(); }
-
-void LogExporter::OnHandleReady(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                zx_status_t status, const zx_packet_signal_t* signal) {
-  if (status != ZX_OK) {
-    NotifyError(status);
-    return;
-  }
-
-  if (signal->observed & ZX_CHANNEL_READABLE) {
-    fidl::IncomingMessageBuffer buffer;
-    for (uint64_t i = 0; i < signal->count; i++) {
-      status = ReadAndDispatchMessage(&buffer);
-      if (status == ZX_ERR_SHOULD_WAIT) {
-        break;
-      }
-      if (status != ZX_OK) {
-        NotifyError(status);
-        return;
-      }
-    }
-    // make sure nothing else invalidated the channel
-    if (!channel_.is_valid()) {
-      // no need to return error as someone would have already done that before invalidating
-      // channel.
-      return;
-    }
-    status = wait_.Begin(dispatcher);
-    if (status != ZX_OK) {
-      NotifyError(status);
-    }
-    return;
-  }
-
-  ZX_DEBUG_ASSERT(signal->observed & ZX_CHANNEL_PEER_CLOSED);
-
-  // We don't notify an error until we've drained all the messages.
-  NotifyError(ZX_ERR_PEER_CLOSED);
-}
-
-zx_status_t LogExporter::ReadAndDispatchMessage(fidl::IncomingMessageBuffer* buffer) {
-  fidl::HLCPPIncomingMessage message = buffer->CreateEmptyIncomingMessage();
-  zx_status_t status = message.Read(channel_.get(), 0);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  uint64_t ordinal = message.ordinal();
-  switch (ordinal) {
-    case fuchsia_logger_LogListenerSafeLogOrdinal:
-      return Log(std::move(message));
-    case fuchsia_logger_LogListenerSafeLogManyOrdinal:
-      return LogMany(std::move(message));
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
   }
 }
 
@@ -142,16 +55,16 @@ uint64_t GetNanoSeconds(uint64_t nanoseconds) { return (nanoseconds / 1000UL) % 
 
 int LogExporter::WriteSeverity(int32_t severity) {
   switch (severity) {
-    case fuchsia_logger_LogLevelFilter_INFO:
+    case static_cast<int32_t>(fuchsia_logger::wire::LogLevelFilter::kInfo):
       return fputs(" INFO", output_file_);
-    case fuchsia_logger_LogLevelFilter_WARN:
+    case static_cast<int32_t>(fuchsia_logger::wire::LogLevelFilter::kWarn):
       return fputs(" WARNING", output_file_);
-    case fuchsia_logger_LogLevelFilter_ERROR:
+    case static_cast<int32_t>(fuchsia_logger::wire::LogLevelFilter::kError):
       return fputs(" ERROR", output_file_);
-    case fuchsia_logger_LogLevelFilter_FATAL:
+    case static_cast<int32_t>(fuchsia_logger::wire::LogLevelFilter::kFatal):
       return fputs(" FATAL", output_file_);
     default:
-      // all other cases severity would be a negative nuber so print it as
+      // all other cases severity would be a negative number so print it as
       // VLOG(n) where severity=-n
       return fprintf(output_file_, " VLOG(%d)", -severity);
   }
@@ -212,64 +125,25 @@ ssize_t LogExporter::LogMessage(fuchsia_logger::wire::LogMessage message) {
   return 0;
 }
 
-zx_status_t LogExporter::Log(fidl::HLCPPIncomingMessage message) {
-  const char* error_msg = nullptr;
-  zx_status_t status =
-      message.Decode(&fuchsia_logger_LogListenerSafeLogRequestMessageTable, &error_msg);
-  if (status != ZX_OK) {
-    fprintf(stderr, "log-listener: error: Log: %s\n", error_msg);
-    return status;
-  }
-
-  fuchsia_logger_LogMessage* log_message = message.GetBodyViewAs<fuchsia_logger_LogMessage>();
-  if (LogMessage(ToLLCPP(log_message)) < 0) {
+void LogExporter::Log(LogRequestView request, LogCompleter::Sync& completer) {
+  if (LogMessage(request->log) < 0) {
     NotifyFileError(strerror(errno));
-    return ZX_OK;
-  }
-
-  fuchsia_logger_LogListenerSafeLogManyResponseMessage response;
-  memset(&response, 0, sizeof(response));
-  fidl::InitTxnHeader(&response.hdr, message.txid(), message.ordinal(),
-                      fidl::MessageDynamicFlags::kStrictMethod);
-  return channel_.write(0, &response, sizeof(response), nullptr, 0);
+  };
+  completer.Reply();
 }
 
-zx_status_t LogExporter::LogMany(fidl::HLCPPIncomingMessage message) {
-  const char* error_msg = nullptr;
-  zx_status_t status =
-      message.Decode(&fuchsia_logger_LogListenerSafeLogManyRequestMessageTable, &error_msg);
-  if (status != ZX_OK) {
-    fprintf(stderr, "log-listener: error: LogMany: %s\n", error_msg);
-    return status;
-  }
-
-  fidl_vector_t* log_messages = message.GetBodyViewAs<fidl_vector_t>();
-  fuchsia_logger_LogMessage* msgs = static_cast<fuchsia_logger_LogMessage*>(log_messages->data);
-  for (size_t i = 0; i < log_messages->count; ++i) {
-    if (LogMessage(ToLLCPP(&msgs[i])) < 0) {
+void LogExporter::LogMany(LogManyRequestView request, LogManyCompleter::Sync& completer) {
+  for (const auto& msg : request->log) {
+    if (LogMessage(msg) < 0) {
       NotifyFileError(strerror(errno));
-      return ZX_OK;
     }
   }
-
-  fuchsia_logger_LogListenerSafeLogManyResponseMessage response;
-  memset(&response, 0, sizeof(response));
-  fidl::InitTxnHeader(&response.hdr, message.txid(), message.ordinal(),
-                      fidl::MessageDynamicFlags::kStrictMethod);
-  return channel_.write(0, &response, sizeof(response), nullptr, 0);
+  completer.Reply();
 }
 
-void LogExporter::NotifyError(zx_status_t error) {
-  channel_.reset();
-  fclose(output_file_);
-  output_file_ = nullptr;
-  if (error_handler_) {
-    error_handler_(error);
-  }
-}
+void LogExporter::Done(DoneCompleter::Sync& completer) {}
 
 void LogExporter::NotifyFileError(const char* error) {
-  channel_.reset();
   fclose(output_file_);
   output_file_ = nullptr;
   if (file_error_handler_) {
@@ -277,79 +151,57 @@ void LogExporter::NotifyFileError(const char* error) {
   }
 }
 
-std::unique_ptr<LogExporter> LaunchLogExporter(const std::string_view syslog_path,
+std::unique_ptr<LogExporter> LaunchLogExporter(async_dispatcher_t* dispatcher,
+                                               const std::string_view syslog_path,
                                                ExporterLaunchError* error) {
-  *error = NO_ERROR;
+  *error = ExporterLaunchError::NO_ERROR;
   fbl::String syslog_path_str = fbl::String(syslog_path.data());
   FILE* syslog_file = fopen(syslog_path_str.c_str(), "w");
   if (syslog_file == nullptr) {
     fprintf(stderr, "Error: Could not open syslog file '%s': %s\n", syslog_path_str.c_str(),
             strerror(errno));
-    *error = OPEN_FILE;
+    *error = ExporterLaunchError::OPEN_FILE;
     return nullptr;
   }
 
-  // Try and connect to logger service if available. It would be only
-  // available in garnet and above layer
-  zx::channel logger, logger_request;
-  zx_status_t status;
-
-  status = zx::channel::create(0, &logger, &logger_request);
-  if (status != ZX_OK) {
-    fprintf(stderr, "LaunchLogExporter: cannot create channel for logger service: %d (%s).\n",
-            status, zx_status_get_string(status));
-    *error = CREATE_CHANNEL;
-    return nullptr;
-  }
-
-  status = fdio_service_connect("/svc/fuchsia.logger.Log", logger_request.release());
-  if (status != ZX_OK) {
-    fprintf(stderr, "LaunchLogExporter: cannot connect to logger service: %d (%s).\n", status,
-            zx_status_get_string(status));
-    *error = CONNECT_TO_LOGGER_SERVICE;
+  zx::result syslog = component::Connect<fuchsia_logger::Log>();
+  if (syslog.is_error()) {
+    fprintf(stderr, "LaunchLogExporter: cannot connect to logger service: %d (%s).\n",
+            syslog.error_value(), syslog.status_string());
+    *error = ExporterLaunchError::CONNECT_TO_LOGGER_SERVICE;
     return nullptr;
   }
 
   // Create a log exporter channel and pass it to logger service.
-  zx::channel listener, listener_request;
-  status = zx::channel::create(0, &listener, &listener_request);
-  if (status != ZX_OK) {
-    fprintf(stderr, "LaunchLogExporter: cannot create channel for listener: %d (%s).\n", status,
-            zx_status_get_string(status));
-    *error = CREATE_CHANNEL;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
+  if (endpoints.is_error()) {
+    fprintf(stderr, "LaunchLogExporter: cannot create channel for listener: %d (%s).\n",
+            endpoints.error_value(), endpoints.status_string());
+    *error = ExporterLaunchError::CREATE_CHANNEL;
     return nullptr;
   }
-  fuchsia_logger_LogListenSafeRequestMessage req = {};
-  fidl::InitTxnHeader(&req.hdr, 0, fuchsia_logger_LogListenSafeOrdinal,
-                      fidl::MessageDynamicFlags::kStrictMethod);
-  req.log_listener = FIDL_HANDLE_PRESENT;
-  zx_handle_t listener_handle = listener.release();
-  status = logger.write(0, &req, sizeof(req), &listener_handle, 1);
-  if (status != ZX_OK) {
-    fprintf(stderr, "LaunchLogExporter: cannot pass listener to logger service: %d (%s).\n", status,
-            zx_status_get_string(status));
-    *error = FIDL_ERROR;
+  auto& [client, server] = endpoints.value();
+
+  const fidl::OneWayStatus status =
+      fidl::WireCall(syslog.value())->ListenSafe(std::move(client), {});
+  if (!status.ok()) {
+    fprintf(stderr, "LaunchLogExporter: cannot pass listener to logger service: %d (%s).\n",
+            status.status(), status.status_string());
+    *error = ExporterLaunchError::FIDL_ERROR;
     return nullptr;
   }
 
   // Connect log exporter channel to object and start message loop on it.
-  auto log_exporter = std::make_unique<LogExporter>(std::move(listener_request), syslog_file);
-  log_exporter->set_error_handler([](zx_status_t status) {
-    if (status != ZX_ERR_CANCELED) {
-      fprintf(stderr, "log exporter: Failed: %d (%s).\n", status, zx_status_get_string(status));
-    }
-  });
-  log_exporter->set_file_error_handler([](const char* error) {
-    fprintf(stderr, "log exporter: Error writing to file: %s.\n", error);
-  });
-  status = log_exporter->StartThread();
-  if (status != ZX_OK) {
-    fprintf(stderr, "LaunchLogExporter: Failed to start log exporter: %d (%s).\n", status,
-            zx_status_get_string(status));
-    *error = START_LISTENER;
-    return nullptr;
-  }
-  return log_exporter;
+  return std::make_unique<LogExporter>(
+      syslog_file, dispatcher, std::move(server),
+      [](zx_status_t status) {
+        if (status != ZX_ERR_CANCELED) {
+          fprintf(stderr, "log exporter: Failed: %d (%s).\n", status, zx_status_get_string(status));
+        }
+      },
+      [](const char* error) {
+        fprintf(stderr, "log exporter: Error writing to file: %s.\n", error);
+      });
 }
 
 }  // namespace runtests
