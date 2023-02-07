@@ -127,10 +127,13 @@ async fn guest_attached_to_network() {
     let network = sandbox.create_network("test_network").await.expect("failed to create network");
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
     let net_mac = net_declare::net_mac!("aa:bb:cc:dd:ee:ff");
-    let mut fidl_mac = fnet::MacAddress { octets: net_mac.bytes() };
-    let _guest = netemul::guest::Controller::new("test_guest", &network, Some(&mut fidl_mac))
-        .await
-        .expect("setup installed guest failed");
+    let _guest = netemul::guest::Controller::new(
+        "test_guest",
+        &network,
+        Some(fnet::MacAddress { octets: net_mac.bytes() }),
+    )
+    .await
+    .expect("setup installed guest failed");
 
     // Linux generates frames on its own; validate that Netemul propagates them to endpoints
     // on the virtual network.
