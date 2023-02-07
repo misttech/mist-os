@@ -1,0 +1,53 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            include: "../loopback_isolated_filter.json5",
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
+
+                // Netstack3 does not support dual-stack TCP sockets yet.
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4MappedLoopback",
+
+                // Netstack3 does not have complete support for multicast sockets.
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/UDP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/UDP",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Skip tests that will otherwise hang forever.
+                // TODO(b/245940107): un-skip some of these when the data path is ready.
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
+            ],
+        },
+    ],
+}
