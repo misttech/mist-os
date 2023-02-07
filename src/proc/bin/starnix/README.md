@@ -174,11 +174,10 @@ If you set the log level to `TRACE` (e.g.,  `ffx log --severity TRACE --select "
 ```
 
 For GUnit tests (such as the syscall tests in //src/proc/tests/android/gvisor),
-you can override the `--gunit_filter` argument, which excludes or include tests,
-by specifying an alternate flag after `--` on the command line. For example,
+you can run specific tests with the `--test-filter` flag. For example,
 
 ```sh
-fx test epoll_test --output -- --gunit_filter="*"
+fx test epoll_test --output --test-filter="EpollTest.AllWritable"
 ```
 
 Specifying `*` as the filter turns on all tests in the binary.

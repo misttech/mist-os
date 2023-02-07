@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/statfs_test",
-        args: [ "--gunit_filter=-*.BlocksFree" ],
     },
 }

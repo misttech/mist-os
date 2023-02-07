@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/futex_test",
-        args: [ "--gunit_filter=-*.WakeOp*:*.Wake0/*:*.PI*" ],
     },
 }
