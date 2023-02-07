@@ -13,7 +13,6 @@ use {
         server::ServiceFs,
     },
     fuchsia_component_test::{ScopedInstance, ScopedInstanceFactory},
-    fuchsia_zircon as zx,
     futures::prelude::*,
     tracing::{info, warn},
 };
@@ -128,6 +127,7 @@ async fn proxy_component_controller(
     );
 
     let mut stop_or_kill_called = false;
+    let mut nested_controller_epitaph = None;
 
     while let Some(event) = combined_stream.next().await {
         match event {
@@ -137,16 +137,26 @@ async fn proxy_component_controller(
                 break;
             }
             ProxyEvent::ClientRequest(StreamItem::Item(Ok(request))) => match request {
-                fcrunner::ComponentControllerRequest::Stop { control_handle } => {
-                    nested_controller
-                        .stop()
-                        .unwrap_or_else(|e| shutdown_controller(&control_handle, e));
+                fcrunner::ComponentControllerRequest::Stop { control_handle: _ } => {
+                    // TODO(fxbug.dev/113160): Remove is_closed() check once
+                    // Rust bindings hide PEER_CLOSED.
+                    match nested_controller.stop() {
+                        Err(e) if !e.is_closed() => {
+                            warn!("failed forwarding Stop() to dart runner: {e}")
+                        }
+                        _ => {}
+                    }
                     stop_or_kill_called = true;
                 }
-                fcrunner::ComponentControllerRequest::Kill { control_handle } => {
-                    nested_controller
-                        .kill()
-                        .unwrap_or_else(|e| shutdown_controller(&control_handle, e));
+                fcrunner::ComponentControllerRequest::Kill { control_handle: _ } => {
+                    // TODO(fxbug.dev/113160): Remove is_closed() check once
+                    // Rust bindings hide PEER_CLOSED.
+                    match nested_controller.kill() {
+                        Err(e) if !e.is_closed() => {
+                            warn!("failed forwarding Kill() to dart runner: {e}")
+                        }
+                        _ => {}
+                    }
                     stop_or_kill_called = true;
                 }
             },
@@ -154,36 +164,34 @@ async fn proxy_component_controller(
             ProxyEvent::ServerEvent(Ok(
                 fcrunner::ComponentControllerEvent::OnPublishDiagnostics { payload },
             )) => {
-                let _ = request_stream_control.send_on_publish_diagnostics(payload);
+                request_stream_control.send_on_publish_diagnostics(payload).unwrap_or_else(|e| {
+                    warn!("failed forwarding send_on_publish_diagnostics: {e}")
+                });
+            }
+            ProxyEvent::ServerEvent(Err(fidl::Error::ClientChannelClosed { status, .. })) => {
+                nested_controller_epitaph = Some(status);
             }
             ProxyEvent::ServerEvent(Err(e)) => {
-                // The real Dart runner appears to close the controller with an epitaph
-                // before fuchsia.test.Suite completes running. Because of this, in the
-                // case of tests, killing the runner immediately after the proxy terminates
-                // can kill fuchsia.test.Suite, preventing test_manager from retrieving
-                // test results.
-                // To handle this case, for tests only we ignore the signal and wait for
-                // stop or kill to be called instead. Note that this could cause timeouts
-                // during destruction if a test crashes, but this will likely be reported
-                // over fuchsia.test.Suite.
-                if !is_test || stop_or_kill_called {
-                    shutdown_controller(&request_stream_control, e);
-                }
+                warn!("failed to get event: {e:?}");
             }
+        }
+        // The real Dart runner appears to close the controller with an epitaph
+        // before fuchsia.test.Suite completes running. Because of this, in the
+        // case of tests, killing the runner immediately after the proxy terminates
+        // can kill fuchsia.test.Suite, preventing test_manager from retrieving
+        // test results.
+        // To handle this case, for tests only we ignore the signal and wait for
+        // stop or kill to be called instead. Note that this could cause timeouts
+        // during destruction if a test crashes, but this will likely be reported
+        // over fuchsia.test.Suite.
+        if is_test && !stop_or_kill_called {
+            continue;
+        }
+        if let Some(status) = nested_controller_epitaph {
+            request_stream_control.shutdown_with_epitaph(status);
         }
     }
     Ok(())
-}
-
-fn shutdown_controller<T: ControlHandle>(controller: &T, err: fidl::Error) {
-    match err {
-        fidl::Error::ClientChannelClosed { status, .. } if status != zx::Status::PEER_CLOSED => {
-            controller.shutdown_with_epitaph(status);
-        }
-        _ => {
-            controller.shutdown();
-        }
-    }
 }
 
 fn component_is_test(start_info: &fcrunner::ComponentStartInfo) -> bool {
@@ -247,7 +255,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn closing_server_does_not_close_client_if_test() {
+    fn closing_server_does_not_close_client_until_stop_called_if_test() {
         let mut executor = fasync::TestExecutor::new();
 
         let (client_proxy, client_request_stream) =
@@ -274,6 +282,44 @@ mod test {
 
         // After calling stop or kill, the client channel should close.
         client_proxy.stop().expect("stop should succeed");
+        assert_matches!(executor.run_until_stalled(&mut proxy_fut), Poll::Ready(Ok(())));
+        assert_matches!(
+            executor.run_until_stalled(&mut event_stream.next()),
+            Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
+                status: fidl::Status::OK,
+                ..
+            })))
+        );
+    }
+
+    #[fuchsia::test]
+    fn closing_server_closes_client_if_stop_already_called_if_test() {
+        let mut executor = fasync::TestExecutor::new();
+
+        let (client_proxy, client_request_stream) =
+            create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
+                .expect("create stream");
+        let (server_proxy, mut server_request_stream) =
+            create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
+                .expect("create stream");
+
+        let mut proxy_fut =
+            proxy_component_controller(server_proxy, client_request_stream, true).boxed();
+
+        client_proxy.stop().expect("stop should succeed");
+
+        assert_matches!(executor.run_until_stalled(&mut proxy_fut), Poll::Pending);
+
+        let mut event_stream = client_proxy.take_event_stream();
+        assert_matches!(executor.run_until_stalled(&mut event_stream.next()), Poll::Pending);
+
+        server_request_stream.control_handle().shutdown_with_epitaph(fidl::Status::OK);
+        assert_matches!(
+            executor.run_until_stalled(&mut server_request_stream.next()),
+            Poll::Ready(None)
+        );
+        drop(server_request_stream);
+
         assert_matches!(executor.run_until_stalled(&mut proxy_fut), Poll::Ready(Ok(())));
         assert_matches!(
             executor.run_until_stalled(&mut event_stream.next()),
