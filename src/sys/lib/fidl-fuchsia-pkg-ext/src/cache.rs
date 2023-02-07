@@ -252,11 +252,12 @@ impl Get {
         let (blob_iterator, blob_iterator_server_end) =
             fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>()?;
 
-        match self.needed_blobs.get_missing_blobs(blob_iterator_server_end) {
-            Ok(()) => Ok(Some(blob_iterator)),
-            Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => Ok(None),
-            Err(e) => Err(e),
-        }
+        self.needed_blobs
+            .get_missing_blobs(blob_iterator_server_end)
+            // TODO(fxbug.dev/113160): Remove this line since
+            // is_closed() will always be false.
+            .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })?;
+        Ok(Some(blob_iterator))
     }
 
     /// Determines the set of blobs that the caller must open/write to complete this `Get()`
@@ -1072,6 +1073,7 @@ mod tests {
         let (mut get, pending_get) = PendingGet::new().await;
         let _ = pending_get.finish();
 
+        assert_matches!(get.open_meta_blob(fpkg::BlobType::Uncompressed).await, Ok(None));
         assert_eq!(get.get_missing_blobs().try_concat().await.unwrap(), vec![]);
     }
 
@@ -1105,7 +1107,7 @@ mod tests {
 
         assert_matches!(
             get.get_missing_blobs().try_concat().await,
-            Err(ListMissingBlobsError::CallGetMissingBlobs(
+            Err(ListMissingBlobsError::CallNextOnBlobIterator(
                 fidl::Error::ClientChannelClosed{status, ..})
             )
                 if status == Status::PEER_CLOSED
