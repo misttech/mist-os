@@ -72,6 +72,25 @@ When updating, please add the value in alphabetical order.
 :                                         : target is in fastboot, and to      :
 :                                         : communicate directly with it as    :
 :                                         : opposed to doing discovery.        :
+| `log.dir`                               | Location for ffx and daemon logs   |
+| `log.enabled`                           | Whether logging is enabled         |
+| `log.include_spans`                     | Whether spans (function names,     |
+:                                         : parameters, etc) are included      :
+| `log.level`                             | Filter level for log messages      |
+:                                         : Overridable on specific components :
+:                                         : via `log.target_levels.<prefix>`.  :
+:                                         : Values are:                        :
+:                                         : `error`, `warn`, `info`, `debug`,  :
+:                                         : `trace`                            :
+| `log.rotate_size`                       | Limit of log size before log file  |
+:                                         : is rotated (if rotation is enabled;:
+:                                         : see `log.rotate_size`)             :
+| `log.rotations`                         | How many rotations of log files    |
+:                                         : to keep (0 to disable rotation)    :
+| `log.target_levels.<prefix>`            | Filter levels for components with  :
+:                                         : specified prefix. Values are:      :
+:                                         : `error`, `warn`, `info`, `debug`,  :
+:                                         : `trace`                            :
 | `proactive_log.cache_directory`         | Location for target logs to be     |
 :                                         : cached                             :
 | `proactive_log.enabled`                 | Flag to enable proactive log       |

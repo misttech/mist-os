@@ -27,6 +27,7 @@ const LOG_ROTATE_SIZE: &str = "log.rotate_size";
 const LOG_ENABLED: &str = "log.enabled";
 const LOG_TARGET_LEVELS: &str = "log.target_levels";
 const LOG_LEVEL: &str = "log.level";
+const LOG_INCLUDE_SPANS: &str = "log.include_spans";
 pub const LOG_PREFIX: &str = "ffx";
 const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
 
@@ -204,12 +205,17 @@ async fn target_levels() -> Vec<(String, LevelFilter)> {
     vec![]
 }
 
+async fn include_spans() -> bool {
+    super::query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
+}
+
 async fn configure_subscribers(stdio: bool, file: Option<File>, level: LevelFilter) {
     let filter_targets =
         filter::Targets::new().with_targets(target_levels().await).with_default(level);
 
+    let include_spans = include_spans().await;
     let stdio_layer = if stdio {
-        let event_format = LogFormat::new(*LOGGING_ID);
+        let event_format = LogFormat::new(*LOGGING_ID, include_spans);
         let format = tracing_subscriber::fmt::layer()
             .event_format(event_format)
             .with_filter(DisableableFilter)
@@ -220,7 +226,7 @@ async fn configure_subscribers(stdio: bool, file: Option<File>, level: LevelFilt
     };
 
     let file_layer = file.map(|f| {
-        let event_format = LogFormat::new(*LOGGING_ID);
+        let event_format = LogFormat::new(*LOGGING_ID, include_spans);
         let writer = Mutex::new(std::io::LineWriter::new(f));
         let format = tracing_subscriber::fmt::layer()
             .event_format(event_format)
@@ -248,13 +254,14 @@ struct LogFormat {
     display_thread_id: bool,
     display_filename: bool,
     display_line_number: bool,
+    display_spans: bool,
     display_target: bool,
     timer: LogTimer,
 }
 
 impl LogFormat {
-    fn new(id: u64) -> Self {
-        LogFormat { id, display_target: true, ..Default::default() }
+    fn new(id: u64, display_spans: bool) -> Self {
+        LogFormat { id, display_spans, display_target: true, ..Default::default() }
     }
 }
 
@@ -294,8 +301,10 @@ where
             write!(writer, "{:0>2?} ", std::thread::current().id())?;
         }
 
-        let full_ctx = FullCtx::new(ctx, event.parent());
-        write!(writer, "{}", full_ctx)?;
+        if self.display_spans {
+            let full_ctx = FullCtx::new(ctx, event.parent());
+            write!(writer, "{}", full_ctx)?;
+        }
 
         if self.display_target {
             write!(writer, "{}: ", meta.target())?;
