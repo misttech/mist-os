@@ -2,6 +2,15 @@
 
 <h1>Device Info</h1>
 
+<h2>Board</h2>
+<ul>
+{{#with board_info}}
+<li> CPU_ARCHITECTURE: {{cpu_architecture}}</li>
+<li> NAME: {{name}}</li>
+<li> REVISION: {{revision}}</li>
+{{/with}}
+</ul>
+
 <h2>Product</h2>
 <ul>
 {{#each product_info}}

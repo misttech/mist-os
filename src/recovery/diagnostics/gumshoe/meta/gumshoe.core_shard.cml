@@ -21,7 +21,10 @@
             to: "#gumshoe",
         },
         {
-            protocol: "fuchsia.hwinfo.Product",
+            protocol: [
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Product",
+            ],
             from: "#hwinfo",
             to: "#gumshoe",
         },
