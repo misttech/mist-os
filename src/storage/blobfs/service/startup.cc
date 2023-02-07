@@ -94,8 +94,22 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
     std::unique_ptr<block_client::RemoteBlockDevice> device;
+
+// TODO(fxbug.dev/121465): Use  Volume instead of Block.
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     zx_status_t status =
         block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#elif __GNUC__
+#pragma GCC diagnostic pop
+#endif
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Could not initialize block device";
       return zx::error(status);
@@ -114,8 +128,22 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
     std::unique_ptr<block_client::RemoteBlockDevice> device;
+
+// TODO(fxbug.dev/121465): Use  Volume instead of Block.
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     zx_status_t status =
         block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#elif __GNUC__
+#pragma GCC diagnostic pop
+#endif
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Could not initialize block device: " << zx_status_get_string(status);
       return zx::error(status);
@@ -137,8 +165,22 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
     std::unique_ptr<block_client::RemoteBlockDevice> device;
+
+// TODO(fxbug.dev/121465): Use  Volume instead of Block.
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     zx_status_t status =
         block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#elif __GNUC__
+#pragma GCC diagnostic pop
+#endif
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Could not initialize block device";
       return zx::error(status);
