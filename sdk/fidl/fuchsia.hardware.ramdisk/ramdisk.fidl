@@ -5,45 +5,32 @@ library fuchsia.hardware.ramdisk;
 
 using zx;
 
-/// Identifies if requests which are sent ot the ramdisk while it is
-/// considered "asleep" should be processed when the ramdisk wakes up.
-/// If this flag is not set, those requests are failed immediately.
-const RAMDISK_FLAG_RESUME_ON_WAKE uint32 = 0x00000001;
-
-// If set, blocks written after the last flush are filled with an
-// indeterminate value when waking after sleeping.
-const RAMDISK_FLAG_DISCARD_NOT_FLUSHED_ON_WAKE uint32 = 0x00000002;
-
-// If set, blocks written after the last flush are filled at random
-// rather than all blocks.  This can be used to simulate out-of-order
-// writes.
-const RAMDISK_FLAG_DISCARD_RANDOM uint32 = 0x00000004;
-
-/// Counters for the number of write requests since the last call to either
-/// "SleepAfter" or "Wake". All units are in individual blocks.
-@for_deprecated_c_bindings
-type BlockWriteCounts = struct {
-    received uint64;
-    successful uint64;
-    failed uint64;
-};
-
 /// The protocol for interacting with a instance of a ramdisk.
-@for_deprecated_c_bindings
 protocol Ramdisk {
     /// Sets any of the `RAMDISK_FLAG_*` flags.
     SetFlags(struct {
-        flags uint32;
-    }) -> (struct {
-        s zx.status;
-    });
+        flags @generated_name("RamdiskFlag") strict bits : uint32 {
+            /// Identifies if requests which are sent ot the ramdisk while it is
+            /// considered "asleep" should be processed when the ramdisk wakes
+            /// up. If this flag is not set, those requests are failed
+            /// immediately.
+            RESUME_ON_WAKE = 0x00000001;
+
+            /// If set, blocks written after the last flush are filled with an
+            /// indeterminate value when waking after sleeping.
+            DISCARD_NOT_FLUSHED_ON_WAKE = 0x00000002;
+
+            /// If set, blocks written after the last flush are filled at
+            /// random rather than all blocks.  This can be used to simulate
+            /// out-of-order writes.
+            DISCARD_RANDOM = 0x00000004;
+        };
+    }) -> ();
 
     /// Wakes a ramdisk, if it was sleeping.
     ///
     /// Resets the block counts being stored by the ramdisk.
-    Wake() -> (struct {
-        s zx.status;
-    });
+    Wake() -> ();
 
     /// Causes the ramdisk to sleep after `count` blocks are written successfully.
     /// After `count` blocks are written, requests either wait for the ramdisk to
@@ -52,15 +39,18 @@ protocol Ramdisk {
     /// Resets the block counts being stored by the ramdisk.
     SleepAfter(struct {
         count uint64;
-    }) -> (struct {
-        s zx.status;
-    });
+    }) -> ();
 
     /// Returns the number of write requests since the last call to either
     /// "SleepAfter" or "Wake".
     GetBlockCounts() -> (struct {
-        s zx.status;
-        counts box<BlockWriteCounts>;
+        /// Counters for the number of write requests since the last call to either
+        /// "SleepAfter" or "Wake". All units are in individual blocks.
+        counts @generated_name("BlockWriteCounts") struct {
+            received uint64;
+            successful uint64;
+            failed uint64;
+        };
     });
 
     /// Causes the ramdisk size to grow to `required_size` in bytes.
@@ -68,9 +58,7 @@ protocol Ramdisk {
     /// returned. `required_size` must be a multiple of `block_size`.
     Grow(struct {
         new_size uint64;
-    }) -> (struct {
-        s zx.status;
-    });
+    }) -> () error zx.status;
 };
 
 // TODO(smklein): Deduplicate GUID declarations with other FIDL interfaces.
@@ -94,18 +82,16 @@ protocol RamdiskController {
         block_count uint64;
         type_guid box<Guid>;
     }) -> (struct {
-        s zx.status;
         name string:<MAX_NAME_LENGTH, optional>;
-    });
+    }) error zx.status;
 
     /// Initializes a new Ramdisk instance from a VMO. Uses a block size of `PAGE_SIZE`,
     /// and derives the block count from the size of the VMO.
     CreateFromVmo(resource struct {
         vmo zx.handle:VMO;
     }) -> (struct {
-        s zx.status;
         name string:<MAX_NAME_LENGTH, optional>;
-    });
+    }) error zx.status;
 
     /// Same as CreateFromVmo, but with the given `block_size` and optional `type_guid`. If
     /// `block_size` is zero, `PAGE_SIZE` will be used as `block_size`.
@@ -114,7 +100,6 @@ protocol RamdiskController {
         block_size uint64;
         type_guid box<Guid>;
     }) -> (struct {
-        s zx.status;
         name string:<MAX_NAME_LENGTH, optional>;
-    });
+    }) error zx.status;
 };

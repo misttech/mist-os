@@ -100,9 +100,10 @@ zx::result<std::pair<storage::RamDisk, std::string>> CreateRamDisk(
   }
 
   if (options.ram_disk_discard_random_after_last_flush) {
-    ramdisk_set_flags(ram_disk_or->client(),
-                      fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardRandom |
-                          fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardNotFlushedOnWake);
+    uint32_t flags = static_cast<uint32_t>(
+        fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom |
+        fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake);
+    ramdisk_set_flags(ram_disk_or->client(), flags);
   }
 
   std::string device_path = ram_disk_or.value().path();

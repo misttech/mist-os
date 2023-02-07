@@ -185,7 +185,7 @@ void TestDevice::SleepUntil(uint64_t num, bool deferred) {
   need_join_ = true;
   if (deferred) {
     uint32_t flags =
-        static_cast<uint32_t>(fuchsia_hardware_ramdisk::wire::kRamdiskFlagResumeOnWake);
+        static_cast<uint32_t>(fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
     ASSERT_OK(ramdisk_set_flags(ramdisk_, flags));
   }
   uint64_t sleep_after = 0;

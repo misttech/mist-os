@@ -104,7 +104,7 @@ class Ramdisk : public RamdiskDeviceType,
   // sent to the ramdisk while it is considered "alseep" should be processed
   // when the ramdisk wakes up. This is implemented by utilizing a "deferred
   // list" of requests, which are immediately re-issued on wakeup.
-  uint32_t flags_ TA_GUARDED(lock_) = 0;
+  fuchsia_hardware_ramdisk::RamdiskFlag flags_ TA_GUARDED(lock_);
 
   // True if the ramdisk is "sleeping", and deferring all upcoming requests,
   // or dropping them if |RAMDISK_FLAG_RESUME_ON_WAKE| is not set.

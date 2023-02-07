@@ -107,8 +107,8 @@ void Ramdisk::BlockImplQuery(block_info_t* info, size_t* bopsz) {
   info->block_count = block_count_;
   // Arbitrarily set, but matches the SATA driver for testing
   info->max_transfer_size = kMaxTransferSize;
-  fbl::AutoLock lock(&lock_);
-  info->flags = flags_;
+  // None of the block flags are applied to the ramdisk.
+  info->flags = 0;
   *bopsz = Transaction::OperationSize(sizeof(block_op_t));
 }
 
@@ -173,14 +173,14 @@ void Ramdisk::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& com
     fbl::AutoLock lock(&lock_);
     flags_ = request->flags;
   }
-  completer.Reply(ZX_OK);
+  completer.Reply();
 }
 
 void Ramdisk::Wake(WakeCompleter::Sync& completer) {
   {
     fbl::AutoLock lock(&lock_);
 
-    if (flags_ & fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardNotFlushedOnWake) {
+    if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
       // Fill all blocks with a fill pattern.
       for (uint64_t block : blocks_written_since_last_flush_) {
         void* addr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping_.start()) +
@@ -196,7 +196,7 @@ void Ramdisk::Wake(WakeCompleter::Sync& completer) {
     pre_sleep_write_block_count_ = 0;
     sync_completion_signal(&signal_);
   }
-  completer.Reply(ZX_OK);
+  completer.Reply();
 }
 
 void Ramdisk::SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Sync& completer) {
@@ -210,17 +210,12 @@ void Ramdisk::SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Syn
       asleep_ = true;
     }
   }
-  completer.Reply(ZX_OK);
+  completer.Reply();
 }
 
 void Ramdisk::GetBlockCounts(GetBlockCountsCompleter::Sync& completer) {
-  fidl::Arena allocator;
-  fidl::ObjectView<fuchsia_hardware_ramdisk::wire::BlockWriteCounts> block_counts(allocator);
-  {
-    fbl::AutoLock lock(&lock_);
-    memcpy(block_counts.get(), &block_counts_, sizeof(block_counts_));
-  }
-  completer.Reply(ZX_OK, block_counts);
+  fbl::AutoLock lock(&lock_);
+  completer.Reply(block_counts_);
 }
 
 zx_status_t Ramdisk::BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid) {
@@ -244,22 +239,21 @@ zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
 void Ramdisk::Grow(GrowRequestView request, GrowCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   if (request->new_size < block_size_ * block_count_) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
 
   if (request->new_size % block_size_ != 0) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
-  zx_status_t status = mapping_.Grow(request->new_size);
-  if (status != ZX_OK) {
-    completer.Reply(status);
+  if (zx::result<> result = zx::make_result(mapping_.Grow(request->new_size)); result.is_error()) {
+    completer.Reply(result);
     return;
   }
 
   block_count_ = request->new_size / block_size_;
-  completer.Reply(ZX_OK);
+  completer.Reply(zx::ok());
 }
 
 void Ramdisk::ProcessRequests() {
@@ -275,7 +269,8 @@ void Ramdisk::ProcessRequests() {
     do {
       {
         fbl::AutoLock lock(&lock_);
-        defer = (flags_ & fuchsia_hardware_ramdisk::wire::kRamdiskFlagResumeOnWake) != 0;
+        defer =
+            static_cast<bool>(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
         block_write_limit = pre_sleep_write_block_count_ == 0 && !asleep_
                                 ? std::numeric_limits<uint64_t>::max()
                                 : pre_sleep_write_block_count_;
@@ -358,10 +353,10 @@ void Ramdisk::ProcessRequests() {
           pre_sleep_write_block_count_ -= blocks;
           asleep_ = (pre_sleep_write_block_count_ == 0);
 
-          if (flags_ & fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardNotFlushedOnWake) {
+          if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
             for (uint64_t block = txn->operation()->rw.offset_dev, count = blocks; count > 0;
                  ++block, --count) {
-              if (!(flags_ & fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardRandom) ||
+              if (!(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom) ||
                   distribution(random)) {
                 blocks_written_since_last_flush_.push_back(block);
               }

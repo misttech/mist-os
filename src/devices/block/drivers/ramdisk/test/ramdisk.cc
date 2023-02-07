@@ -1573,7 +1573,8 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   }
 
   // Sleep and wake parameters
-  uint32_t flags = fuchsia_hardware_ramdisk::wire::kRamdiskFlagResumeOnWake;
+  uint32_t flags =
+      static_cast<uint32_t>(fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
   thrd_t thread;
   wake_args_t wake;
   wake.ramdisk_client = ramdisk_->ramdisk_client();
@@ -1677,9 +1678,11 @@ TEST(RamdiskTests, RamdiskCreateAtVmo) {
 }
 
 TEST_F(RamdiskTestWithClient, DiscardOnWake) {
-  ASSERT_EQ(ramdisk_set_flags(ramdisk_->ramdisk_client(),
-                              fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardNotFlushedOnWake),
-            ZX_OK);
+  ASSERT_EQ(
+      ramdisk_set_flags(ramdisk_->ramdisk_client(),
+                        static_cast<uint32_t>(
+                            fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake)),
+      ZX_OK);
   ASSERT_EQ(ramdisk_sleep_after(ramdisk_->ramdisk_client(), 100), ZX_OK);
 
   block_fifo_request_t requests[5];
@@ -1726,10 +1729,12 @@ TEST_F(RamdiskTestWithClient, DiscardOnWake) {
 }
 
 TEST_F(RamdiskTestWithClient, DiscardRandomOnWake) {
-  ASSERT_EQ(ramdisk_set_flags(ramdisk_->ramdisk_client(),
-                              fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardNotFlushedOnWake |
-                                  fuchsia_hardware_ramdisk::wire::kRamdiskFlagDiscardRandom),
-            ZX_OK);
+  ASSERT_EQ(
+      ramdisk_set_flags(ramdisk_->ramdisk_client(),
+                        static_cast<uint32_t>(
+                            fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake |
+                            fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom)),
+      ZX_OK);
 
   int found = 0;
   do {

@@ -85,18 +85,17 @@ impl RamdiskClientBuilder {
         let ramdisk_controller_proxy =
             RamdiskControllerProxy::new(node_proxy.into_channel().unwrap());
         let mut type_guid = guid.map(|guid| Guid { value: guid });
-        let (status, name) = match ramdisk_source {
-            RamdiskSource::Vmo { vmo } => {
-                ramdisk_controller_proxy
-                    .create_from_vmo_with_params(vmo, block_size, type_guid.as_mut())
-                    .await?
-            }
-            RamdiskSource::Size { block_count } => {
-                ramdisk_controller_proxy.create(block_size, block_count, type_guid.as_mut()).await?
-            }
+        let name = match ramdisk_source {
+            RamdiskSource::Vmo { vmo } => ramdisk_controller_proxy
+                .create_from_vmo_with_params(vmo, block_size, type_guid.as_mut())
+                .await?
+                .map_err(zx::Status::from_raw)?,
+            RamdiskSource::Size { block_count } => ramdisk_controller_proxy
+                .create(block_size, block_count, type_guid.as_mut())
+                .await?
+                .map_err(zx::Status::from_raw)?,
         };
         let name = name.ok_or_else(|| anyhow!("Failed to get instance name"))?;
-        zx::Status::ok(status)?;
         RamdiskClient::new(dev_root, &name, default_dev_root).await
     }
 }

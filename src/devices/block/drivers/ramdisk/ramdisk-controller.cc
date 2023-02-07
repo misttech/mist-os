@@ -53,16 +53,16 @@ void RamdiskController::Create(CreateRequestView request, CreateCompleter::Sync&
   zx_status_t status =
       zx::vmo::create(request->block_size * request->block_count, ZX_VMO_RESIZABLE, &vmo);
   if (status != ZX_OK) {
-    completer.Reply(status, fidl::StringView());
+    completer.ReplyError(status);
     return;
   }
-  auto name_or = ConfigureDevice(std::move(vmo), request->block_size, request->block_count,
-                                 request->type_guid ? request->type_guid->value.data() : nullptr);
-  if (name_or.is_error()) {
-    completer.Reply(status, fidl::StringView());
+  auto name = ConfigureDevice(std::move(vmo), request->block_size, request->block_count,
+                              request->type_guid ? request->type_guid->value.data() : nullptr);
+  if (name.is_error()) {
+    completer.Reply(name.take_error());
     return;
   }
-  completer.Reply(ZX_OK, fidl::StringView::FromExternal(name_or.value()));
+  completer.ReplySuccess(fidl::StringView::FromExternal(name.value()));
 }
 
 zx::result<std::string> RamdiskController::CreateFromVmoWithParamsInternal(
@@ -102,27 +102,27 @@ zx::result<std::string> RamdiskController::CreateFromVmoWithParamsInternal(
 
 void RamdiskController::CreateFromVmo(CreateFromVmoRequestView request,
                                       CreateFromVmoCompleter::Sync& completer) {
-  auto name_or = CreateFromVmoWithParamsInternal(std::move(request->vmo), /*block_size*/ 0,
-                                                 /*type_guid*/ nullptr);
-  if (name_or.is_error()) {
-    completer.Reply(name_or.status_value(), fidl::StringView());
+  auto name = CreateFromVmoWithParamsInternal(std::move(request->vmo), /*block_size*/ 0,
+                                              /*type_guid*/ nullptr);
+  if (name.is_error()) {
+    completer.Reply(name.take_error());
     return;
   }
 
-  completer.Reply(ZX_OK, fidl::StringView::FromExternal(name_or.value()));
+  completer.ReplySuccess(fidl::StringView::FromExternal(name.value()));
 }
 
 void RamdiskController::CreateFromVmoWithParams(CreateFromVmoWithParamsRequestView request,
                                                 CreateFromVmoWithParamsCompleter::Sync& completer) {
-  auto name_or = CreateFromVmoWithParamsInternal(
+  auto name = CreateFromVmoWithParamsInternal(
       std::move(request->vmo), request->block_size,
       request->type_guid ? request->type_guid->value.data() : nullptr);
-  if (name_or.is_error()) {
-    completer.Reply(name_or.status_value(), fidl::StringView());
+  if (name.is_error()) {
+    completer.Reply(name.take_error());
     return;
   }
 
-  completer.Reply(ZX_OK, fidl::StringView::FromExternal(name_or.value()));
+  completer.ReplySuccess(fidl::StringView::FromExternal(name.value()));
 }
 
 zx::result<std::string> RamdiskController::ConfigureDevice(zx::vmo vmo, uint64_t block_size,

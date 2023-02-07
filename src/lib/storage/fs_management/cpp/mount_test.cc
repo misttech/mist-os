@@ -164,29 +164,6 @@ TEST_F(MountTest, MountReadonly) {
   ASSERT_LT(unlinkat(root_fd.get(), file_name, 0), 0);
 }
 
-// Test that when a block device claims to be read-only, the filesystem is mounted as read-only.
-TEST_F(MountTest, MountBlockReadonly) {
-  const char file_name[] = "some_file";
-  CreateTestFile(file_name);
-
-  uint32_t flags = BLOCK_FLAG_READONLY;
-  ASSERT_EQ(ramdisk_set_flags(ramdisk_client(), flags), ZX_OK);
-
-  bool read_only = false;
-  auto mounted_filesystem_or = MountMinfs(read_only);
-  ASSERT_EQ(mounted_filesystem_or.status_value(), ZX_OK);
-
-  // We can't modify the file.
-  fbl::unique_fd root_fd(open(kTestMountPath, O_RDONLY | O_DIRECTORY));
-  ASSERT_TRUE(root_fd);
-  fbl::unique_fd fd(openat(root_fd.get(), file_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
-  ASSERT_FALSE(fd);
-
-  // We can open it as read-only.
-  fd.reset(openat(root_fd.get(), file_name, O_RDONLY));
-  ASSERT_TRUE(fd);
-}
-
 TEST_F(MountTest, StatfsTest) {
   auto mounted_filesystem_or = MountMinfs(/*read_only=*/false);
   ASSERT_EQ(mounted_filesystem_or.status_value(), ZX_OK);
