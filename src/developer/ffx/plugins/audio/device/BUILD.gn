@@ -4,7 +4,7 @@
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
-ffx_plugin("ffx_audio_info") {
+ffx_plugin("ffx_audio_device") {
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
@@ -13,13 +13,14 @@ ffx_plugin("ffx_audio_info") {
   args_deps = [ "//third_party/rust_crates:anyhow" ]
   args_sources = [ "src/args.rs" ]
 
+  sources = [ "src/lib.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
-
-  sources = [ "src/lib.rs" ]
 }

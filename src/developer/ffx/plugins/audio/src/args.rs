@@ -10,14 +10,27 @@ use {argh::FromArgs, ffx_audio_sub_command::SubCommand, ffx_core::ffx_command};
     subcommand,
     name = "audio",
     description = "Interact with the audio subsystem.",
-    example = "Generate a 5s long audio signal with 440Hz frequency:
-        $ ffx audio gen sine --frequency=440 --duration=5s > /tmp/sine.wav",
-    note = "Output format parameters: <SampleRate>,<SampleType>,<Channels>
-        SampleRate: Integer 
+    example = "\
+    Generate a 5s long audio signal with 440Hz frequency and write to a file: \n\
+    \t$ ffx audio gen sine --frequency 440 --duration 5s --format 48000,uint8,1ch > ~/sine.wav \n\n\
+    Play a wav file using audio_core API: \n\
+    \t$ cat ~/sine.wav | ffx audio play \n\n\
+    Record audio signal to a file using audio_core API: \n\
+    \t$ ffx audio record --duration 1s --format 48000,uint8,1ch > ~/recording.wav\n\n\
+    List available audio devices on target: \n\
+    \t$ ffx audio list-devices --output text\n\n\
+    Print information about a specific audio device on target: \n\
+    \t$ ffx audio device --id 000 info --type input \n\n\
+    Play a wav file directly to device hardware: \n\
+    \t$ cat ~/sine.wav | ffx audio device --id 000 play \n",
+    note = "Format parameters: \
+    Some commands take a --format=<format> argument for describing audio PCM format.\n\
+    The <format> argument has the pattern: <SampleRate>,<SampleType>,<Channels>
+        SampleRate: Integer
         SampleType options: uint8, int16, int32, float32
         Channels: <uint>ch
 
-        example: --format=48000,float32,2ch"
+    example: --format=48000,float32,2ch"
 )]
 pub struct AudioCommand {
     #[argh(subcommand)]

@@ -41,6 +41,9 @@ type CapturerInfo = table {
     /// The usage of the audio stream.
     /// Required.
     1: usage fuchsia.media.AudioCaptureUsage;
+
+    /// Buffer size in bytes for retrieving audio data.
+    2: buffer_size uint64;
 };
 
 /// Gain settings.

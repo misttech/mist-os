@@ -15,11 +15,9 @@ ffx_plugin("ffx_audio_play") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
-    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:blocking",
-    "//third_party/rust_crates:futures",
   ]
 
   args_sources = [ "src/args.rs" ]

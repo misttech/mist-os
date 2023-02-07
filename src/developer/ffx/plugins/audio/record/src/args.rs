@@ -9,7 +9,12 @@ use {
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "record", description = "record", example = "ffx audio record")]
+#[argh(
+    subcommand,
+    name = "record",
+    description = "Records audio data from audio_core AudioCapturer API and outputs a WAV file to stdout.",
+    example = "$ ffx audio record --duration 1s --format 48000,uint8,1ch --usage SYSTEM-AGENT > ~/recording.wav"
+)]
 pub struct RecordCommand {
     #[argh(
         option,
@@ -21,14 +26,23 @@ pub struct RecordCommand {
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
     pub format: Format,
 
-    #[argh(subcommand)]
-    pub subcommand: SubCommand,
-}
+    #[argh(
+        option,
+        description = "purpose of the stream being recorded.\
+        Accepted values: BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, or LOOPBACK.\
+        Default: COMMUNICATION.",
+        from_str_fn(str_to_usage),
+        default = "AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication)"
+    )]
+    pub usage: AudioCaptureUsageExtended,
 
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand)]
-pub enum SubCommand {
-    Capture(CaptureCommand),
+    #[argh(
+        option,
+        description = "buffer size (bytes) to allocate on device VMO.\
+        Used to retrieve audio data from AudioCapturer.\
+        Defaults to size to hold 1 second of audio data."
+    )]
+    pub buffer_size: Option<u64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -38,30 +52,6 @@ pub enum AudioCaptureUsageExtended {
     SystemAgent(AudioCaptureUsage),
     Communication(AudioCaptureUsage),
     Loopback,
-}
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "capture", description = "Retrieve audio data from AudioCapturer.")]
-pub struct CaptureCommand {
-    #[argh(
-        option,
-        description = "purpose of the stream being used to capture audio. One of: 
-        BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, or LOOPBACK",
-        from_str_fn(str_to_usage)
-    )]
-    pub usage: AudioCaptureUsageExtended,
-
-    #[argh(
-        option,
-        description = "buffer size (bytes) to allocate on device VMO. Used to send audio data from 
-        ffx tool to AudioRenderer. If not specified, defaults to size to hold 1 second of data."
-    )]
-    pub buffer_size: Option<u64>,
-
-    #[argh(option, description = "gain (in decibels) for the capturer.")]
-    pub gain: f32,
-
-    #[argh(option, description = "mute the capturer.")]
-    pub mute: bool,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {

@@ -9,49 +9,37 @@ use {anyhow::Result, argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_media::
 #[argh(
     subcommand,
     name = "play",
-    description = "Reads a WAV file from stdin and writes the audio data to the target.",
-    example = "ffx audio play renderer --usage MEDIA --buffer-size 10 --gain 1 --mute true --clock default"
+    description = "Reads a WAV file from stdin and sends the audio data to audio_core AudioRenderer API.",
+    example = "$ ffx audio gen sine --duration 1s --frequency 440 --amplitude 0.5 --format 48000,int16,2ch | ffx audio play"
 )]
 pub struct PlayCommand {
-    #[argh(subcommand)]
-    pub subcommand: SubCommand,
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand)]
-pub enum SubCommand {
-    Render(RenderCommand),
-    Device(DeviceCommand),
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "render", description = "Send audio data to AudioRenderer.")]
-pub struct RenderCommand {
     #[argh(
         option,
-        description = "purpose of the stream being used to render audio.",
-        from_str_fn(str_to_usage)
+        description = "purpose of the stream being used to render audio.\
+        Accepted values: BACKGROUND, MEDIA, SYSTEM-AGENT, COMMUNICATION, INTERRUPTION.\
+        Default: MEDIA.",
+        from_str_fn(str_to_usage),
+        default = "AudioRenderUsage::Media"
     )]
     pub usage: AudioRenderUsage,
 
     #[argh(
         option,
-        description = "buffer size (bytes) to allocate on device VMO. used to send audio data from ffx tool to AudioRenderer."
+        description = "buffer size (bytes) to allocate on device VMO.\
+        Used to send audio data from ffx tool to AudioRenderer.\
+        Defaults to size to hold 1 second of audio data. "
     )]
-    pub buffer_size: u32,
+    pub buffer_size: Option<u32>,
 
-    #[argh(option, description = "gain (in decibels) for the renderer.")]
+    #[argh(
+        option,
+        description = "gain (decibels) for the renderer. Default: 0 dB",
+        default = "0.0f32"
+    )]
     pub gain: f32,
 
-    #[argh(option, description = "mute the renderer.")]
+    #[argh(option, description = "mute the renderer. Default: false", default = "false")]
     pub mute: bool,
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "device", description = "Send audio data to ring buffer.")]
-pub struct DeviceCommand {
-    #[argh(option, description = "id of device (path)")]
-    pub id: String,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioRenderUsage, String> {

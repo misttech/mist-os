@@ -1,14 +1,14 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use {
     anyhow::Result,
     errors::ffx_bail,
-    ffx_audio_info_args::{DeviceInfoCommand, InfoCommand, InfoOutputFormat, SubCommand},
+    ffx_audio_device_args::{DeviceCommand, SubCommand},
     ffx_core::ffx_plugin,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonDeviceInfoRequest, AudioDaemonProxy, DeviceSelector,
+        AudioDaemonDeviceInfoRequest, AudioDaemonPlayRequest, AudioDaemonProxy, DeviceSelector,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     serde::{Deserialize, Serialize},
@@ -18,10 +18,10 @@ use {
     "audio",
     AudioDaemonProxy = "core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"
 )]
-pub async fn info_cmd(audio_proxy: AudioDaemonProxy, cmd: InfoCommand) -> Result<()> {
-    let format = cmd.output;
+pub async fn device_cmd(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
     match cmd.subcommand {
-        SubCommand::DeviceInfo(info_cmd) => device_info(audio_proxy, info_cmd, format).await?,
+        SubCommand::Info(_) => device_info(audio_proxy, cmd).await?,
+        SubCommand::Play(_) => device_play(audio_proxy, cmd).await?,
     }
 
     Ok(())
@@ -76,24 +76,25 @@ pub struct JsonPcmFormats {
     pub frame_rates: Option<Vec<u32>>,
 }
 
-async fn device_info(
-    audio_proxy: AudioDaemonProxy,
-    info_cmd: DeviceInfoCommand,
-    format: InfoOutputFormat,
-) -> Result<()> {
+async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+    let info_cmd = match cmd.subcommand {
+        SubCommand::Info(cmd) => cmd,
+        _ => panic!("Unreachable."),
+    };
+
     let (device_path, is_input) = match info_cmd.device_type {
-        ffx_audio_info_args::DeviceType::Input => {
-            (format!("/dev/class/audio-input/{}", info_cmd.id), true)
+        ffx_audio_device_args::DeviceType::Input => {
+            (format!("/dev/class/audio-input/{}", cmd.id), true)
         }
-        ffx_audio_info_args::DeviceType::Output => {
-            (format!("/dev/class/audio-output/{}", info_cmd.id), false)
+        ffx_audio_device_args::DeviceType::Output => {
+            (format!("/dev/class/audio-output/{}", cmd.id), false)
         }
     };
 
     let request = AudioDaemonDeviceInfoRequest {
         device: Some(DeviceSelector {
-            is_input: Some(ffx_audio_info_args::DeviceType::Input == info_cmd.device_type),
-            id: Some(info_cmd.id.clone()),
+            is_input: Some(ffx_audio_device_args::DeviceType::Input == info_cmd.device_type),
+            id: Some(cmd.id),
             ..DeviceSelector::EMPTY
         }),
         ..AudioDaemonDeviceInfoRequest::EMPTY
@@ -267,16 +268,16 @@ async fn device_info(
             }
 
             for frame_rate in format.frame_rates.clone().unwrap_or(Vec::new()) {
-                print!("\nFrame rate     : {} Hz", frame_rate);
+                print!("\nFrame rate      : {} Hz", frame_rate);
             }
 
             for bytes_per_sample in format.bytes_per_sample.clone().unwrap_or(Vec::new()) {
-                println!("\nBits per channel     : {} ", bytes_per_sample * 8);
+                print!("\nBits per channel: {} ", bytes_per_sample * 8);
             }
 
             for valid_bits_per_channel in format.valid_bits_per_sample.clone().unwrap_or(Vec::new())
             {
-                println!("Valid bits per channel    : {} ", valid_bits_per_channel);
+                println!("\nValid bits per channel: {} ", valid_bits_per_channel);
             }
         }
         Ok(())
@@ -341,10 +342,35 @@ async fn device_info(
         Ok(())
     };
 
-    match format {
-        ffx_audio_info_args::InfoOutputFormat::Json => print_json()?,
-        ffx_audio_info_args::InfoOutputFormat::Text => print_text_output()?,
+    match info_cmd.output {
+        ffx_audio_device_args::InfoOutputFormat::Json => print_json()?,
+        ffx_audio_device_args::InfoOutputFormat::Text => print_text_output()?,
     }
 
+    Ok(())
+}
+
+async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+    let (play_remote, play_local) = fidl::Socket::create(fidl::SocketOpts::DATAGRAM)?;
+
+    let request = AudioDaemonPlayRequest {
+        socket: Some(play_remote),
+        location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::RingBuffer(
+            fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
+                is_input: Some(false),
+                id: Some(cmd.id),
+                ..fidl_fuchsia_audio_ffxdaemon::DeviceSelector::EMPTY
+            },
+        )),
+
+        gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+            mute: None, // TODO(fxbug.dev/121211)
+            gain: None, // TODO(fxbug.dev/121211)
+            ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+        }),
+        ..AudioDaemonPlayRequest::EMPTY
+    };
+
+    ffx_audio_common::play(request, audio_proxy, play_local).await?;
     Ok(())
 }

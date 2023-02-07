@@ -11,8 +11,8 @@ ffx_plugin("ffx_audio") {
   with_unit_tests = false
 
   plugin_deps = [
+    "device:ffx_audio_device",
     "gen:ffx_audio_gen",
-    "info:ffx_audio_info",
     "list-devices:ffx_audio_listdevices",
     "play:ffx_audio_play",
     "record:ffx_audio_record",

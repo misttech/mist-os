@@ -8,7 +8,7 @@ use {
     anyhow::Result,
     blocking::Unblock,
     errors::ffx_bail,
-    ffx_audio_record_args::{RecordCommand, SubCommand},
+    ffx_audio_record_args::RecordCommand,
     ffx_core::ffx_plugin,
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, RecordLocation,
@@ -22,9 +22,7 @@ use {
     AudioDaemonProxy = "core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"
 )]
 pub async fn record_cmd(audio_proxy: AudioDaemonProxy, cmd: RecordCommand) -> Result<()> {
-    match cmd.subcommand {
-        SubCommand::Capture(_) => record_capture(audio_proxy, cmd).await?,
-    }
+    record_capture(audio_proxy, cmd).await?;
     Ok(())
 }
 
@@ -32,14 +30,8 @@ pub async fn record_capture(
     audio_proxy: AudioDaemonProxy,
     record_command: RecordCommand,
 ) -> Result<()> {
-    let (usage_extended, _buffer_size_arg) = match record_command.subcommand {
-        SubCommand::Capture(capture_command) => {
-            (capture_command.usage, capture_command.buffer_size)
-        }
-    };
-
-    let loopback = usage_extended == AudioCaptureUsageExtended::Loopback;
-    let capturer_usage = match usage_extended {
+    let loopback = record_command.usage == AudioCaptureUsageExtended::Loopback;
+    let capturer_usage = match record_command.usage {
         AudioCaptureUsageExtended::Background(usage)
         | AudioCaptureUsageExtended::Foreground(usage)
         | AudioCaptureUsageExtended::Communication(usage)
@@ -59,6 +51,7 @@ pub async fn record_capture(
             } else {
                 Some(RecordLocation::Capturer(CapturerInfo {
                     usage: capturer_usage,
+                    buffer_size: record_command.buffer_size,
                     ..CapturerInfo::EMPTY
                 }))
             },
