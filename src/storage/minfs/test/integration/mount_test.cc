@@ -168,7 +168,6 @@ TEST_F(MountTest, ServeExportDirectoryExportRootDirectoryEntries) {
   auto close_dir = fit::defer([&]() { closedir(dir); });
 
   // Verify that there are exactly two entries, "root" and "diagnostics".
-  // TODO(fxbug.dev/34531): Adjust this test accordingly when the admin service is added.
   std::vector<std::string> directory_entries;
   while ((entry = readdir(dir)) != nullptr) {
     if ((strcmp(entry->d_name, ".") != 0) && (strcmp(entry->d_name, "..") != 0)) {
