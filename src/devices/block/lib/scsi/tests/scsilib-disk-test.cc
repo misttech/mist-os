@@ -22,8 +22,7 @@ namespace {
 // ScsiController for test; allows us to set expectations and fakes command responses.
 class ScsiControllerForTest : public scsi::Controller {
  public:
-  using IOCallbackType =
-      fit::function<zx_status_t(uint8_t, uint16_t, struct iovec, struct iovec, struct iovec)>;
+  using IOCallbackType = fit::function<zx_status_t(uint8_t, uint16_t, iovec, bool, iovec)>;
 
   ~ScsiControllerForTest() { ASSERT_EQ(times_, 0); }
 
@@ -62,9 +61,13 @@ class ScsiControllerForTest : public scsi::Controller {
     }
   }
 
-  zx_status_t ExecuteCommandAsync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                  struct iovec data_out, struct iovec data_in,
-                                  void (*cb)(void*, zx_status_t), void* cookie) override {
+  size_t BlockOpSize() override {
+    // No additional metadata required for each command transaction.
+    return sizeof(scsi::ScsiLibOp);
+  }
+
+  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                           uint32_t block_size_bytes, scsi::ScsiLibOp* scsilib_op) override {
     // In the caller, enqueue the request for the worker thread,
     // poke the worker thread and return. The worker thread, on
     // waking up, will do the actual IO and call the callback.
@@ -76,18 +79,18 @@ class ScsiControllerForTest : public scsi::Controller {
     memcpy(reinterpret_cast<void*>(&io->cdbptr), cdb.iov_base, cdb.iov_len);
     io->cdb.iov_base = &io->cdbptr;
     io->cdb.iov_len = cdb.iov_len;
-    io->data_out = data_out;
-    io->data_in = data_in;
-    io->cb = cb;
-    io->cookie = cookie;
+    io->is_write = is_write;
+    io->data_vmo = zx::unowned_vmo(scsilib_op->op.rw.vmo);
+    io->vmo_offset_bytes = scsilib_op->op.rw.offset_vmo * block_size_bytes;
+    io->transfer_bytes = scsilib_op->op.rw.length * block_size_bytes;
+    io->scsilib_op = scsilib_op;
     fbl::AutoLock lock(&lock_);
     list_add_tail(&queued_ios_, &io->node);
     cv_.Signal();
-    return ZX_OK;
   }
 
-  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                 struct iovec data_out, struct iovec data_in) override {
+  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                 iovec data) override {
     EXPECT_TRUE(do_io_);
     EXPECT_GT(times_, 0);
 
@@ -95,7 +98,7 @@ class ScsiControllerForTest : public scsi::Controller {
       return ZX_ERR_INTERNAL;
     }
 
-    auto status = do_io_(target, lun, cdb, data_out, data_in);
+    auto status = do_io_(target, lun, cdb, is_write, data);
     if (--times_ == 0) {
       decltype(do_io_) empty;
       do_io_.swap(empty);
@@ -124,8 +127,32 @@ class ScsiControllerForTest : public scsi::Controller {
         auto* io = containerof(node, struct queued_io, node);
         list_delete(node);
         zx_status_t status;
-        status = ExecuteCommandSync(io->target, io->lun, io->cdb, io->data_out, io->data_in);
-        io->cb(io->cookie, status);
+        std::unique_ptr<uint8_t[]> temp_buffer;
+
+        if (io->data_vmo->is_valid()) {
+          temp_buffer = std::make_unique<uint8_t[]>(io->transfer_bytes);
+          // In case of WRITE command, populate the temp buffer with data from VMO.
+          if (io->is_write) {
+            status = zx_vmo_read(io->data_vmo->get(), temp_buffer.get(), io->vmo_offset_bytes,
+                                 io->transfer_bytes);
+            if (status != ZX_OK) {
+              io->scsilib_op->Complete(status);
+              delete io;
+              continue;
+            }
+          }
+        }
+
+        status = ExecuteCommandSync(io->target, io->lun, io->cdb, io->is_write,
+                                    {temp_buffer.get(), io->transfer_bytes});
+
+        // In case of READ command, populate the VMO with data from temp buffer.
+        if (status == ZX_OK && !io->is_write && io->data_vmo->is_valid()) {
+          status = zx_vmo_write(io->data_vmo->get(), temp_buffer.get(), io->vmo_offset_bytes,
+                                io->transfer_bytes);
+        }
+
+        io->scsilib_op->Complete(status);
         delete io;
       }
       cv_.Wait(&lock_);
@@ -142,11 +169,12 @@ class ScsiControllerForTest : public scsi::Controller {
       scsi::Read16CDB readcdb;
       scsi::Write16CDB writecdb;
     } cdbptr;
-    struct iovec cdb;
-    struct iovec data_out;
-    struct iovec data_in;
-    void (*cb)(void*, zx_status_t);
-    void* cookie;
+    iovec cdb;
+    bool is_write;
+    zx::unowned_vmo data_vmo;
+    zx_off_t vmo_offset_bytes;
+    size_t transfer_bytes;
+    scsi::ScsiLibOp* scsilib_op;
   };
 
   // These are the state for testing Async IOs.
@@ -168,13 +196,13 @@ class ScsilibDiskTest : public zxtest::Test {
 
   void SetupDefaultCreateExpectations() {
     controller_.ExpectCall(
-        [this](uint8_t target, uint16_t lun, struct iovec cdb, struct iovec data_out,
-               struct iovec data_in) -> auto {
+        [this](uint8_t target, uint16_t lun, iovec cdb, bool is_write, iovec data) -> auto {
           switch (default_seq_) {
             case 0: {
               scsi::InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::INQUIRY);
+              EXPECT_FALSE(is_write);
               break;
             }
             case 1: {
@@ -183,18 +211,21 @@ class ScsilibDiskTest : public zxtest::Test {
               EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::MODE_SENSE_6);
               EXPECT_EQ(decoded_cdb.page_code, scsi::kCachingPageCode);
               EXPECT_EQ(decoded_cdb.disable_block_descriptors, 0b1000);
+              EXPECT_FALSE(is_write);
               scsi::CachingModePage response = {};
               response.page_code = scsi::kCachingPageCode;
-              memcpy(data_in.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
               break;
             }
             case 2: {
               scsi::ReadCapacity16CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::READ_CAPACITY_16);
+              EXPECT_FALSE(is_write);
               scsi::ReadCapacity16ParameterData response = {};
               response.returned_logical_block_address = htobe64(kFakeBlocks - 1);
               response.block_length_in_bytes = htobe32(kBlockSize);
-              memcpy(data_in.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
               break;
             }
           }
@@ -217,8 +248,7 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
 
   int seq = 0;
   controller_.ExpectCall(
-      [&seq](uint8_t target, uint16_t lun, struct iovec cdb, struct iovec data_out,
-             struct iovec data_in) -> auto {
+      [&seq](uint8_t target, uint16_t lun, iovec cdb, bool is_write, iovec data) -> auto {
         EXPECT_EQ(target, kTarget);
         EXPECT_EQ(lun, kLun);
 
@@ -228,6 +258,7 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
           scsi::InquiryCDB decoded_cdb = {};
           memcpy(reinterpret_cast<scsi::InquiryCDB*>(&decoded_cdb), cdb.iov_base, cdb.iov_len);
           EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::INQUIRY);
+          EXPECT_FALSE(is_write);
         } else if (seq == 1) {
           // Then MODE SENSE (6).
           EXPECT_EQ(cdb.iov_len, 6);
@@ -236,10 +267,11 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
           EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::MODE_SENSE_6);
           EXPECT_EQ(decoded_cdb.page_code, scsi::kCachingPageCode);
           EXPECT_EQ(decoded_cdb.disable_block_descriptors, 0b1000);
+          EXPECT_FALSE(is_write);
 
           scsi::CachingModePage response = {};
           response.page_code = scsi::kCachingPageCode;
-          memcpy(data_in.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+          memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
         } else if (seq == 2) {
           // Then READ CAPACITY (16).
           EXPECT_EQ(cdb.iov_len, 16);
@@ -248,11 +280,12 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
                  cdb.iov_len);
           EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::READ_CAPACITY_16);
           EXPECT_EQ(decoded_cdb.service_action, 0x10);
+          EXPECT_FALSE(is_write);
 
           scsi::ReadCapacity16ParameterData response = {};
           response.returned_logical_block_address = htobe64(kFakeBlocks - 1);
           response.block_length_in_bytes = htobe32(kBlockSize);
-          memcpy(data_in.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+          memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
         }
         seq++;
 
@@ -261,7 +294,7 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
       /*times=*/3);
 
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
+  ASSERT_OK(scsi::Disk::Bind(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
@@ -274,7 +307,7 @@ TEST_F(ScsilibDiskTest, TestCreateReadDestroy) {
   SetupDefaultCreateExpectations();
 
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
+  ASSERT_OK(scsi::Disk::Bind(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
   auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<scsi::Disk>();
   block_info_t info;
@@ -288,18 +321,18 @@ TEST_F(ScsilibDiskTest, TestCreateReadDestroy) {
   memset(test_block_1, 0x01, sizeof(DiskBlock));
 
   controller_.ExpectCall(
-      [&blocks](uint8_t target, uint16_t lun, struct iovec cdb, struct iovec data_out,
-                struct iovec data_in) -> auto {
+      [&blocks](uint8_t target, uint16_t lun, iovec cdb, bool is_write, iovec data) -> auto {
         EXPECT_EQ(cdb.iov_len, 16);
         scsi::Read16CDB decoded_cdb = {};
         memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
         EXPECT_EQ(decoded_cdb.opcode, scsi::Opcode::READ_16);
+        EXPECT_FALSE(is_write);
 
         // Support reading one block.
         EXPECT_EQ(be32toh(decoded_cdb.transfer_length), 1);
         uint64_t block_to_read = be64toh(decoded_cdb.logical_block_address);
         const DiskBlock& data_to_return = blocks.at(block_to_read);
-        memcpy(data_in.iov_base, data_to_return, sizeof(DiskBlock));
+        memcpy(data.iov_base, data_to_return, sizeof(DiskBlock));
 
         return ZX_OK;
       },

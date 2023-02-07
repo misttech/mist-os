@@ -21,12 +21,12 @@ zx_library("scsi") {
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
   ]
   public_deps = [
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
   ]
 }

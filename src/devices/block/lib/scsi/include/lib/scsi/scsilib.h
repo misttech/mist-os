@@ -12,6 +12,9 @@
 #include <stdint.h>
 
 #include <ddktl/device.h>
+#include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
+#include <fbl/string_printf.h>
 #include <hwreg/bitfields.h>
 
 #include "scsilib_controller.h"
@@ -83,6 +86,8 @@ struct InquiryData {
   uint8_t product_id[16];
   uint8_t product_revision[4];
   uint8_t drive_serial_number[8];
+
+  DEF_SUBBIT(removable, 7, removable_media);
 } __PACKED;
 
 static_assert(offsetof(InquiryData, t10_vendor_id) == 8, "T10 Vendor ID is at offset 8");
@@ -163,6 +168,8 @@ struct CachingModePage {
   uint16_t cache_segment_size;
   uint8_t reserved;
   uint8_t obsolete[3];
+
+  DEF_SUBBIT(control_bits, 2, write_cache_enabled);
 } __PACKED;
 
 static_assert(sizeof(CachingModePage) == 24, "Caching Mode Page must be 24 bytes");
@@ -350,49 +357,75 @@ struct SynchronizeCache10CDB {
 
 static_assert(sizeof(SynchronizeCache10CDB) == 10, "Synchronize Cache 10 CDB must be 10 bytes");
 
+struct ScsiLibOp {
+  void Complete(zx_status_t status) { completion_cb(cookie, status, &op); }
+
+  block_op_t op;
+  block_impl_queue_callback completion_cb;
+  void* cookie;
+};
+
 class Disk;
 using DeviceType = ddk::Device<Disk>;
 
 // |Disk| represents a single SCSI direct access block device.
 // |Disk| bridges between the Zircon block protocol and SCSI commands/responses.
-class Disk : public DeviceType, public ddk::BlockImplProtocol<Disk, ddk::base_protocol> {
+class Disk : public DeviceType,
+             public ddk::BlockImplProtocol<Disk, ddk::base_protocol>,
+             public fbl::RefCounted<Disk> {
  public:
   // Public so that we can use make_unique.
-  // Clients should use Disk::Create().
-  Disk(Controller* controller, zx_device_t* parent, uint8_t target, uint16_t lun);
+  // Clients should use Disk::Bind().
+  Disk(Controller* controller, zx_device_t* parent, uint8_t target, uint16_t lun,
+       uint32_t max_transfer_size_blocks)
+      : DeviceType(parent),
+        controller_(controller),
+        target_(target),
+        lun_(lun),
+        max_transfer_size_blocks_(max_transfer_size_blocks) {}
 
   // Create a Disk at a specific target/lun.
   // |controller| is a pointer to the scsi::Controller this disk is attached to.
   // |controller| must outlast Disk.
   // This disk does not take ownership of or any references on |controller|.
-  static zx_status_t Create(Controller* controller, zx_device_t* parent, uint8_t target,
-                            uint16_t lun, uint32_t max_xfer_size);
+  // Returns a Disk* to allow for removal of removable media disks.
+  static zx::result<fbl::RefPtr<Disk>> Bind(Controller* controller, zx_device_t* parent,
+                                            uint8_t target, uint16_t lun,
+                                            uint32_t max_transfer_size_blocks);
 
-  const char* tag() const { return tag_; }
+  fbl::String DiskName() const { return fbl::StringPrintf("scsi-disk-%u-%u", target_, lun_); }
 
   // DeviceType functions.
-  void DdkRelease() { delete this; }
+  void DdkRelease();
 
   // ddk::BlockImplProtocol functions.
   void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out);
   void BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb, void* cookie);
 
+  uint8_t target() const { return target_; }
+  uint16_t lun() const { return lun_; }
+
+  bool removable() const { return removable_; }
+  bool write_cache_enabled() const { return write_cache_enabled_; }
+  uint64_t block_count() const { return block_count_; }
+  uint32_t block_size_bytes() const { return block_size_bytes_; }
+  uint32_t max_transfer_size_blocks() const { return max_transfer_size_blocks_; }
+
   Disk(const Disk&) = delete;
   Disk& operator=(const Disk&) = delete;
 
  private:
-  zx_status_t Bind();
+  zx_status_t Add();
 
   Controller* const controller_;
-  char tag_[24];
   const uint8_t target_;
   const uint16_t lun_;
 
   bool removable_;
   bool write_cache_enabled_;
-  uint64_t blocks_;
-  uint32_t block_size_;
-  uint32_t max_xfer_size_;  // In block_size_ units.
+  uint64_t block_count_;
+  uint32_t block_size_bytes_;
+  uint32_t max_transfer_size_blocks_;  // In block_size_bytes_ units.
 };
 
 }  // namespace scsi

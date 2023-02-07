@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
+#include <lib/fit/defer.h>
 #include <lib/scsi/scsilib.h>
 #include <lib/scsi/scsilib_controller.h>
 #include <netinet/in.h>
@@ -95,10 +96,28 @@ void ScsiDevice::IrqRingUpdate() {
         } else {
           status = ZX_OK;
         }
+
         // If Read, copy data from iobuffer to the iovec.
-        if (status == ZX_OK && io_slot->data_in.iov_len) {
-          memcpy(io_slot->data_in.iov_base, io_slot->data_in_region, io_slot->data_in.iov_len);
+        const bool read_success = status == ZX_OK && !io_slot->is_write && io_slot->transfer_bytes;
+        if (read_success) {
+          memcpy(io_slot->data, io_slot->data_in_region, io_slot->transfer_bytes);
         }
+
+        // Undo previous zx_vmar_map or free temp buffer (allocated if offset, length were not page
+        // aligned).
+        if (io_slot->data_vmo->is_valid()) {
+          if (io_slot->vmar_mapped) {
+            status = zx_vmar_unmap(zx_vmar_root_self(), reinterpret_cast<zx_vaddr_t>(io_slot->data),
+                                   io_slot->transfer_bytes);
+          } else {
+            if (read_success) {
+              status = zx_vmo_write(io_slot->data_vmo->get(), io_slot->data,
+                                    io_slot->vmo_offset_bytes, io_slot->transfer_bytes);
+            }
+            free(io_slot->data);
+          }
+        }
+
         void* cookie = io_slot->cookie;
         auto (*callback)(void* cookie, zx_status_t status) = io_slot->callback;
         FreeIO(io_slot);
@@ -116,8 +135,8 @@ void ScsiDevice::IrqRingUpdate() {
   request_queue_.IrqRingUpdate(free_chain);
 }
 
-zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                           struct iovec data_out, struct iovec data_in) {
+zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                           iovec data) {
   struct scsi_sync_callback_state {
     sync_completion_t completion;
     zx_status_t status;
@@ -129,20 +148,90 @@ zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, struct 
     state->status = status;
     sync_completion_signal(&state->completion);
   };
-  ExecuteCommandAsync(target, lun, cdb, data_out, data_in, callback, &cookie);
+  QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(), 0, data.iov_len, callback, &cookie,
+               data.iov_base, /*vmar_mapped=*/false);
   sync_completion_wait(&cookie.completion, ZX_TIME_INFINITE);
   return cookie.status;
 }
 
-zx_status_t ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                            struct iovec data_out, struct iovec data_in,
-                                            void (*cb)(void*, zx_status_t), void* cookie) {
+static void ScsiLibCompletionCb(void* cookie, zx_status_t status) {
+  auto scsilib_op = static_cast<scsi::ScsiLibOp*>(cookie);
+  scsilib_op->Complete(status);
+}
+
+void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                     uint32_t block_size_bytes, scsi::ScsiLibOp* scsilib_op) {
+  // TODO(fxbug.dev/121404): Check data arguments are cleared for flush commands.
+  const block_read_write_t& rw = scsilib_op->op.rw;
+  const zx_handle_t data_vmo = rw.vmo;
+  const zx_off_t vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
+  const size_t transfer_bytes = rw.length * block_size_bytes;
+
+  // Map IO data into process memory.
+  void* data = nullptr;
+  bool vmar_mapped = false;
+  if (data_vmo != ZX_HANDLE_INVALID) {
+    // To use zx_vmar_map, offset, length must be page aligned. If it isn't (uncommon),
+    // allocate a temp buffer and do a copy.
+    zx_status_t status;
+    if ((transfer_bytes > 0) && ((transfer_bytes % zx_system_get_page_size()) == 0) &&
+        ((vmo_offset_bytes % zx_system_get_page_size()) == 0)) {
+      vmar_mapped = true;
+      zx_vaddr_t mapped_addr;
+      // This is later unmapped in IrqRingUpdate().
+      status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, data_vmo,
+                           vmo_offset_bytes, transfer_bytes, &mapped_addr);
+      if (status != ZX_OK) {
+        scsilib_op->Complete(status);
+        return;
+      }
+      data = reinterpret_cast<void*>(mapped_addr);
+    } else {
+      // This is later freed in IrqRingUpdate().
+      data = calloc(1, transfer_bytes);
+      if (is_write) {
+        status = zx_vmo_read(data_vmo, data, vmo_offset_bytes, transfer_bytes);
+        if (status != ZX_OK) {
+          free(data);
+          scsilib_op->Complete(status);
+          return;
+        }
+      }
+    }
+  }
+
+  return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
+                      transfer_bytes, ScsiLibCompletionCb, static_cast<void*>(scsilib_op), data,
+                      vmar_mapped);
+}
+
+void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                              zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes,
+                              size_t transfer_bytes, void (*cb)(void*, zx_status_t), void* cookie,
+                              void* data, bool vmar_mapped) {
+  auto cleanup = fit::defer([=] {
+    if (data_vmo->is_valid() && !vmar_mapped) {
+      free(data);
+    }
+  });
+
+  iovec data_in = {nullptr, 0};
+  iovec data_out = {nullptr, 0};
+  if (transfer_bytes) {
+    if (is_write) {
+      data_out = {data, transfer_bytes};
+    } else {
+      data_in = {data, transfer_bytes};
+    }
+  }
+
   // We do all of the error checking up front, so we don't need to fail the IO
   // after acquiring the IO slot and the descriptors.
   // If data_in fits within request_buffers_, all the regions of this request will fit.
   if ((sizeof(struct virtio_scsi_req_cmd) + data_out.iov_len + sizeof(struct virtio_scsi_resp_cmd) +
        data_in.iov_len) > request_buffers_size_) {
-    return ZX_ERR_NO_MEMORY;
+    cb(cookie, ZX_ERR_NO_MEMORY);
+    return;
   }
 
   uint16_t descriptor_chain_length = 2;
@@ -191,7 +280,7 @@ zx_status_t ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, struct
   memset(request, 0, sizeof(*request));
   memset(response, 0, sizeof(*response));
   memcpy(&request->cdb, cdb.iov_base, cdb.iov_len);
-  FillLUNStructure(request, /*target=*/target, /*lun=*/lun);
+  FillLUNStructure(request, target, lun);
   request->id = scsi_transport_tag_++;
 
   vring_desc* tail_desc;
@@ -225,19 +314,25 @@ zx_status_t ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, struct
     tail_desc = response_desc;
   }
 
+  io_slot->data_vmo = data_vmo;
+  io_slot->vmo_offset_bytes = vmo_offset_bytes;
+  io_slot->transfer_bytes = transfer_bytes;
+  io_slot->is_write = is_write;
+  io_slot->data = data;
+  io_slot->vmar_mapped = vmar_mapped;
   io_slot->tail_desc = tail_desc;
-  io_slot->data_in = data_in;
   io_slot->data_in_region = data_in_region;
   io_slot->callback = cb;
   io_slot->cookie = cookie;
   io_slot->request_buffers = request_buffers;
   io_slot->response = response;
 
+  cleanup.cancel();
+
   request_queue_.SubmitChain(id);
   request_queue_.Kick();
 
   lock_.Release();
-  return ZX_OK;
 }
 
 constexpr uint32_t SCSI_SECTOR_SIZE = 512;
@@ -254,10 +349,8 @@ zx_status_t ScsiDevice::TargetMaxXferSize(uint8_t target, uint16_t lun,
   inquiry_cdb.reserved_and_evpd = 0x1;
   inquiry_cdb.page_code = 0x00;
   inquiry_cdb.allocation_length = ntohs(sizeof(vpd_pagelist));
-  auto status = ExecuteCommandSync(/*target=*/target, /*lun=*/lun,
-                                   /*cdb=*/{&inquiry_cdb, sizeof(inquiry_cdb)},
-                                   /*data_out=*/{nullptr, 0},
-                                   /*data_in=*/{&vpd_pagelist, sizeof(vpd_pagelist)});
+  auto status = ExecuteCommandSync(target, lun, {&inquiry_cdb, sizeof(inquiry_cdb)},
+                                   /*is_write=*/false, {&vpd_pagelist, sizeof(vpd_pagelist)});
   if (status != ZX_OK)
     return status;
   uint8_t i;
@@ -271,10 +364,8 @@ zx_status_t ScsiDevice::TargetMaxXferSize(uint8_t target, uint16_t lun,
   scsi::VPDBlockLimits block_limits = {};
   inquiry_cdb.page_code = 0xB0;
   inquiry_cdb.allocation_length = ntohs(sizeof(block_limits));
-  status = ExecuteCommandSync(/*target=*/target, /*lun=*/lun,
-                              /*cdb=*/{&inquiry_cdb, sizeof(inquiry_cdb)},
-                              /*data_out=*/{nullptr, 0},
-                              /*data_in=*/{&block_limits, sizeof(block_limits)});
+  status = ExecuteCommandSync(target, lun, {&inquiry_cdb, sizeof(inquiry_cdb)}, /*is_write=*/false,
+                              {&block_limits, sizeof(block_limits)});
   if (status != ZX_OK)
     return status;
   xfer_size_sectors = block_limits.max_xfer_length_blocks;
@@ -319,9 +410,7 @@ zx_status_t ScsiDevice::WorkerThread() {
       scsi::TestUnitReadyCDB cdb = {};
       cdb.opcode = scsi::Opcode::TEST_UNIT_READY;
 
-      auto status = ExecuteCommandSync(
-          /*target=*/target,
-          /*lun=*/lun, {&cdb, sizeof(cdb)}, {}, {});
+      auto status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, {});
       if ((status == ZX_OK) && (max_xfer_size_sectors == 0)) {
         // If we haven't queried the VPD pages for the target's xfer size
         // yet, do it now. We only query this once per target.
@@ -336,7 +425,10 @@ zx_status_t ScsiDevice::WorkerThread() {
         }
         zxlogf(INFO, "Virtio SCSI %u:%u Max Xfer Size %ukb", target, lun,
                max_xfer_size_sectors * 2);
-        scsi::Disk::Create(this, device_, /*target=*/target, /*lun=*/lun, max_xfer_size_sectors);
+        zx::result result = scsi::Disk::Bind(this, device_, target, lun, max_xfer_size_sectors);
+        if (result.is_error()) {
+          return result.status_value();
+        }
         luns_found++;
       }
       // If we've found all the LUNs present on this target, move on.

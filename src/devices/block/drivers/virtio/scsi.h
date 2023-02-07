@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
+#include <lib/scsi/scsilib.h>
 #include <lib/scsi/scsilib_controller.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
@@ -47,6 +48,16 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   // Invoked on config change interrupts.
   void IrqConfigChange() override {}
 
+  // scsi::Controller overrides
+  size_t BlockOpSize() override {
+    // No additional metadata required for each command transaction.
+    return sizeof(scsi::ScsiLibOp);
+  }
+  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                 iovec data) override;
+  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                           uint32_t block_size_bytes, scsi::ScsiLibOp* scsilib_op) override;
+
   const char* tag() const override { return "virtio-scsi"; }
 
   static void FillLUNStructure(struct virtio_scsi_req_cmd* req, uint8_t target, uint16_t lun);
@@ -54,24 +65,27 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
  private:
   zx_status_t TargetMaxXferSize(uint8_t target, uint16_t lun, uint32_t& xfer_size_sectors);
 
-  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                 struct iovec data_out, struct iovec data_in) override;
+  void QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                    zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes, size_t transfer_bytes,
+                    void (*cb)(void*, zx_status_t), void* cookie, void* data, bool vmar_mapped);
 
-  zx_status_t ExecuteCommandAsync(uint8_t target, uint16_t lun, struct iovec cdb,
-                                  struct iovec data_out, struct iovec data_in,
-                                  void (*cb)(void*, zx_status_t), void* cookie) override;
   zx_status_t WorkerThread();
 
   // Latched copy of virtio-scsi device configuration.
   struct virtio_scsi_config config_ TA_GUARDED(lock_) = {};
 
   struct scsi_io_slot {
+    zx::unowned_vmo data_vmo;
+    zx_off_t vmo_offset_bytes;
+    size_t transfer_bytes;
+    bool is_write;
+    void* data;
+    bool vmar_mapped;
     io_buffer_t request_buffer;
     bool avail;
     vring_desc* tail_desc;
     void* cookie;
     void (*callback)(void* cookie, zx_status_t status);
-    struct iovec data_in;
     void* data_in_region;
     io_buffer_t* request_buffers;
     struct virtio_scsi_resp_cmd* response;
