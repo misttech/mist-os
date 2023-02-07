@@ -1555,13 +1555,14 @@ func (s *streamSocketImpl) loopWrite(ch chan<- struct{}) {
 			// never connected. Such endpoints should never reach this loop.
 			panic(fmt.Sprintf("connected endpoint returned %s", err))
 		case *tcpip.ErrWouldBlock:
-			// NB: we can't select on closing here because the client may have
-			// written some data into the buffer and then immediately closed the
-			// socket.
-			//
-			// We must wait until the linger timeout.
+			// NB: we can't select on closing here because the socket may need to
+			// delay terminating loopWrite to allow time for pending writes in the
+			// zircon socket to be flushed to the gVisor endpoint, and eventually to
+			// the peer. This may be needed when we have SO_LINGER enabled, or when
+			// the zircon socket has pending bytes even when SO_LINGER is disabled.
+			// See streamSocketImpl.close for more details.
 			select {
-			case <-s.linger:
+			case <-s.unblockLoopWrite:
 				return
 			case <-notifyCh:
 				continue
@@ -3111,8 +3112,9 @@ type streamSocketImpl struct {
 
 	sharedState *sharedStreamSocketState
 
-	// Used to unblock waiting to write when SO_LINGER is enabled.
-	linger chan struct{}
+	// Used to unblock waiting to write to an endpoint after receiving
+	// an error indicating that the endpoint's send buffer is full.
+	unblockLoopWrite chan struct{}
 
 	cancel context.CancelFunc
 }
@@ -3123,7 +3125,7 @@ func makeStreamSocketImpl(eps *endpointWithSocket) streamSocketImpl {
 	return streamSocketImpl{
 		endpointWithSocket:   eps,
 		endpointWithMutators: endpointWithMutators{ep: &eps.endpoint},
-		linger:               make(chan struct{}),
+		unblockLoopWrite:     make(chan struct{}),
 		sharedState: &sharedStreamSocketState{
 			pending: signaler{
 				eventsToSignals: func(events waiter.EventMask) zx.Signals {
@@ -3168,6 +3170,7 @@ func (s *streamSocketImpl) close() {
 			}
 		}
 
+		clock := s.endpoint.ns.stack.Clock()
 		if linger.Enabled {
 			// `man 7 socket`:
 			//
@@ -3180,7 +3183,7 @@ func (s *streamSocketImpl) close() {
 			//
 			// Thus we must allow linger-amount-of-time for pending writes to flush,
 			// and do so synchronously if linger is enabled.
-			time.AfterFunc(linger.Timeout, func() { close(s.linger) })
+			clock.AfterFunc(linger.Timeout, func() { close(s.unblockLoopWrite) })
 			doClose()
 		} else {
 			// Here be dragons.
@@ -3205,13 +3208,21 @@ func (s *streamSocketImpl) close() {
 			// optimization that prevents flakiness when a socket is closed and
 			// another socket is immediately bound to the port.
 			if reader := (socketReader{socket: s.endpointWithSocket.local}); reader.Len() == 0 {
+				// We close s.unblockLoopWrite as loopWrite may be currently blocked on
+				// the select in the ErrWouldBlock handler.
+				//
+				// This can happen when a previous write exactly fills up the send
+				// buffer in gVisor and then the next call to the endpoint's Write
+				// method fails with ErrWouldBlock (even if the write payload/zircon
+				// socket) is empty.
+				close(s.unblockLoopWrite)
 				doClose()
 			} else {
 				var linger tcpip.TCPLingerTimeoutOption
 				if err := s.endpoint.ep.GetSockOpt(&linger); err != nil {
 					panic(fmt.Sprintf("GetSockOpt(%T): %s", linger, err))
 				}
-				time.AfterFunc(time.Duration(linger), func() { close(s.linger) })
+				clock.AfterFunc(time.Duration(linger), func() { close(s.unblockLoopWrite) })
 
 				go doClose()
 			}

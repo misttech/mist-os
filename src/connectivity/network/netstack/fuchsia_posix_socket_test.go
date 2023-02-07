@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"syscall/zx"
 	"testing"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/udp_serde"
 	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/faketime"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/waiter"
@@ -192,10 +194,10 @@ func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
 	}
 }
 
-func newNetstackAndEndpoint(t *testing.T, transProto tcpip.TransportProtocolNumber) (*Netstack, *waiter.Queue, tcpip.Endpoint) {
+func newNetstackAndEndpoint(t *testing.T, transProto tcpip.TransportProtocolNumber) (*Netstack, *faketime.ManualClock, *waiter.Queue, tcpip.Endpoint) {
 	t.Helper()
 
-	ns, _ := newNetstack(t, netstackTestOptions{})
+	ns, clock := newNetstack(t, netstackTestOptions{})
 	wq := new(waiter.Queue)
 	ep := func() tcpip.Endpoint {
 		ep, err := ns.stack.NewEndpoint(transProto, ipv4.ProtocolNumber, wq)
@@ -204,7 +206,7 @@ func newNetstackAndEndpoint(t *testing.T, transProto tcpip.TransportProtocolNumb
 		}
 		return ep
 	}()
-	return ns, wq, ep
+	return ns, clock, wq, ep
 }
 
 func addEndpoint(t *testing.T, ns *Netstack, ep *endpoint) {
@@ -228,7 +230,7 @@ func verifyZirconSocketClosed(t *testing.T, e *endpointWithSocket) {
 func TestCloseDatagramSocketClosesHandles(t *testing.T) {
 	addGoleakCheck(t)
 
-	ns, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
+	ns, _, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
 	s, err := newDatagramSocketImpl(ns, header.UDPProtocolNumber, ipv4.ProtocolNumber, ep, wq)
 	if err != nil {
 		t.Fatalf("newDatagramSocketImpl(_, %d, %d, _, _): %s", header.UDPProtocolNumber, ipv4.ProtocolNumber, err)
@@ -260,7 +262,7 @@ func TestCloseDatagramSocketClosesHandles(t *testing.T) {
 func TestCloseSynchronousDatagramSocketClosesHandles(t *testing.T) {
 	addGoleakCheck(t)
 
-	ns, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
+	ns, _, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
 	s, err := makeSynchronousDatagramSocket(ep, ipv4.ProtocolNumber, header.UDPProtocolNumber, wq, ns)
 	if err != nil {
 		t.Fatalf("makeSynchronousDatagramSocket(_, %d, %d, _, _): %s", ipv4.ProtocolNumber, header.UDPProtocolNumber, err)
@@ -282,10 +284,8 @@ func TestCloseSynchronousDatagramSocketClosesHandles(t *testing.T) {
 	}
 }
 
-func TestCloseStreamSocketClosesHandles(t *testing.T) {
-	addGoleakCheck(t)
-
-	ns, wq, ep := newNetstackAndEndpoint(t, header.TCPProtocolNumber)
+func newNetstackAndSreamSocket(t *testing.T) (*faketime.ManualClock, *streamSocketImpl) {
+	ns, clock, wq, ep := newNetstackAndEndpoint(t, header.TCPProtocolNumber)
 	socketEp, err := newEndpointWithSocket(ep, wq, header.TCPProtocolNumber, ipv4.ProtocolNumber, ns, zx.SocketStream)
 	if err != nil {
 		t.Fatalf("newEndpointWithSocket(_, _, %d, %d, _, _): %s", header.TCPProtocolNumber, ipv4.ProtocolNumber, err)
@@ -295,10 +295,83 @@ func TestCloseStreamSocketClosesHandles(t *testing.T) {
 	// Provide a cancel callback so the endpoint can be closed below.
 	s.cancel = func() {}
 
+	return clock, &s
+}
+
+func TestCloseStreamSocketClosesHandles(t *testing.T) {
+	addGoleakCheck(t)
+
+	_, s := newNetstackAndSreamSocket(t)
+
 	if _, err := s.Close(context.Background()); err != nil {
 		t.Fatalf("s.Close(): %s", err)
 	}
 
 	// Verify that the handles associated with the socket have been closed.
 	verifyZirconSocketClosed(t, s.endpointWithSocket)
+}
+
+func TestCloseUnblockLoopWrite(t *testing.T) {
+	addGoleakCheck(t)
+
+	tests := []struct {
+		name           string
+		lingerOpt      tcpip.LingerOption
+		tcpLingerOpt   tcpip.TCPLingerTimeoutOption
+		dataInZXSocket bool
+		closeAfter     time.Duration
+	}{
+		{
+			name:         "SO_LINGER enabled",
+			lingerOpt:    tcpip.LingerOption{Enabled: false, Timeout: time.Second},
+			tcpLingerOpt: tcpip.TCPLingerTimeoutOption(time.Hour),
+			closeAfter:   time.Second,
+		},
+		{
+			name:           "SO_LINGER disabled with empty zx.Socket",
+			lingerOpt:      tcpip.LingerOption{Enabled: false, Timeout: time.Hour},
+			tcpLingerOpt:   tcpip.TCPLingerTimeoutOption(time.Hour),
+			dataInZXSocket: false,
+			closeAfter:     0,
+		},
+		{
+			name:           "SO_LINGER disabled with non-empty zx.Socket",
+			lingerOpt:      tcpip.LingerOption{Enabled: false, Timeout: time.Hour},
+			tcpLingerOpt:   tcpip.TCPLingerTimeoutOption(time.Second),
+			dataInZXSocket: true,
+			closeAfter:     time.Second,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clock, s := newNetstackAndSreamSocket(t)
+
+			s.endpoint.ep.SocketOptions().SetLinger(test.lingerOpt)
+			if err := s.endpoint.ep.SetSockOpt(&test.tcpLingerOpt); err != nil {
+				t.Fatalf("s.endpoint.ep.SetSockOpt(&%T): %s", test.tcpLingerOpt, err)
+			}
+
+			if test.dataInZXSocket {
+				var data [1]byte
+				if n, err := s.endpointWithSocket.local.Write(data[:], 0 /* flags */); err != nil {
+					t.Fatalf("s.endpointWithSocket.local.Write(_, 0): %s", err)
+				} else if n != len(data) {
+					t.Fatalf("got s.endpointWithSocket.local.Write(_, 0) = %d, want = %d", n, len(data))
+				}
+			}
+
+			if _, err := s.Close(context.Background()); err != nil {
+				t.Fatalf("s.Close(): %s", err)
+			}
+
+			clock.Advance(test.closeAfter)
+
+			select {
+			case <-s.unblockLoopWrite:
+			default:
+				t.Error("expected s.unblockLoopWrite to be readable")
+			}
+		})
+	}
 }
