@@ -43,7 +43,7 @@ def normalize(config, root_dir, extra_files_read):
             for output in image["outputs"]:
                 # Explicitly set defaults for compress for different filesystem
                 # for consistency between GN and Bazel generated images configs.
-                if output["type"] == "standard" and "compress" not in output:
+                if output["type"] in {"standard", "nand"} and "compress" not in output:
                     output["compress"] = False
 
 
