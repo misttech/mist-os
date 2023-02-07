@@ -1784,7 +1784,7 @@ zx_status_t Controller::DisplayControllerImplGetSysmemConnection(zx::channel con
 zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.usage.display = fuchsia_sysmem_displayUsageLayer;
+  constraints.usage.display = fuchsia_sysmem::kDisplayUsageLayer;
   constraints.has_buffer_memory_constraints = true;
   fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
       constraints.buffer_memory_constraints;
