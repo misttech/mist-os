@@ -36,6 +36,15 @@ with specific boards, due to driver and hardware challenges.
 
 From //build/images/args.gni:129
 
+### all_cpu_phys_boot_tests
+
+Cause //zircon/kernel/phys:boot_tests to generate the phys boot tests
+for all supported CPUs, not just $target_cpu.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/phys/BUILD.gn:31
+
 ### all_font_file_paths
 
 List of file paths to every font asset. Populated in fonts.gni.
@@ -116,6 +125,15 @@ injected that way can override that option's setting in this list.
 **Current value (from the default):** `["detect_stack_use_after_return=1", "quarantine_size_mb=64"]`
 
 From //build/config/sanitizers/sanitizer_default_options.gni:16
+
+### assembly_fshost
+
+Skip configuring fshost in GN and do it via Assembly instead.
+Used as a parameter to assembled_system().
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:177
 
 ### authorized_ssh_keys
 
@@ -273,7 +291,7 @@ When set, include the corresponding Bazel assembly targets in this build.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:176
+From //build/images/args.gni:180
 
 ### bazel_quiet
 
@@ -312,7 +330,7 @@ reserve few blocks required for its operations.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:74
+From //build/images/fvm.gni:77
 
 ### blobfs_board_minimum_data_bytes
 
@@ -324,7 +342,7 @@ required for the filesystem.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:61
+From //build/images/fvm.gni:64
 
 ### blobfs_board_minimum_inodes
 
@@ -334,7 +352,7 @@ required for the filesystem.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:53
+From //build/images/fvm.gni:56
 
 ### blobfs_capacity
 
@@ -411,19 +429,19 @@ From //src/storage/blobfs/BUILD.gn:13
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:75
+From //build/images/fvm.gni:78
 
 ### blobfs_product_minimum_data_bytes
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:62
+From //build/images/fvm.gni:65
 
 ### blobfs_product_minimum_inodes
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:54
+From //build/images/fvm.gni:57
 
 ### blobfs_size_creep_limit
 
@@ -1573,6 +1591,20 @@ Controls whether to promote warnings to errors.
 **Current value (from the default):** `true`
 
 From //build/config/BUILD.gn:37
+
+### deprecated_x86_legacy_boot_protocol
+
+**TODO(fxbug.dev/32255): This is a temporary switch that will be removed.**
+
+Set this to make the ZBI compatible with older boot loaders such as a
+gigaboot or zedboot image already installed on a machine that's hard to
+update.  This is an interim workaround only for people who have machines
+that are not physically accessible to update their boot images, and will
+be removed after everyone has had a chance to get hold of their machines.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/BUILD.gn:29
 
 ### dev_bootfs_labels
 
@@ -3499,19 +3531,19 @@ Possible values:
 
 **Current value (from the default):** `"default"`
 
-From //build/images/fvm.gni:96
+From //build/images/fvm.gni:99
 
 ### fvm_ftl_nand_block_count
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:89
+From //build/images/fvm.gni:92
 
 ### fvm_ftl_nand_oob_size
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:87
+From //build/images/fvm.gni:90
 
 ### fvm_ftl_nand_page_size
 
@@ -3523,13 +3555,13 @@ room to initialize on boot.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:86
+From //build/images/fvm.gni:89
 
 ### fvm_ftl_nand_pages_per_block
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:88
+From //build/images/fvm.gni:91
 
 ### fvm_max_disk_size
 
@@ -3563,7 +3595,7 @@ If set to 0, then no reservation partition will be added.
 
 **Current value (from the default):** `0`
 
-From //build/images/fvm.gni:36
+From //build/images/fvm.gni:39
 
 ### fvm_slice_size
 
@@ -3572,10 +3604,11 @@ minimum size of a particular chunk of a partition that is stored within
 FVM. A very small slice size may lead to decreased throughput. A very large
 slice size may lead to wasted space. The selected default size of 8mb is
 selected for conservation of space, rather than performance.
+LINT.IfChange
 
 **Current value (from the default):** `8388608`
 
-From //build/images/fvm.gni:31
+From //build/images/fvm.gni:32
 
 ### gcc_tool_dir
 
@@ -3648,7 +3681,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -4701,13 +4734,13 @@ From //zircon/kernel/lib/crashlog/params.gni:14
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:76
+From //build/images/fvm.gni:79
 
 ### minfs_board_minimum_data_bytes
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:63
+From //build/images/fvm.gni:66
 
 ### minfs_maximum_runtime_bytes
 
@@ -4725,13 +4758,13 @@ From //src/storage/fshost/generated_fshost_config.gni:22
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:77
+From //build/images/fvm.gni:80
 
 ### minfs_product_minimum_data_bytes
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:64
+From //build/images/fvm.gni:67
 
 ### mini_chromium_is_chromeos_ash
 
@@ -5710,6 +5743,12 @@ and functions to be instrumented by `profile` variants.
 **Current value (from the default):** `[]`
 
 From //build/config/profile/config.gni:24
+
+### proprietary_codecs
+
+**Current value (from the default):** `false`
+
+From //build/config/features.gni:9
 
 ### pw_JAVA_NATIVE_INTERFACE_INCLUDE_DIRS
 
@@ -7805,7 +7844,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7965,6 +8004,12 @@ epoch increased.
 
 From //build/images/args.gni:51
 
+### use_blink
+
+**Current value (from the default):** `false`
+
+From //build/config/features.gni:13
+
 ### use_bringup_assembly
 
 Is the `assemble_system()` instantiation used by the product the standard
@@ -8015,6 +8060,12 @@ value.
 **Current value (from the default):** `false`
 
 From //src/chromium/BUILD.gn:35
+
+### use_dbus
+
+**Current value (from the default):** `false`
+
+From //build/config/features.gni:11
 
 ### use_direct_for_carnelian_examples
 
@@ -8073,6 +8124,12 @@ From //boards/x64.gni:59
 **Overridden from the default:** `false`
 
 From //build/images/args.gni:26
+
+### use_gio
+
+**Current value (from the default):** `false`
+
+From //build/config/features.gni:12
 
 ### use_goma
 
@@ -8233,6 +8290,12 @@ Use ThinLTO variant of LTO if use_lto = true.
 **Current value (from the default):** `true`
 
 From //build/config/lto/config.gni:10
+
+### use_udev
+
+**Current value (from the default):** `false`
+
+From //build/config/features.gni:10
 
 ### use_vbmeta
 
@@ -8650,18 +8713,4 @@ From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
 **Current value (from the default):** `"//third_party/android/device/generic/goldfish-opengl:libvulkan_goldfish"`
 
 From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:11
-
-### deprecated_x86_legacy_boot_protocol
-
-**TODO(fxbug.dev/32255): This is a temporary switch that will be removed.**
-
-Set this to make the ZBI compatible with older boot loaders such as a
-gigaboot or zedboot image already installed on a machine that's hard to
-update.  This is an interim workaround only for people who have machines
-that are not physically accessible to update their boot images, and will
-be removed after everyone has had a chance to get hold of their machines.
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/BUILD.gn:29
 
