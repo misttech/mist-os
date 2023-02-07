@@ -184,7 +184,6 @@ rustc_library("lib") {
     "src/model/namespace.rs",
     "src/model/ns_dir.rs",
     "src/model/resolver.rs",
-    "src/model/routing/error.rs",
     "src/model/routing/mod.rs",
     "src/model/routing/open.rs",
     "src/model/routing/providers.rs",

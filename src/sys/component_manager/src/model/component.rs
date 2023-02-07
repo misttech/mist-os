@@ -12,8 +12,9 @@ use {
         environment::Environment,
         error::{
             AddChildError, AddDynamicChildError, DestroyActionError, DiscoverActionError,
-            DynamicOfferError, ModelError, OpenExposedDirError, RebootError, ResolveActionError,
-            StartActionError, StopActionError, StructuredConfigError, UnresolveActionError,
+            DynamicOfferError, ModelError, OpenExposedDirError, OpenOutgoingDirError, RebootError,
+            ResolveActionError, StartActionError, StopActionError, StructuredConfigError,
+            UnresolveActionError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
@@ -22,7 +23,7 @@ use {
         routing::{
             self, route_and_open_capability,
             service::{CollectionServiceDirectory, CollectionServiceRoute},
-            OpenOptions, OpenResourceError, OpenRunnerOptions, RouteRequest, RoutingError,
+            OpenOptions, OpenRunnerOptions, RouteRequest,
         },
     },
     ::routing::{
@@ -70,7 +71,6 @@ use {
         collections::{HashMap, HashSet},
         convert::TryFrom,
         fmt,
-        path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -986,28 +986,17 @@ impl ComponentInstance {
     pub async fn open_outgoing(
         &self,
         flags: fio::OpenFlags,
-        path: PathBuf,
+        path: &str,
         server_chan: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), OpenOutgoingDirError> {
         let execution = self.lock_execution().await;
-        if execution.runtime.is_none() {
-            return Err(RoutingError::source_instance_stopped(&self.abs_moniker).into());
-        }
-        let runtime = execution.runtime.as_ref().expect("bind_instance_open_outgoing: no runtime");
-        let out_dir = &runtime.outgoing_dir.as_ref().ok_or_else(|| {
-            ModelError::from(RoutingError::source_instance_not_executable(&self.abs_moniker))
-        })?;
-        let path = path.to_str().ok_or_else(|| ModelError::path_is_not_utf8(path.clone()))?;
-        let path = fuchsia_fs::canonicalize_path(path);
+        let runtime = execution.runtime.as_ref().ok_or(OpenOutgoingDirError::InstanceNotRunning)?;
+        let out_dir =
+            runtime.outgoing_dir.as_ref().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
+        let path = fuchsia_fs::canonicalize_path(&path);
         let server_chan = channel::take_channel(server_chan);
         let server_end = ServerEnd::new(server_chan);
-        out_dir.open(flags, fio::ModeType::empty(), path, server_end).map_err(|e| {
-            ModelError::from(OpenResourceError::open_outgoing_failed(
-                &self.instanced_moniker,
-                path,
-                e,
-            ))
-        })?;
+        out_dir.open(flags, fio::ModeType::empty(), path, server_end)?;
         Ok(())
     }
 

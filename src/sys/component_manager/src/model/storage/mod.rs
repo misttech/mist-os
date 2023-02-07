@@ -169,10 +169,13 @@ async fn open_storage_root(
         // TODO(fxbug.dev/50716): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
         dir_source_component.start(&StartReason::StorageAdmin).await?;
+        let path = full_backing_directory_path
+            .to_str()
+            .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;
         dir_source_component
             .open_outgoing(
                 FLAGS | fio::OpenFlags::DIRECTORY,
-                full_backing_directory_path.clone(),
+                path,
                 &mut local_server_end.into_channel(),
             )
             .await?;
@@ -450,7 +453,7 @@ mod tests {
     use super::*;
     use {
         crate::model::{
-            routing::error::OpenResourceError,
+            error::OpenOutgoingDirError,
             testing::{
                 routing_test_helpers::{RoutingTest, RoutingTestBuilder},
                 test_helpers::{self, component_decl_with_test_runner},
@@ -671,9 +674,7 @@ mod tests {
         .await;
         assert_matches!(
             res,
-            Err(ModelError::OpenResourceError {
-                err: OpenResourceError::OpenOutgoingFailed { .. }
-            })
+            Err(ModelError::OpenOutgoingDirError { err: OpenOutgoingDirError::Fidl { .. } })
         );
     }
 

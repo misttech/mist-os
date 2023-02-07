@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod error;
 pub mod open;
 pub mod providers;
 pub mod service;
 pub use ::routing::error::RoutingError;
-pub use error::OpenResourceError;
 pub use open::*;
 
 use {
@@ -521,13 +519,12 @@ async fn open_storage_capability(
     options: OpenOptions<'_>,
 ) -> Result<(), ModelError> {
     let dir_source = source.storage_provider.clone();
-    let relative_moniker_2 = relative_moniker.clone();
     match options {
         OpenOptions::Storage(OpenStorageOptions { flags, relative_path, server_chan, .. }) => {
             let storage_dir_proxy = storage::open_isolated_storage(
                 &source,
                 target.persistent_storage,
-                relative_moniker,
+                relative_moniker.clone(),
                 target.instance_id().as_ref(),
             )
             .await
@@ -543,19 +540,19 @@ async fn open_storage_capability(
 
             storage_dir_proxy
                 .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
-                .map_err(|e| {
+                .map_err(|err| {
                     let moniker = match &dir_source {
                         Some(r) => InstancedExtendedMoniker::ComponentInstance(
                             r.instanced_moniker().clone(),
                         ),
                         None => InstancedExtendedMoniker::ComponentManager,
                     };
-                    ModelError::from(OpenResourceError::open_storage_failed(
-                        &moniker,
-                        &relative_moniker_2,
-                        "",
-                        e,
-                    ))
+                    ModelError::OpenStorageFailed {
+                        moniker,
+                        relative_moniker,
+                        path: relative_path.to_string(),
+                        err,
+                    }
                 })?;
             return Ok(());
         }

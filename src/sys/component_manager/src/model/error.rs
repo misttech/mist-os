@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{events::error::EventsError, routing::OpenResourceError, storage::StorageError},
+    crate::model::{events::error::EventsError, storage::StorageError},
     ::routing::{
         component_id_index::ComponentIdIndexError,
         config::AbiRevisionError,
@@ -12,6 +12,7 @@ use {
         resolving::ResolverError,
     },
     clonable_error::ClonableError,
+    cm_moniker::{InstancedExtendedMoniker, InstancedRelativeMoniker},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::path::PathBuf,
@@ -50,10 +51,25 @@ pub enum ModelError {
         #[from]
         err: RoutingError,
     },
-    #[error("Failed to open resource: {}", err)]
-    OpenResourceError {
-        #[from]
-        err: OpenResourceError,
+    #[error("Failed to open path `{}` in component manager's namespace: {}", path, err)]
+    OpenComponentManagerNamespaceFailed {
+        path: String,
+        #[source]
+        err: ClonableError,
+    },
+    #[error(
+        "Failed to open path `{}`, in storage directory for `{}` backed by `{}`: {}",
+        path,
+        relative_moniker,
+        moniker,
+        err
+    )]
+    OpenStorageFailed {
+        moniker: InstancedExtendedMoniker,
+        relative_moniker: InstancedRelativeMoniker,
+        path: String,
+        #[source]
+        err: fidl::Error,
     },
     #[error("storage error: {}", err)]
     StorageError {
@@ -113,6 +129,11 @@ pub enum ModelError {
         #[from]
         err: StartActionError,
     },
+    #[error("failed to open outgoing dir: {err}")]
+    OpenOutgoingDirError {
+        #[from]
+        err: OpenOutgoingDirError,
+    },
 }
 
 impl ModelError {
@@ -165,6 +186,7 @@ impl ModelError {
             } => zx::Status::NOT_FOUND,
             ModelError::Unsupported { .. } => zx::Status::NOT_SUPPORTED,
             ModelError::Timeout { .. } => zx::Status::TIMED_OUT,
+            ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
         }
@@ -207,6 +229,25 @@ pub enum RebootError {
 pub enum OpenExposedDirError {
     #[error("instance was destroyed")]
     InstanceDestroyed,
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum OpenOutgoingDirError {
+    #[error("instance is not running")]
+    InstanceNotRunning,
+    #[error("instance is non-executable")]
+    InstanceNonExecutable,
+    #[error("open call FIDL error: {0}")]
+    Fidl(#[from] fidl::Error),
+}
+
+impl OpenOutgoingDirError {
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::InstanceNotRunning | Self::InstanceNonExecutable => zx::Status::UNAVAILABLE,
+            Self::Fidl(_) => zx::Status::INTERNAL,
+        }
+    }
 }
 
 #[derive(Debug, Error, Clone)]

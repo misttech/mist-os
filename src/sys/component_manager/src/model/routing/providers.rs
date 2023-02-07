@@ -8,11 +8,11 @@ use {
             component::{ComponentInstance, StartReason, WeakComponentInstance},
             error::ModelError,
             hooks::{Event, EventPayload},
-            routing::error::OpenResourceError,
         },
     },
     ::routing::path::PathBufExt,
     async_trait::async_trait,
+    clonable_error::ClonableError,
     cm_rust::{self, CapabilityName, CapabilityPath},
     cm_task_scope::TaskScope,
     cm_util::channel,
@@ -75,6 +75,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             // Pass back the channel so the caller can set the epitaph, if necessary.
             *server_end = channel::take_channel(&mut server_end_in);
             let path = self.path.to_path_buf().attach(relative_path);
+            let path = path.to_str().ok_or_else(|| ModelError::path_is_not_utf8(path.clone()))?;
             res?.open_outgoing(flags, path, server_end).await?;
         } else {
             res?;
@@ -107,8 +108,9 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
             flags,
             ServerEnd::new(server_end),
         )
-        .map_err(|e| {
-            OpenResourceError::open_component_manager_namespace_failed(namespace_path, e).into()
+        .map_err(|e| ModelError::OpenComponentManagerNamespaceFailed {
+            path: namespace_path.to_string(),
+            err: ClonableError::from(anyhow::Error::from(e)),
         })
     }
 }
