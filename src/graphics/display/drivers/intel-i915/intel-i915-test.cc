@@ -172,8 +172,9 @@ class TglIntegrationTest : public ::testing::Test {
 
 TEST(IntelI915TglDisplay, SysmemRequirements) {
   Controller display(nullptr);
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -183,8 +184,8 @@ TEST(IntelI915TglDisplay, SysmemRequirements) {
   ASSERT_OK(
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
+      &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
@@ -192,8 +193,9 @@ TEST(IntelI915TglDisplay, SysmemRequirements) {
 
 TEST(IntelI915TglDisplay, SysmemNoneFormat) {
   Controller display(nullptr);
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -203,8 +205,8 @@ TEST(IntelI915TglDisplay, SysmemNoneFormat) {
   ASSERT_OK(
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
+      &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
@@ -212,8 +214,9 @@ TEST(IntelI915TglDisplay, SysmemNoneFormat) {
 
 TEST(IntelI915TglDisplay, SysmemInvalidFormat) {
   Controller display(nullptr);
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -224,7 +227,7 @@ TEST(IntelI915TglDisplay, SysmemInvalidFormat) {
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, client_channel.get()));
+                                     &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_FALSE(collection.set_constraints_called());
@@ -232,8 +235,9 @@ TEST(IntelI915TglDisplay, SysmemInvalidFormat) {
 
 TEST(IntelI915TglDisplay, SysmemInvalidType) {
   Controller display(nullptr);
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -245,7 +249,7 @@ TEST(IntelI915TglDisplay, SysmemInvalidType) {
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, client_channel.get()));
+                                     &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_FALSE(collection.set_constraints_called());
@@ -326,8 +330,9 @@ TEST_F(TglIntegrationTest, SysmemImport) {
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -339,12 +344,13 @@ TEST_F(TglIntegrationTest, SysmemImport) {
   ASSERT_OK(
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
+      &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
   loop.StartThread();
-  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.get(), 0));
+  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.channel().get(), 0));
 
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
   EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
@@ -361,8 +367,9 @@ TEST_F(TglIntegrationTest, SysmemRotated) {
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
-  zx::channel server_channel, client_channel;
-  ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   collection.set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
@@ -377,13 +384,14 @@ TEST_F(TglIntegrationTest, SysmemRotated) {
   ASSERT_OK(
       fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, client_channel.get()));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
+      &image, client_channel.channel().get()));
 
   loop.RunUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
   loop.StartThread();
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
-  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.get(), 0));
+  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.channel().get(), 0));
 
   // Check that rotating the image doesn't hang.
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_ROT_90);
