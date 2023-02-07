@@ -330,6 +330,8 @@ impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePa
     }
 }
 
+impl<SourcePath: AsRef<Path>> Eq for dyn DataSource<SourcePath = SourcePath> {}
+
 /// Kinds of artifacts that may constitute a source of truth for a [`Scrutiny`] instance reasoning
 /// about a built Fuchsia system.
 #[derive(Clone, Debug, Eq, PartialEq)]

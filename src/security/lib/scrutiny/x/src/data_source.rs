@@ -5,11 +5,12 @@
 use crate::api::DataSource as DataSourceApi;
 use crate::api::DataSourceKind;
 use crate::api::DataSourceVersion;
+use std::fmt::Debug;
 use std::iter;
 use std::path::PathBuf;
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct BlobFsArchive {
+pub(crate) struct BlobFsArchive {
     path: PathBuf,
 }
 
@@ -48,7 +49,7 @@ impl DataSourceApi for BlobFsArchive {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct BlobDirectory {
+pub(crate) struct BlobDirectory {
     directory: PathBuf,
 }
 
@@ -88,7 +89,7 @@ impl DataSourceApi for BlobDirectory {
 
 /// Unified `crate::api::DataSource` implementation over production blob types.
 #[derive(Debug, Eq, PartialEq)]
-pub enum BlobSource {
+pub(crate) enum BlobSource {
     BlobFsArchive(BlobFsArchive),
     BlobDirectory(BlobDirectory),
 }
@@ -149,7 +150,7 @@ impl DataSourceApi for BlobSource {
 // TODO(fxbug.dev/111251): Add additional data source types for production System API.
 
 #[cfg(test)]
-pub mod fake {
+pub(crate) mod fake {
     use crate::api::DataSource as DataSourceApi;
     use crate::api::DataSourceKind;
     use crate::api::DataSourceVersion;

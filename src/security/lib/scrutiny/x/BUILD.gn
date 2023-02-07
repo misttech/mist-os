@@ -25,16 +25,19 @@ if (is_host) {
       "src/lib.rs",
       "src/package.rs",
       "src/package_resolver.rs",
+      "src/product_bundle.rs",
       "src/scrutiny.rs",
       "src/system.rs",
     ]
 
     deps = [
+      "//build/sdk/meta:rust",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:camino",
       "//third_party/rust_crates:thiserror",
 
       # TODO(fxbug.dev/112505): This dependency was introduced for accessing blobfs archives via
@@ -43,8 +46,11 @@ if (is_host) {
       "//src/security/lib/scrutiny/utils",
     ]
     test_deps = [
+      "//src/lib/assembly/assembly_manifest",
+      "//src/lib/assembly/partitions_config",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:maplit",
+      "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",
     ]
   }

@@ -14,6 +14,7 @@ mod data_source;
 mod hash;
 mod package;
 mod package_resolver;
+mod product_bundle;
 mod scrutiny;
 mod system;
 
