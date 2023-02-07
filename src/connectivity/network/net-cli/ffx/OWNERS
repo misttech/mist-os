@@ -1,3 +1,2 @@
-include /src/storage/OWNERS
 # FFX-owners included for changes to subtool API
 file:/src/developer/ffx/OWNERS
