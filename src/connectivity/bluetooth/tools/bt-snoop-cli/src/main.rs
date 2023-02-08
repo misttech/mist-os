@@ -8,7 +8,6 @@ use {
     byteorder::{BigEndian, WriteBytesExt},
     fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopEvent, SnoopMarker, SnoopPacket},
     fuchsia_async as fasync,
-    fuchsia_bluetooth::error::Error as BTError,
     fuchsia_component::client::connect_to_protocol,
     futures::TryStreamExt,
     std::{fmt, fs::File, io, path::Path},
@@ -186,7 +185,7 @@ fn main_res() -> Result<(), Error> {
         // Send request to start receiving snoop packets
         let status = snoop_svc.start(follow, dev_str).await?;
         if let Some(e) = status.error {
-            return Err(BTError::from(*e).into());
+            return Err(anyhow::format_err!("{e:?}"));
         }
 
         // Receive snoop packet events and output them in the requested format.

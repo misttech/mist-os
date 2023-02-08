@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Error};
+use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_gatt2::ClientProxy;
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::error::Error as BTError;
 use futures::{
     channel::mpsc::{channel, SendError},
     Sink, SinkExt, Stream, StreamExt,
@@ -119,7 +118,7 @@ async fn handle_cmd(line: String, client: &GattClientPtr) -> Result<(), Error> {
 
     match cmd {
         Some(Ok(Cmd::Exit)) | Some(Ok(Cmd::Quit)) => {
-            return Err(BTError::new("exited").into());
+            return Err(format_err!("exited").into());
         }
         Some(Ok(Cmd::Help)) => {
             print!("{}", Cmd::help_msg());

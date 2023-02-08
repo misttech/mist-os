@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_bluetooth::{
-        error::Error as BtError,
-        types::{Address, PeerId},
-    },
-};
+use anyhow::{format_err, Error};
+use fuchsia_bluetooth::types::{Address, PeerId};
 
 pub const BONDING_DATA_PREFIX: &'static str = "bonding-data:";
 pub const HOST_DATA_PREFIX: &'static str = "host-data:";
@@ -23,7 +18,7 @@ pub fn host_data_key(host_address: &Address) -> String {
 
 pub fn host_id_from_key(key: &str) -> Result<String, Error> {
     if key.len() <= HOST_DATA_PREFIX.len() {
-        return Err(BtError::new(&format!("malformed host data key: {}", key)).into());
+        return Err(format_err!("malformed host data key: {}", key));
     }
     Ok(key[HOST_DATA_PREFIX.len()..].to_string())
 }

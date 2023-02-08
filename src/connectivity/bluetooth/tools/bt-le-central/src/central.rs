@@ -11,10 +11,7 @@ use fidl_fuchsia_bluetooth_gatt2::ClientMarker;
 use fidl_fuchsia_bluetooth_le::{
     CentralProxy, ConnectionMarker, ConnectionOptions, ScanResultWatcherProxy,
 };
-use fuchsia_bluetooth::{
-    error::Error as BTError,
-    types::{le::Peer, PeerId, Uuid},
-};
+use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
 use futures::{future::FutureExt, pin_mut, select};
 use parking_lot::RwLock;
 use std::{convert::TryFrom, sync::Arc};
@@ -79,7 +76,7 @@ pub async fn watch_scan_results(
         let fidl_peers: Vec<fidl_fuchsia_bluetooth_le::Peer> = result_watcher
             .watch()
             .await
-            .map_err(|e| BTError::new(&format!("ScanResultWatcherProxy error: {}", e)))?;
+            .map_err(|e| format_err!("ScanResultWatcherProxy error: {e}"))?;
 
         for fidl_peer in fidl_peers {
             let peer = Peer::try_from(fidl_peer)?;

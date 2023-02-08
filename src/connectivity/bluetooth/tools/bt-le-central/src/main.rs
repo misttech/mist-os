@@ -8,7 +8,6 @@ use fidl_fuchsia_bluetooth_le::{CentralMarker, Filter, ScanOptions, ScanResultWa
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::{
     assigned_numbers,
-    error::Error as BTError,
     types::{PeerId, Uuid},
 };
 use futures::{try_join, TryFutureExt};
@@ -121,7 +120,7 @@ async fn do_scan(appname: &String, args: &[String], state: CentralStatePtr) -> R
 async fn do_connect<'a>(state: CentralStatePtr, args: &'a [String]) -> Result<(), Error> {
     if args.len() < 1 {
         println!("connect: peer-id is required");
-        return Err(BTError::new("invalid input").into());
+        return Err(format_err!("invalid connect arguments"));
     }
 
     let mut opts = Options::new();
@@ -133,7 +132,7 @@ async fn do_connect<'a>(state: CentralStatePtr, args: &'a [String]) -> Result<()
     let uuid = match possible_uuid {
         None => None,
         Some(Ok(uuid)) => Some(uuid),
-        Some(Err(_)) => return Err(BTError::new("invalid UUID").into()),
+        Some(Err(_)) => return Err(format_err!("invalid UUID")),
     };
 
     let peer_id: PeerId = PeerId::from_str(&args[0]).map_err(|_| format_err!("invalid peer id"))?;
@@ -175,7 +174,7 @@ fn main() -> Result<(), Error> {
             _ => {
                 println!("Invalid command: {}", command);
                 usage(appname);
-                Err(BTError::new("invalid input").into())
+                Err(format_err!("invalid command input"))
             }
         }
     };

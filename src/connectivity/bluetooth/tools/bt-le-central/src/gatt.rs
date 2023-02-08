@@ -12,7 +12,6 @@ use fidl_fuchsia_bluetooth_gatt2::{
     WriteMode, WriteOptions,
 };
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::error::Error as BTError;
 use fuchsia_bluetooth::types::Uuid;
 use futures::StreamExt;
 use num::Num;
@@ -110,7 +109,7 @@ async fn read_characteristic(svc: &RemoteServiceProxy, id: u64) -> Result<(), Er
     let value: ReadValue = svc
         .read_characteristic(&mut Handle { value: id }, &mut options)
         .await
-        .map_err(|e| format_err!("Failed to read characteristic: {}", BTError::from(e)))?
+        .map_err(|e| format_err!("Failed to read characteristic: {e:?}"))?
         .map_err(|e| format_err!("Failed to read characteristic: {:?}", e))?;
 
     if let Some(value) = value.value {
@@ -135,7 +134,7 @@ async fn read_long_characteristic(
     let value: ReadValue = svc
         .read_characteristic(&mut Handle { value: id }, &mut options)
         .await
-        .map_err(|e| format_err!("Failed to read characteristic: {}", BTError::from(e)))?
+        .map_err(|e| format_err!("Failed to read characteristic: {e:?}"))?
         .map_err(|e| format_err!("Failed to read characteristic: {:?}", e))?;
 
     if let Some(value) = value.value {
@@ -622,10 +621,10 @@ async fn do_read_by_type<'a>(args: &'a [&'a str], client: &'a GattClientPtr) -> 
                 }
             }
             Ok(Err(e)) => {
-                println!("read by type error result: {:?}", e);
+                println!("read by type error result: {e:?}");
             }
             Err(e) => {
-                println!("read by type FIDL error: {:?}", BTError::from(e));
+                println!("read by type FIDL error: {e:?}");
             }
         },
         None => {

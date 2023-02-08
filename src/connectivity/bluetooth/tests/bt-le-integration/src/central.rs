@@ -11,7 +11,6 @@ use {
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
-        error::Error as BTError,
         expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
         types::Address,
     },
@@ -59,7 +58,7 @@ async fn start_scan(central: &CentralHarness) -> Result<(), Error> {
         .on_timeout(INTEGRATION_TIMEOUT.after_now(), move || Err(format_err!("Timed out")));
     let status = fut.await.unwrap();
     if let Some(e) = status.error {
-        return Err(BTError::from(*e).into());
+        return Err(format_err!("error during scan {e:?}"));
     }
     Ok(())
 }

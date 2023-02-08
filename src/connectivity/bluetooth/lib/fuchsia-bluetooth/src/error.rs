@@ -7,15 +7,8 @@ use {fidl_fuchsia_bluetooth as bt, thiserror::Error};
 /// Error type that can be constructed from a Bluetooth FIDL Error or from on its own.
 #[derive(Debug, Error)]
 #[error("{}", message)]
-pub struct Error {
+struct Error {
     message: String,
-}
-
-impl Error {
-    /// Constructs an Error with a message.
-    pub fn new(msg: &str) -> Error {
-        Error { message: msg.to_string() }
-    }
 }
 
 impl From<bt::Error> for Error {

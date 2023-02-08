@@ -8,7 +8,6 @@ use fidl_fuchsia_stash::{
     GetIteratorMarker, KeyValue, SecureStoreMarker, StoreAccessorMarker, StoreAccessorProxy, Value,
 };
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::error::Error as BtError;
 use fuchsia_bluetooth::inspect::Inspectable;
 use fuchsia_bluetooth::types::{Address, BondingData, HostData, PeerId};
 use fuchsia_inspect;
@@ -412,7 +411,7 @@ impl StashInner {
                     }
                 } else {
                     error!("stash malformed: host data should be a string");
-                    return Err(BtError::new("failed to initialize stash").into());
+                    return Err(format_err!("failed to initialize stash"));
                 }
             }
         }
