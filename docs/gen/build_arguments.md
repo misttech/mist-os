@@ -2680,6 +2680,16 @@ From //third_party/perfetto/gn/perfetto.gni:195
 
 From //third_party/perfetto/gn/perfetto.gni:198
 
+### enable_perfetto_grpc
+
+Enables gRPC support. This is used as the RPC framework for cloud trace
+processor in open source but is disabled by default because of how
+heavyweight gRPC is.
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:314
+
 ### enable_perfetto_heapprofd
 
 **Current value (from the default):** `false`
@@ -2719,7 +2729,7 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:326
+From //third_party/perfetto/gn/perfetto.gni:331
 
 ### enable_perfetto_stderr_crash_dump
 
@@ -2779,7 +2789,7 @@ From //third_party/perfetto/gn/perfetto.gni:275
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:315
+From //third_party/perfetto/gn/perfetto.gni:320
 
 ### enable_perfetto_traced_perf
 
@@ -2805,7 +2815,7 @@ From //third_party/perfetto/gn/perfetto.gni:267
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:319
+From //third_party/perfetto/gn/perfetto.gni:324
 
 ### enable_perfetto_unittests
 
@@ -5566,7 +5576,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:333
+From //third_party/perfetto/gn/perfetto.gni:338
 
 ### perfetto_use_system_sqlite
 
@@ -5575,13 +5585,13 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:337
+From //third_party/perfetto/gn/perfetto.gni:342
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:339
+From //third_party/perfetto/gn/perfetto.gni:344
 
 ### perfetto_verbose_logs_enabled
 
@@ -7590,7 +7600,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:329
+From //third_party/perfetto/gn/perfetto.gni:334
 
 ### smp_max_cpus
 
