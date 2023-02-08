@@ -4,23 +4,22 @@
 
 use {
     crate::args::RepoPublishCommand,
-    anyhow::{Context, Result},
+    anyhow::{format_err, Context, Result},
     fuchsia_async as fasync,
     fuchsia_lockfile::Lockfile,
     fuchsia_repo::{
-        package_manifest_watcher::{PackageManifestWatcher, PackageManifestWatcherBuilder},
+        package_manifest_watcher::PackageManifestWatcher,
         repo_builder::RepoBuilder,
         repo_client::RepoClient,
         repo_keys::RepoKeys,
         repository::{Error as RepoError, PmRepository},
     },
-    futures::{FutureExt, StreamExt},
+    futures::StreamExt,
     std::{
         collections::BTreeSet,
         fs::File,
         io::{BufWriter, Write},
         path::Path,
-        pin::Pin,
     },
     tracing::{error, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
@@ -29,56 +28,32 @@ use {
 /// Time in seconds after which the attempt to get a lock file is considered failed.
 const LOCK_TIMEOUT_SEC: u64 = 2 * 60;
 
-/// Time in milliseconds at which the filesystem update events are rated.
-const WATCHER_NEXT_EVENT_RATE_MILLIS: u64 = 200;
-
 /// Filename for lockfile for repository that's being processed by the command.
 const REPOSITORY_LOCK_FILENAME: &str = ".repository.lock";
 
-pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
+pub async fn cmd_repo_publish(mut cmd: RepoPublishCommand) -> Result<()> {
+    repo_publish(&cmd).await?;
     if cmd.watch {
-        repo_incremental_publish(&cmd, WATCHER_NEXT_EVENT_RATE_MILLIS).await
-    } else {
-        repo_publish(&cmd).await
+        repo_incremental_publish(&mut cmd).await?;
     }
+    Ok(())
 }
 
-async fn repo_incremental_publish(cmd: &RepoPublishCommand, watcher_rate: u64) -> Result<()> {
-    let mut watcher = PackageManifestWatcher::watch(
-        PackageManifestWatcherBuilder::builder()
-            .manifests(cmd.package_manifests.iter())
-            .lists(cmd.package_list_manifests.iter())
-            .build(),
-    )?
-    .peekable();
-    loop {
-        repo_publish(cmd).await.unwrap_or_else(|e| warn!("Repo publish error: {:?}", e));
-
-        // TODO(fxb/117882): The current implementation of `PackageManifestWatcher` guarantees that
-        // all buffered events can be processed, but future implementations might change this. It
-        // should be considered to rewrite things such that the watcher only retains the last event
-        // to avoid the risk of a bunch of changes being queued up to avoid unnecessary
-        // re-publishes.
-        // Wait for 200ms after last file change.
-        let watcher_result = loop {
-            let watcher_result = watcher.next().await;
-            fuchsia_async::Timer::new(fuchsia_async::Duration::from_millis(watcher_rate)).await;
-            // If the stream is empty, return the result.
-            if Pin::new(&mut watcher).peek().now_or_never().is_none() {
-                break watcher_result;
-            } else {
-                // Skip all but the last item on the stream.
-                while Pin::new(&mut watcher).peek().now_or_never().is_some() {
-                    let _ = watcher.next().await;
-                }
-            }
-        };
-
-        // Exit the loop if the notify watcher has shut down.
-        if watcher_result.is_none() {
-            break Ok(());
-        }
+async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
+    if !cmd.package_archives.is_empty() {
+        return Err(format_err!("incrementally publishing archives is not yet supported"));
     }
+
+    let mut watcher = PackageManifestWatcher::builder()
+        .package_manifests(cmd.package_manifests.iter().cloned())
+        .package_lists(cmd.package_list_manifests.iter().cloned())
+        .watch()?;
+
+    while let Some(event) = watcher.next().await {
+        cmd.package_manifests = event.paths.into_iter().collect();
+        repo_publish(cmd).await.unwrap_or_else(|e| warn!("Repo publish error: {:?}", e));
+    }
+    Ok(())
 }
 
 async fn lock_repository(lock_path: &Path) -> Result<Lockfile> {
@@ -215,6 +190,11 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
             .await?,
     );
 
+    if cmd.watch {
+        // Deps don't need to be written for incremental publish.
+        return Ok(());
+    }
+
     if let Some(depfile_path) = &cmd.depfile {
         let timestamp_path = cmd.repo_path.join("repository").join("timestamp.json");
 
@@ -246,6 +226,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_pkg::{PackageManifest, PackageManifestList},
         fuchsia_repo::{repository::CopyMode, test_utils},
+        futures::FutureExt,
         tuf::metadata::Metadata as _,
     };
 
@@ -338,19 +319,21 @@ mod tests {
                     let blob_path = blob_repo_path.join(blob.merkle.to_string());
                     assert_eq!(
                         std::fs::read(&blob.source_path).unwrap(),
-                        std::fs::read(blob_path).unwrap(),
+                        std::fs::read(blob_path).unwrap()
                     );
                 }
             }
 
-            assert_eq!(
-                std::fs::read_to_string(&self.depfile_path).unwrap(),
-                format!(
-                    "{}: {}",
-                    self.repo_path.join("repository").join("timestamp.json"),
-                    expected_deps.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "),
-                )
-            );
+            if !self.cmd.watch {
+                assert_eq!(
+                    std::fs::read_to_string(&self.depfile_path).unwrap(),
+                    format!(
+                        "{}: {}",
+                        self.repo_path.join("repository").join("timestamp.json"),
+                        expected_deps.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "),
+                    )
+                );
+            }
         }
     }
 
@@ -909,21 +892,27 @@ mod tests {
     async fn test_watch_republishes_on_package_change() {
         let mut env = TestEnv::new();
         env.cmd.watch = true;
-        let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
+        repo_publish(&env.cmd).await.unwrap();
+        {
+            let mut publish_fut = Box::pin(repo_incremental_publish(&mut env.cmd)).fuse();
 
-        futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
-            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
-        }
+            futures::select! {
+                r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
+                _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+            }
 
-        // Make changes to the watched manifest.
-        let (_, manifest) =
-            test_utils::make_package_manifest("foobar", env.repo_path.as_std_path(), Vec::new());
-        update_manifest(&env.manifest_paths[4], &manifest);
+            // Make changes to the watched manifest.
+            let (_, manifest) = test_utils::make_package_manifest(
+                "foobar",
+                env.repo_path.as_std_path(),
+                Vec::new(),
+            );
+            update_manifest(&env.manifest_paths[4], &manifest);
 
-        futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
-            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+            futures::select! {
+                r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
+                _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+            }
         }
 
         let expected_deps =
@@ -935,7 +924,7 @@ mod tests {
     async fn test_watch_unlocks_repository_on_error() {
         let mut env = TestEnv::new();
         env.cmd.watch = true;
-        let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
+        let mut publish_fut = Box::pin(repo_incremental_publish(&mut env.cmd)).fuse();
 
         futures::select! {
             r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
