@@ -214,7 +214,7 @@ EOF
 
   # Fire up fx serve-updates.
   "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -l "${serve_updates_port}" 1>stdout &
-  serve_updates_pid=$!
+  local serve_updates_pid=$!
 
   # Give fx serve-updates some time to come up.
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
@@ -242,10 +242,12 @@ TEST_fx_serve_updates_with_pm_with_incremental() {
 
   BT_ASSERT _create_mock_pm "${serve_updates_port}"
 
-  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" <<EOF
 if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"pm\""
+elif [[ "$@" == "config get repository.server.listen" ]]; then
+  echo "\"[::]:${serve_update_port}\""
 else
   echo "127.0.0.1"
 fi
@@ -253,13 +255,16 @@ EOF
 
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental=0 ${FUCHSIA_DEVSHELL_DIR}/serve-updates -v -l "${serve_updates}" 1>stdout 2>stderr &
-  serve_updates_pid=$!
+  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  local serve_updates_pid=$!
 
+  # Give fx serve-updates some time to come up.
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
   # Request the list of targets. Confirm testpackage is one of the targets.
   BT_ASSERT _check_targets "${serve_updates_port}"
+
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING targets.json "testpackage/0"
 
   # Shut down our fake pm, which should stop serve-updates.
   kill "${serve_updates_pid}"
@@ -276,11 +281,11 @@ TEST_fx_serve_updates_exits_if_pm_fails_to_start() {
   # Listen on a unique port.
   local serve_updates_port=9085
 
-  pm="$(btf::make_installed_hosttools_mock pm)"
-  lockfile="${BT_TEMP_DIR}/.pm.lock"
+  local pm="$(btf::make_installed_hosttools_mock pm)"
+  local lockfile="${BT_TEMP_DIR}/.pm.lock"
   echo 5 > "${pm}.mock_status"
 
-  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" << "EOF"
 if [[ "$@" == "config get repository.server.mode" ]]; then
   echo "\"pm\""
@@ -354,14 +359,30 @@ TEST_fx_serve_updates_with_ffx_with_incremental() {
   # Listen on a unique port.
   local serve_updates_port=9087
 
+  local shell="${FUCHSIA_DIR}/tools/devshell/shell"
+  btf::make_mock "${shell}"
+  cat > "${shell}.mock_side_effects" <<EOF
+if [[ "\$@" == "clock --monotonic" ]]; then
+  echo "0"
+fi
+EOF
+
   BT_ASSERT _create_mock_pm "${serve_updates_port}"
 
   # Even though the ffx config says we should use the ffx repository server, we
   # should fall back to using pm.
-  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" <<EOF
 if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
+elif [[ "\$@" == "config get repository.server.listen" ]]; then
+  echo "\"[::]:${serve_updates_port}\""
+elif [[ "\$@" == "repository server start" ]]; then
+  touch "${started_server}"
+  exit 0
+elif [[ "\$@" == "repository server stop" ]]; then
+  touch "${stopped_server}"
+  exit 0
 else
   echo "127.0.0.1"
 fi
@@ -369,8 +390,8 @@ EOF
 
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental=0 ${FUCHSIA_DEVSHELL_DIR}/serve-updates -v -l "${serve_updates}" 1>stdout 2>stderr &
-  serve_updates_pid=$!
+  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  local serve_updates_pid=$!
 
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
