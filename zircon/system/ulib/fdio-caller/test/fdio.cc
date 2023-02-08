@@ -43,7 +43,7 @@ void TryFilesystemOperations(fidl::UnownedClientEnd<fio::File> client_end) {
   ASSERT_EQ(std::string_view(reinterpret_cast<const char*>(data.data()), data.count()), payload);
 }
 
-void TryFilesystemOperations(zx::unowned_channel channel) {
+void TryFilesystemOperations(const zx::unowned_channel& channel) {
   TryFilesystemOperations(fidl::UnownedClientEnd<fio::File>(channel));
 }
 
@@ -136,7 +136,7 @@ TEST(FdioCallTests, FdioCallerBorrow) {
   ASSERT_TRUE(channel->is_valid());
   ASSERT_TRUE(caller);
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller));
-  ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(std::move(channel)));
+  ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(channel));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.node().channel()));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.file().channel()));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.directory().channel()));
@@ -206,7 +206,7 @@ TEST(FdioCallTests, UnownedFdioCallerBorrow) {
   ASSERT_TRUE(channel->is_valid());
   ASSERT_TRUE(caller);
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller));
-  ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(std::move(channel)));
+  ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(channel));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.node().channel()));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.file().channel()));
   ASSERT_NO_FATAL_FAILURE(TryFilesystemOperations(caller.directory().channel()));
