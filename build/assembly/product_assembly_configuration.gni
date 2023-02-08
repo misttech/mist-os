@@ -105,22 +105,40 @@ template("product_assembly_configuration") {
     # Base packages specified by the invoker, used to create the list of
     # manifests and as the deps for the package set targets.
     base_package_labels = []
+    base_package_config_data_deps = []
     if (defined(invoker.base_packages)) {
       foreach(package, invoker.base_packages) {
         assert(defined(package.package_target),
                "package_target must be supplied")
         base_package_labels += [ package.package_target ]
+
+        if (defined(package.config_data)) {
+          foreach(_config_data, package.config_data) {
+            if (defined(_config_data.label)) {
+              base_package_config_data_deps += [ _config_data.label ]
+            }
+          }
+        }
       }
     }
 
     # Cache packages specified by the invoker, used to create the list of
     # manifests and as the deps for the package set targets.
     cache_package_labels = []
+    cache_package_config_data_deps = []
     if (defined(invoker.cache_packages)) {
       foreach(package, invoker.cache_packages) {
         assert(defined(package.package_target),
                "package_target must be supplied")
         cache_package_labels += [ package.package_target ]
+
+        if (defined(package.config_data)) {
+          foreach(_config_data, package.config_data) {
+            if (defined(_config_data.label)) {
+              base_package_config_data_deps += [ _config_data.label ]
+            }
+          }
+        }
       }
     }
 
@@ -352,13 +370,11 @@ template("product_assembly_configuration") {
     deps = labels.base_package_labels
   }
 
-  # Validate that the config data sources are all static files (not produced by
-  # any deps)
   group_with_inputs(labels.base_package_config_data) {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":${labels.target_name}" ]
     inputs = files.base_package_config_data_sources
-    deps = []
+    deps = labels.base_package_config_data_deps
   }
 
   # Create a target for the base driver packages, so they appear in the dep
@@ -381,13 +397,11 @@ template("product_assembly_configuration") {
     deps = labels.cache_package_labels
   }
 
-  # Validate that the config data sources are all static files (not produced by
-  # any deps)
   group_with_inputs(labels.cache_package_config_data) {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":${labels.target_name}" ]
     inputs = files.cache_package_config_data_sources
-    deps = []
+    deps = labels.cache_package_config_data_deps
   }
 
   # Create a target for the board-provided driver packages, so they appear in
