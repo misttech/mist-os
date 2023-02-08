@@ -192,23 +192,23 @@ bool ValidateOptionsWithNand(const NandBroker& nand, const Config& config) {
     return true;
   }
 
-  if (config.page_num >= nand.Info().pages_per_block) {
+  if (config.page_num >= nand.Info().pages_per_block()) {
     printf("Page not within a block:\n");
     return false;
   }
 
-  if (config.block_num >= nand.Info().num_blocks) {
+  if (config.block_num >= nand.Info().num_blocks()) {
     printf("Block not within device:\n");
     return false;
   }
 
-  if (config.abs_page >= nand.Info().num_blocks * nand.Info().pages_per_block) {
+  if (config.abs_page >= nand.Info().num_blocks() * nand.Info().pages_per_block()) {
     printf("Page not within device:\n");
     return false;
   }
 
   if (config.action == Actions::kErase &&
-      nand.Info().nand_class == fuchsia_hardware_nand_Class_PARTMAP && config.block_num < 24) {
+      nand.Info().nand_class() == fuchsia_hardware_nand::Class::kPartmap && config.block_num < 24) {
     printf("Erasing the restricted area is not a good idea, sorry\n");
     return false;
   }
@@ -228,7 +228,7 @@ bool ExecuteAction(const NandBroker& nand, const Config& config) {
     case Actions::kRead: {
       uint32_t abs_page = config.abs_page
                               ? config.abs_page
-                              : config.block_num * nand.Info().pages_per_block + config.page_num;
+                              : config.block_num * nand.Info().pages_per_block() + config.page_num;
       printf("To read page %d\n", abs_page);
       return nand.DumpPage(abs_page);
     }

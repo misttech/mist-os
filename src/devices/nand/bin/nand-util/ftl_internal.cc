@@ -141,12 +141,12 @@ NdmHeader GetNdmHeader(const void* page) {
 }
 
 bool NdmData::FindHeader(const NandBroker& nand) {
-  page_multiplier_ = nand.Info().oob_size < 16 ? 16 / nand.Info().oob_size : 1;
+  page_multiplier_ = nand.Info().oob_size() < 16 ? 16 / nand.Info().oob_size() : 1;
 
   int last = -1;
-  for (int32_t block = nand.Info().num_blocks - 1; block > header_.free_virt_block; block--) {
-    for (uint32_t page = 0; page < nand.Info().pages_per_block; page += page_multiplier_) {
-      if (!nand.ReadPages(block * nand.Info().pages_per_block + page, page_multiplier_)) {
+  for (int32_t block = nand.Info().num_blocks() - 1; block > header_.free_virt_block; block--) {
+    for (uint32_t page = 0; page < nand.Info().pages_per_block(); page += page_multiplier_) {
+      if (!nand.ReadPages(block * nand.Info().pages_per_block() + page, page_multiplier_)) {
         printf("Read failed for block %d, page %d\n", block, page);
         break;
       }
@@ -236,7 +236,7 @@ void NdmData::ParseNdmData(const void* page, fbl::Vector<int32_t>* bad_blocks,
   for (int i = 0;; i++) {
     int32_t bad_block;
     memcpy(&bad_block, reinterpret_cast<const int32_t*>(bad_data) + i + 1, sizeof(bad_block));
-    if(bad_block == h.num_blocks) {
+    if (bad_block == h.num_blocks) {
       break;
     }
     Log("Bad block at %d\n", bad_block);
@@ -251,7 +251,7 @@ void NdmData::ParseNdmData(const void* page, fbl::Vector<int32_t>* bad_blocks,
   const RunningBadBlock* running_ptr = reinterpret_cast<const RunningBadBlock*>(data);
   data += sizeof(*running_ptr);
 
-  for (int i = 0; ; i++, running_ptr++) {
+  for (int i = 0;; i++, running_ptr++) {
     RunningBadBlock running;
     memcpy(&running, running_ptr, sizeof(running));
     if (running.bad_block == -1) {

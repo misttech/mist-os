@@ -42,7 +42,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//src/devices/ml/drivers/aml-nna:aml-nna-test-bin",
     "//src/devices/ml/drivers/as370-nna:as370-nna-driver",
     "//src/devices/ml/drivers/as370-nna:as370-nna-test-bin",
-    "//src/devices/nand/bin/nand-util:common",
     "//src/devices/power/drivers/ti-ina231:ti-ina231-test-bin",
     "//src/devices/ram/bin/ram-info",
     "//src/devices/ram/bin/ram-info:ram-info-test-bin",

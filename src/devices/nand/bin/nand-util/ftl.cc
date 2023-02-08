@@ -25,7 +25,7 @@ int GetWearCount(const NandBroker& nand, uint32_t block, int page_multiplier) {
     return -1;
   }
 
-  if (!nand.ReadPages(block * nand.Info().pages_per_block, page_multiplier)) {
+  if (!nand.ReadPages(block * nand.Info().pages_per_block(), page_multiplier)) {
     printf("Read failed for block %u\n", block);
     return -1;
   }
@@ -58,7 +58,7 @@ bool FtlData::Initialize() { return ndm_.FindHeader(*nand_); }
 bool FtlData::IsMapPage(uint32_t page) const {
   page /= ndm_.page_multiplier();
   const SpareArea* oob = reinterpret_cast<const SpareArea*>(nand_->oob());
-  ZX_DEBUG_ASSERT(nand_->Info().oob_size <= sizeof(*oob));
+  ZX_DEBUG_ASSERT(nand_->Info().oob_size() <= sizeof(*oob));
   return IsMapBlock(oob[page]);
 }
 
@@ -74,7 +74,7 @@ std::unique_ptr<FtlInfo> FtlInfo::Factory(const NandBroker* nand) {
 }
 
 bool WearCounts(const NandBroker& nand) {
-  uint32_t num_blocks = nand.Info().num_blocks;
+  uint32_t num_blocks = nand.Info().num_blocks();
   int page_multiplier = 2;
   if (nand.ftl()) {
     const FtlData* ftl = reinterpret_cast<const FtlData*>(nand.ftl());

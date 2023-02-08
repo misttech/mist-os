@@ -4,12 +4,13 @@
 
 #pragma once
 
-#include <memory>
-
-#include <fbl/unique_fd.h>
-#include <fuchsia/hardware/nand/c/fidl.h>
+#include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.hardware.nand/cpp/fidl.h>
+#include <fidl/fuchsia.nand/cpp/fidl.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zx/channel.h>
+
+#include <memory>
 
 #include "ftl.h"
 
@@ -34,9 +35,9 @@ class NandBroker {
   // at the end of the buffer (oob()). In other words, these two pointers will
   // always point to the same location for the lifetime of this object.
   char* data() const { return reinterpret_cast<char*>(mapping_.start()); }
-  char* oob() const { return data() + info_.page_size * info_.pages_per_block; }
+  char* oob() const { return data() + info_.page_size() * info_.pages_per_block(); }
 
-  const fuchsia_hardware_nand_Info& Info() const { return info_; }
+  const fuchsia_hardware_nand::Info& Info() const { return info_; }
 
   // The operations to perform (return true on success):
   bool Query();
@@ -48,14 +49,11 @@ class NandBroker {
  private:
   // Attempts to load the broker driver, if it seems it's needed. Returns true
   // on success.
-  bool LoadBroker();
+  zx::result<fidl::ClientEnd<fuchsia_nand::Broker>> LoadBroker();
 
-  zx_handle_t channel() const { return caller_.get(); }
-
-  const char* path_;
-  fbl::unique_fd device_;
-  zx::channel caller_;
-  fuchsia_hardware_nand_Info info_ = {};
+  std::string path_;
+  fidl::SyncClient<fuchsia_nand::Broker> broker_client_;
+  fuchsia_hardware_nand::Info info_ = {};
   fzl::OwnedVmoMapper mapping_;
   std::unique_ptr<FtlInfo> ftl_;
 };

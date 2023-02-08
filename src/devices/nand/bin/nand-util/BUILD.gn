@@ -20,7 +20,7 @@ executable("nand-util") {
   ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
+    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
@@ -28,10 +28,6 @@ executable("nand-util") {
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/cksum",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 source_set("common") {
@@ -42,23 +38,15 @@ source_set("common") {
   ]
   deps = [ "//zircon/system/ulib/pretty" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_c",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
-    "//sdk/fidl/fuchsia.nand:fuchsia.nand_c",
+    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
+    "//sdk/fidl/fuchsia.nand:fuchsia.nand_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
   ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 test("nand-util-test-bin") {
@@ -76,10 +64,6 @@ test("nand-util-test-bin") {
     "//sdk/lib/fdio",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_unittest_package("nand-util-test") {

@@ -4,9 +4,8 @@
 
 #pragma once
 
+#include <fidl/fuchsia.hardware.nand/cpp/fidl.h>
 #include <stdint.h>
-
-#include <fuchsia/hardware/nand/c/fidl.h>
 
 // Prints out some data from the "first page".
 void DumpPage0(const void* data);
@@ -19,4 +18,4 @@ void GetBbtLocation(const void* data, uint32_t* first_block, uint32_t* num_block
 // tables parsed. |data| and |oob| must contain the data from a full erase block.
 // Note that GetBbtLocation() has to be called before using this function, to
 // determine what erase blocks to read.
-int DumpBbt(const void* data, const void* oob, const fuchsia_hardware_nand_Info& info);
+int DumpBbt(const void* data, const void* oob, const fuchsia_hardware_nand::Info& info);
