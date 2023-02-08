@@ -100,8 +100,9 @@ impl OtCtl {
                 if outbound_buffer.is_empty() {
                     loop {
                         match openthread_conole_output_receiver.poll_next_unpin(cx) {
-                            Poll::Ready(Some(bytes)) => {
-                                outbound_buffer.append(&mut bytes.as_bytes().to_vec());
+                            Poll::Ready(Some(cli_output_str)) => {
+                                fx_log_info!("CLI output: {}", MarkPii(&cli_output_str));
+                                outbound_buffer.append(&mut cli_output_str.as_bytes().to_vec());
                             }
                             Poll::Ready(None) => {
                                 return Poll::Ready(Ok(()));
