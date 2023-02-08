@@ -43,6 +43,7 @@ class Library {
         this.ir.external_struct_declarations,
         this.ir.struct_declarations,
         this.ir.table_declarations,
+        this.ir.union_declarations,
       ]
       for (const declarations of method_type_declarations) {
         let decl = this._findDeclaration(declarations, payload);
@@ -643,6 +644,15 @@ function constToValue(c) {
   }
 }
 
+// Takes a bits declaration, returns an object containing the members and their values.
+function bitsObject(p) {
+  let value = {};
+  for (const member of p.members) {
+    value[member.name] = BigInt(member.value.value);
+  }
+  return value;
+}
+
 // Make fidl definitions available on an object called `fidling`
 // Asking for fidling.libraryName.CONST returns a const value.
 // Asking for fidling.libraryName.Protocol returns the IR for the protocol.
@@ -666,6 +676,12 @@ var fidling_handler = {
               let p = val.ir.protocol_declarations[i];
               if (p.name == maybeName) {
                 return p;
+              }
+            }
+            for (let i = 0; i < val.ir.bits_declarations.length; i++) {
+              let p = val.ir.bits_declarations[i];
+              if (p.name == maybeName) {
+                return bitsObject(p);
               }
             }
             // And similarly for non-const decls

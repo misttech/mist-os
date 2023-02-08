@@ -209,40 +209,12 @@ void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
 }
 
 void ObjectConverter::VisitBitsType(const fidl_codec::BitsType* type) {
-  size_t len;
-  const char* str = JS_ToCStringLen(ctx_, &len, value_);
-
-  if (!str) {
+  int64_t pres = 0;
+  if (JS_ToInt64Ext(ctx_, &pres, value_) != 0) {
+    JS_ThrowTypeError(ctx_, "Unexpected bits value");
     return;
   }
-
-  auto value_string = std::string(str, len);
-  std::map<std::string, std::unique_ptr<fidl_codec::Value>> values;
-  size_t pos = 0;
-
-  while (pos < value_string.size()) {
-    std::string next_key;
-    size_t next = value_string.find('|', pos);
-    if (next == std::string::npos) {
-      next_key = value_string.substr(pos);
-      pos = value_string.size();
-    } else {
-      next_key = value_string.substr(pos, next - pos);
-      pos = next + 1;
-    }
-
-    values[next_key] = std::unique_ptr<fidl_codec::Value>();
-  }
-
-  uint64_t out = 0;
-
-  for (const auto& member : type->bits_definition().members()) {
-    if (values.find(member.name()) != values.end()) {
-      out |= member.absolute_value();
-    }
-  }
-
-  result_ = std::make_unique<fidl_codec::IntegerValue>(out, false);
+  result_ = std::make_unique<fidl_codec::IntegerValue>(pres, false);
 }
 
 void ObjectConverter::VisitHandleType(const fidl_codec::HandleType* type) {

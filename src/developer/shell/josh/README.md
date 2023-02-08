@@ -104,3 +104,13 @@ Javascript console:
     QuickJS - Type "\h" for help
     qjs > console.log("Hello World!");
     Hello World!
+    
+# Notes on object representation
+
+FIDL objects are mostly represented with a relatively straightforward conversion to
+JSON.  This section contains some notes on the details of representation.
+
+## Bits
+
+Bits are represented as `BigInt` values, so that they are not accidentally
+affected by JavaScript's lack of integer support.

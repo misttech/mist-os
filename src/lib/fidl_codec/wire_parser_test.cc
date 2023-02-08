@@ -1278,7 +1278,7 @@ TEST_F(WireParserTest, ParseNullableHandle) {
 }
 TEST_F(WireParserTest, ParseProtocol) {
   HandleSupport support;
-  TEST_DECODE_WIRE_BODY(Protocol, support.GetJSON(), support.GetPretty(),
+  TEST_DECODE_WIRE_BODY(ProtocolMethod, support.GetJSON(), support.GetPretty(),
                         support.protocol<test::fidlcodec::examples::ParamProtocol>());
 }
 

@@ -59,6 +59,7 @@ class JsTest : public ::testing::Test {
     JSValue result = JS_Eval(ctx, command.data(), command.size(), "batch", 0); \
     ::shell::Value val(ctx, result);                                           \
     if (JS_IsException(result)) {                                              \
+      js_std_dump_error(ctx);                                                  \
       GTEST_FAIL() << val.ToString();                                          \
     }                                                                          \
   } while (0)

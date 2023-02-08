@@ -253,7 +253,9 @@ closed protocol FidlCodecTestProtocol {
         s box<TraversalStruct>;
     });
 
-    strict Protocol(resource struct {
+    // Named ProtocolMethod because the natural bindings
+    // do not support a method named Protocol.
+    strict ProtocolMethod(resource struct {
         ch client_end:ParamProtocol;
     });
 };

@@ -96,6 +96,7 @@ source_set("tests_base") {
     "//sdk/testing/fidl:test",
     "//sdk/testing/fidl:test_support",
     "//src/developer/shell/josh/console",
+    "//src/lib/fidl_codec:fidl_cpp",
     "//src/lib/fidl_codec:json_for_test",
     "//src/storage/memfs",
     "//third_party/googletest:gtest",
@@ -141,6 +142,7 @@ source_set("tests") {
   deps = [
     ":tests_base",
     "test/optional:opt_js_lib_tests",
+    "//sdk/lib/fidl/cpp/wire",
   ]
   configs += [ ":tests_base_config" ]
 }
