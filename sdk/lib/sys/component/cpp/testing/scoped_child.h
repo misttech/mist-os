@@ -135,6 +135,16 @@ class ScopedChild final {
     return clone;
   }
 
+  // Clone the exposed directory.
+  void CloneExposedDir(fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) const
+      ZX_AVAILABLE_SINCE(11) {
+    zx_status_t status = exposed_dir_->Clone(
+        fuchsia::io::OpenFlags::CLONE_SAME_RIGHTS,
+        fidl::InterfaceRequest<fuchsia::io::Node>(directory_request.TakeChannel()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Cloning exposed directory failed: %s",
+                  zx_status_get_string(status));
+  }
+
   // Returns reference to underlying exposed directory handle.
   const fuchsia::io::DirectorySyncPtr& exposed() const ZX_AVAILABLE_SINCE(11);
 
