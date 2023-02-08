@@ -11,6 +11,7 @@ use std::{
     iter::Iterator,
     net::Ipv4Addr,
     num::NonZeroU8,
+    ops::Deref,
 };
 use thiserror::Error;
 use tracing::debug;
@@ -658,6 +659,19 @@ macro_rules! option_to_code {
     };
 }
 
+trait SizeOfContents {
+    fn size_of_contents_in_bytes(&self) -> usize;
+}
+
+impl<T, U> SizeOfContents for T
+where
+    T: Deref<Target = [U]>,
+{
+    fn size_of_contents_in_bytes(&self) -> usize {
+        self.deref().len() * std::mem::size_of::<U>()
+    }
+}
+
 impl DhcpOption {
     fn from_raw_parts(code: OptionCode, val: &[u8]) -> Result<Self, ProtocolError> {
         match code {
@@ -953,7 +967,7 @@ impl DhcpOption {
             DhcpOption::DefaultIpTtl(v) => serialize_u8(code, v.into(), buf),
             DhcpOption::PathMtuAgingTimeout(v) => serialize_u32(code, v, buf),
             DhcpOption::PathMtuPlateauTable(v) => {
-                let size = std::mem::size_of_val(&v);
+                let size = v.size_of_contents_in_bytes();
                 buf.push(code.into());
                 buf.push(size as u8);
                 for mtu in v {
@@ -1009,7 +1023,7 @@ impl DhcpOption {
             DhcpOption::DhcpMessageType(v) => serialize_enum(code, v, buf),
             DhcpOption::ServerIdentifier(v) => serialize_address(code, v, buf),
             DhcpOption::ParameterRequestList(v) => {
-                let size = std::mem::size_of_val(&v);
+                let size = v.size_of_contents_in_bytes();
                 buf.push(code.into());
                 buf.push(size as u8);
                 buf.extend(v.into_iter().map(|code| code as u8));
@@ -1112,7 +1126,7 @@ fn serialize_address(code: OptionCode, addr: Ipv4Addr, buf: &mut Vec<u8>) {
 }
 
 fn serialize_addresses(code: OptionCode, addrs: &[Ipv4Addr], buf: &mut Vec<u8>) {
-    let size = std::mem::size_of_val(addrs);
+    let size = addrs.size_of_contents_in_bytes();
     buf.push(code.into());
     buf.push(size as u8);
     for addr in addrs {
@@ -1156,7 +1170,7 @@ fn serialize_u32(code: OptionCode, v: u32, buf: &mut Vec<u8>) {
 }
 
 fn serialize_bytes(code: OptionCode, v: &[u8], buf: &mut Vec<u8>) {
-    let size = std::mem::size_of_val(v);
+    let size = v.size_of_contents_in_bytes();
     buf.push(code.into());
     buf.push(size as u8);
     buf.extend_from_slice(v);
@@ -2082,6 +2096,8 @@ mod tests {
             msg.options.push(DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK));
             msg.options.push(DhcpOption::NameServer(vec![ip_v4!("1.2.3.4")]));
             msg.options.push(DhcpOption::DhcpMessageType(MessageType::DHCPDISCOVER));
+            msg.options.push(DhcpOption::ParameterRequestList(vec![OptionCode::SubnetMask]));
+            msg.options.push(DhcpOption::PathMtuPlateauTable(vec![1480u16]));
             msg
         };
 
