@@ -26,6 +26,18 @@ fuchsia_component("async_reporter_v2") {
   manifest = "components/async/meta/reporter_v2.cml"
 }
 
+fuchsia_component("capability_requested_child_v2") {
+  testonly = true
+  deps = [ "components:capability_requested_child_v2_bin" ]
+  manifest = "components/capability_requested/meta/child_v2.cml"
+}
+
+fuchsia_component("capability_requested_root_v2") {
+  testonly = true
+  deps = [ "components:capability_requested_root_v2_bin" ]
+  manifest = "components/capability_requested/meta/root_v2.cml"
+}
+
 fuchsia_component("directory_ready_child_v2") {
   testonly = true
   deps = [ "components:directory_ready_child_v2_bin" ]
@@ -106,6 +118,8 @@ fuchsia_unittest_package("events_v2_integration_test") {
   manifest = "meta/events_integration_test_v2.cml"
   deps = [
     ":async_reporter_v2",
+    ":capability_requested_child_v2",
+    ":capability_requested_root_v2",
     ":directory_ready_child_v2",
     ":directory_ready_root_v2",
     ":echo_client_v2",

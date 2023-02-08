@@ -5,7 +5,7 @@
 use {
     crate::model::{
         events::{event::Event, registry::ComponentEventRoute},
-        hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
+        hooks::{Event as ComponentEvent, EventPayload},
     },
     ::routing::event::EventFilter,
     anyhow::{format_err, Error},
@@ -73,7 +73,7 @@ impl EventDispatcher {
     /// Sends the event to an event stream, if fired in the scope of `scope_moniker`. Returns
     /// a responder which can be blocked on.
     pub async fn dispatch(&self, event: &ComponentEvent) -> Result<(), Error> {
-        let maybe_scope = self.find_scope(&event);
+        let maybe_scope = self.find_scope(&event, true);
         if maybe_scope.is_none() {
             return Err(format_err!("Could not find scope for event"));
         }
@@ -82,17 +82,26 @@ impl EventDispatcher {
 
         {
             let mut tx = self.tx.lock().await;
-            tx.send((Event { event: event.transfer().await, scope_moniker }, None)).await?;
+            tx.send((Event { event: event.clone(), scope_moniker }, None)).await?;
         }
         Ok(())
     }
 
-    fn find_scope(&self, event: &ComponentEvent) -> Option<&EventDispatcherScope> {
+    pub fn find_scope(
+        &self,
+        event: &ComponentEvent,
+        check_name_on_capability_requested: bool,
+    ) -> Option<&EventDispatcherScope> {
         // TODO(fxbug.dev/48360): once flattening of monikers is done, we would expect to have a single
         // moniker here. For now taking the first one and ignoring the rest.
         // Ensure that the event is coming from a realm within the scope of this dispatcher and
         // matching the path filter if one exists.
-        self.scopes.iter().filter(|scope| scope.contains(&self.subscriber, &event)).next()
+        self.scopes
+            .iter()
+            .filter(|scope| {
+                scope.contains(&self.subscriber, &event, check_name_on_capability_requested)
+            })
+            .next()
     }
 }
 
@@ -125,7 +134,12 @@ impl EventDispatcherScope {
 
     /// Given the subscriber, indicates whether or not the event is contained
     /// in this scope.
-    pub fn contains(&self, subscriber: &ExtendedMoniker, event: &ComponentEvent) -> bool {
+    pub fn contains(
+        &self,
+        subscriber: &ExtendedMoniker,
+        event: &ComponentEvent,
+        check_name_on_capability_requested: bool,
+    ) -> bool {
         let in_scope = match &event.payload {
             EventPayload::CapabilityRequested { source_moniker, .. } => match &subscriber {
                 ExtendedMoniker::ComponentManager => true,
@@ -149,11 +163,17 @@ impl EventDispatcherScope {
 
         // TODO(fsamuel): Creating hashmaps on every lookup is not ideal, but in practice this
         // likely doesn't happen too often.
-        let filterable_fields = match &event.payload {
-            EventPayload::CapabilityRequested { name, .. } => Some(hashmap! {
+        let filterable_fields = match (&event.payload, check_name_on_capability_requested) {
+            (EventPayload::CapabilityRequested { name, .. }, false) => Some(hashmap! {
                 "name".to_string() => DictionaryValue::Str(name.into())
             }),
-            EventPayload::DirectoryReady { name, .. } => Some(hashmap! {
+            // For the case of CapabilityRequested, if we are performing routing rather than
+            // validation, don't perform "name" checks in order to allow ambiguous match
+            // checking to be handled in stream.rs (which has access to the correct
+            // UseEventStreamDecl), whereas routing will match on a random decl in the case
+            // of duplicate names.
+            (EventPayload::CapabilityRequested { .. }, true) => return true,
+            (EventPayload::DirectoryReady { name, .. }, _) => Some(hashmap! {
                 "name".to_string() => DictionaryValue::Str(name.into())
             }),
             _ => None,

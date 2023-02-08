@@ -14,9 +14,10 @@ use {
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     },
     async_trait::async_trait,
-    cm_rust::{ComponentDecl, UseDecl},
+    cm_rust::{ComponentDecl, DictionaryValue, UseDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
+    routing::event::EventFilter,
     std::{
         collections::HashMap,
         sync::{Arc, Weak},
@@ -29,6 +30,8 @@ pub struct EventStreamAttachment {
     name: String,
     /// The server end of a component's event stream.
     server_end: Option<EventStream>,
+    /// The path of the attachment.
+    path: String,
 }
 
 /// An absolute path to a directory within a specified component.
@@ -104,20 +107,44 @@ impl EventStreamProvider {
         stream_name: String,
         subscription: EventSubscription,
         path: String,
+        filter: Option<HashMap<String, DictionaryValue>>,
     ) -> Result<(), ModelError> {
         let registry = self.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
-        let event_stream = registry.subscribe(subscriber, vec![subscription]).await?;
+        let mut event_stream = registry.subscribe(subscriber, vec![subscription]).await?;
         let subscriber_moniker = subscriber.extended_moniker();
-        let absolute_path = AbsolutePath { target_moniker: subscriber_moniker.clone(), path };
+        event_stream.filter = EventFilter::new(filter);
+        event_stream.subscriber = Some(subscriber_moniker.clone());
+        let absolute_path =
+            AbsolutePath { target_moniker: subscriber_moniker.clone(), path: path.clone() };
         let mut state = self.state.lock().await;
         let subscriptions =
             state.subscription_component_lookup.entry(subscriber_moniker.clone()).or_default();
         let path_list = subscriptions.entry(absolute_path).or_default();
         path_list.push(stream_name.clone());
         let event_streams = state.streams.entry(subscriber_moniker.clone()).or_default();
-        event_streams
-            .push(EventStreamAttachment { name: stream_name, server_end: Some(event_stream) });
+        event_streams.push(EventStreamAttachment {
+            name: stream_name,
+            server_end: Some(event_stream),
+            path,
+        });
         Ok(())
+    }
+
+    /// Takes a static event stream using a filter matching specified criteria for a given moniker.
+    /// Returns None if the stream has already been taken.
+    pub async fn take_static_event_stream_by_lambda(
+        &self,
+        target_moniker: &ExtendedMoniker,
+        filter_lambda: impl Fn(&EventStreamAttachment) -> bool,
+    ) -> Option<EventStream> {
+        let mut state = self.state.lock().await;
+        state
+            .streams
+            .get_mut(&target_moniker)
+            .and_then(|event_streams| {
+                event_streams.iter_mut().find(|attachment| filter_lambda(&**attachment))
+            })
+            .and_then(|attachment| attachment.server_end.take())
     }
 
     /// Returns the server end of the event stream with provided `name` associated with
@@ -128,14 +155,25 @@ impl EventStreamProvider {
         target_moniker: &ExtendedMoniker,
         stream_name: String,
     ) -> Option<EventStream> {
-        let mut state = self.state.lock().await;
-        state
-            .streams
-            .get_mut(&target_moniker)
-            .and_then(|event_streams| {
-                event_streams.iter_mut().find(|event_stream| event_stream.name == stream_name)
-            })
-            .and_then(|attachment| attachment.server_end.take())
+        self.take_static_event_stream_by_lambda(target_moniker, |event_stream| {
+            event_stream.name == stream_name
+        })
+        .await
+    }
+
+    /// Returns the server end of the event stream with provided `name` associated with
+    /// the component with the provided `target_moniker`. This method returns None if such a stream
+    /// does not exist or the channel has already been taken.
+    pub async fn take_static_event_stream_by_path(
+        &self,
+        target_moniker: &ExtendedMoniker,
+        stream_name: &str,
+        path: &str,
+    ) -> Option<EventStream> {
+        self.take_static_event_stream_by_lambda(target_moniker, |event_stream| {
+            event_stream.name == stream_name && event_stream.path == path
+        })
+        .await
     }
 
     async fn on_component_destroyed(self: &Arc<Self>, target_moniker: &AbsoluteMoniker) {
@@ -160,6 +198,7 @@ impl EventStreamProvider {
                         decl.source_name.to_string(),
                         EventSubscription { event_name: decl.source_name.clone() },
                         decl.target_path.to_string(),
+                        decl.filter.clone(),
                     )
                     .await?;
                 }

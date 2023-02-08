@@ -14,7 +14,10 @@ use {
                 stream::EventStream,
                 synthesizer::{EventSynthesisProvider, EventSynthesizer},
             },
-            hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
+            hooks::{
+                Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration,
+                TransferEvent,
+            },
             model::Model,
             routing::RouteSource,
         },
@@ -182,15 +185,27 @@ impl EventRegistry {
             ExtendedMoniker::ComponentInstance(target_moniker) => {
                 let route_result = self.route_events(&target_moniker, &event_names).await?;
                 // Each target name that we routed, will have an associated scope. The number of
-                // scopes must be equal to the number of target names.
+                // scopes must be equal to the number of target names, except in the case of
+                // capability_requested.
                 let total_scopes: usize =
                     route_result.mapping.values().map(|state| state.scopes.len()).sum();
+                // NOTE: This check is best-effort due to inaccurate results from routing
+                // when routing duplicate capability_requested events.
                 if total_scopes != event_names.len() {
-                    let names = event_names
-                        .into_iter()
-                        .filter(|event_name| !route_result.contains_event(&event_name))
-                        .collect();
-                    return Err(EventsError::not_available(names).into());
+                    if !(route_result
+                        .mapping
+                        .iter()
+                        .filter(|(name, _)| name.str() == "capability_requested")
+                        .next()
+                        .is_some()
+                        && total_scopes > event_names.len())
+                    {
+                        let names = event_names
+                            .into_iter()
+                            .filter(|event_name| !route_result.contains_event(&event_name))
+                            .collect();
+                        return Err(EventsError::not_available(names).into());
+                    }
                 }
                 route_result.to_vec()
             }
@@ -264,13 +279,25 @@ impl EventRegistry {
             }
         };
 
+        // This event is dispatchable ONLY IF we have a match on both scope and filter
+        // for the event. If no matches are found, the capability is kept by the VFS
+        // and dispatched normally.
+        let dispatchable =
+            dispatchers.iter().any(|dispatcher| dispatcher.find_scope(event, false).is_some());
+        if !dispatchable {
+            // No matches for scope, can't dispatch event (don't take the capability)
+            return;
+        }
+        // take the capability
+        let event = event.transfer().await;
+
         for dispatcher in &dispatchers {
             // A send can fail if the EventStream was dropped. We don't
             // crash the system when this happens. It is perfectly
             // valid for a EventStream to be dropped. That simply means
             // that the EventStream is no longer interested in future
             // events.
-            let _ = dispatcher.dispatch(event).await;
+            let _ = dispatcher.dispatch(&event).await;
         }
     }
 
