@@ -5,11 +5,10 @@
 #ifndef SYSROOT_ZIRCON_AVAILABILITY_H_
 #define SYSROOT_ZIRCON_AVAILABILITY_H_
 
-// TODO(https://fxbug.dev/104513) upstream clang support for HEAD
 // Emulate a "HEAD" API level since it is not supported directly by clang.
 // Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
 // so we define this as `((uint32_t)-1)`. clang expects API levels to be literals.
-#define FUCHSIA_HEAD 0xffffffff
+#define FUCHSIA_HEAD 4294967295
 
 #ifdef __Fuchsia_API_level__
 
