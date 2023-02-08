@@ -31,6 +31,17 @@ objects in the new C++ bindings.
 </thead>
 <tbody>
   <tr>
+    <td rowspan="2">Header include</td>
+    <td>C++</td>
+    <td>#include &lt;fidl/examples.keyvaluestore.baseline/cpp/fidl.h&gt;</td>
+    <td>Format is `fidl/library name/cpp/fidl.h`</td>
+  </tr>
+  <tr>
+    <td>HLCPP</td>
+    <td>#include &lt;examples/keyvaluestore/baseline/cpp/fidl.h&gt;</td>
+    <td>Format is `slash separated library name/cpp/fidl.h`</td>
+  </tr>
+  <tr>
     <td rowspan="2">The library</td>
     <td>C++</td>
     <td>::examples_keyvaluestore_baseline</td>
