@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -24,7 +25,6 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"
-	"go.uber.org/multierr"
 	"google.golang.org/api/iterator"
 )
 
@@ -181,10 +181,10 @@ func (cmd *downloadCmd) execute(ctx context.Context) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(&productBundleContainer); err != nil {
-		errs = multierr.Append(errs, err)
+		errs = errors.Join(errs, err)
 	}
 	if err := f.Close(); err != nil {
-		errs = multierr.Append(errs, err)
+		errs = errors.Join(errs, err)
 	}
 	return errs
 }
