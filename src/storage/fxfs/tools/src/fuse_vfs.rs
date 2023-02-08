@@ -17,21 +17,23 @@ use {
     futures as _,
     futures_util::stream::Iter,
     fxfs::{
+        filesystem::Filesystem,
         log::info,
-        object_handle::{ObjectHandle, WriteObjectHandle},
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
+            directory::{replace_child, ReplacedChild},
             transaction::{Options, TransactionHandler},
             ObjectDescriptor, Timestamp,
         },
     },
-    std::{ffi::OsStr, time::Duration, vec::IntoIter},
+    std::{ffi::OsStr, io::Write, time::Duration, vec::IntoIter},
 };
 
 /// The TTL duration of each reply.
 const TTL: Duration = Duration::from_secs(1);
 
-/// In the function parameters, request, mode and mask are not
-/// supported by Fxfs and hence they are ignored.
+/// Some of the function parameters (i.e., request, mode, mask, fh, flags and lock_owner)
+/// are not supported by Fxfs and hence are ignored.
 #[async_trait]
 impl FuseFilesystem for FuseFs {
     // Stream of directory entries without attributes.
@@ -108,6 +110,174 @@ impl FuseFilesystem for FuseFs {
             })
         } else {
             Err(libc::EEXIST.into())
+        }
+    }
+
+    /// Remove a file or symlink called `name` under `parent` directory.
+    /// Return Ok if the object is successfully removed.
+    /// Return ENOTDIR if `parent` is not a directory.
+    /// Return EISDIR if `name` is a directory under `parent`.
+    /// Return ENOENT if `name` is not found under `parent`.
+    async fn unlink(&self, _req: Request, parent: u64, name: &OsStr) -> Result<()> {
+        let parent = self.fuse_inode_to_object_id(parent);
+        info!("unlink (parent={:?}, name={:?})", parent, name);
+        let dir = self.open_dir(parent).await?;
+
+        if let Some((_, object_descriptor)) = dir.lookup(name.parse_str()?).await.parse_error()? {
+            if object_descriptor == ObjectDescriptor::File {
+                let mut transaction =
+                    self.fs.clone().new_transaction(&[], Options::default()).await.parse_error()?;
+                let replaced_child =
+                    replace_child(&mut transaction, None, (&dir, name.parse_str()?))
+                        .await
+                        .parse_error()?;
+                transaction.commit().await.parse_error()?;
+
+                // If the object is a file without remaining links,
+                // immediately tombstones it in the graveyard.
+                if let ReplacedChild::File(object_id) = replaced_child {
+                    self.fs
+                        .graveyard()
+                        .tombstone(dir.store().store_object_id(), object_id)
+                        .await
+                        .parse_error()?;
+                }
+
+                Ok(())
+            } else if object_descriptor == ObjectDescriptor::Symlink {
+                let mut transaction =
+                    self.fs.clone().new_transaction(&[], Options::default()).await.parse_error()?;
+                replace_child(&mut transaction, None, (&dir, name.parse_str()?))
+                    .await
+                    .parse_error()?;
+
+                transaction.commit().await.parse_error()?;
+                Ok(())
+            } else {
+                Err(libc::EISDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Read data from a file object with id `inode`,
+    /// which starts from `offset` with a length of `size`.
+    /// Return Ok with the read data if successful.
+    /// Return ENOENT if `inode` does not exist.
+    /// Return EISDIR if `inode` is a directory.
+    async fn read(
+        &self,
+        _req: Request,
+        inode: u64,
+        _fh: u64,
+        offset: u64,
+        size: u32,
+    ) -> Result<ReplyData> {
+        let inode = self.fuse_inode_to_object_id(inode);
+        info!("read (inode={:?}, offset={:?}, size={:?})", inode, offset, size);
+
+        if let Some(object_type) = self.get_object_type(inode).await? {
+            if object_type == ObjectDescriptor::File {
+                let handle = self.get_object_handle(inode).await?;
+                let mut out: Vec<u8> = Vec::new();
+                let align = offset % self.fs.block_size();
+
+                let mut buf = handle.allocate_buffer(handle.block_size() as usize);
+                // Round down for the block alignment.
+                let mut ofs = offset - align;
+                let len = size as u64 + align + ofs;
+
+                loop {
+                    let bytes = handle.read(ofs, buf.as_mut()).await.parse_error()?;
+                    if len - ofs > bytes as u64 {
+                        // Read `bytes` size of content from buf.
+                        ofs += bytes as u64;
+                        out.write_all(&buf.as_ref().as_slice()[..bytes])?;
+                        if bytes as u64 != handle.block_size() {
+                            break;
+                        }
+                    } else {
+                        // Read the remaining content from buf.
+                        out.write_all(&buf.as_ref().as_slice()[..(len - ofs) as usize])?;
+                        break;
+                    }
+                }
+                let out: Vec<u8> = if (align as usize) < out.len() {
+                    out.drain((align as usize)..).collect()
+                } else {
+                    vec![]
+                };
+
+                Ok(ReplyData { data: out.into() })
+            } else {
+                Err(libc::EISDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Write data into a file object with id `inode`, starting from `offset`.
+    /// Return Ok with the length of written data if successful.
+    /// Return EISDIR if `inode` is a directory.
+    /// Return ENOENT if `inode` does not exist.
+    async fn write(
+        &self,
+        _req: Request,
+        inode: u64,
+        _fh: u64,
+        offset: u64,
+        data: &[u8],
+        _flags: u32,
+    ) -> Result<ReplyWrite> {
+        let inode = self.fuse_inode_to_object_id(inode);
+        info!("write (inode={:?}, offset={:?}, data_len={:?})", inode, offset, data.len());
+
+        if let Some(object_type) = self.get_object_type(inode).await? {
+            if object_type == ObjectDescriptor::File {
+                let handle = self.get_object_handle(inode).await?;
+                let mut buf = handle.allocate_buffer(data.len());
+
+                buf.as_mut_slice().copy_from_slice(data);
+                handle.write_or_append(Some(offset), buf.as_ref()).await.parse_error()?;
+                handle.flush().await.parse_error()?;
+
+                Ok(ReplyWrite { written: data.len() as u32 })
+            } else {
+                Err(libc::EISDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Release an open file object with id `inode` to indicate its end of read or write.
+    /// Parameter `flush` is unused because data is flushed at every read/write.
+    /// Return OK and remove `inode`'s file type and handle from cache if successful.
+    /// Return EISDIR if `inode` is a directory.
+    /// Return ENOENT if `inode` does not exist.
+    async fn release(
+        &self,
+        _req: Request,
+        inode: u64,
+        _fh: u64,
+        _flags: u32,
+        _lock_owner: u64,
+        _flush: bool,
+    ) -> Result<()> {
+        let inode = self.fuse_inode_to_object_id(inode);
+        info!("release (inode={:?})", inode);
+
+        if let Some(object_type) = self.get_object_type(inode).await? {
+            if object_type == ObjectDescriptor::File {
+                // TODO(fxbug.dev/117461): Add cache support that removes object handle from cache.
+                Ok(())
+            } else {
+                Err(libc::EISDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
         }
     }
 
@@ -409,7 +579,7 @@ mod tests {
             raw::{Filesystem, Request},
             Errno, FileType, SetAttr, Timestamp,
         },
-        fxfs::object_store::ObjectDescriptor,
+        fxfs::{filesystem::Filesystem as FxFs, object_store::ObjectDescriptor},
         std::ffi::OsStr,
     };
 
@@ -417,6 +587,7 @@ mod tests {
     const DEFAULT_FLAG: u32 = 0;
     const DEFAULT_TIME: Timestamp = Timestamp { sec: 10i64, nsec: 20u32 };
     const INVALID_INODE: u64 = 0;
+    const TEST_DATA: &[u8] = b"hello";
 
     /// Create fake request for testing purpose.
     fn new_fake_request() -> Request {
@@ -590,6 +761,78 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_unlink_remove_file() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let file_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create file failed");
+        let unlink_res = fs.unlink(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
+        let lookup_res = dir.lookup(OsStr::new("foo").parse_str().unwrap()).await.unwrap();
+        let type_res =
+            fs.get_object_type(file_reply.attr.ino).await.expect("get_object_type failed");
+
+        assert_eq!(unlink_res, Ok(()));
+        assert_eq!(lookup_res, None);
+        assert_eq!(type_res, None);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_unlink_remove_symlink() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+        let symlin_reply = fs
+            .symlink(new_fake_request(), dir.object_id(), OsStr::new("link"), OsStr::new("foo"))
+            .await
+            .expect("symlink failed");
+
+        let unlink_res = fs.unlink(new_fake_request(), dir.object_id(), OsStr::new("link")).await;
+        let lookup_res = dir.lookup(OsStr::new("link").parse_str().unwrap()).await.unwrap();
+        let type_res =
+            fs.get_object_type(symlin_reply.attr.ino).await.expect("get_object_type failed");
+
+        assert_eq!(unlink_res, Ok(()));
+        assert_eq!(lookup_res, None);
+        assert_eq!(type_res, None);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_unlink_fails_when_object_is_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+        fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+
+        let unlink_res = fs.unlink(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
+        assert_eq!(unlink_res, Err(libc::EISDIR.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_unlink_fails_when_parent_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let unlink_res = fs.unlink(new_fake_request(), INVALID_INODE, OsStr::new("foo")).await;
+        assert_eq!(unlink_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
     async fn test_create_new_file() {
         let fs = FuseFs::new_in_memory().await;
         let dir = fs.root_dir().await.expect("root_dir failed");
@@ -713,6 +956,541 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_read_with_same_length_as_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_offset_smaller_than_block_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 1, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA[1..]);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_offset_equal_to_block_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(
+                new_fake_request(),
+                create_reply.attr.ino,
+                0,
+                fs.fs.block_size(),
+                TEST_DATA.len() as _,
+            )
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data.len(), 0);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_offset_larger_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 512, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data.len(), 0);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_smaller_length_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, (TEST_DATA.len() / 2) as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA[0..TEST_DATA.len() / 2]);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_non_zero_offset_and_length_smaller_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 1, (TEST_DATA.len() / 2) as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA[1..TEST_DATA.len() / 2 + 1]);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_length_larger_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, (TEST_DATA.len() * 2) as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_non_zero_offset_and_length_larger_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        fs.write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 1, (TEST_DATA.len() * 2) as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA[1..]);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_when_file_is_empty() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data.len(), 0);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_fails_when_file_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let read_res = fs.read(new_fake_request(), INVALID_INODE, 0, 0, TEST_DATA.len() as _).await;
+        assert_eq!(read_res.is_err(), true);
+        let err: Errno = libc::ENOENT.into();
+        assert_eq!(read_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_fails_when_object_is_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let read_res =
+            fs.read(new_fake_request(), mkdir_reply.attr.ino, 0, 0, TEST_DATA.len() as _).await;
+        assert_eq!(read_res.is_err(), true);
+        let err: Errno = libc::EISDIR.into();
+        assert_eq!(read_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_to_file() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data, TEST_DATA);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_with_offset_smaller_than_file_size_and_file_size_unchanged() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 1, b"aa", DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, 2u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"haalo";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_with_offset_smaller_than_file_size_and_file_size_changed() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 4, b"aaa", DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, 3u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, (TEST_DATA.len() + 2) as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"hellaaa";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_with_offset_equal_to_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 5, b"aaa", DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, 3u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, (TEST_DATA.len() + 3) as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"helloaaa";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_with_offset_larger_than_file_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 6, b"aaa", DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, 3u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, (TEST_DATA.len() + 4) as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"hello\0aaa";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_when_file_is_empty() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, b"", DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, 0u32);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        assert_eq!(read_reply.data.len(), 0);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_fails_when_file_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let write_res =
+            fs.write(new_fake_request(), INVALID_INODE, 0, 0, TEST_DATA, DEFAULT_FLAG).await;
+        assert_eq!(write_res.is_err(), true);
+        let err: Errno = libc::ENOENT.into();
+        assert_eq!(write_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_write_fails_when_object_is_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let write_res =
+            fs.write(new_fake_request(), mkdir_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG).await;
+        assert_eq!(write_res.is_err(), true);
+        let err: Errno = libc::EISDIR.into();
+        assert_eq!(write_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
     async fn test_getattr_on_directory() {
         let fs = FuseFs::new_in_memory().await;
         let dir = fs.root_dir().await.expect("root_dir failed");
@@ -829,6 +1607,126 @@ mod tests {
             .await
             .expect("setattr failed");
         assert_eq!(setattr_reply.attr.mtime, DEFAULT_TIME);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_setattr_on_file_with_zero_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+        let mut set_attr = SetAttr::default();
+        set_attr.size = Some(0u64);
+
+        let setattr_reply = fs
+            .setattr(new_fake_request(), create_reply.attr.ino, Some(0), set_attr)
+            .await
+            .expect("setattr failed");
+        assert_eq!(setattr_reply.attr.size, 0);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_setattr_on_file_with_shrinked_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+        let mut set_attr = SetAttr::default();
+        set_attr.size = Some(2u64);
+
+        let setattr_reply = fs
+            .setattr(new_fake_request(), create_reply.attr.ino, Some(0), set_attr)
+            .await
+            .expect("setattr failed");
+        assert_eq!(setattr_reply.attr.size, 2);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"he";
+        assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_setattr_on_file_with_increased_size() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+
+        let write_reply = fs
+            .write(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA, DEFAULT_FLAG)
+            .await
+            .expect("write failed");
+        assert_eq!(write_reply.written, TEST_DATA.len() as u32);
+        let mut set_attr = SetAttr::default();
+        set_attr.size = Some(8u64);
+
+        let setattr_reply = fs
+            .setattr(new_fake_request(), create_reply.attr.ino, Some(0), set_attr)
+            .await
+            .expect("setattr failed");
+        assert_eq!(setattr_reply.attr.size, 8);
+
+        let read_reply = fs
+            .read(new_fake_request(), create_reply.attr.ino, 0, 0, TEST_DATA.len() as _)
+            .await
+            .expect("read failed");
+        let result_data: &[u8] = b"hello";
+        assert_eq!(read_reply.data, result_data);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
