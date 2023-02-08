@@ -8,3 +8,10 @@ pub mod ops;
 
 // A set of helper functions for performing golden image generation and validation.
 pub mod golden;
+
+// The implementation of the FUSE prototype to mount Fxfs in Linux.
+#[cfg(target_os = "linux")]
+pub mod fuse_fs;
+
+#[cfg(target_os = "linux")]
+pub mod fuse_vfs;

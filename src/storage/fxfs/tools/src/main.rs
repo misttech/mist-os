@@ -16,6 +16,14 @@ use {
     tools::ops,
 };
 
+#[cfg(target_os = "linux")]
+use {
+    fuse3::{raw::prelude::Session, MountOptions},
+    libc,
+    tokio::runtime::Runtime,
+    tools::fuse_fs::FuseFs,
+};
+
 #[derive(FromArgs, PartialEq, Debug)]
 /// fxfs
 struct TopLevel {
@@ -32,6 +40,12 @@ enum SubCommand {
     ImageEdit(ImageEditCommand),
     CreateGolden(CreateGoldenSubCommand),
     CheckGolden(CheckGoldenSubCommand),
+    #[cfg(target_os = "linux")]
+    RunInMemoryFuse(InMemoryFuseSubCommand),
+    #[cfg(target_os = "linux")]
+    CreateFileFuse(CreateFileFuseSubCommand),
+    #[cfg(target_os = "linux")]
+    OpenFileFuse(OpenFileFuseSubCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -133,6 +147,42 @@ struct RmdirSubCommand {
 #[argh(subcommand, name = "create_golden")]
 struct CreateGoldenSubCommand {}
 
+#[cfg(target_os = "linux")]
+#[derive(FromArgs, PartialEq, Debug)]
+/// Mount the filesystem on Linux using in-memory device.
+#[argh(subcommand, name = "in_memory_fuse")]
+struct InMemoryFuseSubCommand {
+    #[argh(positional)]
+    /// path to the mounted directory.
+    path: String,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(FromArgs, PartialEq, Debug)]
+/// Mount the filesystem on Linux by creating a new file-backed device.
+#[argh(subcommand, name = "create_file_fuse")]
+struct CreateFileFuseSubCommand {
+    #[argh(positional)]
+    /// path to the mounted directory.
+    mount_path: String,
+    #[argh(positional)]
+    /// path to the file-backed device.
+    device_path: String,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(FromArgs, PartialEq, Debug)]
+/// Mount the filesystem on Linux by opening an existing file-backed device.
+#[argh(subcommand, name = "open_file_fuse")]
+struct OpenFileFuseSubCommand {
+    #[argh(positional)]
+    /// path to the mounted directory.
+    mount_path: String,
+    #[argh(positional)]
+    /// path to the file-backed device.
+    device_path: String,
+}
+
 #[derive(FromArgs, PartialEq, Debug)]
 /// Check all golden images at current filesystem version.
 #[argh(subcommand, name = "check_golden")]
@@ -142,7 +192,7 @@ struct CheckGoldenSubCommand {
     images_dir: Option<String>,
 }
 
-#[fuchsia::main(threads = 10)]
+#[fuchsia::main(threads = 2)]
 async fn main() -> Result<(), Error> {
     tracing::debug!("fxfs {:?}", std::env::args());
 
@@ -250,5 +300,82 @@ async fn main() -> Result<(), Error> {
         }
         SubCommand::CreateGolden(_) => tools::golden::create_image().await,
         SubCommand::CheckGolden(args) => tools::golden::check_images(args.images_dir).await,
+        #[cfg(target_os = "linux")]
+        SubCommand::RunInMemoryFuse(args) => run_in_memory_fuse(args.path),
+        #[cfg(target_os = "linux")]
+        SubCommand::CreateFileFuse(args) => run_file_fuse_create(args.mount_path, args.device_path),
+        #[cfg(target_os = "linux")]
+        SubCommand::OpenFileFuse(args) => run_file_fuse_open(args.mount_path, args.device_path),
     }
+}
+
+/// Run FUSE-Fxfs with a fake in-memory device.
+/// This is used for running unit tests for FUSE-Fxfs.
+#[cfg(target_os = "linux")]
+fn run_in_memory_fuse(path: String) -> Result<(), Error> {
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+
+        let mut mount_options = MountOptions::default();
+        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+
+        let fs = FuseFs::new_in_memory().await;
+
+        Session::new(mount_options).mount_with_unprivileged(fs, path).await.unwrap().await.unwrap();
+    });
+
+    Ok(())
+}
+
+/// Run FUSE-Fxfs by creating a new file-backed device.
+#[cfg(target_os = "linux")]
+fn run_file_fuse_create(mount_path: String, device_path: String) -> Result<(), Error> {
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+
+        let mut mount_options = MountOptions::default();
+        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+
+        let fs = FuseFs::new_file_backed(device_path.as_str()).await;
+
+        Session::new(mount_options)
+            .mount_with_unprivileged(fs, mount_path)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    Ok(())
+}
+
+/// Run FUSE-Fxfs by opening an existing file-backed device.
+#[cfg(target_os = "linux")]
+fn run_file_fuse_open(mount_path: String, device_path: String) -> Result<(), Error> {
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+
+        let mut mount_options = MountOptions::default();
+        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+
+        let fs = FuseFs::open_file_backed(device_path.as_str()).await;
+
+        Session::new(mount_options)
+            .mount_with_unprivileged(fs, mount_path)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    Ok(())
 }
