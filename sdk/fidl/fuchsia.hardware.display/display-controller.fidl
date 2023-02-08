@@ -190,20 +190,7 @@ type ClientCompositionOp = struct {
     opcode ClientCompositionOpcode;
 };
 
-type DisplayFence = resource struct {
-    /// The internal event object to signal.
-    event zx.handle:EVENT;
-
-    /// A bitmap indicating the scope of displays the event will affect.
-    /// Each bit in `displays` represents a display in an array defined
-    /// elsewhere (e.g. for ApplyConfig2(), the array is `display_ids`.)
-    displays uint64;
-};
-
-/// Maximum number of `displays` supported in an ApplyConfig2() call.
-const APPLY_CONFIG_MAX_DISPLAYS uint64 = 32;
-
-/// Maximum number of `signal_fences` supported in an ApplyConfig2() call.
+/// Maximum number of fences supported by ApplyConfig2().
 const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
 
 /// Each set of configurations in ApplyConfig() call corresponds to a
@@ -619,34 +606,36 @@ protocol Controller {
     /// Applies any pending changes to the current configuration. This will
     /// not apply pending changes to layers which are not on any display.
     ///
-    /// For each `event` in `signal_fences`, once the pending configuration is
-    /// applied to and contents are displayed on all the displays in its
-    /// `displays` bitmap, the fence signal will be signaled immediately.
+    /// For each event in `signal_fences`, once the pending configuration is
+    /// applied to and contents are displayed on all the displays connected to
+    /// the Controller, it will be signaled immediately.
     ///
     /// Arguments
     ///
-    ///   `display_ids`:
-    ///     Lists all display IDs which are used on the incoming configuration.
-    ///     Each display ID represents the corresponding bit in the `display`
-    ///     field of `signal_fences`.
-    ///
     ///   `signal_fences`:
     ///     Stores all fence events that will be signaled once the configuration
-    ///     is applied and display scopes of each event. See the definition of
-    ///     `DisplayFences` for details.
+    ///     is applied.
     ///
     /// Error handling
     ///
     ///     If the input is invalid, for example:
     ///         - `signal_fences` contains invalid events
-    ///         - `display` has bits referring to display ID `INVALID_DISP_ID`.
     ///     or the pending configuration cannot be applied, this call will
     ///     silently fail, so the client should ensure its configuration is
     ///     valid with CheckConfig().
+    //
+    // TODO(fxbug.dev/121265): The current ApplyConfig2() API could cause delay
+    // when there are multiple displays with different refresh rates and vsync
+    // phases. In order to better support multiple displays, we should support
+    // fences to be signaled when configuration is applied to a subset of
+    // displays.
+    //
+    // TODO(fxbug.dev/121340): `signal_fences` should be renamed. The field
+    // should be named to better indicate the timing and semantics when it is
+    // signaled by the display driver.
     @transitional
     ApplyConfig2(resource struct {
-        display_ids vector<uint64>:APPLY_CONFIG_MAX_DISPLAYS;
-        signal_fences vector<DisplayFence>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
+        signal_fences vector<zx.handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
     });
 
     // Sets whether or not vsync events will be given to this client. Defaults
