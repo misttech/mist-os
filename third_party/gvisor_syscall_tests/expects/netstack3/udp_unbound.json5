@@ -1,0 +1,75 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                "IPv4Sockets/*",
+
+                // Netstack3-produced entries for getifaddrs() do not all have interface
+                // names.
+                "IPv4UDPUnboundSockets/IPv4UDPUnboundExternalNetworkingSocketTest.*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // Netstack3 does not support SO_REUSEADDR and only partially supports
+                // SO_REUSEPORT for UDP sockets.
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReuseAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable1/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable2/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReuseAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrDistribution/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/*",
+
+                // Netstack3 does not have complete support for multicast UDP sockets.
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddrNoDefaultSendIf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelfConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelfNoLoop/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNic/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfNoLoop/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNicNoDefaultSendIf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestTwoSocketsJoinSameMulticastGroup/*",
+
+                // Uncategorized
+                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBuf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBuf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufAboveMax/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufBelowMin/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenReceive/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenSend/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenJoinThenReceive/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenNoJoinThenNoReceive/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionOnTwoSockets/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionWhenDroppingMemberships/*",
+                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.IPv6PacketInfo/*",
+                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
+            ],
+        },
+    ],
+}
