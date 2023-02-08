@@ -8,7 +8,7 @@ image. The correct driver will be built and loaded based on the
 [board](/docs/development/build/build_system/boards_and_products.md) that is selected
 when building.
 
-### Add Vulkan driver support
+### Component manifest
 
 Include the following to enable access to the Vulkan driver:
 
@@ -21,35 +21,16 @@ Include the following to enable access to the Vulkan driver:
     include: [
       "vulkan/client.shard.cml"
     ],
-    ...
-  }
-  ```
-
-### Out of tree runtime dependencies
-
-For components built outside the Fuchsia tree or otherwise can't include the
-above shards, include the following:
-
-- {CML}
-
-  For components declared using a [.cml][cml] manifest:
-
-  ```json5
-  {
-    include: [
-      "vulkan/client.shard.cml"
+    use: [
+        { protocol: "fuchsia.media.ProfileProvider" },
     ],
     ...
   }
   ```
 
-  The `fuchsia.tracing.provider.Registry` service may optionally be included to
-  allow the client driver to report [trace events](/docs/concepts/kernel/tracing-system.md).
-  `fuchsia.logger.LogSink` is also
-  recommended to allow logs from the client driver to appear in the [system
-  log](/docs/development/diagnostics/logs/viewing.md).
+The `fuchsia.media.ProfileProvider` capability optional, but recommended.
 
-### Required capabilities
+### Required capability routes
 
 A component that uses Vulkan must have these FIDL services routed to it:
 
@@ -73,10 +54,17 @@ Test components can use the [vulkan_envs][vulkan_envs]
 support.
 
 ## Buildtime dependencies
+### In-tree builds
 
-In order for your project to access the Vulkan headers, and to link against the Vulkan loader libvulkan.so, add the following GN dependency:
+In-tree code should depend on `//src/lib/vulkan` to be able to include the vulkan headers and link against `libvulkan.so`.
 
-`//src/lib/vulkan`
+Other useful targets:
+
+- `//src/lib/vulkan:vulkan_validation_layers`: Needed to be able to enable the [Vulkan validation layers][validation-layers].
+
+### SDK clients
+
+Code using the [Bazel SDK][bazel-sdk] should depend on `@fuchsia_sdk//pkg/vulkan`.
 
 ## Rendering onscreen
 
@@ -146,3 +134,5 @@ Again, may be an application error or driver bug. If you believe your app is inn
 [cml]: /docs/concepts/components/v2/component_manifests.md
 [environment]: /docs/contribute/testing/environments.md
 [vulkan_envs]: /src/lib/vulkan/vulkan.gni
+[bazel-sdk]: /docs/get-started/sdk/index.md
+[validation-layers]: https://github.com/KhronosGroup/Vulkan-ValidationLayers
