@@ -227,7 +227,6 @@ hlcpp_visibility = [
   "//src/media/audio/drivers/aml-g12-tdm/*",
   "//src/media/audio/drivers/dai-test:*",
   "//src/media/audio/drivers/test:*",
-  "//src/media/audio/examples/fx:*",
   "//src/media/audio/examples/simple_capture:*",
   "//src/media/audio/examples/simple_sine:*",
   "//src/media/audio/examples/sync_sine:*",
