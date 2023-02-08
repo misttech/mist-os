@@ -197,6 +197,7 @@ impl UnixSocket {
             server.address = listener.address.clone();
             server.messages.set_capacity(listener.messages.capacity())?;
             server.credentials = listener.credentials.clone();
+            server.passcred = listener.passcred;
         }
 
         // We already checked that the socket is in Listening state...but the borrow checker cannot
