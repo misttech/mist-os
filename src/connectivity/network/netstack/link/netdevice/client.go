@@ -8,6 +8,7 @@ package netdevice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/bits"
@@ -23,7 +24,6 @@ import (
 
 	"fidl/fuchsia/hardware/network"
 
-	"go.uber.org/multierr"
 	"gvisor.dev/gvisor/pkg/bufferv2"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -335,7 +335,7 @@ func (p *Port) Close() error {
 		}
 	}()
 
-	return multierr.Combine(p.port.Close(), p.watcher.Close(), err, detachErr)
+	return errors.Join(p.port.Close(), p.watcher.Close(), err, detachErr)
 }
 
 func (c *Client) processRxDescriptor(descriptorIndex uint16) {
@@ -570,7 +570,7 @@ func (c *Client) Close() error {
 
 	// NB: descriptors and data VMOs are closed only after all the goroutines
 	// in Run are closed to prevent data races.
-	return multierr.Combine(err, c.data.Close(), c.descriptors.Close())
+	return errors.Join(err, c.data.Close(), c.descriptors.Close())
 }
 
 func (c *Client) closeInner() (chan struct{}, error) {
@@ -584,7 +584,7 @@ func (c *Client) closeInner() (chan struct{}, error) {
 		ports := c.mu.ports
 		c.mu.ports = nil
 
-		return c.mu.runningChan, ports, multierr.Combine(
+		return c.mu.runningChan, ports, errors.Join(
 			c.device.Close(),
 			// Session also has a Close method, make sure we're calling the ChannelProxy
 			// one.
@@ -595,7 +595,7 @@ func (c *Client) closeInner() (chan struct{}, error) {
 	}()
 
 	for _, port := range ports {
-		err = multierr.Append(err, port.Close())
+		err = errors.Join(err, port.Close())
 	}
 
 	return runningChan, err

@@ -98,7 +98,6 @@ go_library("pprof") {
     "//src/connectivity/network/netstack/inspect/vmobuffer",
     "//src/lib/component",
     "//src/lib/syslog/go",
-    "//third_party/golibs:go.uber.org/multierr",
   ]
 }
 

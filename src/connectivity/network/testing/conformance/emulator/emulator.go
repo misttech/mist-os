@@ -6,13 +6,13 @@ package emulator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/util"
 	"go.fuchsia.dev/fuchsia/tools/emulator"
 	fvdpb "go.fuchsia.dev/fuchsia/tools/virtual_device/proto"
-	"go.uber.org/multierr"
 )
 
 // QemuInstance is a live instance of Fuchsia running in QEMU.
@@ -59,7 +59,9 @@ func NewQemuInstance(
 	}
 
 	// We don't need the distro after we've created and started the emulator Instance.
-	defer multierr.AppendInvoke(&err, multierr.Invoke(distro.Delete))
+	defer func() {
+		err = errors.Join(err, distro.Delete())
+	}()
 
 	arch, err := distro.TargetCPU()
 	if err != nil {

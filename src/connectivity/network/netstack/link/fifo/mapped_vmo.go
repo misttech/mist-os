@@ -7,12 +7,11 @@
 package fifo
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"syscall/zx"
 	"unsafe"
-
-	"go.uber.org/multierr"
 )
 
 // MappedVMO own a VMO and its mapping into process memory. It provides common
@@ -58,12 +57,12 @@ func NewMappedVMO(size uint64, name string) (MappedVMO, zx.VMO, error) {
 		return MappedVMO{}, zx.VMO(zx.HandleInvalid), err
 	}
 	if err := vmo.Handle().SetProperty(zx.PropName, []byte(name)); err != nil {
-		err = multierr.Append(err, vmo.Close())
+		err = errors.Join(err, vmo.Close())
 		return MappedVMO{}, zx.VMO(zx.HandleInvalid), err
 	}
 	mappedVmo, err := MapVMO(vmo)
 	if err != nil {
-		err = multierr.Append(err, vmo.Close())
+		err = errors.Join(err, vmo.Close())
 		return MappedVMO{}, zx.VMO(zx.HandleInvalid), err
 	}
 	return mappedVmo, vmo, nil

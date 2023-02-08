@@ -9,7 +9,6 @@ if (is_host) {
     sources = [ "ffx.go" ]
     deps = [
       "//src/connectivity/network/testing/conformance/util",
-      "//third_party/golibs:go.uber.org/multierr",
       "//tools/lib/ffxutil",
     ]
     testonly = true

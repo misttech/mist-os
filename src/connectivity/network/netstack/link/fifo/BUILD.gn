@@ -6,10 +6,7 @@ import("//build/components.gni")
 import("//build/go/go_library.gni")
 
 go_library("fifo") {
-  deps = [
-    "//third_party/golibs:go.uber.org/multierr",
-    "//third_party/golibs:gvisor.dev/gvisor",
-  ]
+  deps = [ "//third_party/golibs:gvisor.dev/gvisor" ]
 
   sources = [
     "mapped_vmo.go",

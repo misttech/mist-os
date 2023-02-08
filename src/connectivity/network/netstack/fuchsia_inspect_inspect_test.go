@@ -8,6 +8,7 @@ package netstack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"go.uber.org/multierr"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/arp"
@@ -53,11 +53,11 @@ func checkInspectRecurse(node inspectInner, expected inspectNodeExpectation) err
 	nodeData := node.ReadData()
 
 	if nodeData.Name != expected.node.Name {
-		err = multierr.Append(err, fmt.Errorf("found unexpected name %s instead of %s", nodeData.Name, expected.node.Name))
+		err = errors.Join(err, fmt.Errorf("found unexpected name %s instead of %s", nodeData.Name, expected.node.Name))
 	}
 
 	if diff := cmp.Diff(expected.node.Properties, nodeData.Properties, cmpopts.IgnoreUnexported(inspect.Object{}, inspect.Metric{})); diff != "" {
-		err = multierr.Append(err, fmt.Errorf("Properties mismatch (-want +got):\n%s", diff))
+		err = errors.Join(err, fmt.Errorf("Properties mismatch (-want +got):\n%s", diff))
 	}
 
 	containsMetric := func(metrics []inspect.Metric, metricToFind inspect.Metric) bool {
@@ -72,13 +72,13 @@ func checkInspectRecurse(node inspectInner, expected inspectNodeExpectation) err
 
 	for _, metric := range nodeData.Metrics {
 		if metric.Value != inspect.MetricValueWithUintValue(0) && !containsMetric(expected.node.Metrics, metric) {
-			err = multierr.Append(err, fmt.Errorf("ReadData() mismatch: found unexpected non-zero metric %#v", metric))
+			err = errors.Join(err, fmt.Errorf("ReadData() mismatch: found unexpected non-zero metric %#v", metric))
 		}
 	}
 
 	for _, metric := range expected.node.Metrics {
 		if !containsMetric(nodeData.Metrics, metric) {
-			err = multierr.Append(err, fmt.Errorf("ReadData() mismatch: missing expected non-zero metric %#v", metric))
+			err = errors.Join(err, fmt.Errorf("ReadData() mismatch: missing expected non-zero metric %#v", metric))
 		}
 	}
 
@@ -92,19 +92,19 @@ func checkInspectRecurse(node inspectInner, expected inspectNodeExpectation) err
 	if diff := cmp.Diff(expectedChildrenNames, children, cmpopts.SortSlices(func(a, b string) bool {
 		return a < b
 	})); diff != "" {
-		err = multierr.Append(err, fmt.Errorf("ListChildren() mismatch (-want +got):\n%s", diff))
+		err = errors.Join(err, fmt.Errorf("ListChildren() mismatch (-want +got):\n%s", diff))
 	}
 
 	childName := "not a real child"
 	if child := node.GetChild(childName); child != nil {
-		err = multierr.Append(err, fmt.Errorf("got GetChild(%s) = %s, want = nil", childName, child))
+		err = errors.Join(err, fmt.Errorf("got GetChild(%s) = %s, want = nil", childName, child))
 	}
 
 	for i, childName := range expectedChildrenNames {
 		if child := node.GetChild(childName); child != nil {
-			err = multierr.Append(err, checkInspectRecurse(child, expected.children[i]))
+			err = errors.Join(err, checkInspectRecurse(child, expected.children[i]))
 		} else {
-			err = multierr.Append(err, fmt.Errorf("got GetChild(%s) = nil, want non-nil", childName))
+			err = errors.Join(err, fmt.Errorf("got GetChild(%s) = nil, want non-nil", childName))
 		}
 	}
 	return err

@@ -16,7 +16,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
-	"go.uber.org/multierr"
 )
 
 type FfxInstance struct {
@@ -133,7 +132,7 @@ func (f *FfxInstance) Close() error {
 
 	err := f.Stop()
 	if f.iOwnOutputDir {
-		multierr.AppendInto(&err, os.RemoveAll(f.outputDir))
+		err = errors.Join(err, os.RemoveAll(f.outputDir))
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -181,7 +180,7 @@ func (f *FfxInstance) CreateStdoutStderrTempFiles() (*os.File, *os.File, error) 
 
 	stderr, err := ioutil.TempFile(f.outputDir, "ffx-stderr-*.log")
 	if err != nil {
-		return nil, nil, multierr.Combine(err, stdout.Close())
+		return nil, nil, errors.Join(err, stdout.Close())
 	}
 
 	f.SetStdoutStderr(stdout, stderr)
