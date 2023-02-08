@@ -1,0 +1,55 @@
+# Example Mobly Test execution
+
+## Set up
+1. Configure example test to be built.
+```shell
+$ fx set core.qemu-x64 --with-host //src/testing/end_to_end/examples:hello_world_test
+```
+
+2. Ensure testbeds are detected on host
+```shell
+
+# (optional) - If the DUT can be emulated, start an emulator via ffx.
+$ ffx emu start --net tap --headless
+
+$ ffx target list
+NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
+fuchsia-emulator    <unknown>    core.qemu-x64    Product    [fe80::3373:a179:8b4:b9bc%qemu]    Y
+````
+
+
+## Local mode
+The majority of users will be using this local test execution method for test
+development.
+```shell
+$ fx test //src/testing/end_to_end/examples:hello_world_test --e2e --output
+```
+
+## Infra mode
+This method of execution is atypical and is only documented for the special case
+of debugging and developing the infra_driver.InfraDriver() implementation which
+most Mobly test owners will not need to know about.
+
+In order to run a Mobly test locally as if it was executing in Fuchsia's lab
+infrastructure, simply set the `FUCHSIA_TESTBED_CONFIG` environment variable to
+point to a handcrafted `botanist.json` file.
+
+```shell
+$ FUCHSIA_TESTBED_CONFIG=<PATH_TO_BOTANIST_JSON> FUCHSIA_TEST_OUTDIR=/tmp fx test //src/testing/end_to_end/examples:hello_world_test --e2e --output
+````
+
+### Example `botanist.json` file
+
+The exact schema of `targetInfo` is defined in //tools/botanist/cmd/run.go.
+
+```json
+[
+    {
+       "nodename":"fuchsia-54b2-030e-eb19",
+       "ipv4":"192.168.42.112",
+       "ipv6":"",
+       "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
+       "ssh_key":"/etc/botanist/keys/pkey_infra"
+    }
+]
+```

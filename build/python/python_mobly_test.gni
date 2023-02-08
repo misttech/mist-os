@@ -14,7 +14,7 @@ import("//build/testing/host_test_data.gni")
 #
 # Example
 # ```
-# python_host_e2e_test("hello_world_test") {
+# python_mobly_test("hello_world_test") {
 #   main_source = "my_mobly_test.py"
 #   sources = [
 #     "test_helpers_foo.py",

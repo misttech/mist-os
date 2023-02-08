@@ -1,0 +1,34 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/host_test_data.gni")
+
+if (is_host) {
+  # Define a Mobly `fuchsia_device` module.
+  python_library("fuchsia_device") {
+    source_root = "."
+    sources = [ "fuchsia_device.py" ]
+  }
+
+  python_mobly_test("hello_world_test") {
+    main_source = "hello_world_test.py"
+    sources = [ "fuchsia_device.py" ]
+
+    libraries = [ ":fuchsia_device" ]
+
+    params_source = "params.yaml"
+    local_config_source = "local_mobly_config.yaml"
+
+    # Used for infra Swarming bot allocation.
+    environments = [
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+      },
+    ]
+  }
+}
