@@ -99,9 +99,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//src/sys/startup",
     "//src/ui/backlight/bin/backlight",
     "//src/ui/backlight/tests:backlight-test",
-    "//src/ui/bin/hardware_display_controller_provider/fake:bin",
-    "//src/ui/bin/hardware_display_controller_provider/fake:lib",
-    "//src/ui/bin/hardware_display_controller_provider/fake/tests:unittests",
   ]
 }
 
