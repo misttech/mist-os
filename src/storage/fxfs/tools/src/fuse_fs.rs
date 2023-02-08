@@ -5,11 +5,12 @@
 use {
     crate::{
         fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr},
-        fuse_errors::FuseErrorParser,
+        fuse_errors::FxfsResult,
     },
     event_listener::Event,
-    fuse3::{raw::prelude::*, Result},
+    fuse3::raw::prelude::*,
     fxfs::{
+        errors::FxfsError,
         filesystem::{FxFilesystem, OpenFxFilesystem},
         log::info,
         object_handle::{GetProperties, ObjectProperties},
@@ -115,7 +116,7 @@ impl FuseFs {
         let default_store = root_volume
             .volume(DEFAULT_VOLUME_NAME, crypt.clone())
             .await
-            .expect("default_store failed");
+            .expect("failed to open default store");
 
         Self { fs, default_store }
     }
@@ -127,7 +128,7 @@ impl FuseFs {
         let default_store = root_volume
             .volume(DEFAULT_VOLUME_NAME, crypt.clone())
             .await
-            .expect("default_store failed");
+            .expect("failed to open default store");
 
         Self { fs, default_store }
     }
@@ -158,22 +159,20 @@ impl FuseFs {
     }
 
     /// Get the object store of Fxfs's root directory.
-    pub async fn root_dir(&self) -> Result<Directory<ObjectStore>> {
-        Directory::open(&self.default_store, self.default_store.root_directory_object_id())
-            .await
-            .parse_error()
+    pub async fn root_dir(&self) -> FxfsResult<Directory<ObjectStore>> {
+        Directory::open(&self.default_store, self.default_store.root_directory_object_id()).await
     }
 
     /// Open the directory with specified object id.
-    pub async fn open_dir(&self, object_id: u64) -> Result<Directory<ObjectStore>> {
-        Directory::open(&self.default_store, object_id).await.parse_error()
+    pub async fn open_dir(&self, object_id: u64) -> FxfsResult<Directory<ObjectStore>> {
+        Directory::open(&self.default_store, object_id).await
     }
 
     /// Get the handle of an object with specified id.
     pub async fn get_object_handle(
         &self,
         object_id: u64,
-    ) -> Result<Arc<StoreObjectHandle<ObjectStore>>> {
+    ) -> FxfsResult<Arc<StoreObjectHandle<ObjectStore>>> {
         let handle = Arc::new(
             ObjectStore::open_object(
                 &self.default_store,
@@ -181,8 +180,7 @@ impl FuseFs {
                 HandleOptions::default(),
                 None,
             )
-            .await
-            .parse_error()?,
+            .await?,
         );
 
         Ok(handle)
@@ -193,22 +191,22 @@ impl FuseFs {
         &self,
         object_id: u64,
         object_type: ObjectDescriptor,
-    ) -> Result<ObjectProperties> {
+    ) -> FxfsResult<ObjectProperties> {
         if object_type == ObjectDescriptor::File {
             let handle = self.get_object_handle(object_id).await?;
-            handle.get_properties().await.parse_error()
+            handle.get_properties().await
         } else if object_type == ObjectDescriptor::Directory {
             let dir = self.open_dir(object_id).await?;
-            dir.get_properties().await.parse_error()
+            dir.get_properties().await
         } else {
             panic!("Invalid input object type");
         }
     }
 
     /// Get the type of an object with specified id.
-    pub async fn get_object_type(&self, object_id: u64) -> Result<Option<ObjectDescriptor>> {
-        let object_result =
-            self.default_store.tree().find(&ObjectKey::object(object_id)).await.parse_error()?;
+    pub async fn get_object_type(&self, object_id: u64) -> FxfsResult<Option<ObjectDescriptor>> {
+        let object_result = self.default_store.tree().find(&ObjectKey::object(object_id)).await?;
+
         if let Some(object) = object_result {
             match object.value {
                 ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. } => {
@@ -220,12 +218,8 @@ impl FuseFs {
                 _ => Ok(None),
             }
         } else {
-            if let Some(symlink) = self
-                .default_store
-                .tree()
-                .find(&ObjectKey::symlink(object_id))
-                .await
-                .parse_error()?
+            if let Some(symlink) =
+                self.default_store.tree().find(&ObjectKey::symlink(object_id)).await?
             {
                 if symlink.value != ObjectValue::None {
                     return Ok(Some(ObjectDescriptor::Symlink));
@@ -240,7 +234,7 @@ impl FuseFs {
         &self,
         object_id: u64,
         object_type: ObjectDescriptor,
-    ) -> Result<FileAttr> {
+    ) -> FxfsResult<FileAttr> {
         match object_type {
             ObjectDescriptor::Directory => {
                 let properties = self.get_object_properties(object_id, object_type.clone()).await?;
@@ -261,7 +255,16 @@ impl FuseFs {
                     properties.refs as u32,
                 ))
             }
-            ObjectDescriptor::Volume => Err(libc::ENOSYS.into()),
+            // Volume attributes are treated as directory attributes.
+            ObjectDescriptor::Volume => {
+                let properties = self.get_object_properties(object_id, object_type.clone()).await?;
+                Ok(create_dir_attr(
+                    object_id,
+                    properties.data_attribute_size,
+                    properties.creation_time,
+                    properties.modification_time,
+                ))
+            }
             ObjectDescriptor::Symlink => {
                 Ok(create_symlink_attr(object_id, Timestamp::now(), Timestamp::now()))
             }
@@ -270,16 +273,16 @@ impl FuseFs {
 }
 
 pub trait FuseStrParser {
-    fn parse_str(&self) -> Result<&str>;
+    fn osstr_to_str(&self) -> FxfsResult<&str>;
 }
 
 impl FuseStrParser for OsStr {
     /// Convert from OsStr to str.
-    fn parse_str(&self) -> Result<&str> {
+    fn osstr_to_str(&self) -> FxfsResult<&str> {
         if let Some(s) = self.to_str() {
             Ok(s)
         } else {
-            Err(libc::EINVAL.into())
+            Err(FxfsError::InvalidArgs.into())
         }
     }
 }

@@ -8,8 +8,11 @@ use {
     libc,
 };
 
-/// Convert from Fxfs error to libc error.
-pub fn cast_to_fuse_error(err: &anyhow::Error) -> Errno {
+/// Pre-defined Fxfs Result with FxfsError.
+pub type FxfsResult<T> = std::result::Result<T, anyhow::Error>;
+
+/// Convert from FxfsError to libc error.
+pub fn fxfs_error_to_fuse_error(err: &anyhow::Error) -> Errno {
     if let Some(root_cause) = err.root_cause().downcast_ref::<FxfsError>() {
         let err = match root_cause {
             FxfsError::NotFound => libc::ENOENT.into(),
@@ -22,35 +25,38 @@ pub fn cast_to_fuse_error(err: &anyhow::Error) -> Errno {
             FxfsError::NoSpace => libc::ENOSPC.into(),
             FxfsError::InvalidArgs => libc::EINVAL.into(),
             FxfsError::TooBig => libc::EFBIG.into(),
-            FxfsError::InvalidVersion => libc::ENOTSUP.into(),
-            FxfsError::JournalFlushError => libc::EIO.into(),
             FxfsError::NotSupported => libc::ENOTSUP.into(),
             FxfsError::AccessDenied => libc::EACCES.into(),
-            FxfsError::OutOfRange => libc::ERANGE.into(),
+            FxfsError::OutOfRange => libc::EINVAL.into(),
             FxfsError::BadPath => libc::ENAMETOOLONG.into(),
+
+            // Below are Fxfs-specific errors without specific libc translation.
+            FxfsError::Inconsistent => libc::EIO.into(),
+            FxfsError::Internal => libc::EIO.into(),
+            FxfsError::InvalidVersion => libc::ENOTSUP.into(),
+            FxfsError::JournalFlushError => libc::EIO.into(),
             FxfsError::AlreadyBound => libc::EBUSY.into(),
-            FxfsError::Inconsistent => libc::ENOTTY.into(),
-            FxfsError::Internal => libc::ENOTSUP.into(),
         };
         info!("Converted from Fxfs error {:?} to libc error {:?}", root_cause, err);
         err
     } else {
-        libc::ENOTSUP.into()
+        // No specific translation, so return a generic value.
+        libc::EIO.into()
     }
 }
 
 pub trait FuseErrorParser<S> {
     /// Convert from Fxfs Result to Fuse Result.
-    fn parse_error(self) -> Result<S>;
+    fn fxfs_result_to_fuse_result(self) -> Result<S>;
 }
 
 impl<S> FuseErrorParser<S> for std::result::Result<S, anyhow::Error> {
-    fn parse_error(self) -> Result<S> {
+    fn fxfs_result_to_fuse_result(self) -> Result<S> {
         if let Ok(ret) = self {
             Ok(ret)
         } else {
             let err = &self.err().unwrap();
-            Err(cast_to_fuse_error(err))
+            Err(fxfs_error_to_fuse_error(err))
         }
     }
 }
