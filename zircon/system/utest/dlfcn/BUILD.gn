@@ -20,11 +20,6 @@ test("dlfcn") {
   defines = [ "LIBPREFIX=\"/boot/lib/${toolchain_variant.libprefix}\"" ]
 
   data_deps = [ ":test-dso-no-note" ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 }
 
 loadable_module("test-dso-no-note") {

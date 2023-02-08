@@ -112,7 +112,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/test-utils",
     "//zircon/system/ulib/usb-peripheral-utils",
-    "//zircon/system/utest/dlfcn",
   ]
 }
 
