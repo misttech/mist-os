@@ -15,9 +15,9 @@ use {
         Result,
     },
     futures as _,
-    futures_util::stream::Iter,
+    futures_util::{stream, stream::Iter, StreamExt},
     fxfs::{
-        filesystem::Filesystem,
+        filesystem::{Filesystem, SyncOptions},
         log::info,
         object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
@@ -26,14 +26,19 @@ use {
             ObjectDescriptor, Timestamp,
         },
     },
-    std::{ffi::OsStr, io::Write, time::Duration, vec::IntoIter},
+    std::{
+        ffi::{OsStr, OsString},
+        io::Write,
+        time::Duration,
+        vec::IntoIter,
+    },
 };
 
 /// The TTL duration of each reply.
 const TTL: Duration = Duration::from_secs(1);
 
-/// Some of the function parameters (i.e., request, mode, mask, fh, flags and lock_owner)
-/// are not supported by Fxfs and hence are ignored.
+/// Some of the function parameters (i.e., request, mode, mask, fh, flags, unique
+/// and lock_owner) are not supported by Fxfs and hence are ignored.
 #[async_trait]
 impl FuseFilesystem for FuseFs {
     // Stream of directory entries without attributes.
@@ -156,6 +161,85 @@ impl FuseFilesystem for FuseFs {
             } else {
                 Err(libc::EISDIR.into())
             }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Remove a directory called `name` under `parent` directory.
+    /// Return Ok if the directory called `name` is successfully removed.
+    /// Return ENOTDIR if `name` is not a directory.
+    /// Return ENOTEMPTY if `name` directory is not empty.
+    /// Return ENOENT if `name` is not found under `parent`.
+    async fn rmdir(&self, _req: Request, parent: u64, name: &OsStr) -> Result<()> {
+        let parent = self.fuse_inode_to_object_id(parent);
+        info!("rmdir (parent={:?}, name={:?})", parent, name);
+        let dir = self.open_dir(parent).await?;
+
+        if let Some((_, object_descriptor)) = dir.lookup(name.parse_str()?).await.parse_error()? {
+            if object_descriptor == ObjectDescriptor::Directory {
+                let mut transaction =
+                    self.fs.clone().new_transaction(&[], Options::default()).await.parse_error()?;
+                replace_child(&mut transaction, None, (&dir, name.parse_str()?))
+                    .await
+                    .parse_error()?;
+
+                transaction.commit().await.parse_error()?;
+                Ok(())
+            } else {
+                Err(libc::ENOTDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Rename an object called `name` under `parent` to an object called
+    /// `new_name` under `new_parent`.
+    /// Return Ok if the rename of object is successful.
+    /// Return ENOTDIR if `parent` or `new_parent` is not a directory.
+    /// Return ENOENT if `parent` or `new_parent` does not exist, or `name`
+    /// or `new_name` does not exist under their parents.
+    async fn rename(
+        &self,
+        _req: Request,
+        parent: u64,
+        name: &OsStr,
+        new_parent: u64,
+        new_name: &OsStr,
+    ) -> Result<()> {
+        let parent = self.fuse_inode_to_object_id(parent);
+        let new_parent = self.fuse_inode_to_object_id(new_parent);
+        info!(
+            "rename (parent={:?}, name={:?}, new_parent={:?}, new_name={:?})",
+            parent, name, new_parent, new_name
+        );
+        let old_dir = self.open_dir(parent).await?;
+        let new_dir = self.open_dir(new_parent).await?;
+
+        if old_dir.lookup(name.parse_str()?).await.parse_error()?.is_some() {
+            let mut transaction =
+                self.fs.clone().new_transaction(&[], Options::default()).await.parse_error()?;
+            let replaced_child = replace_child(
+                &mut transaction,
+                Some((&old_dir, name.parse_str()?)),
+                (&new_dir, new_name.parse_str()?),
+            )
+            .await
+            .parse_error()?;
+
+            transaction.commit().await.parse_error()?;
+
+            // If the object is a file without remaining links,
+            // immediately tombstones it in the graveyard.
+            if let ReplacedChild::File(object_id) = replaced_child {
+                self.fs
+                    .graveyard()
+                    .tombstone(new_dir.store().store_object_id(), object_id)
+                    .await
+                    .parse_error()?;
+            }
+            Ok(())
         } else {
             Err(libc::ENOENT.into())
         }
@@ -393,6 +477,19 @@ impl FuseFilesystem for FuseFs {
         Err(libc::ENOSYS.into())
     }
 
+    /// Synchronize the filesystem contents.
+    async fn fsync(&self, _req: Request, _inode: u64, _fh: u64, _datasync: bool) -> Result<()> {
+        info!("fsync");
+        Ok(self.fs.sync(SyncOptions::default()).await.parse_error()?)
+    }
+
+    /// Flush the data.
+    /// This function does nothing because data is flushed at every write in Fxfs.
+    async fn flush(&self, _req: Request, inode: u64, _fh: u64, _lock_owner: u64) -> Result<()> {
+        info!("flush (inode={:?})", inode);
+        Ok(())
+    }
+
     /// Check access permission of `inode`.
     /// Return Ok if `inode` exists.
     /// Return ENOENT if `inode` does not exist.
@@ -469,6 +566,184 @@ impl FuseFilesystem for FuseFs {
         } else {
             Err(libc::ENOENT.into())
         }
+    }
+
+    /// Handle interrupt on the user side.
+    async fn interrupt(&self, _req: Request, _unique: u64) -> Result<()> {
+        info!("interrupt");
+        Ok(())
+    }
+
+    /// Open a directory with id `inode` for read.
+    /// Return Ok if `inode` exists as a directory.
+    /// Return ENOTDIR if `inode` is not a directory.
+    /// Return ENOENT if `inode` does not exist.
+    async fn opendir(&self, _req: Request, inode: u64, _flags: u32) -> Result<ReplyOpen> {
+        let inode = self.fuse_inode_to_object_id(inode);
+        info!("opendir (inode={:?})", inode);
+
+        if let Some(object_type) = self.get_object_type(inode).await? {
+            if object_type == ObjectDescriptor::Directory {
+                Ok(ReplyOpen { fh: 0, flags: 0 })
+            } else {
+                Err(libc::ENOTDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Read the entries of a directory with id `parent`.
+    /// Return Ok with a stream of `parent`'s entries with their object id,
+    /// name and type if successful.
+    /// Return ENOTDIR if `parent` is not a directory.
+    /// Return ENOENT if `parent` does not exist.
+    async fn readdir(
+        &self,
+        _req: Request,
+        parent: u64,
+        _fh: u64,
+        offset: i64,
+    ) -> Result<ReplyDirectory<Self::DirEntryStream>> {
+        let parent = self.fuse_inode_to_object_id(parent);
+        info!("readdir (parent={:?})", parent);
+
+        if let Some(object_type) = self.get_object_type(parent).await? {
+            if object_type == ObjectDescriptor::Directory {
+                let dir = self.open_dir(parent).await?;
+                let mut pre_children = vec![
+                    (parent, FileType::Directory, OsString::from("."), 1),
+                    // The attributes of ".." directory are automatically set by FUSE.
+                    (parent, FileType::Directory, OsString::from(".."), 2),
+                ];
+
+                let layer_set = dir.store().tree().layer_set();
+                let mut merger = layer_set.merger();
+                let mut iter = dir.iter(&mut merger).await.parse_error()?;
+                // Start the offset from 3 because the first two are "." and ".." directories.
+                let mut entry_ofs = 3i64;
+
+                while let Some((name, object_id, descriptor)) = iter.get() {
+                    let file_type = match descriptor {
+                        ObjectDescriptor::File => FileType::RegularFile,
+                        ObjectDescriptor::Directory => FileType::Directory,
+                        ObjectDescriptor::Symlink => FileType::Symlink,
+                        // Volumes are treated as Directories for now when reading directory.
+                        ObjectDescriptor::Volume => FileType::Directory,
+                    };
+
+                    pre_children.push((object_id, file_type, OsString::from(name), entry_ofs));
+                    entry_ofs += 1;
+                    iter.advance().await.parse_error()?;
+                }
+
+                let pre_children = stream::iter(pre_children.into_iter());
+                let children = pre_children
+                    .map(|(inode, kind, name, offset)| DirectoryEntry { inode, kind, name, offset })
+                    .skip(offset as _)
+                    .map(Ok)
+                    .collect::<Vec<_>>()
+                    .await;
+
+                Ok(ReplyDirectory { entries: stream::iter(children) })
+            } else {
+                Err(libc::ENOTDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Read the entries with attributes of a directory with id `parent`.
+    /// Return Ok with a stream of `inode`'s entries with their attributes if successful.
+    /// Return ENOTDIR if `parent` is not a directory.
+    /// Return ENOENT if `parent` does not exist.
+    async fn readdirplus(
+        &self,
+        _req: Request,
+        parent: u64,
+        _fh: u64,
+        offset: u64,
+        _lock_owner: u64,
+    ) -> Result<ReplyDirectoryPlus<Self::DirEntryPlusStream>> {
+        let parent = self.fuse_inode_to_object_id(parent);
+        info!("readdirplus (parent={:?})", parent);
+
+        if let Some(object_type) = self.get_object_type(parent).await? {
+            if object_type == ObjectDescriptor::Directory {
+                let parent_attr =
+                    self.create_object_attr(parent, ObjectDescriptor::Directory).await?;
+                let dir = self.open_dir(parent).await?;
+                let mut pre_children = vec![
+                    (parent, FileType::Directory, OsString::from("."), parent_attr, 1),
+                    // The attributes of ".." directory are automatically set by FUSE.
+                    (parent, FileType::Directory, OsString::from(".."), parent_attr, 2),
+                ];
+
+                let layer_set = dir.store().tree().layer_set();
+                let mut merger = layer_set.merger();
+                let mut iter = dir.iter(&mut merger).await.parse_error()?;
+                // Start the offset from 3 because the first two are "." and ".." directories.
+                let mut entry_ofs = 3i64;
+
+                while let Some((name, object_id, descriptor)) = iter.get() {
+                    let file_type = match descriptor {
+                        ObjectDescriptor::File => FileType::RegularFile,
+                        ObjectDescriptor::Directory => FileType::Directory,
+                        ObjectDescriptor::Symlink => FileType::Symlink,
+                        // Volumes are treated as Directories for now when reading directory.
+                        ObjectDescriptor::Volume => FileType::Directory,
+                    };
+                    let child_attr = self.create_object_attr(object_id, descriptor.clone()).await?;
+                    pre_children.push((
+                        object_id,
+                        file_type,
+                        OsString::from(name),
+                        child_attr,
+                        entry_ofs,
+                    ));
+                    entry_ofs += 1;
+                    iter.advance().await.parse_error().unwrap();
+                }
+
+                let pre_children = stream::iter(pre_children.into_iter());
+                let children = pre_children
+                    .map(|(inode, kind, name, attr, offset)| DirectoryEntryPlus {
+                        inode,
+                        generation: 0,
+                        kind,
+                        name,
+                        offset,
+                        attr,
+                        entry_ttl: TTL,
+                        attr_ttl: TTL,
+                    })
+                    .skip(offset as _)
+                    .map(Ok)
+                    .collect::<Vec<_>>()
+                    .await;
+
+                Ok(ReplyDirectoryPlus { entries: stream::iter(children) })
+            } else {
+                Err(libc::ENOTDIR.into())
+            }
+        } else {
+            Err(libc::ENOENT.into())
+        }
+    }
+
+    /// Rename a file or directory with flags.
+    /// Directly call `rename` because flags are not used in Fxfs.
+    async fn rename2(
+        &self,
+        req: Request,
+        parent: u64,
+        name: &OsStr,
+        new_parent: u64,
+        new_name: &OsStr,
+        _flags: u32,
+    ) -> Result<()> {
+        self.rename(req, parent, name, new_parent, new_name).await
     }
 
     /// Allocate space for a file with id `inode`, starting from position
@@ -688,9 +963,13 @@ mod tests {
     use {
         crate::fuse_fs::{FuseFs, FuseStrParser},
         fuse3::{
-            raw::{Filesystem, Request},
-            Errno, FileType, SetAttr, Timestamp,
+            raw::{
+                prelude::{DirectoryEntry, DirectoryEntryPlus},
+                Filesystem, Request,
+            },
+            Errno, FileType, Result, SetAttr, Timestamp,
         },
+        futures::stream::StreamExt,
         fxfs::{filesystem::Filesystem as FxFs, object_store::ObjectDescriptor},
         std::ffi::OsStr,
     };
@@ -784,6 +1063,81 @@ mod tests {
             .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await;
         assert_eq!(mkdir_res, Err(libc::EEXIST.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rmdir_remove_directory_tree() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let (child_id, child_descriptor) =
+            dir.lookup(OsStr::new("foo").parse_str().unwrap()).await.unwrap().unwrap();
+        assert_eq!(child_descriptor, ObjectDescriptor::Directory);
+        assert_ne!(child_id, dir.object_id());
+
+        fs.rmdir(new_fake_request(), dir.object_id(), OsStr::new("foo"))
+            .await
+            .expect("rmdir failed");
+        let result = dir.lookup(OsStr::new("foo").parse_str().unwrap()).await.unwrap();
+        assert_eq!(result, None);
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rmdir_fails_when_directory_is_not_empty() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let (child_id, _) =
+            dir.lookup(OsStr::new("foo").parse_str().unwrap()).await.unwrap().unwrap();
+        fs.mkdir(new_fake_request(), child_id, OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+
+        let rmdir_res = fs.rmdir(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
+        assert_eq!(rmdir_res, Err(libc::ENOTEMPTY.into()));
+        let (_child_id, child_descriptor) =
+            dir.lookup(OsStr::new("foo").parse_str().unwrap()).await.unwrap().unwrap();
+        assert_eq!(child_id, _child_id);
+        assert_eq!(child_descriptor, ObjectDescriptor::Directory);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rmdir_fails_when_parent_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let rmdir_res = fs.rmdir(new_fake_request(), INVALID_INODE, OsStr::new("foo")).await;
+        assert_eq!(rmdir_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rmdir_fails_when_object_is_file() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let dir = fs.root_dir().await.expect("root_dir failed");
+        fs.create(
+            new_fake_request(),
+            dir.object_id(),
+            OsStr::new("foo"),
+            DEFAULT_FILE_MODE,
+            DEFAULT_FLAG,
+        )
+        .await
+        .expect("create file failed");
+        let rmdir_res = fs.rmdir(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
+        assert_eq!(rmdir_res, Err(libc::ENOTDIR.into()));
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -1017,6 +1371,236 @@ mod tests {
             )
             .await;
         assert_eq!(create_res, Err(libc::EEXIST.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_move_file_to_another_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let foo_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let bar_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let src_dir = foo_mkdir_reply.attr.ino;
+        let dst_dir = bar_mkdir_reply.attr.ino;
+
+        fs.create(new_fake_request(), src_dir, OsStr::new("old"), DEFAULT_FILE_MODE, DEFAULT_FLAG)
+            .await
+            .expect("create failed");
+        fs.rename(new_fake_request(), src_dir, OsStr::new("old"), dst_dir, OsStr::new("new"))
+            .await
+            .expect("rename failed");
+        let bar_child_dir = fs.open_dir(dst_dir).await.expect("open_dir failed");
+        let bar_lookup_res = bar_child_dir
+            .lookup(OsStr::new("new").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(bar_lookup_res.is_some(), true);
+        assert_eq!(bar_lookup_res.unwrap().1, ObjectDescriptor::File);
+
+        let foo_child_dir = fs.open_dir(src_dir).await.expect("open_dir failed");
+        let foo_lookup_res = foo_child_dir
+            .lookup(OsStr::new("old").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(foo_lookup_res, None);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_rename_file_in_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let new_dir = mkdir_reply.attr.ino;
+
+        fs.create(new_fake_request(), new_dir, OsStr::new("old"), DEFAULT_FILE_MODE, DEFAULT_FLAG)
+            .await
+            .expect("create failed");
+        fs.rename(new_fake_request(), new_dir, OsStr::new("old"), new_dir, OsStr::new("new"))
+            .await
+            .expect("rename failed");
+        let child_dir = fs.open_dir(new_dir).await.expect("open_dir failed");
+        let lookup_res =
+            child_dir.lookup(OsStr::new("new").parse_str().unwrap()).await.expect("lookup failed");
+        assert_eq!(lookup_res.is_some(), true);
+        assert_eq!(lookup_res.unwrap().1, ObjectDescriptor::File);
+
+        let _lookup_res =
+            child_dir.lookup(OsStr::new("old").parse_str().unwrap()).await.expect("lookup failed");
+        assert_eq!(_lookup_res, None);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_fails_when_old_parent_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let dst_dir = mkdir_reply.attr.ino;
+
+        let rename_res = fs
+            .rename(
+                new_fake_request(),
+                INVALID_INODE,
+                OsStr::new("old"),
+                dst_dir,
+                OsStr::new("new"),
+            )
+            .await;
+        assert_eq!(rename_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_fails_when_old_name_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let _mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let src_dir = mkdir_reply.attr.ino;
+        let dst_dir = mkdir_reply.attr.ino;
+
+        let rename_res = fs
+            .rename(new_fake_request(), src_dir, OsStr::new("old"), dst_dir, OsStr::new("new"))
+            .await;
+        assert_eq!(rename_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_fails_when_new_parent_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let src_dir = mkdir_reply.attr.ino;
+
+        fs.create(new_fake_request(), src_dir, OsStr::new("old"), DEFAULT_FILE_MODE, DEFAULT_FLAG)
+            .await
+            .expect("create failed");
+        let rename_res = fs
+            .rename(
+                new_fake_request(),
+                src_dir,
+                OsStr::new("old"),
+                INVALID_INODE,
+                OsStr::new("new"),
+            )
+            .await;
+        assert_eq!(rename_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_move_file_to_another_directory_where_new_name_exists() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let foo_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let bar_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let src_dir = foo_mkdir_reply.attr.ino;
+        let dst_dir = bar_mkdir_reply.attr.ino;
+
+        fs.create(new_fake_request(), src_dir, OsStr::new("old"), DEFAULT_FILE_MODE, DEFAULT_FLAG)
+            .await
+            .expect("create failed");
+        fs.create(new_fake_request(), dst_dir, OsStr::new("new"), DEFAULT_FILE_MODE, DEFAULT_FLAG)
+            .await
+            .expect("create failed");
+        fs.rename(new_fake_request(), src_dir, OsStr::new("old"), dst_dir, OsStr::new("new"))
+            .await
+            .expect("rename failed");
+        let bar_child_dir = fs.open_dir(dst_dir).await.expect("open_dir failed");
+        let bar_lookup_res = bar_child_dir
+            .lookup(OsStr::new("new").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(bar_lookup_res.is_some(), true);
+        assert_eq!(bar_lookup_res.unwrap().1, ObjectDescriptor::File);
+
+        let foo_child_dir = fs.open_dir(src_dir).await.expect("open_dir failed");
+        let foo_lookup_res = foo_child_dir
+            .lookup(OsStr::new("old").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(foo_lookup_res, None);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_move_directory_to_under_another_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let foo_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let bar_mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let src_dir = foo_mkdir_reply.attr.ino;
+        let dst_dir = bar_mkdir_reply.attr.ino;
+
+        fs.mkdir(new_fake_request(), src_dir, OsStr::new("old"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        fs.rename(new_fake_request(), src_dir, OsStr::new("old"), dst_dir, OsStr::new("new"))
+            .await
+            .expect("rename failed");
+        let bar_child_dir = fs.open_dir(dst_dir).await.expect("open_dir failed");
+        let bar_lookup_res = bar_child_dir
+            .lookup(OsStr::new("new").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(bar_lookup_res.is_some(), true);
+        assert_eq!(bar_lookup_res.unwrap().1, ObjectDescriptor::Directory);
+
+        let foo_child_dir = fs.open_dir(src_dir).await.expect("open_dir failed");
+        let foo_lookup_res = foo_child_dir
+            .lookup(OsStr::new("old").parse_str().unwrap())
+            .await
+            .expect("lookup failed");
+        assert_eq!(foo_lookup_res, None);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -2023,6 +2607,285 @@ mod tests {
             .expect("read failed");
         let result_data: &[u8] = b"hello";
         assert_eq!(read_reply.data, result_data);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_opendir_open_directory() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        fs.opendir(new_fake_request(), mkdir_reply.attr.ino, 0).await.expect("opendir failed");
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_opendir_fails_when_directory_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let opendir_res = fs.opendir(new_fake_request(), INVALID_INODE, 0).await;
+        assert_eq!(opendir_res, Err(libc::ENOENT.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_opendir_fails_when_object_is_file() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let opendir_res = fs.opendir(new_fake_request(), create_reply.attr.ino, 0).await;
+        assert_eq!(opendir_res, Err(libc::ENOTDIR.into()));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdir_read_directory_entries() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("bar"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let symlink_reply = fs
+            .symlink(new_fake_request(), dir.object_id(), OsStr::new("link"), OsStr::new("foo"))
+            .await
+            .expect("symlink failed");
+        let readdir_reply =
+            fs.readdir(new_fake_request(), dir.object_id(), 0, 0).await.expect("readdir failed");
+        let entries = readdir_reply.entries.collect::<Vec<Result<DirectoryEntry>>>().await;
+        assert_eq!(entries.len(), 5);
+
+        let root_entry = entries[0].clone().unwrap();
+        let parent_entry = entries[1].clone().unwrap();
+        let file_entry = entries[2].clone().unwrap();
+        let dir_entry = entries[3].clone().unwrap();
+        let symlink_entry = entries[4].clone().unwrap();
+
+        assert_eq!(root_entry.inode, dir.object_id());
+        assert_eq!(parent_entry.inode, dir.object_id());
+        assert_eq!(dir_entry.inode, mkdir_reply.attr.ino);
+        assert_eq!(file_entry.inode, create_reply.attr.ino);
+        assert_eq!(symlink_entry.inode, symlink_reply.attr.ino);
+
+        assert_eq!(root_entry.kind, FileType::Directory);
+        assert_eq!(parent_entry.kind, FileType::Directory);
+        assert_eq!(dir_entry.kind, FileType::Directory);
+        assert_eq!(file_entry.kind, FileType::RegularFile);
+        assert_eq!(symlink_entry.kind, FileType::Symlink);
+
+        assert_eq!(root_entry.name, OsStr::new("."));
+        assert_eq!(parent_entry.name, OsStr::new(".."));
+        assert_eq!(dir_entry.name, OsStr::new("foo"));
+        assert_eq!(file_entry.name, OsStr::new("bar"));
+        assert_eq!(symlink_entry.name, OsStr::new("link"));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdir_read_empty_directory_entries() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let readdir_reply =
+            fs.readdir(new_fake_request(), dir.object_id(), 0, 0).await.expect("readdir failed");
+        let entries = readdir_reply.entries.collect::<Vec<Result<DirectoryEntry>>>().await;
+        assert_eq!(entries.len(), 2);
+
+        let root_entry = entries[0].clone().unwrap();
+        let parent_entry = entries[1].clone().unwrap();
+
+        assert_eq!(root_entry.inode, dir.object_id());
+        assert_eq!(parent_entry.inode, dir.object_id());
+
+        assert_eq!(root_entry.kind, FileType::Directory);
+        assert_eq!(parent_entry.kind, FileType::Directory);
+
+        assert_eq!(root_entry.name, OsStr::new("."));
+        assert_eq!(parent_entry.name, OsStr::new(".."));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdir_fails_when_directory_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let readdir_res = fs.readdir(new_fake_request(), INVALID_INODE, 0, 0).await;
+        assert_eq!(readdir_res.is_err(), true);
+        let err: Errno = libc::ENOENT.into();
+        assert_eq!(readdir_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdir_fails_when_object_is_file() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let readdir_res = fs.readdir(new_fake_request(), create_reply.attr.ino, 0, 0).await;
+        assert_eq!(readdir_res.is_err(), true);
+        let err: Errno = libc::ENOTDIR.into();
+        assert_eq!(readdir_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdirplus_read_directory_entries() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let mkdir_reply = fs
+            .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
+            .await
+            .expect("mkdir failed");
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("bar"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let symlink_reply = fs
+            .symlink(new_fake_request(), dir.object_id(), OsStr::new("link"), OsStr::new("foo"))
+            .await
+            .expect("symlink failed");
+        let readdir_reply = fs
+            .readdirplus(new_fake_request(), dir.object_id(), 0, 0, 0)
+            .await
+            .expect("readdirplus failed");
+        let entries = readdir_reply.entries.collect::<Vec<Result<DirectoryEntryPlus>>>().await;
+        assert_eq!(entries.len(), 5);
+
+        let root_entry = entries[0].clone().unwrap();
+        let parent_entry = entries[1].clone().unwrap();
+        let file_entry = entries[2].clone().unwrap();
+        let dir_entry = entries[3].clone().unwrap();
+        let symlink_entry = entries[4].clone().unwrap();
+
+        assert_eq!(root_entry.inode, dir.object_id());
+        assert_eq!(parent_entry.inode, dir.object_id());
+        assert_eq!(dir_entry.inode, mkdir_reply.attr.ino);
+        assert_eq!(file_entry.inode, create_reply.attr.ino);
+        assert_eq!(symlink_entry.inode, symlink_reply.attr.ino);
+
+        assert_eq!(root_entry.kind, FileType::Directory);
+        assert_eq!(parent_entry.kind, FileType::Directory);
+        assert_eq!(dir_entry.kind, FileType::Directory);
+        assert_eq!(file_entry.kind, FileType::RegularFile);
+        assert_eq!(symlink_entry.kind, FileType::Symlink);
+
+        assert_eq!(root_entry.name, OsStr::new("."));
+        assert_eq!(parent_entry.name, OsStr::new(".."));
+        assert_eq!(dir_entry.name, OsStr::new("foo"));
+        assert_eq!(file_entry.name, OsStr::new("bar"));
+        assert_eq!(symlink_entry.name, OsStr::new("link"));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdirplus_read_empty_directory_entries() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let readdir_reply = fs
+            .readdirplus(new_fake_request(), dir.object_id(), 0, 0, 0)
+            .await
+            .expect("readdirplus failed");
+        let entries = readdir_reply.entries.collect::<Vec<Result<DirectoryEntryPlus>>>().await;
+        assert_eq!(entries.len(), 2);
+
+        let root_entry = entries[0].clone().unwrap();
+        let parent_entry = entries[1].clone().unwrap();
+
+        assert_eq!(root_entry.inode, dir.object_id());
+        assert_eq!(parent_entry.inode, dir.object_id());
+
+        assert_eq!(root_entry.kind, FileType::Directory);
+        assert_eq!(parent_entry.kind, FileType::Directory);
+
+        assert_eq!(root_entry.name, OsStr::new("."));
+        assert_eq!(parent_entry.name, OsStr::new(".."));
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdirplus_fails_when_directory_does_not_exist() {
+        let fs = FuseFs::new_in_memory().await;
+
+        let readdir_res = fs.readdirplus(new_fake_request(), INVALID_INODE, 0, 0, 0).await;
+        assert_eq!(readdir_res.is_err(), true);
+        let err: Errno = libc::ENOENT.into();
+        assert_eq!(readdir_res.err().unwrap(), err);
+
+        fs.fs.close().await.expect("failed to close filesystem");
+    }
+
+    #[fuchsia::test]
+    async fn test_readdirplus_fails_when_object_is_file() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+
+        let create_reply = fs
+            .create(
+                new_fake_request(),
+                dir.object_id(),
+                OsStr::new("foo"),
+                DEFAULT_FILE_MODE,
+                DEFAULT_FLAG,
+            )
+            .await
+            .expect("create failed");
+        let readdir_res = fs.readdirplus(new_fake_request(), create_reply.attr.ino, 0, 0, 0).await;
+        assert_eq!(readdir_res.is_err(), true);
+        let err: Errno = libc::ENOTDIR.into();
+        assert_eq!(readdir_res.err().unwrap(), err);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
