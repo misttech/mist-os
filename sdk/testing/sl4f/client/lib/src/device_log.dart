@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 //
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 import 'sl4f_client.dart';
 
 /// Manipulate the device's logs.

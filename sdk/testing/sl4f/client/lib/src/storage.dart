@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io' show File;
@@ -21,7 +20,7 @@ class Storage {
   final Dump _dump;
 
   /// Constructs a [Storage] object.
-  Storage(this._sl4f, [Dump dump]) : _dump = dump ?? Dump();
+  Storage(this._sl4f, [Dump? dump]) : _dump = dump ?? Dump();
 
   /// Closes the underlying HTTP client. This need not be called if the
   /// Sl4f client was provided.
@@ -65,7 +64,7 @@ class Storage {
   ///
   /// Throws a [JsonRpcException] if the SL4F server replied with a non-null
   /// error string, like when the file doesn't exist or can't be read.
-  Future<File> dumpFile(
+  Future<File?> dumpFile(
           String filename, String dumpName, String extension) async =>
       _dump.writeAsBytes(dumpName, extension, await readFile(filename));
 
@@ -94,7 +93,7 @@ class Storage {
     return result;
   }
 
-  Future<Map<String, dynamic>> stat(String path) async {
+  Future<Map<String, dynamic>?> stat(String path) async {
     _log.fine('Stat\'ing $path.');
     final result = await _sl4f.request('file_facade.Stat', {'path': path});
     if (result == 'NotFound') {

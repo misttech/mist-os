@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io' show File;
@@ -29,7 +28,7 @@ class Audio {
   final Dump _dump;
 
   /// Construct an [Audio] facade abstraction.
-  Audio(this._sl4f, [Dump dump]) : _dump = dump ?? Dump();
+  Audio(this._sl4f, [Dump? dump]) : _dump = dump ?? Dump();
 
   /// Uploads an audio [file] to be used as input number [index].
   ///
@@ -68,7 +67,7 @@ class Audio {
   ///
   /// If [dumpName] is provided, the audio file will also be dumped with
   /// [dumpName] in the filename.
-  Future<AudioTrack> getOutputAudio({String dumpName}) async {
+  Future<AudioTrack> getOutputAudio({String? dumpName}) async {
     // The response body is just base64encoded audio
     final String response = await _sl4f.request('audio_facade.GetOutputAudio');
     final Uint8List bytes = base64Decode(response);
@@ -105,5 +104,5 @@ class AudioTrack {
   bool isSilence = false;
 
   /// A WAV file (including header).
-  Uint8List audioData;
+  late Uint8List audioData;
 }

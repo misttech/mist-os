@@ -24,7 +24,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 }
               },
               "name": "Audio",
@@ -46,7 +46,7 @@
                   "isRequiredPositional": false,
                   "name": "dumpName",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "isAbstract": false,
@@ -153,7 +153,7 @@
             "audioData": {
               "isConst": false,
               "isFinal": false,
-              "isLate": false,
+              "isLate": true,
               "name": "audioData",
               "type": "VariableDeclarationImpl",
               "varType": "Uint8List"
@@ -1218,7 +1218,7 @@
                   "isRequiredPositional": false,
                   "name": "args",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "List<String>"
+                  "varType": "List<String>?"
                 },
                 "url": {
                   "isConst": false,
@@ -1505,7 +1505,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 }
               },
               "name": "Diagnostics",
@@ -2280,7 +2280,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "getSnapshot",
-              "returnType": "Future<FeedbackSnapshot>",
+              "returnType": "Future<FeedbackSnapshot?>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -2803,7 +2803,7 @@
                   "isRequiredPositional": false,
                   "name": "screenRotation",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Rotation"
+                  "varType": "Rotation?"
                 },
                 "to": {
                   "isConst": false,
@@ -2843,7 +2843,7 @@
                   "isRequiredPositional": false,
                   "name": "duration",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "fingers": {
                   "isConst": false,
@@ -2871,7 +2871,7 @@
                   "isRequiredPositional": false,
                   "name": "screenRotation",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Rotation"
+                  "varType": "Rotation?"
                 },
                 "tapEventCount": {
                   "isConst": false,
@@ -2885,7 +2885,7 @@
                   "isRequiredPositional": false,
                   "name": "tapEventCount",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 }
               },
               "isAbstract": false,
@@ -2965,7 +2965,7 @@
                   "isRequiredPositional": false,
                   "name": "screenRotation",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Rotation"
+                  "varType": "Rotation?"
                 },
                 "to": {
                   "isConst": false,
@@ -3019,7 +3019,7 @@
                   "isRequiredPositional": false,
                   "name": "duration",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "screenRotation": {
                   "isConst": false,
@@ -3033,7 +3033,7 @@
                   "isRequiredPositional": false,
                   "name": "screenRotation",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Rotation"
+                  "varType": "Rotation?"
                 },
                 "tapEventCount": {
                   "isConst": false,
@@ -3047,7 +3047,7 @@
                   "isRequiredPositional": false,
                   "name": "tapEventCount",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 }
               },
               "isAbstract": false,
@@ -3316,7 +3316,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "snapshotRoot",
-              "returnType": "Future<Map<String, dynamic>>",
+              "returnType": "Future<Map<String, dynamic>?>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -3857,7 +3857,7 @@
                   "isRequiredPositional": false,
                   "name": "config",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "sessionUrl": {
                   "isConst": false,
@@ -3871,7 +3871,7 @@
                   "isRequiredPositional": false,
                   "name": "sessionUrl",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "isAbstract": false,
@@ -3963,7 +3963,7 @@
                   "isRequiredPositional": false,
                   "name": "config",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "sessionUrl": {
                   "isConst": false,
@@ -3977,7 +3977,7 @@
                   "isRequiredPositional": false,
                   "name": "sessionUrl",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "isAbstract": false,
@@ -5296,7 +5296,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 }
               },
               "name": "Scenic",
@@ -5318,7 +5318,7 @@
                   "isRequiredPositional": false,
                   "name": "dumpName",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "isAbstract": false,
@@ -5410,20 +5410,20 @@
           "ConstructorDeclarationImpl": {
             "IntlInfo": {
               "FieldFormalParameterImpl": {
-                "@required this.hourCycle": {
-                  "name": "@required this.hourCycle",
+                "required this.hourCycle": {
+                  "name": "required this.hourCycle",
                   "type": "FieldFormalParameterImpl"
                 },
-                "@required this.locales": {
-                  "name": "@required this.locales",
+                "required this.locales": {
+                  "name": "required this.locales",
                   "type": "FieldFormalParameterImpl"
                 },
-                "@required this.temperatureUnit": {
-                  "name": "@required this.temperatureUnit",
+                "required this.temperatureUnit": {
+                  "name": "required this.temperatureUnit",
                   "type": "FieldFormalParameterImpl"
                 },
-                "@required this.timeZoneId": {
-                  "name": "@required this.timeZoneId",
+                "required this.timeZoneId": {
+                  "name": "required this.timeZoneId",
                   "type": "FieldFormalParameterImpl"
                 }
               },
@@ -5444,7 +5444,7 @@
                   "isRequiredPositional": true,
                   "name": "json",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Map<String, dynamic>"
+                  "varType": "Map<String, dynamic>?"
                 }
               },
               "name": "IntlInfo.fromJson",
@@ -6886,7 +6886,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 }
               },
               "name": "Storage",
@@ -6981,7 +6981,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "dumpFile",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "makeDirectory": {
@@ -7153,7 +7153,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "stat",
-              "returnType": "Future<Map<String, dynamic>>",
+              "returnType": "Future<Map<String, dynamic>?>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -9739,7 +9739,7 @@
                   "isRequiredPositional": false,
                   "name": "portForwarder",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "PortForwarder"
+                  "varType": "PortForwarder?"
                 },
                 "sl4f": {
                   "isConst": false,
@@ -9767,7 +9767,7 @@
                   "isRequiredPositional": false,
                   "name": "webDriverHelper",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "WebDriverHelper"
+                  "varType": "WebDriverHelper?"
                 }
               },
               "name": "SingleWebDriverConnector",
@@ -9842,7 +9842,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "webDriverForHosts",
-              "returnType": "Future<async_core.WebDriver>",
+              "returnType": "Future<async_core.WebDriver?>",
               "type": "MethodDeclarationImpl"
             },
             "webDriverForUrl": {
@@ -9868,7 +9868,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "webDriverForUrl",
-              "returnType": "Future<async_core.WebDriver>",
+              "returnType": "Future<async_core.WebDriver?>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -9991,7 +9991,7 @@
                   "isRequiredPositional": false,
                   "name": "hostPort",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "proxyPort": {
                   "isConst": false,
@@ -10005,7 +10005,7 @@
                   "isRequiredPositional": false,
                   "name": "proxyPort",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "sl4f": {
                   "isConst": false,
@@ -10033,7 +10033,7 @@
                   "isRequiredPositional": false,
                   "name": "targetHost",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "name": "TcpPortForwarder",
@@ -10131,7 +10131,7 @@
               "isLate": false,
               "name": "proxyControl",
               "type": "VariableDeclarationImpl",
-              "varType": "TcpProxyController"
+              "varType": "TcpProxyController?"
             }
           },
           "name": "TcpPortForwarder",
@@ -10167,7 +10167,7 @@
                   "isRequiredPositional": false,
                   "name": "portForwarder",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "PortForwarder"
+                  "varType": "PortForwarder?"
                 },
                 "processHelper": {
                   "isConst": false,
@@ -10181,7 +10181,7 @@
                   "isRequiredPositional": false,
                   "name": "processHelper",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "ProcessHelper"
+                  "varType": "ProcessHelper?"
                 },
                 "sl4f": {
                   "isConst": false,
@@ -10209,7 +10209,7 @@
                   "isRequiredPositional": false,
                   "name": "webDriverHelper",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "WebDriverHelper"
+                  "varType": "WebDriverHelper?"
                 }
               },
               "name": "WebDriverConnector",
@@ -10258,7 +10258,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "chromedriverProcess",
-              "returnType": "io.Process",
+              "returnType": "io.Process?",
               "type": "MethodDeclarationImpl"
             },
             "initialize": {
@@ -10385,7 +10385,7 @@
                   "isRequiredPositional": false,
                   "name": "filters",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Map<String, dynamic>"
+                  "varType": "Map<String, dynamic>?"
                 },
                 "host": {
                   "isConst": false,
@@ -10445,7 +10445,7 @@
                   "isRequiredPositional": false,
                   "name": "httpClient",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "io.HttpClient"
+                  "varType": "io.HttpClient?"
                 }
               },
               "name": "WebDriverHelper",
@@ -10504,7 +10504,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "createAsyncDriver",
-              "returnType": "Future<async_core.WebDriver>",
+              "returnType": "Future<async_core.WebDriver?>",
               "type": "MethodDeclarationImpl"
             },
             "createDriver": {
@@ -10521,7 +10521,7 @@
                   "isRequiredPositional": true,
                   "name": "chromedriverPort",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "debuggerAddress": {
                   "isConst": false,
@@ -10544,7 +10544,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "createDriver",
-              "returnType": "Future<sync_core.WebDriver>",
+              "returnType": "Future<sync_core.WebDriver?>",
               "type": "MethodDeclarationImpl"
             }
           },

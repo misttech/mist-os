@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'sl4f_client.dart';
 
@@ -15,7 +14,7 @@ class Component {
 
   /// List currently running components in the device.
   Future<List<String>> list() async {
-    final result = await _sl4f.request('component_facade.List');
+    final List<dynamic> result = await _sl4f.request('component_facade.List');
     return result.cast<String>();
   }
 
@@ -29,7 +28,7 @@ class Component {
   }
 
   /// Launches a component given by [url].
-  Future<dynamic> launch(String url, [List<String> args]) async {
+  Future<dynamic> launch(String url, [List<String>? args]) async {
     if (args != null && args.isNotEmpty) {
       return await _sl4f
           .request('component_facade.Launch', {'url': url, 'arguments': args});

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:async';
 
@@ -27,7 +26,6 @@ extension ServiceNameExtension on InspectPipeline {
       case InspectPipeline.legacyMetrics:
         return 'fuchsia.diagnostics.LegacyMetricsArchiveAccessor';
     }
-    return '';
   }
 }
 
@@ -82,7 +80,7 @@ class Inspect {
   /// under root.
   ///
   /// Returns null if no hierarchy was found.
-  Future<Map<String, dynamic>> snapshotRoot(
+  Future<Map<String, dynamic>?> snapshotRoot(
     String componentSelector, {
     InspectPipeline pipeline = InspectPipeline.none,
   }) async {

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:async';
 import 'dart:convert';
@@ -37,7 +36,7 @@ class FeedbackDataProvider {
 
   /// Performs a call to `fuchsia.feedback.DataProvider#GetSnapshot` and returns
   /// a [FeedbackSnapshot] that contains the resulting zip.
-  Future<FeedbackSnapshot> getSnapshot() async {
+  Future<FeedbackSnapshot?> getSnapshot() async {
     final result =
         await sl4f.request('feedback_data_provider_facade.GetSnapshot', {}) ??
             {};

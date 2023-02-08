@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io' as io;
@@ -38,7 +37,7 @@ final _log = Logger('Webdriver');
 class WebDriverConnector {
   /// Relative path of chromedriver binary, only provided if an existing
   /// chromedriver is not already running.
-  final String _chromedriverPath;
+  final String? _chromedriverPath;
 
   /// SL4F client.
   final Sl4f _sl4f;
@@ -46,7 +45,7 @@ class WebDriverConnector {
   /// Helper for starting processes.
   ///
   /// Will be null if constructed with [fromExistingChromedriver()].
-  final ProcessHelper _processHelper;
+  final ProcessHelper? _processHelper;
 
   /// Helper for instantiating WebDriver objects.
   final WebDriverHelper _webDriverHelper;
@@ -59,24 +58,24 @@ class WebDriverConnector {
   ///
   /// Will be null if constructed using [fromExistingChromedriver()], or if
   /// [initialize()] hasn't been called.
-  io.Process _chromedriverProcess;
-  io.Process get chromedriverProcess => _chromedriverProcess;
+  io.Process? _chromedriverProcess;
+  io.Process? get chromedriverProcess => _chromedriverProcess;
 
   /// The port Chromedriver is listening on.
   ///
   /// If the [fromExistingChromedriver()] constructor is used, Chromedriver has
   /// already started; use that port. If it isn't passed in, an unused port is
   /// picked.
-  int _chromedriverPort;
+  int? _chromedriverPort;
 
   /// A mapping from a target port number on the DUT to an open WebDriver
   /// session.
   Map<int, WebDriverSession> _webDriverSessions;
 
   WebDriverConnector(String chromeDriverPath, Sl4f sl4f,
-      {ProcessHelper processHelper,
-      WebDriverHelper webDriverHelper,
-      PortForwarder portForwarder})
+      {ProcessHelper? processHelper,
+      WebDriverHelper? webDriverHelper,
+      PortForwarder? portForwarder})
       : _chromedriverPath = chromeDriverPath,
         _sl4f = sl4f,
         _processHelper = processHelper ?? ProcessHelper(),
@@ -112,12 +111,12 @@ class WebDriverConnector {
   Future<void> tearDown() async {
     if (_chromedriverProcess != null) {
       _log.info('Stopping chromedriver');
-      _chromedriverProcess.kill();
-      await _chromedriverProcess.exitCode.timeout(Duration(seconds: 5),
+      _chromedriverProcess!.kill();
+      await _chromedriverProcess!.exitCode.timeout(Duration(seconds: 5),
           onTimeout: () {
         _log.warning('Chromedriver did not shut down, killing it.');
-        _chromedriverProcess.kill(io.ProcessSignal.sigkill);
-        return _chromedriverProcess.exitCode;
+        _chromedriverProcess!.kill(io.ProcessSignal.sigkill);
+        return _chromedriverProcess!.exitCode;
       });
       _chromedriverProcess = null;
       _chromedriverPort = null;
@@ -162,7 +161,7 @@ class WebDriverConnector {
   /// To match, for each (key, value) pair in [filters] must have key present in
   /// the [endpoint] object, and the corresponding values must be equal.
   bool _checkDebuggerEndpointFilters(
-      Map<String, dynamic> endpoint, Map<String, dynamic> filters) {
+      Map<String, dynamic> endpoint, Map<String, dynamic>? filters) {
     if (filters == null) {
       return true;
     }
@@ -188,7 +187,7 @@ class WebDriverConnector {
   /// multiple debugging targets, and more than one of them may match the
   /// given host.
   Future<List<String>> webSocketDebuggerUrlsForHost(String host,
-      {Map<String, dynamic> filters}) async {
+      {Map<String, dynamic>? filters}) async {
     final accessPointsForHost = (await _webDriverSessionsForHost(host))
         .map((session) => session.accessPoint);
 
@@ -204,7 +203,7 @@ class WebDriverConnector {
 
       for (final endpoint in endpoints) {
         if (_checkDebuggerEndpointFilters(endpoint, filters)) {
-          devToolsUrls.add(endpoint['webSocketDebuggerUrl']);
+          devToolsUrls.add(endpoint['webSocketDebuggerUrl']!);
         }
       }
     }
@@ -218,17 +217,17 @@ class WebDriverConnector {
       _chromedriverPort = await _sl4f.ssh.pickUnusedPort();
 
       final chromedriver =
-          io.Platform.script.resolve(_chromedriverPath).toFilePath();
+          io.Platform.script.resolve(_chromedriverPath!).toFilePath();
       final args = ['--port=$_chromedriverPort'];
-      _chromedriverProcess = await _processHelper.start(chromedriver, args);
-      _chromedriverProcess.stderr
+      _chromedriverProcess = await _processHelper!.start(chromedriver, args);
+      _chromedriverProcess!.stderr
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen((error) {
         _log.info('[Chromedriver] $error');
       });
 
-      _chromedriverProcess.stdout
+      _chromedriverProcess!.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen((log) {
@@ -295,7 +294,7 @@ class WebDriverConnector {
 
   /// Creates a `Webdriver` connection using the specified port.  Retries
   /// on errors that may occur due to network issues.
-  Future<WebDriverSession> _createWebDriverSession(int remotePort,
+  Future<WebDriverSession?> _createWebDriverSession(int remotePort,
       {int tries = 5}) async {
     final accessPoint = await _portForwarder.forwardPort(remotePort);
     final webDriver = await retry(
@@ -330,17 +329,17 @@ class SingleWebDriverConnector {
   final Uri _chromeDriverUri;
 
   /// The current [WebDriver].
-  async_core.WebDriver _webDriver;
+  async_core.WebDriver? _webDriver;
 
   /// The DevTools port on the DUT. Note that this is not guaranteed to be
   /// accessible from the host; use [_devtoolsAccessPoint] instead.
-  int _devtoolsDevicePort;
+  int? _devtoolsDevicePort;
 
   /// The access point for the current DevTools usable on the host.
-  HostAndPort _devtoolsAccessPoint;
+  HostAndPort? _devtoolsAccessPoint;
 
   SingleWebDriverConnector(Uri chromeDriverUri, Sl4f sl4f,
-      {WebDriverHelper webDriverHelper, PortForwarder portForwarder})
+      {WebDriverHelper? webDriverHelper, PortForwarder? portForwarder})
       : _chromeDriverUri = chromeDriverUri,
         _sl4f = sl4f,
         _webDriverHelper = webDriverHelper ?? WebDriverHelper(),
@@ -363,7 +362,7 @@ class SingleWebDriverConnector {
 
   /// Searches for a Chrome context whose current URL satisfies [urlMatcher].
   /// Returns null if none is found.
-  Future<async_core.WebDriver> webDriverForUrl(
+  Future<async_core.WebDriver?> webDriverForUrl(
       bool Function(String) urlMatcher) async {
     if (await _checkCurrentWebDriver(urlMatcher)) {
       return _webDriver;
@@ -387,7 +386,7 @@ class SingleWebDriverConnector {
 
   /// Searches for a Chrome context whose currently displayed page matches one
   /// of the provided [hosts]. Returns null if none is found.
-  Future<async_core.WebDriver> webDriverForHosts(List<String> hosts) {
+  Future<async_core.WebDriver?> webDriverForHosts(List<String> hosts) {
     return webDriverForUrl((url) => hosts.contains(Uri.parse(url).host));
   }
 
@@ -397,12 +396,12 @@ class SingleWebDriverConnector {
       return false;
     }
     try {
-      await _webDriver.window;
+      await _webDriver!.window;
     } on WebDriverException {
       _log.fine('No current window.');
       return false;
     }
-    final url = await _webDriver.currentUrl;
+    final url = await _webDriver!.currentUrl;
     if (url == null) {
       _log.fine('No current URL.');
       return false;
@@ -422,7 +421,7 @@ class SingleWebDriverConnector {
   Future<void> _recreateWebDriver(int remotePort) async {
     if (_webDriver != null) {
       try {
-        await _webDriver.quit();
+        await _webDriver!.quit();
       } on WebDriverException {
         // Exceptions are safe to ignore here; we will create a new session.
       }
@@ -436,7 +435,7 @@ class SingleWebDriverConnector {
     // https://source.chromium.org/chromium/chromium/src/+/main:chrome/test/chromedriver/chrome_launcher.cc;l=390;drc=e35572b59f0e12a3b98a8565e714dc6ce65f9ae4
     try {
       _webDriver = await _webDriverHelper.createAsyncDriver(
-          _devtoolsAccessPoint, _chromeDriverUri);
+          _devtoolsAccessPoint!, _chromeDriverUri);
     } on WebDriverException catch (e) {
       // Do not throw so we may try the next port.
       _log.fine('Failed to create WebDriver: $e');
@@ -446,7 +445,7 @@ class SingleWebDriverConnector {
   Future<void> _maybeDropProxy() async {
     if (_devtoolsDevicePort != null && _devtoolsAccessPoint != null) {
       await _portForwarder.stopPortForwarding(
-          _devtoolsAccessPoint, _devtoolsDevicePort);
+          _devtoolsAccessPoint!, _devtoolsDevicePort!);
     }
     _devtoolsDevicePort = null;
     _devtoolsAccessPoint = null;
@@ -519,21 +518,21 @@ class SshPortForwarder implements PortForwarder {
 /// A PortForwarder that uses the TCP proxy on the DUT.
 class TcpPortForwarder implements PortForwarder {
   final String _targetHost;
-  final int _hostPort;
-  final TcpProxyController proxyControl;
+  final int? _hostPort;
+  final TcpProxyController? proxyControl;
 
   @override
   Future<HostAndPort> forwardPort(int targetPort) async {
-    final openPort = await proxyControl.openProxy(targetPort);
+    final openPort = await proxyControl!.openProxy(targetPort);
     return HostAndPort(_targetHost, _hostPort ?? openPort);
   }
 
   @override
   Future<void> stopPortForwarding(HostAndPort openAddr, int targetPort) async =>
-      await proxyControl.dropProxy(targetPort);
+      await proxyControl!.dropProxy(targetPort);
 
   @override
-  Future<void> tearDown() async => await proxyControl.stopAllProxies();
+  Future<void> tearDown() async => await proxyControl!.stopAllProxies();
 
   /// Creates a TcpPortForwarder.
   ///
@@ -543,7 +542,8 @@ class TcpPortForwarder implements PortForwarder {
   /// * [targetHost]: The domain name of the host (defaults to [sl4f.target]).
   /// This is useful for e.g. QEMU user-mode networking where a static port
   /// forwarding is set up before starting the virtual device.
-  TcpPortForwarder(Sl4f sl4f, {int proxyPort, int hostPort, String targetHost})
+  TcpPortForwarder(Sl4f sl4f,
+      {int? proxyPort, int? hostPort, String? targetHost})
       : proxyControl = proxyPort == null
             ? sl4f.proxy
             : TcpProxyController(sl4f, proxyPorts: [proxyPort]),
@@ -569,7 +569,7 @@ class WebDriverHelper {
   ///
   /// If an [HttpClient] is provided, it'll be used by everything *except* the
   /// sync [WebDriver] from [createDriver].
-  WebDriverHelper({io.HttpClient httpClient})
+  WebDriverHelper({io.HttpClient? httpClient})
       : _httpClient = httpClient ?? io.HttpClient();
 
   Map<String, dynamic> _capabilities(HostAndPort debuggerAddress) {
@@ -602,8 +602,8 @@ class WebDriverHelper {
   ///
   /// Note: [HttpClient] is only used to check [debuggerAddress] connectivity,
   /// but not used by the created [WebDriver].
-  Future<sync_core.WebDriver> createDriver(
-      HostAndPort debuggerAddress, int chromedriverPort) async {
+  Future<sync_core.WebDriver?> createDriver(
+      HostAndPort debuggerAddress, int? chromedriverPort) async {
     if (!await _checkDebugger(debuggerAddress)) {
       return null;
     }
@@ -619,7 +619,7 @@ class WebDriverHelper {
   /// The async version of [WebDriver] uses [HttpClient], so it supports HTTPS,
   /// proxy, custom headers, etc., which may be needed if ChromeDriver isn't
   /// running locally.
-  Future<async_core.WebDriver> createAsyncDriver(
+  Future<async_core.WebDriver?> createAsyncDriver(
       HostAndPort debuggerAddress, Uri chromedriverUri) async {
     if (!await _checkDebugger(debuggerAddress)) {
       return null;

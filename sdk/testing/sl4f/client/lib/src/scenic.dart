@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert' show base64Decode;
 
@@ -24,7 +23,7 @@ class Scenic {
   final DeviceLog _deviceLog;
 
   /// Constructs a [Scenic] object.
-  Scenic(this._sl4f, [Dump dump])
+  Scenic(this._sl4f, [Dump? dump])
       : _dump = dump ?? Dump(),
         _deviceLog = DeviceLog(_sl4f);
 
@@ -32,7 +31,7 @@ class Scenic {
   ///
   /// Returns the screenshot as an [Image]. If a [dumpName] is provided, the
   /// PNG is also dumped with that name as prefix.
-  Future<Image> takeScreenshot({String dumpName}) async {
+  Future<Image> takeScreenshot({String? dumpName}) async {
     final Map<String, dynamic> response =
         await _sl4f.request('scenic_facade.TakeScreenshot');
     final Map<String, dynamic> info = response['info'];

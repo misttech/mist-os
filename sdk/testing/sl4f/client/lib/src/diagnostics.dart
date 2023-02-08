@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'package:logging/logging.dart';
@@ -19,7 +18,7 @@ class Diagnostics {
   final Dump _dump;
 
   /// Constructs a [Diagnostics] object.
-  Diagnostics(this._sl4f, [Dump dump]) : _dump = dump ?? Dump();
+  Diagnostics(this._sl4f, [Dump? dump]) : _dump = dump ?? Dump();
 
   Future<void> dumpDiagnostics(String dumpName) async {
     if (_dump.hasDumpDirectory) {
@@ -34,12 +33,11 @@ class Diagnostics {
     try {
       final result = await _sl4f.request('netstack_facade.ListInterfaces', {});
       if (result == null) {
-        return null;
+        return;
       }
-      return _dump.writeAsBytes(
-          fileName, 'json', json.encode(result).codeUnits);
+      await _dump.writeAsBytes(fileName, 'json', json.encode(result).codeUnits);
     } on Exception catch (e) {
-      return _dump.writeAsString('error-$fileName', 'txt', 'error catch: $e');
+      await _dump.writeAsString('error-$fileName', 'txt', 'error catch: $e');
     }
   }
 
@@ -49,12 +47,11 @@ class Diagnostics {
     try {
       final result = await _sl4f.request('wlan.status', {});
       if (result == null) {
-        return null;
+        return;
       }
-      return _dump.writeAsBytes(
-          fileName, 'json', json.encode(result).codeUnits);
+      await _dump.writeAsBytes(fileName, 'json', json.encode(result).codeUnits);
     } on Exception catch (e) {
-      return _dump.writeAsString('error-$fileName', 'txt', 'error catch: $e');
+      await _dump.writeAsString('error-$fileName', 'txt', 'error catch: $e');
     }
   }
 }

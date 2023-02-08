@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 
@@ -57,7 +56,7 @@ class Modular {
   /// with system default config if not provided.
   ///
   /// If [sessionUrl] provided, the given session component will be launched.
-  Future<String> startBasemgr([String config, String sessionUrl]) async {
+  Future<String> startBasemgr([String? config, String? sessionUrl]) async {
     final args = {};
     if (config != null && config.isNotEmpty) {
       args['config'] = json.decode(config);
@@ -84,7 +83,7 @@ class Modular {
   ///
   /// If [sessionUrl] provided, the given session component will be launched.
   Future<void> boot(
-      {String config, bool assumeControl = true, String sessionUrl}) async {
+      {String? config, bool assumeControl = true, String? sessionUrl}) async {
     if (await isRunning) {
       _log.info('Not taking control of basemgr, it was already running.');
       return;

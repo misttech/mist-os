@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:math';
 
@@ -45,7 +44,7 @@ class Input {
   /// [duration]: Duration of the event(s) in milliseconds. Defaults to 0.
   /// These defaults are set in the input facade.
   Future<bool> tap(Point<int> coord,
-      {Rotation screenRotation, int tapEventCount, int duration}) async {
+      {Rotation? screenRotation, int? tapEventCount, int? duration}) async {
     final tcoord = _rotate(coord, screenRotation);
     final result = await _sl4f.request('input_facade.Tap', {
       'x': tcoord.x,
@@ -69,7 +68,7 @@ class Input {
   /// [duration]: Duration of the event(s) in milliseconds. Defaults to 0.
   /// These defaults are set in the input facade.
   Future<bool> multiFingerTap(List<Point<int>> fingers,
-      {Rotation screenRotation, int tapEventCount, int duration}) async {
+      {Rotation? screenRotation, int? tapEventCount, int? duration}) async {
     // Convert each Point finger to Touch json matching the FIDL struct `Touch`
     // defined in sdk/fidl/fuchsia.ui.input/input_reports.fidl
     // Example:
@@ -105,7 +104,7 @@ class Input {
   /// [duration].
   Future<bool> swipe(Point<int> from, Point<int> to,
       {Duration duration = const Duration(milliseconds: 300),
-      Rotation screenRotation}) async {
+      Rotation? screenRotation}) async {
     final tfrom = _rotate(from, screenRotation);
     final tto = _rotate(to, screenRotation);
     final result = await _sl4f.request('input_facade.Swipe', {
@@ -131,7 +130,7 @@ class Input {
   /// will be generated.
   Future<bool> multiFingerSwipe(List<Point<int>> from, List<Point<int>> to,
       {Duration duration = const Duration(milliseconds: 300),
-      Rotation screenRotation}) async {
+      Rotation? screenRotation}) async {
     final tfrom = from.map((fingerFrom) => _rotate(fingerFrom, screenRotation));
     final tto = to.map((fingerTo) => _rotate(fingerTo, screenRotation));
     final fingers = zip([tfrom, tto])
@@ -269,9 +268,9 @@ class Input {
   /// rotation) and clamps the coordinates to the valid range [0, 1000].
   ///
   /// If null is provided, the default specified in the constructor is used.
-  Point<int> _rotate(Point<int> coord, Rotation screenRotation) {
+  Point<int> _rotate(Point<int> coord, Rotation? screenRotation) {
     final rotation = screenRotation ?? _screenRotation;
-    Point<int> rotatedCoord;
+    late Point<int> rotatedCoord;
     switch (rotation) {
       case Rotation.degrees0:
         rotatedCoord = coord;

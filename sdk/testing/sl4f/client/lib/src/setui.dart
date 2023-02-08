@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'package:logging/logging.dart';
-import 'package:meta/meta.dart';
 
 import 'sl4f_client.dart';
 
@@ -47,12 +45,12 @@ class IntlInfo {
   final List<String> locales;
 
   IntlInfo(
-      {@required this.temperatureUnit,
-      @required this.timeZoneId,
-      @required this.hourCycle,
-      @required this.locales});
+      {required this.temperatureUnit,
+      required this.timeZoneId,
+      required this.hourCycle,
+      required this.locales});
 
-  factory IntlInfo.fromJson(Map<String, dynamic> json) {
+  factory IntlInfo.fromJson(Map<String, dynamic>? json) {
     if (json == null ||
         json['locales'] == null ||
         json['temperature_unit'] == null ||
