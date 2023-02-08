@@ -32,7 +32,6 @@ import (
 	_ "github.com/ulikunitz/xz"
 	_ "github.com/xeipuuv/gojsonschema"
 	_ "go.uber.org/goleak"
-	_ "go.uber.org/multierr"
 	_ "golang.org/x/crypto/openpgp"
 	_ "golang.org/x/crypto/ssh"
 	_ "golang.org/x/exp/maps"
