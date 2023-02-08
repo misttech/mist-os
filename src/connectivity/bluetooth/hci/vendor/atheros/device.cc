@@ -4,7 +4,7 @@
 
 #include "device.h"
 
-#include <fuchsia/hardware/bluetooth/c/fidl.h>
+#include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/zx/vmo.h>
 #include <zircon/process.h>
@@ -18,6 +18,7 @@
 #include <usb/usb.h>
 
 #include "logging.h"
+#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
 
 namespace btatheros {
 
@@ -43,7 +44,11 @@ static zx_protocol_device_t dev_proto = {
     .unbind = [](void* ctx) { return static_cast<Device*>(ctx)->DdkUnbind(); },
     .release = [](void* ctx) { return static_cast<Device*>(ctx)->DdkRelease(); },
     .message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
-      return static_cast<Device*>(ctx)->DdkMessage(msg, txn);
+      Device* thiz = static_cast<Device*>(ctx);
+      DdkTransaction transaction(txn);
+      fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
+          thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+      return transaction.Status();
     },
 };
 
@@ -316,14 +321,28 @@ zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
   return ZX_OK;
 }
 
-zx_status_t Device::OpenCommandChannel(void* ctx, zx_handle_t channel) {
-  auto& self = *static_cast<btatheros::Device*>(ctx);
-  return bt_hci_open_command_channel(&self.hci_, channel);
+void Device::OpenCommandChannel(OpenCommandChannelRequestView request,
+                                OpenCommandChannelCompleter::Sync& completer) {
+  if (zx_status_t status = bt_hci_open_command_channel(&hci_, request->channel.release());
+      status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
-zx_status_t Device::OpenAclDataChannel(void* ctx, zx_handle_t channel) {
-  auto& self = *static_cast<btatheros::Device*>(ctx);
-  return bt_hci_open_acl_data_channel(&self.hci_, channel);
+void Device::OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                                OpenAclDataChannelCompleter::Sync& completer) {
+  if (zx_status_t status = bt_hci_open_acl_data_channel(&hci_, request->channel.release());
+      status != ZX_OK) {
+    completer.Close(status);
+  }
+}
+
+void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                              OpenSnoopChannelCompleter::Sync& completer) {
+  if (zx_status_t status = bt_hci_open_snoop_channel(&hci_, request->channel.release());
+      status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
 zx_status_t Device::OpenScoChannel(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
@@ -336,15 +355,6 @@ void Device::ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_enco
 
 void Device::ResetSco(void* ctx, bt_hci_reset_sco_callback callback, void* cookie) {
   callback(cookie, ZX_ERR_NOT_SUPPORTED);
-}
-
-zx_status_t Device::OpenSnoopChannel(void* ctx, zx_handle_t channel) {
-  auto& self = *static_cast<btatheros::Device*>(ctx);
-  return bt_hci_open_snoop_channel(&self.hci_, channel);
-}
-
-zx_status_t Device::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  return fuchsia_hardware_bluetooth_Hci_dispatch(this, txn, msg, &fidl_ops_);
 }
 
 }  // namespace btatheros

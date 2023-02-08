@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_ATHEROS_DEVICE_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_ATHEROS_DEVICE_H_
 
-#include <fuchsia/hardware/bluetooth/c/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/ddk/device.h>
@@ -14,10 +14,6 @@
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
-
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
 
 struct qca_version {
   uint32_t rom_version;
@@ -31,11 +27,11 @@ namespace btatheros {
 
 class Device;
 
-class Device {
+class Device : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
   Device(zx_device_t* device, bt_hci_protocol_t* hci, usb_protocol_t* usb);
 
-  ~Device() = default;
+  ~Device() override = default;
 
   // Bind the device, invisibly.
   zx_status_t Bind();
@@ -51,23 +47,19 @@ class Device {
   void DdkUnbind();
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
-  zx_status_t DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
 
  private:
-  static zx_status_t OpenCommandChannel(void* ctx, zx_handle_t channel);
-  static zx_status_t OpenAclDataChannel(void* ctx, zx_handle_t channel);
+  void OpenCommandChannel(OpenCommandChannelRequestView request,
+                          OpenCommandChannelCompleter::Sync& completer) override;
+  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                          OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                        OpenSnoopChannelCompleter::Sync& completer) override;
   static zx_status_t OpenScoChannel(void* ctx, zx_handle_t channel);
   static void ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
                            sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                            void* cookie);
   static void ResetSco(void* ctx, bt_hci_reset_sco_callback callback, void* cookie);
-  static zx_status_t OpenSnoopChannel(void* ctx, zx_handle_t channel);
-
-  static constexpr fuchsia_hardware_bluetooth_Hci_ops_t fidl_ops_ = {
-      .OpenCommandChannel = OpenCommandChannel,
-      .OpenAclDataChannel = OpenAclDataChannel,
-      .OpenSnoopChannel = OpenSnoopChannel,
-  };
 
   // Informs the device manager that device initialization has failed,
   // which will unbind the device, and leaves an error on the kernel log
