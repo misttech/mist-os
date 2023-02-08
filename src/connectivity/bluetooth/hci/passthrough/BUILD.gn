@@ -16,7 +16,7 @@ driver_bind_rules("bt_hci_passthrough_bind") {
 fuchsia_driver("fuchsia_driver") {
   output_name = "bt-hci-passthrough"
 
-  sources = [ "passthrough.c" ]
+  sources = [ "passthrough.cc" ]
 
   deps = [
     ":bt_hci_passthrough_bind",

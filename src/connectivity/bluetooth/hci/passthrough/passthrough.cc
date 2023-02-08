@@ -27,8 +27,8 @@ static zx_status_t bt_hci_passthrough_get_protocol(void* ctx, uint32_t proto_id,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  passthrough_t* passthrough = ctx;
-  bt_hci_protocol_t* hci_proto = out_proto;
+  passthrough_t* passthrough = static_cast<passthrough_t*>(ctx);
+  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol_t*>(out_proto);
 
   // Forward the underlying bt-transport ops.
   hci_proto->ops = passthrough->hci.ops;
@@ -38,7 +38,7 @@ static zx_status_t bt_hci_passthrough_get_protocol(void* ctx, uint32_t proto_id,
 }
 
 static void bt_hci_passthrough_unbind(void* ctx) {
-  passthrough_t* passthrough = ctx;
+  passthrough_t* passthrough = static_cast<passthrough_t*>(ctx);
 
   device_unbind_reply(passthrough->dev);
 }
@@ -46,17 +46,17 @@ static void bt_hci_passthrough_unbind(void* ctx) {
 static void bt_hci_passthrough_release(void* ctx) { free(ctx); }
 
 zx_status_t fidl_bt_hci_open_command_channel(void* ctx, zx_handle_t channel) {
-  passthrough_t* hci = ctx;
+  passthrough_t* hci = static_cast<passthrough_t*>(ctx);
   return bt_hci_open_command_channel(&hci->hci, channel);
 }
 
 zx_status_t fidl_bt_hci_open_acl_data_channel(void* ctx, zx_handle_t channel) {
-  passthrough_t* hci = ctx;
+  passthrough_t* hci = static_cast<passthrough_t*>(ctx);
   return bt_hci_open_acl_data_channel(&hci->hci, channel);
 }
 
 zx_status_t fidl_bt_hci_open_snoop_channel(void* ctx, zx_handle_t channel) {
-  passthrough_t* hci = ctx;
+  passthrough_t* hci = static_cast<passthrough_t*>(ctx);
   return bt_hci_open_snoop_channel(&hci->hci, channel);
 }
 
@@ -74,14 +74,14 @@ static zx_status_t fuchsia_bt_hci_message_instance(void* ctx, fidl_incoming_msg_
 static zx_protocol_device_t passthrough_device_proto = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = bt_hci_passthrough_get_protocol,
-    .message = fuchsia_bt_hci_message_instance,
     .unbind = bt_hci_passthrough_unbind,
     .release = bt_hci_passthrough_release,
+    .message = fuchsia_bt_hci_message_instance,
 };
 
 static zx_status_t bt_hci_passthrough_bind(void* ctx, zx_device_t* device) {
   printf("bt_hci_passthrough_bind: starting\n");
-  passthrough_t* passthrough = calloc(1, sizeof(passthrough_t));
+  passthrough_t* passthrough = static_cast<passthrough_t*>(calloc(1, sizeof(passthrough_t)));
   if (!passthrough) {
     printf("bt_hci_passthrough_bind: not enough memory\n");
     return ZX_ERR_NO_MEMORY;
