@@ -81,6 +81,7 @@ impl Mocks for DisplayTest {
                             }
                             ControlRequest::SetManualBrightness { value, control_handle: _ } => {
                                 *brightness_handle.lock().await = Some(value);
+                                *auto_brightness_handle.lock().await = Some(false);
                                 let current_num = num_changes_handle.load(Ordering::Relaxed);
                                 (*num_changes_handle).store(current_num + 1, Ordering::Relaxed);
                                 requests_sender

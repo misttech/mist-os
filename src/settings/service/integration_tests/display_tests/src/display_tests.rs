@@ -46,6 +46,7 @@ async fn test_manual_brightness_with_brightness_controller() {
     // Verify the brightness changes as expected.
     let settings = proxy.watch().await.expect("watch completed");
     assert_eq!(settings.brightness_value, Some(CHANGED_BRIGHTNESS));
+    assert_eq!(settings.auto_brightness, Some(false));
 
     // Verify that the mock brightness service finishes processing requests.
     assert_eq!(Some(Request::SetManualBrightness), requests_receiver.next().await);
