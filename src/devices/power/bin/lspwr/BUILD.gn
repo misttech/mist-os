@@ -5,12 +5,8 @@
 executable("lspwr") {
   sources = [ "lspwr.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_c",
-    "//sdk/lib/fdio",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
