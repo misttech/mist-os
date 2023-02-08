@@ -14,9 +14,9 @@ type ResultConfig struct {
 	Outputs           []string    `json:"outputs"`
 	Templates         []*Template `json:"templates"`
 	Zip               bool        `json:"zip"`
-	ExitOnError       bool        `json:"exitOnError"`
 	GnGenOutputFile   string      `json:"gnGenOutputFile"`
 	OutputLicenseFile bool        `json:"outputLicenseFile"`
+	RunAnalysis       bool        `json:"runAnalysis"`
 	BuildInfoVersion  string      `json:"buildInfoVersion"`
 	BuildInfoProduct  string      `json:"buildInfoProduct"`
 	BuildInfoBoard    string      `json:"buildInfoBoard"`
@@ -37,7 +37,8 @@ func NewConfig() *ResultConfig {
 		Outputs:           make([]string, 0),
 		Templates:         make([]*Template, 0),
 		Checks:            make([]*Check, 0),
-		OutputLicenseFile: true,
+		OutputLicenseFile: false,
+		RunAnalysis:       false,
 	}
 }
 
@@ -60,11 +61,11 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 	c.Templates = append(c.Templates, other.Templates...)
 	c.Outputs = append(c.Outputs, other.Outputs...)
 	c.Zip = c.Zip || other.Zip
-	c.ExitOnError = c.ExitOnError || other.ExitOnError
 	if c.GnGenOutputFile == "" {
 		c.GnGenOutputFile = other.GnGenOutputFile
 	}
 	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
+	c.RunAnalysis = c.RunAnalysis || other.RunAnalysis
 	if c.BuildInfoVersion == "" {
 		c.BuildInfoVersion = other.BuildInfoVersion
 	}

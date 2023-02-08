@@ -32,6 +32,12 @@ func AnalyzeLicenses() error {
 				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmePath, err)
 			} else {
 				p.SearchResults = append(p.SearchResults, results...)
+				for _, r := range results {
+					key := string(r.LicenseData.Data)
+					if _, ok := p.SearchResultsDeduped[key]; !ok {
+						p.SearchResultsDeduped[key] = r
+					}
+				}
 			}
 			// Set the license URLs in the license file objects.
 			l.UpdateURLs(p.Name, p.URL)

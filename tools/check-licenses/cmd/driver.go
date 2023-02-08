@@ -17,7 +17,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/result"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/result/world"
 )
 
 // Execute kicks-off the check-licenses runthrough.
@@ -70,17 +69,21 @@ func Execute(ctx context.Context) error {
 		project.RootProject = project.AllProjects["."]
 	}
 
-	// Analyze the remaining projects, and keep track of all found license texts.
-	r = trace.StartRegion(ctx, "project.AnalyzeLicenses")
-	startAnalyze := time.Now()
-	log.Printf("Searching for license texts [%v projects]... ", len(project.FilteredProjects))
-	err = project.AnalyzeLicenses()
-	if err != nil {
-		log.Println("Error!")
-		return err
+	// License analysis happens in CQ.
+	// There is no need to analyze them if all we want to do is produce a NOTICE file.
+	if Config.RunAnalysis {
+		// Analyze the remaining projects, and keep track of all found license texts.
+		r = trace.StartRegion(ctx, "project.AnalyzeLicenses")
+		startAnalyze := time.Now()
+		log.Printf("Searching for license texts [%v projects]... ", len(project.FilteredProjects))
+		err = project.AnalyzeLicenses()
+		if err != nil {
+			log.Println("Error!")
+			return err
+		}
+		log.Printf("Done. [%v]\n", time.Since(startAnalyze))
+		r.End()
 	}
-	log.Printf("Done. [%v]\n", time.Since(startAnalyze))
-	r.End()
 
 	// Save the resulting NOTICE file (if necessary), all config files
 	// and execution metrics to the output directory.
@@ -117,9 +120,6 @@ func initialize() error {
 		return err
 	}
 	if err := result.Initialize(Config.Result); err != nil {
-		return err
-	}
-	if err := world.Initialize(Config.World); err != nil {
 		return err
 	}
 

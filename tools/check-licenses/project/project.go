@@ -22,15 +22,16 @@ import (
 //
 //	https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata
 type Project struct {
-	Root               string `json:"root"`
-	ReadmePath         string
-	Files              []*file.File
-	SearchableFiles    []*file.File
-	LicenseFileType    file.FileType
-	LicenseFileTypeMap map[string]file.FileType
-	RegularFileType    file.FileType
-	CustomFields       []string
-	SearchResults      []*license.SearchResult
+	Root                 string `json:"root"`
+	ReadmePath           string
+	Files                []*file.File
+	SearchableFiles      []*file.File
+	LicenseFileType      file.FileType
+	LicenseFileTypeMap   map[string]file.FileType
+	RegularFileType      file.FileType
+	CustomFields         []string
+	SearchResults        []*license.SearchResult
+	SearchResultsDeduped map[string]*license.SearchResult
 
 	// These fields are taken directly from the README.fuchsia files
 	Name               string
@@ -133,14 +134,15 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 	}
 
 	p := &Project{
-		Root:               projectRootPath,
-		ReadmePath:         readmePath,
-		LicenseFileType:    file.SingleLicense,
-		LicenseFileTypeMap: make(map[string]file.FileType, 0),
-		RegularFileType:    file.Any,
-		ShouldBeDisplayed:  true,
-		SourceCodeIncluded: false,
-		Children:           make(map[string]*Project, 0),
+		Root:                 projectRootPath,
+		ReadmePath:           readmePath,
+		LicenseFileType:      file.SingleLicense,
+		LicenseFileTypeMap:   make(map[string]file.FileType, 0),
+		RegularFileType:      file.Any,
+		ShouldBeDisplayed:    true,
+		SourceCodeIncluded:   false,
+		Children:             make(map[string]*Project, 0),
+		SearchResultsDeduped: make(map[string]*license.SearchResult, 0),
 	}
 
 	if Config.OutputLicenseFile {

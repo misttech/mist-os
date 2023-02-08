@@ -22,7 +22,6 @@ go_library("main") {
     "//tools/check-licenses/license",
     "//tools/check-licenses/project",
     "//tools/check-licenses/result",
-    "//tools/check-licenses/result/world",
     "//tools/check-licenses/util",
     "//tools/lib/logger",
   ]

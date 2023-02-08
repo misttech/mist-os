@@ -15,9 +15,9 @@ go_library("result") {
     "spdx.go",
     "spdx_test.go",
     "template.go",
+    "world.go",
   ]
   deps = [
-    "world",
     "//third_party/golibs:github.com/spdx/tools-golang",
     "//tools/check-licenses/directory",
     "//tools/check-licenses/license",
@@ -28,10 +28,7 @@ go_library("result") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":check-licenses_result_tests($host_toolchain)",
-    "world:tests",
-  ]
+  deps = [ ":check-licenses_result_tests($host_toolchain)" ]
 }
 
 if (is_host) {

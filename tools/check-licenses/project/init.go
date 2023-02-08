@@ -11,6 +11,7 @@ import (
 	"log"
 	"path/filepath"
 
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/util"
 )
 
@@ -19,6 +20,8 @@ var (
 	AllProjects      map[string]*Project
 	FilteredProjects map[string]*Project
 
+	DedupedLicenseData [][]*file.FileData
+
 	git *util.Git
 	ctx context.Context
 
@@ -26,8 +29,9 @@ var (
 )
 
 func init() {
-	AllProjects = make(map[string]*Project)
-	FilteredProjects = make(map[string]*Project)
+	AllProjects = make(map[string]*Project, 0)
+	FilteredProjects = make(map[string]*Project, 0)
+	DedupedLicenseData = make([][]*file.FileData, 0)
 }
 
 func Initialize(c *ProjectConfig) error {

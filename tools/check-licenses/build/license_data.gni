@@ -51,7 +51,6 @@ template("license_data") {
 
   check_licenses_target = "${target_name}_check-licenses"
   copy_txt_notices_target = "${target_name}_txt_copy"
-  copy_html_notices_target = "${target_name}_html_copy"
 
   compliance_output = "compliance.csv"
 
@@ -60,9 +59,7 @@ template("license_data") {
     copy_spdx_target = "${target_name}_spdx_copy"
   }
 
-  txt_notices_output = "license_texts_grouped_by_license_pattern_deduped.txt.gz"
-  html_notices_output =
-      "license_texts_grouped_by_license_pattern_deduped.html.gz"
+  txt_notices_output = "license_texts_grouped_by_project.txt.gz"
 
   product_board = "${build_info_product}.${build_info_board}"
   path_prefix = "${build_info_version}/${product_board}"
@@ -87,7 +84,6 @@ template("license_data") {
 
     outputs = [
       "$temp_out_dir/$path_prefix/out/$txt_notices_output",
-      "$temp_out_dir/$path_prefix/out/$html_notices_output",
       "$temp_out_dir/$path_prefix/out/$compliance_output",
     ]
 
@@ -146,18 +142,6 @@ template("license_data") {
     outputs = [ "$out_dir/NOTICE.txt.gz" ]
     deps = [ ":$check_licenses_target" ]
   }
-  copy(copy_html_notices_target) {
-    forward_variables_from(invoker,
-                           [
-                             "fuchsia_dir",
-                             "testonly",
-                             "visibility",
-                           ])
-
-    sources = [ "$temp_out_dir/$path_prefix/out/$html_notices_output" ]
-    outputs = [ "$out_dir/NOTICE.html.gz" ]
-    deps = [ ":$check_licenses_target" ]
-  }
 
   if (produce_spdx) {
     copy(copy_spdx_target) {
@@ -184,7 +168,6 @@ template("license_data") {
 
     deps = [
       ":$check_licenses_target",
-      ":$copy_html_notices_target",
       ":$copy_txt_notices_target",
     ]
     if (produce_spdx) {

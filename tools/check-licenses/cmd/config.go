@@ -16,7 +16,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/result"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/result/world"
 )
 
 var (
@@ -46,6 +45,10 @@ type CheckLicensesConfig struct {
 	// a NOTICE file.
 	OutputLicenseFile bool `json:"outputLicenseFile"`
 
+	// Flag stating whether or not check-licenses should analyze licenses
+	// and run tests on the output results
+	RunAnalysis bool `json:"runAnalysis"`
+
 	// FuchsiaDir is the path to the root of your fuchsia workspace.
 	// Typically ~/fuchsia, but can be set by environment variables
 	// or command-line arguments.
@@ -72,7 +75,6 @@ type CheckLicensesConfig struct {
 	Project   *project.ProjectConfig     `json:"project"`
 	Directory *directory.DirectoryConfig `json:"directory"`
 	Result    *result.ResultConfig       `json:"result"`
-	World     *world.WorldConfig         `json:"world"`
 }
 
 // Create a new CheckLicensesConfig object by reading in a config.json file.
@@ -109,7 +111,6 @@ func NewCheckLicensesConfigJson(configJson string) (*CheckLicensesConfig, error)
 		Project:   project.NewConfig(),
 		Directory: directory.NewConfig(),
 		Result:    result.NewConfig(),
-		World:     world.NewConfig(),
 	}
 
 	d := json.NewDecoder(strings.NewReader(configJson))
@@ -134,6 +135,7 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 	}
 
 	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
+	c.RunAnalysis = c.RunAnalysis || other.RunAnalysis
 
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
@@ -160,7 +162,6 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 	c.Project.Merge(other.Project)
 	c.Directory.Merge(other.Directory)
 	c.Result.Merge(other.Result)
-	c.World.Merge(other.World)
 
 	return nil
 }

@@ -41,6 +41,7 @@ var (
 	checkURLs = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
 
 	outputLicenseFile = flag.Bool("output_license_file", true, "Flag for enabling template expansions.")
+	runAnalysis       = flag.Bool("run_analysis", true, "Flag for enabling license analysis and 'result' package tests.")
 )
 
 func mainImpl() error {
@@ -146,6 +147,7 @@ func mainImpl() error {
 	ConfigVars["{GN_PATH}"] = *gnPath
 	ConfigVars["{GN_GEN_FILE}"] = *gnPath
 	ConfigVars["{OUTPUT_LICENSE_FILE}"] = strconv.FormatBool(*outputLicenseFile)
+	ConfigVars["{RUN_ANALYSIS}"] = strconv.FormatBool(*runAnalysis)
 
 	ConfigVars["{CHECK_URLS}"] = strconv.FormatBool(*checkURLs)
 

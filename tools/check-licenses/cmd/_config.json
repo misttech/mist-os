@@ -1,5 +1,6 @@
 {
     "outputLicenseFile": {OUTPUT_LICENSE_FILE},
+    "runAnalysis": {RUN_ANALYSIS},
     "buildInfoVersion": "{BUILD_INFO_VERSION}",
     "buildInfoProduct": "{BUILD_INFO_PRODUCT}",
     "buildInfoBoard": "{BUILD_INFO_BOARD}",
@@ -13,8 +14,7 @@
                 "{FUCHSIA_DIR}/tools/check-licenses/file/_config.json",
                 "{FUCHSIA_DIR}/tools/check-licenses/license/_config.json",
                 "{FUCHSIA_DIR}/tools/check-licenses/project/_config.json",
-                "{FUCHSIA_DIR}/tools/check-licenses/result/_config.json",
-                "{FUCHSIA_DIR}/tools/check-licenses/result/world/_config.json"
+                "{FUCHSIA_DIR}/tools/check-licenses/result/_config.json"
             ],
             "notes": [
                 "Import the default settings for each subpackage of the check-licenses tool."

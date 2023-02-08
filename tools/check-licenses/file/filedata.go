@@ -32,6 +32,9 @@ type FileData struct {
 	PatternPath string
 	URL         string `json:"url"`
 
+	BeingSurfaced      string
+	SourceCodeIncluded string
+
 	// SPDX fields for referencing this file content
 	// in the SPDX output file.
 	SPDXName string `json:"SPDXName"`

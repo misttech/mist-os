@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/result/world"
 )
 
 // Generate output files for every template defined in the config file.
@@ -30,12 +28,7 @@ func expandTemplates() (string, error) {
 	var b strings.Builder
 	b.WriteString("\n")
 
-	w, err := world.NewWorld()
-	if err != nil {
-		return "", err
-	}
-	b.WriteString(w.Status.String())
-	b.WriteString("\n")
+	w := getWorldStruct()
 
 	for _, o := range Config.Outputs {
 		if t, ok := AllTemplates[o]; !ok {

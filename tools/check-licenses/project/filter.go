@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
@@ -44,6 +45,30 @@ func FilterProjects() error {
 	if err != nil {
 		return err
 	}
+
+	dedupedLicenseDataMap := make(map[string][]*file.FileData)
+	for _, p := range FilteredProjects {
+		for _, lf := range p.LicenseFile {
+			for _, ld := range lf.Data {
+				key := string(ld.Data)
+				if _, ok := dedupedLicenseDataMap[key]; !ok {
+					dedupedLicenseDataMap[key] = make([]*file.FileData, 0)
+				}
+				dedupedLicenseDataMap[key] = append(dedupedLicenseDataMap[key], ld)
+			}
+		}
+	}
+
+	for _, v := range dedupedLicenseDataMap {
+		sort.SliceStable(v, func(i, j int) bool {
+			return v[i].LibraryName > string(v[j].LibraryName)
+		})
+		DedupedLicenseData = append(DedupedLicenseData, v)
+	}
+
+	sort.SliceStable(DedupedLicenseData, func(i, j int) bool {
+		return string(DedupedLicenseData[i][0].Data) > string(DedupedLicenseData[j][0].Data)
+	})
 
 	return nil
 }

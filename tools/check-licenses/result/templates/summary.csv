@@ -1,4 +1,0 @@
-Project,License File,Library Name,Line Number
-{{ $csvData := .GetCSVEntries }}
-{{ range $_, $entry := $csvData.Entries }}
-{{ $entry.Project }},{{ $entry.Path }},{{ $entry.Package }},{{ $entry.Left }}{{ end }}

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
-	"go.fuchsia.dev/fuchsia/tools/check-licenses/result/world"
 )
 
 const (
@@ -69,13 +69,13 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 	}
 	b.WriteString(s)
 
-	err = RunChecks()
-	if err != nil {
-		if Config.ExitOnError {
+	if Config.RunAnalysis {
+		err = RunChecks()
+		if err != nil {
 			return "", err
-		} else {
-			// TODO: Log err to a file
 		}
+	} else {
+		log.Printf(" -> Not running tests on results.\n")
 	}
 
 	if Config.OutputLicenseFile {
@@ -83,16 +83,9 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 		if err != nil {
 			return "", err
 		}
-
-		s2, err := savePackageInfo("world", world.Config, world.Metrics)
-		if err != nil {
-			return "", err
-		}
-
-		b.WriteString(s2)
 		b.WriteString(s1)
 	} else {
-		b.WriteString("Not expanding templates.\n")
+		log.Printf(" -> Not expanding templates.\n")
 	}
 
 	projectList := make([]*project.Project, 0)
@@ -116,7 +109,7 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 			b.WriteString(s)
 		}
 	} else {
-		b.WriteString("Not generating SPDX doc.\n")
+		log.Printf(" -> Not generating SPDX doc.\n")
 	}
 
 	if err = writeFile("summary", []byte(b.String())); err != nil {

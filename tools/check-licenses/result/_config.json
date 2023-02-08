@@ -1,6 +1,7 @@
 {
   "result": {
     "outputLicenseFile": {OUTPUT_LICENSE_FILE},
+    "runAnalysis": {RUN_ANALYSIS},
     "fuchsiaDir": "{FUCHSIA_DIR}",
     "rootOutDir": "{ROOT_OUT_DIR}",
     "outDir": "{OUT_DIR}",
@@ -11,14 +12,7 @@
     "buildInfoBoard": "{BUILD_INFO_BOARD}",
     "outputs": [
       "compliance.csv",
-      "summary.csv",
-      "license_texts_grouped_by_project.txt",
-      "license_texts_grouped_by_project_deduped.txt",
-      "license_all_grouped_by_license_pattern_deduped.txt",
-      "license_meta_grouped_by_license_pattern_deduped.txt",
-      "license_texts_grouped_by_license_pattern_deduped.txt",
-      "license_texts_grouped_by_license_pattern_deduped.html",
-      "compliance_merged.csv"
+      "license_texts_grouped_by_project.txt"
     ],
     "templates": [
       {
@@ -28,7 +22,6 @@
         "notes": []
       }
     ],
-    "exitOnError": true,
     "zip": true,
     "checks": [
       {
