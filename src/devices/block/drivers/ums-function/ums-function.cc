@@ -4,8 +4,8 @@
 // found in the LICENSE file.
 
 #include <assert.h>
+#include <fidl/fuchsia.hardware.usb.peripheral.block/cpp/wire.h>
 #include <fuchsia/hardware/usb/function/c/banjo.h>
-#include <fuchsia/hardware/usb/peripheral/block/c/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -74,7 +74,23 @@ static struct {
         },
 };
 
-typedef struct {
+struct usb_ums_t : fidl::WireServer<fuchsia_hardware_usb_peripheral_block::Device> {
+  void EnableWritebackCache(EnableWritebackCacheCompleter::Sync& completer) override {
+    writeback_cache = true;
+    completer.Reply(ZX_OK);
+  }
+
+  void DisableWritebackCache(DisableWritebackCacheCompleter::Sync& completer) override {
+    writeback_cache = false;
+    completer.Reply(ZX_OK);
+  }
+
+  void SetWritebackCacheReported(SetWritebackCacheReportedRequestView request,
+                                 SetWritebackCacheReportedCompleter::Sync& completer) override {
+    writeback_cache_report = request->report;
+    completer.Reply(ZX_OK);
+  }
+
   zx_device_t* zxdev;
   usb_function_protocol_t function;
   usb_request_t* cbw_req;
@@ -109,7 +125,7 @@ typedef struct {
   cnd_t event;
   mtx_t mtx;
   std::atomic_int pending_request_count;
-} usb_ums_t;
+};
 
 static void ums_cbw_complete(void* ctx, usb_request_t* req);
 static void ums_data_complete(void* ctx, usb_request_t* req);
@@ -589,39 +605,18 @@ static void usb_ums_release(void* ctx) {
   free(ums);
 }
 
-static zx_status_t usb_ums_enable_writeback_cache(void* ctx, fidl_txn_t* txn) {
-  usb_ums_t* ums = (usb_ums_t*)ctx;
-  ums->writeback_cache = true;
-  return fuchsia_hardware_usb_peripheral_block_DeviceEnableWritebackCache_reply(txn, ZX_OK);
-}
-
-static zx_status_t usb_ums_disable_writeback_cache(void* ctx, fidl_txn_t* txn) {
-  usb_ums_t* ums = (usb_ums_t*)ctx;
-  ums->writeback_cache = false;
-  return fuchsia_hardware_usb_peripheral_block_DeviceDisableWritebackCache_reply(txn, ZX_OK);
-}
-
-static zx_status_t usb_ums_set_writeback_cache_reported(void* ctx, bool report, fidl_txn_t* txn) {
-  usb_ums_t* ums = (usb_ums_t*)ctx;
-  ums->writeback_cache_report = report;
-  return fuchsia_hardware_usb_peripheral_block_DeviceSetWritebackCacheReported_reply(txn, ZX_OK);
-}
-
-fuchsia_hardware_usb_peripheral_block_Device_ops_t usb_cache_proto = {
-    .EnableWritebackCache = usb_ums_enable_writeback_cache,
-    .DisableWritebackCache = usb_ums_disable_writeback_cache,
-    .SetWritebackCacheReported = usb_ums_set_writeback_cache_reported,
-};
-
-static zx_status_t usb_ums_message(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  return fuchsia_hardware_usb_peripheral_block_Device_dispatch(ctx, txn, msg, &usb_cache_proto);
-}
-
 static zx_protocol_device_t usb_ums_proto = {
     .version = DEVICE_OPS_VERSION,
     .unbind = usb_ums_unbind,
     .release = usb_ums_release,
-    .message = usb_ums_message,
+    .message =
+        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+          usb_ums_t* thiz = static_cast<usb_ums_t*>(ctx);
+          DdkTransaction transaction(txn);
+          fidl::WireDispatch<fuchsia_hardware_usb_peripheral_block::Device>(
+              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+          return transaction.Status();
+        },
 };
 static zx_handle_t vmo = 0;
 

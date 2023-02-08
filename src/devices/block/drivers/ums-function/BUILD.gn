@@ -34,7 +34,7 @@ fuchsia_driver("ums-function-driver") {
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral.block:fuchsia.hardware.usb.peripheral.block_c",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral.block:fuchsia.hardware.usb.peripheral.block_cpp_wire",
     "//sdk/lib/fit",
     "//src/devices/block/lib/scsi",
     "//src/devices/lib/driver",
@@ -44,9 +44,6 @@ fuchsia_driver("ums-function-driver") {
     "//src/lib/ddk",
     "//zircon/system/ulib/sync",
   ]
-
-  # TODO(https://fxbug.dev/111342): Remove.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_driver_component("ums-function") {
