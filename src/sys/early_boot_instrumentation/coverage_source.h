@@ -5,6 +5,7 @@
 #ifndef SRC_SYS_EARLY_BOOT_INSTRUMENTATION_COVERAGE_SOURCE_H_
 #define SRC_SYS_EARLY_BOOT_INSTRUMENTATION_COVERAGE_SOURCE_H_
 
+#include <fidl/fuchsia.boot/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -74,7 +75,7 @@ zx::result<> ExposePhysbootProfileData(fbl::unique_fd& physboot_data_dir, SinkDi
 //    'req_id'. Then the name generated for the data associated with the request(svc_id, req_id) =
 //    "svc_id"-"req_id"."vmo_name".
 // In essence "vmo_name" acts like the extension.
-SinkDirMap ExtractDebugData(zx::unowned_channel svc_stash);
+SinkDirMap ExtractDebugData(fidl::ServerEnd<fuchsia_boot::SvcStash> svc_stash);
 
 }  // namespace early_boot_instrumentation
 

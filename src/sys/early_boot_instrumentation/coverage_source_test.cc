@@ -268,10 +268,9 @@ void ValidatePublishedRequests(uint32_t svc_index, PublishRequest& request, Sink
 class ExtractDebugDataTest : public ::testing::Test {
  public:
   void SetUp() final {
-    zx::channel svc_stash_client;
-    ASSERT_EQ(zx::channel::create(0, &svc_stash_read_, &svc_stash_client), ZX_OK);
-    fidl::ClientEnd<fuchsia_boot::SvcStash> client_end(std::move(svc_stash_client));
-    svc_stash_.Bind(std::move(client_end));
+    zx::result client_end = fidl::CreateEndpoints(&svc_stash_read_);
+    ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
+    svc_stash_.Bind(std::move(client_end.value()));
   }
 
   void StashSvcWithPublishedData(const PublishRequest& publish_info, zx::eventpair& out_token) {
@@ -333,13 +332,13 @@ class ExtractDebugDataTest : public ::testing::Test {
     out_token = std::move(token2);
   }
 
-  zx::channel svc_stash_read_;
+  fidl::ServerEnd<fuchsia_boot::SvcStash> svc_stash_read_;
   fidl::WireSyncClient<fuchsia_boot::SvcStash> svc_stash_;
 };
 
 TEST_F(ExtractDebugDataTest, NoRequestsIsEmpty) {
   auto svc_stash = take_stash_read();
-  auto sink_map = ExtractDebugData(svc_stash.borrow());
+  auto sink_map = ExtractDebugData(std::move(svc_stash));
   ASSERT_TRUE(sink_map.empty());
 }
 
@@ -349,7 +348,7 @@ TEST_F(ExtractDebugDataTest, SingleStashedSvcWithSingleOutstandingPublishRequest
   zx::eventpair token;
 
   ASSERT_NO_FATAL_FAILURE(StashSvcWithPublishedData(req, token));
-  auto sink_map = ExtractDebugData(svc_stash.borrow());
+  auto sink_map = ExtractDebugData(std::move(svc_stash));
   ASSERT_FALSE(sink_map.empty());
   ValidatePublishedRequests(0u, req, sink_map);
 }
@@ -363,7 +362,7 @@ TEST_F(ExtractDebugDataTest, LlvmSinkHaveProfrawExtension) {
 
   ASSERT_NO_FATAL_FAILURE(StashSvcWithPublishedData(reqs, tokens));
 
-  auto sink_map = ExtractDebugData(svc_stash.borrow());
+  auto sink_map = ExtractDebugData(std::move(svc_stash));
   ASSERT_FALSE(sink_map.empty());
 
   ValidatePublishedRequests(0u, reqs, sink_map);
@@ -378,7 +377,7 @@ TEST_F(ExtractDebugDataTest, SingleStashedSvcWithMultipleOutstandingPublishReque
 
   ASSERT_NO_FATAL_FAILURE(StashSvcWithPublishedData(reqs, tokens));
 
-  auto sink_map = ExtractDebugData(svc_stash.borrow());
+  auto sink_map = ExtractDebugData(std::move(svc_stash));
   ASSERT_FALSE(sink_map.empty());
 
   ValidatePublishedRequests(0u, reqs, sink_map);
@@ -395,7 +394,7 @@ TEST_F(ExtractDebugDataTest, MultipleStashedSvcWithSingleOutstandingPublishReque
     ASSERT_NO_FATAL_FAILURE(StashSvcWithPublishedData(reqs[i], tokens[i]));
   }
 
-  auto sink_map = ExtractDebugData(svc_stash.borrow());
+  auto sink_map = ExtractDebugData(std::move(svc_stash));
   ASSERT_FALSE(sink_map.empty());
 
   for (uint32_t i = 0; i < reqs.size(); ++i) {

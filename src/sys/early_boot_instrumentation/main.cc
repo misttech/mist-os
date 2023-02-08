@@ -4,7 +4,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.boot/cpp/markers.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -64,7 +63,7 @@ int main(int argc, char** argv) {
 
     if (get_response->is_ok()) {
       auto& stash_svc = get_response->value()->resource;
-      sink_map = early_boot_instrumentation::ExtractDebugData(stash_svc.channel().borrow());
+      sink_map = early_boot_instrumentation::ExtractDebugData(std::move(stash_svc));
     }
   }
 

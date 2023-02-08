@@ -18,11 +18,9 @@ source_set("coverage-source") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_c",
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_c",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_c",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
