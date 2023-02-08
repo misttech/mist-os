@@ -11,6 +11,7 @@
 #include "src/devices/lib/log/log.h"
 
 namespace fdm = fuchsia_device_manager;
+namespace fdd = fuchsia_driver_development;
 
 DeviceManager::DeviceManager(Coordinator* coordinator, DriverHostCrashPolicy crash_policy)
     : coordinator_(coordinator), crash_policy_(crash_policy) {}
@@ -413,4 +414,18 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
   }
 
   return ZX_OK;
+}
+
+std::vector<fdd::wire::CompositeInfo> DeviceManager::GetCompositeInfoList(
+    fidl::AnyArena& arena) const {
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> list;
+  for (auto& composite : composite_devices_) {
+    list.push_back(composite.GetCompositeInfo(arena));
+  }
+
+  for (auto& [spec, composite] : composites_from_specs_) {
+    list.push_back(composite->GetCompositeInfo(arena));
+  }
+
+  return list;
 }

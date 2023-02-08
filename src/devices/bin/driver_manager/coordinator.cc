@@ -890,7 +890,9 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
 
 void Coordinator::GetCompositeInfo(GetCompositeInfoRequestView request,
                                    GetCompositeInfoCompleter::Sync& completer) {
-  auto iterator = std::make_unique<CompositeInfoIterator>(device_manager_->composite_devices());
+  auto arena = std::make_unique<fidl::Arena<512>>();
+  auto list = device_manager_->GetCompositeInfoList(*arena);
+  auto iterator = std::make_unique<CompositeInfoIterator>(std::move(arena), std::move(list));
   fidl::BindServer(dispatcher(), std::move(request->iterator), std::move(iterator),
                    [](auto* server, fidl::UnbindInfo info, auto channel) {
                      if (!info.is_peer_closed()) {

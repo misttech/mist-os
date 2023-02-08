@@ -146,50 +146,56 @@ protocol DriverInfoIterator {
 };
 
 /// Information for a composite node's fragment in DFv1.
-type Dfv1CompositeFragmentInfo = table {
+type LegacyCompositeFragmentInfo = table {
     1: name string:MAX;
     2: bind_rules
             vector<fuchsia.device.manager.BindInstruction>:fuchsia.device.manager.BIND_RULES_INSTRUCTIONS_MAX;
     3: device string:MAX;
 };
 
-/// Information for a composite node in DFv1.
-type Dfv1CompositeInfo = table {
+/// Information for a legacy composite node in DFv1.
+type LegacyCompositeNodeInfo = table {
+    /// A list of composite fragment information.
+    1: fragments vector<LegacyCompositeFragmentInfo>:MAX;
+
+    /// The node properties in the composite node.
+    2: properties
+            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
+};
+
+/// Information for a composite node's parent.
+type CompositeParentNodeInfo = table {
+    /// The name of the parent. Provided by the composite driver.
+    1: name string:MAX;
+
+    /// The topological path of the node that parents the composite node.
+    /// Only set if available.
+    2: device string:MAX;
+};
+
+
+/// Contains information for the composite node.
+type CompositeNodeInfo = strict union {
+    1: legacy LegacyCompositeNodeInfo;
+    2: parents vector<CompositeParentNodeInfo>:MAX;
+};
+
+/// Information for a composite node.
+type CompositeInfo = table {
     /// The name of the composite node.
     1: name string:MAX;
 
-    /// The url of the driver that has matched this node group. Empty if no driver has matched
-    /// to this node group.
+    /// The url of the driver matched to the composite node.
     2: driver string:MAX;
 
-    /// The index of the primary fragment.
-    3: primary_index uint32;
-
-    /// A list of composite fragment information.
-    4: fragments vector<Dfv1CompositeFragmentInfo>:MAX;
-
-    // The node properties in the composite node.
-    5: properties
-            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-
     /// The topological of the composite node. Empty if a composite node wasn't created.
-    6: topological_path string:MAX;
-};
+    3: topological_path string:MAX;
 
-/// Information for a composite node in DFv2.
-type Dfv2CompositeInfo = table {
-    /// The name of the composite node.
-    1: name string:MAX;
-};
+    /// The primary node index.
+    4: primary_index uint32;
 
-/// A list of composite nodes.
-// TODO(fxb/119947): Implement support for DFv2 composites.
-type CompositeList = strict union {
-    /// Composite node information in DFv1.
-    1: dfv1_composites vector<Dfv1CompositeInfo>:MAX;
-
-    /// Composite node information in DFv2.
-    2: dfv2_composites vector<Dfv2CompositeInfo>:MAX;
+    /// Information on the composite node.
+    5: node_info CompositeNodeInfo;
 };
 
 /// Used to page through a CompositeList.
@@ -197,7 +203,7 @@ protocol CompositeInfoIterator {
     /// Returns up to 100 entries at a time. Return empty when no more
     /// composites are left.
     GetNext() -> (struct {
-        composites CompositeList;
+        composites vector<CompositeInfo>:MAX;
     });
 };
 
@@ -205,7 +211,7 @@ type CompositeNodeSpecInfo = table {
     /// The name of the node group.
     1: name string:MAX;
 
-    /// The url of the driver that has matched this node group. Empty if no driver has matched
+    /// The url of the driver matched to the spec. Empty if no driver has matched
     /// to this node group.
     2: driver string:MAX;
 

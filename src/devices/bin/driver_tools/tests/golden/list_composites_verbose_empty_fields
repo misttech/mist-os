@@ -1,17 +1,9 @@
 Name     : composite_dev
-Driver   : N/A
-Device   : N/A
-  2 Properties
-  [ 1/ 2] : Key "avocet"                       Value 0x00000a
-  [ 2/ 2] : Key "stilt"                        Value false
-Fragments : 2
-Fragment 0 : sysmem 
+Driver   : fuchsia-boot:///#driver/waxwing.so
+Device   : dev/sys/composite_dev
+Parents  : 2
+Parent 0 : sysmem 
    Device : Unbound
-   Bind rules : Bytecode Version 1
-     BindInstruction { op: 1, arg: 30, debug: 0 }
-Fragment 1 : acpi (Primary)
+Parent 1 : acpi (Primary)
    Device : Unbound
-   Bind rules : Bytecode Version 1
-     BindInstruction { op: 2, arg: 50, debug: 0 }
-     BindInstruction { op: 1, arg: 30, debug: 0 }
 

@@ -95,7 +95,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // is invoked after this, it will reassemble the device.
   void Remove();
 
-  fuchsia_driver_development::wire::Dfv1CompositeInfo GetCompositeInfo(fidl::AnyArena& arena) const;
+  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(fidl::AnyArena& arena) const;
 
   CompositeDeviceFragment* GetPrimaryFragment();
   const CompositeDeviceFragment* GetPrimaryFragment() const;
@@ -118,6 +118,12 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // If the composite device does not have a driver host yet, this function
   // will create a new one.
   zx::result<fbl::RefPtr<DriverHost>> GetDriverHost();
+
+  fuchsia_driver_development::wire::LegacyCompositeNodeInfo GetLegacyCompositeInfo(
+      fidl::AnyArena& arena) const;
+
+  fidl::VectorView<fuchsia_driver_development::wire::CompositeParentNodeInfo> GetParentInfo(
+      fidl::AnyArena& arena) const;
 
   // Returns true if a fragment matches |dev|. Sets |*index_out| will be set to the
   // matching fragment.

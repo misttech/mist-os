@@ -30,30 +30,21 @@ pub async fn list_composites(
         let composite_list =
             iterator.get_next().await.context("CompositeInfoIterator GetNext() failed")?;
 
-        match composite_list {
-            fdd::CompositeList::Dfv1Composites(composites) => {
-                if composites.is_empty() {
-                    break;
-                }
+        if composite_list.is_empty() {
+            break;
+        }
 
-                for composite in composites {
-                    write_dfv1_composite(writer, composite, cmd.verbose)?;
-                }
-            }
-            fdd::CompositeList::Dfv2Composites(_) => {
-                // TODO(fxb/119947): Implement support for DFv2.
-                writeln!(writer, "DFv2 composites are currently not supported. See fxb/119947.")?;
-                break;
-            }
+        for composite in composite_list {
+            write_composite(writer, composite, cmd.verbose)?;
         }
     }
 
     Ok(())
 }
 
-fn write_dfv1_composite(
+fn write_composite(
     writer: &mut impl Write,
-    composite: fdd::Dfv1CompositeInfo,
+    composite: fdd::CompositeInfo,
     verbose: bool,
 ) -> Result<()> {
     if !verbose {
@@ -70,13 +61,32 @@ fn write_dfv1_composite(
         composite.topological_path.unwrap_or("N/A".to_string())
     )?;
 
+    match composite.node_info {
+        Some(fdd::CompositeNodeInfo::Legacy(info)) => {
+            write_legacy_composite_node_info(writer, composite.primary_index, info)?;
+        }
+        Some(fdd::CompositeNodeInfo::Parents(parents)) => {
+            write_parent_nodes_info(writer, composite.primary_index, parents)?;
+        }
+        None => {}
+    }
+
+    writeln!(writer)?;
+    Ok(())
+}
+
+fn write_legacy_composite_node_info(
+    writer: &mut impl Write,
+    primary_index: Option<u32>,
+    composite: fdd::LegacyCompositeNodeInfo,
+) -> Result<()> {
     write_node_properties(&composite.properties.unwrap_or(vec![]), writer)?;
 
     let fragments = composite.fragments.unwrap_or(vec![]);
     writeln!(writer, "{0: <10}: {1}", "Fragments", fragments.len())?;
 
     for (i, fragment) in fragments.into_iter().enumerate() {
-        let primary_tag = if composite.primary_index == Some(i as u32) { "(Primary)" } else { "" };
+        let primary_tag = if primary_index == Some(i as u32) { "(Primary)" } else { "" };
         writeln!(
             writer,
             "{0: <1} {1} : {2} {3}",
@@ -93,14 +103,39 @@ fn write_dfv1_composite(
             fragment.device.unwrap_or("Unbound".to_string())
         )?;
 
-        writeln!(writer, "   {0: <1} : Bytecode Version 1", "Bind rules")?;
+        writeln!(writer, "   {0: <1} :", "Bind rules")?;
         let bind_rules = fragment.bind_rules.unwrap_or(vec![]);
         for rule in bind_rules {
             writeln!(writer, "     {:?}", rule)?;
         }
     }
+    Ok(())
+}
 
-    writeln!(writer)?;
+fn write_parent_nodes_info(
+    writer: &mut impl Write,
+    primary_index: Option<u32>,
+    parents: Vec<fdd::CompositeParentNodeInfo>,
+) -> Result<()> {
+    writeln!(writer, "{0: <9}: {1}", "Parents", parents.len())?;
+    for (i, parent) in parents.into_iter().enumerate() {
+        let primary_tag = if primary_index == Some(i as u32) { "(Primary)" } else { "" };
+        writeln!(
+            writer,
+            "{0: <1} {1} : {2} {3}",
+            "Parent",
+            i,
+            parent.name.unwrap_or("".to_string()),
+            primary_tag
+        )?;
+
+        writeln!(
+            writer,
+            "   {0: <1} : {1}",
+            "Device",
+            parent.device.unwrap_or("Unbound".to_string())
+        )?;
+    }
     Ok(())
 }
 
@@ -139,40 +174,67 @@ mod tests {
         ]
     }
 
-    fn gen_composite_data() -> fdd::Dfv1CompositeInfo {
+    fn gen_legacy_composite_data() -> fdd::CompositeInfo {
         let test_fragments = vec![
-            fdd::Dfv1CompositeFragmentInfo {
+            fdd::LegacyCompositeFragmentInfo {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 device: Some("sysmem_dev".to_string()),
-                ..fdd::Dfv1CompositeFragmentInfo::EMPTY
+                ..fdd::LegacyCompositeFragmentInfo::EMPTY
             },
-            fdd::Dfv1CompositeFragmentInfo {
+            fdd::LegacyCompositeFragmentInfo {
                 name: Some("acpi".to_string()),
                 bind_rules: Some(vec![
                     BindInstruction { op: 2, arg: 50, debug: 0 },
                     BindInstruction { op: 1, arg: 30, debug: 0 },
                 ]),
                 device: Some("acpi_dev".to_string()),
-                ..fdd::Dfv1CompositeFragmentInfo::EMPTY
+                ..fdd::LegacyCompositeFragmentInfo::EMPTY
             },
         ];
 
-        fdd::Dfv1CompositeInfo {
+        let legacy_info = fdd::LegacyCompositeNodeInfo {
+            fragments: Some(test_fragments),
+            properties: Some(gen_composite_property_data()),
+            ..fdd::LegacyCompositeNodeInfo::EMPTY
+        };
+
+        fdd::CompositeInfo {
             name: Some("composite_dev".to_string()),
             driver: Some("fuchsia-boot:///#driver/waxwing.so".to_string()),
             topological_path: Some("dev/sys/composite_dev".to_string()),
             primary_index: Some(1),
-            fragments: Some(test_fragments),
-            properties: Some(gen_composite_property_data()),
-            ..fdd::Dfv1CompositeInfo::EMPTY
+            node_info: Some(fdd::CompositeNodeInfo::Legacy(legacy_info)),
+            ..fdd::CompositeInfo::EMPTY
         }
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_verbose() {
+        let test_parents = vec![
+            fdd::CompositeParentNodeInfo {
+                name: Some("sysmem".to_string()),
+                device: Some("path/sysmem_dev".to_string()),
+                ..fdd::CompositeParentNodeInfo::EMPTY
+            },
+            fdd::CompositeParentNodeInfo {
+                name: Some("acpi".to_string()),
+                device: Some("path/acpi_dev".to_string()),
+                ..fdd::CompositeParentNodeInfo::EMPTY
+            },
+        ];
+
+        let test_composite = fdd::CompositeInfo {
+            name: Some("composite_dev".to_string()),
+            driver: Some("fuchsia-boot:///#driver/waxwing.so".to_string()),
+            topological_path: Some("dev/sys/composite_dev".to_string()),
+            primary_index: Some(1),
+            node_info: Some(fdd::CompositeNodeInfo::Parents(test_parents)),
+            ..fdd::CompositeInfo::EMPTY
+        };
+
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_dfv1_composite(&mut test_write_buffer, gen_composite_data(), true).unwrap();
+        write_composite(&mut test_write_buffer, test_composite, true).unwrap();
         assert_eq!(
             include_str!("../../../tests/golden/list_composites_verbose"),
             test_write_buffer.content
@@ -180,9 +242,51 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_composite_nonverbose() {
+    async fn test_composite_verbose_empty_fields() {
+        let test_parents = vec![
+            fdd::CompositeParentNodeInfo {
+                name: Some("sysmem".to_string()),
+                ..fdd::CompositeParentNodeInfo::EMPTY
+            },
+            fdd::CompositeParentNodeInfo {
+                name: Some("acpi".to_string()),
+                ..fdd::CompositeParentNodeInfo::EMPTY
+            },
+        ];
+
+        let test_composite = fdd::CompositeInfo {
+            name: Some("composite_dev".to_string()),
+            driver: Some("fuchsia-boot:///#driver/waxwing.so".to_string()),
+            topological_path: Some("dev/sys/composite_dev".to_string()),
+            primary_index: Some(1),
+            node_info: Some(fdd::CompositeNodeInfo::Parents(test_parents)),
+            ..fdd::CompositeInfo::EMPTY
+        };
+
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_dfv1_composite(&mut test_write_buffer, gen_composite_data(), false).unwrap();
+        write_composite(&mut test_write_buffer, test_composite, true).unwrap();
+        println!("{}", test_write_buffer.content);
+
+        assert_eq!(
+            include_str!("../../../tests/golden/list_composites_verbose_empty_fields"),
+            test_write_buffer.content
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_legacy_composite_verbose() {
+        let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
+        write_composite(&mut test_write_buffer, gen_legacy_composite_data(), true).unwrap();
+        assert_eq!(
+            include_str!("../../../tests/golden/list_legacy_composites_verbose"),
+            test_write_buffer.content
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_legacy_composite_nonverbose() {
+        let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
+        write_composite(&mut test_write_buffer, gen_legacy_composite_data(), false).unwrap();
 
         let expected_output = "composite_dev\n";
         assert_eq!(expected_output, test_write_buffer.content);
@@ -191,36 +295,41 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_empty_fields() {
         let test_fragments = vec![
-            fdd::Dfv1CompositeFragmentInfo {
+            fdd::LegacyCompositeFragmentInfo {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 device: None,
-                ..fdd::Dfv1CompositeFragmentInfo::EMPTY
+                ..fdd::LegacyCompositeFragmentInfo::EMPTY
             },
-            fdd::Dfv1CompositeFragmentInfo {
+            fdd::LegacyCompositeFragmentInfo {
                 name: Some("acpi".to_string()),
                 bind_rules: Some(vec![
                     BindInstruction { op: 2, arg: 50, debug: 0 },
                     BindInstruction { op: 1, arg: 30, debug: 0 },
                 ]),
                 device: None,
-                ..fdd::Dfv1CompositeFragmentInfo::EMPTY
+                ..fdd::LegacyCompositeFragmentInfo::EMPTY
             },
         ];
 
-        let test_composite = fdd::Dfv1CompositeInfo {
+        let legacy_info = fdd::LegacyCompositeNodeInfo {
+            fragments: Some(test_fragments),
+            properties: Some(gen_composite_property_data()),
+            ..fdd::LegacyCompositeNodeInfo::EMPTY
+        };
+
+        let test_composite = fdd::CompositeInfo {
             name: Some("composite_dev".to_string()),
             driver: None,
             primary_index: Some(1),
-            properties: Some(gen_composite_property_data()),
-            fragments: Some(test_fragments),
-            ..fdd::Dfv1CompositeInfo::EMPTY
+            node_info: Some(fdd::CompositeNodeInfo::Legacy(legacy_info)),
+            ..fdd::CompositeInfo::EMPTY
         };
 
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_dfv1_composite(&mut test_write_buffer, test_composite, true).unwrap();
+        write_composite(&mut test_write_buffer, test_composite, true).unwrap();
         assert_eq!(
-            include_str!("../../../tests/golden/list_composites_verbose_empty_fields"),
+            include_str!("../../../tests/golden/list_legacy_composites_verbose_empty_fields"),
             test_write_buffer.content
         );
     }

@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_DEVICE_MANAGER_H_
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.driver.development/cpp/wire.h>
 
 #include "src/devices/bin/driver_manager/composite_device.h"
 #include "src/devices/bin/driver_manager/device.h"
@@ -66,6 +67,9 @@ class DeviceManager {
 
   // Pushes |new_device| to |devices_|.
   void AddToDevices(fbl::RefPtr<Device> new_device);
+
+  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfoList(
+      fidl::AnyArena& arena) const;
 
   fbl::TaggedDoublyLinkedList<fbl::RefPtr<Device>, Device::AllDevicesListTag>& devices() {
     return devices_;

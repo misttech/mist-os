@@ -21,9 +21,9 @@ CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std
 
 CompositeDeviceFragment::~CompositeDeviceFragment() = default;
 
-fdd::wire::Dfv1CompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo(
+fdd::wire::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo(
     fidl::AnyArena& arena) const {
-  auto fragment_info = fdd::wire::Dfv1CompositeFragmentInfo::Builder(arena).name(
+  auto fragment_info = fdd::wire::LegacyCompositeFragmentInfo::Builder(arena).name(
       fidl::StringView(arena, name_.c_str()));
 
   if (bound_device_) {

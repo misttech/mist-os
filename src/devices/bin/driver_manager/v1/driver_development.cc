@@ -157,25 +157,14 @@ void DeviceInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
       fidl::VectorView<fdd::wire::DeviceInfo>::FromExternal(result.data(), result.size()));
 }
 
-// TODO(fxb/119948): Include composites from composite node specs.
-CompositeInfoIterator::CompositeInfoIterator(
-    const fbl::DoublyLinkedList<std::unique_ptr<CompositeDevice>>& composites) {
-  for (auto& composite : composites) {
-    list_.push_back(composite.GetCompositeInfo(arena_));
-  }
-}
-
 void CompositeInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
   if (offset_ >= list_.size()) {
-    completer.Reply(fdd::wire::CompositeList::WithDfv1Composites(
-        arena_, fidl::VectorView<fdd::wire::Dfv1CompositeInfo>{}));
+    completer.Reply(fidl::VectorView<fdd::wire::CompositeInfo>{});
     return;
   }
 
   auto result = cpp20::span(&list_[offset_], std::min(kMaxEntries, list_.size() - offset_));
   offset_ += result.size();
-
-  completer.Reply(fdd::wire::CompositeList::WithDfv1Composites(
-      arena_,
-      fidl::VectorView<fdd::wire::Dfv1CompositeInfo>::FromExternal(result.data(), result.size())));
+  completer.Reply(
+      fidl::VectorView<fdd::wire::CompositeInfo>::FromExternal(result.data(), result.size()));
 }
