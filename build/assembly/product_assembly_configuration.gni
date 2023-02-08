@@ -135,7 +135,7 @@ template("product_assembly_configuration") {
         if (defined(package.config_data)) {
           foreach(_config_data, package.config_data) {
             if (defined(_config_data.label)) {
-              base_package_config_data_deps += [ _config_data.label ]
+              cache_package_config_data_deps += [ _config_data.label ]
             }
           }
         }
