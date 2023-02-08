@@ -39,8 +39,26 @@ pub trait FidlIntoNative<T> {
     fn fidl_into_native(self) -> T;
 }
 
+impl<Native, Fidl> FidlIntoNative<Vec<Native>> for Vec<Fidl>
+where
+    Fidl: FidlIntoNative<Native>,
+{
+    fn fidl_into_native(self) -> Vec<Native> {
+        self.into_iter().map(|s| s.fidl_into_native()).collect()
+    }
+}
+
 pub trait NativeIntoFidl<T> {
     fn native_into_fidl(self) -> T;
+}
+
+impl<Native, Fidl> NativeIntoFidl<Vec<Fidl>> for Vec<Native>
+where
+    Native: NativeIntoFidl<Fidl>,
+{
+    fn native_into_fidl(self) -> Vec<Fidl> {
+        self.into_iter().map(|s| s.native_into_fidl()).collect()
+    }
 }
 
 /// Generates `FidlIntoNative` and `NativeIntoFidl` implementations that leaves the input unchanged.
@@ -426,17 +444,6 @@ impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
     }
 }
 
-impl NativeIntoFidl<Vec<fdecl::NameMapping>> for Vec<NameMapping> {
-    fn native_into_fidl(self) -> Vec<fdecl::NameMapping> {
-        self.into_iter().map(|s| s.native_into_fidl()).collect()
-    }
-}
-
-impl FidlIntoNative<Vec<NameMapping>> for Vec<fdecl::NameMapping> {
-    fn fidl_into_native(self) -> Vec<NameMapping> {
-        self.into_iter().map(|s| s.fidl_into_native()).collect()
-    }
-}
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::OfferService")]
@@ -1448,18 +1455,8 @@ fidl_translations_identical!(i8);
 fidl_translations_identical!(i16);
 fidl_translations_identical!(i32);
 fidl_translations_identical!(i64);
-fidl_translations_identical!(Vec<u8>);
-fidl_translations_identical!(Vec<u16>);
-fidl_translations_identical!(Vec<u32>);
-fidl_translations_identical!(Vec<u64>);
-fidl_translations_identical!(Vec<i8>);
-fidl_translations_identical!(Vec<i16>);
-fidl_translations_identical!(Vec<i32>);
-fidl_translations_identical!(Vec<i64>);
 fidl_translations_identical!(bool);
-fidl_translations_identical!(Vec<bool>);
 fidl_translations_identical!(String);
-fidl_translations_identical!(Vec<String>);
 fidl_translations_identical!(Vec<CapabilityName>);
 fidl_translations_identical!(fdecl::StartupMode);
 fidl_translations_identical!(fdecl::OnTerminate);
@@ -1469,30 +1466,6 @@ fidl_translations_identical!(fio::Operations);
 fidl_translations_identical!(fdecl::EnvironmentExtends);
 fidl_translations_identical!(fdecl::StorageId);
 fidl_translations_identical!(Vec<fprocess::HandleInfo>);
-
-impl FidlIntoNative<Vec<EventScope>> for Vec<fidl_fuchsia_component_decl::Ref> {
-    fn fidl_into_native(self) -> Vec<EventScope> {
-        self.into_iter().map(|s| s.fidl_into_native()).collect()
-    }
-}
-
-impl NativeIntoFidl<Vec<fidl_fuchsia_component_decl::Ref>> for Vec<EventScope> {
-    fn native_into_fidl(self) -> Vec<fidl_fuchsia_component_decl::Ref> {
-        self.into_iter().map(|s| s.native_into_fidl()).collect()
-    }
-}
-
-impl FidlIntoNative<Vec<UseSource>> for Vec<fidl_fuchsia_component_decl::Ref> {
-    fn fidl_into_native(self) -> Vec<UseSource> {
-        self.into_iter().map(|s| s.fidl_into_native()).collect()
-    }
-}
-
-impl NativeIntoFidl<Vec<fidl_fuchsia_component_decl::Ref>> for Vec<UseSource> {
-    fn native_into_fidl(self) -> Vec<fidl_fuchsia_component_decl::Ref> {
-        self.into_iter().map(|s| s.native_into_fidl()).collect()
-    }
-}
 
 fidl_translations_from_into!(cm_types::AllowedOffers, fdecl::AllowedOffers);
 fidl_translations_from_into!(CapabilityName, String);
