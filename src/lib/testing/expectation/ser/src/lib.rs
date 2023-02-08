@@ -72,6 +72,21 @@ pub enum Expectation {
     ExpectPassWithErrLogs(Matchers),
 }
 
+impl Expectation {
+    pub fn matchers(&self) -> &[glob::Pattern] {
+        match self {
+            Expectation::ExpectFailure(matchers)
+            | Expectation::ExpectPass(matchers)
+            | Expectation::Skip(matchers)
+            | Expectation::ExpectFailureWithErrLogs(matchers)
+            | Expectation::ExpectPassWithErrLogs(matchers) => {
+                let Matchers { matchers } = matchers;
+                matchers
+            }
+        }
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct Include {
     #[serde(rename = "include")]

@@ -12,6 +12,7 @@ if (is_host) {
     deps = [
       "//src/lib/testing/expectation/ser",
       "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:glob",
       "//third_party/rust_crates:serde_json5",
     ]
     sources = [ "src/main.rs" ]

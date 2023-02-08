@@ -61,6 +61,9 @@ fn preprocess(
         },
         cases_to_run: CasesToRun::from_str(&cases_to_run).expect("failed to convert from string"),
     };
+
+    run_final_validation(&merged_expectations);
+
     std::fs::write(
         &preprocessed_expectations_file,
         serde_json5::to_string(&merged_expectations)
@@ -86,6 +89,21 @@ fn preprocess(
         ),
     )
     .expect("failed to write depfile");
+}
+
+fn run_final_validation(merged_expectations: &ser::Expectations) {
+    let ser::Expectations { expectations, cases_to_run: _ } = merged_expectations;
+
+    if expectations.len() > 1 {
+        let matchers = expectations.last().unwrap().matchers();
+        if matchers.contains(&glob::Pattern::from_str("*").unwrap()) {
+            panic!(
+                "Found catch-all pattern (\"*\") in last `action` in expectations file. \
+                 This is almost certainly a mistake because the last matcher wins; the catch-all \
+                 means all preceding matchers are useless."
+            );
+        }
+    }
 }
 
 fn push_expectations(
@@ -191,7 +209,7 @@ mod tests {
 
     #[test]
     fn noop() {
-        const CONTENTS: &'static str = r#"
+        const CONTENTS: &str = r#"
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -210,6 +228,39 @@ mod tests {
             type: "skip",
             matchers: [
                 "*skip_these_cases*",
+            ],
+        },
+    ],
+    cases_to_run: {
+        type: "all",
+    }
+}
+"#;
+        test_preprocessor(
+            &TestFile { path: "root.json5".into(), contents: CONTENTS.to_string() },
+            &[],
+            serde_json5::from_str(CONTENTS).unwrap(),
+        )
+    }
+
+    #[test]
+    #[should_panic]
+    fn panics_when_last_matcher_is_catchall() {
+        const CONTENTS: &str = r#"
+{
+    actions: [
+        {
+            type: "expect_failure",
+            matchers: [ "some_case_expected_to_fail" ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [ "some_cases_*_expected_to_pass/*" ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                "*",
             ],
         },
     ],
