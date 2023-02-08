@@ -82,9 +82,6 @@ class HidButtonsDevice : public DeviceType {
   zx_status_t HidbusGetProtocol(uint8_t* protocol);
   zx_status_t HidbusSetProtocol(uint8_t protocol);
 
-  // Buttons Protocol Functions.
-  zx_status_t ButtonsGetChannel(zx::channel chan, async_dispatcher_t* dispatcher);
-
   // FIDL Interface Functions.
   bool GetState(ButtonType type);
   zx_status_t RegisterNotify(uint8_t types, ButtonsNotifyInterface* notify);
@@ -185,30 +182,17 @@ class HidButtonsHidBusFunction
 class ButtonsNotifyInterface : public fidl::WireServer<Buttons> {
  public:
   explicit ButtonsNotifyInterface(HidButtonsDevice* peripheral) : device_(peripheral) {}
-  ~ButtonsNotifyInterface() = default;
-
-  zx_status_t Init(async_dispatcher_t* dispatcher, zx::channel chan) {
-    fidl::OnUnboundFn<ButtonsNotifyInterface> unbound =
-        [this](ButtonsNotifyInterface*, fidl::UnbindInfo,
-               fidl::ServerEnd<fuchsia_buttons::Buttons>) { device_->ClosingChannel(this); };
-    binding_ = fidl::BindServer<Buttons>(dispatcher, std::move(chan), this, std::move(unbound));
-    return ZX_OK;
-  }
+  ~ButtonsNotifyInterface() override = default;
 
   const fidl::ServerBindingRef<Buttons>& binding() { return *binding_; }
 
   // Methods required by the FIDL interface
-  void GetState(GetStateRequestView request, GetStateCompleter::Sync& _completer) override {
-    _completer.Reply(device_->GetState(request->type));
+  void GetState(GetStateRequestView request, GetStateCompleter::Sync& completer) override {
+    completer.Reply(device_->GetState(request->type));
   }
   void RegisterNotify(RegisterNotifyRequestView request,
-                      RegisterNotifyCompleter::Sync& _completer) override {
-    zx_status_t status = ZX_OK;
-    if ((status = device_->RegisterNotify(request->types, this)) == ZX_OK) {
-      _completer.ReplySuccess();
-    } else {
-      _completer.ReplyError(status);
-    }
+                      RegisterNotifyCompleter::Sync& completer) override {
+    completer.Reply(zx::make_result(device_->RegisterNotify(request->types, this)));
   }
 
  private:

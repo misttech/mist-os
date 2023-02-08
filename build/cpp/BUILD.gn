@@ -102,8 +102,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//src/ui/bin/hardware_display_controller_provider/fake:bin",
     "//src/ui/bin/hardware_display_controller_provider/fake:lib",
     "//src/ui/bin/hardware_display_controller_provider/fake/tests:unittests",
-    "//src/ui/input/drivers/hid-buttons:common",
-    "//src/ui/input/drivers/hid-buttons:hid-buttons-test",
   ]
 }
 

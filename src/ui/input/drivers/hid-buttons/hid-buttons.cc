@@ -563,16 +563,6 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
   return status;
 }
 
-zx_status_t HidButtonsDevice::ButtonsGetChannel(zx::channel chan, async_dispatcher_t* dispatcher) {
-  fbl::AutoLock lock(&channels_lock_);
-
-  interfaces_.emplace_back(this);
-  auto status = interfaces_.back().Init(dispatcher, std::move(chan));
-  if (status != ZX_OK)
-    interfaces_.pop_back();
-  return status;
-}
-
 bool HidButtonsDevice::GetState(ButtonType type) {
   uint8_t val;
   gpio_read(&gpios_[buttons_[button_map_[type]].gpioA_idx].gpio, &val);
