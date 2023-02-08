@@ -62,11 +62,10 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   enum class Ep0State {
     DISCONNECTED,
     IDLE,
-    DATA_OUT,
-    DATA_IN,
-    STATUS_OUT,
-    STATUS_IN,
+    DATA,
+    STATUS,
     STALL,
+    TIMEOUT_RECOVERY,
   };
 
   using Request = usb::BorrowedRequest<void>;
@@ -107,7 +106,8 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   void StartEndpoints();
   void HandleEp0Setup();
   void HandleEp0Status(bool is_in);
-  void HandleEp0TransferComplete();
+  void HandleEp0TimeoutRecovery();
+  void HandleEp0TransferComplete(bool is_in);
   void HandleTransferComplete(uint8_t ep_num);
   void EnableEp(uint8_t ep_num, bool enable);
   void QueueNextRequest(Endpoint* ep) __TA_REQUIRES(ep->lock);
@@ -158,6 +158,8 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   bool configured_ = false;
   // True if recovering from diepint.timeout interrupt.
   bool timeout_recovering_ = false;
+  // The length of the last IN-data sent to the host.
+  uint32_t last_transmission_len_;
   // Raw IRQ timestamp from kernel
   zx::time irq_timestamp_;
   // Timestamp we were dispatched at

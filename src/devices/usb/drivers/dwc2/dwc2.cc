@@ -164,7 +164,7 @@ void Dwc2::HandleInEpInterrupt() {
         DIEPINT::Get(ep_num).FromValue(0).set_xfercompl(1).WriteTo(mmio);
 
         if (ep_num == DWC_EP0_IN) {
-          HandleEp0TransferComplete();
+          HandleEp0TransferComplete(true);
         } else {
           HandleTransferComplete(ep_num);
           if (diepint.nak()) {
@@ -177,7 +177,7 @@ void Dwc2::HandleInEpInterrupt() {
       // Timeout on receiving appropriate 2.0 token from host.
       if (diepint.timeout() && ep_num == DWC_EP0_IN) {
         switch (ep0_state_) {
-          case Ep0State::DATA_IN: {
+          case Ep0State::DATA: {
             // TODO(105382) remove logging once timeout recovery has stabilized.
             //   - what does the core think it's doing at wrt NAK status?
             //   - Is the core globally NAK-ing all non-periodic IN endpoints at the moment?
@@ -189,29 +189,26 @@ void Dwc2::HandleInEpInterrupt() {
                    dctl.reg_value(), depctl0.reg_value());
 
             // The timeout is due to one of two cases:
-            //   1. The core never received an ACK to sent IN-data.
-            //   2. IN-data was lost in transmission to the host.
+            //   1. The core never received an ACK to sent IN-data. In this case, the host
+            //      successfully received IN-data, and will subsequently ACK the transmission. That
+            //      ACK was lost in transit to the core.
+            //   2. IN-data was lost in transmission to the host. In this case, the host will
+            //      re-issue an IN-token requesting the data be retransmitted.
             //
-            // (7.6.7)
-            // In the ACK-case, the core will receive a transfer-complete OUT interrupt and should
-            // flush the TX-FIFO. In this case, the current control transaction is terminal and
-            // there is nothing left to do. In the lost data case, the host will resend an IN-token
-            // and the core will receive a transfer-complete IN interrupt.
+            // In the case of #1, the core is in a state where it NAKs all incoming tokens on
+            // OUT-EP0. It needs to clear NAK state and prepare to receive an ACK token from the
+            // host.
             //
-            // Having cleared the timeout interrupt, depending on which case caused the timeout,
-            // we can expect either an IN or OUT EP0 transfer-complete interrupt to follow. See the
-            // special case logic in either diepint/doepint.xfercompl() branches.
-            timeout_recovering_ = true;
-            DEPCTL::Get(DWC_EP0_IN).ReadFrom(mmio).set_cnak(1).set_epena(1).WriteTo(mmio);
-            DEPCTL::Get(DWC_EP0_OUT).ReadFrom(mmio).set_cnak(1).set_epena(1).WriteTo(mmio);
+            // In the case of #2, the core needs to prepare to retransmit the lost data (which
+            // remains in the FIFO).
+            HandleEp0TimeoutRecovery();
             DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
             break;
           }
           case Ep0State::DISCONNECTED:
           case Ep0State::IDLE:
-          case Ep0State::DATA_OUT:
-          case Ep0State::STATUS_OUT:
-          case Ep0State::STATUS_IN:
+          case Ep0State::STATUS:
+          case Ep0State::TIMEOUT_RECOVERY:
           case Ep0State::STALL:
             // The other cases should either theoretically never happen, or handled by the core
             // internally in dedicate-FIFO mode, but we'll log anyway.
@@ -318,7 +315,7 @@ void Dwc2::HandleOutEpInterrupt() {
 
         if (ep_num == DWC_EP0_OUT) {
           if (!doepint.setup()) {
-            HandleEp0TransferComplete();
+            HandleEp0TransferComplete(false);
           }
         } else {
           HandleTransferComplete(ep_num);
@@ -617,20 +614,15 @@ void Dwc2::HandleEp0Setup() {
   }
 
   if (length > 0) {
+    ep0_state_ = Ep0State::DATA;
+    auto* ep = &endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
+    ep->req_offset = 0;
+
     if (is_in) {
-      ep0_state_ = Ep0State::DATA_IN;
-      // send data in
-      auto* ep = &endpoints_[DWC_EP0_IN];
-      ep->req_offset = 0;
       ep->req_length = static_cast<uint32_t>(actual);
       fbl::AutoLock al(&ep->lock);
       StartTransfer(ep, (ep->req_length > 127 ? ep->max_packet_size : ep->req_length));
     } else {
-      ep0_state_ = Ep0State::DATA_OUT;
-      // queue a read for the data phase
-      ep0_state_ = Ep0State::DATA_OUT;
-      auto* ep = &endpoints_[DWC_EP0_OUT];
-      ep->req_offset = 0;
       ep->req_length = length;
       fbl::AutoLock al(&ep->lock);
       StartTransfer(ep, (length > 127 ? ep->max_packet_size : length));
@@ -644,7 +636,7 @@ void Dwc2::HandleEp0Setup() {
 
 // Handles status phase of a setup request
 void Dwc2::HandleEp0Status(bool is_in) {
-  ep0_state_ = (is_in ? Ep0State::STATUS_IN : Ep0State::STATUS_OUT);
+  ep0_state_ = Ep0State::STATUS;
   uint8_t ep_num = (is_in ? DWC_EP0_IN : DWC_EP0_OUT);
   auto* ep = &endpoints_[ep_num];
   fbl::AutoLock al(&ep->lock);
@@ -656,65 +648,101 @@ void Dwc2::HandleEp0Status(bool is_in) {
 }
 
 // Handles transfer complete events for endpoint zero
-void Dwc2::HandleEp0TransferComplete() {
+void Dwc2::HandleEp0TransferComplete(bool is_in) {
   switch (ep0_state_) {
     case Ep0State::IDLE: {
       StartEp0();
       break;
     }
-    case Ep0State::DATA_IN: {
-      auto* ep = &endpoints_[DWC_EP0_IN];
+    case Ep0State::DATA: {
+      auto* ep = &endpoints_[is_in ? DWC_EP0_IN : DWC_EP0_OUT];
       auto transfered = ReadTransfered(ep);
       ep->req_offset += transfered;
 
-      if (ep->req_offset == ep->req_length) {
+      if (is_in) { // data direction is IN-type (to the host).
+        if (ep->req_offset == ep->req_length) {
+          HandleEp0Status(false);
+        } else {
+          auto length = ep->req_length - ep->req_offset;
+          if (length > 64) {
+            length = 64;
+          }
+
+          // It's possible the data to be transmitted never makes it to the host. For all but the
+          // last packet's worth of data, the core handles retransmission internally. To prepare to
+          // (potentially) retransmit data, the last transmission's size is recorded.
+          last_transmission_len_ = length;
+
+          fbl::AutoLock al(&ep->lock);
+          StartTransfer(ep, length);
+        }
+      } else { // data direction is OUT-type (from the host).
+        if (ep->req_offset == ep->req_length) {
+          if (dci_intf_) {
+            size_t actual;
+            dci_intf_->Control(&cur_setup_, (uint8_t*)ep0_buffer_.virt(), ep->req_length, nullptr, 0,
+                               &actual);
+          }
+          HandleEp0Status(true);
+        } else {
+          auto length = ep->req_length - ep->req_offset;
+          // Strangely, the controller can transfer up to 127 bytes in a single transaction.
+          // But if length is > 127, the transfer must be done in multiple chunks, and those
+          // chunks must be 64 bytes long.
+          if (length > 127) {
+            length = 64;
+          }
+          fbl::AutoLock al(&ep->lock);
+          StartTransfer(ep, length);
+        }
+      }
+      break;
+    }
+    case Ep0State::STATUS:
+      ep0_state_ = Ep0State::IDLE;
+      if (!is_in) {
+        StartEp0();
+      }
+      break;
+    case Ep0State::TIMEOUT_RECOVERY: {
+      if (is_in) {
+        // Timeout was due to lost data.
+        auto* ep = &endpoints_[DWC_EP0_IN];
+        ep->req_offset += ReadTransfered(ep);
+        ZX_ASSERT(ep->req_offset == ep->req_length);
         HandleEp0Status(false);
       } else {
-        auto length = ep->req_length - ep->req_offset;
-        if (length > 64) {
-          length = 64;
-        }
-        fbl::AutoLock al(&ep->lock);
-        StartTransfer(ep, length);
+        // Timeout was due to lost ACK.
+        ep0_state_ = Ep0State::IDLE;
+        StartEp0();
       }
       break;
     }
-    case Ep0State::DATA_OUT: {
-      auto* ep = &endpoints_[DWC_EP0_OUT];
-      auto transfered = ReadTransfered(ep);
-      ep->req_offset += transfered;
-
-      if (ep->req_offset == ep->req_length) {
-        if (dci_intf_) {
-          size_t actual;
-          dci_intf_->Control(&cur_setup_, (uint8_t*)ep0_buffer_.virt(), ep->req_length, nullptr, 0,
-                             &actual);
-        }
-        HandleEp0Status(true);
-      } else {
-        auto length = ep->req_length - ep->req_offset;
-        // Strangely, the controller can transfer up to 127 bytes in a single transaction.
-        // But if length is > 127, the transfer must be done in multiple chunks, and those
-        // chunks must be 64 bytes long.
-        if (length > 127) {
-          length = 64;
-        }
-        fbl::AutoLock al(&ep->lock);
-        StartTransfer(ep, length);
-      }
-      break;
-    }
-    case Ep0State::STATUS_OUT:
-      ep0_state_ = Ep0State::IDLE;
-      StartEp0();
-      break;
-    case Ep0State::STATUS_IN:
-      ep0_state_ = Ep0State::IDLE;
-      break;
     case Ep0State::STALL:
     default:
       zxlogf(ERROR, "EP0 state is %d, should not get here", static_cast<int>(ep0_state_));
       break;
+  }
+}
+
+// Handles the case where the core experiences a timeout due to lost data or ACK.
+void Dwc2::HandleEp0TimeoutRecovery() {
+  timeout_recovering_ = true;
+  ep0_state_ = Ep0State::TIMEOUT_RECOVERY;
+
+  // If the ACK was lost in transit, prepare DWC_EP0_OUT to receive ACK.
+  {
+    auto* ep_out = &endpoints_[DWC_EP0_OUT];
+    fbl::AutoLock al(&ep_out->lock);
+    StartTransfer(ep_out, 0);
+  }
+
+  // Otherwise, if the data never made it to the host, prepare DWC_EP0_IN to retransmit.
+  {
+    auto* ep_in = &endpoints_[DWC_EP0_IN];
+    ep_in->req_offset -= last_transmission_len_;
+    fbl::AutoLock al(&ep_in->lock);
+    StartTransfer(ep_in, last_transmission_len_);
   }
 }
 
