@@ -172,7 +172,7 @@ TEST(ImageFormat, PassThroughColorSpace_V1_wire) {
       .has_format_modifier = true,
       .format_modifier =
           {
-              .value = fuchsia_sysmem_FORMAT_MODIFIER_LINEAR,
+              .value = fuchsia_sysmem::kFormatModifierLinear,
           },
   };
 
@@ -184,7 +184,7 @@ TEST(ImageFormat, PassThroughColorSpace_V1_wire) {
       .has_format_modifier = true,
       .format_modifier =
           {
-              .value = fuchsia_sysmem_FORMAT_MODIFIER_LINEAR,
+              .value = fuchsia_sysmem::kFormatModifierLinear,
           },
   };
 
@@ -312,7 +312,7 @@ TEST(ImageFormat, ZxPixelFormat_V1_wire) {
       EXPECT_EQ(back_format, format);
     }
     EXPECT_TRUE(sysmem_format.has_format_modifier);
-    EXPECT_EQ(fuchsia_sysmem_FORMAT_MODIFIER_LINEAR,
+    EXPECT_EQ(fuchsia_sysmem::kFormatModifierLinear,
               static_cast<uint64_t>(sysmem_format.format_modifier.value));
 
     sysmem_v1::wire::ColorSpace color_space;

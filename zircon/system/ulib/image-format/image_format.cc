@@ -6,9 +6,6 @@
 
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#if defined(FIDL_ALLOW_DEPRECATED_C_BINDINGS)
-#include <fuchsia/sysmem/c/fidl.h>
-#endif
 #include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/assert.h>
@@ -1444,24 +1441,6 @@ fpromise::result<fuchsia_sysmem::wire::PixelFormat> ImageFormatConvertZxToSysmem
   auto pixel_format_v1 = sysmem::V1CopyFromV2PixelFormat(pixel_format_v2);
   return fpromise::ok(fidl::ToWire(allocator, pixel_format_v1));
 }
-
-#if defined(FIDL_ALLOW_DEPRECATED_C_BINDINGS)
-bool ImageFormatConvertZxToSysmem(zx_pixel_format_t zx_pixel_format,
-                                  fuchsia_sysmem_PixelFormat* pixel_format_out) {
-  ZX_DEBUG_ASSERT(pixel_format_out);
-  fidl::Arena allocator;
-  auto pixel_format_v2_result = ImageFormatConvertZxToSysmem_v2(zx_pixel_format);
-  if (!pixel_format_v2_result.is_ok()) {
-    return false;
-  }
-  auto pixel_format_v2 = pixel_format_v2_result.take_value();
-  pixel_format_out->type =
-      static_cast<fuchsia_sysmem_PixelFormatType>(pixel_format_v2.type().value());
-  pixel_format_out->has_format_modifier = pixel_format_v2.format_modifier_value().has_value();
-  pixel_format_out->format_modifier.value = pixel_format_v2.format_modifier_value().value();
-  return true;
-}
-#endif
 
 fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstraints& constraints,
                                                        uint32_t width, uint32_t height) {

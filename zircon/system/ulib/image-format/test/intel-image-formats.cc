@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
 #include <zxtest/zxtest.h>
-
-#include "fidl/fuchsia.sysmem/cpp/wire.h"
-#include "fidl/fuchsia.sysmem2/cpp/wire.h"
-#include "fuchsia/sysmem/c/fidl.h"
 
 namespace sysmem_v1 = fuchsia_sysmem;
 namespace sysmem_v2 = fuchsia_sysmem2;
