@@ -1413,9 +1413,17 @@ pub fn sys_timerfd_settime(
     user_new_value: UserRef<itimerspec>,
     user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
-    if flags & !(TFD_TIMER_ABSTIME) != 0 {
+    if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
         not_implemented!(current_task, "timerfd_settime: flags {:#x}", flags);
         return error!(EINVAL);
+    }
+
+    if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
+        // TODO(fxbug.dev/121607): Respect the cancel on set.
+        not_implemented!(
+            current_task,
+            "timerfd_settime: TFD_TIMER_CANCEL_ON_SET accepted, but not implemented",
+        );
     }
 
     let file = current_task.files.get(fd)?;
