@@ -89,8 +89,16 @@ static zx_protocol_device_t bt_emulator_device_ops = {
     },
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg,
-                  fidl_txn_t* txn) { return DEV(ctx)->EmulatorMessage(msg, txn); }};
+    .message =
+        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+          logf(TRACE, "EmulatorMessage\n");
+          EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
+          DdkTransaction transaction(txn);
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::Emulator>(
+              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+          return transaction.Status();
+        },
+};
 
 // NOTE: We do not implement unbind and release. The lifecycle of the bt-hci
 // device is strictly tied to the bt-emulator device (i.e. it can never out-live
@@ -101,8 +109,16 @@ static zx_protocol_device_t bt_hci_device_ops = {
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
     },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg,
-                  fidl_txn_t* txn) { return DEV(ctx)->HciMessage(msg, txn); }};
+    .message =
+        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+          logf(TRACE, "HciMessage\n");
+          EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
+          DdkTransaction transaction(txn);
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
+              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+          return transaction.Status();
+        },
+};
 
 static bt_hci_protocol_ops_t hci_protocol_ops = {
     .open_command_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
@@ -226,16 +242,6 @@ void EmulatorDevice::Release() {
   logf(TRACE, "emulator dispatcher shut down\n");
 
   delete this;
-}
-
-zx_status_t EmulatorDevice::HciMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  logf(TRACE, "HciMessage\n");
-  return fuchsia_hardware_bluetooth_Hci_dispatch(this, txn, msg, &hci_fidl_ops_);
-}
-
-zx_status_t EmulatorDevice::EmulatorMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  logf(TRACE, "EmulatorMessage\n");
-  return fuchsia_hardware_bluetooth_Emulator_dispatch(this, txn, msg, &emul_fidl_ops_);
 }
 
 zx_status_t EmulatorDevice::GetProtocol(uint32_t proto_id, void* out_proto) {
@@ -594,20 +600,33 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
   }
 }
 
-zx_status_t EmulatorDevice::OpenCommandChannel(void* ctx, zx_handle_t channel) {
-  return static_cast<EmulatorDevice*>(ctx)->OpenChan(Channel::COMMAND, channel);
+void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
+                                        OpenCommandChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChan(Channel::COMMAND, request->channel.release());
+      status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
-zx_status_t EmulatorDevice::OpenAclDataChannel(void* ctx, zx_handle_t channel) {
-  return static_cast<EmulatorDevice*>(ctx)->OpenChan(Channel::ACL, channel);
+void EmulatorDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                                        OpenAclDataChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChan(Channel::ACL, request->channel.release()); status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
-zx_status_t EmulatorDevice::OpenSnoopChannel(void* ctx, zx_handle_t channel) {
-  return static_cast<EmulatorDevice*>(ctx)->OpenChan(Channel::SNOOP, channel);
+void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                                      OpenSnoopChannelCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChan(Channel::SNOOP, request->channel.release()); status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
-zx_status_t EmulatorDevice::OpenEmulatorChannel(void* ctx, zx_handle_t channel) {
-  return static_cast<EmulatorDevice*>(ctx)->OpenChan(Channel::EMULATOR, channel);
+void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
+  if (zx_status_t status = OpenChan(Channel::EMULATOR, request->channel.release());
+      status != ZX_OK) {
+    completer.Close(status);
+  }
 }
 
 }  // namespace bt_hci_virtual

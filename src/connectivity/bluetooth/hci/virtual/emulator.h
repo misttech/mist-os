@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_EMULATOR_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <fuchsia/hardware/bluetooth/c/fidl.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <fuchsia/hardware/test/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -31,7 +30,9 @@ namespace bt_hci_virtual {
 
 enum class Channel { ACL, COMMAND, SNOOP, EMULATOR };
 
-class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator {
+class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
  public:
   explicit EmulatorDevice(zx_device_t* device);
 
@@ -39,15 +40,16 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator {
   void Unbind();
   void Release();
 
-  zx_status_t HciMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
-  zx_status_t EmulatorMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
   zx_status_t GetProtocol(uint32_t proto_id, void* out_proto);
   zx_status_t OpenChan(Channel chan_type, zx_handle_t chan);
 
-  static zx_status_t OpenCommandChannel(void* ctx, zx_handle_t channel);
-  static zx_status_t OpenAclDataChannel(void* ctx, zx_handle_t channel);
-  static zx_status_t OpenSnoopChannel(void* ctx, zx_handle_t channel);
-  static zx_status_t OpenEmulatorChannel(void* ctx, zx_handle_t channel);
+  void OpenCommandChannel(OpenCommandChannelRequestView request,
+                          OpenCommandChannelCompleter::Sync& completer) override;
+  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
+                          OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
+                        OpenSnoopChannelCompleter::Sync& completer) override;
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
  private:
   void StartEmulatorInterface(zx::channel chan);
@@ -97,16 +99,6 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator {
                            zx_status_t wait_status, const zx_packet_signal_t* signal);
   void HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                        zx_status_t wait_status, const zx_packet_signal_t* signal);
-
-  static constexpr fuchsia_hardware_bluetooth_Hci_ops_t hci_fidl_ops_ = {
-      .OpenCommandChannel = OpenCommandChannel,
-      .OpenAclDataChannel = OpenAclDataChannel,
-      .OpenSnoopChannel = OpenSnoopChannel,
-  };
-
-  static constexpr fuchsia_hardware_bluetooth_Emulator_ops_t emul_fidl_ops_ = {
-      .Open = OpenEmulatorChannel,
-  };
 
   // Responsible for running the thread-hostile fake_device_, along with other members listed below.
   // Device publishes a bt-hci child, which is bound to by a bt-host child, which talks to the

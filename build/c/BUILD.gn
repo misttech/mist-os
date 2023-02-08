@@ -25,7 +25,6 @@ config("fidl-deprecated-c-bindings") {
   # and replace the contents of `visibility` with the script output.
   visibility = [
     "//src/connectivity/bluetooth/hci/passthrough:fuchsia_driver",
-    "//src/connectivity/bluetooth/hci/virtual:common",
 
     # TODO(https://fxbug.dev/111342): Remove.
     "//src/devices/block/drivers/ums-function:ums-function-driver",
