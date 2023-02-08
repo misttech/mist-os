@@ -16,88 +16,336 @@ config("fidl-llcpp-deprecated-raw-channels") {
   #
   # and replace the contents of `visibility` with the script output.
   visibility = [
+    #------------------
+    #------------------
     "//src/cobalt/bin/system-metrics:system_metrics_daemon_lib",
+
+    #------------------
+    #------------------
     "//src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver-driver",
+
+    #------------------
+    #------------------
     "//src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver",
+
+    #------------------
+    #------------------
     "//src/devices/bin/acpidump:src",
+
+    #------------------
+    #------------------
     "//src/devices/bin/driver_host:common",
+
+    #------------------
+    #------------------
     "//src/devices/bin/driver_host:driver_host_test",
+
+    #------------------
+    #------------------
     "//src/devices/bin/lsdev",
+
+    #------------------
+    #------------------
     "//src/devices/bin/register-util",
+
+    #------------------
+    #------------------
     "//src/devices/bin/register-util:bin",
+
+    #------------------
+    #------------------
     "//src/devices/block/bin/sdio",
+
+    #------------------
+    #------------------
     "//src/devices/block/bin/sdio:sdio-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/block/drivers/sdmmc:sdmmc-driver",
+
+    #------------------
+    #------------------
     "//src/devices/block/drivers/sdmmc:sdmmc-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/block/drivers/usb-mass-storage:ums-integration",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/x86/test:x86-board",
+
+    #------------------
+    #------------------
     "//src/devices/bus/drivers/platform:platform-bus-driver",
+
+    #------------------
+    #------------------
     "//src/devices/bus/drivers/platform:platform-bus-unittest",
+
+    #------------------
+    #------------------
     "//src/devices/cpu/drivers/aml-cpu:aml-cpu-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver",
+
+    #------------------
+    #------------------
     "//src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/i2c/bin:i2cutil",
+
+    #------------------
+    #------------------
     "//src/devices/mailbox/bin:hifi4rpctest",
+
+    #------------------
+    #------------------
     "//src/devices/ml/drivers/aml-nna:aml-nna-driver",
+
+    #------------------
+    #------------------
     "//src/devices/ml/drivers/aml-nna:aml-nna-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/ml/drivers/as370-nna:as370-nna-driver",
+
+    #------------------
+    #------------------
     "//src/devices/ml/drivers/as370-nna:as370-nna-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/power/drivers/ti-ina231:ti-ina231-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/ram/bin/ram-info",
+
+    #------------------
+    #------------------
     "//src/devices/ram/bin/ram-info:ram-info-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/ram/drivers/aml-ram:aml-ram-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/registers/drivers/registers:registers-driver",
+
+    #------------------
+    #------------------
     "//src/devices/registers/drivers/registers:registers-test",
+
+    #------------------
+    #------------------
     "//src/devices/registers/testing/mock-registers:mock-registers-test",
+
+    #------------------
+    #------------------
     "//src/devices/securemem/drivers/aml-securemem:aml-securemem-driver",
+
+    #------------------
+    #------------------
     "//src/devices/securemem/drivers/aml-securemem:aml-securemem-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/sysmem/drivers/sysmem:sysmem-unittest-bin",
+
+    #------------------
+    #------------------
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
+
+    #------------------
+    #------------------
     "//src/devices/sysmem/tools:common_srcs",
+
+    #------------------
+    #------------------
     "//src/devices/temperature/drivers/tmp112:tmp112-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/testing/fake_ddk",
+
+    #------------------
+    #------------------
     "//src/devices/tests/bind-fail-test:tests",
+
+    #------------------
+    #------------------
     "//src/devices/tests/ddk-environment-test:ddk-environment",
+
+    #------------------
+    #------------------
     "//src/devices/tests/ddk-metadata-test:tests",
+
+    #------------------
+    #------------------
     "//src/devices/tests/ddk-power",
+
+    #------------------
+    #------------------
     "//src/devices/tests/mock-device:mock-device-driver",
+
+    #------------------
+    #------------------
     "//src/devices/thermal/drivers/as370-thermal:as370-thermal-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/usb/bin/usb-fwloader",
+
+    #------------------
+    #------------------
     "//src/devices/usb/bin/usbctl",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-v2-driver",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-v2-driver",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-driver",
+
+    #------------------
+    #------------------
     "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-test-bin",
+
+    #------------------
+    #------------------
     "//src/graphics/display/bin/dsiutil",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/display:shared",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/display/tests:base",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/display/tests:display-core-unittests",
+
+    #------------------
+    #------------------
     "//src/graphics/display/testing",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-arm-mali/tests/integration:msd_arm_mali_integration_tests",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-intel-gen/tests/integration:msd_intel_gen_integration_tests",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-vsi-vip/tests/integration:msd_vsi_vip_integration_tests",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/virtio:gpu_lib",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/virtio:virtio-gpu-test",
+
+    #------------------
+    #------------------
     "//src/graphics/lib/magma/src/tools:magma-info-bin",
+
+    #------------------
+    #------------------
     "//src/graphics/lib/magma/tests/helper:test_device_helper",
+
+    #------------------
+    #------------------
     "//src/graphics/tests/vkloop",
+
+    #------------------
+    #------------------
     "//src/graphics/tests/vkloop:vkloop_bin",
+
+    #------------------
+    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/lib/intel-hda",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/usb-audio:shared",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/usb-audio:usb-audio-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/usb-audio/tests:usb-audio-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/tools/audio-driver-ctl:bin",
+
+    #------------------
+    #------------------
     "//src/modular/lib/fidl:environment",
+
+    #------------------
+    #------------------
     "//src/sys/appmgr:appmgr_for_test",
+
+    #------------------
+    #------------------
     "//src/sys/appmgr:bin",
+
+    #------------------
+    #------------------
     "//src/sys/appmgr:lib",
+
+    #------------------
+    #------------------
     "//src/sys/appmgr:unittest_bin",
+
+    #------------------
+    #------------------
     "//src/sys/lib/stdout-to-debuglog/cpp",
+
+    #------------------
+    #------------------
     "//src/sys/startup",
+
+    #------------------
+    #------------------
     "//src/ui/backlight/bin/backlight",
+
+    #------------------
+    #------------------
     "//src/ui/backlight/tests:backlight-test",
   ]
 }
@@ -123,114 +371,443 @@ config("fidl-wire-deprecated-mutable-tables") {
   #
   # and replace the contents of `visibility` with the script output.
   visibility = [
+    #------------------
+    #------------------
     "//examples/drivers/driver_test_realm/non_hermetic/cpp:driver_test_realm_example_non_hermetic_cpp",
+
+    #------------------
+    #------------------
     "//sdk/lib/driver/component/cpp:cpp_test",
+
+    #------------------
+    #------------------
     "//sdk/lib/driver/component/cpp:driver2_llcpp_test",
+
+    #------------------
+    #------------------
     "//sdk/lib/driver_test_realm:bin",
+
+    #------------------
+    #------------------
     "//sdk/lib/driver_test_realm/platform:bin",
+
+    #------------------
+    #------------------
     "//sdk/lib/driver_test_realm/simple:bin",
+
+    #------------------
+    #------------------
     "//sdk/lib/sys/cpp/tests:component_cpp_unittests_bin",
+
+    #------------------
+    #------------------
     "//src/connectivity/lib/network-device/cpp",
+
+    #------------------
+    #------------------
     "//src/connectivity/lib/network-device/cpp:cpp-test",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/drivers/network-device:driver-test",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/drivers/network-device/device",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/drivers/network-device/device:device_ddk",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/drivers/network-device/device:microbenchmarks_bin",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/drivers/network-device/device:test_bin",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/testing/netemul/network-context/lib:network_service",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/tun/network-tun:network_tun_unittest",
+
+    #------------------
+    #------------------
     "//src/connectivity/network/tun/network-tun:src",
+
+    #------------------
+    #------------------
     "//src/developer/forensics/crasher/cpp:crasher_exe",
+
+    #------------------
+    #------------------
     "//src/developer/shell/interpreter:shell_server_lib",
+
+    #------------------
+    #------------------
     "//src/devices/bin/driver_host2:unittests",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/astro:astro-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/nelson:nelson-module-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/sherlock:sherlock-dai-test-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/sherlock:sherlock-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/sherlock:sherlock-factory-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/drivers/vim3:vim3-driver",
+
+    #------------------
+    #------------------
     "//src/devices/board/lib/acpi",
+
+    #------------------
+    #------------------
     "//src/devices/board/lib/acpi:acpi-test",
+
+    #------------------
+    #------------------
     "//src/devices/board/lib/acpi:host-acpi",
+
+    #------------------
+    #------------------
     "//src/devices/lib/fidl-metadata",
+
+    #------------------
+    #------------------
     "//src/devices/nand/drivers/broker/test:nand-broker",
+
+    #------------------
+    #------------------
     "//src/devices/nand/drivers/broker/test:nandpart-broker",
+
+    #------------------
+    #------------------
     "//src/devices/nand/drivers/ram-nand:ram-nand-driver",
+
+    #------------------
+    #------------------
     "//src/devices/nand/drivers/ram-nand:test",
+
+    #------------------
+    #------------------
     "//src/devices/power/drivers/aml-pwm-regulator:aml-pwm-regulator-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/registers/drivers/registers:registers-test",
+
+    #------------------
+    #------------------
     "//src/devices/serial/drivers/ftdi:ftdi-driver",
+
+    #------------------
+    #------------------
     "//src/devices/serial/drivers/ftdi/test:common",
+
+    #------------------
+    #------------------
     "//src/devices/sysmem/drivers/sysmem:sysmem-unittest-bin",
+
+    #------------------
+    #------------------
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
+
+    #------------------
+    #------------------
     "//src/devices/tee/drivers/optee:optee-message-test-bin",
+
+    #------------------
+    #------------------
     "//src/devices/tee/drivers/optee:optee_lib",
+
+    #------------------
+    #------------------
     "//src/devices/tests/ddk-fallback-test-v2:test",
+
+    #------------------
+    #------------------
     "//src/devices/tests/devfs",
+
+    #------------------
+    #------------------
     "//src/devices/tests/fidl-protocol:test",
+
+    #------------------
+    #------------------
     "//src/devices/tests/v2/composite:root_driver",
+
+    #------------------
+    #------------------
     "//src/devices/tests/v2/dynamic_offers:root_driver",
+
+    #------------------
+    #------------------
     "//src/devices/tests/v2/interop:root_driver",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/aml-hdmi:aml-hdmi-test-bin",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/amlogic-display:common_srcs",
+
+    #------------------
+    #------------------
     "//src/graphics/display/drivers/simple:shared",
+
+    #------------------
+    #------------------
     "//src/graphics/display/lib/designware/test:hdmi-dw",
+
+    #------------------
+    #------------------
     "//src/graphics/display/testing",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/aml-gpu:aml-gpu-test-bin",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/misc/goldfish_control:control_driver-driver",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/misc/goldfish_control:goldfish-control-device-test",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-intel-gen:msd_intel_entry",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-intel-gen:msd_intel_test_entry",
+
+    #------------------
+    #------------------
     "//src/graphics/drivers/msd-intel-gen/src",
+
+    #------------------
+    #------------------
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:entry",
+
+    #------------------
+    #------------------
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:entry_test",
+
+    #------------------
+    #------------------
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:sysmem_connection",
+
+    #------------------
+    #------------------
     "//src/lib/fidl/llcpp/tests/conformance:*",
+
+    #------------------
+    #------------------
     "//src/lib/storage/vfs/cpp",
+
+    #------------------
+    #------------------
     "//src/media/audio/audio_core/v1:audio_core_lib",
+
+    #------------------
+    #------------------
     "//src/media/audio/audio_core/v1:unittest_bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/aml-g12-pdm:aml-g12-pdm-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/aml-g12-pdm/test:aml-g12-pdm-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/aml-g12-tdm/test:aml-g12-tdm-dai-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/aml-g12-tdm/test:aml-g12-tdm-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/intel-hda/controller:intel-hda-stream-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/intel-hda/controller:src",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/lib/audio-utils",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/lib/intel-hda",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/usb-audio:shared",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/usb-audio/tests:usb-audio-test-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver",
+
+    #------------------
+    #------------------
     "//src/media/audio/effects/test_effects:test_effects_v2",
+
+    #------------------
+    #------------------
     "//src/media/audio/lib/effects_loader:test",
+
+    #------------------
+    #------------------
     "//src/media/audio/lib/simple-audio-stream",
+
+    #------------------
+    #------------------
     "//src/media/audio/lib/simple-audio-stream/tests:sa-unittest-bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/lib/simple-codec",
+
+    #------------------
+    #------------------
     "//src/security/lib/tee/tee-client-api",
+
+    #------------------
+    #------------------
     "//src/security/lib/tee/tee-client-api:tee-client-api-static",
+
+    #------------------
+    #------------------
     "//src/storage/bin/mount",
+
+    #------------------
+    #------------------
     "//src/storage/blobfs/test:blobfs_unittest",
+
+    #------------------
+    #------------------
     "//src/storage/blobfs/test/integration:blobfs_verifier_service",
+
+    #------------------
+    #------------------
     "//src/storage/fshost:fshost-registry",
+
+    #------------------
+    #------------------
     "//src/storage/testing/driver_test_realm:bin",
+
+    #------------------
+    #------------------
     "//src/tests/benchmarks/fidl/driver_cpp:*",
+
+    #------------------
+    #------------------
     "//src/tests/benchmarks/fidl/driver_llcpp:*",
+
+    #------------------
+    #------------------
     "//src/tests/benchmarks/fidl/llcpp:*",
+
+    #------------------
+    #------------------
     "//src/tests/benchmarks/fidl/reference:benchmark_suite_reference",
+
+    #------------------
+    #------------------
     "//src/tests/benchmarks/fidl/walker:*",
+
+    #------------------
+    #------------------
     "//src/ui/input/drivers/hid-input-report:driver-internals",
+
+    #------------------
+    #------------------
     "//src/ui/input/drivers/hid-input-report:hid-input-report-test-bin",
+
+    #------------------
+    #------------------
     "//src/ui/input/drivers/virtio:virtio-input-test",
+
+    #------------------
+    #------------------
     "//src/ui/input/lib/hid-input-report",
+
+    #------------------
+    #------------------
     "//src/ui/input/lib/hid-input-report:lib-hid-input-report-test",
+
+    #------------------
+    #------------------
     "//src/virtualization/bin/vmm/device/virtio_magma:magma_image",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/image-format:image-format",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/image-format/test:image-format-test",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/mipi-dsi",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/sysmem-version:sysmem-version",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/sysmem-version/test:sysmem-version-test",
+
+    #------------------
+    #------------------
   ]
 }

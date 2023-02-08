@@ -25,13 +25,37 @@ config("fidl-deprecated-c-bindings") {
   # and replace the contents of `visibility` with the script output.
   visibility = [
     "//src/devices/clock/bin/clock",
+
+    #------------------
+    #------------------
     "//src/devices/usb/bin/usb-fwloader",
+
+    #------------------
+    #------------------
     "//src/devices/usb/tests/usb",
+
+    #------------------
+    #------------------
     "//src/lib/fidl/c/simple_tests:bin",
+
+    #------------------
+    #------------------
     "//src/media/audio/bin/ihda",
+
+    #------------------
+    #------------------
     "//zircon/kernel/lib/userabi/userboot/*",
+
+    #------------------
+    #------------------
     "//zircon/system/ulib/c/sanitizers",
+
+    #------------------
+    #------------------
     "//zircon/system/utest/fidl-utils",
+
+    #------------------
+    #------------------
   ]
 }
 
