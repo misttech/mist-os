@@ -56,7 +56,6 @@ filegroup(
     srcs = [
         "include/libunwind.h",
         "include/libunwind.modulemap",
-        "include/llvm-c/lto.h",
         "include/mach-o/compact_unwind_encoding.h",
         "include/mach-o/compact_unwind_encoding.modulemap",
         "include/unwind.h",
