@@ -61,6 +61,8 @@ template("package_tool_repository_publish") {
       rebase_path(depfile, root_build_dir),
       "--clean",
       "--time-versioning",
+      "--copy-mode",
+      "hard-link",
     ]
 
     if (defined(invoker.initial_trusted_root_metadata)) {
