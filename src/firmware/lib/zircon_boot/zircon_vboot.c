@@ -11,6 +11,7 @@
 #endif
 
 #include <lib/zbi/zbi.h>
+#include <lib/zircon_boot/zircon_boot.h>
 
 #include <libavb/libavb.h>
 #include <libavb_atx/libavb_atx.h>
@@ -38,7 +39,7 @@ static AvbIOResult GetPreloadedPartition(AvbOps* ops, const char* partition, siz
   *out_pointer = NULL;
   *out_num_bytes_preloaded = 0;
 
-  if (!strncmp(partition, "zircon", strlen("zircon"))) {
+  if (!strncmp(partition, GPT_ZIRCON_SLOTLESS_NAME, strlen(GPT_ZIRCON_SLOTLESS_NAME))) {
     *out_pointer = (uint8_t*)context->preloaded_image;
     size_t preloaded_size = context->preloaded_image->length + sizeof(zbi_header_t);
     if (num_bytes <= preloaded_size) {
@@ -238,7 +239,7 @@ static bool ZirconVBootSlotVerifyInternal(ZirconBootOps* zb_ops, zbi_header_t* i
     return false;
   }
 
-  const char* const requested_partitions[] = {"zircon", NULL};
+  const char* const requested_partitions[] = {GPT_ZIRCON_SLOTLESS_NAME, NULL};
 
   AvbSlotVerifyFlags flag =
       unlocked ? AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR : AVB_SLOT_VERIFY_FLAGS_NONE;

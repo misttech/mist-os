@@ -11,6 +11,7 @@ import tempfile
 from typing import List
 import subprocess
 
+MY_DIR = os.path.dirname(__file__)
 FUCHSIA_DIR = os.environ.get('FUCHSIA_DIR')
 AVB_REPO = os.path.join(
     f'{FUCHSIA_DIR}', 'third_party', 'android', 'platform', 'external', 'avb')
@@ -67,7 +68,7 @@ def GenerateTestImageCArrayDeclaration(
             data = zbi.read()
             decls.append(
                 GetCArrayDeclaration(
-                    data, f'kTestZircon{ab_suffix.upper()}Image'))
+                    data, f'kTestZircon{ab_suffix.capitalize()}Image'))
         # Generate vbmeta descriptor.
         vbmeta_desc = f'{temp_dir}/test_vbmeta_{ab_suffix}.desc'
         subprocess.run(
@@ -138,7 +139,7 @@ def GenerateTestImageCArrayDeclaration(
             data = vbmeta.read()
             decls.append(
                 GetCArrayDeclaration(
-                    data, f'kTestVbmeta{ab_suffix.upper()}Image'))
+                    data, f'kTestVbmeta{ab_suffix.capitalize()}Image'))
     return decls
 
 
@@ -196,8 +197,11 @@ if __name__ == '__main__':
     decls.extend(GenerateTestImageCArrayDeclaration('a', rollback_index=5))
     decls.extend(GenerateTestImageCArrayDeclaration('b', rollback_index=10))
     decls.extend(GenerateTestImageCArrayDeclaration('r'))
+    decls.extend(
+        GenerateTestImageCArrayDeclaration('slotless', rollback_index=2))
     # permanent attributes
     decls.append(
         GeneratePermanentAttributesDeclaration(ATX_PERMANENT_ATTRIBUTES))
     decls.append(GenerateTestGptDeclaration())
-    GenerateVariableDeclarationHeader(decls, 'test_images.h')
+    GenerateVariableDeclarationHeader(
+        decls, os.path.join(MY_DIR, 'test_images.h'))

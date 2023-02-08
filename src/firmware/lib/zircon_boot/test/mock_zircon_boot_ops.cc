@@ -59,10 +59,11 @@ void MockZirconBootOps::AddPartition(const char* name, size_t size) {
   partitions_[name] = std::vector<uint8_t>(size, 0);
 }
 
-void MockZirconBootOps::Boot(zbi_header_t* image, size_t capacity, AbrSlotIndex slot) {
+void MockZirconBootOps::RemovePartition(const char* name) { partitions_.erase(name); }
+
+void MockZirconBootOps::Boot(zbi_header_t* image, size_t capacity) {
   const uint8_t* start = reinterpret_cast<const uint8_t*>(image);
   booted_image_ = std::vector<uint8_t>(start, start + capacity);
-  booted_slot_ = slot;
 }
 
 void MockZirconBootOps::Reboot(bool force_recovery) {
@@ -96,7 +97,7 @@ AbrOps MockZirconBootOps::GetAbrOps() {
 }
 
 void MockZirconBootOps::SetAddDeviceZbiItemsMethod(
-    std::function<bool(zbi_header_t*, size_t, AbrSlotIndex)> method) {
+    std::function<bool(zbi_header_t*, size_t, const AbrSlotIndex*)> method) {
   add_zbi_items_ = method;
 }
 
@@ -165,15 +166,17 @@ void MockZirconBootOps::Reboot(ZirconBootOps* ops, bool force_recovery) {
   dev->Reboot(force_recovery);
 }
 
-void MockZirconBootOps::Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
-                             AbrSlotIndex slot) {
+void MockZirconBootOps::Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity) {
   MockZirconBootOps* dev = static_cast<MockZirconBootOps*>(ops->context);
-  dev->Boot(image, capacity, slot);
+  dev->Boot(image, capacity);
 }
 
 bool MockZirconBootOps::AddDeviceZbiItems(ZirconBootOps* zb_ops, zbi_header_t* image,
-                                          size_t capacity, AbrSlotIndex slot) {
+                                          size_t capacity, const AbrSlotIndex* slot) {
   MockZirconBootOps* dev = static_cast<MockZirconBootOps*>(zb_ops->context);
+  if (slot) {
+    dev->booted_slot_ = *slot;
+  }
   return dev->add_zbi_items_(image, capacity, slot);
 }
 

@@ -120,7 +120,7 @@ static uint8_t* GetKernelLoadBuffer(ZirconBootOps* ops, size_t* size) {
 static uint8_t kernel_boot_buffer[8 * 1024] __attribute__((__aligned__(ZIRCON_BOOT_KERNEL_ALIGN)));
 
 // Callback to boot the zircon kernel in `image`.
-static void Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity, AbrSlotIndex slot) {
+static void Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity) {
   // We need to relocate the kernel to a different buffer for booting because zircon requires
   // additional scratch memory at the tail when booting. The following API can be used to extract
   // the kernel from `image` and relocate it to a different address for booting. It also checks
@@ -190,10 +190,10 @@ static void Reboot(ZirconBootOps* ops, bool force_recovery) {
 // following callback is introduced for this purpose. It will be called by LoadAndBoot() before
 // handing off to the kernel.
 static bool AddZbiItems(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
-                        AbrSlotIndex slot) {
+                        const AbrSlotIndex* slot) {
   // Appends the current slot index. This should almost always be appended as it is required to
-  // enable A/B/R support in Zircon.
-  if (AppendCurrentSlotZbiItem(image, capacity, slot) != ZBI_RESULT_OK) {
+  // enable A/B/R support in Zircon, but in some cases such as RAM-boot there is no slot.
+  if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
     return false;
   }
 
@@ -334,7 +334,7 @@ static bool VerifiedBootReadPermanentAttributesHash(ZirconBootOps* ops, uint8_t*
 }
 
 // See GptBootMain() for details.
-ForceRecovery WaitForUserForceRecoveryInput(uint32_t timeout_seconds);
+ZirconBootMode WaitForUserForceRecoveryInput(uint32_t timeout_seconds);
 
 // Now integrate everything and start Zircon. The function should be called from the firmware main
 // function
@@ -380,10 +380,10 @@ ZirconBootResult GptBootMain(void) {
   // implement similar logic using device-specific APIs.
   uint32_t timeout_seconds = 2;
   printf("Autoboot in %u seconds. Listening for force recovery input...\n", timeout_seconds);
-  ForceRecovery force_recovery = WaitForUserForceRecoveryInput(timeout_seconds);
+  ZirconBootMode boot_mode = WaitForUserForceRecoveryInput(timeout_seconds);
 
   // Finally after all the preparation, we can call LoadAndBoot to boot zircon.
-  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, force_recovery);
+  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_mode);
 
   // Should not reach here if booted successfully. In this example, boot is simply a return and we
   // need to release the gpt_data to avoid sanitizer build errors.

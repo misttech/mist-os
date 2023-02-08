@@ -51,6 +51,21 @@ typedef enum ZirconBootResult {
   kBootResultErrorSlotVerification,
 } ZirconBootResult;
 
+// Partition names for slotless boot.
+//
+// These currently live here rather than zircon/hw/gpt.h because they aren't
+// fully-supported Fuchsia partitions, but instead are intended for two narrow
+// use cases:
+//   1. very early bring-up, before A/B/R partitions might be available
+//   2. RAM-booting, in which case these aren't actually partitions on-disk but
+//      just used for internal mapping to indicate the RAM buffer.
+//
+// Some OS functionality, in particular OTA/paving, may behave strangely or not
+// work at all during slotless boot so should not be relied upon for normal
+// operation.
+#define GPT_ZIRCON_SLOTLESS_NAME "zircon"
+#define GPT_VBMETA_SLOTLESS_NAME "vbmeta"
+
 struct ZirconBootOps;
 typedef struct ZirconBootOps ZirconBootOps;
 
@@ -95,10 +110,9 @@ struct ZirconBootOps {
   // @image: Pointer to the zircon kernel image in memory. It is expected to be a zbi
   //        container.
   // @capacity: Capacity of the container.
-  // @slot: The A/B/R slot index of the image.
   //
   // The function is not expected to return if boot is successful.
-  void (*boot)(ZirconBootOps* ops, zbi_header_t* image, size_t capacity, AbrSlotIndex slot);
+  void (*boot)(ZirconBootOps* ops, zbi_header_t* image, size_t capacity);
 
   // Checks whether the currently running firmware can be used to boot the target kernel slot.
   // If set, zircon_boot will call this before attempting to load/boot/decrease retry counter for
@@ -133,11 +147,11 @@ struct ZirconBootOps {
   // @ops: Pointer to the host |ZirconBootOps|
   // @image: The loaded kernel image as a ZBI container. Items should be appended to it.
   // @capacity: Capacity of the ZBI container.
-  // @slot: A/B/R slot of the loaded image.
+  // @slot: A/B/R slot of the loaded image, or NULL for a kZirconBootModeSlotless boot.
   //
   // Returns true on success.
   bool (*add_zbi_items)(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
-                        AbrSlotIndex slot);
+                        const AbrSlotIndex* slot);
 
   // Following are operations required to perform zircon verified boot.
   // Verified boot implemented in this library is based on libavb. The library use the following
@@ -231,10 +245,17 @@ struct ZirconBootOps {
   uint8_t* (*get_kernel_load_buffer)(ZirconBootOps* ops, size_t* size);
 };
 
-typedef enum ForceRecovery {
-  kForceRecoveryOn,
-  kForceRecoveryOff,
-} ForceRecovery;
+// Selector for A/B/R boot behavior.
+typedef enum ZirconBootMode {
+  // Boot from {zircon,vbmeta}_{a,b,r} partitions based on the A/B/R metadata.
+  kZirconBootModeAbr,
+
+  // Boot from {zircon,vbmeta}_r partitions, no A/B/R metadata used.
+  kZirconBootModeForceRecovery,
+
+  // Boot from {zircon,vbmeta} partitions, no A/B/R metadata used.
+  kZirconBootModeSlotless
+} ZirconBootMode;
 
 // Loads kernel image into memory and boots it. if ops.get_firmware_slot is set, the function
 // boots according to firwmare ABR. Otherwise it boots according to OS ABR.
@@ -243,18 +264,19 @@ typedef enum ForceRecovery {
 // @force_recovery: Enable/Disable force recovery.
 //
 // The function is not expected to return if boot is successful.
-ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ForceRecovery force_recovery);
+ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode);
 
-// Get the slot that will be selected to boot according to current A/B/R metadata.
+// Gets the slot that will be selected to boot according to current A/B/R metadata.
 // Specifically, this is the slot that will be booted by LoadAndBoot() with
-// `force_recovery=kForceRecoveryOff` assuming the slot passes all verification.
+// `boot_mode=kZirconBootModeAbr` assuming the slot passes all verification.
 AbrSlotIndex GetActiveBootSlot(ZirconBootOps* ops);
 
-// Create operations for libabr from a ZirconBootOps.
+// Creates operations for libabr from a ZirconBootOps.
 AbrOps GetAbrOpsFromZirconBootOps(ZirconBootOps* ops);
 
-// Returns the zircon partition name of a given slot.
-const char* GetSlotPartitionName(AbrSlotIndex slot);
+// Returns the zircon partition name of a given slot, the slotless partition
+// name if |slot| is NULL.
+const char* GetSlotPartitionName(const AbrSlotIndex* slot);
 
 #ifdef __cplusplus
 }

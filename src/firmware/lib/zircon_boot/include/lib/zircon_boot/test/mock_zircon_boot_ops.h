@@ -30,12 +30,20 @@ class MockZirconBootOps {
   zx::result<> ReadFromPartition(const char* part, size_t offset, size_t size, void* out);
   zx::result<> WriteToPartition(const char* part, size_t offset, size_t size, const void* payload);
   zx::result<size_t> GetPartitionSize(const char* part);
-  void AddPartition(const char* name, size_t size);
-  void Boot(zbi_header_t* image, size_t capacity, AbrSlotIndex slot);
+  void Boot(zbi_header_t* image, size_t capacity);
   std::optional<AbrSlotIndex> GetBootedSlot() const { return booted_slot_; }
   const std::vector<uint8_t>& GetBootedImage() const { return booted_image_; }
   AbrOps GetAbrOps();
-  void SetAddDeviceZbiItemsMethod(std::function<bool(zbi_header_t*, size_t, AbrSlotIndex)> method);
+  void SetAddDeviceZbiItemsMethod(
+      std::function<bool(zbi_header_t*, size_t, const AbrSlotIndex*)> method);
+
+  // Adds a partition to the fake disk.
+  void AddPartition(const char* name, size_t size);
+  // Removes an existing partition, which will cause a test failure on any
+  // further read or write access. Useful to ensure code-under-test never
+  // touches the given partition past a certain point.
+  void RemovePartition(const char* name);
+
   // Firmware ABR related
   AbrSlotIndex GetFirmwareSlot() { return firmware_slot_; }
   void SetFirmwareSlot(AbrSlotIndex slot) { firmware_slot_ = slot; }
@@ -63,7 +71,7 @@ class MockZirconBootOps {
   std::vector<uint8_t> booted_image_;
   std::optional<AbrSlotIndex> booted_slot_;
   std::vector<uint8_t> load_buffer_;
-  std::function<bool(zbi_header_t*, size_t, AbrSlotIndex)> add_zbi_items_;
+  std::function<bool(zbi_header_t*, size_t, const AbrSlotIndex*)> add_zbi_items_;
   AvbAtxPermanentAttributes permanent_attributes_;
 
   zx::result<cpp20::span<uint8_t>> GetPartitionSpan(const char* name, size_t offset, size_t size);
@@ -75,9 +83,9 @@ class MockZirconBootOps {
                                const void* src, size_t* write_size);
   static bool FirmwareCanBootKernelSlot(ZirconBootOps* ops, AbrSlotIndex kernel_slot, bool* out);
   static void Reboot(ZirconBootOps* ops, bool force_recovery);
-  static void Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity, AbrSlotIndex slot);
+  static void Boot(ZirconBootOps* ops, zbi_header_t* image, size_t capacity);
   static bool AddDeviceZbiItems(ZirconBootOps* zb_ops, zbi_header_t* image, size_t capacity,
-                                AbrSlotIndex slot);
+                                const AbrSlotIndex* slot);
 
   // For assigning to ZirconVBootOps
   static bool GetPartitionSize(ZirconBootOps* ops, const char* part, size_t* out);

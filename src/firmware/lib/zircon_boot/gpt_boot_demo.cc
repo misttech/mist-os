@@ -64,7 +64,7 @@ void StartKeyListener() {
   listener.detach();
 }
 
-extern "C" ForceRecovery WaitForUserForceRecoveryInput(uint32_t delay_seconds) {
+extern "C" ZirconBootMode WaitForUserForceRecoveryInput(uint32_t delay_seconds) {
   key = 0;
   auto start = std::chrono::high_resolution_clock::now();
   while (std::chrono::duration_cast<std::chrono::seconds>(
@@ -72,12 +72,12 @@ extern "C" ForceRecovery WaitForUserForceRecoveryInput(uint32_t delay_seconds) {
              .count() < delay_seconds) {
     if (key == 'f') {
       printf("Got force recovery request\n");
-      return kForceRecoveryOn;
+      return kZirconBootModeForceRecovery;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 
-  return kForceRecoveryOff;
+  return kZirconBootModeAbr;
 }
 
 int main(int argc, char* argv[]) {
