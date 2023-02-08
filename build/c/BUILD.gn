@@ -50,7 +50,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/media/audio/drivers/intel-hda/controller:controller_test",
     "//src/media/audio/drivers/intel-hda/controller:src",
     "//src/performance/ktrace_provider:bin",
-    "//src/power/thermd:bin",
     "//src/sys/early_boot_instrumentation:coverage-source",
     "//zircon/kernel/lib/userabi/userboot/*",
     "//zircon/system/ulib/c/sanitizers",
