@@ -180,7 +180,7 @@ pub enum KnownServiceProvider {
     DhcpServer { persistent: bool },
     Dhcpv6Client,
     DnsResolver,
-    Reachability,
+    Reachability { eager: bool },
     NetworkTestRealm,
     FakeClock,
 }
@@ -481,7 +481,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 ])),
                 ..fnetemul::ChildDef::EMPTY
             },
-            KnownServiceProvider::Reachability => fnetemul::ChildDef {
+            KnownServiceProvider::Reachability { eager } => fnetemul::ChildDef {
                 name: Some(constants::reachability::COMPONENT_NAME.to_string()),
                 source: Some(fnetemul::ChildSource::Component(
                     constants::reachability::COMPONENT_URL.to_string(),
@@ -516,7 +516,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::fake_clock::COMPONENT_NAME
                     )),
                 ])),
-                eager: Some(true),
+                eager: Some(*eager),
                 ..fnetemul::ChildDef::EMPTY
             },
             KnownServiceProvider::NetworkTestRealm => fnetemul::ChildDef {

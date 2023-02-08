@@ -275,12 +275,10 @@ impl EventLoop {
                         None => {}
                     }
                 },
-                // The interval timer is longer than the lookup future timeout,
-                // so the future will be terminated by the time the next
-                // interval is reached.
                 () = dns_interval_timer.select_next_some() => {
-                    debug_assert!(dns_lookup_fut.is_terminated());
-                    dns_lookup_fut.set(dns_lookup(&name_lookup).fuse());
+                    if dns_lookup_fut.is_terminated() {
+                        dns_lookup_fut.set(dns_lookup(&name_lookup).fuse());
+                    }
                 },
                 // If the DNS lookup errors or if there are no IpAddresses returned, DNS is
                 // inactive. In the future, another condition of DNS inactivity will be if the
