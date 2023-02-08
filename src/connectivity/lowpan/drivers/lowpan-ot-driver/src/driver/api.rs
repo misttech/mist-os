@@ -95,7 +95,8 @@ where
     BI: BackboneInterface,
 {
     async fn provision_network(&self, params: ProvisioningParams) -> ZxResult<()> {
-        debug!("Got provision command: {:?}", params);
+        info!("Got \"provision network\" request");
+        debug!("provision command: {:?}", params);
 
         // Wait until we are not busy.
         self.wait_for_state(|x| !x.is_busy()).await;
@@ -139,7 +140,7 @@ where
     }
 
     async fn leave_network(&self) -> ZxResult<()> {
-        fx_log_debug!("Got leave command");
+        info!("Got leave command");
 
         let task = async {
             let driver_state = self.driver_state.lock();
@@ -298,7 +299,8 @@ where
         &self,
         params: ProvisioningParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        fx_log_debug!("Got form command: {:?}", params);
+        info!("Got \"form network\" request");
+        debug!("form command: {:?}", params);
 
         ready(Err(ZxStatus::NOT_SUPPORTED)).into_stream().boxed()
     }
@@ -307,7 +309,8 @@ where
         &self,
         params: JoinParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        fx_log_debug!("Got join command: {:?}", params);
+        info!("Got \"join network\" request");
+        debug!("join command: {:?}", params);
 
         match params {
             JoinParams::JoinerParameter(joiner_params) => self.joiner_start(joiner_params),
@@ -559,6 +562,7 @@ where
     }
 
     async fn setup_ot_cli(&self, server_socket: fidl::Socket) -> ZxResult<()> {
+        info!("Got \"setup OT CLI\" request");
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
         let ot_ctl = &driver_state.ot_ctl;
@@ -623,6 +627,7 @@ where
     }
 
     async fn register_on_mesh_prefix(&self, net: OnMeshPrefix) -> ZxResult<()> {
+        info!("Got \"register on mesh prefix\" request");
         let prefix = if let Some(subnet) = net.subnet {
             Ok(ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len))
         } else {
@@ -657,6 +662,7 @@ where
         &self,
         subnet: fidl_fuchsia_net::Ipv6AddressWithPrefix,
     ) -> ZxResult<()> {
+        info!("Got \"unregister on mesh prefix\" request");
         let prefix = ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len);
 
         Ok(self.driver_state.lock().ot_instance.remove_on_mesh_prefix(&prefix).map_err(|e| {
@@ -666,6 +672,7 @@ where
     }
 
     async fn register_external_route(&self, net: ExternalRoute) -> ZxResult<()> {
+        info!("Got \"register external route\" request");
         let prefix = if let Some(subnet) = net.subnet {
             Ok(ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len))
         } else {
@@ -692,6 +699,7 @@ where
         &self,
         subnet: fidl_fuchsia_net::Ipv6AddressWithPrefix,
     ) -> ZxResult<()> {
+        info!("Got \"unregister external route\" request");
         let prefix = ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len);
 
         Ok(self.driver_state.lock().ot_instance.remove_external_route(&prefix).map_err(|e| {
@@ -746,6 +754,7 @@ where
     }
 
     async fn set_active_dataset_tlvs(&self, dataset: &[u8]) -> ZxResult {
+        info!("Got \"set active dataset\" request, dataset len:{}", dataset.len());
         let dataset = ot::OperationalDatasetTlvs::try_from_slice(dataset).map_err(|e| {
             warn!("set_active_dataset_tlvs: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
@@ -758,6 +767,7 @@ where
     }
 
     async fn attach_all_nodes_to(&self, dataset_raw: &[u8]) -> ZxResult<i64> {
+        info!("Got \"attach all nodes to\" request, raw dataset len:{}", dataset_raw.len());
         const DELAY_TIMER_MS: u32 = 300 * 1000;
 
         let dataset_tlvs = ot::OperationalDatasetTlvs::try_from_slice(dataset_raw)
@@ -823,6 +833,8 @@ where
     }
 
     async fn meshcop_update_txt_entries(&self, txt_entries: Vec<(String, Vec<u8>)>) -> ZxResult {
+        info!("Got \"meshcop update txt entries\" request, txt entries size:{}", txt_entries.len());
+
         *self.border_agent_vendor_txt_entries.lock().await = txt_entries;
         self.update_border_agent_service().await;
 
@@ -931,6 +943,7 @@ where
     }
 
     async fn update_feature_config(&self, config: FeatureConfig) -> ZxResult<()> {
+        info!("Got \"update feature config\" request");
         let driver_state = self.driver_state.lock();
         let ot = &driver_state.ot_instance;
 
