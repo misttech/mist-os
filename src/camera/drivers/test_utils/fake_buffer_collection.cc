@@ -46,7 +46,7 @@ zx_status_t GetImageFormat(image_format_2_t& image_format, uint32_t pixel_format
               .has_format_modifier = false,
               .format_modifier =
                   {
-                      .value = fuchsia_sysmem::kFormatModifierNone,
+                      .value = static_cast<uint64_t>(fuchsia_sysmem::kFormatModifierNone),
                   },
           },
       .coded_width = width,
@@ -56,7 +56,7 @@ zx_status_t GetImageFormat(image_format_2_t& image_format, uint32_t pixel_format
       .layers = 1,
       .color_space =
           {
-              .type = fidl::ToUnderlying(fuchsia_sysmem::ColorSpaceType::kSrgb),
+              .type = static_cast<color_space_type_t>(fuchsia_sysmem::ColorSpaceType::kSrgb),
           },
       .has_pixel_aspect_ratio = false,
       .pixel_aspect_ratio_width = 1,

@@ -27,9 +27,10 @@ TEST(CreateContiguousBufferCollectionInfo2, CreatesCollection2) {
   buffer_collection_info_2_t buffer_collection;
   image_format_2_t image_format;
 
-  EXPECT_EQ(GetImageFormat(image_format, fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12),
-                           kWidth, kHeight),
-            ZX_OK);
+  EXPECT_EQ(
+      GetImageFormat(image_format, static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12),
+                     kWidth, kHeight),
+      ZX_OK);
   ASSERT_EQ(CreateContiguousBufferCollectionInfo(buffer_collection, image_format, bti.get(),
                                                  kNumberOfBuffers),
             ZX_OK);
@@ -55,9 +56,10 @@ TEST(CreateContiguousBufferCollectionInfo2, FailsOnBadHandle) {
   buffer_collection_info_2_t buffer_collection;
   image_format_2_t image_format;
 
-  EXPECT_EQ(GetImageFormat(image_format, fidl::ToUnderlying(fuchsia_sysmem::PixelFormatType::kNv12),
-                           kWidth, kHeight),
-            ZX_OK);
+  EXPECT_EQ(
+      GetImageFormat(image_format, static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kNv12),
+                     kWidth, kHeight),
+      ZX_OK);
   EXPECT_EQ(camera::CreateContiguousBufferCollectionInfo(buffer_collection, image_format,
                                                          bti_handle, kNumberOfBuffers),
             ZX_ERR_INVALID_ARGS);
