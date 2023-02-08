@@ -6,6 +6,18 @@
 
 use zerocopy::{AsBytes, FromBytes};
 
+pub const MAGMA_STATUS_OK: u32 = 0;
+pub const MAGMA_STATUS_INVALID_ARGS: i32 = -2;
+pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
+pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;
+pub const MAGMA_MAX_IMAGE_PLANES: u32 = 4;
+pub const MAGMA_COHERENCY_DOMAIN_CPU: u32 = 0;
+pub const MAGMA_COHERENCY_DOMAIN_RAM: u32 = 1;
+pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: u32 = 2;
+pub const MAGMA_POLL_TYPE_SEMAPHORE: u32 = 1;
+pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
+
+
 pub const _IOC_NRBITS: u32 = 8;
 pub const _IOC_TYPEBITS: u32 = 8;
 pub const _IOC_SIZEBITS: u32 = 14;
@@ -125,35 +137,7 @@ pub const SIG_ATOMIC_MAX: u32 = 2147483647;
 pub const SIZE_MAX: i32 = -1;
 pub const WINT_MIN: u32 = 0;
 pub const WINT_MAX: u32 = 4294967295;
-pub const MAGMA_QUERY_VENDOR_ID: u32 = 0;
-pub const MAGMA_QUERY_DEVICE_ID: u32 = 1;
-pub const MAGMA_QUERY_IS_TOTAL_TIME_SUPPORTED: u32 = 3;
-pub const MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS: u32 = 5;
-pub const MAGMA_QUERY_VENDOR_PARAM_0: u32 = 10000;
-pub const MAGMA_QUERY_TOTAL_TIME: u32 = 500;
-pub const MAGMA_INVALID_OBJECT_ID: u32 = 0;
-pub const MAGMA_COMMAND_BUFFER_VENDOR_FLAGS_0: u32 = 65536;
-pub const MAGMA_STATUS_OK: u32 = 0;
-pub const MAGMA_STATUS_INTERNAL_ERROR: i32 = -1;
-pub const MAGMA_STATUS_INVALID_ARGS: i32 = -2;
-pub const MAGMA_STATUS_ACCESS_DENIED: i32 = -3;
-pub const MAGMA_STATUS_MEMORY_ERROR: i32 = -4;
-pub const MAGMA_STATUS_CONTEXT_KILLED: i32 = -5;
-pub const MAGMA_STATUS_CONNECTION_LOST: i32 = -6;
-pub const MAGMA_STATUS_TIMED_OUT: i32 = -7;
-pub const MAGMA_STATUS_UNIMPLEMENTED: i32 = -8;
-pub const MAGMA_STATUS_BAD_STATE: i32 = -9;
-pub const MAGMA_STATUS_ALIAS_FOR_LAST: i32 = -9;
-pub const MAGMA_CACHE_OPERATION_CLEAN: u32 = 0;
-pub const MAGMA_CACHE_OPERATION_CLEAN_INVALIDATE: u32 = 1;
-pub const MAGMA_CACHE_POLICY_CACHED: u32 = 0;
-pub const MAGMA_CACHE_POLICY_WRITE_COMBINING: u32 = 1;
-pub const MAGMA_CACHE_POLICY_UNCACHED: u32 = 2;
-pub const MAGMA_DUMP_TYPE_NORMAL: u32 = 1;
-pub const MAGMA_PERF_COUNTER_RESULT_DISCONTINUITY: u32 = 1;
-pub const MAGMA_MAX_IMAGE_PLANES: u32 = 4;
-pub const MAGMA_MAX_DRM_FORMAT_MODIFIERS: u32 = 16;
-pub const MAGMA_MAP_FLAG_VENDOR_SHIFT: u32 = 16;
+pub const MAGMA_API_VERSION: u32 = 1;
 pub type __s8 = ::std::os::raw::c_schar;
 pub type __u8 = ::std::os::raw::c_uchar;
 pub type __s16 = ::std::os::raw::c_short;
@@ -347,83 +331,16 @@ pub type uint_fast32_t = ::std::os::raw::c_ulong;
 pub type uint_fast64_t = ::std::os::raw::c_ulong;
 pub type intmax_t = __intmax_t;
 pub type uintmax_t = __uintmax_t;
-pub const MAGMA_FORMAT_INVALID: _bindgen_ty_1 = 0;
-pub const MAGMA_FORMAT_R8G8B8A8: _bindgen_ty_1 = 1;
-pub const MAGMA_FORMAT_BGRA32: _bindgen_ty_1 = 101;
-pub const MAGMA_FORMAT_I420: _bindgen_ty_1 = 102;
-pub const MAGMA_FORMAT_M420: _bindgen_ty_1 = 103;
-pub const MAGMA_FORMAT_NV12: _bindgen_ty_1 = 104;
-pub const MAGMA_FORMAT_YUY2: _bindgen_ty_1 = 105;
-pub const MAGMA_FORMAT_MJPEG: _bindgen_ty_1 = 106;
-pub const MAGMA_FORMAT_YV12: _bindgen_ty_1 = 107;
-pub const MAGMA_FORMAT_BGR24: _bindgen_ty_1 = 108;
-pub const MAGMA_FORMAT_RGB565: _bindgen_ty_1 = 109;
-pub const MAGMA_FORMAT_RGB332: _bindgen_ty_1 = 110;
-pub const MAGMA_FORMAT_RGB2220: _bindgen_ty_1 = 111;
-pub const MAGMA_FORMAT_L8: _bindgen_ty_1 = 112;
-pub const MAGMA_FORMAT_R8: _bindgen_ty_1 = 113;
-pub const MAGMA_FORMAT_R8G8: _bindgen_ty_1 = 114;
-pub type _bindgen_ty_1 = ::std::os::raw::c_uint;
-pub const MAGMA_FORMAT_MODIFIER_LINEAR: _bindgen_ty_2 = 0;
-pub const MAGMA_FORMAT_MODIFIER_INTEL_X_TILED: _bindgen_ty_2 = 72057594037927937;
-pub const MAGMA_FORMAT_MODIFIER_INTEL_Y_TILED: _bindgen_ty_2 = 72057594037927938;
-pub const MAGMA_FORMAT_MODIFIER_INTEL_YF_TILED: _bindgen_ty_2 = 72057594037927939;
-pub const MAGMA_FORMAT_MODIFIER_INTEL_Y_TILED_CCS: _bindgen_ty_2 = 72057594054705154;
-pub const MAGMA_FORMAT_MODIFIER_INTEL_YF_TILED_CCS: _bindgen_ty_2 = 72057594054705155;
-pub const MAGMA_FORMAT_MODIFIER_ARM_YUV_BIT: _bindgen_ty_2 = 16;
-pub const MAGMA_FORMAT_MODIFIER_ARM_SPLIT_BLOCK_BIT: _bindgen_ty_2 = 32;
-pub const MAGMA_FORMAT_MODIFIER_ARM_SPARSE_BIT: _bindgen_ty_2 = 64;
-pub const MAGMA_FORMAT_MODIFIER_ARM_BCH_BIT: _bindgen_ty_2 = 2048;
-pub const MAGMA_FORMAT_MODIFIER_ARM_TE_BIT: _bindgen_ty_2 = 4096;
-pub const MAGMA_FORMAT_MODIFIER_ARM_TILED_HEADER_BIT: _bindgen_ty_2 = 8192;
-pub const MAGMA_FORMAT_MODIFIER_ARM: _bindgen_ty_2 = 576460752303423488;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16: _bindgen_ty_2 = 576460752303423489;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_32X8: _bindgen_ty_2 = 576460752303423490;
-pub const MAGMA_FORMAT_MODIFIER_ARM_LINEAR_TE: _bindgen_ty_2 = 576460752303427584;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_TE: _bindgen_ty_2 = 576460752303427585;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_32X8_TE: _bindgen_ty_2 = 576460752303427586;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_YUV_TILED_HEADER: _bindgen_ty_2 = 576460752303431697;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV: _bindgen_ty_2 =
-    576460752303423601;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE: _bindgen_ty_2 =
-    576460752303427697;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TILED_HEADER: _bindgen_ty_2 =
-    576460752303431793;
-pub const MAGMA_FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE_TILED_HEADER:
-    _bindgen_ty_2 = 576460752303435889;
-pub type _bindgen_ty_2 = ::std::os::raw::c_ulong;
-pub const MAGMA_COLORSPACE_INVALID: _bindgen_ty_3 = 0;
-pub const MAGMA_COLORSPACE_SRGB: _bindgen_ty_3 = 1;
-pub const MAGMA_COLORSPACE_REC601_NTSC: _bindgen_ty_3 = 2;
-pub const MAGMA_COLORSPACE_REC601_NTSC_FULL_RANGE: _bindgen_ty_3 = 3;
-pub const MAGMA_COLORSPACE_REC601_PAL: _bindgen_ty_3 = 4;
-pub const MAGMA_COLORSPACE_REC601_PAL_FULL_RANGE: _bindgen_ty_3 = 5;
-pub const MAGMA_COLORSPACE_REC709: _bindgen_ty_3 = 6;
-pub const MAGMA_COLORSPACE_REC2020: _bindgen_ty_3 = 7;
-pub const MAGMA_COLORSPACE_REC2100: _bindgen_ty_3 = 8;
-pub type _bindgen_ty_3 = ::std::os::raw::c_uint;
-pub const MAGMA_COHERENCY_DOMAIN_CPU: _bindgen_ty_4 = 0;
-pub const MAGMA_COHERENCY_DOMAIN_RAM: _bindgen_ty_4 = 1;
-pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: _bindgen_ty_4 = 2;
-pub type _bindgen_ty_4 = ::std::os::raw::c_uint;
-pub const MAGMA_POLL_TYPE_SEMAPHORE: _bindgen_ty_5 = 1;
-pub const MAGMA_POLL_TYPE_HANDLE: _bindgen_ty_5 = 2;
-pub type _bindgen_ty_5 = ::std::os::raw::c_uint;
-pub const MAGMA_POLL_CONDITION_READABLE: _bindgen_ty_6 = 1;
-pub const MAGMA_POLL_CONDITION_SIGNALED: _bindgen_ty_6 = 3;
-pub type _bindgen_ty_6 = ::std::os::raw::c_uint;
-pub const MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES: _bindgen_ty_7 = 1;
-pub const MAGMA_BUFFER_RANGE_OP_COMMIT: _bindgen_ty_7 = 2;
-pub const MAGMA_BUFFER_RANGE_OP_DEPOPULATE_TABLES: _bindgen_ty_7 = 3;
-pub const MAGMA_BUFFER_RANGE_OP_DECOMMIT: _bindgen_ty_7 = 4;
-pub type _bindgen_ty_7 = ::std::os::raw::c_uint;
-pub const MAGMA_SYSMEM_FLAG_PROTECTED: _bindgen_ty_8 = 1;
-pub const MAGMA_SYSMEM_FLAG_FOR_CLIENT: _bindgen_ty_8 = 4;
-pub type _bindgen_ty_8 = ::std::os::raw::c_uint;
+pub type magma_query_t = u64;
 pub type magma_status_t = i32;
-pub type magma_bool_t = u8;
 pub type magma_cache_operation_t = u32;
 pub type magma_cache_policy_t = u32;
+pub type magma_format_t = u32;
+pub type magma_format_modifier_t = u64;
+pub type magma_colorspace_t = u32;
+pub type magma_coherency_domain_t = u32;
+pub type magma_buffer_range_op_t = u32;
+pub type magma_bool_t = u8;
 pub type magma_device_t = u64;
 pub type magma_buffer_t = u64;
 pub type magma_semaphore_t = u64;
@@ -472,6 +389,7 @@ pub struct magma_exec_resource {
     pub offset: u64,
     pub length: u64,
 }
+pub type magma_exec_resource_t = magma_exec_resource;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct magma_exec_command_buffer {
@@ -479,6 +397,7 @@ pub struct magma_exec_command_buffer {
     pub unused: u32,
     pub start_offset: u64,
 }
+pub type magma_exec_command_buffer_t = magma_exec_command_buffer;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct magma_command_descriptor {
@@ -500,6 +419,7 @@ impl Default for magma_command_descriptor {
         }
     }
 }
+pub type magma_command_descriptor_t = magma_command_descriptor;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct magma_inline_command_buffer {
@@ -518,12 +438,14 @@ impl Default for magma_inline_command_buffer {
         }
     }
 }
+pub type magma_inline_command_buffer_t = magma_inline_command_buffer;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct magma_total_time_query_result {
     pub gpu_time_ns: u64,
     pub monotonic_time_ns: u64,
 }
+pub type magma_total_time_query_result_t = magma_total_time_query_result;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct magma_buffer_offset {
@@ -531,38 +453,79 @@ pub struct magma_buffer_offset {
     pub offset: u64,
     pub length: u64,
 }
-pub const MAGMA_MAP_FLAGS_MAGMA_MAP_FLAG_READ: MAGMA_MAP_FLAGS = 1;
-pub const MAGMA_MAP_FLAGS_MAGMA_MAP_FLAG_WRITE: MAGMA_MAP_FLAGS = 2;
-pub const MAGMA_MAP_FLAGS_MAGMA_MAP_FLAG_EXECUTE: MAGMA_MAP_FLAGS = 4;
-pub const MAGMA_MAP_FLAGS_MAGMA_MAP_FLAG_GROWABLE: MAGMA_MAP_FLAGS = 8;
-pub const MAGMA_MAP_FLAGS_MAGMA_MAP_FLAG_VENDOR_0: MAGMA_MAP_FLAGS = 65536;
-pub type MAGMA_MAP_FLAGS = ::std::os::raw::c_uint;
+pub type magma_buffer_offset_t = magma_buffer_offset;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct magma_buffer_info_t {
+pub struct magma_buffer_info {
     pub committed_byte_count: u64,
     pub size: u64,
 }
-pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: _bindgen_ty_9 = 1;
-pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: _bindgen_ty_9 = 2;
-pub type _bindgen_ty_9 = ::std::os::raw::c_uint;
+pub type magma_buffer_info_t = magma_buffer_info;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct magma_image_create_info_t {
+pub struct magma_image_create_info {
     pub drm_format: u64,
     pub drm_format_modifiers: [u64; 16usize],
     pub width: u32,
     pub height: u32,
     pub flags: u64,
 }
+pub type magma_image_create_info_t = magma_image_create_info;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct magma_image_info_t {
+pub struct magma_image_info {
     pub plane_strides: [u64; 4usize],
     pub plane_offsets: [u32; 4usize],
     pub drm_format_modifier: u64,
     pub coherency_domain: u32,
     pub unused: u32,
+}
+pub type magma_image_info_t = magma_image_info;
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Imports and takes ownership of a channel to a device."]
+    #[doc = " \\param device_channel A channel connecting to a gpu class device."]
+    #[doc = " \\param device_out Returned device."]
+    #[doc = ""]
+    pub fn magma_device_import(
+        device_channel: magma_handle_t,
+        device_out: *mut magma_device_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Releases a handle to a device"]
+    #[doc = " \\param device An open device."]
+    #[doc = ""]
+    pub fn magma_device_release(device: magma_device_t);
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either"]
+    #[doc = "        a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be"]
+    #[doc = "        provided for whichever result parameter is not needed."]
+    #[doc = " \\param device An open device."]
+    #[doc = " \\param id A vendor-specific ID."]
+    #[doc = " \\param result_buffer_out Handle to the returned buffer."]
+    #[doc = " \\param result_out Pointer to a uint64 result."]
+    #[doc = ""]
+    pub fn magma_device_query(
+        device: magma_device_t,
+        id: u64,
+        result_buffer_out: *mut magma_handle_t,
+        result_out: *mut u64,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Opens a connection to a device."]
+    #[doc = " \\param device An open device"]
+    #[doc = " \\param connection_out Returned connection."]
+    #[doc = ""]
+    pub fn magma_device_create_connection(
+        device: magma_device_t,
+        connection_out: *mut magma_connection_t,
+    ) -> magma_status_t;
 }
 extern "C" {
     #[doc = ""]
@@ -624,6 +587,201 @@ extern "C" {
 }
 extern "C" {
     #[doc = ""]
+    #[doc = " \\brief Exports the given buffer, returning a handle that may be imported into another"]
+    #[doc = "        connection."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = " \\param buffer_handle_out The returned handle."]
+    #[doc = ""]
+    pub fn magma_connection_export_buffer(
+        connection: magma_connection_t,
+        buffer: magma_buffer_t,
+        buffer_handle_out: *mut magma_handle_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Imports and takes ownership of the buffer referred to by the given handle."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param buffer_handle A valid handle."]
+    #[doc = " \\param buffer_out The returned buffer."]
+    #[doc = ""]
+    pub fn magma_connection_import_buffer(
+        connection: magma_connection_t,
+        buffer_handle: magma_handle_t,
+        buffer_out: *mut magma_buffer_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Creates a semaphore."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param semaphore_out The returned semaphore."]
+    #[doc = ""]
+    pub fn magma_connection_create_semaphore(
+        connection: magma_connection_t,
+        semaphore_out: *mut magma_semaphore_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Releases the given semaphore."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param semaphore A valid semaphore."]
+    #[doc = ""]
+    pub fn magma_connection_release_semaphore(
+        connection: magma_connection_t,
+        semaphore: magma_semaphore_t,
+    );
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Exports the given semaphore, returning a handle that may be imported into another"]
+    #[doc = "        connection"]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param semaphore A valid semaphore."]
+    #[doc = " \\param semaphore_handle_out The returned handle."]
+    #[doc = ""]
+    pub fn magma_connection_export_semaphore(
+        connection: magma_connection_t,
+        semaphore: magma_semaphore_t,
+        semaphore_handle_out: *mut magma_handle_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Imports and takes ownership of the semaphore referred to by the given handle."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param semaphore_handle A valid semaphore handle."]
+    #[doc = " \\param semaphore_out The returned semaphore."]
+    #[doc = ""]
+    pub fn magma_connection_import_semaphore(
+        connection: magma_connection_t,
+        semaphore_handle: magma_handle_t,
+        semaphore_out: *mut magma_semaphore_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Perform an operation on a range of a buffer"]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = " \\param options Options for the operation."]
+    #[doc = " \\param start_offset Byte offset into the buffer."]
+    #[doc = " \\param length Length (in bytes) of the region to operate on."]
+    #[doc = ""]
+    pub fn magma_connection_perform_buffer_op(
+        connection: magma_connection_t,
+        buffer: magma_buffer_t,
+        options: u32,
+        start_offset: u64,
+        length: u64,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Maps a buffer range onto the hardware in the connection's address space at the given"]
+    #[doc = "        address. Depending on the MSD this may automatically commit and populate that range."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param hw_va Destination virtual address for the mapping."]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = " \\param offset Offset into the buffer."]
+    #[doc = " \\param length Length in bytes of the range to map."]
+    #[doc = " \\param map_flags A valid MAGMA_MAP_FLAGS value."]
+    #[doc = ""]
+    pub fn magma_connection_map_buffer(
+        connection: magma_connection_t,
+        hw_va: u64,
+        buffer: magma_buffer_t,
+        offset: u64,
+        length: u64,
+        map_flags: u64,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Releases the mapping at the given hardware address."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param hw_va A hardware virtual address associated with an existing mapping of the given buffer."]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = ""]
+    pub fn magma_connection_unmap_buffer(
+        connection: magma_connection_t,
+        hw_va: u64,
+        buffer: magma_buffer_t,
+    );
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Submits command buffers for execution on the hardware."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param context_id A valid context id."]
+    #[doc = " \\param descriptor A pointer to the command descriptor."]
+    #[doc = ""]
+    pub fn magma_connection_execute_command(
+        connection: magma_connection_t,
+        context_id: u32,
+        descriptor: *mut magma_command_descriptor_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Submits a series of commands for execution on the hardware without using a command"]
+    #[doc = "        buffer."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param context_id A valid context ID."]
+    #[doc = " \\param command_count The number of commands in the provided buffer."]
+    #[doc = " \\param command_buffers An array of command_count magma_inline_command_buffer structs."]
+    #[doc = ""]
+    pub fn magma_connection_execute_immediate_commands(
+        connection: magma_connection_t,
+        context_id: u32,
+        command_count: u64,
+        command_buffers: *mut magma_inline_command_buffer_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Incurs a round-trip to the system driver, used to ensure all previous messages have been"]
+    #[doc = "        observed, but not necessarily completed."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = ""]
+    pub fn magma_connection_flush(connection: magma_connection_t) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Returns a handle that can be waited on to determine when the connection has data in the"]
+    #[doc = "        notification channel. This channel has the same lifetime as the connection and must not"]
+    #[doc = "        be closed by the client."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = ""]
+    pub fn magma_connection_get_notification_channel_handle(
+        connection: magma_connection_t,
+    ) -> magma_handle_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Reads a notification from the channel into the given buffer.  Message sizes may vary"]
+    #[doc = "        depending on the MSD.  If the buffer provided is too small for the message,"]
+    #[doc = "        MAGMA_STATUS_INVALID_ARGS will be returned and the size of message will be returned in"]
+    #[doc = "        the buffer_size_out parameter."]
+    #[doc = " \\param connection An open connection."]
+    #[doc = " \\param buffer Buffer into which to read notification data."]
+    #[doc = " \\param buffer_size Size of the given buffer."]
+    #[doc = " \\param buffer_size_out Returned size of the notification data written to the buffer, or 0 if"]
+    #[doc = "        there are no messages pending."]
+    #[doc = " \\param more_data_out True if there is more notification data waiting."]
+    #[doc = ""]
+    pub fn magma_connection_read_notification_channel(
+        connection: magma_connection_t,
+        buffer: *mut ::std::os::raw::c_void,
+        buffer_size: u64,
+        buffer_size_out: *mut u64,
+        more_data_out: *mut magma_bool_t,
+    ) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
     #[doc = " \\brief Returns a unique id for the given buffer. For performance reasons it's recommended to"]
     #[doc = "        cache the id rather than call this repeatedly."]
     #[doc = " \\param buffer A valid buffer."]
@@ -678,68 +836,38 @@ extern "C" {
 }
 extern "C" {
     #[doc = ""]
-    #[doc = " \\brief Exports the given buffer, returning a handle that may be imported into another"]
-    #[doc = "        connection."]
-    #[doc = " \\param connection An open connection."]
+    #[doc = " \\brief Sets a name for the buffer for use in debugging tools."]
     #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param buffer_handle_out The returned handle."]
+    #[doc = " \\param name The 0-terminated name of the buffer. May be truncated."]
     #[doc = ""]
-    pub fn magma_connection_export_buffer(
-        connection: magma_connection_t,
+    pub fn magma_buffer_set_name(
         buffer: magma_buffer_t,
-        buffer_handle_out: *mut magma_handle_t,
+        name: *const ::std::os::raw::c_char,
     ) -> magma_status_t;
 }
 extern "C" {
     #[doc = ""]
-    #[doc = " \\brief Imports and takes ownership of the buffer referred to by the given handle."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param buffer_handle A valid handle."]
-    #[doc = " \\param buffer_out The returned buffer."]
+    #[doc = " \\brief Get information on a magma buffer"]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = " \\param info_out Pointer to struct that receives the buffer info."]
     #[doc = ""]
-    pub fn magma_connection_import_buffer(
-        connection: magma_connection_t,
-        buffer_handle: magma_handle_t,
-        buffer_out: *mut magma_buffer_t,
+    pub fn magma_buffer_get_info(
+        buffer: magma_buffer_t,
+        info_out: *mut magma_buffer_info_t,
     ) -> magma_status_t;
 }
 extern "C" {
     #[doc = ""]
-    #[doc = " \\brief Submits a series of commands for execution on the hardware without using a command"]
-    #[doc = "        buffer."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param context_id A valid context ID."]
-    #[doc = " \\param command_count The number of commands in the provided buffer."]
-    #[doc = " \\param command_buffers An array of command_count magma_inline_command_buffer structs."]
+    #[doc = " \\brief Gets a platform handle for the given buffer. This can be used to perform a CPU mapping of"]
+    #[doc = "        the buffer using the standard syscall.  The handle may be released without invalidating"]
+    #[doc = "        such CPU mappings."]
+    #[doc = " \\param buffer A valid buffer."]
+    #[doc = " \\param handle_out Pointer to the returned handle."]
     #[doc = ""]
-    pub fn magma_connection_execute_immediate_commands(
-        connection: magma_connection_t,
-        context_id: u32,
-        command_count: u64,
-        command_buffers: *mut magma_inline_command_buffer,
+    pub fn magma_buffer_get_handle(
+        buffer: magma_buffer_t,
+        handle_out: *mut magma_handle_t,
     ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Creates a semaphore."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param semaphore_out The returned semaphore."]
-    #[doc = ""]
-    pub fn magma_connection_create_semaphore(
-        connection: magma_connection_t,
-        semaphore_out: *mut magma_semaphore_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Releases the given semaphore."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param semaphore A valid semaphore."]
-    #[doc = ""]
-    pub fn magma_connection_release_semaphore(
-        connection: magma_connection_t,
-        semaphore: magma_semaphore_t,
-    );
 }
 extern "C" {
     #[doc = ""]
@@ -764,104 +892,6 @@ extern "C" {
 }
 extern "C" {
     #[doc = ""]
-    #[doc = " \\brief Exports the given semaphore, returning a handle that may be imported into another"]
-    #[doc = "        connection"]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param semaphore A valid semaphore."]
-    #[doc = " \\param semaphore_handle_out The returned handle."]
-    #[doc = ""]
-    pub fn magma_connection_export_semaphore(
-        connection: magma_connection_t,
-        semaphore: magma_semaphore_t,
-        semaphore_handle_out: *mut magma_handle_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Imports and takes ownership of the semaphore referred to by the given handle."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param semaphore_handle A valid semaphore handle."]
-    #[doc = " \\param semaphore_out The returned semaphore."]
-    #[doc = ""]
-    pub fn magma_connection_import_semaphore(
-        connection: magma_connection_t,
-        semaphore_handle: magma_handle_t,
-        semaphore_out: *mut magma_semaphore_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Returns a handle that can be waited on to determine when the connection has data in the"]
-    #[doc = "        notification channel. This channel has the same lifetime as the connection and must not"]
-    #[doc = "        be closed by the client."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = ""]
-    pub fn magma_connection_get_notification_channel_handle(
-        connection: magma_connection_t,
-    ) -> magma_handle_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Initializes tracing"]
-    #[doc = " \\param channel An open connection to a tracing provider."]
-    #[doc = ""]
-    pub fn magma_initialize_tracing(channel: magma_handle_t) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Imports and takes ownership of a channel to a device."]
-    #[doc = " \\param device_channel A channel connecting to a gpu class device."]
-    #[doc = " \\param device_out Returned device."]
-    #[doc = ""]
-    pub fn magma_device_import(
-        device_channel: magma_handle_t,
-        device_out: *mut magma_device_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Releases a handle to a device"]
-    #[doc = " \\param device An open device."]
-    #[doc = ""]
-    pub fn magma_device_release(device: magma_device_t);
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either"]
-    #[doc = "        a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be"]
-    #[doc = "        provided for whichever result parameter is not needed."]
-    #[doc = " \\param device An open device."]
-    #[doc = " \\param id A vendor-specific ID."]
-    #[doc = " \\param result_buffer_out Handle to the returned buffer."]
-    #[doc = " \\param result_out Pointer to a uint64 result."]
-    #[doc = ""]
-    pub fn magma_device_query(
-        device: magma_device_t,
-        id: u64,
-        result_buffer_out: *mut magma_handle_t,
-        result_out: *mut u64,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Opens a connection to a device."]
-    #[doc = " \\param device An open device"]
-    #[doc = " \\param connection_out Returned connection."]
-    #[doc = ""]
-    pub fn magma_device_create_connection(
-        device: magma_device_t,
-        connection_out: *mut magma_connection_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Initializes logging; used for debug and some exceptional error reporting."]
-    #[doc = " \\param channel An open connection to the syslog service."]
-    #[doc = ""]
-    pub fn magma_initialize_logging(channel: magma_handle_t) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
     #[doc = " \\brief Waits for at least one of the given items to meet a condition. Does not reset any"]
     #[doc = "        semaphores. Results are returned in the items array."]
     #[doc = " \\param items Array of poll items. Type should be either MAGMA_POLL_TYPE_SEMAPHORE or"]
@@ -874,6 +904,20 @@ extern "C" {
     #[doc = ""]
     pub fn magma_poll(items: *mut magma_poll_item_t, count: u32, timeout_ns: u64)
         -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Initializes tracing"]
+    #[doc = " \\param channel An open connection to a tracing provider."]
+    #[doc = ""]
+    pub fn magma_initialize_tracing(channel: magma_handle_t) -> magma_status_t;
+}
+extern "C" {
+    #[doc = ""]
+    #[doc = " \\brief Initializes logging; used for debug and some exceptional error reporting."]
+    #[doc = " \\param channel An open connection to the syslog service."]
+    #[doc = ""]
+    pub fn magma_initialize_logging(channel: magma_handle_t) -> magma_status_t;
 }
 extern "C" {
     #[doc = ""]
@@ -951,7 +995,7 @@ extern "C" {
     pub fn magma_connection_add_performance_counter_buffer_offsets_to_pool(
         connection: magma_connection_t,
         pool_id: magma_perf_count_pool_t,
-        offsets: *const magma_buffer_offset,
+        offsets: *const magma_buffer_offset_t,
         offsets_count: u64,
     ) -> magma_status_t;
 }
@@ -1026,70 +1070,6 @@ extern "C" {
 }
 extern "C" {
     #[doc = ""]
-    #[doc = " \\brief Sets a name for the buffer for use in debugging tools."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param name The 0-terminated name of the buffer. May be truncated."]
-    #[doc = ""]
-    pub fn magma_buffer_set_name(
-        connection: magma_connection_t,
-        buffer: magma_buffer_t,
-        name: *const ::std::os::raw::c_char,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Perform an operation on a range of a buffer"]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param options Options for the operation."]
-    #[doc = " \\param start_offset Byte offset into the buffer."]
-    #[doc = " \\param length Length (in bytes) of the region to operate on."]
-    #[doc = ""]
-    pub fn magma_connection_buffer_range_op(
-        connection: magma_connection_t,
-        buffer: magma_buffer_t,
-        options: u32,
-        start_offset: u64,
-        length: u64,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Get information on a magma buffer"]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param info_out Pointer to struct that receives the buffer info."]
-    #[doc = ""]
-    pub fn magma_buffer_get_info(
-        connection: magma_connection_t,
-        buffer: magma_buffer_t,
-        info_out: *mut magma_buffer_info_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Reads a notification from the channel into the given buffer.  Message sizes may vary"]
-    #[doc = "        depending on the MSD.  If the buffer provided is too small for the message,"]
-    #[doc = "        MAGMA_STATUS_INVALID_ARGS will be returned and the size of message will be returned in"]
-    #[doc = "        the buffer_size_out parameter."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param buffer Buffer into which to read notification data."]
-    #[doc = " \\param buffer_size Size of the given buffer."]
-    #[doc = " \\param buffer_size_out Returned size of the notification data written to the buffer, or 0 if"]
-    #[doc = "        there are no messages pending."]
-    #[doc = " \\param more_data_out True if there is more notification data waiting."]
-    #[doc = ""]
-    pub fn magma_connection_read_notification_channel(
-        connection: magma_connection_t,
-        buffer: *mut ::std::os::raw::c_void,
-        buffer_size: u64,
-        buffer_size_out: *mut u64,
-        more_data_out: *mut magma_bool_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
     #[doc = " \\brief Creates an image buffer backed by a buffer collection given a DRM format and optional"]
     #[doc = "        modifier, as specified in the create info."]
     #[doc = " \\param connection An open connection."]
@@ -1115,79 +1095,17 @@ extern "C" {
         image_info_out: *mut magma_image_info_t,
     ) -> magma_status_t;
 }
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Gets a platform handle for the given buffer. This can be used to perform a CPU mapping of"]
-    #[doc = "        the buffer using the standard syscall.  The handle may be released without invalidating"]
-    #[doc = "        such CPU mappings."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param handle_out Pointer to the returned handle."]
-    #[doc = ""]
-    pub fn magma_buffer_get_handle(
-        buffer: magma_buffer_t,
-        handle_out: *mut magma_handle_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Incurs a round-trip to the system driver, used to ensure all previous messages have been"]
-    #[doc = "        observed, but not necessarily completed."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = ""]
-    pub fn magma_connection_flush(connection: magma_connection_t) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Submits command buffers for execution on the hardware."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param context_id A valid context id."]
-    #[doc = " \\param descriptor A pointer to the command descriptor."]
-    #[doc = ""]
-    pub fn magma_connection_execute_command(
-        connection: magma_connection_t,
-        context_id: u32,
-        descriptor: *mut magma_command_descriptor,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Maps a buffer range onto the hardware in the connection's address space at the given"]
-    #[doc = "        address. Depending on the MSD this may automatically commit and populate that range."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param hw_va Destination virtual address for the mapping."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = " \\param offset Offset into the buffer."]
-    #[doc = " \\param length Length in bytes of the range to map."]
-    #[doc = " \\param map_flags A valid MAGMA_MAP_FLAGS value."]
-    #[doc = ""]
-    pub fn magma_connection_map_buffer(
-        connection: magma_connection_t,
-        hw_va: u64,
-        buffer: magma_buffer_t,
-        offset: u64,
-        length: u64,
-        map_flags: u64,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = ""]
-    #[doc = " \\brief Releases the mapping at the given hardware address."]
-    #[doc = " \\param connection An open connection."]
-    #[doc = " \\param hw_va A hardware virtual address associated with an existing mapping of the given buffer."]
-    #[doc = " \\param buffer A valid buffer."]
-    #[doc = ""]
-    pub fn magma_connection_unmap_buffer(
-        connection: magma_connection_t,
-        hw_va: u64,
-        buffer: magma_buffer_t,
-    );
-}
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_config {
     pub dummy: u64,
 }
 pub type virtio_magma_config_t = virtio_magma_config;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_IMPORT: virtio_magma_ctrl_type = 4142;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_RELEASE: virtio_magma_ctrl_type = 4143;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_QUERY: virtio_magma_ctrl_type = 4177;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_CREATE_CONNECTION: virtio_magma_ctrl_type =
+    4146;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE: virtio_magma_ctrl_type = 4100;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_ERROR: virtio_magma_ctrl_type =
     4101;
@@ -1199,6 +1117,33 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER: virt
     4104;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_BUFFER:
     virtio_magma_ctrl_type = 4105;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_BUFFER: virtio_magma_ctrl_type =
+    4122;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER: virtio_magma_ctrl_type =
+    4123;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE:
+    virtio_magma_ctrl_type = 4130;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE:
+    virtio_magma_ctrl_type = 4131;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_SEMAPHORE:
+    virtio_magma_ctrl_type = 4136;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE:
+    virtio_magma_ctrl_type = 4137;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_PERFORM_BUFFER_OP:
+    virtio_magma_ctrl_type = 4161;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
+    4178;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_UNMAP_BUFFER: virtio_magma_ctrl_type =
+    4179;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND:
+    virtio_magma_ctrl_type = 4176;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
+    virtio_magma_ctrl_type = 4129;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_FLUSH: virtio_magma_ctrl_type = 4175;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
+    virtio_magma_ctrl_type = 4138;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_READ_NOTIFICATION_CHANNEL:
+    virtio_magma_ctrl_type = 4166;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_ID: virtio_magma_ctrl_type = 4108;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_SIZE: virtio_magma_ctrl_type = 4109;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_CLEAN_CACHE: virtio_magma_ctrl_type = 4110;
@@ -1206,33 +1151,15 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_CACHE_POLICY: virti
     4111;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_CACHE_POLICY: virtio_magma_ctrl_type =
     4112;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_BUFFER: virtio_magma_ctrl_type =
-    4122;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER: virtio_magma_ctrl_type =
-    4123;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
-    virtio_magma_ctrl_type = 4129;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE:
-    virtio_magma_ctrl_type = 4130;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE:
-    virtio_magma_ctrl_type = 4131;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_NAME: virtio_magma_ctrl_type = 4160;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_INFO: virtio_magma_ctrl_type = 4162;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_HANDLE: virtio_magma_ctrl_type = 4171;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_GET_ID: virtio_magma_ctrl_type = 4132;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_SIGNAL: virtio_magma_ctrl_type = 4133;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_RESET: virtio_magma_ctrl_type = 4134;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_SEMAPHORE:
-    virtio_magma_ctrl_type = 4136;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE:
-    virtio_magma_ctrl_type = 4137;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
-    virtio_magma_ctrl_type = 4138;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INITIALIZE_TRACING: virtio_magma_ctrl_type = 4141;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_IMPORT: virtio_magma_ctrl_type = 4142;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_RELEASE: virtio_magma_ctrl_type = 4143;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_QUERY: virtio_magma_ctrl_type = 4177;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_CREATE_CONNECTION: virtio_magma_ctrl_type =
-    4146;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INITIALIZE_LOGGING: virtio_magma_ctrl_type = 4147;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_POLL: virtio_magma_ctrl_type = 4148;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INITIALIZE_TRACING: virtio_magma_ctrl_type = 4141;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INITIALIZE_LOGGING: virtio_magma_ctrl_type = 4147;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_ENABLE_PERFORMANCE_COUNTER_ACCESS:
     virtio_magma_ctrl_type = 4149;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_ENABLE_PERFORMANCE_COUNTERS:
@@ -1247,28 +1174,19 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CLEAR_PERFORMANCE_C
     virtio_magma_ctrl_type = 4158;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_READ_PERFORMANCE_COUNTER_COMPLETION:
     virtio_magma_ctrl_type = 4159;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_NAME: virtio_magma_ctrl_type = 4160;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_BUFFER_RANGE_OP:
-    virtio_magma_ctrl_type = 4161;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_INFO: virtio_magma_ctrl_type = 4162;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_READ_NOTIFICATION_CHANNEL:
-    virtio_magma_ctrl_type = 4166;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 4167;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 4168;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_HANDLE: virtio_magma_ctrl_type = 4171;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_FLUSH: virtio_magma_ctrl_type = 4175;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND:
-    virtio_magma_ctrl_type = 4176;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
-    4178;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_UNMAP_BUFFER: virtio_magma_ctrl_type =
-    4179;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     4172;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_MAP2: virtio_magma_ctrl_type = 4173;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_UNMAP2: virtio_magma_ctrl_type = 4174;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT: virtio_magma_ctrl_type = 8238;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE: virtio_magma_ctrl_type = 8239;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_QUERY: virtio_magma_ctrl_type = 8273;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION:
+    virtio_magma_ctrl_type = 8242;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE: virtio_magma_ctrl_type =
     8196;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_ERROR: virtio_magma_ctrl_type =
@@ -1281,6 +1199,33 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER:
     virtio_magma_ctrl_type = 8200;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_BUFFER:
     virtio_magma_ctrl_type = 8201;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER:
+    virtio_magma_ctrl_type = 8218;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER:
+    virtio_magma_ctrl_type = 8219;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE:
+    virtio_magma_ctrl_type = 8226;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_SEMAPHORE:
+    virtio_magma_ctrl_type = 8227;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_SEMAPHORE:
+    virtio_magma_ctrl_type = 8232;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE:
+    virtio_magma_ctrl_type = 8233;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_PERFORM_BUFFER_OP:
+    virtio_magma_ctrl_type = 8257;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
+    8274;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_UNMAP_BUFFER: virtio_magma_ctrl_type =
+    8275;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND:
+    virtio_magma_ctrl_type = 8272;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
+    virtio_magma_ctrl_type = 8225;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_FLUSH: virtio_magma_ctrl_type = 8271;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
+    virtio_magma_ctrl_type = 8234;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL:
+    virtio_magma_ctrl_type = 8262;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_ID: virtio_magma_ctrl_type = 8204;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_SIZE: virtio_magma_ctrl_type = 8205;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_CLEAN_CACHE: virtio_magma_ctrl_type =
@@ -1289,35 +1234,17 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_CACHE_POLICY: virt
     8207;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_CACHE_POLICY: virtio_magma_ctrl_type =
     8208;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER:
-    virtio_magma_ctrl_type = 8218;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER:
-    virtio_magma_ctrl_type = 8219;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
-    virtio_magma_ctrl_type = 8225;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE:
-    virtio_magma_ctrl_type = 8226;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_SEMAPHORE:
-    virtio_magma_ctrl_type = 8227;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_NAME: virtio_magma_ctrl_type = 8256;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_INFO: virtio_magma_ctrl_type = 8258;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE: virtio_magma_ctrl_type = 8267;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_GET_ID: virtio_magma_ctrl_type = 8228;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_SIGNAL: virtio_magma_ctrl_type = 8229;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_RESET: virtio_magma_ctrl_type = 8230;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_SEMAPHORE:
-    virtio_magma_ctrl_type = 8232;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE:
-    virtio_magma_ctrl_type = 8233;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
-    virtio_magma_ctrl_type = 8234;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_POLL: virtio_magma_ctrl_type = 8244;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INITIALIZE_TRACING: virtio_magma_ctrl_type =
     8237;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT: virtio_magma_ctrl_type = 8238;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE: virtio_magma_ctrl_type = 8239;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_QUERY: virtio_magma_ctrl_type = 8273;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION:
-    virtio_magma_ctrl_type = 8242;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INITIALIZE_LOGGING: virtio_magma_ctrl_type =
     8243;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_POLL: virtio_magma_ctrl_type = 8244;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_ENABLE_PERFORMANCE_COUNTER_ACCESS:
     virtio_magma_ctrl_type = 8245;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_ENABLE_PERFORMANCE_COUNTERS:
@@ -1331,24 +1258,10 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_DUMP_PERFORMANCE_C
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CLEAR_PERFORMANCE_COUNTERS:
     virtio_magma_ctrl_type = 8254;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_PERFORMANCE_COUNTER_COMPLETION : virtio_magma_ctrl_type = 8255 ;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_NAME: virtio_magma_ctrl_type = 8256;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_BUFFER_RANGE_OP:
-    virtio_magma_ctrl_type = 8257;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_INFO: virtio_magma_ctrl_type = 8258;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL:
-    virtio_magma_ctrl_type = 8262;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 8263;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 8264;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE: virtio_magma_ctrl_type = 8267;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_FLUSH: virtio_magma_ctrl_type = 8271;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND:
-    virtio_magma_ctrl_type = 8272;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_MAP_BUFFER: virtio_magma_ctrl_type =
-    8274;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_UNMAP_BUFFER: virtio_magma_ctrl_type =
-    8275;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     8268;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_MAP2: virtio_magma_ctrl_type = 8269;
@@ -1372,6 +1285,66 @@ pub struct virtio_magma_ctrl_hdr {
     pub flags: u32,
 }
 pub type virtio_magma_ctrl_hdr_t = virtio_magma_ctrl_hdr;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_import_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub device_channel: u32,
+}
+pub type virtio_magma_device_import_ctrl_t = virtio_magma_device_import_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_import_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub device_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_device_import_resp_t = virtio_magma_device_import_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_release_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub device: u64,
+}
+pub type virtio_magma_device_release_ctrl_t = virtio_magma_device_release_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_release_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+}
+pub type virtio_magma_device_release_resp_t = virtio_magma_device_release_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_query_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub device: u64,
+    pub id: u64,
+}
+pub type virtio_magma_device_query_ctrl_t = virtio_magma_device_query_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_query_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_buffer_out: u64,
+    pub result_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_device_query_resp_t = virtio_magma_device_query_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_create_connection_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub device: u64,
+}
+pub type virtio_magma_device_create_connection_ctrl_t = virtio_magma_device_create_connection_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_device_create_connection_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_device_create_connection_resp_t = virtio_magma_device_create_connection_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_connection_release_ctrl {
@@ -1467,6 +1440,248 @@ pub type virtio_magma_connection_release_buffer_resp_t =
     virtio_magma_connection_release_buffer_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_export_buffer_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub buffer: u64,
+}
+pub type virtio_magma_connection_export_buffer_ctrl_t = virtio_magma_connection_export_buffer_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_export_buffer_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub buffer_handle_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_export_buffer_resp_t = virtio_magma_connection_export_buffer_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_import_buffer_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub buffer_handle: u32,
+}
+pub type virtio_magma_connection_import_buffer_ctrl_t = virtio_magma_connection_import_buffer_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_import_buffer_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub buffer_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_import_buffer_resp_t = virtio_magma_connection_import_buffer_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_create_semaphore_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+}
+pub type virtio_magma_connection_create_semaphore_ctrl_t =
+    virtio_magma_connection_create_semaphore_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_create_semaphore_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub semaphore_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_create_semaphore_resp_t =
+    virtio_magma_connection_create_semaphore_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_release_semaphore_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub semaphore: u64,
+}
+pub type virtio_magma_connection_release_semaphore_ctrl_t =
+    virtio_magma_connection_release_semaphore_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_release_semaphore_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+}
+pub type virtio_magma_connection_release_semaphore_resp_t =
+    virtio_magma_connection_release_semaphore_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_export_semaphore_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub semaphore: u64,
+}
+pub type virtio_magma_connection_export_semaphore_ctrl_t =
+    virtio_magma_connection_export_semaphore_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_export_semaphore_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub semaphore_handle_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_export_semaphore_resp_t =
+    virtio_magma_connection_export_semaphore_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_import_semaphore_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub semaphore_handle: u32,
+}
+pub type virtio_magma_connection_import_semaphore_ctrl_t =
+    virtio_magma_connection_import_semaphore_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_import_semaphore_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub semaphore_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_import_semaphore_resp_t =
+    virtio_magma_connection_import_semaphore_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_perform_buffer_op_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub buffer: u64,
+    pub options: u32,
+    pub start_offset: u64,
+    pub length: u64,
+}
+pub type virtio_magma_connection_perform_buffer_op_ctrl_t =
+    virtio_magma_connection_perform_buffer_op_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_perform_buffer_op_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_perform_buffer_op_resp_t =
+    virtio_magma_connection_perform_buffer_op_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_map_buffer_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub hw_va: u64,
+    pub buffer: u64,
+    pub offset: u64,
+    pub length: u64,
+    pub map_flags: u64,
+}
+pub type virtio_magma_connection_map_buffer_ctrl_t = virtio_magma_connection_map_buffer_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_map_buffer_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_map_buffer_resp_t = virtio_magma_connection_map_buffer_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_unmap_buffer_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub hw_va: u64,
+    pub buffer: u64,
+}
+pub type virtio_magma_connection_unmap_buffer_ctrl_t = virtio_magma_connection_unmap_buffer_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_unmap_buffer_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+}
+pub type virtio_magma_connection_unmap_buffer_resp_t = virtio_magma_connection_unmap_buffer_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_execute_command_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub context_id: u32,
+    pub descriptor: u64,
+}
+pub type virtio_magma_connection_execute_command_ctrl_t =
+    virtio_magma_connection_execute_command_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_execute_command_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_execute_command_resp_t =
+    virtio_magma_connection_execute_command_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_execute_immediate_commands_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub context_id: u32,
+    pub command_count: u64,
+    pub command_buffers: u64,
+}
+pub type virtio_magma_connection_execute_immediate_commands_ctrl_t =
+    virtio_magma_connection_execute_immediate_commands_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_execute_immediate_commands_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_execute_immediate_commands_resp_t =
+    virtio_magma_connection_execute_immediate_commands_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_flush_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+}
+pub type virtio_magma_connection_flush_ctrl_t = virtio_magma_connection_flush_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_flush_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_flush_resp_t = virtio_magma_connection_flush_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_get_notification_channel_handle_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+}
+pub type virtio_magma_connection_get_notification_channel_handle_ctrl_t =
+    virtio_magma_connection_get_notification_channel_handle_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_get_notification_channel_handle_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u32,
+}
+pub type virtio_magma_connection_get_notification_channel_handle_resp_t =
+    virtio_magma_connection_get_notification_channel_handle_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_read_notification_channel_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub buffer: u64,
+    pub buffer_size: u64,
+}
+pub type virtio_magma_connection_read_notification_channel_ctrl_t =
+    virtio_magma_connection_read_notification_channel_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_connection_read_notification_channel_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub buffer_size_out: u64,
+    pub more_data_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_read_notification_channel_resp_t =
+    virtio_magma_connection_read_notification_channel_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_buffer_get_id_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
@@ -1542,88 +1757,49 @@ pub struct virtio_magma_buffer_get_cache_policy_resp {
 pub type virtio_magma_buffer_get_cache_policy_resp_t = virtio_magma_buffer_get_cache_policy_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_export_buffer_ctrl {
+pub struct virtio_magma_buffer_set_name_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
+    pub buffer: u64,
+    pub name: u64,
+}
+pub type virtio_magma_buffer_set_name_ctrl_t = virtio_magma_buffer_set_name_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_buffer_set_name_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_buffer_set_name_resp_t = virtio_magma_buffer_set_name_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtio_magma_buffer_get_info_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
 }
-pub type virtio_magma_connection_export_buffer_ctrl_t = virtio_magma_connection_export_buffer_ctrl;
+pub type virtio_magma_buffer_get_info_ctrl_t = virtio_magma_buffer_get_info_ctrl;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_export_buffer_resp {
+pub struct virtio_magma_buffer_get_info_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub buffer_handle_out: u64,
+    pub info_out: u64,
     pub result_return: u64,
 }
-pub type virtio_magma_connection_export_buffer_resp_t = virtio_magma_connection_export_buffer_resp;
+pub type virtio_magma_buffer_get_info_resp_t = virtio_magma_buffer_get_info_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_buffer_ctrl {
+pub struct virtio_magma_buffer_get_handle_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer_handle: u32,
+    pub buffer: u64,
 }
-pub type virtio_magma_connection_import_buffer_ctrl_t = virtio_magma_connection_import_buffer_ctrl;
+pub type virtio_magma_buffer_get_handle_ctrl_t = virtio_magma_buffer_get_handle_ctrl;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_buffer_resp {
+pub struct virtio_magma_buffer_get_handle_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub buffer_out: u64,
+    pub handle_out: u64,
     pub result_return: u64,
 }
-pub type virtio_magma_connection_import_buffer_resp_t = virtio_magma_connection_import_buffer_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_execute_immediate_commands_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub context_id: u32,
-    pub command_count: u64,
-    pub command_buffers: u64,
-}
-pub type virtio_magma_connection_execute_immediate_commands_ctrl_t =
-    virtio_magma_connection_execute_immediate_commands_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_execute_immediate_commands_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_execute_immediate_commands_resp_t =
-    virtio_magma_connection_execute_immediate_commands_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_semaphore_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-}
-pub type virtio_magma_connection_create_semaphore_ctrl_t =
-    virtio_magma_connection_create_semaphore_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_semaphore_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub semaphore_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_create_semaphore_resp_t =
-    virtio_magma_connection_create_semaphore_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_release_semaphore_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub semaphore: u64,
-}
-pub type virtio_magma_connection_release_semaphore_ctrl_t =
-    virtio_magma_connection_release_semaphore_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_release_semaphore_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-}
-pub type virtio_magma_connection_release_semaphore_resp_t =
-    virtio_magma_connection_release_semaphore_resp;
+pub type virtio_magma_buffer_get_handle_resp_t = virtio_magma_buffer_get_handle_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_semaphore_get_id_ctrl {
@@ -1666,56 +1842,20 @@ pub struct virtio_magma_semaphore_reset_resp {
 pub type virtio_magma_semaphore_reset_resp_t = virtio_magma_semaphore_reset_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_export_semaphore_ctrl {
+pub struct virtio_magma_poll_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub semaphore: u64,
+    pub items: u64,
+    pub count: u32,
+    pub timeout_ns: u64,
 }
-pub type virtio_magma_connection_export_semaphore_ctrl_t =
-    virtio_magma_connection_export_semaphore_ctrl;
+pub type virtio_magma_poll_ctrl_t = virtio_magma_poll_ctrl;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_export_semaphore_resp {
+pub struct virtio_magma_poll_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub semaphore_handle_out: u64,
     pub result_return: u64,
 }
-pub type virtio_magma_connection_export_semaphore_resp_t =
-    virtio_magma_connection_export_semaphore_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_semaphore_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub semaphore_handle: u32,
-}
-pub type virtio_magma_connection_import_semaphore_ctrl_t =
-    virtio_magma_connection_import_semaphore_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_semaphore_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub semaphore_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_import_semaphore_resp_t =
-    virtio_magma_connection_import_semaphore_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_get_notification_channel_handle_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-}
-pub type virtio_magma_connection_get_notification_channel_handle_ctrl_t =
-    virtio_magma_connection_get_notification_channel_handle_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_get_notification_channel_handle_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u32,
-}
-pub type virtio_magma_connection_get_notification_channel_handle_resp_t =
-    virtio_magma_connection_get_notification_channel_handle_resp;
+pub type virtio_magma_poll_resp_t = virtio_magma_poll_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_initialize_tracing_ctrl {
@@ -1732,66 +1872,6 @@ pub struct virtio_magma_initialize_tracing_resp {
 pub type virtio_magma_initialize_tracing_resp_t = virtio_magma_initialize_tracing_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_import_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub device_channel: u32,
-}
-pub type virtio_magma_device_import_ctrl_t = virtio_magma_device_import_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_import_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub device_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_device_import_resp_t = virtio_magma_device_import_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_release_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub device: u64,
-}
-pub type virtio_magma_device_release_ctrl_t = virtio_magma_device_release_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_release_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-}
-pub type virtio_magma_device_release_resp_t = virtio_magma_device_release_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_query_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub device: u64,
-    pub id: u64,
-}
-pub type virtio_magma_device_query_ctrl_t = virtio_magma_device_query_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_query_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_buffer_out: u64,
-    pub result_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_device_query_resp_t = virtio_magma_device_query_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_create_connection_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub device: u64,
-}
-pub type virtio_magma_device_create_connection_ctrl_t = virtio_magma_device_create_connection_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_device_create_connection_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_device_create_connection_resp_t = virtio_magma_device_create_connection_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_initialize_logging_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub channel: u32,
@@ -1804,22 +1884,6 @@ pub struct virtio_magma_initialize_logging_resp {
     pub result_return: u64,
 }
 pub type virtio_magma_initialize_logging_resp_t = virtio_magma_initialize_logging_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_poll_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub items: u64,
-    pub count: u32,
-    pub timeout_ns: u64,
-}
-pub type virtio_magma_poll_ctrl_t = virtio_magma_poll_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_poll_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_poll_resp_t = virtio_magma_poll_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_connection_enable_performance_counter_access_ctrl {
@@ -1987,78 +2051,6 @@ pub type virtio_magma_connection_read_performance_counter_completion_resp_t =
     virtio_magma_connection_read_performance_counter_completion_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_set_name_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer: u64,
-    pub name: u64,
-}
-pub type virtio_magma_buffer_set_name_ctrl_t = virtio_magma_buffer_set_name_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_set_name_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_buffer_set_name_resp_t = virtio_magma_buffer_set_name_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_buffer_range_op_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer: u64,
-    pub options: u32,
-    pub start_offset: u64,
-    pub length: u64,
-}
-pub type virtio_magma_connection_buffer_range_op_ctrl_t =
-    virtio_magma_connection_buffer_range_op_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_buffer_range_op_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_buffer_range_op_resp_t =
-    virtio_magma_connection_buffer_range_op_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_get_info_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer: u64,
-}
-pub type virtio_magma_buffer_get_info_ctrl_t = virtio_magma_buffer_get_info_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_get_info_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub info_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_buffer_get_info_resp_t = virtio_magma_buffer_get_info_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_read_notification_channel_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer: u64,
-    pub buffer_size: u64,
-}
-pub type virtio_magma_connection_read_notification_channel_ctrl_t =
-    virtio_magma_connection_read_notification_channel_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_read_notification_channel_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub buffer_size_out: u64,
-    pub more_data_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_read_notification_channel_resp_t =
-    virtio_magma_connection_read_notification_channel_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_virt_connection_create_image_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -2093,87 +2085,6 @@ pub struct virtio_magma_virt_connection_get_image_info_resp {
 }
 pub type virtio_magma_virt_connection_get_image_info_resp_t =
     virtio_magma_virt_connection_get_image_info_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_get_handle_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub buffer: u64,
-}
-pub type virtio_magma_buffer_get_handle_ctrl_t = virtio_magma_buffer_get_handle_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_buffer_get_handle_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub handle_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_buffer_get_handle_resp_t = virtio_magma_buffer_get_handle_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_flush_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-}
-pub type virtio_magma_connection_flush_ctrl_t = virtio_magma_connection_flush_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_flush_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_flush_resp_t = virtio_magma_connection_flush_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_execute_command_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub context_id: u32,
-    pub descriptor: u64,
-}
-pub type virtio_magma_connection_execute_command_ctrl_t =
-    virtio_magma_connection_execute_command_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_execute_command_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_execute_command_resp_t =
-    virtio_magma_connection_execute_command_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_map_buffer_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub hw_va: u64,
-    pub buffer: u64,
-    pub offset: u64,
-    pub length: u64,
-    pub map_flags: u64,
-}
-pub type virtio_magma_connection_map_buffer_ctrl_t = virtio_magma_connection_map_buffer_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_map_buffer_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_map_buffer_resp_t = virtio_magma_connection_map_buffer_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_unmap_buffer_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub hw_va: u64,
-    pub buffer: u64,
-}
-pub type virtio_magma_connection_unmap_buffer_ctrl_t = virtio_magma_connection_unmap_buffer_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_unmap_buffer_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-}
-pub type virtio_magma_connection_unmap_buffer_resp_t = virtio_magma_connection_unmap_buffer_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_internal_release_handle_ctrl {
