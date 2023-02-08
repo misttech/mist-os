@@ -793,10 +793,8 @@ class VmPageList final {
           zx_status_t st = ZX_ERR_NEXT;
           if (compare_func(p, off)) {
             st = per_page_func(p, off);
-            if (st == ZX_ERR_STOP) {
-              return ZX_OK;
-            }
-            if (st != ZX_ERR_NEXT) {
+            // Return any errors early before considering this page for contiguous_run_func.
+            if (st != ZX_ERR_NEXT && st != ZX_ERR_STOP) {
               return st;
             }
             // Start tracking a new range first if no range is being tracked yet.
@@ -805,7 +803,9 @@ class VmPageList final {
             }
             // Append this page to the contiguous range being tracked.
             contiguous_run_len += PAGE_SIZE;
-            return ZX_ERR_NEXT;
+            // In the case that st is ZX_ERR_STOP, we will include this page in the contiguous run
+            // and stop traversal *after* this page.
+            return st;
           }
           // We were already tracking a contiguous range when we encountered this page that does not
           // fulfill compare_func. Invoke contiguous_run_func on the range so far and start tracking

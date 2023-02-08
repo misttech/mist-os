@@ -936,6 +936,53 @@ static bool vmpl_contiguous_run_compare_test() {
   END_TEST;
 }
 
+static bool vmpl_contiguous_traversal_end_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+  vm_page_t test_pages[3] = {};
+
+  // Add 3 consecutive pages.
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_TRUE(AddPage(&list, &test_pages[i], i * PAGE_SIZE));
+  }
+
+  uint64_t expected_offsets[2] = {0, 2};
+  uint64_t range_offsets[2] = {};
+  size_t index = 0;
+  // The compare function evaluates to true for all pages, but the traversal ends early due to
+  // ZX_ERR_STOP in the per-page function.
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [](const VmPageOrMarker* p, uint64_t off) {
+        // Stop the traversal at page 1. This means the last page processed should be page 1 and
+        // should be included in the contiguous range. Traversal will stop *after* this page.
+        return (off / PAGE_SIZE < 1) ? ZX_ERR_NEXT : ZX_ERR_STOP;
+      },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, VmPageListNode::kPageFanOut * PAGE_SIZE);
+
+  EXPECT_OK(status);
+  EXPECT_EQ(2u, index);
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
+  list_node_t free_list;
+  list_initialize(&free_list);
+  list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
+    list_add_tail(&free_list, &p.ReleasePage()->queue_node);
+  });
+  EXPECT_EQ(3u, list_length(&free_list));
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vm_page_list_tests)
 VM_UNITTEST(vmpl_add_remove_page_test)
 VM_UNITTEST(vmpl_basic_marker_test)
@@ -960,6 +1007,7 @@ VM_UNITTEST(vmpl_merge_onto_test)
 VM_UNITTEST(vmpl_merge_marker_test)
 VM_UNITTEST(vmpl_contiguous_run_test)
 VM_UNITTEST(vmpl_contiguous_run_compare_test)
+VM_UNITTEST(vmpl_contiguous_traversal_end_test)
 UNITTEST_END_TESTCASE(vm_page_list_tests, "vmpl", "VmPageList tests")
 
 }  // namespace vm_unittest
