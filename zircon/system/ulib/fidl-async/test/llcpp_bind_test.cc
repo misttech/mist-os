@@ -12,7 +12,7 @@
 
 namespace {
 
-class Server : public fidl::WireServer<::fidl_test_simple::Simple> {
+class Server : public fidl::WireServer<fidl_test_simple::Simple> {
  public:
   explicit Server(sync_completion_t* destroyed) : destroyed_(destroyed) {}
   Server(Server&& other) = delete;
@@ -33,38 +33,41 @@ class Server : public fidl::WireServer<::fidl_test_simple::Simple> {
 
 TEST(BindTestCase, UniquePtrDestroyOnClientClose) {
   sync_completion_t destroyed;
-  auto server = std::make_unique<Server>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), std::move(server)));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_end),
+                                         std::make_unique<Server>(&destroyed)));
   loop.RunUntilIdle();
   ASSERT_FALSE(sync_completion_signaled(&destroyed));
 
-  local.reset();
+  client_end.reset();
   loop.RunUntilIdle();
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 }
 
 TEST(BindTestCase, UniquePtrDestroyOnServerClose) {
   sync_completion_t destroyed;
-  auto server = std::make_unique<Server>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
+
+  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_end),
+                                         std::make_unique<Server>(&destroyed)));
+  ASSERT_FALSE(sync_completion_signaled(&destroyed));
+
   // Launch a thread so we can make a blocking client call
   ASSERT_OK(loop.StartThread());
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
-
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), std::move(server)));
-  ASSERT_FALSE(sync_completion_signaled(&destroyed));
-
-  auto result = fidl::WireCall<::fidl_test_simple::Simple>(zx::unowned_channel{local})->Close();
-  ASSERT_EQ(result.status(), ZX_ERR_PEER_CLOSED);
+  const fidl::WireResult result = fidl::WireCall(client_end)->Close();
+  ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
   // Make sure the other end closed
-  ASSERT_OK(local.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
+  ASSERT_OK(client_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 }
 
@@ -73,17 +76,18 @@ TEST(BindTestCase, CallbackDestroyOnClientClose) {
   auto server = std::make_unique<Server>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
 
-  fidl::OnChannelClosedFn<Server> cb = [](Server* server) { delete server; };
+  ASSERT_OK(fidl::BindSingleInFlightOnly(
+      loop.dispatcher(), std::move(server_end), server.release(),
+      fidl::OnChannelClosedFn<Server>{[](Server* server) { delete server; }}));
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), server.release(),
-                                         std::move(cb)));
   loop.RunUntilIdle();
   ASSERT_FALSE(sync_completion_signaled(&destroyed));
 
-  local.reset();
+  client_end.reset();
   loop.RunUntilIdle();
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 }
@@ -92,40 +96,43 @@ TEST(BindTestCase, CallbackDestroyOnServerClose) {
   sync_completion_t destroyed;
   auto server = std::make_unique<Server>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
+
+  ASSERT_OK(fidl::BindSingleInFlightOnly(
+      loop.dispatcher(), std::move(server_end), server.release(),
+      fidl::OnChannelClosedFn<Server>{[](Server* server) { delete server; }}));
+
+  ASSERT_FALSE(sync_completion_signaled(&destroyed));
+
   // Launch a thread so we can make a blocking client call
   ASSERT_OK(loop.StartThread());
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
-
-  fidl::OnChannelClosedFn<Server> cb = [](Server* server) { delete server; };
-
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), server.release(),
-                                         std::move(cb)));
-  ASSERT_FALSE(sync_completion_signaled(&destroyed));
-
-  auto result = fidl::WireCall<::fidl_test_simple::Simple>(zx::unowned_channel{local})->Close();
-  ASSERT_EQ(result.status(), ZX_ERR_PEER_CLOSED);
+  const fidl::WireResult result = fidl::WireCall(client_end)->Close();
+  ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
 
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
   // Make sure the other end closed
-  ASSERT_OK(local.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
+  ASSERT_OK(client_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
 }
 
 TEST(BindTestCase, UnknownMethod) {
   sync_completion_t destroyed;
-  auto server = std::make_unique<Server>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), std::move(server)));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_end),
+                                         std::make_unique<Server>(&destroyed)));
   loop.RunUntilIdle();
   ASSERT_FALSE(sync_completion_signaled(&destroyed));
 
   // An epitaph is never a valid message to a server.
-  fidl_epitaph_write(local.get(), ZX_OK);
+  fidl_epitaph_write(client_end.channel().get(), ZX_OK);
 
   loop.RunUntilIdle();
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
@@ -146,7 +153,7 @@ class PlaceholderBase2 {
 };
 
 class MultiInheritanceServer : public PlaceholderBase1,
-                               public fidl::WireServer<::fidl_test_simple::Simple>,
+                               public fidl::WireServer<fidl_test_simple::Simple>,
                                public PlaceholderBase2 {
  public:
   explicit MultiInheritanceServer(sync_completion_t* destroyed) : destroyed_(destroyed) {}
@@ -171,21 +178,23 @@ class MultiInheritanceServer : public PlaceholderBase1,
 
 TEST(BindTestCase, MultipleInheritanceServer) {
   sync_completion_t destroyed;
-  auto server = std::make_unique<MultiInheritanceServer>(&destroyed);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+  zx::result endpoints = fidl::CreateEndpoints<fidl_test_simple::Simple>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
+
+  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_end),
+                                         std::make_unique<Server>(&destroyed)));
+  ASSERT_FALSE(sync_completion_signaled(&destroyed));
+
   // Launch a thread so we can make a blocking client call
   ASSERT_OK(loop.StartThread());
 
-  zx::channel local, remote;
-  ASSERT_OK(zx::channel::create(0, &local, &remote));
-
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(remote), std::move(server)));
-  ASSERT_FALSE(sync_completion_signaled(&destroyed));
-
-  auto result = fidl::WireCall<::fidl_test_simple::Simple>(zx::unowned_channel{local})->Close();
-  ASSERT_EQ(result.status(), ZX_ERR_PEER_CLOSED);
+  const fidl::WireResult result = fidl::WireCall(client_end)->Close();
+  ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
   // Make sure the other end closed
-  ASSERT_OK(local.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
+  ASSERT_OK(client_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time{}, nullptr));
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 }
 
