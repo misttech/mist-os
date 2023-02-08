@@ -917,7 +917,6 @@ impl LinkDevice for EthernetLinkDevice {
 mod tests {
     use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
 
-    use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, IpVersion};
     use packet::Buf;
@@ -935,7 +934,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::FakeInstant,
-        device::{DeviceId, DeviceIdInner},
+        device::DeviceId,
         error::NotFoundError,
         ip::{
             device::{
@@ -945,7 +944,6 @@ mod tests {
             dispatch_receive_ip_packet_name, receive_ip_packet,
             testutil::{is_in_ip_multicast, FakeDeviceId},
         },
-        sync::WeakReferenceCounted,
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng,
             FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V4,
@@ -2032,13 +2030,16 @@ mod tests {
         );
 
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
-        let e = assert_matches!(&device, DeviceId(DeviceIdInner::Ethernet(e)) => e);
-        let EthernetDeviceId(_, ptr) = e;
-        let state = WeakReferenceCounted::upgrade(ptr).unwrap();
         // Verify that there is a single assigned address.
         assert_eq!(
-            state
-                .as_ref()
+            sync_ctx
+                .state
+                .device
+                .devices
+                .read()
+                .ethernet
+                .get(0)
+                .unwrap()
                 .ip
                 .ipv6
                 .read()
@@ -2056,8 +2057,14 @@ mod tests {
         )
         .unwrap();
         // Assert that the new address got added.
-        let addr_subs: Vec<_> = state
-            .as_ref()
+        let addr_subs: Vec<_> = sync_ctx
+            .state
+            .device
+            .devices
+            .read()
+            .ethernet
+            .get(0)
+            .unwrap()
             .ip
             .ipv6
             .read()
