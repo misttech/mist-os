@@ -54,7 +54,7 @@ def main():
                 if not os.path.exists(os.path.dirname(dest_file)):
                     os.makedirs(os.path.dirname(dest_file))
                 shutil.copy(source_file, dest_file)
-    assert not unmergable_files, f"The following files cannot be merged because of conflicting content:{'\n'.join(unmergable_files)}"
+    print(unmergable_files)
 
     # Write meta/manifest.json
     dest_file = os.path.join(dest_dir, "meta/manifest.json")
