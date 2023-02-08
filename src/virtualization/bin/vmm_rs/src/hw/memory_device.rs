@@ -22,6 +22,9 @@ impl MemoryMode {
 /// `MemoryDevice` is a simple device that reads and writes bytes to a backing vector.
 pub struct MemoryDevice(Vec<u8>, MemoryMode);
 
+// Some definitions are only used on x64 right now, but there's nothing platform
+// specific about them.
+#[allow(dead_code)]
 impl MemoryDevice {
     pub fn ram_bytes(size: u16) -> Self {
         MemoryDevice(vec![0; size as usize], MemoryMode::ReadWrite)
@@ -29,6 +32,10 @@ impl MemoryDevice {
 
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.0.as_mut_slice()
     }
 }
 

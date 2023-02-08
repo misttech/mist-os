@@ -175,6 +175,21 @@ pub trait Hypervisor: Send + Sync + Clone + 'static {
         state: &zx::sys::zx_vcpu_state_t,
     ) -> Result<(), zx::Status>;
 
+    /// Writes the result of a port-read instruction to the vcpu.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vcpu` - The [VcpuHandle] of the vcpu to write state.
+    /// * `value` - The value of the emulated port-io access. This _must_ be 1,
+    ///   2, or 4 bytes in length.
+    ///
+    /// # Errors:
+    ///
+    /// The full set of errors can be found on the documentation for the
+    /// [zx_vcpu_write_state](https://fuchsia.dev/fuchsia-src/reference/syscalls/vcpu_write_state)
+    /// syscall.
+    fn vcpu_write_io(&self, vcpu: &Self::VcpuHandle, value: &[u8]) -> Result<(), zx::Status>;
+
     /// Resumes execution of a vcpu within the guest.
     ///
     /// This is a blocking operation; the vcpu will execute within the guest context until a vm-
@@ -316,6 +331,15 @@ impl Hypervisor for FuchsiaHypervisor {
         state: &zx::sys::zx_vcpu_state_t,
     ) -> Result<(), zx::Status> {
         vcpu.0.write_state(state)
+    }
+    fn vcpu_write_io(&self, vcpu: &Self::VcpuHandle, value: &[u8]) -> Result<(), zx::Status> {
+        // len should only be a supported IO access size. These are the only sizes that the
+        // hypervisor will generate traps for so we don't expect any other values.
+        assert!(value.len() == 1 || value.len() == 2 || value.len() == 4);
+        let mut raw =
+            zx::sys::zx_vcpu_io_t { access_size: value.len() as u8, ..Default::default() };
+        raw.data.copy_from_slice(value);
+        vcpu.0.write_io(&raw)
     }
     fn vcpu_enter(&self, vcpu: &Self::VcpuHandle) -> Result<zx::Packet, zx::Status> {
         vcpu.0.enter()
@@ -517,6 +541,11 @@ pub mod testing {
                 MockVcpuController { packet_sender, initial_ip, entry_counter },
             )
         }
+
+        #[allow(dead_code)]
+        pub fn update_registers<F: Fn(&mut zx::sys::zx_vcpu_state_t)>(&self, f: F) {
+            f(&mut *self.state.borrow_mut());
+        }
     }
 
     /// Allow tests to control the behavior of [MockHypervisor] methods.
@@ -547,6 +576,7 @@ pub mod testing {
         on_vcpu_create: MockBehavior,
         on_vcpu_read_state: MockBehavior,
         on_vcpu_write_state: MockBehavior,
+        on_vcpu_write_io: MockBehavior,
         on_vcpu_enter: MockBehavior,
         on_vcpu_kick: MockBehavior,
     }
@@ -594,6 +624,27 @@ pub mod testing {
     ) -> Result<(), zx::Status> {
         *vcpu.state.borrow_mut() = *state;
         Ok(())
+    }
+    /// The default callable used to implement [Hypervisor::vcpu_write_state] for [MockHypervisor].
+    #[cfg(target_arch = "x86_64")]
+    pub fn mock_vcpu_write_io(vcpu: &MockVcpu, value: &[u8]) -> Result<(), zx::Status> {
+        // Handle this by updating the rax register within the current vcpu state.
+        let rax = match value.len() {
+            1 => value[0] as u64,
+            2 => u16::from_ne_bytes(value.try_into().unwrap()) as u64,
+            4 => u32::from_ne_bytes(value.try_into().unwrap()) as u64,
+            _ => return Err(zx::Status::INVALID_ARGS),
+        };
+        let mask = u64::MAX << (value.len() << 3);
+        vcpu.update_registers(|state| {
+            state.rax = (state.rax & mask) | rax;
+        });
+        Ok(())
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn mock_vcpu_write_io(_vcpu: &MockVcpu, _value: &[u8]) -> Result<(), zx::Status> {
+        // No io instructions on arm64.
+        unimplemented!();
     }
 
     /// The default callable used to implement [Hypervisor::vcpu_enter] for [MockHypervisor].
@@ -646,6 +697,11 @@ pub mod testing {
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_write_state] is called.
         pub fn on_vcpu_write_state(&self, behavior: MockBehavior) {
             self.inner.lock().unwrap().on_vcpu_write_state = behavior;
+        }
+
+        /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_write_io] is called.
+        pub fn on_vcpu_write_io(&self, behavior: MockBehavior) {
+            self.inner.lock().unwrap().on_vcpu_write_io = behavior;
         }
 
         /// Specify the behavior of [MockHypervisor] when [Hypervisor::vcpu_enter] is called.
@@ -773,6 +829,12 @@ pub mod testing {
                 return Err(status);
             }
             mock_vcpu_write_state(vcpu, state)
+        }
+        fn vcpu_write_io(&self, vcpu: &Self::VcpuHandle, value: &[u8]) -> Result<(), zx::Status> {
+            if let Some(status) = self.inner.lock().unwrap().on_vcpu_write_io.return_error() {
+                return Err(status);
+            }
+            mock_vcpu_write_io(vcpu, value)
         }
         fn vcpu_enter(&self, vcpu: &Self::VcpuHandle) -> Result<zx::Packet, zx::Status> {
             if let Some(status) = self.inner.lock().unwrap().on_vcpu_enter.return_error() {

@@ -167,7 +167,7 @@ impl<H: Hypervisor> Vcpu<H> {
                 }
             };
 
-            match handle_packet(&devices, packet) {
+            match handle_packet(&hypervisor, &vcpu, &devices, packet) {
                 // If the packet handling succeeded, we can resume execution of the vcpu.
                 Ok(()) => continue,
                 // `CANCELED` means a graceful shutdown has been requested so we will stop running the
@@ -203,11 +203,13 @@ impl<H: Hypervisor> Vcpu<H> {
 }
 
 fn handle_packet<H: Hypervisor>(
+    hypervisor: &H,
+    vcpu: &H::VcpuHandle,
     devices: &DeviceManager<H>,
     packet: zx::Packet,
 ) -> Result<(), zx::Status> {
     match packet.contents() {
-        zx::PacketContents::GuestIo(pio) => handle_pio_packet(devices, pio),
+        zx::PacketContents::GuestIo(pio) => handle_pio_packet(hypervisor, vcpu, devices, pio),
         zx::PacketContents::GuestMem(mmio) => handle_mmio_packet(devices, mmio),
         zx::PacketContents::GuestVcpu(vcpu) => handle_vcpu_packet(devices, vcpu),
         unhandled_packet => {
@@ -218,6 +220,8 @@ fn handle_packet<H: Hypervisor>(
 }
 
 fn handle_pio_packet<H: Hypervisor>(
+    hypervisor: &H,
+    vcpu: &H::VcpuHandle,
     devices: &DeviceManager<H>,
     pio: zx::GuestIoPacket,
 ) -> Result<(), zx::Status> {
@@ -237,7 +241,20 @@ fn handle_pio_packet<H: Hypervisor>(
                 return Err(zx::Status::INTERNAL);
             }
         },
-        zx::AccessType::Read => unimplemented!(),
+        zx::AccessType::Read => {
+            let mut data: [u8; 4] = Default::default();
+            let slice = match pio.access_size() {
+                Some(zx::PortAccessSize::Bits8) => &mut data[..1],
+                Some(zx::PortAccessSize::Bits16) => &mut data[..2],
+                Some(zx::PortAccessSize::Bits32) => &mut data[..4],
+                None => {
+                    tracing::error!("Hypervisor generated a pio read packet with invalid size");
+                    return Err(zx::Status::INTERNAL);
+                }
+            };
+            devices.pio_read(PioAddress(pio.port()), slice)?;
+            hypervisor.vcpu_write_io(vcpu, slice)
+        }
     }
 }
 
@@ -473,5 +490,47 @@ mod tests {
         let join_handle = vcpu.take_join_handle().expect("Failed to obtain vcpu JoinHandle");
         assert_eq!(join_handle.join().unwrap(), Err(zx::Status::NOT_FOUND));
         assert_eq!(vcpu_controller.entry_counter().get_count(), 1);
+    }
+
+    #[fuchsia::test]
+    #[cfg(target_arch = "x86_64")]
+    async fn test_vcpu_pio_read() {
+        let hypervisor = MockHypervisor::new();
+        let (guest, _address_space) = hypervisor.guest_create().unwrap();
+        let guest = Arc::new(guest);
+
+        // Create a test device on the PIO bus.
+        let devices = DeviceManager::new(hypervisor.clone(), guest.clone());
+        let ram_device = Arc::new(Mutex::new(MemoryDevice::ram_bytes(100)));
+        devices
+            .register_pio(PioRange::new(PioAddress(0x1000), 100).unwrap(), ram_device.clone())
+            .unwrap();
+
+        // Create and start a vcpu.
+        let mut vcpu = Vcpu::new(hypervisor.clone(), guest.clone(), devices, 0, 0, 0);
+        assert_eq!(vcpu.start().await, zx::Status::OK);
+
+        // Initialize device to a known state:
+        ram_device.lock().unwrap().as_mut_slice()[0] = 0xab;
+
+        // Simulate an IO trap by sending a port packet to the vcpu.
+        let vcpus = guest.vcpus();
+        assert_eq!(vcpus.len(), 1);
+        let io_packet = zx::GuestIoPacket::from_raw(zx::sys::zx_packet_guest_io_t {
+            port: 0x1000,
+            access_size: 1,
+            input: true,
+            data: Default::default(),
+        });
+        vcpus[0]
+            .send_packet(zx::Packet::from_guest_io_packet(0, zx::sys::ZX_OK, io_packet))
+            .unwrap();
+
+        // Once the vcpu has called vcpu_enter for the second time we know it should have handled
+        // the trap.
+        vcpus[0].entry_counter().wait_for_count(2);
+        // Expect the first byte to be written but not the others.
+        assert_eq!(ram_device.lock().unwrap().as_slice()[0], 0xab);
+        assert_eq!(ram_device.lock().unwrap().as_slice()[1], 0x00);
     }
 }
