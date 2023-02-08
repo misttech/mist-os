@@ -11,7 +11,8 @@ use {
     std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         directory_benchmarks::{
-            DirectoryTreeStructure, WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
+            DirectoryTreeStructure, OpenDeeplyNestedFile, OpenFile, StatPath,
+            WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
         },
         io_benchmarks::{
             ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm,
@@ -80,6 +81,9 @@ fn build_benchmark_set() -> BenchmarkSet {
     benchmark_set.add_benchmark(WriteRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT), &filesystems);
+    benchmark_set.add_benchmark(StatPath::new(), &filesystems);
+    benchmark_set.add_benchmark(OpenFile::new(), &filesystems);
+    benchmark_set.add_benchmark(OpenDeeplyNestedFile::new(), &filesystems);
 
     // Creates a total of 62 directories and 189 files.
     let dts = DirectoryTreeStructure {

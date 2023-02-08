@@ -1,3 +1,11 @@
+fuchsia.storage: OpenDeeplyNestedFile/f2fs
+fuchsia.storage: OpenDeeplyNestedFile/fxfs
+fuchsia.storage: OpenDeeplyNestedFile/memfs
+fuchsia.storage: OpenDeeplyNestedFile/minfs
+fuchsia.storage: OpenFile/f2fs
+fuchsia.storage: OpenFile/fxfs
+fuchsia.storage: OpenFile/memfs
+fuchsia.storage: OpenFile/minfs
 fuchsia.storage: ReadRandomCold/8192/f2fs
 fuchsia.storage: ReadRandomCold/8192/fxfs
 fuchsia.storage: ReadRandomCold/8192/memfs
@@ -14,6 +22,10 @@ fuchsia.storage: ReadSequentialWarm/8192/f2fs
 fuchsia.storage: ReadSequentialWarm/8192/fxfs
 fuchsia.storage: ReadSequentialWarm/8192/memfs
 fuchsia.storage: ReadSequentialWarm/8192/minfs
+fuchsia.storage: StatPath/f2fs
+fuchsia.storage: StatPath/fxfs
+fuchsia.storage: StatPath/memfs
+fuchsia.storage: StatPath/minfs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/f2fs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/fxfs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/memfs
@@ -34,10 +46,6 @@ fuchsia.storage: WriteSequentialCold/8192/f2fs
 fuchsia.storage: WriteSequentialCold/8192/fxfs
 fuchsia.storage: WriteSequentialCold/8192/memfs
 fuchsia.storage: WriteSequentialCold/8192/minfs
-fuchsia.storage: WriteSequentialWarm/8192/f2fs
-fuchsia.storage: WriteSequentialWarm/8192/fxfs
-fuchsia.storage: WriteSequentialWarm/8192/memfs
-fuchsia.storage: WriteSequentialWarm/8192/minfs
 fuchsia.storage: WriteSequentialFsyncCold/8192/f2fs
 fuchsia.storage: WriteSequentialFsyncCold/8192/fxfs
 fuchsia.storage: WriteSequentialFsyncCold/8192/memfs
@@ -46,3 +54,7 @@ fuchsia.storage: WriteSequentialFsyncWarm/8192/f2fs
 fuchsia.storage: WriteSequentialFsyncWarm/8192/fxfs
 fuchsia.storage: WriteSequentialFsyncWarm/8192/memfs
 fuchsia.storage: WriteSequentialFsyncWarm/8192/minfs
+fuchsia.storage: WriteSequentialWarm/8192/f2fs
+fuchsia.storage: WriteSequentialWarm/8192/fxfs
+fuchsia.storage: WriteSequentialWarm/8192/memfs
+fuchsia.storage: WriteSequentialWarm/8192/minfs

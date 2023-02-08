@@ -27,6 +27,17 @@ The `WalkDirectoryTree` benchmarks measure how long it takes to walk a directory
 times by the benchmarks. The "cold" variant of the benchmarks remounts the filesystem between each
 traversal and the "warm" variant does not.
 
+### OpenFile Benchmarks
+The `OpenFile` benchmark measures how long it takes for a filesystem to open a file.
+
+The `OpenDeeplyNestedFile` benchmark expands on the `OpenFile` benchmark by placing the file several
+directories deep and then opening it from the root of the filesystem. When compared to the
+`OpenFile` benchmark, the `OpenDeeplyNestedFile` captures how long it takes the filesystem to
+internally traverse directories.
+
+### StatPath Benchmark
+The `StatPath` benchmark measure how long it takes to call `stat` on a path to a file.
+
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
 Simply closing all handles to those files doesn't guarantee that the filesystem will immediately
