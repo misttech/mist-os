@@ -188,6 +188,28 @@ zx_status_t DeviceManager::AddCompositeDevice(const fbl::RefPtr<Device>& dev, st
   return ZX_OK;
 }
 
+void DeviceManager::AddCompositeDeviceFromSpec(CompositeNodeSpecInfo info,
+                                               fbl::Array<std::unique_ptr<Metadata>> metadata) {
+  ZX_ASSERT(composites_from_specs_.count(info.spec_name) == 0);
+  std::unique_ptr<CompositeDevice> new_device =
+      CompositeDevice::CreateFromSpec(info, std::move(metadata));
+  composites_from_specs_[info.spec_name] = std::move(new_device);
+}
+
+zx::result<> DeviceManager::BindFragmentForSpec(const fbl::RefPtr<Device>& dev,
+                                                const std::string& spec, size_t fragment_idx) {
+  if (composites_from_specs_.count(spec) == 0) {
+    LOGF(ERROR, "Composite node spec %s is missing in DeviceManager", spec.c_str());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  zx_status_t status = composites_from_specs_[spec]->BindFragment(fragment_idx, dev);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok();
+}
+
 void DeviceManager::AddToDevices(fbl::RefPtr<Device> new_device) { devices_.push_back(new_device); }
 
 void DeviceManager::ScheduleRemove(const fbl::RefPtr<Device>& dev) {

@@ -31,8 +31,13 @@ struct StrProperty {
 
 // Contains the information to create a CompositeDevice from a spec.
 struct CompositeNodeSpecInfo {
+  // The name of the spec.
+  std::string spec_name;
   MatchedDriverInfo driver;
-  std::string name;
+
+  // The name of the composite node.
+  std::string composite_name;
+
   uint32_t primary_index;
   std::vector<std::string> parent_names;
 };

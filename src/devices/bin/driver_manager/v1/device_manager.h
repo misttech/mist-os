@@ -17,6 +17,8 @@ class Coordinator;
 // In charge of creating, adding, and removing devices. Doesn't include the root device.
 class DeviceManager {
  public:
+  using CompositeNodeSpecMap = std::unordered_map<std::string, std::unique_ptr<CompositeDevice>>;
+
   DeviceManager(Coordinator* coordinator, DriverHostCrashPolicy crash_policy);
 
   // Add a new device to a parent device (same driver_host)
@@ -38,6 +40,11 @@ class DeviceManager {
 
   zx_status_t AddCompositeDevice(const fbl::RefPtr<Device>& dev, std::string_view name,
                                  fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_desc);
+
+  void AddCompositeDeviceFromSpec(CompositeNodeSpecInfo info,
+                                  fbl::Array<std::unique_ptr<Metadata>> metadata);
+  zx::result<> BindFragmentForSpec(const fbl::RefPtr<Device>& dev, const std::string& spec,
+                                   size_t fragment_idx);
 
   // Begin scheduling for removal of the device and unbinding of its children.
   void ScheduleRemove(const fbl::RefPtr<Device>& dev);
@@ -70,7 +77,7 @@ class DeviceManager {
   }
 
   // Returns all composite devices that are not added through composite node specs.
-  // TODO(fxb/115878): DeviceManager should return composites from specs as well.
+  // TODO(fxb/115878): DeviceManager should also return composites in |composites_from_specs_|.
   fbl::DoublyLinkedList<std::unique_ptr<CompositeDevice>>& composite_devices() {
     return composite_devices_;
   }
@@ -82,9 +89,11 @@ class DeviceManager {
   // All Devices (excluding static immortal devices)
   fbl::TaggedDoublyLinkedList<fbl::RefPtr<Device>, Device::AllDevicesListTag> devices_;
 
-  // All composite devices that are not added through composite node specs.
-  // TODO(fxb/115878): DeviceManager should own and manage the composite node spec composites.
+  // All composite devices that are added from the legacy composite system.
   fbl::DoublyLinkedList<std::unique_ptr<CompositeDevice>> composite_devices_;
+
+  // All composite devices that are added from composite node specs.
+  CompositeNodeSpecMap composites_from_specs_;
 
   DriverHostCrashPolicy crash_policy_;
 };

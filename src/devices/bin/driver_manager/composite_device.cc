@@ -169,10 +169,10 @@ std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromSpec(
     CompositeNodeSpecInfo composite_info, fbl::Array<std::unique_ptr<Metadata>> metadata) {
   uint32_t num_parents = static_cast<uint32_t>(composite_info.parent_names.size());
 
-  fbl::String name(composite_info.name);
   auto dev = std::make_unique<CompositeDevice>(
-      std::move(name), fbl::Array<const zx_device_prop_t>(), fbl::Array<const StrProperty>(),
-      num_parents, composite_info.primary_index, std::nullopt, std::move(metadata), true);
+      fbl::String(composite_info.composite_name), fbl::Array<const zx_device_prop_t>(),
+      fbl::Array<const StrProperty>(), num_parents, composite_info.primary_index, std::nullopt,
+      std::move(metadata), true);
 
   for (uint32_t i = 0; i < num_parents; ++i) {
     std::string name = composite_info.parent_names[i];

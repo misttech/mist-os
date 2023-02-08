@@ -6,13 +6,12 @@
 
 #include "src/devices/lib/log/log.h"
 
-namespace node_group {
+namespace composite_node_specs {
 
 zx::result<std::unique_ptr<CompositeNodeSpecV1>> CompositeNodeSpecV1::Create(
     CompositeNodeSpecCreateInfo create_info,
-    fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DriverLoader* driver_loader) {
-  ZX_ASSERT(driver_loader);
-
+    fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DriverLoader& driver_loader,
+    DeviceManager& device_manager) {
   fbl::Array<std::unique_ptr<Metadata>> metadata(
       new std::unique_ptr<Metadata>[spec.metadata.count()], spec.metadata.count());
   for (size_t i = 0; i < spec.metadata.count(); i++) {
@@ -30,17 +29,17 @@ zx::result<std::unique_ptr<CompositeNodeSpecV1>> CompositeNodeSpecV1::Create(
   }
 
   return zx::ok(std::make_unique<CompositeNodeSpecV1>(std::move(create_info), std::move(metadata),
-                                                      driver_loader));
+                                                      driver_loader, device_manager));
 }
 
 CompositeNodeSpecV1::CompositeNodeSpecV1(CompositeNodeSpecCreateInfo create_info,
                                          fbl::Array<std::unique_ptr<Metadata>> metadata,
-                                         DriverLoader* driver_loader)
+                                         DriverLoader& driver_loader, DeviceManager& device_manager)
     : CompositeNodeSpec(std::move(create_info)),
       metadata_(std::move(metadata)),
-      driver_loader_(driver_loader) {
-  ZX_ASSERT(driver_loader_);
-}
+      has_composite_device_(false),
+      driver_loader_(driver_loader),
+      device_manager_(device_manager) {}
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
     fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node) {
@@ -52,17 +51,17 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  if (!composite_device_) {
-    SetCompositeDevice(info);
+  if (!has_composite_device_) {
+    SetupCompositeDevice(info);
   }
 
   auto owned_device = owned->device;
-  auto status = composite_device_->BindFragment(info.node_index(), owned_device);
-  if (status != ZX_OK) {
+  auto result = device_manager_.BindFragmentForSpec(owned_device, name(), info.node_index());
+  if (result.is_error()) {
     LOGF(ERROR, "Failed to BindFragment for '%.*s': %s",
          static_cast<uint32_t>(owned_device->name().size()), owned_device->name().data(),
-         zx_status_get_string(status));
-    return zx::error(status);
+         result.status_string());
+    return result.take_error();
   }
 
   if (owned_device->name() == "sysmem-fidl" || owned_device->name() == "sysmem-banjo") {
@@ -78,9 +77,9 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
   return zx::ok(std::nullopt);
 }
 
-void CompositeNodeSpecV1::SetCompositeDevice(
+void CompositeNodeSpecV1::SetupCompositeDevice(
     fuchsia_driver_index::wire::MatchedNodeGroupInfo info) {
-  ZX_ASSERT(!composite_device_);
+  ZX_ASSERT(!has_composite_device_);
   ZX_ASSERT(info.has_composite() && info.composite().has_driver_info() &&
             info.composite().driver_info().has_url() && info.composite().has_composite_name());
   ZX_ASSERT(info.has_node_index() && info.has_num_nodes() && info.has_node_names() &&
@@ -94,19 +93,21 @@ void CompositeNodeSpecV1::SetCompositeDevice(
 
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {
-      .driver = driver_loader_->LoadDriverUrl(std::string(fidl_driver_info.driver_url().get())),
+      .driver = driver_loader_.LoadDriverUrl(std::string(fidl_driver_info.driver_url().get())),
       .colocate = fidl_driver_info.has_colocate() && fidl_driver_info.colocate(),
   };
 
   CompositeNodeSpecInfo composite_info = {
+      .spec_name = name(),
       .driver = matched_driver_info,
-      .name = std::string(info.composite().composite_name().get()),
+      .composite_name = std::string(info.composite().composite_name().get()),
       .primary_index = info.primary_index(),
       .parent_names = std::move(parent_names),
   };
 
-  composite_device_ = CompositeDevice::CreateFromSpec(composite_info, std::move(metadata_));
+  device_manager_.AddCompositeDeviceFromSpec(composite_info, std::move(metadata_));
+  has_composite_device_ = true;
   metadata_ = fbl::Array<std::unique_ptr<Metadata>>();
 }
 
-}  // namespace node_group
+}  // namespace composite_node_specs

@@ -779,12 +779,12 @@ zx_status_t Coordinator::AddCompositeNodeSpec(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto spec_result = node_group::CompositeNodeSpecV1::Create(
+  auto spec_result = composite_node_specs::CompositeNodeSpecV1::Create(
       CompositeNodeSpecCreateInfo{
           .name = std::string(name.data()),
           .size = spec.parents.count(),
       },
-      spec, &driver_loader_);
+      spec, driver_loader_, *device_manager_);
   if (!spec_result.is_ok()) {
     LOGF(ERROR, "Failed to create composite node spec");
     return spec_result.status_value();

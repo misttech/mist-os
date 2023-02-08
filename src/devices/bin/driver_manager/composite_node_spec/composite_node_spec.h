@@ -49,6 +49,8 @@ class CompositeNodeSpec {
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
       const DeviceOrNode& device_or_node) = 0;
 
+  const std::string& name() const { return name_; }
+
  private:
   std::string name_;
   std::vector<bool> parent_specs_;
