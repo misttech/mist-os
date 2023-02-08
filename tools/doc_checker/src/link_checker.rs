@@ -5,23 +5,21 @@
 //! link_checker implements the [`DocCheck` trait  used to perform checks on the links and images
 //! found in markdown documentation in the Fuchsia project.
 
-use {
-    crate::{
-        md_element::{CowStr, Element, LinkType},
-        DocCheck, DocCheckError, DocCheckerArgs, DocLine,
-    },
-    anyhow::{bail, Result},
-    async_trait::async_trait,
-    fuchsia_hyper::{new_https_client_from_tcp_options, HttpsClient, TcpOptions},
-    http::{uri::Uri, Request, StatusCode},
-    hyper::Body,
-    std::{
-        collections::{HashMap, HashSet},
-        ffi::OsStr,
-        path::{self, Path, PathBuf},
-    },
-    url::Url,
+use crate::{
+    md_element::{CowStr, Element, LinkType},
+    DocCheck, DocCheckError, DocCheckerArgs, DocLine,
 };
+use anyhow::{bail, Result};
+use async_trait::async_trait;
+use fuchsia_hyper::{new_https_client_from_tcp_options, HttpsClient, TcpOptions};
+use http::{uri::Uri, Request, StatusCode};
+use hyper::Body;
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::OsStr,
+    path::{self, Path, PathBuf},
+};
+use url::Url;
 
 // path_help is a wrapper to allow mocking path checks
 // exists. and is_dir.
@@ -194,6 +192,10 @@ impl DocCheck for LinkChecker {
                                     .map(|e| e.get_contents())
                                     .collect::<Vec<String>>()
                                     .join("");
+                                if link_url.starts_with("\"") && link_url.ends_with("\"") {
+                                    // This is not a link but an array of quoted strings.
+                                    continue;
+                                }
                                 if text == link_url.to_string() && link_url == link_title {
                                     errors.push(DocCheckError::new_info_helpful(
                                             ele.doc_line().line_num,
@@ -237,6 +239,10 @@ impl DocCheck for LinkChecker {
                                     .map(|e| e.get_contents())
                                     .collect::<Vec<String>>()
                                     .join("");
+                                if link_url.starts_with("\"") && link_url.ends_with("\"") {
+                                    // This is not a link but an array of quoted strings.
+                                    continue;
+                                }
                                 if text == link_url.to_string() && link_url == link_title {
                                     errors.push(DocCheckError::new_info_helpful(
                                         ele.doc_line().line_num,
@@ -840,7 +846,8 @@ pub(crate) fn register_markdown_checks(opt: &DocCheckerArgs) -> Result<Vec<Box<d
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::DocContext};
+    use super::*;
+    use crate::DocContext;
 
     #[test]
     fn test_make_link_to_check() -> Result<()> {
@@ -1160,7 +1167,15 @@ mod tests {
                 "Unknown reference link to [text][link-to-text]",
                 "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference"
             )].to_vec())
-        )
+        ),
+        (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                r#"pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = [".*/third_party/.*"]"#,
+                true
+            ),
+            None
+        ),
         ];
 
         for (ctx, expected_errors) in test_data {
