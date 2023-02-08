@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
       {"dev", required_argument, NULL, 'd'},
       {"monotonic", no_argument, NULL, 'm'},
       {"help", no_argument, NULL, 'h'},
-      {0},
+      {0, 0, 0, 0},
   };
   for (int opt; (opt = getopt_long(argc, argv, "", opts, NULL)) != -1;) {
     switch (opt) {

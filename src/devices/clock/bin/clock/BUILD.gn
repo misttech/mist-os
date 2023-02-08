@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 executable("clock") {
-  sources = [ "clock.c" ]
+  sources = [ "clock.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_c",
     "//sdk/lib/fdio",
