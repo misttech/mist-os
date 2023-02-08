@@ -1121,6 +1121,51 @@ pub struct zx_thread_state_general_regs_t {
     pub tpidr: u64,
 }
 
+#[cfg(target_arch = "aarch64")]
+impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
+    fn from(state: &zx_restricted_state_t) -> Self {
+        Self {
+            r: [
+                state.r[0],
+                state.r[1],
+                state.r[2],
+                state.r[3],
+                state.r[4],
+                state.r[5],
+                state.r[6],
+                state.r[7],
+                state.r[8],
+                state.r[9],
+                state.r[10],
+                state.r[11],
+                state.r[12],
+                state.r[13],
+                state.r[14],
+                state.r[15],
+                state.r[16],
+                state.r[17],
+                state.r[18],
+                state.r[19],
+                state.r[20],
+                state.r[21],
+                state.r[22],
+                state.r[23],
+                state.r[24],
+                state.r[25],
+                state.r[26],
+                state.r[27],
+                state.r[28],
+                state.r[29],
+            ],
+            lr: state.r[30],
+            sp: state.sp,
+            pc: 0,
+            cpsr: state.cpsr as u64,
+            tpidr: 0,
+        }
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -1171,6 +1216,61 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
             flags: registers.rflags,
             fs_base: registers.fs_base,
             gs_base: registers.gs_base,
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_restricted_state_t {
+    pub r: [u64; 31], // Note: r[30] is `lr` which is separated out in the general regs.
+    pub sp: u64,
+    // Contains only the user-controllable upper 4-bits (NZCV).
+    pub cpsr: u32,
+    pub padding1: [u8; 4],
+}
+
+#[cfg(target_arch = "aarch64")]
+impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
+    fn from(registers: &zx_thread_state_general_regs_t) -> Self {
+        Self {
+            r: [
+                registers.r[0],
+                registers.r[1],
+                registers.r[2],
+                registers.r[3],
+                registers.r[4],
+                registers.r[5],
+                registers.r[6],
+                registers.r[7],
+                registers.r[8],
+                registers.r[9],
+                registers.r[10],
+                registers.r[11],
+                registers.r[12],
+                registers.r[13],
+                registers.r[14],
+                registers.r[15],
+                registers.r[16],
+                registers.r[17],
+                registers.r[18],
+                registers.r[19],
+                registers.r[20],
+                registers.r[21],
+                registers.r[22],
+                registers.r[23],
+                registers.r[24],
+                registers.r[25],
+                registers.r[26],
+                registers.r[27],
+                registers.r[28],
+                registers.r[29],
+                registers.lr,
+            ],
+            sp: registers.sp,
+            cpsr: registers.cpsr as u32,
+            padding1: [0, 0, 0, 0],
         }
     }
 }

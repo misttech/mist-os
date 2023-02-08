@@ -1123,14 +1123,14 @@ impl From<&Task> for FsCred {
 ///
 /// Implements [`std::ops::Deref`] and [`std::ops::DerefMut`] as a way to get at the underlying
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
-#[cfg(target_arch = "x86_64")]
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterState {
     real_registers: zx::sys::zx_thread_state_general_regs_t,
 
-    /// A copy of the `rax` register at the time of the `syscall` instruction. This is important to
-    /// store, as the return value of a syscall overwrites `rax`, making it impossible to recover
+    /// A copy of the x64 `rax` register at the time of the `syscall` instruction. This is important
+    /// to store, as the return value of a syscall overwrites `rax`, making it impossible to recover
     /// the original syscall number in the case of syscall restart and strace output.
+    #[cfg(target_arch = "x86_64")]
     pub orig_rax: u64,
 }
 
