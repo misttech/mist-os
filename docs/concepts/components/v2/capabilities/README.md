@@ -56,30 +56,30 @@ Routing terminology divides into the following categories:
 
 The following capabilities can be routed:
 
-| type                   | description                   | routed to          |
-| ---------------------- | ----------------------------- | ------------------ |
-| [`protocol`]           | A filesystem node that is     | components         |
-: [capability-protocol]  : used to open a channel backed :                    :
-:                        : by a FIDL protocol.           :                    :
-| [`service`]            | A filesystem directory that   | components         |
-: [capability-service]   : is used to open a channel to  :                    :
-:                        : one of several service        :                    :
-:                        : instances.                    :                    :
-| [`directory`]          | A filesystem directory.       | components         |
-: [capability-directory] :                               :                    :
-| [`storage`]            | A writable filesystem         | components         |
-: [capability-storage]   : directory that is isolated to :                    :
-:                        : the component using it.       :                    :
-| [`resolver`]           | A capability that, when       | [environments]     |
-: [capability-resolver]  : registered in an environment, : [doc-environments] :
-:                        : causes a component with a     :                    :
-:                        : particular URL scheme to be   :                    :
-:                        : resolved with that resolver.  :                    :
-| [`runner`]             | A capability that, when       | [environments]     |
-: [capability-runner]    : registered in an environment, : [doc-environments] :
-:                        : allows the framework to use   :                    :
-:                        : that runner when starting     :                    :
-:                        : components.                   :                    :
+| type                                 | description                   | routed to                         |
+| ------------------------------------ | ----------------------------- | --------------------------------- |
+| [`protocol`][capability-protocol]    | A filesystem node that is     | components                        |
+:                                      : used to open a channel backed :                                   :
+:                                      : by a FIDL protocol.           :                                   :
+| [`service`][capability-service]      | A filesystem directory that   | components                        |
+:                                      : is used to open a channel to  :                                   :
+:                                      : one of several service        :                                   :
+:                                      : instances.                    :                                   :
+| [`directory`][capability-directory]  | A filesystem directory.       | components                        |
+:                                      :                               :                                   :
+| [`storage`][capability-storage]      | A writable filesystem         | components                        |
+:                                      : directory that is isolated to :                                   :
+:                                      : the component using it.       :                                   :
+| [`resolver`][capability-resolver]    | A capability that, when       | [environments][doc-environments]  |
+:                                      : registered in an environment, :                                   :
+:                                      : causes a component with a     :                                   :
+:                                      : particular URL scheme to be   :                                   :
+:                                      : resolved with that resolver.  :                                   :
+| [`runner`][capability-runner]        | A capability that, when       | [environments][doc-environments]  |
+:                                      : registered in an environment, :                                   :
+:                                      : allows the framework to use   :                                   :
+:                                      : that runner when starting     :                                   :
+:                                      : components.                   :                                   :
 
 ## Examples {#examples}
 
