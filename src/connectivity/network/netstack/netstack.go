@@ -357,6 +357,7 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.P
 	ifs.ns.routeTable.Lock()
 	defer ifs.ns.routeTable.Unlock()
 
+	var v4DefaultRouteAdded, v6DefaultRouteAdded bool
 	for _, r := range rs {
 		r.NIC = ifs.nicid
 
@@ -365,13 +366,21 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.P
 
 		if enabled {
 			if r.Destination.Equal(header.IPv4EmptySubnet) {
-				ifs.ns.onDefaultIPv4RouteChangeLocked(r.NIC, true /* hasDefaultRoute */)
+				v4DefaultRouteAdded = true
 			} else if r.Destination.Equal(header.IPv6EmptySubnet) {
-				ifs.ns.onDefaultIPv6RouteChangeLocked(r.NIC, true /* hasDefaultRoute */)
+				v6DefaultRouteAdded = true
 			}
 		}
 	}
+
 	ifs.ns.routeTable.UpdateStackLocked(ifs.ns.stack, ifs.ns.resetDestinationCache)
+
+	if v4DefaultRouteAdded {
+		ifs.ns.onDefaultIPv4RouteChangeLocked(ifs.nicid, true /* hasDefaultRoute */)
+	}
+	if v6DefaultRouteAdded {
+		ifs.ns.onDefaultIPv6RouteChangeLocked(ifs.nicid, true /* hasDefaultRoute */)
+	}
 }
 
 // delRouteLocked deletes routes from a single interface identified by `r.NIC`.
@@ -387,6 +396,8 @@ func (ns *Netstack) delRouteLocked(r tcpip.Route) []routes.ExtendedRoute {
 		return nil
 	}
 
+	ns.routeTable.UpdateStackLocked(ns.stack, ns.resetDestinationCache)
+
 	for _, er := range routesDeleted {
 		if er.Enabled {
 			if er.Route.Destination.Equal(header.IPv4EmptySubnet) {
@@ -397,7 +408,6 @@ func (ns *Netstack) delRouteLocked(r tcpip.Route) []routes.ExtendedRoute {
 		}
 	}
 
-	ns.routeTable.UpdateStackLocked(ns.stack, ns.resetDestinationCache)
 	return routesDeleted
 }
 
