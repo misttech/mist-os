@@ -477,7 +477,6 @@ zx_status_t VPartition::BlockVolumeShrink(const slice_extent_t* extent) {
 
 zx_status_t VPartition::BlockVolumeGetInfo(volume_manager_info_t* out_manager,
                                            volume_info_t* out_volume) {
-  // TODO(smklein): Ensure Banjo (volume_manager_info_t) and FIDL (volume_info_t) are aligned.
   static_assert(sizeof(volume_manager_info_t) == sizeof(VolumeManagerInfo), "Info Mismatch");
   VolumeManagerInfo* info = reinterpret_cast<VolumeManagerInfo*>(out_manager);
   mgr_->GetInfoInternal(info);

@@ -429,8 +429,6 @@ TEST(BlkdevTests, blkdev_test_fifo_multiple_vmo_multithreaded) {
   }
 }
 
-// TODO(smklein): Test ops across different vmos
-//
 // TODO(https://fxbug.dev/44600): Re-enable.
 TEST(BlkdevTests, DISABLED_blkdev_test_fifo_unclean_shutdown) {
   // Set up the blkdev

@@ -131,8 +131,6 @@ std::vector<std::string> FsckOptions::as_argv(const char *binary) const {
   if (verbose) {
     argv.push_back("-v");
   }
-  // TODO(smklein): Add support for modify, force flags. Without them,
-  // we have "never_modify=true" and "force=true" effectively on by default.
   argv.push_back("fsck");
 
   return argv;

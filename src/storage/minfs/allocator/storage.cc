@@ -55,9 +55,6 @@ zx::result<> PersistentStorage::Extend(PendingWork* write_transaction, WriteData
   uint32_t bitmap_blocks_new = BitmapBlocksForSize(pool_size);
 
   if (bitmap_blocks_new > bitmap_blocks) {
-    // TODO(smklein): Grow the bitmap another slice.
-    // TODO(planders): Once we start growing the [block] bitmap,
-    //                 we will need to start growing the journal as well.
     FX_LOGS(ERROR) << "Minfs allocator needs to increase bitmap size";
     return zx::error(ZX_ERR_NO_SPACE);
   }

@@ -257,10 +257,6 @@ class VnodeMinfs : public fs::Vnode,
   Minfs* const fs_;
 
 #ifdef __Fuchsia__
-  // TODO(smklein): When we have can register MinFS as a pager service, and
-  // it can properly handle pages faults on a vnode's contents, then we can
-  // avoid reading the entire file up-front. Until then, read the contents of
-  // a VMO into memory when it is read/written.
   zx::vmo vmo_{};
   uint64_t vmo_size_ = 0;
   storage::Vmoid vmoid_;

@@ -99,7 +99,6 @@ class SparseTruncateTest : public BaseFilesystemTest,
 //
 // This test tries to proke at a variety of offsets of interest.
 TEST_P(SparseTruncateTest, PartialBlockSparse) {
-  // TODO(smklein): Acquire these constants directly from MinFS's header
   constexpr size_t kBlockSize = 8192;
   constexpr size_t kDirectBlocks = 16;
   constexpr size_t kIndirectBlocks = 31;

@@ -661,8 +661,6 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
   ZX_ASSERT(len <= kMinfsMaxFileSize);
 
 #ifdef __Fuchsia__
-  // TODO(smklein): We should only init up to 'len'; no need
-  // to read in the portion of a large file we plan on deleting.
   if (auto status = InitVmo(); status.is_error()) {
     FX_LOGS(ERROR) << "Truncate failed to initialize VMO: " << status.status_value();
     return zx::error(ZX_ERR_IO);

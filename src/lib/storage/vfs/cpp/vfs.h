@@ -34,9 +34,6 @@ class Vnode;
 // A storage class for a vdircookie which is passed to Readdir. Common vnode implementations may use
 // this struct as scratch space, or cast it to an alternative structure of the same size (or
 // smaller).
-//
-// TODO(smklein): To implement seekdir and telldir, the size of this vdircookie may need to shrink
-// to a 'long'.
 struct VdirCookie {
   uint64_t n = 0;
   void* p = nullptr;

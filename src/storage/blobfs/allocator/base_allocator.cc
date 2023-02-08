@@ -51,12 +51,6 @@ zx::result<bool> BaseAllocator::IsBlockAllocated(uint64_t block_number) const {
 zx_status_t BaseAllocator::ReserveBlocks(uint64_t num_blocks,
                                          std::vector<ReservedExtent>* out_extents) {
   uint64_t actual_blocks;
-
-  // TODO(smklein): If we allocate blocks up to the end of the block map, extend, and continue
-  // allocating, we'll create two extents where one would suffice. If we knew how many reserved /
-  // allocated blocks existed we could resize ahead-of-time and flatten this case, as an
-  // optimization.
-
   if ((FindBlocks(0, num_blocks, out_extents, &actual_blocks) != ZX_OK)) {
     // If we have run out of blocks, attempt to add block slices via FVM. The new 'hint' is the
     // first location we could try to find blocks after merely extending the allocation maps.

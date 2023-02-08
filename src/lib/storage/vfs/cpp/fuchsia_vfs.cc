@@ -166,7 +166,6 @@ zx::result<bool> FuchsiaVfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_
 zx_status_t FuchsiaVfs::TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) {
   const auto& vnode_token = vnode_tokens_.find(GetTokenKoid(token));
   if (vnode_token == vnode_tokens_.end()) {
-    // TODO(smklein): Return a more specific error code for "token not from this server"
     return ZX_ERR_INVALID_ARGS;
   }
 

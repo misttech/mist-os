@@ -19,10 +19,6 @@ namespace {
 
 using SyncTest = FilesystemTest;
 
-// TODO(smklein): Create a more complex test, capable of mocking a block device
-// and ensuring that data is actually being flushed to a block device.
-// For now, test that 'fsync' and 'fdatasync' don't throw errors for file and
-// directories.
 TEST_P(SyncTest, VerifyNoFsyncErrorsForFiles) {
   const std::string alpha = GetPath("alpha");
   auto fd = fbl::unique_fd(open(alpha.c_str(), O_RDWR | O_CREAT | O_EXCL, 0644));

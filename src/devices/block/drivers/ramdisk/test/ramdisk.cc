@@ -1011,7 +1011,6 @@ TEST(RamdiskTests, RamdiskTestFifoMultipleVmoMultithreaded) {
   }
 }
 
-// TODO(smklein): Test ops across different vmos
 TEST(RamdiskTests, RamdiskTestFifoLargeOpsCount) {
   // Set up the ramdisk
   const size_t kBlockSize = zx_system_get_page_size();

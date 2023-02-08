@@ -27,8 +27,6 @@ namespace {
 using DirectoryTest = FilesystemTest;
 
 TEST_P(DirectoryTest, DirectoryFilenameMax) {
-  // TODO(smklein): This value may be filesystem-specific. Plumb it through
-  // from the test driver.
   constexpr int max_file_len = 255;
 
   // Unless the max_file_len is approaching half of PATH_MAX,

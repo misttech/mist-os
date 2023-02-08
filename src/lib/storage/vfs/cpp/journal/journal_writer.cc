@@ -45,8 +45,6 @@ fpromise::result<void, zx_status_t> JournalWriter::WriteData(JournalWorkItem wor
                                  operation.op.dev_offset + operation.op.length);
     // Determine if the given range partially overlaps any live operations.
     if (live_metadata_operations_.find(range) != live_metadata_operations_.end()) {
-      // TODO(smklein): Write "real" revocation records instead of merely updating the info block.
-      //
       // Currently, writing the info block is sufficient to "avoid metadata replay", but this is
       // only the case because the JournalWriter is synchronous, single-threaded, and non-caching.
       // If we enable asynchronous writeback, emitting revocation records may be a more desirable
