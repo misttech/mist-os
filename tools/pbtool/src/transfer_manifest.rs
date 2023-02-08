@@ -9,7 +9,7 @@ use argh::FromArgs;
 use assembly_manifest::AssemblyManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
-use sdk_metadata::ProductBundle;
+use sdk_metadata::{ProductBundle, VirtualDevice, VirtualDeviceManifest};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
@@ -126,6 +126,35 @@ impl GenerateTransferManifest {
         system(&product_bundle.system_b)?;
         system(&product_bundle.system_r)?;
 
+        // Add virtual devices.
+        if let Some(manifest_path) = &product_bundle.virtual_devices_path {
+            product_bundle_entries.push(ArtifactEntry {
+                name: diff_utf8_paths(manifest_path, &canonical_product_bundle_path)
+                    .context("rebasing virtual device manifest path")?,
+            });
+            let manifest_dir = manifest_path.parent().unwrap_or("".into());
+            let manifest = VirtualDeviceManifest::from_path(&product_bundle.virtual_devices_path)
+                .context("manifest from_path")?;
+            for path in manifest.device_paths.values() {
+                let virtual_device_path = manifest_dir.join(path);
+                product_bundle_entries.push(ArtifactEntry {
+                    name: diff_utf8_paths(&virtual_device_path, &canonical_product_bundle_path)
+                        .context("rebasing virtual device path")?,
+                });
+                let virtual_device_dir = virtual_device_path.parent().unwrap_or("".into());
+                match VirtualDevice::try_load_from(&virtual_device_path)? {
+                    VirtualDevice::V1(virtual_device) => {
+                        let template_path =
+                            virtual_device_dir.join(&virtual_device.start_up_args_template);
+                        product_bundle_entries.push(ArtifactEntry {
+                            name: diff_utf8_paths(template_path, &canonical_product_bundle_path)
+                                .context("rebasing virtual device template path")?,
+                        });
+                    }
+                }
+            }
+        }
+
         // Add the tuf metadata by walking the metadata directories and listing all the files inside.
         for repository in &product_bundle.repositories {
             let entries: Result<Vec<DirEntry>, _> =
@@ -220,7 +249,8 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
     use fuchsia_repo::test_utils;
-    use sdk_metadata::{ProductBundleV2, Repository};
+    use sdk_metadata::virtual_device::Hardware;
+    use sdk_metadata::{ProductBundleV2, Repository, VirtualDeviceV1};
     use serde_json::json;
     use std::io::Write;
     use tempfile::tempdir;
@@ -246,6 +276,25 @@ mod tests {
         )
         .await;
 
+        let vd_dir = pb_path.join("virtual_devices");
+        std::fs::create_dir_all(&vd_dir).unwrap();
+
+        let vd_manifest_path = vd_dir.join("manifest.json");
+        let mut vd_manifest = VirtualDeviceManifest::default();
+        vd_manifest.device_paths = [
+            ("virtual_device_A".into(), "virtual_device_A.json".into()),
+            ("virtual_device_B".into(), "virtual_device_B.json".into()),
+            ("virtual_device_C".into(), "virtual_device_C.json".into()),
+        ]
+        .into();
+        for (name, path) in &vd_manifest.device_paths {
+            let mut vd = VirtualDeviceV1::new(name, Hardware::default());
+            vd.start_up_args_template = vd_dir.join(format!("{name}_flags.json.template"));
+            VirtualDevice::V1(vd).write(vd_dir.join(path)).unwrap();
+        }
+        let vd_manifest_file = File::create(vd_manifest_path.clone()).unwrap();
+        serde_json::to_writer(vd_manifest_file, &vd_manifest).unwrap();
+
         let pb = ProductBundle::V2(ProductBundleV2 {
             partitions: PartitionsConfig::default(),
             system_a: Some(AssemblyManifest {
@@ -263,7 +312,7 @@ mod tests {
                 blobs_path: pb_path.join("blobs"),
             }],
             update_package_hash: None,
-            virtual_devices_path: None,
+            virtual_devices_path: Some(vd_manifest_path),
         });
         pb.write(&pb_path).unwrap();
 
@@ -311,6 +360,13 @@ mod tests {
                             ArtifactEntry { name: "repository/targets/package2/1b0e8a06a242d49fbcdf24fa6bd1f8c0f2606afacafb47ba37bb1c45e700cce6.0".into() },
                             ArtifactEntry { name: "repository/targets.json".into() },
                             ArtifactEntry { name: "repository/timestamp.json".into() },
+                            ArtifactEntry { name: "virtual_devices/manifest.json".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_A.json".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_A_flags.json.template".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_B.json".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_B_flags.json.template".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_C.json".into() },
+                            ArtifactEntry { name: "virtual_devices/virtual_device_C_flags.json.template".into() },
                             ArtifactEntry { name: "zbi".into() },
                         ]
                     },

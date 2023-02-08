@@ -296,6 +296,14 @@ template("product_bundle") {
       "--out-dir",
       rebase_path(target_out_dir, root_build_dir),
     ]
+
+    if (virtual_devices != []) {
+      inputs += [ "${files.vd_dir}/manifest.json" ]
+    }
+    foreach(virtual_device, virtual_devices) {
+      vd_filename = get_path_info(virtual_device, "file")
+      inputs += [ "${files.vd_dir}/${vd_filename}" ]
+    }
   }
 
   group(target_name) {
