@@ -126,6 +126,7 @@ async fn run_overnet_command(
                 &mut tx,
                 is_server,
                 circuit::Quality::IN_PROCESS,
+                "test node".to_owned(),
             )
             .await?;
             Ok(())

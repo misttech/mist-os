@@ -18,8 +18,8 @@ pub enum Error {
     CallbackRejectedBuffer(usize, usize),
     #[error("Bad characters in UTF8 String `{0}`")]
     BadUTF8(String),
-    #[error("Connection closed")]
-    ConnectionClosed,
+    #[error("Connection closed. reason: `{}`", .0.as_deref().unwrap_or("not given"))]
+    ConnectionClosed(Option<String>),
     #[error("Version mismatch")]
     VersionMismatch,
     #[error("Protocol mismatch")]

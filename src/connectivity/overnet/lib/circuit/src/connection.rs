@@ -284,7 +284,14 @@ fn conn_stream(
 
             let (conn_id, stream_id) = match got {
                 Ok(got) => got,
-                Err(Error::ConnectionClosed) => return None,
+                Err(Error::ConnectionClosed(reason)) => {
+                    let reason = reason.as_deref().unwrap_or("(No reason given)");
+                    tracing::warn!(
+                        reason,
+                        "New stream closed without associating with a connection"
+                    );
+                    return None;
+                }
                 _ => unreachable!("Deserializing the connection ID should never fail!"),
             };
 

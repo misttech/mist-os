@@ -220,7 +220,12 @@ impl FramedStreamReaderInner {
                 })
                 .await
                 .or_else(|x| match x {
-                    circuit::Error::ConnectionClosed => Ok(false),
+                    circuit::Error::ConnectionClosed(reason) => {
+                        if let Some(reason) = reason {
+                            tracing::debug!(?reason);
+                        }
+                        Ok(false)
+                    }
                     other => Err(other.into()),
                 }),
         }

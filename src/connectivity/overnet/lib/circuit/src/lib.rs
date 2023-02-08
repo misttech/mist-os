@@ -311,7 +311,11 @@ impl Node {
                 control_stream
             } else {
                 let (reader, writer, error_sender) =
-                    new_stream_receiver.next().await.ok_or(Error::ConnectionClosed)?;
+                    new_stream_receiver.next().await.ok_or_else(|| {
+                        Error::ConnectionClosed(Some(
+                            "Client stopped listening for new streams".to_owned(),
+                        ))
+                    })?;
                 let _ = error_sender.send(Ok(()));
                 (reader, writer)
             };
@@ -345,14 +349,16 @@ impl Node {
                 return Err(Error::ProtocolMismatch);
             }
 
-            control_reader_sender.send(control_reader).map_err(|_| Error::ConnectionClosed)?;
+            control_reader_sender.send(control_reader).map_err(|_| {
+                Error::ConnectionClosed(Some("Control stream handler disappeared".to_owned()))
+            })?;
 
             futures::pin_mut!(control_stream_loop);
             futures::pin_mut!(new_streams_loop);
 
             let ret = match futures::future::select(control_stream_loop, new_streams_loop).await {
                 Either::Left((result, new_streams)) => {
-                    if result.is_ok() {
+                    if matches!(result, Ok(()) | Err(Error::ConnectionClosed(_))) {
                         new_streams.await;
                     }
                     result
@@ -390,13 +396,13 @@ impl Node {
         let new_peer_sender = self.new_peer_sender.clone();
 
         async move {
-            let control_reader = control_reader.await.map_err(|_| Error::ConnectionClosed)?;
+            let control_reader = control_reader.await.map_err(|_| {
+                Error::ConnectionClosed(Some(
+                    "Reader never given to control stream handler".to_string(),
+                ))
+            })?;
             loop {
-                let state = match control_reader.read_protocol_message::<NodeState>().await {
-                    Err(Error::ConnectionClosed) => break Ok(()),
-                    other => other?,
-                };
-
+                let state = control_reader.read_protocol_message::<NodeState>().await?;
                 match state {
                     NodeState::Online(peer, path_quality) => {
                         if peer == node_id {
@@ -499,7 +505,11 @@ impl Node {
 
                             incoming_stream_sender
                                 .unbounded_send((reader, writer, src.to_string()))
-                                .map_err(|_| Error::ConnectionClosed)?;
+                                .map_err(|_| {
+                                    Error::ConnectionClosed(Some(
+                                        "Incoming stream dispatcher disappeared".to_owned(),
+                                    ))
+                                })?;
                         }
                         Ok(())
                     }

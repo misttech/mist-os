@@ -113,6 +113,7 @@ pub async fn run_stream<'a>(
             tx,
             true,
             circuit::Quality::LOCAL_SOCKET,
+            "ascendd client".to_owned(),
         )
         .await
         .map_err(Error::from)

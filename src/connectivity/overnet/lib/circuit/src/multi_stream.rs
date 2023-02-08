@@ -54,6 +54,7 @@ pub async fn multi_stream(
     is_server: bool,
     streams_out: UnboundedSender<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
     streams_in: UnboundedReceiver<(stream::Reader, stream::Writer)>,
+    remote_name: String,
 ) -> Result<()> {
     let (new_readers_sender, new_readers) = unbounded();
     let (stream_errors_sender, stream_errors) = unbounded();
@@ -74,7 +75,8 @@ pub async fn multi_stream(
             let got = reader
                 .read(6, |buf| {
                     let mut streams = streams.lock().unwrap();
-                    let (size, new_stream) = handle_one_chunk(&mut *streams, is_server, buf)?;
+                    let (size, new_stream) =
+                        handle_one_chunk(&mut *streams, is_server, buf, &remote_name)?;
 
                     if let Some((id, first_chunk_data)) = new_stream {
                         streams_out
@@ -85,7 +87,11 @@ pub async fn multi_stream(
                                 &new_readers_sender,
                                 &stream_errors_sender,
                             )?)
-                            .map_err(|_| Error::ConnectionClosed)?;
+                            .map_err(|_| {
+                                Error::ConnectionClosed(Some(
+                                    "New stream handler disappeared".to_owned(),
+                                ))
+                            })?;
                     }
 
                     Ok(((), size))
@@ -95,8 +101,11 @@ pub async fn multi_stream(
             Some((got, ()))
         });
 
-        let stream_errors =
-            stream_errors.then(|x| async move { x.await.unwrap_or(Err(Error::ConnectionClosed)) });
+        let stream_errors = stream_errors.then(|x| async move {
+            x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
+                "Stream handler hung up without returning a status".to_owned(),
+            ))))
+        });
 
         let read_result_stream = futures::stream::select(stream_errors, read_result_stream);
 
@@ -117,7 +126,6 @@ pub async fn multi_stream(
         while let Some(event) = events.next().await {
             match event {
                 Either::Left(Ok(())) => (),
-                Either::Left(Err(Error::ConnectionClosed)) => break,
                 Either::Left(other) => {
                     ret = other;
                     break;
@@ -175,13 +183,15 @@ fn handle_new_stream(
             Ok(first_chunk_data.len())
         })
         .expect("We just created this stream!");
-    new_readers_sender.unbounded_send((id, remote_reader)).map_err(|_| Error::ConnectionClosed)?;
+    new_readers_sender.unbounded_send((id, remote_reader)).map_err(|_| {
+        Error::ConnectionClosed(Some("New stream reader handler disappeared".to_owned()))
+    })?;
     let (sender, receiver) = oneshot::channel();
     streams.insert(id, StreamStatus::Open(remote_writer));
     if stream_errors_sender.unbounded_send(receiver).is_ok() {
         Ok((reader, writer, sender))
     } else {
-        Err(Error::ConnectionClosed)
+        Err(Error::ConnectionClosed(Some("Error reporting channel closed".to_owned())))
     }
 }
 
@@ -204,6 +214,7 @@ fn handle_one_chunk<'a>(
     streams: &mut HashMap<u32, StreamStatus>,
     is_server: bool,
     buf: &'a [u8],
+    remote_name: &str,
 ) -> Result<(usize, Option<(u32, &'a [u8])>)> {
     if buf.len() < 6 {
         return Err(Error::BufferTooShort(6));
@@ -217,10 +228,30 @@ fn handle_one_chunk<'a>(
     let buf = &buf[6..];
 
     if length == 0 {
-        if streams.insert(id, StreamStatus::Closed).is_none() {
-            Err(Error::BadStreamId)
+        if buf.len() < 2 {
+            return Err(Error::BufferTooShort(8));
+        }
+        let length = u16::from_le_bytes(buf[..2].try_into().unwrap());
+        let length = length as usize;
+
+        if buf.len() < length + 2 {
+            return Err(Error::BufferTooShort(8 + length));
+        }
+
+        let epitaph =
+            if length > 0 { Some(String::from_utf8_lossy(&buf[2..][..length])) } else { None };
+
+        if let Some(old) = streams.insert(id, StreamStatus::Closed) {
+            if let StreamStatus::Open(old) = old {
+                if let Some(epitaph) = epitaph {
+                    old.close(format!("{remote_name} reported: {epitaph}"));
+                } else {
+                    old.close(format!("{remote_name} reported no epitaph"));
+                }
+            }
+            Ok((length + 8, None))
         } else {
-            Ok((chunk_length, None))
+            Err(Error::BadStreamId)
         }
     } else if buf.len() < length {
         Err(Error::BufferTooShort(chunk_length))
@@ -279,15 +310,13 @@ async fn write_as_chunks(id: u32, reader: stream::Reader, writer: Arc<SyncMutex<
                         .try_into()
                         .expect("We just truncated the length so it would fit!");
 
-                    if let e @ Err(_) =
-                        writer.lock().unwrap().write(6 + buf.len(), |out_buf_orig| {
-                            out_buf_orig[..4].copy_from_slice(&id.to_le_bytes());
-                            let out_buf = &mut out_buf_orig[4..];
-                            out_buf[..2].copy_from_slice(&len.to_le_bytes());
-                            out_buf[2..][..buf.len()].copy_from_slice(buf);
-                            Ok(buf.len() + 6)
-                        })
-                    {
+                    if let e @ Err(_) = writer.lock().unwrap().write(6 + buf.len(), |out_buf| {
+                        out_buf[..4].copy_from_slice(&id.to_le_bytes());
+                        let out_buf = &mut out_buf[4..];
+                        out_buf[..2].copy_from_slice(&len.to_le_bytes());
+                        out_buf[2..][..buf.len()].copy_from_slice(buf);
+                        Ok(buf.len() + 6)
+                    }) {
                         return Ok((e, total_len));
                     } else {
                         total_len += buf.len();
@@ -299,22 +328,30 @@ async fn write_as_chunks(id: u32, reader: stream::Reader, writer: Arc<SyncMutex<
             .await;
 
         match got {
-            Err(Error::ConnectionClosed) => {
+            Err(Error::ConnectionClosed(epitaph)) => {
+                let epitaph = epitaph.as_ref().map(|x| x.as_bytes()).unwrap_or(b"");
+                let length_u16: u16 = epitaph.len().try_into().unwrap_or(u16::MAX);
+                let length = length_u16 as usize;
+
                 // If the stream was closed, send a frame indicating such.
-                let write_result = writer.lock().unwrap().write(6, |out_buf| {
+                let write_result = writer.lock().unwrap().write(8 + length, |out_buf| {
                     out_buf[..4].copy_from_slice(&id.to_le_bytes());
                     let out_buf = &mut out_buf[4..];
                     out_buf[..2].copy_from_slice(&0u16.to_le_bytes());
-                    Ok(6)
+                    let out_buf = &mut out_buf[2..];
+                    out_buf[..2].copy_from_slice(&length_u16.to_le_bytes());
+                    let out_buf = &mut out_buf[2..];
+                    out_buf[..length].copy_from_slice(&epitaph[..length]);
+                    Ok(8 + length)
                 });
 
                 match write_result {
-                    Ok(()) | Err(Error::ConnectionClosed) => break,
+                    Ok(()) | Err(Error::ConnectionClosed(_)) => break,
                     other => unreachable!("Unexpected write error: {other:?}"),
                 }
             }
             Ok(Ok(())) => (),
-            Ok(Err(Error::ConnectionClosed)) => break,
+            Ok(Err(Error::ConnectionClosed(_))) => break,
             Ok(other) => unreachable!("Unexpected write error: {other:?}"),
             other => unreachable!("Unexpected read error: {other:?}"),
         }
@@ -339,6 +376,7 @@ pub fn multi_stream_node_connection(
     writer: stream::Writer,
     is_server: bool,
     quality: Quality,
+    remote_name: String,
 ) -> impl Future<Output = Result<()>> + Send {
     let (new_stream_sender, streams_in) = unbounded();
     let (streams_out, new_stream_receiver) = unbounded();
@@ -355,7 +393,7 @@ pub fn multi_stream_node_connection(
         None
     };
 
-    let stream_fut = multi_stream(reader, writer, is_server, streams_out, streams_in);
+    let stream_fut = multi_stream(reader, writer, is_server, streams_out, streams_in, remote_name);
     let node_fut = node.link_node(control_stream, new_stream_sender, new_stream_receiver, quality);
 
     async move {
@@ -379,11 +417,18 @@ pub async fn multi_stream_node_connection_to_async(
     tx: &mut (dyn AsyncWrite + Unpin + Send),
     is_server: bool,
     quality: Quality,
+    remote_name: String,
 ) -> Result<()> {
     let (reader, remote_writer) = stream::stream();
     let (remote_reader, writer) = stream::stream();
-    let conn_fut =
-        multi_stream_node_connection(node, remote_reader, remote_writer, is_server, quality);
+    let conn_fut = multi_stream_node_connection(
+        node,
+        remote_reader,
+        remote_writer,
+        is_server,
+        quality,
+        remote_name,
+    );
 
     let read_fut = async move {
         let mut buf = [0u8; 4096];
@@ -392,34 +437,25 @@ pub async fn multi_stream_node_connection_to_async(
             if n == 0 {
                 break Ok(());
             }
-            match writer.write(n, |write_buf| {
+            writer.write(n, |write_buf| {
                 write_buf[..n].copy_from_slice(&buf[..n]);
                 Ok(n)
-            }) {
-                Err(Error::ConnectionClosed) => break Ok(()),
-                other => other?,
-            }
+            })?
         }
     };
 
     let write_fut = async move {
         loop {
             let mut buf = [0u8; 4096];
-            match reader
+            let len = reader
                 .read(1, |read_buf| {
                     let read_buf = &read_buf[..std::cmp::min(buf.len(), read_buf.len())];
                     buf[..read_buf.len()].copy_from_slice(read_buf);
                     Ok((read_buf.len(), read_buf.len()))
                 })
-                .await
-            {
-                Err(Error::ConnectionClosed) => break Ok(()),
-                other => {
-                    let len = other?;
-                    tx.write_all(&buf[..len]).await?;
-                    tx.flush().await?;
-                }
-            };
+                .await?;
+            tx.write_all(&buf[..len]).await?;
+            tx.flush().await?;
         }
     };
 
@@ -444,10 +480,25 @@ mod test {
         let (b_streams_out, mut get_stream_b) = unbounded();
 
         let _a = fasync::Task::spawn(async move {
-            multi_stream(a_reader, a_writer, true, a_streams_out, a_streams_in).await.unwrap()
+            assert!(matches!(
+                multi_stream(a_reader, a_writer, true, a_streams_out, a_streams_in, "b".to_owned())
+                    .await,
+                Ok(()) | Err(Error::ConnectionClosed(None))
+            ))
         });
         let _b = fasync::Task::spawn(async move {
-            multi_stream(b_reader, b_writer, false, b_streams_out, b_streams_in).await.unwrap()
+            assert!(matches!(
+                multi_stream(
+                    b_reader,
+                    b_writer,
+                    false,
+                    b_streams_out,
+                    b_streams_in,
+                    "a".to_owned()
+                )
+                .await,
+                Ok(()) | Err(Error::ConnectionClosed(None))
+            ))
         });
 
         let (ab_reader_a, ab_reader_write) = stream::stream();
@@ -490,7 +541,7 @@ mod test {
         std::mem::drop(ab_writer_b);
         assert!(matches!(
             ab_reader_a.read::<_, ()>(1, |_| unreachable!()).await,
-            Err(Error::ConnectionClosed)
+            Err(Error::ConnectionClosed(_))
         ));
 
         std::mem::drop(ab_reader_b);
@@ -517,6 +568,7 @@ mod test {
             true,
             a_streams_out,
             a_streams_in,
+            "b".to_owned(),
         ));
         let _b = fasync::Task::spawn(multi_stream(
             b_reader,
@@ -524,6 +576,7 @@ mod test {
             false,
             b_streams_out,
             b_streams_in,
+            "a".to_owned(),
         ));
 
         let (ab_reader_a, ab_reader_write) = stream::stream();
@@ -613,12 +666,16 @@ mod test {
             ab_writer,
             true,
             Quality::IN_PROCESS,
+            "b".to_owned(),
         ));
-        let b_conn =
-            multi_stream_node_connection(&b, ab_reader, ba_writer, false, Quality::IN_PROCESS);
-        let _b_conn = fasync::Task::spawn(async move {
-            let _ = b_conn.await.unwrap();
-        });
+        let _b_conn = fasync::Task::spawn(multi_stream_node_connection(
+            &b,
+            ab_reader,
+            ba_writer,
+            false,
+            Quality::IN_PROCESS,
+            "a".to_owned(),
+        ));
 
         let new_peer = new_peers.next().await.unwrap();
         assert_eq!("b", &new_peer);

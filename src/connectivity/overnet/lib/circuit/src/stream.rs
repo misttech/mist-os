@@ -10,6 +10,37 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex as SyncMutex;
 
+/// Indicates whether a stream is open or closed, and if closed, why it closed.
+#[derive(Debug, Clone)]
+enum Status {
+    /// Stream is open.
+    Open,
+    /// Stream is closed. Argument may contain a reason for closure.
+    Closed(Option<String>),
+}
+
+impl Status {
+    fn is_closed(&self) -> bool {
+        match self {
+            Status::Open => true,
+            Status::Closed(_) => false,
+        }
+    }
+
+    fn reason(&self) -> Option<String> {
+        match self {
+            Status::Open => None,
+            Status::Closed(x) => x.clone(),
+        }
+    }
+
+    fn close(&mut self) {
+        if let Status::Open = self {
+            *self = Status::Closed(None);
+        }
+    }
+}
+
 /// Internal state of a stream. See `stream()`.
 #[derive(Debug)]
 struct State {
@@ -26,13 +57,18 @@ struct State {
     /// also lists how many bytes should be available before it should be woken up.
     notify_readable: Option<(oneshot::Sender<()>, usize)>,
     /// Whether this stream is closed. I.e. whether either the `Reader` or `Writer` has been dropped.
-    closed: bool,
+    closed: Status,
 }
 
 /// Read half of a stream. See `stream()`.
 pub struct Reader(Arc<SyncMutex<State>>);
 
 impl Reader {
+    /// Debug
+    pub fn inspect_shutdown(&self) -> String {
+        self.0.lock().unwrap().closed.reason().unwrap_or_else(|| "No epitaph".to_owned())
+    }
+
     /// Read bytes from the stream.
     ///
     /// The reader will wait until there are *at least* `size` bytes to read, Then it will call the
@@ -66,8 +102,10 @@ impl Reader {
             let receiver = {
                 let mut state = self.0.lock().unwrap();
 
-                if state.closed && size == 0 {
-                    return Err(Error::ConnectionClosed);
+                if let Status::Closed(reason) = &state.closed {
+                    if size == 0 {
+                        return Err(Error::ConnectionClosed(reason.clone()));
+                    }
                 }
 
                 if state.readable >= size {
@@ -104,11 +142,11 @@ impl Reader {
                     return Ok(ret);
                 }
 
-                if state.closed {
+                if let Status::Closed(reason) = &state.closed {
                     if state.readable > 0 {
                         return Err(Error::BufferTooShort(size));
                     } else {
-                        return Err(Error::ConnectionClosed);
+                        return Err(Error::ConnectionClosed(reason.clone()));
                     }
                 }
 
@@ -166,7 +204,12 @@ impl Reader {
     /// even if the writer has hung up.
     pub fn is_closed(&self) -> bool {
         let state = self.0.lock().unwrap();
-        state.closed && state.readable == 0
+        state.closed.is_closed() && state.readable == 0
+    }
+
+    /// Close this stream, giving a reason for the closure.
+    pub fn close(self, reason: String) {
+        self.0.lock().unwrap().closed = Status::Closed(Some(reason))
     }
 }
 
@@ -179,7 +222,7 @@ impl std::fmt::Debug for Reader {
 impl Drop for Reader {
     fn drop(&mut self) {
         let mut state = self.0.lock().unwrap();
-        state.closed = true;
+        state.closed.close();
     }
 }
 
@@ -204,8 +247,8 @@ impl Writer {
     {
         let mut state = self.0.lock().unwrap();
 
-        if state.closed {
-            return Err(Error::ConnectionClosed);
+        if let Status::Closed(reason) = &state.closed {
+            return Err(Error::ConnectionClosed(reason.clone()));
         }
 
         let total_size = state.readable + size;
@@ -256,6 +299,11 @@ impl Writer {
     pub fn write_protocol_message<P: protocol::ProtocolMessage>(&self, message: &P) -> Result<()> {
         self.write(message.byte_size(), |mut buf| message.write_bytes(&mut buf))
     }
+
+    /// Close this stream, giving a reason for the closure.
+    pub fn close(self, reason: String) {
+        self.0.lock().unwrap().closed = Status::Closed(Some(reason))
+    }
 }
 
 impl std::fmt::Debug for Writer {
@@ -267,7 +315,7 @@ impl std::fmt::Debug for Writer {
 impl Drop for Writer {
     fn drop(&mut self) {
         let mut state = self.0.lock().unwrap();
-        state.closed = true;
+        state.closed.close();
         state.notify_readable.take().map(|x| {
             let _ = x.0.send(());
         });
@@ -283,7 +331,7 @@ pub fn stream() -> (Reader, Writer) {
         deque: VecDeque::new(),
         readable: 0,
         notify_readable: None,
-        closed: false,
+        closed: Status::Open,
     }));
     let writer = Arc::clone(&reader);
 
@@ -389,7 +437,7 @@ mod test {
                 buf[..2].copy_from_slice(&[9, 10]);
                 Ok(2)
             }),
-            Err(Error::ConnectionClosed)
+            Err(Error::ConnectionClosed(None))
         ));
     }
 
@@ -421,7 +469,10 @@ mod test {
         let got = reader.read(6, |buf| Ok((buf[..6].to_vec(), 6))).await.unwrap();
 
         assert_eq!(vec![5, 6, 7, 8, 9, 10], got);
-        assert!(matches!(reader.read(1, |_| Ok(((), 1))).await, Err(Error::ConnectionClosed)));
+        assert!(matches!(
+            reader.read(1, |_| Ok(((), 1))).await,
+            Err(Error::ConnectionClosed(None))
+        ));
     }
 
     #[fuchsia::test]

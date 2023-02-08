@@ -47,7 +47,7 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
                     })
                     .await;
 
-                if let Err(Error::ConnectionClosed) = got {
+                if let Err(Error::ConnectionClosed(_)) = got {
                     break;
                 }
                 got.unwrap();
@@ -66,7 +66,7 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
                     })
                     .await;
 
-                if let Err(Error::ConnectionClosed) = got {
+                if let Err(Error::ConnectionClosed(_)) = got {
                     break;
                 }
                 got.unwrap();

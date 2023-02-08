@@ -117,6 +117,7 @@ impl Hoist {
                     &mut tx,
                     false,
                     circuit::Quality::LOCAL_SOCKET,
+                    "client".to_owned(),
                 )
                 .await?;
                 Result::<(), Error>::Ok(())
@@ -272,6 +273,7 @@ async fn run_ascendd_connection<'a>(
                 tx,
                 false,
                 circuit::Quality::LOCAL_SOCKET,
+                "ascendd".to_owned(),
             )
             .await
             .map_err(Error::from)

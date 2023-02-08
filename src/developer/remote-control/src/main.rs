@@ -47,6 +47,7 @@ async fn exec_server() -> Result<(), Error> {
                                 &mut tx,
                                 true,
                                 circuit::Quality::NETWORK,
+                                "client".to_owned(),
                             )
                             .await
                         {
