@@ -26,8 +26,8 @@ zx_status_t Outgoing::Serve(fidl::ServerEnd<fuchsia_io::Directory> dir_server_en
 }
 
 zx_status_t Outgoing::ServeFromStartupInfo() {
-  zx_handle_t dir_request = zx_take_startup_handle(PA_DIRECTORY_REQUEST);
-  return Serve(zx::channel(dir_request));
+  return Serve(fidl::ServerEnd<fuchsia_io::Directory>{
+      zx::channel{zx_take_startup_handle(PA_DIRECTORY_REQUEST)}});
 }
 
 }  // namespace svc

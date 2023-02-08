@@ -109,7 +109,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//zircon/system/ulib/fidl-async/test:fidl-async-test",
     "//zircon/system/ulib/log-writer-logger",
     "//zircon/system/ulib/mock-boot-arguments",
-    "//zircon/system/ulib/svc",
   ]
 }
 
