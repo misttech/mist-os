@@ -830,6 +830,112 @@ static bool vmpl_merge_onto_test() {
   END_TEST;
 }
 
+static bool vmpl_contiguous_run_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+  vm_page_t test_pages[6] = {};
+
+  // Add test pages, some in the same node, and some in different nodes.
+  // This is so that the code below adds pages in new nodes as expected.
+  ASSERT_GT(VmPageListNode::kPageFanOut, 4u);
+  // single page, then gap
+  EXPECT_TRUE(AddPage(&list, &test_pages[0], 0));
+  // gap in the same node, then two pages
+  EXPECT_TRUE(AddPage(&list, &test_pages[1], 2 * PAGE_SIZE));
+  EXPECT_TRUE(AddPage(&list, &test_pages[2], 3 * PAGE_SIZE));
+  // gap moving to the next node, then three pages spanning the node boundary
+  EXPECT_TRUE(AddPage(&list, &test_pages[3], (VmPageListNode::kPageFanOut * 2 - 1) * PAGE_SIZE));
+  EXPECT_TRUE(AddPage(&list, &test_pages[4], VmPageListNode::kPageFanOut * 2 * PAGE_SIZE));
+  EXPECT_TRUE(AddPage(&list, &test_pages[5], (VmPageListNode::kPageFanOut * 2 + 1) * PAGE_SIZE));
+
+  // Perform a basic iteration to see if we can list the ranges correctly.
+  uint64_t range_offsets[6] = {};
+  uint64_t expected_offsets[6] = {
+      0, 1, 2, 4, VmPageListNode::kPageFanOut * 2 - 1, VmPageListNode::kPageFanOut * 2 + 2};
+  size_t index = 0;
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [](const VmPageOrMarker* p, uint64_t off) { return ZX_ERR_NEXT; },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, VmPageListNode::kPageFanOut * 3 * PAGE_SIZE);
+
+  EXPECT_OK(status);
+  EXPECT_EQ(6u, index);
+  for (size_t i = 0; i < 6; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
+  list_node_t free_list;
+  list_initialize(&free_list);
+  list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
+    list_add_tail(&free_list, &p.ReleasePage()->queue_node);
+  });
+  EXPECT_EQ(6u, list_length(&free_list));
+
+  END_TEST;
+}
+
+static bool vmpl_contiguous_run_compare_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+  vm_page_t test_pages[5] = {};
+
+  // Add 5 consecutive pages. The ranges will be divided up based on the compare function.
+  for (size_t i = 0; i < 5; i++) {
+    EXPECT_TRUE(AddPage(&list, &test_pages[i], i * PAGE_SIZE));
+  }
+
+  // Random bools to use as results of comparison for each page.
+  bool compare_results[5] = {false, true, true, false, true};
+  bool page_visited[5] = {};
+  // Expected ranges based on the compare function.
+  uint64_t expected_offsets[4] = {1, 3, 4, 5};
+  uint64_t range_offsets[4] = {};
+  size_t index = 0;
+
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [&compare_results](const VmPageOrMarker* p, uint64_t off) {
+        return compare_results[off / PAGE_SIZE];
+      },
+      [&page_visited](const VmPageOrMarker* p, uint64_t off) {
+        page_visited[off / PAGE_SIZE] = true;
+        return ZX_ERR_NEXT;
+      },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, VmPageListNode::kPageFanOut * PAGE_SIZE);
+
+  EXPECT_OK(status);
+
+  for (size_t i = 0; i < 5; i++) {
+    EXPECT_EQ(compare_results[i], page_visited[i]);
+  }
+  EXPECT_EQ(4u, index);
+  for (size_t i = 0; i < 4; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
+  list_node_t free_list;
+  list_initialize(&free_list);
+  list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
+    list_add_tail(&free_list, &p.ReleasePage()->queue_node);
+  });
+  EXPECT_EQ(5u, list_length(&free_list));
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vm_page_list_tests)
 VM_UNITTEST(vmpl_add_remove_page_test)
 VM_UNITTEST(vmpl_basic_marker_test)
@@ -852,6 +958,8 @@ VM_UNITTEST(vmpl_merge_overlap_test)
 VM_UNITTEST(vmpl_for_every_page_test)
 VM_UNITTEST(vmpl_merge_onto_test)
 VM_UNITTEST(vmpl_merge_marker_test)
+VM_UNITTEST(vmpl_contiguous_run_test)
+VM_UNITTEST(vmpl_contiguous_run_compare_test)
 UNITTEST_END_TESTCASE(vm_page_list_tests, "vmpl", "VmPageList tests")
 
 }  // namespace vm_unittest
