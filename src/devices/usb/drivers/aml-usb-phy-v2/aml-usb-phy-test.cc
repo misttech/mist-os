@@ -143,60 +143,38 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   phy->InitOp();
   phy->WaitUntilInitReplyCalled();
   EXPECT_TRUE(phy->InitReplyCalled());
-  // Wait for host mode to be set by the irq thread. This should add the xhci child device.
-  while (phy->child_count() != 1) {
-    zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  }
   auto* xhci = phy->GetLatestChild();
   ASSERT_NOT_NULL(xhci);
   auto* xhci_ctx = xhci->GetDeviceContext<void>();
   ASSERT_NE(xhci_ctx, root_ctx);
+
   ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::HOST);
 
-  // Switch to Peripheral mode and trigger interrupt.
+  // Trigger interrupt, and switch to Peripheral mode.
   TriggerInterrupt(AmlUsbPhy::UsbMode::PERIPHERAL);
-
-  // Wait for peripheral mode to be set by the irq thread. This should 1) add the dwc2 child device.
-  while (phy->child_count() != 2) {
-    zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  }
+  xhci->WaitUntilAsyncRemoveCalled();
+  EXPECT_TRUE(xhci->AsyncRemoveCalled());
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+  ASSERT_EQ(phy->child_count(), 1);
   auto* dwc2 = phy->GetLatestChild();
   ASSERT_NOT_NULL(dwc2);
   auto* dwc2_ctx = dwc2->GetDeviceContext<void>();
   ASSERT_NE(dwc2_ctx, root_ctx);
 
-  // and 2) remove the xhci child device.
-  xhci->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(xhci->AsyncRemoveCalled());
-  mock_ddk::ReleaseFlaggedDevices(root_.get());
-  ASSERT_EQ(phy->child_count(), 1);
-  phy->ChildPreReleaseOp(xhci_ctx);
-
   ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::PERIPHERAL);
 
-  // Switch to Host mode and trigger interrupt.
+  // Trigger interrupt, and switch (back) to Host mode.
   TriggerInterrupt(AmlUsbPhy::UsbMode::HOST);
-
-  // Wait for host mode to be set by the irq thread. This should 1) add the xhci child device.
-  while (phy->child_count() != 2) {
-    zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  }
+  dwc2->WaitUntilAsyncRemoveCalled();
+  EXPECT_TRUE(dwc2->AsyncRemoveCalled());
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+  ASSERT_EQ(phy->child_count(), 1);
   xhci = phy->GetLatestChild();
   ASSERT_NOT_NULL(xhci);
   xhci_ctx = xhci->GetDeviceContext<void>();
   ASSERT_NE(xhci_ctx, root_ctx);
 
-  // and 2) remove the dwc2 child device.
-  dwc2->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(dwc2->AsyncRemoveCalled());
-  mock_ddk::ReleaseFlaggedDevices(root_.get());
-  ASSERT_EQ(phy->child_count(), 1);
-  phy->ChildPreReleaseOp(dwc2_ctx);
-
   ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::HOST);
-
-  // Shutdown. Release child context.
-  phy->ChildPreReleaseOp(xhci_ctx);
 }
 
 }  // namespace aml_usb_phy
