@@ -289,7 +289,7 @@ to ensure `user` build, for example, does not run a development
 component or service meant for `eng` builds.
 
 In another example, the `userdebug` build allows for a limited set of
-tools to run for inspecting the system such as [`iquery`] [doc-iquery]
+tools to run for inspecting the system such as [`iquery`][doc-iquery]
 to inspect properties of the running components.
 
 In `user`, only the software required for the running of the product is

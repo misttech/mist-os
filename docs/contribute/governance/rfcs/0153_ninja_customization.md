@@ -353,7 +353,7 @@ case-by-case basis in terms of:
 As well as other criteria the owners see as appropriate.
 
 The list of local modifications will be tracked in a
-[`FUCHSIA.readme`]((/docs/development/source_code/third-party-metadata.md)
+[`FUCHSIA.readme`](/docs/development/source_code/third-party-metadata.md)
 file as standard practice.
 
 The maintainers of that branch will be the Fuchsia Build Team, which is
