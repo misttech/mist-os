@@ -1,0 +1,31 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/110824): Stop skipping these manually once NS3 is
+                // returning EPERM for raw and packet socket creation.
+                "AllInetTests/RawPacketTest.*",
+                "AllInetTests/CookedPacketTest.*",
+                "AllPacketSocketTests/*",
+                "AllRawPacketMsgSizeTest/*",
+                "BasicCookedPacketTest.WrongType",
+                "RawHDRINCL.*",
+                "RawSocketICMPTest.*",
+                "RawSocketICMPv6Test.*",
+                "AllInetTests/RawSocketTest.*",
+                "AllRawSocketTests/*",
+                "RawSocketTest.*",
+            ],
+        },
+    ],
+}

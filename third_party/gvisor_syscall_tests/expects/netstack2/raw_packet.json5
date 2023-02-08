@@ -1,0 +1,33 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // https://fxbug.dev/82596
+                "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
+                "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
+
+                // https://fxbug.dev/46102
+                "RawSocketTest.ReceiveIPPacketInfo",
+
+                // TODO(https://fxbug.dev/87235): Expect success once Fuchsia supports sending
+                // packets with the maximum possible payload length. Currently, this is
+                // limited by a channel's maximum message size.
+                "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SendTooLong/*",
+
+                // https://fxbug.dev/90501
+                "RawSocketICMPTest.IPv6ChecksumNotSupported",
+                "RawSocketICMPTest.ICMPv6FilterNotSupported",
+            ],
+        },
+    ],
+}
