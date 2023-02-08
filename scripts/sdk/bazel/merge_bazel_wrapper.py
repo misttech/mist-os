@@ -13,6 +13,7 @@ import filecmp
 import os
 import shutil
 import json
+import sys
 
 
 def merge_new_manifest(manifest_json, new_manifest):
@@ -30,6 +31,7 @@ def main():
     parser.add_argument("--dest-dir")
     args = parser.parse_args()
     manifest_json = None
+    unmergable_files = []
 
     for directory in os.listdir(args.source_dir):
         directory = os.path.join(args.source_dir, directory)
@@ -46,12 +48,13 @@ def main():
                     continue
                 if os.path.exists(dest_file):
                     # Coherence check: Ensure that files with the same path have equal content.
-                    assert filecmp.cmp(
-                        source_file, dest_file), f"Cannot merge {source_file} and {dest_file}, which both have different content."
+                    if not filecmp.cmp(source_file, dest_file):
+                        unmergable_files.append(relpath)
                     continue
                 if not os.path.exists(os.path.dirname(dest_file)):
                     os.makedirs(os.path.dirname(dest_file))
                 shutil.copy(source_file, dest_file)
+    assert not unmergable_files, f"The following files cannot be merged because of conflicting content:{'\n'.join(unmergable_files)}"
 
     # Write meta/manifest.json
     dest_file = os.path.join(dest_dir, "meta/manifest.json")
