@@ -288,6 +288,7 @@ impl Calls {
                 }
             }
             Err(e) => {
+                // TODO(fxbug.dev/113160): Warn unconditionally once one-ways hide PEER_CLOSED.
                 if !e.is_closed() {
                     warn!("Error making request on Call channel for call {:?}: {}", index, e);
                 }
@@ -923,8 +924,10 @@ mod tests {
         assert_eq!(result, Err(CallError::UnknownIndexError(invalid.clone())));
     }
 
-    #[fasync::run_until_stalled(test)]
-    async fn call_requests_manager_closed_clears_call() {
+    #[fuchsia::test]
+    fn call_requests_manager_closed_clears_call() {
+        let mut exec = fasync::TestExecutor::new();
+
         let (mut calls, _peer_handler, call_stream, idx, num) = setup_ongoing_call();
         drop(call_stream);
 
@@ -932,9 +935,9 @@ mod tests {
             calls.current_calls().into_iter().find(|info| info.index == idx && info.number == num);
         assert!(call.is_some(), "Call must exist in list of calls");
 
-        // A request made to a Call channel that is closed will remove the call entry.
-        let result = calls.request_hold(idx);
-        assert_eq!(result, Ok(()));
+        // Since we dropped `call_stream`, the WatchState hanging get will
+        // return with PEER_CLOSED, and the call entry will be removed.
+        poll_calls_until_pending(&mut exec, &mut calls);
 
         let call =
             calls.current_calls().into_iter().find(|info| info.index == idx && info.number == num);
