@@ -26,7 +26,7 @@ void SetRamDevice(monitor::Monitor* app) {
   // Use the noexcept version of std::filesystem::exists.
   if (std::filesystem::exists(kRamDeviceClassPath, ec)) {
     for (const auto& entry : std::filesystem::directory_iterator(kRamDeviceClassPath)) {
-      int fd = open(entry.path().c_str(), O_RDWR);
+      int fd = open(entry.path().c_str(), O_RDONLY);
       if (fd > -1) {
         zx::channel handle;
         zx_status_t status = fdio_get_service_handle(fd, handle.reset_and_get_address());
