@@ -18,34 +18,6 @@
 
 namespace wlanif {
 
-class EthDevice {
- public:
-  EthDevice();
-  ~EthDevice();
-
-  // wlan_fullmac_protocol_t (ethernet_impl_protocol -> wlan_fullmac_impl_protocol)
-  zx_status_t EthStart(const ethernet_ifc_protocol_t* ifc);
-  void EthStop();
-  void EthQueueTx(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto, uint32_t options,
-                  ethernet_netbuf_t* netbuf, ethernet_impl_queue_tx_callback completion_cb,
-                  void* cookie);
-  zx_status_t EthSetParam(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto, uint32_t param,
-                          int32_t value, const void* data, size_t data_size);
-
-  // wlan_fullmac_impl_ifc (wlanif-impl -> ethernet_ifc_t)
-  void EthRecv(const uint8_t* data, size_t length, uint32_t flags);
-
-  void SetEthernetStatus(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto, bool online);
-  bool IsEthernetOnline();
-
- private:
-  std::mutex lock_;
-
-  bool eth_started_ __TA_GUARDED(lock_) = false;
-  bool eth_online_ __TA_GUARDED(lock_) = false;
-  ethernet_ifc_protocol_t ethernet_ifc_ __TA_GUARDED(lock_) = {};
-};
-
 class Device {
  public:
   Device(zx_device_t* device, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto);
@@ -84,17 +56,6 @@ class Device {
 
   void OnLinkStateChanged(bool online);
 
-  // ethernet_impl_protocol_t (ethernet_impl_protocol -> wlan_fullmac_impl_protocol)
-  zx_status_t EthStart(const ethernet_ifc_protocol_t* ifc);
-  void EthStop();
-  zx_status_t EthQuery(uint32_t options, ethernet_info_t* info);
-  void EthQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                  ethernet_impl_queue_tx_callback completion_cb, void* cookie);
-  zx_status_t EthSetParam(uint32_t param, int32_t value, const void* data, size_t data_size);
-
-  // wlan_fullmac_impl_ifc (wlanif-impl -> ethernet_ifc_t)
-  void EthRecv(const uint8_t* data, size_t length, uint32_t flags);
-
  private:
   zx_status_t AddDevice();
 
@@ -105,12 +66,13 @@ class Device {
   zx_device_t* device_ = nullptr;
 
   wlan_fullmac_impl_protocol_t wlan_fullmac_impl_;
-  EthDevice eth_device_;
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
   // calls to this protocol should only be performed by the vendor driver.
   std::unique_ptr<wlan_fullmac_impl_ifc_protocol_ops_t> wlan_fullmac_impl_ifc_ops_;
   std::unique_ptr<FullmacMlme> mlme_;
+
+  bool device_online_ = false;
 };
 
 }  // namespace wlanif

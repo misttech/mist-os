@@ -13,6 +13,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
 #include <net/ethernet.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include <memory>
@@ -42,22 +43,6 @@ static zx_protocol_device_t device_ops = {
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
 };
-
-static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
-    .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
-      return DEV(ctx)->EthQuery(options, info);
-    },
-    .stop = [](void* ctx) { DEV(ctx)->EthStop(); },
-    .start = [](void* ctx, const ethernet_ifc_protocol_t* ifc) -> zx_status_t {
-      return DEV(ctx)->EthStart(ifc);
-    },
-    .queue_tx =
-        [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
-           ethernet_impl_queue_tx_callback completion_cb,
-           void* cookie) { return DEV(ctx)->EthQueueTx(options, netbuf, completion_cb, cookie); },
-    .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data, size_t data_size)
-        -> zx_status_t { return DEV(ctx)->EthSetParam(param, value, data, data_size); },
-};
 #undef DEV
 
 zx_status_t Device::AddDevice() {
@@ -69,13 +54,6 @@ zx_status_t Device::AddDevice() {
   auto vmo = mlme_->DuplicateInspectVmo();
   if (vmo) {
     args.inspect_vmo = *vmo;
-  }
-  mac_sublayer_support mac_sublayer_support;
-  wlan_fullmac_impl_query_mac_sublayer_support(&wlan_fullmac_impl_, &mac_sublayer_support);
-  if (mac_sublayer_support.data_plane.data_plane_type == DATA_PLANE_TYPE_ETHERNET_DEVICE) {
-    // This is an ethernet driver, add the custom protocol to the device
-    args.proto_id = ZX_PROTOCOL_ETHERNET_IMPL;
-    args.proto_ops = &ethernet_impl_ops;
   }
   return device_add(parent_, &args, &device_);
 }
@@ -118,8 +96,13 @@ zx_status_t Device::Bind() {
 
   mac_sublayer_support_t mac_sublayer_support;
   wlan_fullmac_impl_query_mac_sublayer_support(&wlan_fullmac_impl_, &mac_sublayer_support);
-  if (wlan_fullmac_impl_.ops->data_queue_tx &&
-      mac_sublayer_support.data_plane.data_plane_type == DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE) {
+
+  if (mac_sublayer_support.data_plane.data_plane_type == DATA_PLANE_TYPE_ETHERNET_DEVICE) {
+    lerror("Ethernet data plane is no longer supported by wlanif");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (wlan_fullmac_impl_.ops->data_queue_tx) {
     lwarn(
         "driver implements data_queue_tx while indicating a GND data plane, data_queue_tx "
         "will not be called.");
@@ -142,7 +125,8 @@ zx_status_t Device::Bind() {
 
 void Device::Unbind() {
   ltrace_fn();
-  mlme_->StopMainLoop();
+  if (mlme_)
+    mlme_->StopMainLoop();
   device_unbind_reply(device_);
 }
 
@@ -185,7 +169,7 @@ void Device::StartScan(const wlan_fullmac_scan_req_t* req) {
 }
 
 void Device::ConnectReq(const wlan_fullmac_connect_req_t* req) {
-  eth_device_.SetEthernetStatus(&wlan_fullmac_impl_, false);
+  OnLinkStateChanged(false);
   wlan_fullmac_impl_connect_req(&wlan_fullmac_impl_, req);
 }
 
@@ -198,7 +182,7 @@ void Device::AuthenticateResp(const wlan_fullmac_auth_resp_t* resp) {
 }
 
 void Device::DeauthenticateReq(const wlan_fullmac_deauth_req_t* req) {
-  eth_device_.SetEthernetStatus(&wlan_fullmac_impl_, false);
+  OnLinkStateChanged(false);
   wlan_fullmac_impl_deauth_req(&wlan_fullmac_impl_, req);
 }
 
@@ -207,12 +191,12 @@ void Device::AssociateResp(const wlan_fullmac_assoc_resp_t* resp) {
 }
 
 void Device::DisassociateReq(const wlan_fullmac_disassoc_req_t* req) {
-  eth_device_.SetEthernetStatus(&wlan_fullmac_impl_, false);
+  OnLinkStateChanged(false);
   wlan_fullmac_impl_disassoc_req(&wlan_fullmac_impl_, req);
 }
 
 void Device::ResetReq(const wlan_fullmac_reset_req_t* req) {
-  eth_device_.SetEthernetStatus(&wlan_fullmac_impl_, false);
+  OnLinkStateChanged(false);
   wlan_fullmac_impl_reset_req(&wlan_fullmac_impl_, req);
 }
 
@@ -263,7 +247,13 @@ int32_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out
 }
 
 void Device::OnLinkStateChanged(bool online) {
-  eth_device_.SetEthernetStatus(&wlan_fullmac_impl_, online);
+  // TODO(fxbug.dev/51009): Let SME handle these changes.
+  if (online != device_online_) {
+    device_online_ = online;
+    if (wlan_fullmac_impl_.ops->on_link_state_changed) {
+      wlan_fullmac_impl_on_link_state_changed(&wlan_fullmac_impl_, online);
+    }
+  }
 }
 
 void Device::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {
@@ -275,141 +265,5 @@ void Device::SaeFrameTx(const wlan_fullmac_sae_frame_t* frame) {
 }
 
 void Device::WmmStatusReq() { wlan_fullmac_impl_wmm_status_req(&wlan_fullmac_impl_); }
-
-zx_status_t Device::EthStart(const ethernet_ifc_protocol_t* ifc) {
-  return eth_device_.EthStart(ifc);
-}
-
-void Device::EthStop() { return eth_device_.EthStop(); }
-
-zx_status_t Device::EthQuery(uint32_t options, ethernet_info_t* info) {
-  std::lock_guard<std::mutex> lock(lock_);
-
-  std::memset(info, 0, sizeof(*info));
-
-  // features
-  wlan_fullmac_query_info query_info;
-  wlan_fullmac_impl_query(&wlan_fullmac_impl_, &query_info);
-  info->features = ETHERNET_FEATURE_WLAN;
-  if (query_info.features & WLAN_FULLMAC_FEATURE_DMA) {
-    info->features |= ETHERNET_FEATURE_DMA;
-  }
-  if (query_info.features & WLAN_FULLMAC_FEATURE_SYNTH) {
-    info->features |= ETHERNET_FEATURE_SYNTH;
-  }
-  if (query_info.role == WLAN_MAC_ROLE_AP) {
-    info->features |= ETHERNET_FEATURE_WLAN_AP;
-  }
-
-  // mtu
-  info->mtu = 1500;
-  info->netbuf_size = sizeof(ethernet_netbuf_t);
-
-  // sta
-  std::memcpy(info->mac, query_info.sta_addr, ETH_ALEN);
-
-  return ZX_OK;
-}
-
-void Device::EthQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                        ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  eth_device_.EthQueueTx(&wlan_fullmac_impl_, options, netbuf, completion_cb, cookie);
-}
-
-zx_status_t Device::EthSetParam(uint32_t param, int32_t value, const void* data, size_t data_size) {
-  return eth_device_.EthSetParam(&wlan_fullmac_impl_, param, value, data, data_size);
-}
-
-void Device::EthRecv(const uint8_t* data, size_t length, uint32_t flags) {
-  eth_device_.EthRecv(data, length, flags);
-}
-
-EthDevice::EthDevice() { ltrace_fn(); }
-
-EthDevice::~EthDevice() { ltrace_fn(); }
-
-zx_status_t EthDevice::EthStart(const ethernet_ifc_protocol_t* ifc) {
-  std::lock_guard<std::mutex> lock(lock_);
-  ethernet_ifc_ = *ifc;
-  eth_started_ = true;
-  if (eth_online_) {
-    ethernet_ifc_status(&ethernet_ifc_, ETHERNET_STATUS_ONLINE);
-  }
-  // TODO(fxbug.dev/51009): Inform SME that ethernet has started.
-  return ZX_OK;
-}
-
-void EthDevice::EthStop() {
-  std::lock_guard<std::mutex> lock(lock_);
-  eth_started_ = false;
-  ethernet_ifc_ = {};
-}
-
-void EthDevice::EthQueueTx(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto, uint32_t options,
-                           ethernet_netbuf_t* netbuf, ethernet_impl_queue_tx_callback completion_cb,
-                           void* cookie) {
-  if (wlan_fullmac_impl_proto->ops->data_queue_tx != nullptr) {
-    wlan_fullmac_impl_data_queue_tx(wlan_fullmac_impl_proto, options, netbuf, completion_cb,
-                                    cookie);
-  } else {
-    completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, netbuf);
-  }
-}
-
-zx_status_t EthDevice::EthSetParam(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto,
-                                   uint32_t param, int32_t value, const void* data,
-                                   size_t data_size) {
-  zx_status_t status = ZX_ERR_NOT_SUPPORTED;
-
-  switch (param) {
-    case ETHERNET_SETPARAM_PROMISC:
-      // See fxbug.dev/28881: In short, the bridge mode doesn't require WLAN promiscuous mode
-      // enabled.
-      //               So we give a warning and return OK here to continue the bridging.
-      // TODO(fxbug.dev/29113): To implement the real promiscuous mode.
-      if (value == 1) {  // Only warn when enabling.
-        lwarn("WLAN promiscuous not supported yet. see fxbug.dev/29113\n");
-      }
-      status = ZX_OK;
-      break;
-    case ETHERNET_SETPARAM_MULTICAST_PROMISC:
-      if (wlan_fullmac_impl_proto->ops->set_multicast_promisc != nullptr) {
-        return wlan_fullmac_impl_set_multicast_promisc(wlan_fullmac_impl_proto, !!value);
-      } else {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      break;
-  }
-
-  return status;
-}
-
-void EthDevice::SetEthernetStatus(wlan_fullmac_impl_protocol_t* wlan_fullmac_impl_proto,
-                                  bool online) {
-  std::lock_guard<std::mutex> lock(lock_);
-
-  // TODO(fxbug.dev/51009): Let SME handle these changes.
-  if (online != eth_online_) {
-    eth_online_ = online;
-    if (eth_started_) {
-      ethernet_ifc_status(&ethernet_ifc_, online ? ETHERNET_STATUS_ONLINE : 0);
-    }
-    if (wlan_fullmac_impl_proto->ops->on_link_state_changed) {
-      wlan_fullmac_impl_on_link_state_changed(wlan_fullmac_impl_proto, online);
-    }
-  }
-}
-
-bool EthDevice::IsEthernetOnline() {
-  std::lock_guard<std::mutex> lock(lock_);
-  return eth_online_;
-}
-
-void EthDevice::EthRecv(const uint8_t* data, size_t length, uint32_t flags) {
-  std::lock_guard<std::mutex> lock(lock_);
-  if (eth_started_) {
-    ethernet_ifc_recv(&ethernet_ifc_, data, length, flags);
-  }
-}
 
 }  // namespace wlanif
