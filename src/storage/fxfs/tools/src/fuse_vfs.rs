@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        fuse_attr::to_fxfs_time,
+        fuse_attr::{create_file_attr, to_fxfs_time},
         fuse_errors::{FuseErrorParser, FxfsResult},
         fuse_fs::{FuseFs, FuseStrParser},
     },
@@ -20,7 +20,7 @@ use {
         errors::FxfsError,
         filesystem::{Filesystem, SyncOptions},
         log::info,
-        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
+        object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
             transaction::{Options, TransactionHandler},
@@ -30,6 +30,7 @@ use {
     std::{
         ffi::{OsStr, OsString},
         io::Write,
+        sync::Arc,
         time::Duration,
         vec::IntoIter,
     },
@@ -104,6 +105,9 @@ impl FuseFs {
                 // immediately tombstones it in the graveyard.
                 if let ReplacedChild::File(object_id) = replaced_child {
                     self.fs.graveyard().tombstone(dir.store().store_object_id(), object_id).await?;
+
+                    // Remove object's handle from cache if it exists.
+                    self.object_handle_cache.write().await.remove(&object_id);
                 }
 
                 Ok(())
@@ -177,7 +181,11 @@ impl FuseFs {
             // immediately tombstones it in the graveyard.
             if let ReplacedChild::File(object_id) = replaced_child {
                 self.fs.graveyard().tombstone(new_dir.store().store_object_id(), object_id).await?;
+
+                // Remove object's handle from cache if it exists.
+                self.object_handle_cache.write().await.remove(&object_id);
             }
+
             Ok(())
         } else {
             Err(FxfsError::NotFound.into())
@@ -261,7 +269,8 @@ impl FuseFs {
     async fn release_fxfs(&self, inode: u64) -> FxfsResult<()> {
         if let Some(object_type) = self.get_object_type(inode).await? {
             if object_type == ObjectDescriptor::File {
-                // TODO(fxbug.dev/117461): Add cache support that removes object handle from cache.
+                // Remove the handle from cache because the file is released.
+                self.release_object_handle(inode).await;
                 Ok(())
             } else {
                 Err(FxfsError::NotFile.into())
@@ -349,20 +358,23 @@ impl FuseFs {
             let mut transaction = self.fs.clone().new_transaction(&[], Options::default()).await?;
 
             let child_file = dir.create_child_file(&mut transaction, name.osstr_to_str()?).await?;
-
             transaction.commit().await?;
+            let child_id = child_file.object_id();
 
-            // TODO(fxbug.dev/117461): Add cache supoort to store object handle.
+            let properties = child_file.get_properties().await?;
+            let attributes = create_file_attr(
+                child_id,
+                properties.data_attribute_size,
+                properties.creation_time,
+                properties.modification_time,
+                properties.refs as u32,
+            );
 
-            Ok(ReplyCreated {
-                ttl: TTL,
-                attr: self
-                    .create_object_attr(child_file.object_id(), ObjectDescriptor::File)
-                    .await?,
-                generation: 0,
-                fh: 0,
-                flags,
-            })
+            // Store the object handle in cache.
+            let mut object_handle_cache = self.object_handle_cache.write().await;
+            object_handle_cache.insert(child_id, (Arc::new(child_file), 1));
+
+            Ok(ReplyCreated { ttl: TTL, attr: attributes, generation: 0, fh: 0, flags })
         } else {
             Err(FxfsError::AlreadyExists.into())
         }
@@ -377,7 +389,8 @@ impl FuseFs {
 
         if let Some(descriptor) = object_type {
             if descriptor == ObjectDescriptor::File {
-                // TODO(fxbug.dev/117461): Add cache supoort to store object handle.
+                // Store the object handle in cache.
+                self.load_object_handle(inode).await?;
 
                 Ok(ReplyOpen { fh: 0, flags: 0 })
             } else {

@@ -23,6 +23,7 @@ use {
     libc,
     once_cell::sync::OnceCell,
     std::{
+        collections::HashMap,
         ffi::OsStr,
         fs::{File, OpenOptions},
         path::PathBuf,
@@ -31,6 +32,7 @@ use {
     },
     storage_device::{fake_device::FakeDevice, file_backed_device::FileBackedDevice, DeviceHolder},
     tokio,
+    tokio::sync::RwLock,
 };
 
 const DEFAULT_DEVICE_BLOCK_SIZE: u32 = 512;
@@ -63,6 +65,9 @@ extern "C" fn handle_sigterm(_signal: i32) {
 pub struct FuseFs {
     pub fs: OpenFxFilesystem,
     pub default_store: Arc<ObjectStore>,
+    // Each entry in object_handle_cache stores an object_handle and a counter that is incremented
+    // on its open/create and decremented on its release.
+    pub object_handle_cache: Arc<RwLock<HashMap<u64, (Arc<StoreObjectHandle<ObjectStore>>, u32)>>>,
 }
 
 impl FuseFs {
@@ -118,7 +123,7 @@ impl FuseFs {
             .await
             .expect("failed to open default store");
 
-        Self { fs, default_store }
+        Self { fs, default_store, object_handle_cache: Arc::new(RwLock::new(HashMap::new())) }
     }
 
     /// Open an existing FxFilesystem using given device and cryption
@@ -130,7 +135,7 @@ impl FuseFs {
             .await
             .expect("failed to open default store");
 
-        Self { fs, default_store }
+        Self { fs, default_store, object_handle_cache: Arc::new(RwLock::new(HashMap::new())) }
     }
 
     /// Listen to the signals to gracefully close the filesystem.
@@ -173,6 +178,18 @@ impl FuseFs {
         &self,
         object_id: u64,
     ) -> FxfsResult<Arc<StoreObjectHandle<ObjectStore>>> {
+        {
+            // Check in the cache if the handle of requested object exists.
+            // Functions that have a matching create/open call should have the object handle in cache.
+            if let Some((object_handle, 0)) = self.object_handle_cache.read().await.get(&object_id)
+            {
+                info!("Cache hit for handle of object {}", object_id);
+                return Ok(object_handle.clone());
+            }
+        }
+
+        // If object handle is not in cache, then it is called by functions that do not have a matching
+        // create/open call. Hence do not store the handle in cache.
         let handle = Arc::new(
             ObjectStore::open_object(
                 &self.default_store,
@@ -184,6 +201,53 @@ impl FuseFs {
         );
 
         Ok(handle)
+    }
+
+    /// Load the handle of an object with specified id into cache.
+    /// Increase the cache counter by 1 if the handle is already in cache.
+    pub async fn load_object_handle(
+        &self,
+        object_id: u64,
+    ) -> FxfsResult<Arc<StoreObjectHandle<ObjectStore>>> {
+        let mut object_handle_cache = self.object_handle_cache.write().await;
+
+        if let Some((handle, counter)) = object_handle_cache.get_mut(&object_id) {
+            *counter += 1;
+            Ok(handle.clone())
+        } else {
+            let handle = Arc::new(
+                ObjectStore::open_object(
+                    &self.default_store,
+                    object_id,
+                    HandleOptions::default(),
+                    None,
+                )
+                .await?,
+            );
+
+            object_handle_cache.insert(object_id, (handle.clone(), 1));
+
+            Ok(handle)
+        }
+    }
+
+    /// Reduce the counter of object handle with specified id in cache by 1.
+    /// Remove the object from cache if the counter reaches 0.
+    pub async fn release_object_handle(&self, object_id: u64) {
+        let mut object_handle_cache = self.object_handle_cache.write().await;
+
+        if let Some((_, counter)) = object_handle_cache.get_mut(&object_id) {
+            if *counter == 1 {
+                object_handle_cache.remove(&object_id);
+            } else {
+                *counter -= 1;
+            }
+        } else {
+            panic!(
+                "release does not have a matching open/create: {} not found in cache.",
+                object_id
+            );
+        }
     }
 
     /// Get the properties of an object with specified id.
@@ -205,8 +269,15 @@ impl FuseFs {
 
     /// Get the type of an object with specified id.
     pub async fn get_object_type(&self, object_id: u64) -> FxfsResult<Option<ObjectDescriptor>> {
-        let object_result = self.default_store.tree().find(&ObjectKey::object(object_id)).await?;
+        {
+            // If the requested object exists in the handle cache, then it must be a file.
+            if self.object_handle_cache.clone().read().await.contains_key(&object_id) {
+                info!("Cache hit for handle of object {}", object_id);
+                return Ok(Some(ObjectDescriptor::File));
+            }
+        }
 
+        let object_result = self.default_store.tree().find(&ObjectKey::object(object_id)).await?;
         if let Some(object) = object_result {
             match object.value {
                 ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. } => {
@@ -284,5 +355,62 @@ impl FuseStrParser for OsStr {
         } else {
             Err(FxfsError::InvalidArgs.into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::fuse_fs::FuseFs,
+        fxfs::{
+            object_handle::ObjectHandle,
+            object_store::transaction::{Options, TransactionHandler},
+        },
+    };
+
+    /// Load object handle for three times, then continuously release the object handle.
+    /// Check the handle counter value after each release.
+    #[fuchsia::test]
+    async fn test_load_object_handle_and_release_object_handle() {
+        let fs = FuseFs::new_in_memory().await;
+        let dir = fs.root_dir().await.expect("root_dir failed");
+        let mut transaction = fs
+            .fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let file =
+            dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
+        transaction.commit().await.expect("transaction commit failed");
+        let object_id = file.object_id();
+
+        fs.load_object_handle(object_id).await.expect("load_object_handle failed");
+        fs.load_object_handle(object_id).await.expect("load_object_handle failed");
+        fs.load_object_handle(object_id).await.expect("load_object_handle failed");
+        {
+            let cache = fs.object_handle_cache.read().await;
+            let handle = cache.get(&object_id);
+            assert!(handle.is_some());
+            assert_eq!(handle.unwrap().1, 3);
+        }
+
+        fs.release_object_handle(object_id).await;
+        fs.release_object_handle(object_id).await;
+        {
+            let cache = fs.object_handle_cache.read().await;
+            let handle = cache.get(&object_id);
+            assert!(handle.is_some());
+            assert_eq!(handle.unwrap().1, 1);
+        }
+
+        fs.release_object_handle(object_id).await;
+        {
+            let cache = fs.object_handle_cache.read().await;
+            let handle = cache.get(&object_id);
+            assert!(handle.is_none());
+        }
+
+        fs.fs.close().await.expect("failed to close filesystem");
     }
 }
