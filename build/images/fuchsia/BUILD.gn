@@ -318,7 +318,7 @@ if (is_fuchsia) {
       public_deps += [ ":copy_fvm_blob_sparse" ]
     }
 
-    if (!is_coverage && custom_signing_script == "") {
+    if (!is_coverage && custom_signing_script == "" && run_scrutiny_verifiers) {
       deps = [ ":scrutiny_verifiers" ]
     }
 
@@ -606,64 +606,33 @@ if (is_fuchsia) {
     }
   }
 
-  if (!is_coverage && custom_signing_script == "") {
-    if (run_scrutiny_verifiers) {
-      # Run ALL the scrutiny verifiers for the provided product bundle.
-      scrutiny_verifiers2("scrutiny_verifiers") {
-        assembly_image_name = "fuchsia"
-        product_bundle = ":product_bundle"
+  if (!is_coverage && custom_signing_script == "" && run_scrutiny_verifiers) {
+    # Run ALL the scrutiny verifiers for the provided product bundle.
+    scrutiny_verifiers("scrutiny_verifiers") {
+      assembly_image_name = "fuchsia"
+      product_bundle = ":product_bundle"
 
-        route_sources_config = fuchsia_route_sources_config
-        static_pkgs_goldens = fuchsia_static_pkgs_goldens
-        structured_config_policy = fuchsia_structured_config_policy
-        verify_component_resolvers_allowlist =
-            fuchsia_verify_component_resolvers_allowlist
-        verify_routes_component_tree_config =
-            fuchsia_verify_routes_component_tree_config
-        verify_routes_exceptions_allowlist =
-            fuchsia_verify_routes_exceptions_allowlist
-        verify_routes_exceptions_allowlist_product =
-            fuchsia_verify_routes_exceptions_allowlist_product
-        zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
-        zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
-        zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
+      route_sources_config = fuchsia_route_sources_config
+      static_pkgs_goldens = fuchsia_static_pkgs_goldens
+      structured_config_policy = fuchsia_structured_config_policy
+      verify_component_resolvers_allowlist =
+          fuchsia_verify_component_resolvers_allowlist
+      verify_routes_component_tree_config =
+          fuchsia_verify_routes_component_tree_config
+      verify_routes_exceptions_allowlist =
+          fuchsia_verify_routes_exceptions_allowlist
+      verify_routes_exceptions_allowlist_product =
+          fuchsia_verify_routes_exceptions_allowlist_product
+      zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
+      zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
+      zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
 
-        forward_variables_from(fuchsia_base,
-                               [
-                                 "product_assembly_config_dep",
-                                 "testonly",
-                                 "product_assembly_config_file",
-                               ])
-      }
-    } else {
-      # The old scrutiny verifiers target that does not necessary run all the verifiers.
-      # TODO(fxbug.dev/93041) Delete this once all clients have moved to scrutiny_verifiers2.
-      scrutiny_verifiers("scrutiny_verifiers") {
-        assembly_image_name = "fuchsia"
-        product_bundle = ":product_bundle"
-
-        route_sources_config = fuchsia_route_sources_config
-        static_pkgs_goldens = fuchsia_static_pkgs_goldens
-        structured_config_policy = fuchsia_structured_config_policy
-        verify_component_resolvers_allowlist =
-            fuchsia_verify_component_resolvers_allowlist
-        verify_routes_component_tree_config =
-            fuchsia_verify_routes_component_tree_config
-        verify_routes_exceptions_allowlist =
-            fuchsia_verify_routes_exceptions_allowlist
-        verify_routes_exceptions_allowlist_product =
-            fuchsia_verify_routes_exceptions_allowlist_product
-        zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
-        zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
-        zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
-
-        forward_variables_from(fuchsia_base,
-                               [
-                                 "product_assembly_config_dep",
-                                 "testonly",
-                                 "product_assembly_config_file",
-                               ])
-      }
+      forward_variables_from(fuchsia_base,
+                             [
+                               "product_assembly_config_dep",
+                               "testonly",
+                               "product_assembly_config_file",
+                             ])
     }
   }
 }

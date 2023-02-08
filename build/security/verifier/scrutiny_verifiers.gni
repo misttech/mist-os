@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/security/verifier/scrutiny_verifiers_old.gni")
 import("//build/security/verifier/verify_bootfs.gni")
 import("//build/security/verifier/verify_by_build_type.gni")
 import("//build/security/verifier/verify_component_resolvers.gni")
@@ -74,7 +73,7 @@ import("//build/security/verifier/verify_structured_config.gni")
 #
 #   testonly (optional)
 #     Usual GN meaning.
-template("scrutiny_verifiers2") {
+template("scrutiny_verifiers") {
   assert(defined(invoker.product_bundle),
          "product_bundle is required for scrutiny_verifiers()")
 
@@ -255,5 +254,19 @@ template("scrutiny_verifiers2") {
       ":${invoker.assembly_image_name}_verify_static_pkgs",
       ":${invoker.assembly_image_name}_verify_structured_config_policy_exists",
     ]
+  }
+}
+
+# Pass-through to scrutiny_verifiers.
+# TODO(fxbug.dev/93041): Delete this file once all clients move back to
+# scrutiny_verifiers.
+template("scrutiny_verifiers2") {
+  scrutiny_verifiers(target_name) {
+    forward_variables_from(invoker, "*", [ "assembly_image_name" ])
+
+    # In some cases, assembly_image_name is added to the invoker ambiently,
+    # therefore we have to forward it explicitly.
+    # (* does not forward ambiently added variables)
+    forward_variables_from(invoker, [ "assembly_image_name" ])
   }
 }
