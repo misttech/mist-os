@@ -440,9 +440,9 @@ impl fmt::Display for OpCode {
     }
 }
 
-impl Into<u8> for OpCode {
-    fn into(self) -> u8 {
-        self as u8
+impl From<OpCode> for u8 {
+    fn from(code: OpCode) -> u8 {
+        code as u8
     }
 }
 
@@ -541,9 +541,9 @@ pub enum OptionCode {
     End = 255,
 }
 
-impl Into<u8> for OptionCode {
-    fn into(self) -> u8 {
-        self as u8
+impl From<OptionCode> for u8 {
+    fn from(code: OptionCode) -> u8 {
+        code as u8
     }
 }
 
@@ -1659,9 +1659,9 @@ impl TryFrom<u8> for NodeType {
     }
 }
 
-impl Into<u8> for NodeType {
-    fn into(self) -> u8 {
-        self as u8
+impl From<NodeType> for u8 {
+    fn from(node_type: NodeType) -> u8 {
+        node_type as u8
     }
 }
 
@@ -1706,9 +1706,9 @@ pub enum Overload {
     Both = 3,
 }
 
-impl Into<u8> for Overload {
-    fn into(self) -> u8 {
-        self as u8
+impl From<Overload> for u8 {
+    fn from(val: Overload) -> Self {
+        val as u8
     }
 }
 
@@ -1762,9 +1762,9 @@ pub enum MessageType {
     DHCPINFORM = 8,
 }
 
-impl Into<u8> for MessageType {
-    fn into(self) -> u8 {
-        self as u8
+impl From<MessageType> for u8 {
+    fn from(val: MessageType) -> Self {
+        val as u8
     }
 }
 
