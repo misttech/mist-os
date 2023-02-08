@@ -813,34 +813,27 @@ class VmPageList final {
           if (contiguous_run_len > 0) {
             st = contiguous_run_func(contiguous_run_start,
                                      contiguous_run_start + contiguous_run_len);
-            if (st == ZX_ERR_STOP) {
-              return ZX_OK;
-            }
-            if (st != ZX_ERR_NEXT) {
-              return st;
-            }
+            // Reset contiguous_run_len to zero to track a new range later if required.
+            // Do this irrespective of the return status to ensure we don't erroneously have a
+            // remaining range to process below after exiting the traversal.
+            contiguous_run_len = 0;
           }
-          // Reset contiguous_run_len to zero to track a new range later if required.
-          contiguous_run_len = 0;
-          return ZX_ERR_NEXT;
+          return st;
         },
         [&](uint64_t start, uint64_t end) {
+          zx_status_t st = ZX_ERR_NEXT;
           // We were already tracking a contiguous range when we encountered this gap. Invoke
           // contiguous_run_func on the range so far and start tracking a new one skipping over this
           // gap.
           if (contiguous_run_len > 0) {
-            zx_status_t st = contiguous_run_func(contiguous_run_start,
-                                                 contiguous_run_start + contiguous_run_len);
-            if (st == ZX_ERR_STOP) {
-              return ZX_OK;
-            }
-            if (st != ZX_ERR_NEXT) {
-              return st;
-            }
+            st = contiguous_run_func(contiguous_run_start,
+                                     contiguous_run_start + contiguous_run_len);
+            // Reset contiguous_run_len to zero to track a new range later if required.
+            // Do this irrespective of the return status to ensure we don't erroneously have a
+            // remaining range to process below after exiting the traversal.
+            contiguous_run_len = 0;
           }
-          // Reset contiguous_run_len to zero to track a new range later if required.
-          contiguous_run_len = 0;
-          return ZX_ERR_NEXT;
+          return st;
         },
         start_offset, end_offset);
 

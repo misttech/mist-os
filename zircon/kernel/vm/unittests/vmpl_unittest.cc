@@ -973,6 +973,40 @@ static bool vmpl_contiguous_traversal_end_test() {
     EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
   }
 
+  // Attempt another traversal. This time it ends early because of ZX_ERR_STOP in the contiguous
+  // range function.
+  index = 0;
+  bool page_visited[3] = {};
+  status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) {
+        // Include even indexed pages in the range.
+        return (off / PAGE_SIZE) % 2 == 0;
+      },
+      [&page_visited](const VmPageOrMarker* p, uint64_t off) {
+        page_visited[off / PAGE_SIZE] = true;
+        return ZX_ERR_NEXT;
+      },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        // End traversal after the first range.
+        return ZX_ERR_STOP;
+      },
+      0, VmPageListNode::kPageFanOut * PAGE_SIZE);
+
+  EXPECT_OK(status);
+  // Should only have visited the first page.
+  EXPECT_TRUE(page_visited[0]);
+  EXPECT_FALSE(page_visited[1]);
+  EXPECT_FALSE(page_visited[2]);
+
+  expected_offsets[0] = 0;
+  expected_offsets[1] = 1;
+  EXPECT_EQ(2u, index);
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
   list_node_t free_list;
   list_initialize(&free_list);
   list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
