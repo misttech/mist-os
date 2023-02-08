@@ -332,7 +332,12 @@ impl RepoStorage for FileSystemRepository {
                 }
                 CopyMode::CopyOverwrite => copy_blob(src, dst).await?,
                 CopyMode::HardLink => {
-                    async_fs::hard_link(src, &dst).await?;
+                    if async_fs::hard_link(&src, &dst).await.is_err() {
+                        let exists = async_fs::File::open(&dst).await.is_ok();
+                        if !exists {
+                            copy_blob(src, dst).await?
+                        }
+                    }
                 }
             }
 
