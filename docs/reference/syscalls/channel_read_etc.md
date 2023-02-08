@@ -72,9 +72,11 @@ and count of handles read.
 
 **ZX_ERR_ACCESS_DENIED**  *handle* does not have **ZX_RIGHT_READ**.
 
-**ZX_ERR_SHOULD_WAIT**  The channel contained no messages to read.
+**ZX_ERR_SHOULD_WAIT**  The channel contained no messages to read and the other side of the
+channel is open.
 
-**ZX_ERR_PEER_CLOSED**  The other side of the channel is closed.
+**ZX_ERR_PEER_CLOSED**  The channel contained no messages to read and the other side of the
+channel is closed.
 
 **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
 There is no good way for userspace to handle this (unlikely) error.

@@ -47,7 +47,7 @@ typedef struct zx_handle_disposition {
 In zx_handle_disposition_t, *handle* is the source handle to be operated on,
 *rights* is the desired final rights (not a mask) and *result* must be set
 to **ZX_OK**. All source handles must have **ZX_RIGHT_TRANSFER**, but
-it it can  be removed in *rights* so that it is not available to the message
+it can be removed in *rights* so that it is not available to the message
 receiver.
 
 *type* is used to perform validation of the object type that the caller
