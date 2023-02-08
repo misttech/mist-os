@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef LIB_KCOUNTER_PROVIDER_H_
+#define LIB_KCOUNTER_PROVIDER_H_
 
 #include <lib/svc/service.h>
-#include <zircon/compiler.h>
 
-__BEGIN_CDECLS
+const zx_service_provider_t* kcounter_get_service_provider();
 
-const zx_service_provider_t* kcounter_get_service_provider(void);
-
-__END_CDECLS
+#endif  // LIB_KCOUNTER_PROVIDER_H_

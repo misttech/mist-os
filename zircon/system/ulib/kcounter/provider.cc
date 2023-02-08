@@ -2,51 +2,49 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/kernel/c/fidl.h>
-#include <lib/fidl-async/bind.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/kcounter/provider.h>
-#include <lib/zx/vmo.h>
+#include <lib/zx/channel.h>
 #include <string.h>
 #include <zircon/status.h>
-#include <zircon/syscalls.h>
 
 #include "kcounter.h"
 
 namespace {
 
-zx_status_t GetInspectVMO(void* ctx, fidl_txn_t* txn) {
-  zx::vmo vmo;
-  fuchsia_mem_Buffer buffer{.vmo = ZX_HANDLE_INVALID, .size = 0};
-  auto status = static_cast<kcounter::VmoToInspectMapper*>(ctx)->GetInspectVMO(&vmo);
-  if (status == ZX_OK) {
-    buffer.vmo = vmo.get();
-    auto size_status = vmo.get_size(&buffer.size);
-    if (size_status != ZX_OK) {
-      return size_status;
+class Counter : public fidl::WireServer<fuchsia_kernel::Counter> {
+ public:
+  explicit Counter(kcounter::VmoToInspectMapper& mapper) : mapper_(mapper) {}
+
+ private:
+  void GetInspectVmo(GetInspectVmoCompleter::Sync& completer) override {
+    fuchsia_mem::wire::Buffer buffer;
+    if (zx_status_t status = mapper_.GetInspectVMO(&buffer.vmo); status != ZX_OK) {
+      return completer.Reply(status, {});
     }
+    if (zx_status_t status = buffer.vmo.get_size(&buffer.size); status != ZX_OK) {
+      return completer.Reply(status, {});
+    }
+    completer.Reply(ZX_OK, std::move(buffer));
   }
-  return fuchsia_kernel_CounterGetInspectVmo_reply(txn, status, &buffer);
-}
 
-zx_status_t UpdateInspectVMO(void* ctx, fidl_txn_t* txn) {
-  auto status = static_cast<kcounter::VmoToInspectMapper*>(ctx)->UpdateInspectVMO();
-  return fuchsia_kernel_CounterUpdateInspectVmo_reply(txn, status);
-}
+  void UpdateInspectVmo(UpdateInspectVmoCompleter::Sync& completer) override {
+    completer.Reply(mapper_.UpdateInspectVMO());
+  }
 
-constexpr fuchsia_kernel_Counter_ops_t kFidlOps = {
-    .GetInspectVmo = GetInspectVMO,
-    .UpdateInspectVmo = UpdateInspectVMO,
+  kcounter::VmoToInspectMapper& mapper_;
 };
 
 zx_status_t Connect(void* ctx, async_dispatcher_t* dispatcher, const char* service_name,
                     zx_handle_t request) {
-  if (strcmp(service_name, fuchsia_kernel_Counter_Name) == 0) {
-    return fidl_bind(dispatcher, request,
-                     reinterpret_cast<fidl_dispatch_t*>(fuchsia_kernel_Counter_dispatch), ctx,
-                     &kFidlOps);
+  zx::channel channel{request};
+  if (fidl::DiscoverableProtocolName<fuchsia_kernel::Counter> == service_name) {
+    kcounter::VmoToInspectMapper& mapper = *static_cast<kcounter::VmoToInspectMapper*>(ctx);
+    fidl::BindServer(dispatcher, fidl::ServerEnd<fuchsia_kernel::Counter>{std::move(channel)},
+                     std::make_unique<Counter>(mapper));
+    return ZX_OK;
   }
 
-  zx_handle_close(request);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -58,7 +56,7 @@ zx_status_t Init(void** out_ctx) {
 void Release(void* ctx) { delete static_cast<kcounter::VmoToInspectMapper*>(ctx); }
 
 constexpr const char* kKcounterServices[] = {
-    fuchsia_kernel_Counter_Name,
+    fidl::DiscoverableProtocolName<fuchsia_kernel::Counter>,
     nullptr,
 };
 
