@@ -941,7 +941,7 @@ impl DhcpOption {
             DhcpOption::TimeOffset(v) => {
                 let size = std::mem::size_of::<i32>();
                 buf.push(code.into());
-                buf.push(size as u8);
+                buf.push(u8::try_from(size).expect("size did not fit in u8"));
                 buf.extend_from_slice(&v.to_be_bytes());
             }
             DhcpOption::Router(v) => serialize_addresses(code, &v, buf),
@@ -969,7 +969,7 @@ impl DhcpOption {
             DhcpOption::PathMtuPlateauTable(v) => {
                 let size = v.size_of_contents_in_bytes();
                 buf.push(code.into());
-                buf.push(size as u8);
+                buf.push(u8::try_from(size).expect("size did not fit in u8"));
                 for mtu in v {
                     buf.extend_from_slice(&mtu.to_be_bytes())
                 }
@@ -1025,8 +1025,8 @@ impl DhcpOption {
             DhcpOption::ParameterRequestList(v) => {
                 let size = v.size_of_contents_in_bytes();
                 buf.push(code.into());
-                buf.push(size as u8);
-                buf.extend(v.into_iter().map(|code| code as u8));
+                buf.push(u8::try_from(size).expect("size did not fit in u8"));
+                buf.extend(v.into_iter().map(u8::from));
             }
             DhcpOption::Message(v) => serialize_string(code, &v, buf),
             DhcpOption::MaxDhcpMessageSize(v) => serialize_u16(code, v, buf),
@@ -1128,7 +1128,7 @@ fn serialize_address(code: OptionCode, addr: Ipv4Addr, buf: &mut Vec<u8>) {
 fn serialize_addresses(code: OptionCode, addrs: &[Ipv4Addr], buf: &mut Vec<u8>) {
     let size = addrs.size_of_contents_in_bytes();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     for addr in addrs {
         buf.extend_from_slice(&addr.octets());
     }
@@ -1137,49 +1137,49 @@ fn serialize_addresses(code: OptionCode, addrs: &[Ipv4Addr], buf: &mut Vec<u8>) 
 fn serialize_string(code: OptionCode, string: &str, buf: &mut Vec<u8>) {
     let size = string.len();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.extend_from_slice(string.as_bytes());
 }
 
 fn serialize_flag(code: OptionCode, flag: bool, buf: &mut Vec<u8>) {
     let size = std::mem::size_of::<bool>();
     buf.push(code.into());
-    buf.push(size as u8);
-    buf.push(flag as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
+    buf.push(flag.into());
 }
 
 fn serialize_u16(code: OptionCode, v: u16, buf: &mut Vec<u8>) {
     let size = std::mem::size_of::<u16>();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.extend_from_slice(&v.to_be_bytes());
 }
 
 fn serialize_u8(code: OptionCode, v: u8, buf: &mut Vec<u8>) {
     let size = std::mem::size_of::<u8>();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.push(v);
 }
 
 fn serialize_u32(code: OptionCode, v: u32, buf: &mut Vec<u8>) {
     let size = std::mem::size_of::<u32>();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.extend_from_slice(&v.to_be_bytes());
 }
 
 fn serialize_bytes(code: OptionCode, v: &[u8], buf: &mut Vec<u8>) {
     let size = v.size_of_contents_in_bytes();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.extend_from_slice(v);
 }
 
 fn serialize_enum<T: Into<u8>>(code: OptionCode, v: T, buf: &mut Vec<u8>) {
     let size = std::mem::size_of::<T>();
     buf.push(code.into());
-    buf.push(size as u8);
+    buf.push(u8::try_from(size).expect("size did not fit in u8"));
     buf.push(v.into());
 }
 
@@ -1815,7 +1815,7 @@ fn parse_options<T: Extend<DhcpOption>>(
                         want: 1,
                     })?;
                 buf = rest;
-                let opt_len = opt_len as usize;
+                let opt_len = usize::from(opt_len);
 
                 // Reaching the end of the buffer means we never encountered an End code.
                 if buf.len() < opt_len {
