@@ -44,20 +44,23 @@ class FakeAmlLight : public AmlLight {
 
   explicit FakeAmlLight() : AmlLight(nullptr) {}
 
-  zx_status_t Connect(async_dispatcher_t* dispatcher, zx::channel request) {
+  zx_status_t Connect(async_dispatcher_t* dispatcher,
+                      fidl::ServerEnd<fuchsia_hardware_light::Light> request) {
     return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
   }
 };
+
+namespace {
 
 class AmlLightTest : public zxtest::Test {
  public:
   void Init() {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
 
-    zx::channel server;
-    ASSERT_OK(zx::channel::create(0, &client_, &server));
+    zx::result server = fidl::CreateEndpoints(&client_);
+    ASSERT_OK(server);
     ASSERT_OK(loop_->StartThread("aml-light-test-loop"));
-    ASSERT_OK(light_->Connect(loop_->dispatcher(), std::move(server)));
+    ASSERT_OK(light_->Connect(loop_->dispatcher(), std::move(server.value())));
   }
 
   void TearDown() override {
@@ -76,7 +79,7 @@ class AmlLightTest : public zxtest::Test {
   ddk::MockGpio gpio_;
   ddk::MockPwm pwm_;
 
-  zx::channel client_;
+  fidl::ClientEnd<fuchsia_hardware_light::Light> client_;
 
  private:
   std::unique_ptr<async::Loop> loop_;
@@ -318,5 +321,7 @@ TEST_F(AmlLightTest, SetValueTestNelson) {
     EXPECT_FALSE(set_result->is_error());
   }
 }
+
+}  // namespace
 
 }  // namespace aml_light

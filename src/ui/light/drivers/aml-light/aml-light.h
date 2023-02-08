@@ -38,7 +38,7 @@ class LightDevice {
 
   zx_status_t Init(bool init_on);
 
-  const std::string GetName() const { return name_; }
+  const std::string& GetName() const { return name_; }
   Capability GetCapability() const {
     return pwm_.has_value() ? Capability::kBrightness : Capability::kSimple;
   }
