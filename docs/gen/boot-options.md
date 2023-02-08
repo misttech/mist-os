@@ -174,7 +174,7 @@ unresponsive CPU before giving up.
 
 When 0, querying for diagnostic data is disabled.
 
-### kernel.oom.behavior=[reboot | jobkill]
+### kernel.oom.behavior=\[reboot | jobkill]
 **Default:** `reboot`
 
 This option can be used to configure the behavior of the kernel when
@@ -370,7 +370,7 @@ to a new page that is swapped in to replace the loaned page.
 When set to true, as much of the recent kernel debuglog as will fit will be
 appended to the generated crashlog during a kernel panic to assist in debugging.
 
-### kernel.serial=[none | legacy | qemu | \<type>,\<base>,\<irq>]
+### kernel.serial=\[none | legacy | qemu | \<type>,\<base>,\<irq>]
 **Default:** `none`
 
 This controls what serial port is used.  If provided, it overrides the serial
@@ -473,7 +473,7 @@ When disabled, certain debugging-related syscalls will fail with
 * `zx_thread_write_state()` (When using the `ZX_THREAD_STATE_DEBUG_REGS` kind.)
 * `zx_vmo_op_range()` with `ZX_VMO_OP_CACHE_INVALIDATE`
 
-### kernel.enable-serial-syscalls=[false | true | output-only]
+### kernel.enable-serial-syscalls=\[false | true | output-only]
 **Default:** `false`
 
 When `false`, both `zx_debug_read()` and `zx_debug_write()` will fail with
@@ -484,7 +484,7 @@ will work normally.
 
 When `true`, both will work normally.
 
-### kernel.entropy-test.src=[hw_rng | jitterentropy]
+### kernel.entropy-test.src=\[hw_rng | jitterentropy]
 **Default:** `hw_rng`
 
 When running an entropy collector quality test, use the provided entropy source.
@@ -517,7 +517,7 @@ graphics console driver takes over.
 The early kernel console can be slow on some platforms, so if it is not
 needed for debugging it may speed up boot to disable it.
 
-### gfxconsole.font=[9x16 | 18x32]
+### gfxconsole.font=\[9x16 | 18x32]
 **Default:** `9x16`
 
 This option asks the graphics console to use a specific font.
@@ -589,7 +589,7 @@ remaining `(N * (100 - X) / 100)` pages from pager-backed VMOs.
 Note that the kernel will try its best to honor this ratio between discardable
 and pager-backed pages evicted, but the actual numbers might not be exact.
 
-### kernel.page-scanner.page-table-eviction-policy=[always | never | on_request]
+### kernel.page-scanner.page-table-eviction-policy=\[always | never | on_request]
 **Default:** `always`
 
 Sets the reclamation policy for user page tables that are not accessed.
@@ -731,7 +731,7 @@ Specifies the number of pages per CPU to reserve for port packet (port_queue)
 allocations. Higher values reduce contention on the PMM when the system is
 under load at the cost of using more memory when the system is idle.
 
-### kernel.root-job.behavior=[halt | reboot | bootloader | recovery | shutdown]
+### kernel.root-job.behavior=\[halt | reboot | bootloader | recovery | shutdown]
 **Default:** `reboot`
 
 This option specifies what action the kernel should take when the root job is
@@ -822,7 +822,7 @@ for a specific architecture.
 
 Note: The default value may vary for each architecture.
 
-### kernel.phys.psci-reset=[disabled | shutdown | reboot | reboot-bootloader | reboot-recovery]
+### kernel.phys.psci-reset=\[disabled | shutdown | reboot | reboot-bootloader | reboot-recovery]
 **Default:** `reboot`
 
 This option determines what kind of PSCI reset operation (if any)
@@ -856,7 +856,7 @@ If unset, the per-mitigation defaults will be used.
 This settings enables HWP (hardware P-states) on supported chips. This feature
 lets Intel CPUs automatically scale their own clock speed.
 
-### kernel.x86.hwp_policy=[bios-specified | performance | balanced | power-save | stable-performance]
+### kernel.x86.hwp_policy=\[bios-specified | performance | balanced | power-save | stable-performance]
 **Default:** `bios-specified`
 
 Set a power/performance tradeoff policy of the CPU. x86 CPUs with HWP
@@ -934,7 +934,7 @@ Note: The default value may vary for each architecture.
 
 Enable the kernel to go to the S3 (Suspend to RAM) ACPI power state.
 
-### kernel.wallclock=[auto | tsc | pit | hpet]
+### kernel.wallclock=\[auto | tsc | pit | hpet]
 **Default:** `auto`
 
 This option can be used to force the selection of a particular wall clock on pc builds.
