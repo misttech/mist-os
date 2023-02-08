@@ -44,8 +44,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/usb/tests/usb",
     "//src/lib/fidl/c/simple_tests:bin",
     "//src/media/audio/bin/ihda",
-    "//src/media/audio/drivers/intel-hda/controller:controller_test",
-    "//src/media/audio/drivers/intel-hda/controller:src",
     "//src/performance/ktrace_provider:bin",
     "//zircon/kernel/lib/userabi/userboot/*",
     "//zircon/system/ulib/c/sanitizers",

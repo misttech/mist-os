@@ -36,17 +36,15 @@ HdaCodecConnection::ProbeCommandListEntry HdaCodecConnection::PROBE_COMMANDS[] =
 
 #define DEV (static_cast<HdaCodecConnection*>(ctx))
 
-// Device FIDL thunks
-fuchsia_hardware_intel_hda_CodecDevice_ops_t HdaCodecConnection::CODEC_FIDL_THUNKS = {
-    .GetChannel = [](void* ctx, fidl_txn_t* txn) -> zx_status_t { return DEV->GetChannel(txn); },
-};
-
 zx_protocol_device_t HdaCodecConnection::CODEC_DEVICE_THUNKS = []() {
   zx_protocol_device_t ops = {};
   ops.version = DEVICE_OPS_VERSION;
   ops.message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
-    return fuchsia_hardware_intel_hda_CodecDevice_dispatch(ctx, txn, msg,
-                                                           &HdaCodecConnection::CODEC_FIDL_THUNKS);
+    HdaCodecConnection* thiz = static_cast<HdaCodecConnection*>(ctx);
+    DdkTransaction transaction(txn);
+    fidl::WireDispatch<fuchsia_hardware_intel_hda::CodecDevice>(
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+    return transaction.Status();
   };
   return ops;
 }();
@@ -252,17 +250,17 @@ zx_status_t HdaCodecConnection::ParseRevisionId(const CodecResponse& resp) {
   return PublishDevice();
 }
 
-zx_status_t HdaCodecConnection::GetChannel(fidl_txn_t* txn) {
+void HdaCodecConnection::GetChannel(GetChannelCompleter::Sync& completer) {
   zx::channel channel_local;
   zx::channel channel_remote;
-  zx_status_t status = zx::channel::create(0, &channel_local, &channel_remote);
-  if (status != ZX_OK) {
-    return status;
+  if (zx_status_t status = zx::channel::create(0, &channel_local, &channel_remote);
+      status != ZX_OK) {
+    return completer.Close(status);
   }
 
   fbl::RefPtr<Channel> channel = Channel::Create(std::move(channel_local));
   if (channel == nullptr) {
-    return ZX_ERR_NO_MEMORY;
+    return completer.Close(ZX_ERR_NO_MEMORY);
   }
   fbl::AutoLock lock(&channel_lock_);
   channel_ = std::move(channel);
@@ -271,14 +269,13 @@ zx_status_t HdaCodecConnection::GetChannel(fidl_txn_t* txn) {
                                                    const zx_packet_signal_t* signal) {
     codec->GetChannelSignalled(dispatcher, wait, status, signal);
   });
-  status = channel_->BeginWait(loop_.dispatcher());
-  if (status != ZX_OK) {
+  if (zx_status_t status = channel_->BeginWait(loop_.dispatcher()); status != ZX_OK) {
     channel_.reset();
     // We let channel_remote go out of scope to trigger channel deactivation via peer close.
-    return status;
+    return completer.Close(status);
   }
 
-  return fuchsia_hardware_intel_hda_CodecDeviceGetChannel_reply(txn, channel_remote.release());
+  completer.Reply(std::move(channel_remote));
 }
 
 void HdaCodecConnection::GetChannelSignalled(async_dispatcher_t* dispatcher, async::WaitBase* wait,

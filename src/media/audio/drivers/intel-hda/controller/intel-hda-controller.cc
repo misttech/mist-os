@@ -33,14 +33,6 @@ namespace intel_hda {
 
 std::atomic_uint32_t IntelHDAController::device_id_gen_(0u);
 
-// Device FIDL thunks
-fuchsia_hardware_intel_hda_ControllerDevice_ops_t IntelHDAController::CONTROLLER_FIDL_THUNKS = {
-    .GetChannel =
-        [](void* ctx, fidl_txn_t* txn) {
-          return static_cast<IntelHDAController*>(ctx)->GetChannel(txn);
-        },
-};
-
 // Device interface thunks
 zx_protocol_device_t IntelHDAController::CONTROLLER_DEVICE_THUNKS = []() {
   zx_protocol_device_t ops = {};
@@ -51,8 +43,11 @@ zx_protocol_device_t IntelHDAController::CONTROLLER_DEVICE_THUNKS = []() {
   ops.unbind = [](void* ctx) { static_cast<IntelHDAController*>(ctx)->DeviceShutdown(); };
   ops.release = [](void* ctx) { static_cast<IntelHDAController*>(ctx)->DeviceRelease(); };
   ops.message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-    return fuchsia_hardware_intel_hda_ControllerDevice_dispatch(
-        ctx, txn, msg, &IntelHDAController::CONTROLLER_FIDL_THUNKS);
+    IntelHDAController* thiz = static_cast<IntelHDAController*>(ctx);
+    DdkTransaction transaction(txn);
+    fidl::WireDispatch<fuchsia_hardware_intel_hda::ControllerDevice>(
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
+    return transaction.Status();
   };
   return ops;
 }();
@@ -242,17 +237,17 @@ void IntelHDAController::DeviceRelease() {
   thiz.reset();
 }
 
-zx_status_t IntelHDAController::GetChannel(fidl_txn_t* txn) {
+void IntelHDAController::GetChannel(GetChannelCompleter::Sync& completer) {
   zx::channel channel_local;
   zx::channel channel_remote;
-  zx_status_t status = zx::channel::create(0, &channel_local, &channel_remote);
-  if (status != ZX_OK) {
-    return status;
+  if (zx_status_t status = zx::channel::create(0, &channel_local, &channel_remote);
+      status != ZX_OK) {
+    return completer.Close(status);
   }
 
   fbl::RefPtr<Channel> channel = Channel::Create(std::move(channel_local));
   if (channel == nullptr) {
-    return ZX_ERR_NO_MEMORY;
+    return completer.Close(ZX_ERR_NO_MEMORY);
   }
   fbl::AutoLock lock(&channel_lock_);
   channel_ = std::move(channel);
@@ -261,13 +256,12 @@ zx_status_t IntelHDAController::GetChannel(fidl_txn_t* txn) {
                                                         const zx_packet_signal_t* signal) {
     controller->ChannelSignalled(dispatcher, wait, status, signal);
   });
-  status = channel_->BeginWait(loop_->dispatcher());
-  if (status != ZX_OK) {
+  if (zx_status_t status = channel_->BeginWait(loop_->dispatcher()); status != ZX_OK) {
     channel_.reset();
     // We let stream_channel_remote go out of scope to trigger channel deactivation via peer close.
-    return status;
+    return completer.Close(status);
   }
-  return fuchsia_hardware_intel_hda_ControllerDeviceGetChannel_reply(txn, channel_remote.release());
+  completer.Reply(std::move(channel_remote));
 }
 
 void IntelHDAController::ChannelSignalled(async_dispatcher_t* dispatcher, async::WaitBase* wait,

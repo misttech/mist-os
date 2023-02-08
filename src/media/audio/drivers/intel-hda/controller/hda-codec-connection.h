@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_HDA_CODEC_CONNECTION_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_HDA_CODEC_CONNECTION_H_
 
-#include <fuchsia/hardware/intel/hda/c/fidl.h>
+#include <fidl/fuchsia.hardware.intel.hda/cpp/wire.h>
 #include <fuchsia/hardware/intelhda/codec/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/binding.h>
@@ -36,7 +36,8 @@ class IntelHDAController;
 struct CodecResponse;
 
 // HdaCodecConnection manages a connection to a child codec driver.
-class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection> {
+class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
+                           public fidl::WireServer<fuchsia_hardware_intel_hda::CodecDevice> {
  public:
   enum class State {
     PROBING,
@@ -85,12 +86,11 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection> {
   static constexpr size_t PROP_VENDOR_STEP = 6;
   static constexpr size_t PROP_COUNT = 7;
 
-  static fuchsia_hardware_intel_hda_CodecDevice_ops_t CODEC_FIDL_THUNKS;
   static zx_protocol_device_t CODEC_DEVICE_THUNKS;
   static ihda_codec_protocol_ops_t CODEC_PROTO_THUNKS;
 
   HdaCodecConnection(IntelHDAController& controller, uint8_t codec_id);
-  virtual ~HdaCodecConnection() { ZX_DEBUG_ASSERT(state_ == State::SHUT_DOWN); }
+  ~HdaCodecConnection() override { ZX_DEBUG_ASSERT(state_ == State::SHUT_DOWN); }
 
   zx_status_t PublishDevice();
   void GetChannelSignalled(async_dispatcher_t* dispatcher, async::WaitBase* wait,
@@ -109,7 +109,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection> {
   zx_status_t CodecGetDispatcherChannel(zx_handle_t* remote_endpoint_out);
 
   // Thunks for interacting with clients and codec drivers.
-  zx_status_t GetChannel(fidl_txn_t* txn);
+  void GetChannel(GetChannelCompleter::Sync& completer) override;
   zx_status_t ProcessUserRequest(Channel* channel);
   zx_status_t ProcessCodecRequest(Channel* channel);
   void ProcessCodecDeactivate();

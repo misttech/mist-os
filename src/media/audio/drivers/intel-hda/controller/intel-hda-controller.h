@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_INTEL_HDA_CONTROLLER_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_INTEL_HDA_CONTROLLER_H_
 
-#include <fuchsia/hardware/intel/hda/c/fidl.h>
+#include <fidl/fuchsia.hardware.intel.hda/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/device.h>
@@ -41,10 +41,11 @@
 namespace audio {
 namespace intel_hda {
 
-class IntelHDAController : public fbl::RefCounted<IntelHDAController> {
+class IntelHDAController : public fbl::RefCounted<IntelHDAController>,
+                           public fidl::WireServer<fuchsia_hardware_intel_hda::ControllerDevice> {
  public:
   explicit IntelHDAController(acpi::Client client);
-  ~IntelHDAController();
+  ~IntelHDAController() override;
 
   zx_status_t Init(zx_device_t* pci_dev);
 
@@ -114,7 +115,7 @@ class IntelHDAController : public fbl::RefCounted<IntelHDAController> {
   zx_status_t DeviceGetProtocol(uint32_t proto_id, void* protocol);
   void DeviceShutdown();
   void DeviceRelease();
-  zx_status_t GetChannel(fidl_txn_t* txn);
+  void GetChannel(GetChannelCompleter::Sync& completer) override;
 
   // Root device interface implementation
   void RootDeviceRelease();
@@ -232,7 +233,6 @@ class IntelHDAController : public fbl::RefCounted<IntelHDAController> {
   fbl::RefPtr<IntelDsp> dsp_;
 
   static std::atomic_uint32_t device_id_gen_;
-  static fuchsia_hardware_intel_hda_ControllerDevice_ops_t CONTROLLER_FIDL_THUNKS;
   static zx_protocol_device_t CONTROLLER_DEVICE_THUNKS;
   static ihda_codec_protocol_ops_t CODEC_PROTO_THUNKS;
 

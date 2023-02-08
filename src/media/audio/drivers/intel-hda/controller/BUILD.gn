@@ -75,13 +75,13 @@ source_set("src") {
     "//src/media/audio/drivers/lib/audio-proto-utils",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_c",
+    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_cpp_wire",
+    "//sdk/lib/fit",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
 
     # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-    "//sdk/lib/fit",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",
@@ -98,10 +98,6 @@ source_set("src") {
   # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 resource("firmware") {
@@ -157,10 +153,6 @@ test("controller_test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 fuchsia_unittest_package("intel-hda-controller-test") {
