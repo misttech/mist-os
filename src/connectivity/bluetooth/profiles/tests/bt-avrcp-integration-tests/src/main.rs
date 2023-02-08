@@ -411,6 +411,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
     // Mock peer receives SetAbsoluteVolume request and responds with the actual volume which was set
     let desired_vol: u8 = 0x7F; // Valid volume range is 0x00 - 0x7F
     let actual_vol: u8 = 0x7E; // Volume actually set on the target
+    const SET_ABSOLUTE_VOLUME_PDU: u8 = 0x050;
     let mut avc_command_stream = AvcPeer::new(channel).take_command_stream();
     async {
         let set_av_fut = c_proxy.set_absolute_volume(desired_vol);
@@ -420,9 +421,7 @@ async fn avrcp_remote_receives_set_absolute_volume_request(mut tf: AvrcpIntegrat
                     // Command and response structure described in AVRCP spec 25.16
                     let body = command.body();
                     assert_eq!(body.len(), 5);
-                    // TODO(nickchee): Define PDUs in bt-avrcp and reference them instead of using
-                    // magic numbers
-                    assert_eq!(body[0], 0x50); // Confirm PDU is 0x50 (SetAbsoluteVolume)
+                    assert_eq!(body[0], SET_ABSOLUTE_VOLUME_PDU); // Confirm PDU is SetAbsoluteVolume
                     assert_eq!(body[4], desired_vol); // Confirm the requested volume was received unmodified
 
                     // Respond with the actual volume set on the target

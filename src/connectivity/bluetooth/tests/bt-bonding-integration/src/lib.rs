@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This entire library is actually only used to create a test binary, so mark the entire module to
-// only build in test configuration
-#![cfg(test)]
-
 use {
     anyhow::Error,
     bt_test_harness::host_driver::v2::{self as host_driver, HostDriverHarness},
@@ -17,7 +13,7 @@ use {
     test_harness,
 };
 
-// TODO(xow): Add tests for BR/EDR and dual mode bond data.
+// TODO(fxbug.dev/121606): Add tests for BR/EDR and dual mode bond data.
 
 fn new_le_bond_data(id: &PeerId, address: &Address, name: &str, has_ltk: bool) -> BondingData {
     BondingData {

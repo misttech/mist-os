@@ -13,5 +13,3 @@ To run the tests:
 ```
 fx test bt-device-watcher-tests
 ```
-
-TODO(fxbug.dev/35077): The unit tests are flaky. Fix flakes and re-enable.
