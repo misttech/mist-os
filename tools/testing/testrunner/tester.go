@@ -771,7 +771,8 @@ func (t *FFXTester) RemoveAllEmptyOutputDirs() error {
 }
 
 func (t *FFXTester) Close() error {
-	return t.sshTester.Close()
+	t.sshTester.Close()
+	return t.ffx.Stop()
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
