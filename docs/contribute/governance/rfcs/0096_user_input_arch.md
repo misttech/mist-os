@@ -713,8 +713,7 @@ presenter][root-presenter] could be extended to handle additional
 use-cases. However, this code lacks test coverage and would require a
 substantial re-write to give the desired properties of consistency and
 configurability, and to remove unnecessary coupling between input handling and
-the graphics API. We have instead opted for a new implementation in Rust to
-allow protoyping with the [session framework][session-framework].
+the graphics API.
 
 ### Product-specific Scenic
 Because input (especially pointer-based input) is intimately related to
