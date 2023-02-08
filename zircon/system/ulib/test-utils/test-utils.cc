@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.process/cpp/wire.h>
 #include <lib/backtrace-request/backtrace-request.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/namespace.h>
@@ -122,19 +123,11 @@ zx_handle_t springboard_get_root_vmar_handle(springboard_t* sb) { return sb->dat
 springboard_t* tu_launch_init(zx_handle_t job, const char* name, int argc, const char* const* argv,
                               int envc, const char* const* envp, size_t num_handles,
                               zx_handle_t* handles, uint32_t* handle_ids) {
-  zx_status_t status;
-
   // Connect to the Launcher service.
+  zx::result client_end = component::Connect<fprocess::Launcher>();
+  tu_check("connecting to launcher service", client_end.status_value());
 
-  zx::channel launcher_channel, launcher_request;
-  status = zx::channel::create(0, &launcher_channel, &launcher_request);
-  tu_check("creating channel for launcher service", status);
-
-  status = fdio_service_connect(fidl::DiscoverableProtocolDefaultPath<fprocess::Launcher>,
-                                launcher_request.release());
-  tu_check("connecting to launcher service", status);
-
-  fidl::WireSyncClient<fprocess::Launcher> launcher(std::move(launcher_channel));
+  fidl::WireSyncClient launcher{std::move(client_end.value())};
 
   // Add arguments.
 
@@ -198,8 +191,11 @@ springboard_t* tu_launch_init(zx_handle_t job, const char* name, int argc, const
     // LDSVC
 
     zx::channel ldsvc;
-    status = dl_clone_loader_service(handle_infos[index].handle.reset_and_get_address());
-    tu_check("getting loader service", status);
+    {
+      zx_status_t status =
+          dl_clone_loader_service(handle_infos[index].handle.reset_and_get_address());
+      tu_check("getting loader service", status);
+    }
     handle_infos[index++].id = PA_LDSVC_LOADER;
 
     auto handle_vector =
@@ -213,15 +209,19 @@ springboard_t* tu_launch_init(zx_handle_t job, const char* name, int argc, const
   fprocess::wire::LaunchInfo launch_info;
 
   const char* filename = argv[0];
-  status = load_executable_vmo(filename, &launch_info.executable);
-  tu_check("loading executable", status);
+  {
+    zx_status_t status = load_executable_vmo(filename, &launch_info.executable);
+    tu_check("loading executable", status);
+  }
 
   if (job == ZX_HANDLE_INVALID) {
     job = zx_job_default();
   }
   zx::unowned_job unowned_job(job);
-  status = unowned_job->duplicate(ZX_RIGHT_SAME_RIGHTS, &launch_info.job);
-  tu_check("duplicating job for launch", status);
+  {
+    zx_status_t status = unowned_job->duplicate(ZX_RIGHT_SAME_RIGHTS, &launch_info.job);
+    tu_check("duplicating job for launch", status);
+  }
 
   const char* process_name = name ? name : filename;
   size_t process_name_size = strlen(process_name);

@@ -12,6 +12,7 @@ zx_library("test-utils") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/fidl/fuchsia.process:fuchsia.process_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/backtrace-request",
     "//zircon/system/ulib/fbl",
@@ -19,9 +20,4 @@ zx_library("test-utils") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 }
