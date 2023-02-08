@@ -19,28 +19,28 @@ namespace mock_boot_arguments {
 
 void Server::CreateClient(async_dispatcher* dispatcher,
                           fidl::WireSyncClient<fuchsia_boot::Arguments>* argclient) {
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_boot::Arguments>();
+  if (endpoints.is_error()) {
     printf(
         "mock_boot_arguments: failed to create client for mock boot arguments, failed to create "
         "channel: %s\n",
-        zx_status_get_string(status));
-    *argclient = fidl::WireSyncClient<fuchsia_boot::Arguments>{zx::channel()};
+        endpoints.status_string());
+    *argclient = {};
     return;
   }
+  auto& [client, server] = endpoints.value();
 
-  status = fidl::BindSingleInFlightOnly(dispatcher, std::move(remote), this);
-  if (status != ZX_OK) {
+  if (zx_status_t status = fidl::BindSingleInFlightOnly(dispatcher, std::move(server), this);
+      status != ZX_OK) {
     printf(
         "mock_boot_arguments: failed to create client for mock boot arguments, failed to bind: "
         "%s\n",
         zx_status_get_string(status));
-    *argclient = fidl::WireSyncClient<fuchsia_boot::Arguments>{zx::channel()};
+    *argclient = {};
     return;
   }
 
-  *argclient = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(local)};
+  *argclient = fidl::WireSyncClient{std::move(client)};
 }
 
 void Server::GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) {
@@ -57,7 +57,7 @@ void Server::GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync
   for (uint64_t i = 0; i < request->keys.count(); i++) {
     auto ret = arguments_.find(std::string{request->keys[i].data(), request->keys[i].size()});
     if (ret == arguments_.end()) {
-      result.emplace_back(fidl::StringView{});
+      result.emplace_back();
     } else {
       result.emplace_back(fidl::StringView::FromExternal(ret->second));
     }
@@ -88,7 +88,8 @@ void Server::Collect(CollectRequestView request, CollectCompleter::Sync& complet
     }
   }
   std::vector<fidl::StringView> views;
-  for (auto val : result) {
+  views.reserve(result.size());
+  for (const auto& val : result) {
     views.emplace_back(fidl::StringView::FromExternal(val));
   }
   completer.Reply(fidl::VectorView<fidl::StringView>::FromExternal(views));
