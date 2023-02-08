@@ -4,11 +4,11 @@
 
 #include "sysmem_fuzz_common.h"
 
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include "fidl/fuchsia.sysmem2/cpp/markers.h"
 #include "log_rtn.h"
 
 MockDdkSysmem::~MockDdkSysmem() {

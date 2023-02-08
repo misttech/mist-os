@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-
 #include <src/devices/sysmem/drivers/sysmem/device.h>
 #include <src/devices/sysmem/drivers/sysmem/driver.h>
 
-#include "src/devices/sysmem/tests/sysmem/fuzz/sysmem_fuzz_common.h"
+#include "sysmem_fuzz_common.h"
 
 #define DBGRTN 0
 
@@ -64,7 +62,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
       std::move(collection_client_end));
-  auto set_constraints_result = collection->SetConstraints(true, std::move(constraints));
+  auto set_constraints_result = collection->SetConstraints(true, constraints);
   LOGRTN(set_constraints_result.status(), "Failed to set buffer collection constraints.\n");
 
   fidl::WireResult result = collection->WaitForBuffersAllocated();

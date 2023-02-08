@@ -40,8 +40,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/nand/bin/nand-util",
     "//src/devices/nand/bin/nand-util:common",
     "//src/devices/nand/bin/nand-util:nand-util-test-bin",
-    "//src/devices/sysmem/tests/sysmem/fuzz:sysmem_fuzzer_bin",
-    "//src/devices/sysmem/tests/sysmem/fuzz:sysmem_fuzzer_multi_bin",
     "//src/devices/usb/bin/usb-fwloader",
     "//src/devices/usb/tests/usb",
     "//src/lib/fidl/c/simple_tests:bin",

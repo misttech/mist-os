@@ -69,7 +69,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection_1(
       std::move(collection_client_1));
-  auto set_constraints_result = collection_1->SetConstraints(true, std::move(constraints_1));
+  auto set_constraints_result = collection_1->SetConstraints(true, constraints_1);
   LOGRTN(set_constraints_result.status(), "BufferCollectionSetConstraints 1 failed.\n");
 
   // Client 2 connects to sysmem separately.
@@ -109,7 +109,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
 
   fuchsia_sysmem::wire::BufferCollectionConstraints empty_constraints;
 
-  auto set_constraints_3_result = collection_3->SetConstraints(false, std::move(empty_constraints));
+  auto set_constraints_3_result = collection_3->SetConstraints(false, empty_constraints);
   LOGRTN(set_constraints_3_result.status(), "Failed BufferCollectionSetConstraints 3 -> empty.\n");
 
   // Not all constraints have been input, so the buffers haven't been
@@ -123,7 +123,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
   LOGRTNC(check_result_2_fail.value().status != ZX_OK,
           "BufferCollection allocated when shouldn't be. 2\n");
 
-  auto set_constraints_2_result = collection_2->SetConstraints(true, std::move(constraints_2));
+  auto set_constraints_2_result = collection_2->SetConstraints(true, constraints_2);
   LOGRTN(set_constraints_2_result.status(), "Failed BufferCollectionSetConstraints 2.\n");
 
   //
