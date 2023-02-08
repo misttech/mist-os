@@ -56,6 +56,7 @@ executable("magnification_pixeltest_bin") {
 }
 
 fuchsia_test_component("magnification-pixeltest-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "magnification-pixeltest-component"
   manifest = "meta/magnification_pixel_test.cml"
   deps = [ ":magnification_pixeltest_bin" ]

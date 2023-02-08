@@ -129,6 +129,7 @@ executable("gfx-scene-integration-test-bin") {
 }
 
 fuchsia_test_component("gfx-scene-integration-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/gfx-scene-integration-test.cml"
   deps = [ ":gfx-scene-integration-test-bin" ]
@@ -223,6 +224,7 @@ executable("flatland-scene-integration-test-bin") {
 }
 
 fuchsia_test_component("flatland-scene-integration-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/flatland-scene-integration-test.cml"
   deps = [ ":flatland-scene-integration-test-bin" ]

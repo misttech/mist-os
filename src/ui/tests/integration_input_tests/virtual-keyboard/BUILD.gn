@@ -65,6 +65,7 @@ executable("virtual-keyboard-test-bin") {
 }
 
 fuchsia_component("virtual-keyboard-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/virtual-keyboard-test.cml"
   deps = [ ":virtual-keyboard-test-bin" ]

@@ -92,6 +92,7 @@ executable("text-input-test-bin") {
 }
 
 fuchsia_component("text-input-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   component_name = "text_input_test"
   manifest = "meta/text-input-test.cml"

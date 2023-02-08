@@ -57,6 +57,7 @@ executable("touch-input-test-bin") {
 }
 
 fuchsia_test_component("touch-input-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/touch-input-test.cml"
   deps = [ ":touch-input-test-bin" ]

@@ -140,6 +140,7 @@ executable("flutter-semantics-test-bin") {
 }
 
 fuchsia_component("flutter-semantics-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/flutter-semantics-test.cml"
   deps = [ ":flutter-semantics-test-bin" ]
@@ -207,6 +208,7 @@ executable("web-semantics-test-bin") {
 }
 
 fuchsia_component("web-semantics-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/web-semantics-test.cml"
   deps = [ ":web-semantics-test-bin" ]

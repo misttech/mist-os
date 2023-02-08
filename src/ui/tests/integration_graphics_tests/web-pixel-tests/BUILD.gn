@@ -65,6 +65,7 @@ font_collection("single-font-collection") {
 }
 
 fuchsia_test_component("web_runner_pixel_test_component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/web_runner_pixeltest.cml"
   deps = [
     ":web_runner_pixel_test_bin",

@@ -61,6 +61,7 @@ executable("mouse-input-test-bin") {
 }
 
 fuchsia_component("mouse-input-test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   component_name = "mouse_input_test"
   manifest = "meta/mouse-input-test.cml"

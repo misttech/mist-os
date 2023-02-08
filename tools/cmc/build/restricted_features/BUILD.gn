@@ -31,6 +31,18 @@ group("allow_non_hermetic_packages") {
     "//src/connectivity/network/testing/netemul/guest/test:*",
     "//src/sys/test_manager/tests:*",
     "//src/sys/test_manager/tests/nonhermetic_packaged_tests:*",
+    "//src/ui/a11y/lib/magnifier/tests:*",
+    "//src/ui/a11y/lib/semantics/tests:*",
+    "//src/ui/a11y/lib/view/tests:*",
+    "//src/ui/tests/integration_flutter_tests/embedder:*",
+    "//src/ui/tests/integration_graphics_tests/presentation:*",
+    "//src/ui/tests/integration_graphics_tests/web-pixel-tests:*",
+    "//src/ui/tests/integration_input_tests/activity:*",
+    "//src/ui/tests/integration_input_tests/focus:*",
+    "//src/ui/tests/integration_input_tests/mouse:*",
+    "//src/ui/tests/integration_input_tests/text-input:*",
+    "//src/ui/tests/integration_input_tests/touch:*",
+    "//src/ui/tests/integration_input_tests/virtual-keyboard:*",
   ]
 }
 

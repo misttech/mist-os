@@ -23,6 +23,7 @@ group("tests") {
 }
 
 fuchsia_unittest_package("flutter-embedder-test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/flutter-embedder-test.cml"
   deps = [
     ":flutter-embedder-test-bin",
