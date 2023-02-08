@@ -101,6 +101,8 @@ template("generate_chrome_browser_targets") {
           {
             name = "canary"
             archive = "${prebuilt_archive_base_path}_latest/arch/${target_cpu}/${target_name}.far"
+
+            # TODO(fxbug.dev/93177): Set this to false after this bug is fixed.
             production_safe = true
           },
         ]

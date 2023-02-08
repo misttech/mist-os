@@ -73,6 +73,9 @@ template("generate_package_flavors") {
       {
         name = "custom"
         archive = "${invoker.chromium_build_dir}${invoker.custom_package_path}"
+
+        # Custom builds are never production-safe.
+        production_safe = false
       },
     ]
   }
@@ -109,12 +112,16 @@ template("generate_fuchsia_web_package_flavors") {
       {
         name = "release"
         archive = "${invoker.prebuilt_archive_base_path}/arch/$target_cpu/${target_name}.far"
-        production_safe = true
+
+        # TODO(fxbug.dev/70573): Add support for overriding this.
+        production_safe = false
       },
       {
         name = "canary"
         archive = "${invoker.prebuilt_archive_base_path}_latest/arch/$target_cpu/${target_name}.far"
-        production_safe = true
+
+        # TODO(fxbug.dev/70573): Add support for overriding this.
+        production_safe = false
       },
     ]
   }
