@@ -343,6 +343,8 @@ fn run_file_fuse_create(mount_path: String, device_path: String) -> Result<(), E
         mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
         let fs = FuseFs::new_file_backed(device_path.as_str()).await;
+        let handle = fs.notify_destroy();
+        handle.await;
 
         Session::new(mount_options)
             .mount_with_unprivileged(fs, mount_path)
@@ -368,6 +370,8 @@ fn run_file_fuse_open(mount_path: String, device_path: String) -> Result<(), Err
         mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
         let fs = FuseFs::open_file_backed(device_path.as_str()).await;
+        let handle = fs.notify_destroy();
+        handle.await;
 
         Session::new(mount_options)
             .mount_with_unprivileged(fs, mount_path)

@@ -1,18 +1,25 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use {
+    event_listener::Event,
     fxfs::{
         filesystem::{FxFilesystem, OpenFxFilesystem},
+        log::info,
         object_store::{volume::root_volume, ObjectStore},
     },
     fxfs_crypto::Crypt,
+    libc,
+    once_cell::sync::OnceCell,
     std::{
         fs::{File, OpenOptions},
         path::PathBuf,
+        process,
         sync::Arc,
     },
     storage_device::{fake_device::FakeDevice, file_backed_device::FileBackedDevice, DeviceHolder},
+    tokio,
 };
 
 const DEFAULT_DEVICE_BLOCK_SIZE: u32 = 512;
@@ -25,6 +32,22 @@ const DEFAULT_VOLUME_NAME: &str = "fxfs";
 
 /// In-memory fake devices are used for unit tests.
 const IN_MEMORY_DEVICE_BLOCK_COUNT: u64 = 8192;
+
+/// CLOSE_EVENT listens to the signals from user to gracefully close the filesystem.
+static CLOSE_EVENT: OnceCell<Event> = OnceCell::new();
+
+fn register_signal_handlers() {
+    unsafe {
+        libc::signal(libc::SIGTERM, handle_sigterm as usize);
+    }
+}
+
+/// Handler for the SIGTERM signal.
+extern "C" fn handle_sigterm(_signal: i32) {
+    register_signal_handlers();
+    info!("SIGTERM Received");
+    CLOSE_EVENT.get().unwrap().notify(usize::MAX);
+}
 
 pub struct FuseFs {
     pub fs: OpenFxFilesystem,
@@ -97,6 +120,22 @@ impl FuseFs {
             .expect("default_store failed");
 
         Self { fs, default_store }
+    }
+
+    /// Listen to the signals to gracefully close the filesystem.
+    pub async fn notify_destroy(&self) -> tokio::task::JoinHandle<()> {
+        register_signal_handlers();
+        CLOSE_EVENT.set(Event::new()).unwrap();
+        let fs_clone = self.fs.clone();
+
+        let handle = tokio::spawn(async move {
+            let listener = CLOSE_EVENT.get().unwrap().listen();
+            listener.wait();
+            fs_clone.close().await.expect("Close failed");
+            info!("Filesystem is gracefully closed");
+            process::exit(0);
+        });
+        handle
     }
 
     /// FUSE assumes that inode 1 is the root of a filesystem, which needs
