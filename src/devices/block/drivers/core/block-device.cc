@@ -46,12 +46,6 @@ void BlockDevice::UpdateStats(bool success, zx::ticks start_tick, block_op_t* op
   stats_.UpdateStats(success, start_tick, op->command, bytes_transfered);
 }
 
-// Adapter from read/write to block_op_t
-// This is technically incorrect because the read/write hooks should not block,
-// but the old adapter in devhost was *also* blocking, so we're no worse off
-// than before, but now localized to the block middle layer.
-// TODO(swetland) plumbing in devhosts to do deferred replies
-
 // Define the maximum I/O possible for the midlayer; this is arbitrarily
 // set to the size of RIO's max payload.
 //
@@ -72,9 +66,6 @@ zx_status_t BlockDevice::DoIo(zx::vmo& vmo, size_t buf_len, zx_off_t off, zx_off
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // TODO(smklein): These requests can be queued simultaneously without
-  // blocking. However, as the comment above mentions, this code probably
-  // shouldn't be blocking at all.
   uint64_t sub_txn_offset = 0;
   while (sub_txn_offset < buf_len) {
     size_t sub_txn_length = std::min(buf_len - sub_txn_offset, max_xfer);
