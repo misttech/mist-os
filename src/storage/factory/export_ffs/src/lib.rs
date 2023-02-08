@@ -266,7 +266,7 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
             ))
         }
 
-        // TODO(sdemos): we are loading all the files we are going to serialize into memory first.
+        // NB: We are loading all the files we are going to serialize into memory first.
         // if the partition is too big this will be a problem.
         let (file_proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()
             .context("failed to create fidl proxy")?;
@@ -324,18 +324,12 @@ pub async fn export_directory(
     dir: &fio::DirectoryProxy,
     client_end: fidl::endpoints::ClientEnd<BlockMarker>,
 ) -> Result<(), Error> {
-    // TODO(sdemos): for now we are taking a device as a channel, but this might change as we
-    // integrate.
     let device = RemoteBlockClientSync::new(client_end)
         .context("failed to create remote block device client")?;
     let mut device = Cache::new(device).context("failed to create cache layer for block device")?;
 
     write_directory(dir, &mut device).await.context("failed to write out directory")?;
 
-    // TODO(sdemos): for now we just flush the writer. for RemoteBlockDevice, that just means we
-    // make sure all the write requests are sent to the disk. it's possible that we need to do more
-    // than this - perhaps Seal() or some other flushing that makes sure that all the contents are
-    // written to disk before we return.
     device.flush().context("failed to flush to device")?;
 
     Ok(())
@@ -436,8 +430,6 @@ mod tests {
 
         assert_matches!(dirent.serialize_metadata(&mut out, data_offset), Ok(()));
         assert_eq!(dirent.metadata_size(), out.len() as u32);
-
-        // TODO(sdemos): check more of the output
     }
 
     #[fuchsia::test]
@@ -463,8 +455,6 @@ mod tests {
         let channel = ramdisk.open().await.unwrap();
 
         assert_matches!(export_directory(&dir_proxy, channel).await, Ok(()));
-
-        // TODO(sdemos): test should check the ramdisk for at least a bit of the expected output
     }
 
     #[fuchsia::test]
