@@ -4,8 +4,9 @@
 
 #include "src/performance/ktrace_provider/log_importer.h"
 
-#include <fuchsia/boot/c/fidl.h>
+#include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
@@ -23,31 +24,25 @@ void LogImporter::Start() {
   if (log_)
     return;
 
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to create channel";
-    return;
-  }
-  constexpr char kReadOnlyLogPath[] = "/svc/" fuchsia_boot_ReadOnlyLog_Name;
-  status = fdio_service_connect(kReadOnlyLogPath, remote.release());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to connect to ReadOnlyLog";
+  zx::result client_end = component::Connect<fuchsia_boot::ReadOnlyLog>();
+  if (!client_end.is_ok()) {
+    FX_PLOGS(ERROR, client_end.status_value()) << "Failed to connect to ReadOnlyLog";
     return;
   }
 
-  status = fuchsia_boot_ReadOnlyLogGet(local.get(), log_.reset_and_get_address());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "ReadOnlyLogGet failed";
+  fidl::WireResult result = fidl::WireCall(*client_end)->Get();
+  if (!result.ok()) {
+    FX_PLOGS(ERROR, result.status()) << "ReadOnlyLogGet failed";
     return;
   }
+  log_ = std::move(result.value().log);
 
   start_time_ = zx_clock_get_monotonic();
   time_scale_ = static_cast<double>(zx_ticks_per_second()) / 1'000'000'000.0;
 
   wait_.set_object(log_.get());
   wait_.set_trigger(ZX_LOG_READABLE);
-  status = wait_.Begin(async_get_default_dispatcher());
+  zx_status_t status = wait_.Begin(async_get_default_dispatcher());
   FX_CHECK(status == ZX_OK) << "status=" << status;
 }
 

@@ -7,7 +7,6 @@ using zx;
 
 /// Protocol for providing the kernel log, readable.
 @discoverable
-@for_deprecated_c_bindings
 protocol ReadOnlyLog {
     /// Get read-only handle to the kernel `log`.
     Get() -> (resource struct {
@@ -17,7 +16,6 @@ protocol ReadOnlyLog {
 
 /// Protocol for providing the kernel log, writable.
 @discoverable
-@for_deprecated_c_bindings
 protocol WriteOnlyLog {
     /// Get write-only handle to the kernel `log`.
     Get() -> (resource struct {

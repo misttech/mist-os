@@ -30,7 +30,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/usb/tests/usb",
     "//src/lib/fidl/c/simple_tests:bin",
     "//src/media/audio/bin/ihda",
-    "//src/performance/ktrace_provider:bin",
     "//zircon/kernel/lib/userabi/userboot/*",
     "//zircon/system/ulib/c/sanitizers",
     "//zircon/system/utest/fidl-utils",
