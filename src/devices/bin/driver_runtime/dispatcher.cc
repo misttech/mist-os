@@ -108,7 +108,8 @@ DispatcherCoordinator& GetDispatcherCoordinator() {
 }
 
 Dispatcher::AsyncWait::AsyncWait(async_wait_t* original_wait, Dispatcher& dispatcher)
-    : async_wait_t{{ASYNC_STATE_INIT},
+    : CallbackRequest(CallbackRequest::RequestType::kWait),
+      async_wait_t{{ASYNC_STATE_INIT},
                    &Dispatcher::AsyncWait::Handler,
                    original_wait->object,
                    original_wait->trigger,
@@ -911,14 +912,22 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
     }
     callback_request->SetCallbackReason(callback_reason);
 
+    auto req_type = callback_request->request_type();
+
     // Synchronous dispatchers do not allow parallel callbacks.
     // Blocking dispatchers are required to queue all callbacks onto the async loop.
     // TODO(fxbug.dev/98168): we should be able to remove the task check once we track
     // drivers through banjo calls, or start each DFv2 driver with a ALLOW_SYNC_CALLS
     // dispatcher.
-    if (unsynchronized_ ||
-        (!dispatching_sync_ && !allow_sync_calls_ &&
-         (callback_request->request_type() != CallbackRequest::RequestType::kTask))) {
+    if (unsynchronized_ || (!dispatching_sync_ && !allow_sync_calls_ &&
+                            (req_type != CallbackRequest::RequestType::kTask))) {
+      // Callbacks that are for waits or irqs can skip the reentrancy check.
+      // This is as they are always first registered on the global async loop which
+      // will initiate the callback when ready, at which point the driver call stack
+      // will be empty, but we still want to consider it not reentrant and directly
+      // call into the driver.
+      bool is_global_loop_callback = (req_type == CallbackRequest::RequestType::kIrq) ||
+                                     (req_type == CallbackRequest::RequestType::kWait);
       // Check if the call would be reentrant, in which case we will queue it up to be run
       // later.
       //
@@ -926,7 +935,8 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
       // to be potentially reentrant.
       // The call stack may be empty if the user writes to a channel, or registers a
       // read callback on a thread not managed by the driver runtime.
-      if (!driver_context::IsCallStackEmpty() && !driver_context::IsDriverInCallStack(owner_)) {
+      if (is_global_loop_callback ||
+          (!driver_context::IsCallStackEmpty() && !driver_context::IsDriverInCallStack(owner_))) {
         direct_call = true;
         dispatching_sync_ = true;
       }

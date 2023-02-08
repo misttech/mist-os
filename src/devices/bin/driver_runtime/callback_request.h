@@ -32,6 +32,7 @@ class CallbackRequest
  public:
   enum class RequestType {
     kIrq,
+    kWait,
     kTask,
     kOther,
   };

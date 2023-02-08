@@ -1691,8 +1691,13 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   ASSERT_EQ(ZX_OK, irq.Begin(dispatcher));
 
   // Block the sync dispatcher thread with a task.
+  libsync::Completion entered_task;
   libsync::Completion complete_task;
-  ASSERT_OK(async::PostTask(dispatcher, [&] { ASSERT_OK(complete_task.Wait()); }));
+  ASSERT_OK(async::PostTask(dispatcher, [&] {
+    entered_task.Signal();
+    ASSERT_OK(complete_task.Wait());
+  }));
+  ASSERT_OK(entered_task.Wait());
 
   // Trigger the irq to queue a callback request.
   irq_object.trigger(0, zx::time());
