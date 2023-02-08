@@ -25,6 +25,7 @@ if (is_host) {
     ]
     if (is_linux) {
       deps += [
+        "//src/lib/fuchsia",
         "//third_party/rust_crates:async-trait",
         "//third_party/rust_crates:event-listener",
         "//third_party/rust_crates:fuse3",
@@ -36,6 +37,8 @@ if (is_host) {
       ]
     }
     sources = [
+      "src/fuse_attr.rs",
+      "src/fuse_errors.rs",
       "src/fuse_fs.rs",
       "src/fuse_vfs.rs",
       "src/golden.rs",

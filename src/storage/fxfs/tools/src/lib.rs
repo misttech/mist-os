@@ -11,6 +11,12 @@ pub mod golden;
 
 // The implementation of the FUSE prototype to mount Fxfs in Linux.
 #[cfg(target_os = "linux")]
+pub mod fuse_attr;
+
+#[cfg(target_os = "linux")]
+pub mod fuse_errors;
+
+#[cfg(target_os = "linux")]
 pub mod fuse_fs;
 
 #[cfg(target_os = "linux")]

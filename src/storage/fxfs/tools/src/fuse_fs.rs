@@ -3,16 +3,26 @@
 // found in the LICENSE file.
 
 use {
+    crate::{
+        fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr},
+        fuse_errors::FuseErrorParser,
+    },
     event_listener::Event,
+    fuse3::{raw::prelude::*, Result},
     fxfs::{
         filesystem::{FxFilesystem, OpenFxFilesystem},
         log::info,
-        object_store::{volume::root_volume, ObjectStore},
+        object_handle::{GetProperties, ObjectProperties},
+        object_store::{
+            volume::root_volume, Directory, HandleOptions, ObjectDescriptor, ObjectKey, ObjectKind,
+            ObjectStore, ObjectValue, StoreObjectHandle, Timestamp,
+        },
     },
     fxfs_crypto::Crypt,
     libc,
     once_cell::sync::OnceCell,
     std::{
+        ffi::OsStr,
         fs::{File, OpenOptions},
         path::PathBuf,
         process,
@@ -144,6 +154,132 @@ impl FuseFs {
         match inode {
             DEFAULT_FUSE_ROOT => self.default_store.root_directory_object_id(),
             _ => inode,
+        }
+    }
+
+    /// Get the object store of Fxfs's root directory.
+    pub async fn root_dir(&self) -> Result<Directory<ObjectStore>> {
+        Directory::open(&self.default_store, self.default_store.root_directory_object_id())
+            .await
+            .parse_error()
+    }
+
+    /// Open the directory with specified object id.
+    pub async fn open_dir(&self, object_id: u64) -> Result<Directory<ObjectStore>> {
+        Directory::open(&self.default_store, object_id).await.parse_error()
+    }
+
+    /// Get the handle of an object with specified id.
+    pub async fn get_object_handle(
+        &self,
+        object_id: u64,
+    ) -> Result<Arc<StoreObjectHandle<ObjectStore>>> {
+        let handle = Arc::new(
+            ObjectStore::open_object(
+                &self.default_store,
+                object_id,
+                HandleOptions::default(),
+                None,
+            )
+            .await
+            .parse_error()?,
+        );
+
+        Ok(handle)
+    }
+
+    /// Get the properties of an object with specified id.
+    pub async fn get_object_properties(
+        &self,
+        object_id: u64,
+        object_type: ObjectDescriptor,
+    ) -> Result<ObjectProperties> {
+        if object_type == ObjectDescriptor::File {
+            let handle = self.get_object_handle(object_id).await?;
+            handle.get_properties().await.parse_error()
+        } else if object_type == ObjectDescriptor::Directory {
+            let dir = self.open_dir(object_id).await?;
+            dir.get_properties().await.parse_error()
+        } else {
+            panic!("Invalid input object type");
+        }
+    }
+
+    /// Get the type of an object with specified id.
+    pub async fn get_object_type(&self, object_id: u64) -> Result<Option<ObjectDescriptor>> {
+        let object_result =
+            self.default_store.tree().find(&ObjectKey::object(object_id)).await.parse_error()?;
+        if let Some(object) = object_result {
+            match object.value {
+                ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. } => {
+                    Ok(Some(ObjectDescriptor::Directory))
+                }
+                ObjectValue::Object { kind: ObjectKind::File { .. }, .. } => {
+                    Ok(Some(ObjectDescriptor::File))
+                }
+                _ => Ok(None),
+            }
+        } else {
+            if let Some(symlink) = self
+                .default_store
+                .tree()
+                .find(&ObjectKey::symlink(object_id))
+                .await
+                .parse_error()?
+            {
+                if symlink.value != ObjectValue::None {
+                    return Ok(Some(ObjectDescriptor::Symlink));
+                }
+            }
+            Ok(None)
+        }
+    }
+
+    /// Create the FUSE-style attribute for an object based on its type.
+    pub async fn create_object_attr(
+        &self,
+        object_id: u64,
+        object_type: ObjectDescriptor,
+    ) -> Result<FileAttr> {
+        match object_type {
+            ObjectDescriptor::Directory => {
+                let properties = self.get_object_properties(object_id, object_type.clone()).await?;
+                Ok(create_dir_attr(
+                    object_id,
+                    properties.data_attribute_size,
+                    properties.creation_time,
+                    properties.modification_time,
+                ))
+            }
+            ObjectDescriptor::File => {
+                let properties = self.get_object_properties(object_id, object_type.clone()).await?;
+                Ok(create_file_attr(
+                    object_id,
+                    properties.data_attribute_size,
+                    properties.creation_time,
+                    properties.modification_time,
+                    properties.refs as u32,
+                ))
+            }
+            ObjectDescriptor::Volume => Err(libc::ENOSYS.into()),
+            ObjectDescriptor::Symlink => {
+                Ok(create_symlink_attr(object_id, Timestamp::now(), Timestamp::now()))
+            }
+        }
+    }
+}
+
+pub trait FuseStrParser {
+    fn parse_str(&self) -> Result<&str>;
+}
+
+impl FuseStrParser for OsStr {
+    /// Convert from OsStr to str.
+    fn parse_str(&self) -> Result<&str> {
+        if let Some(s) = self.to_str() {
+            Ok(s)
+        } else {
+            Err(libc::EINVAL.into())
         }
     }
 }
