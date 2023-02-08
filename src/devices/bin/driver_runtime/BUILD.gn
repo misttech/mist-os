@@ -36,7 +36,6 @@ source_set("driver_runtime_impl") {
   public_deps = [
     "//sdk/lib/driver/runtime:driver_runtime",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   deps = [
     "//sdk/lib/driver/runtime:driver_runtime_env",
@@ -60,7 +59,6 @@ sdk_shared_library("driver_runtime") {
   runtime_deps = [
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/svc:svc_sdk",
-    "//zircon/system/ulib/async-default:async-default_sdk",
     "//zircon/system/ulib/syslog:syslog_sdk",
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
   ]
@@ -86,6 +84,7 @@ test("driver_runtime_test") {
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fidl_driver:fidl_driver_transport",
     "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",

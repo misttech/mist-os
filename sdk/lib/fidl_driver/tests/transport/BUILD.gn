@@ -70,6 +70,7 @@ foreach(test_name, test_names) {
       "//src/devices/bin/driver_runtime:driver_runtime_impl",
       "//src/devices/testing/driver-runtime-main:zxtest",
       "//zircon/system/ulib/async:async-cpp",
+      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/sync:sync-cpp",
       "//zircon/system/ulib/zxtest",
     ]

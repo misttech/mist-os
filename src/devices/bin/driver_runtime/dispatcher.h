@@ -609,7 +609,7 @@ class DispatcherCoordinator {
 
  private:
   static constexpr async_loop_config_t MakeConfig() {
-    async_loop_config_t config = kAsyncLoopConfigNoAttachToCurrentThread;
+    async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
     config.irq_support = true;
     return config;
   }
