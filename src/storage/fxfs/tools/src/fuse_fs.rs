@@ -61,7 +61,7 @@ extern "C" fn handle_sigterm(_signal: i32) {
 
 pub struct FuseFs {
     pub fs: OpenFxFilesystem,
-    default_store: Arc<ObjectStore>,
+    pub default_store: Arc<ObjectStore>,
 }
 
 impl FuseFs {
