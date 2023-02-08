@@ -10,7 +10,6 @@ use crate::{
 };
 use anyhow::{anyhow, Context as _};
 use fidl_connector::{Connect, ServiceReconnector};
-use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
 use fidl_fuchsia_pkg::{self as fpkg, CupData, CupMarker, CupProxy, WriteError};
 use fidl_fuchsia_update_installer::{
     InstallerMarker, InstallerProxy, RebootControllerMarker, RebootControllerProxy,
@@ -20,9 +19,7 @@ use fidl_fuchsia_update_installer_ext::{
     PrepareFailureReason, State, StateId, UpdateAttemptError,
 };
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::PinnedAbsolutePackageUrl;
-use fuchsia_zircon as zx;
 use futures::{future::LocalBoxFuture, lock::Mutex as AsyncMutex, prelude::*};
 use omaha_client::{
     app_set::AppSet as _,
@@ -137,13 +134,21 @@ pub struct FuchsiaInstaller<
     cup_connector: C,
     reboot_controller: Option<RebootControllerProxy>,
     app_set: Rc<AsyncMutex<FuchsiaAppSet>>,
+    allow_reboot: bool,
 }
 
 impl FuchsiaInstaller<ServiceReconnector<InstallerMarker>, ServiceReconnector<CupMarker>> {
     pub fn new(app_set: Rc<AsyncMutex<FuchsiaAppSet>>) -> Self {
+        Self::new_set_allow_reboot(app_set, true)
+    }
+
+    pub fn new_set_allow_reboot(
+        app_set: Rc<AsyncMutex<FuchsiaAppSet>>,
+        allow_reboot: bool,
+    ) -> Self {
         let installer_connector = ServiceReconnector::<InstallerMarker>::new();
         let cup_connector = ServiceReconnector::<CupMarker>::new();
-        Self { installer_connector, cup_connector, reboot_controller: None, app_set }
+        Self { installer_connector, cup_connector, reboot_controller: None, app_set, allow_reboot }
     }
 }
 
@@ -172,7 +177,11 @@ where
             fidl::endpoints::create_proxy::<RebootControllerMarker>()
                 .map_err(FuchsiaInstallError::Fidl)?;
 
-        self.reboot_controller = Some(reboot_controller);
+        if self.allow_reboot {
+            self.reboot_controller = Some(reboot_controller);
+        } else {
+            let () = reboot_controller.detach().context("disabling automatic reboot")?;
+        }
 
         let mut update_attempt =
             start_update(&url.clone().into(), options, &proxy, Some(reboot_controller_server_end))
@@ -306,12 +315,9 @@ where
                         .context("notify installer it can reboot when ready")?;
                 }
                 None => {
-                    // FIXME Need the direct reboot path anymore?
-                    connect_to_protocol::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()?
-                        .reboot(RebootReason::SystemUpdate)
-                        .await?
-                        .map_err(zx::Status::from_raw)
-                        .context("reboot error")?;
+                    if self.allow_reboot {
+                        warn!("We should reboot due to the policy but the reboot controller has been dropped!");
+                    }
                 }
             }
 
@@ -533,7 +539,9 @@ mod tests {
         }
     }
 
-    fn new_mock_installer() -> (
+    fn new_mock_installer(
+        allow_reboot: bool,
+    ) -> (
         FuchsiaInstaller<MockConnector<InstallerProxy>, MockConnector<CupProxy>>,
         InstallerRequestStream,
         CupRequestStream,
@@ -550,6 +558,7 @@ mod tests {
             cup_connector: MockConnector::new(cup_proxy),
             reboot_controller: None,
             app_set,
+            allow_reboot,
         };
         (installer, installer_stream, cup_stream)
     }
@@ -562,8 +571,8 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_start_update() {
-        let (mut installer, mut stream, _) = new_mock_installer();
+    async fn test_start_update_with_reboot() {
+        let (mut installer, mut stream, _) = new_mock_installer(true);
         let plan = FuchsiaInstallPlan {
             update_package_urls: vec![
                 UpdatePackageUrl::System(TEST_URL.parse().unwrap()),
@@ -664,8 +673,116 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn test_start_update_no_reboot() {
+        let (mut installer, mut stream, _) = new_mock_installer(false);
+        let plan = FuchsiaInstallPlan {
+            update_package_urls: vec![
+                UpdatePackageUrl::System(TEST_URL.parse().unwrap()),
+                UpdatePackageUrl::Package(TEST_URL.parse().unwrap()),
+            ],
+            install_source: InstallSource::OnDemand,
+            ..FuchsiaInstallPlan::default()
+        };
+        let observer = MockProgressObserver::new();
+        let progresses = observer.progresses();
+        let installer_fut = async move {
+            let (install_result, app_install_results) =
+                installer.perform_install(&plan, Some(&observer)).await;
+            assert!(!install_result.urgent_update);
+            assert_matches!(
+                app_install_results.as_slice(),
+                &[AppInstallResult::Installed, AppInstallResult::Deferred]
+            );
+            assert_matches!(installer.reboot_controller, None);
+        };
+        let stream_fut = async move {
+            match stream.next().await.unwrap() {
+                Ok(InstallerRequest::StartUpdate {
+                    url,
+                    options,
+                    monitor,
+                    reboot_controller,
+                    responder,
+                }) => {
+                    assert_eq!(url.url, TEST_URL);
+                    let Options {
+                        initiator,
+                        should_write_recovery,
+                        allow_attach_to_existing_attempt,
+                    } = options.try_into().unwrap();
+                    assert_eq!(initiator, Initiator::User);
+                    assert!(should_write_recovery);
+                    assert!(allow_attach_to_existing_attempt);
+                    responder
+                        .send(&mut Ok("00000000-0000-0000-0000-000000000001".to_owned()))
+                        .unwrap();
+                    let monitor = monitor.into_proxy().unwrap();
+                    let () = monitor
+                        .on_state(&mut State::Stage(fidl_fuchsia_update_installer::StageData {
+                            info: Some(UpdateInfo {
+                                download_size: Some(1000),
+                                ..UpdateInfo::EMPTY
+                            }),
+                            progress: Some(InstallationProgress {
+                                fraction_completed: Some(0.5),
+                                bytes_downloaded: Some(500),
+                                ..InstallationProgress::EMPTY
+                            }),
+                            ..fidl_fuchsia_update_installer::StageData::EMPTY
+                        }))
+                        .await
+                        .unwrap();
+                    let () = monitor
+                        .on_state(&mut State::WaitToReboot(
+                            fidl_fuchsia_update_installer::WaitToRebootData {
+                                info: Some(UpdateInfo {
+                                    download_size: Some(1000),
+                                    ..UpdateInfo::EMPTY
+                                }),
+                                progress: Some(InstallationProgress {
+                                    fraction_completed: Some(1.0),
+                                    bytes_downloaded: Some(1000),
+                                    ..InstallationProgress::EMPTY
+                                }),
+                                ..fidl_fuchsia_update_installer::WaitToRebootData::EMPTY
+                            },
+                        ))
+                        .await
+                        .unwrap();
+
+                    let mut reboot_controller_request_stream =
+                        reboot_controller.unwrap().into_stream().unwrap();
+                    assert_matches!(
+                        reboot_controller_request_stream.next().await.unwrap(),
+                        Ok(RebootControllerRequest::Detach { .. })
+                    );
+                }
+                request => panic!("Unexpected request: {request:?}"),
+            }
+        };
+        future::join(installer_fut, stream_fut).await;
+        assert_eq!(
+            *progresses.lock(),
+            vec![
+                Progress {
+                    operation: Some("stage".to_string()),
+                    progress: 0.5,
+                    total_size: Some(1000),
+                    size_so_far: Some(500)
+                },
+                Progress {
+                    operation: Some("wait_to_reboot".to_string()),
+                    progress: 1.0,
+                    total_size: Some(1000),
+                    size_so_far: Some(1000)
+                }
+            ]
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn test_eager_package_update() {
-        let (mut installer, _, mut stream) = new_mock_installer();
+        let (mut installer, _, mut stream) = new_mock_installer(true);
         let plan = FuchsiaInstallPlan {
             update_package_urls: vec![UpdatePackageUrl::Package(TEST_URL.parse().unwrap())],
             install_source: InstallSource::OnDemand,
@@ -716,7 +833,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_install_error() {
-        let (mut installer, mut stream, _) = new_mock_installer();
+        let (mut installer, mut stream, _) = new_mock_installer(true);
         let plan = FuchsiaInstallPlan {
             update_package_urls: vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
             ..FuchsiaInstallPlan::default()
@@ -758,7 +875,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_server_close_unexpectedly() {
-        let (mut installer, mut stream, _) = new_mock_installer();
+        let (mut installer, mut stream, _) = new_mock_installer(true);
         let plan = FuchsiaInstallPlan {
             update_package_urls: vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
             ..FuchsiaInstallPlan::default()
@@ -804,7 +921,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_connect_to_installer_failed() {
-        let (mut installer, _, _) = new_mock_installer();
+        let (mut installer, _, _) = new_mock_installer(true);
         installer.installer_connector = MockConnector::failing();
         let plan = FuchsiaInstallPlan {
             update_package_urls: vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
