@@ -51,8 +51,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/performance/ktrace_provider:bin",
     "//zircon/kernel/lib/userabi/userboot/*",
     "//zircon/system/ulib/c/sanitizers",
-    "//zircon/system/ulib/kcounter",
-    "//zircon/system/ulib/kernel-debug",
     "//zircon/system/utest/fidl-utils",
   ]
 }
