@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.logger/cpp/wire.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/log-writer-logger/log-writer-logger.h>
 #include <lib/log-writer-logger/wire_format.h>
 #include <lib/log/log.h>
@@ -49,20 +49,17 @@ zx_koid_t get_current_thread_koid() {
 }
 
 bool connect_to_logger(zx::socket* socket) {
-  zx::channel logger, logger_request;
-  if (zx::channel::create(0, &logger, &logger_request) != ZX_OK) {
+  zx::result client_end = component::Connect<fuchsia_logger::LogSink>();
+  if (client_end.is_error()) {
     return false;
   }
-  fidl::WireSyncClient<fuchsia_logger::LogSink> logger_client(std::move(logger));
-  if (fdio_service_connect("/svc/fuchsia.logger.LogSink", logger_request.release()) != ZX_OK) {
-    return false;
-  }
+  fidl::WireSyncClient logger_client(std::move(client_end.value()));
   zx::socket local, remote;
   if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
     return false;
   }
-  auto result = logger_client->Connect(std::move(remote));
-  if (result.status() != ZX_OK) {
+  const fidl::OneWayStatus result = logger_client->Connect(std::move(remote));
+  if (!result.ok()) {
     return false;
   }
   *socket = std::move(local);
@@ -75,7 +72,7 @@ class LoggerWriter final : public log_writer {
     socket_error_encountered_ = !connect_to_logger(&socket_);
   }
 
-  void Write(const log_message_t* msg);
+  void Write(const log_message_t* message);
   void SetSocket(zx_handle_t handle);
 
  private:
@@ -111,8 +108,8 @@ size_t write_tag(const char* tag, void* dest, size_t max_allowed_write) {
     // Writing this tag would exceed our allowance, so write nothing instead
     return 0;
   }
-  *(char*)dest = static_cast<char>(tag_len);
-  memcpy((char*)dest + 1, tag, tag_len);
+  *static_cast<char*>(dest) = static_cast<char>(tag_len);
+  memcpy(static_cast<char*>(dest) + 1, tag, tag_len);
   return tag_len + 1;
 }
 
@@ -140,14 +137,14 @@ void LoggerWriter::Write(const log_message* message) {
       break;
     }
     pos += write_tag(message->static_tags[i], packet.data + pos,
-                     std::min(kDataSize - pos, (long unsigned int)LOG_MAX_TAG_LEN));
+                     std::min(kDataSize - pos, size_t{LOG_MAX_TAG_LEN}));
   }
   for (size_t i = 0; i < message->num_dynamic_tags; i++) {
     if (++tag_counter > LOG_MAX_TAGS) {
       break;
     }
     pos += write_tag(message->dynamic_tags[i], packet.data + pos,
-                     std::min(kDataSize - pos, (long unsigned int)LOG_MAX_TAG_LEN));
+                     std::min(kDataSize - pos, size_t{LOG_MAX_TAG_LEN}));
   }
 
   packet.data[pos++] = 0;
