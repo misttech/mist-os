@@ -91,7 +91,6 @@ zx_library("fake_ddk") {
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
     "//src/devices/nand/drivers/aml-rawnand/tests/*",
     "//src/devices/nand/drivers/nand/tests/*",
-    "//src/devices/nand/drivers/skip-block/*",
     "//src/devices/power/drivers/ti-ina231/*",
     "//src/devices/securemem/drivers/aml-securemem/*",
     "//src/devices/spi/drivers/aml-spi/*",

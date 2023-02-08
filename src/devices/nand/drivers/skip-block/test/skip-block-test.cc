@@ -7,8 +7,8 @@
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fuchsia/hardware/badblock/cpp/banjo.h>
 #include <fuchsia/hardware/nand/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fake_ddk/fidl-helper.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/vmo.h>
@@ -16,6 +16,7 @@
 
 #include <optional>
 
+#include <fbl/algorithm.h>
 #include <fbl/vector.h>
 #include <zxtest/zxtest.h>
 
@@ -179,6 +180,10 @@ class FakeBadBlock : public ddk::BadBlockProtocol<FakeBadBlock> {
 };
 
 class SkipBlockTest : public zxtest::Test {
+ public:
+  void SetUp() override { loop_.StartThread(); }
+  void TearDown() override { loop_.Shutdown(); }
+
  protected:
   SkipBlockTest() {
     fake_parent().AddProtocol(ZX_PROTOCOL_NAND, &nand_, nand_.proto_ops());
@@ -189,13 +194,10 @@ class SkipBlockTest : public zxtest::Test {
   void InitializeFidlClient() {
     if (!client_) {
       ASSERT_EQ(fake_parent().child_count(), 1);
-      fidl_messenger_.SetMessageOp(
-          fake_parent().GetLatestChild(),
-          [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
-            return static_cast<MockDevice*>(ctx)->MessageOp(msg, txn);
-          });
-      client_.Bind(fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(
-          std::move(fidl_messenger_.local())));
+      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_skipblock::SkipBlock>();
+      ASSERT_OK(endpoints.status_value());
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &dev());
+      client_.Bind(std::move(endpoints->client));
     }
   }
 
@@ -273,8 +275,7 @@ class SkipBlockTest : public zxtest::Test {
  private:
   const uint32_t count_ = 1;
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  // |fidl_messenger_| must destruct before |fake_parent_| to avoid use after free.
-  fake_ddk::FidlMessenger fidl_messenger_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   FakeNand nand_;
   FakeBadBlock bad_block_;
   fidl::WireSyncClient<fuchsia_hardware_skipblock::SkipBlock> client_;
