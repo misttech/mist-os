@@ -69,7 +69,11 @@ template("device_test") {
     }
   }
   fuchsia_test_component(component_name) {
-    forward_variables_from(invoker, [ "manifest" ])
+    forward_variables_from(invoker,
+                           [
+                             "restricted_features",
+                             "manifest",
+                           ])
     component_name = test_name
     deps = [ ":${bin_name}" ]
   }
@@ -157,6 +161,7 @@ device_test("virtio_console_device_tests") {
 }
 
 device_test("virtio_gpu_device_tests") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   sources = [ "virtio_gpu_test.cc" ]
   manifest = "meta/virtio_gpu_device_tests.cml"
   device_components =

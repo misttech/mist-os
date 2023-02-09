@@ -167,6 +167,7 @@ resource("test_script") {
 }
 
 fuchsia_test_component("server_daemon_test_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [
     ":server_daemon_test",
     ":test_script",

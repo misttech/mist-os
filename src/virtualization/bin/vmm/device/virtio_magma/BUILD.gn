@@ -103,6 +103,7 @@ executable("unittests_bin") {
 }
 
 fuchsia_test_component("unittest_component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtio_magma_unittests"
   deps = [ ":unittests_bin" ]
   manifest = "meta/virtio_magma_unittests.cml"

@@ -110,6 +110,7 @@ executable("virtualization_core_tests") {
 }
 
 fuchsia_test_component("virtualization_core_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_core_tests"
   deps = [
            ":test_images",
@@ -146,6 +147,7 @@ executable("virtualization_shutdown_tests") {
 }
 
 fuchsia_test_component("virtualization_shutdown_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_shutdown_tests"
   deps = [
            ":test_images",
@@ -186,6 +188,7 @@ executable("virtualization_balloon_tests") {
 }
 
 fuchsia_test_component("virtualization_balloon_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_balloon_tests"
   deps = [
            ":test_images",
@@ -224,6 +227,7 @@ executable("virtualization_block_tests") {
 }
 
 fuchsia_test_component("virtualization_block_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_block_tests"
   deps = [
            ":test_images",
@@ -262,6 +266,7 @@ executable("virtualization_gpu_tests") {
 }
 
 fuchsia_test_component("virtualization_gpu_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_gpu_tests"
   deps = [
            ":test_images",
@@ -298,6 +303,7 @@ executable("virtualization_input_tests") {
 }
 
 fuchsia_test_component("virtualization_input_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_input_tests"
   deps = [
            ":test_images",
@@ -336,6 +342,7 @@ executable("virtualization_net_tests") {
 }
 
 fuchsia_test_component("virtualization_net_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_net_tests"
   deps = [
            ":test_images",
@@ -374,6 +381,7 @@ executable("virtualization_sound_tests") {
 }
 
 fuchsia_test_component("virtualization_sound_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_sound_tests"
   deps = [
     ":test_images",
@@ -414,6 +422,7 @@ executable("virtualization_vsock_tests") {
 }
 
 fuchsia_test_component("virtualization_vsock_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_vsock_tests"
   deps = [
            ":test_images",
@@ -454,6 +463,7 @@ executable("virtualization_mem_tests") {
 }
 
 fuchsia_test_component("virtualization_mem_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_mem_tests"
   deps = [
            ":test_images",
@@ -572,6 +582,7 @@ resource("linux_extras_img") {
 }
 
 fuchsia_test_component("virtualization_magma_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_magma_tests"
   deps = [
     ":test_images",
@@ -607,6 +618,7 @@ executable("termina_container_tests") {
 }
 
 fuchsia_test_component("termina_container_tests_cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "termina_container_tests"
   deps = [
     ":termina_container_tests",

@@ -45,6 +45,10 @@ group("allow_non_hermetic_packages") {
     "//src/ui/tests/integration_input_tests/text-input:*",
     "//src/ui/tests/integration_input_tests/touch:*",
     "//src/ui/tests/integration_input_tests/virtual-keyboard:*",
+    "//src/virtualization/bin/vmm/device/tests:*",
+    "//src/virtualization/bin/vmm/device/virtio_magma:*",
+    "//src/virtualization/lib/guest_interaction:*",
+    "//src/virtualization/tests:*",
   ]
 }
 
