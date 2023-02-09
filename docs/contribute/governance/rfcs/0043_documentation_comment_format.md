@@ -140,20 +140,20 @@ The resolution rules are as follows:
 
 1. First, nested elements will be checked.
    If you are documenting a `struct Object`, and it contains a member
-   `event`, you may refer to it as [\`event\`].
+   `event`, you may refer to it as \[\`event\`\].
 2. Next, elements at the same scope level as the documented element will
    be checked.
    For example, if you are documenting a protocol method `foo()`, and the
-   same protocol contains a method `bar()`, you may refer to it as [\`bar\`].
+   same protocol contains a method `bar()`, you may refer to it as \[\`bar\`\].
 3. Next, elements of the enclosing scope are checked, if there is an
    enclosing scope.
    For example, if you are documenting a protocol method `foo()`, and
    there is another protocol in the same library called `Info`, you may refer
-   to it (and its elements) by saying [\`Info\`].
+   to it (and its elements) by saying \[\`Info\`\].
 4. 3 is repeated at successively enclosed scopes until you are at the top
    level scope.
    If you are documenting a protocol method `foo()`, and you write
-   [\`fuchsia.io/NodeInfo\`], it will refer to the union
+   \[\`fuchsia.io/NodeInfo\`\], it will refer to the union
    `fuchsia.io/NodeInfo`.
 
 Fully qualified names are of the form `<library>/<top level

@@ -189,7 +189,7 @@ fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
 
 [inspect_overview]: /docs/development/diagnostics/inspect/README.md
 [Inspect codelab]: /docs/development/diagnostics/inspect/codelab.md
-[roadmap_drivers_components]: /docs/contribute/roadmap/2020/overview.md#implementing_drivers_as_components
+[roadmap-drivers-components]: /docs/contribute/roadmap/2020/overview.md#implementing_drivers_as_components
 [example_test_driver]: /src/devices/tests/driver-inspect-test/test-driver.cc
 [property_types]: /docs/development/diagnostics/inspect/README.md#property
 [inspect_codelab]: /docs/development/diagnostics/inspect/codelab/README.md

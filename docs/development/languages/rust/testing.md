@@ -1,7 +1,7 @@
 # Testing Rust code
 
 This document describes best practices for writing tests for Rust code.
-Please also refer to the [components testing guide][component_tests] for
+Please also refer to the [components testing guide][component-tests] for
 instructions on defining test packages and components and running them.
 
 This document is targeted towards developers working inside of `fuchsia.git`,
@@ -144,6 +144,7 @@ rustc_binary("bin") {
   ]
 }
 ```
+
 [build-tests]:/docs/development/components/build.md#test-packages
 [component-tests]:/docs/development/testing/components/test_component.md
 [example-src]: /examples/hello_world/rust

@@ -10,7 +10,7 @@ compatibility.  To learn more about how it works, please see the [CTF RFC][rfc15
 and the other pages on CTF in fuchsia.dev. This doc aims to help you understand
 what to do if a CTF test fails in Fuchsia CQ.
 
-## Understand how your CL has changed the Fuchsia PlaSA.
+## Understand how your CL has changed the Fuchsia PlaSA
 
 First, try to understand what part of the PlaSA has changed.  If you already
 know, proceed to the next section.
@@ -36,7 +36,7 @@ surface area, do a search of the [CTF directory](https://cs.opensource.google/fu
 The test code should live in a directory named after the PlaSA area it
 validates.
 
-If all else fails, please feel free to reach out to the [CTF team][cts team].
+If all else fails, please feel free to reach out to the [CTF team][ctf team].
 
 Note: TODO(http://fxbug.dev/85409): Test names may not clearly describe which
 PlaSA elements they exercise. Link here a map of CTF test -> PlaSA elements.
@@ -76,7 +76,7 @@ Platform continue to evolve efficiently.
 
 *   Work with the SDK team to identify any downstream customers of the old API.
    *   Work with the associated SDK integrators to migrate them to the new API.
-*   Finally, work with the [CTF team][cts team] to "pause" existing CTF tests.
+*   Finally, work with the [CTF team][ctf team] to "pause" existing CTF tests.
    *   It may take weeks for the paused tests to be removed from all CTF
 releases in CQ (until the next major Fuchsia Platform release)
 
@@ -94,7 +94,7 @@ active CTF releases will need to be modified.
 
 Note: TODO(fxbug.dev/86421): Needs design
 
-Please reach out to the [CTF team][cts team] if this is required.
+Please reach out to the [CTF team][ctf team] if this is required.
 
 [rfc2]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [rfc15]: /docs/contribute/governance/rfcs/0015_cts.md

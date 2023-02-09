@@ -44,7 +44,7 @@ to make them unique in a consistent way rather than remembering odd rules like
 
 Names should use the following scheme, joining parts with underscores:
 
-> _tool_ [ _bindings_ ] [ _category_ [ _subcategory_ ] ] **tests**
+> _tool_ \[ _bindings_ ] \[ _category_ \[ _subcategory_ ] ] **tests**
 
 Where _tool_ is one of:
 
