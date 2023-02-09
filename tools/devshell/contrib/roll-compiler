@@ -123,11 +123,13 @@ before commands are run for any package.
     )
     args = parser.parse_args()
 
-    if not args.platforms:
-        args.platforms = ["linux-arm64", "linux-amd64", "mac-amd64"]
-
     if not args.package:
         args.package = ["clang"]
+
+    if not args.platforms:
+        args.platforms = ["linux-arm64", "linux-amd64", "mac-amd64"]
+        if args.package == ["clang"]:
+            args.platforms.append("windows-amd64")
 
     # Rust separate host/target toolchain
     rust_toolchain_packages = GetSplitRustToolchainPaths(args.package, args.platforms)
