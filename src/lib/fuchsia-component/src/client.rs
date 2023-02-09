@@ -190,23 +190,8 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
     filename: &str,
 ) -> Result<P::Proxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
-    // TODO(https://fxbug.dev/113160): Replacing this with fdio_service_connect_at causes
-    // PEER_CLOSED errors to go silently unreported, but the behavior is racy (reproduces locally
-    // under ASAN only, but everywhere in CQ). Reproduce by replacing this with
-    // fdio_service_connect_at and running:
-    //
-    // fx test -o fuchsia-pkg://fuchsia.com/session_manager_tests#meta/session_manager_tests.cm \
-    //   --test-filter=startup::tests::set_session_returns_error_if_binder_connection_fails
-    //
-    // fx test -o fuchsia-pkg://fuchsia.com/element_manager_tests#meta/element_manager_tests.cm \
-    //   --test-filter=element_manager::tests::launch_element_bind_error
-    let () = directory.open(
-        // TODO(https://fxbug.dev/120673): Replacing this with NOT_DIRECTORY produces test failures.
-        // Reproduce with:
-        //
-        // fx test -o component-manager-services-tests#meta/filtered-service-routing-test.cm
-        fio::OpenFlags::empty(),
-        fio::ModeType::empty(),
+    fdio::service_connect_at(
+        directory.as_channel().as_ref(),
         filename,
         server_end.into_channel().into(),
     )?;

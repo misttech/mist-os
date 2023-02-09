@@ -1464,8 +1464,8 @@ mod tests {
         );
     }
 
-    /// Tests that adding an element which is not successfully bound in the realm returns an
-    /// appropriate error.
+    /// Tests that adding an element which is not successfully bound in the
+    /// realm results in observing PEER_CLOSED on the exposed directory.
     #[fuchsia::test]
     async fn launch_element_bind_error() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
@@ -1497,16 +1497,15 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        assert_matches::assert_matches!(
-            element_manager.launch_element(component_url.to_string(), None, None, "").await,
-            Err(err) => {
-                assert_eq!(err, ElementManagerError::not_bound(
-                    "",
-                    "elements",
-                    component_url,
-                    "A FIDL client's channel to the service (anonymous) Directory was closed: PEER_CLOSED"
-                ));
-            }
-        );
+        let element = element_manager
+            .launch_element(component_url.to_string(), None, None, "")
+            .await
+            .unwrap();
+        let exposed_dir = element.directory_channel();
+
+        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
+        exposed_dir
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
+            .expect("exposed_dir should be closed");
     }
 }

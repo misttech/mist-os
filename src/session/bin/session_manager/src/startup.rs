@@ -156,9 +156,10 @@ async fn set_session(
 #[cfg(test)]
 mod tests {
     use {
-        super::{set_session, zx, StartupError, SESSION_CHILD_COLLECTION, SESSION_NAME},
+        super::{set_session, SESSION_CHILD_COLLECTION, SESSION_NAME},
         fidl::endpoints::spawn_stream_handler,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
+        fuchsia_zircon::{self as zx, AsHandleRef},
         lazy_static::lazy_static,
         session_testing::spawn_directory_server,
         std::sync::mpsc,
@@ -282,9 +283,10 @@ mod tests {
 
         // By not implementing a handler for exposed_dir channel, the
         // set_session function will observe a PEER_CLOSED signal.
-        assert_matches::assert_matches!(
-            set_session(session_url, &realm).await,
-            Err(StartupError::NotLaunched { .. })
-        );
+        let exposed_dir = set_session(session_url, &realm).await.unwrap();
+        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
+        exposed_dir
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
+            .expect("exposed_dir should be closed");
     }
 }
