@@ -5,6 +5,7 @@
     program: {
         apex_hack: [],
         features: [
+            "magma",
             "wayland",
             "custom_artifacts",
             "test_data",

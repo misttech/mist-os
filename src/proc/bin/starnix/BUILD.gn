@@ -145,6 +145,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/mem.rs",
     "device/mod.rs",
     "device/registry.rs",
+    "device/starnix.rs",
     "device/terminal.rs",
     "device/wayland/bridge_client.rs",
     "device/wayland/buffer_collection_file.rs",

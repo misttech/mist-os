@@ -1,6 +1,7 @@
 {
     apex_hack: [],
     features: [
+        "magma",
         "wayland",
     ],
     init: [],

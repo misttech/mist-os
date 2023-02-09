@@ -14,5 +14,6 @@ pub use registry::*;
 pub mod framebuffer;
 pub mod magma;
 pub mod mem;
+pub mod starnix;
 pub mod terminal;
 pub mod wayland;

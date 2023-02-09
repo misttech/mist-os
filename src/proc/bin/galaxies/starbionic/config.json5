@@ -3,6 +3,7 @@
         "com.android.runtime",
     ],
     features: [
+        "magma",
         "binder",
         "framebuffer",
         "selinux_enabled",
