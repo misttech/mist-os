@@ -26,6 +26,20 @@ static constexpr uint32_t kDestFrameBouncePeriod = 60;
 static constexpr uint32_t kRotationPeriod = 24;
 static constexpr uint32_t kScalePeriod = 45;
 
+namespace {
+
+constexpr uint64_t GetPrimaryImageImportId(unsigned display_index, int image_index) {
+  ZX_ASSERT(image_index >= 0);
+  ZX_ASSERT(image_index <= 1);
+  return 1 + display_index * 3 + image_index;
+}
+
+constexpr uint64_t GetCursorImageImportId(unsigned display_index) {
+  return 1 + display_index * 3 + 2;
+}
+
+}  // namespace
+
 static uint32_t get_fg_color() {
   static uint32_t layer_count = 0;
   static uint32_t colors[] = {
@@ -150,11 +164,11 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
       return false;
     }
 
-    if (!images_[0]->Import(dc, &layer->import_info[0])) {
+    if (!images_[0]->Import(dc, GetPrimaryImageImportId(i, 0), &layer->import_info[0])) {
       return false;
     }
     if (layer_flipping_) {
-      if (!images_[1]->Import(dc, &layer->import_info[1])) {
+      if (!images_[1]->Import(dc, GetPrimaryImageImportId(i, 1), &layer->import_info[1])) {
         return false;
       }
     } else {
@@ -366,7 +380,7 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
     }
 
     layer->active = true;
-    if (!image_->Import(dc, &layer->import_info[0])) {
+    if (!image_->Import(dc, GetCursorImageImportId(i), &layer->import_info[0])) {
       return false;
     }
     layer->import_info[0].events[WAIT_EVENT].signal(0, ZX_EVENT_SIGNALED);

@@ -441,7 +441,7 @@ void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
   }
 }
 
-bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc,
+bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc, uint64_t image_id,
                    image_import_t* info_out) const {
   for (int i = 0; i < 2; i++) {
     static int event_id = fhd::wire::kInvalidDispId + 1;
@@ -471,7 +471,8 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc,
 
   fhd::wire::ImageConfig image_config;
   GetConfig(&image_config);
-  const fidl::WireResult import_result = dc->ImportImage(image_config, collection_id_, /*index=*/0);
+  const fidl::WireResult import_result =
+      dc->ImportImage2(image_config, collection_id_, image_id, /*index=*/0);
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;
@@ -481,7 +482,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc,
     printf("Failed to import image: %s\n", zx_status_get_string(status));
     return false;
   }
-  info_out->id = import_response.image_id;
+  info_out->id = image_id;
 
   // image has been imported. we can close the connection
   [[maybe_unused]] fidl::Status result = dc->ReleaseBufferCollection(collection_id_);

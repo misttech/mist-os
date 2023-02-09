@@ -45,7 +45,7 @@ class Image {
 
   void GetConfig(fuchsia_hardware_display::wire::ImageConfig* config_out) const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
-              image_import_t* info_out) const;
+              uint64_t image_id, image_import_t* info_out) const;
 
  private:
   Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t format,
