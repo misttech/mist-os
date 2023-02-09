@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
-#include <lib/fdio/directory.h>
-#include <lib/zx/channel.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <lib/component/incoming/cpp/protocol.h>
+
+#include <filesystem>
 
 namespace {
 
@@ -27,30 +24,35 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    printf("Failed to create channel: %d\n", status);
+  constexpr char kDevicePath[] = "/dev/class/backlight/";
+  std::optional<std::string> path;
+  for (const auto& entry : std::filesystem::directory_iterator(kDevicePath)) {
+    path = entry.path().string();
+    break;
+  }
+  if (!path.has_value()) {
+    printf("Found no backlight devices in %s\n", kDevicePath);
     return -1;
   }
-
-  status = fdio_service_connect("/dev/class/backlight/000", remote.release());
-  if (status != ZX_OK) {
-    printf("Failed to open backlight: %d\n", status);
+  zx::result client_end = component::Connect<FidlBacklight::Device>(path.value());
+  if (client_end.is_error()) {
+    printf("Failed to open backlight: %s\n", client_end.status_string());
     return -1;
   }
-
-  fidl::WireSyncClient<FidlBacklight::Device> client(std::move(local));
-
+  fidl::WireSyncClient<FidlBacklight::Device> client(std::move(client_end.value()));
   if (strcmp(argv[1], "--read") == 0) {
-    auto response = client->GetStateNormalized();
-    zx_status_t status = response.ok() ? (response->is_error() ? response->error_value() : ZX_OK)
-                                       : response.status();
-    if (status != ZX_OK) {
-      printf("Get backlight state failed with %d\n", status);
+    const fidl::WireResult result = client->GetStateNormalized();
+    if (!result.ok()) {
+      printf("GetStateNormalized transport failed with %s\n", result.status_string());
       return -1;
     }
-    auto state = response->value()->state;
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      printf("GetStateNormalized call failed with %s\n",
+             zx_status_get_string(response.error_value()));
+      return -1;
+    }
+    const FidlBacklight::wire::State& state = response.value()->state;
     printf("Backlight:%s Brightness:%f\n", state.backlight_on ? "on" : "off", state.brightness);
     return 0;
   }
@@ -74,14 +76,20 @@ int main(int argc, char* argv[]) {
     on = true;
   }
 
-  FidlBacklight::wire::State state = {.backlight_on = on, .brightness = brightness};
-
-  auto response = client->SetStateNormalized(state);
-  status =
-      response.ok() ? (response->is_error() ? response->error_value() : ZX_OK) : response.status();
-  if (status != ZX_OK) {
-    printf("Set brightness failed with %d\n", status);
+  const fidl::WireResult result = client->SetStateNormalized({
+      .backlight_on = on,
+      .brightness = brightness,
+  });
+  if (!result.ok()) {
+    printf("SetStateNormalized transport failed with %s\n", result.status_string());
     return -1;
   }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    printf("SetStateNormalized call failed with %s\n",
+           zx_status_get_string(response.error_value()));
+    return -1;
+  }
+
   return 0;
 }

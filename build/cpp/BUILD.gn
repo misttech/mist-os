@@ -307,10 +307,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     #------------------
     #------------------
     "//src/sys/startup",
-
-    #------------------
-    #------------------
-    "//src/ui/backlight/bin/backlight",
   ]
 }
 
