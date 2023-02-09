@@ -1841,7 +1841,12 @@ where
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
                 responder_send!(
                     responder,
-                    &mut value.then_some(()).ok_or(fposix::Errno::Eopnotsupp)
+                    &mut match I::VERSION {
+                        IpVersion::V6 => value,
+                        IpVersion::V4 => false,
+                    }
+                    .then_some(())
+                    .ok_or(fposix::Errno::Eopnotsupp)
                 );
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6Only { responder } => {
