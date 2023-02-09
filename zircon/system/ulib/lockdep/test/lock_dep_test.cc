@@ -294,6 +294,9 @@ struct FakeMutexPolicy {
 
   struct State {};
 
+  // No special protection is needed for this userspace lock test.
+  using ValidationGuard = lockdep::NullValidationGuard;
+
   template <typename LockType>
   static void PreValidate(LockType* lock, State*) {
     stage_info[0].RecordCalled();

@@ -7,6 +7,7 @@
 
 #include <lib/concurrent/seqlock.h>
 
+#include <kernel/lock_validation_guard.h>
 #include <kernel/spinlock.h>
 #include <lockdep/lockdep.h>
 
@@ -22,6 +23,9 @@ struct ExclusiveIrqSave {
     interrupt_saved_state_t interrupt_state;
     bool blocking_disallow_state;
   };
+
+  // The lock list and validation is made atomic by interrupt disable in pre-validation.
+  using ValidationGuard = lockdep::NullValidationGuard;
 
   static void PreValidate(SeqLock* lock, State* state) {
     state->interrupt_state = arch_interrupt_save();
@@ -45,6 +49,9 @@ struct ExclusiveNoIrqSave {
   struct State {
     bool blocking_disallow_state;
   };
+
+  // The lock list and validation is made atomic by interrupt disable before locking.
+  using ValidationGuard = lockdep::NullValidationGuard;
 
   static void PreValidate(SeqLock* lock, State* state) {
     DEBUG_ASSERT(arch_ints_disabled());
@@ -72,6 +79,9 @@ struct SharedIrqSave {
     interrupt_saved_state_t interrupt_state;
   };
 
+  using ValidationGuard = lockdep::NullValidationGuard;
+
+  // The lock list and validation is made atomic by interrupt disable in pre-validation.
   static void PreValidate(SeqLock* lock, State* state) {
     state->interrupt_state = arch_interrupt_save();
   }
@@ -94,6 +104,9 @@ struct SharedNoIrqSave {
     bool& result_target;
     SeqLock::ReadTransactionToken token;
   };
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   static void PreValidate(SeqLock* lock, State* state) {}
 

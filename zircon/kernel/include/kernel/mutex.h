@@ -18,6 +18,7 @@
 
 #include <fbl/canary.h>
 #include <fbl/macros.h>
+#include <kernel/lock_validation_guard.h>
 #include <kernel/lockdep.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/thread.h>
@@ -250,6 +251,9 @@ struct MutexPolicy {
   struct State {
     const zx_duration_t spin_max_duration{Mutex::SPIN_MAX_DURATION};
   };
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   // No special actions are needed during pre-validation.
   template <typename LockType>

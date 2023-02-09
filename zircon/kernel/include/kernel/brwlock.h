@@ -15,6 +15,7 @@
 
 #include <fbl/canary.h>
 #include <kernel/lock_trace.h>
+#include <kernel/lock_validation_guard.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
@@ -140,6 +141,8 @@ class TA_CAP("mutex") BrwLock {
     // This will be seen by Guard to know to generate shared acquisitions for thread analysis.
     struct Shared {};
 
+    using ValidationGuard = LockValidationGuard;
+
     static void PreValidate(BrwLock*, State*) {}
     static bool Acquire(BrwLock* lock, State*) TA_ACQ_SHARED(lock) {
       lock->ReadAcquire();
@@ -150,6 +153,8 @@ class TA_CAP("mutex") BrwLock {
 
   struct WriterPolicy {
     struct State {};
+
+    using ValidationGuard = LockValidationGuard;
 
     static void PreValidate(BrwLock*, State*) {}
     static bool Acquire(BrwLock* lock, State*) TA_ACQ(lock) {

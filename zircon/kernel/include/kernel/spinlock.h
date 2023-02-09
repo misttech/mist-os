@@ -199,6 +199,9 @@ struct NoIrqSavePolicy {
   // No extra state required when not saving irq state.
   struct State {};
 
+  // The lock list and validation is made atomic by interrupt disable before locking.
+  using ValidationGuard = lockdep::NullValidationGuard;
+
   static void PreValidate(SpinLock* lock, State*) {}
   static bool Acquire(SpinLock* lock, State*) TA_ACQ(lock) {
     lock->Acquire();
@@ -221,6 +224,9 @@ struct NoIrqSaveMonitoredPolicy {
     const char* const name;
   };
 
+  // The lock list and validation is made atomic by interrupt disable before locking.
+  using ValidationGuard = lockdep::NullValidationGuard;
+
   static void PreValidate(MonitoredSpinLock* lock, State*) {}
   static bool Acquire(MonitoredSpinLock* lock, State* state) TA_ACQ(lock) {
     lock->Acquire(state->name);
@@ -240,6 +246,9 @@ struct IrqSavePolicy {
   struct State {
     interrupt_saved_state_t interrupt_state;
   };
+
+  // The lock list and validation is made atomic by interrupt disable in pre-validation.
+  using ValidationGuard = lockdep::NullValidationGuard;
 
   static void PreValidate(SpinLock* lock, State* state) {
     state->interrupt_state = arch_interrupt_save();
@@ -272,6 +281,9 @@ struct IrqSaveMonitoredPolicy {
     const char* const name;
   };
 
+  // The lock list and validation is made atomic by interrupt disable in pre-validation.
+  using ValidationGuard = lockdep::NullValidationGuard;
+
   static void PreValidate(MonitoredSpinLock* lock, State* state) {
     state->interrupt_state = arch_interrupt_save();
   }
@@ -298,6 +310,9 @@ struct TryLockNoIrqSavePolicy {
   // No extra state required when not saving irq state.
   struct State {};
 
+  // The lock list and validation is made atomic by interrupt disable before locking.
+  using ValidationGuard = lockdep::NullValidationGuard;
+
   static void PreValidate(SpinLock* lock, State*) {}
   static bool Acquire(SpinLock* lock, State*) TA_TRY_ACQ(true, lock) {
     const bool failed = lock->TryAcquire();
@@ -317,6 +332,9 @@ struct TryLockNoIrqSaveMonitoredPolicy {
     explicit State(const char* name) : name(name) {}
     const char* const name;
   };
+
+  // The lock list and validation is made atomic by interrupt disable before locking.
+  using ValidationGuard = lockdep::NullValidationGuard;
 
   static void PreValidate(MonitoredSpinLock* lock, State*) {}
   static bool Acquire(MonitoredSpinLock* lock, State* state) TA_TRY_ACQ(true, lock) {

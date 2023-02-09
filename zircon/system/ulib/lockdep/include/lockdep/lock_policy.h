@@ -4,8 +4,9 @@
 
 #pragma once
 
-#include <type_traits>
 #include <zircon/compiler.h>
+
+#include <type_traits>
 
 #include <lockdep/global_reference.h>
 
@@ -137,13 +138,30 @@ struct HasAssertHeld<T, std::void_t<decltype(std::declval<const T>().AssertHeld(
 template <typename T>
 using EnableIfHasAssertHeld = std::enable_if_t<HasAssertHeld<T>::value>;
 
+// Detects whether T has a subtype `T::ValidationGuard`.
+template <typename T, typename = void>
+struct HasValidationGuard : std::false_type {};
+template <typename T>
+struct HasValidationGuard<T, std::void_t<typename T::ValidationGuard>> : std::true_type {};
+
 }  // namespace internal
+
+// Null validation guard for use cases that do not need additional protection of
+// the thread local lock list.
+struct NullValidationGuard {
+  // Constructor must be non-trivial to avoid unused variable warnings.
+  NullValidationGuard() {}
+  ~NullValidationGuard() = default;
+};
 
 // Default lock policy type that describes how to acquire and release a basic
 // mutex with no additional state or flags.
 struct DefaultLockPolicy {
   // This policy does not specify any additional state for a lock acquisition.
   struct State {};
+
+  // This policy does not specify additional actions to guard lock validation.
+  using ValidationGuard = NullValidationGuard;
 
   // Default lock policy has nothing special to do just before validation.
   template <typename Lock>
@@ -184,10 +202,19 @@ struct DefaultLockPolicy {
 struct AmbiguousOption {};
 
 // Base lock policy type that simply returns the DefaultLockPolicy. This is the
-// default policy applied to any lock that is not tagged with the macros above.
+// default policy applied to any lock that is not tagged with the macros above
+// when the default policy is enabled. The default policy is disabled by default
+// to avoid mistakes in environments that require validation guards for correct
+// operation, such as the kernel.
 template <typename Lock, typename Option = void, typename Enabled = void>
 struct LockPolicyType {
+#if LOCK_DEP_ENABLE_DEFAULT_LOCK_POLICY
   using Type = DefaultLockPolicy;
+#else
+  static_assert(
+      !std::is_same<Lock, Lock>::value,
+      "Default lock policy is disabled. Please define a custom policy or enable the default policy.");
+#endif
 };
 
 // Specialization that returns the lock policy type for the combination of
@@ -195,6 +222,8 @@ struct LockPolicyType {
 template <typename Lock, typename Option>
 struct LockPolicyType<Lock, Option, std::void_t<LookupLockPolicy<Lock, Option>>> {
   using Type = LookupLockPolicy<Lock, Option>;
+  static_assert(internal::HasValidationGuard<Type>::value,
+                "Custom policy missing ValidationGuard subtype!");
 };
 
 // Alias that selects the lock policy for the given |Lock| and optional

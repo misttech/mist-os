@@ -180,8 +180,7 @@ class __TA_SCOPED_CAPABILITY
     LockType* lock_ptr = validator_.lock();
 
     if (lock_ptr != nullptr) {
-      validator_.ValidateRelease();
-      validator_.Clear();
+      validator_.ValidateRelease(/* clear */ true);
       LockPolicy<LockType, Option>::Release(lock_ptr, &state_, std::forward<Args>(args)...);
     }
   }
@@ -238,7 +237,7 @@ class __TA_SCOPED_CAPABILITY
   void CallUnlocked(Op&& op, ReleaseArgs&&... release_args) __TA_NO_THREAD_SAFETY_ANALYSIS {
     ZX_DEBUG_ASSERT(validator_.lock() != nullptr);
 
-    validator_.ValidateRelease();
+    validator_.ValidateRelease(/* clear */ false);
     LockPolicy<LockType, Option>::Release(validator_.lock(), &state_,
                                           std::forward<ReleaseArgs>(release_args)...);
 
@@ -270,7 +269,7 @@ class __TA_SCOPED_CAPABILITY
   void CallUntracked(Op&& op) {
     ZX_DEBUG_ASSERT(validator_.lock() != nullptr);
 
-    validator_.ValidateRelease();
+    validator_.ValidateRelease(/* clear */ false);
 
     std::forward<Op>(op)();
 
@@ -295,8 +294,7 @@ class __TA_SCOPED_CAPABILITY
     LockPolicy<LockType, Option>::PreValidate(validator_.lock(), &state_);
     validator_.ValidateAcquire();
     if (!LockPolicy<LockType, Option>::Acquire(validator_.lock(), &state_)) {
-      validator_.ValidateRelease();
-      validator_.Clear();
+      validator_.ValidateRelease(/* clear */ true);
     }
   }
 
@@ -317,9 +315,26 @@ class __TA_SCOPED_CAPABILITY
     LockValidator(LockType* lock, LockClassId id, uintptr_t order = 0)
         : lock_entry{lock, id, order} {}
 
-    void ValidateAcquire() { ThreadLockState::Get(kLockFlags)->Acquire(&lock_entry); }
-    void ValidateRelease() { ThreadLockState::Get(kLockFlags)->Release(&lock_entry); }
-    void Clear() { lock_entry.Clear(); }
+    LockValidator(LockValidator&& other) { *this = std::move(other); }
+    LockValidator& operator=(LockValidator&& other) {
+      if (this != &other) {
+        typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+        lock_entry = std::move(other.lock_entry);
+      }
+      return *this;
+    }
+
+    void ValidateAcquire() {
+      typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+      ThreadLockState::Get(kLockFlags)->Acquire(&lock_entry);
+    }
+    void ValidateRelease(bool clear) {
+      typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+      ThreadLockState::Get(kLockFlags)->Release(&lock_entry);
+      if (clear) {
+        lock_entry.Clear();
+      }
+    }
 
     LockType* lock() const { return static_cast<LockType*>(lock_entry.address()); }
 
@@ -334,14 +349,17 @@ class __TA_SCOPED_CAPABILITY
     NoValidator& operator=(NoValidator&& other) noexcept {
       if (this != &other) {
         address = other.address;
-        other.Clear();
+        other.address = nullptr;
       }
       return *this;
     }
 
     void ValidateAcquire() {}
-    void ValidateRelease() {}
-    void Clear() { address = nullptr; }
+    void ValidateRelease(bool clear) {
+      if (clear) {
+        address = nullptr;
+      }
+    }
 
     LockType* lock() const { return address; }
 
@@ -413,8 +431,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     LockType* lock_ptr = validator_.lock();
 
     if (lock_ptr != nullptr) {
-      validator_.ValidateRelease();
-      validator_.Clear();
+      validator_.ValidateRelease(/* clear */ true);
       LockPolicy<LockType, Option>::Release(lock_ptr, &state_, std::forward<Args>(args)...);
     }
   }
@@ -472,7 +489,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   void CallUnlocked(Op&& op, ReleaseArgs&&... release_args) __TA_NO_THREAD_SAFETY_ANALYSIS {
     ZX_DEBUG_ASSERT(validator_.lock() != nullptr);
 
-    validator_.ValidateRelease();
+    validator_.ValidateRelease(/* clear */ false);
     LockPolicy<LockType, Option>::Release(validator_.lock(), &state_,
                                           std::forward<ReleaseArgs>(release_args)...);
 
@@ -504,7 +521,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   void CallUntracked(Op&& op) {
     ZX_DEBUG_ASSERT(validator_.lock() != nullptr);
 
-    validator_.ValidateRelease();
+    validator_.ValidateRelease(/* clear */ false);
 
     std::forward<Op>(op)();
 
@@ -529,8 +546,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     LockPolicy<LockType, Option>::PreValidate(validator_.lock(), &state_);
     validator_.ValidateAcquire();
     if (!LockPolicy<LockType, Option>::Acquire(validator_.lock(), &state_)) {
-      validator_.ValidateRelease();
-      validator_.Clear();
+      validator_.ValidateRelease(/* clear */ true);
     }
   }
 
@@ -551,9 +567,26 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     LockValidator(LockType* lock, LockClassId id, uintptr_t order = 0)
         : lock_entry{lock, id, order} {}
 
-    void ValidateAcquire() { ThreadLockState::Get(kLockFlags)->Acquire(&lock_entry); }
-    void ValidateRelease() { ThreadLockState::Get(kLockFlags)->Release(&lock_entry); }
-    void Clear() { lock_entry.Clear(); }
+    LockValidator(LockValidator&& other) { *this = std::move(other); }
+    LockValidator& operator=(LockValidator&& other) {
+      if (this != &other) {
+        typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+        lock_entry = std::move(other.lock_entry);
+      }
+      return *this;
+    }
+
+    void ValidateAcquire() {
+      typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+      ThreadLockState::Get(kLockFlags)->Acquire(&lock_entry);
+    }
+    void ValidateRelease(bool clear) {
+      typename LockPolicy<LockType, Option>::ValidationGuard guard{};
+      ThreadLockState::Get(kLockFlags)->Release(&lock_entry);
+      if (clear) {
+        lock_entry.Clear();
+      }
+    }
 
     LockType* lock() const { return static_cast<LockType*>(lock_entry.address()); }
 
@@ -568,14 +601,17 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     NoValidator& operator=(NoValidator&& other) noexcept {
       if (this != &other) {
         address = other.address;
-        other.Clear();
+        other.address = nullptr;
       }
       return *this;
     }
 
     void ValidateAcquire() {}
-    void ValidateRelease() {}
-    void Clear() { address = nullptr; }
+    void ValidateRelease(bool clear) {
+      if (clear) {
+        address = nullptr;
+      }
+    }
 
     LockType* lock() const { return address; }
 

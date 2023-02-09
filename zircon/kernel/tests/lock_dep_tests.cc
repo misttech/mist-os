@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <zircon/time.h>
 
+#include <kernel/lock_validation_guard.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <kernel/spinlock.h>
@@ -71,6 +72,9 @@ struct TryNoIrqSave {};
 struct SpinlockNoIrqSave {
   struct State {};
 
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
+
   static void PreValidate(Spinlock* lock, State*) {}
   static bool Acquire(Spinlock* lock, State*) TA_ACQ(lock) {
     lock->Acquire();
@@ -83,6 +87,9 @@ LOCK_DEP_POLICY_OPTION(Spinlock, NoIrqSave, SpinlockNoIrqSave);
 
 struct SpinlockIrqSave {
   struct State {};
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   static void PreValidate(Spinlock* lock, State*) {}
   static bool Acquire(Spinlock* lock, State*) TA_ACQ(lock) {
@@ -97,6 +104,9 @@ LOCK_DEP_POLICY_OPTION(Spinlock, IrqSave, SpinlockIrqSave);
 struct SpinlockTryNoIrqSave {
   struct State {};
 
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
+
   static void PreValidate(Spinlock* lock, State*) {}
   static bool Acquire(Spinlock* lock, State*) TA_TRY_ACQ(true, lock) { return lock->TryAcquire(); }
   static void Release(Spinlock* lock, State*) TA_REL(lock) { lock->Release(); }
@@ -106,6 +116,9 @@ LOCK_DEP_POLICY_OPTION(Spinlock, TryNoIrqSave, SpinlockTryNoIrqSave);
 struct SpinlockTryIrqSave {
   struct State {};
 
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
+
   static void PreValidate(Spinlock* lock, State*) {}
   static bool Acquire(Spinlock* lock, State*) TA_TRY_ACQ(true, lock) { return lock->TryAcquire(); }
   static void Release(Spinlock* lock, State*) TA_REL(lock) { lock->Release(); }
@@ -114,6 +127,9 @@ LOCK_DEP_POLICY_OPTION(Spinlock, TryIrqSave, SpinlockTryIrqSave);
 
 struct spinlock_t_NoIrqSave {
   struct State {};
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   static void PreValidate(spinlock_t* lock, State*) {}
   static bool Acquire(spinlock_t* lock, State*) TA_ACQ(lock) {
@@ -126,6 +142,9 @@ LOCK_DEP_POLICY_OPTION(spinlock_t, NoIrqSave, spinlock_t_NoIrqSave);
 
 struct spinlock_t_IrqSave {
   struct State {};
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   static void PreValidate(spinlock_t* lock, State*) {}
   static bool Acquire(spinlock_t* lock, State*) TA_ACQ(lock) {
@@ -140,6 +159,9 @@ LOCK_DEP_POLICY_OPTION(spinlock_t, IrqSave, spinlock_t_IrqSave);
 struct spinlock_t_TryNoIrqSave {
   struct State {};
 
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
+
   static void PreValidate(spinlock_t* lock, State*) {}
   static bool Acquire(spinlock_t* lock, State*) TA_TRY_ACQ(true, lock) {
     return spinlock_try_lock(lock);
@@ -150,6 +172,9 @@ LOCK_DEP_POLICY_OPTION(spinlock_t, TryNoIrqSave, spinlock_t_TryNoIrqSave);
 
 struct spinlock_t_TryIrqSave {
   struct State {};
+
+  // Protects the thread local lock list and validation.
+  using ValidationGuard = LockValidationGuard;
 
   static void PreValidate(spinlock_t* lock, State*) {}
   static bool Acquire(spinlock_t* lock, State*) TA_TRY_ACQ(true, lock) {
@@ -177,6 +202,8 @@ struct TA_CAP("mutex") ReadWriteLock {
   struct Read {
     struct State {};
     struct Shared {};
+    // Protects the thread local lock list and validation.
+    using ValidationGuard = LockValidationGuard;
     static void PreValidate(ReadWriteLock* lock, State*) {}
     static bool Acquire(ReadWriteLock* lock, State*) TA_ACQ_SHARED(lock) {
       return lock->AcquireRead();
@@ -186,6 +213,8 @@ struct TA_CAP("mutex") ReadWriteLock {
 
   struct Write {
     struct State {};
+    // Protects the thread local lock list and validation.
+    using ValidationGuard = LockValidationGuard;
     static void PreValidate(ReadWriteLock* lock, State*) {}
     static bool Acquire(ReadWriteLock* lock, State*) TA_ACQ(lock) { return lock->AcquireWrite(); }
     static void Release(ReadWriteLock* lock, State*) TA_REL(lock) { lock->Release(); }
