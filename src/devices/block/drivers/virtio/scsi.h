@@ -51,20 +51,18 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   // scsi::Controller overrides
   size_t BlockOpSize() override {
     // No additional metadata required for each command transaction.
-    return sizeof(scsi::ScsiLibOp);
+    return sizeof(scsi::DiskOp);
   }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::ScsiLibOp* scsilib_op) override;
+                           uint32_t block_size_bytes, scsi::DiskOp* disk_op) override;
 
   const char* tag() const override { return "virtio-scsi"; }
 
   static void FillLUNStructure(struct virtio_scsi_req_cmd* req, uint8_t target, uint16_t lun);
 
  private:
-  zx_status_t TargetMaxXferSize(uint8_t target, uint16_t lun, uint32_t& xfer_size_sectors);
-
   void QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                     zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes, size_t transfer_bytes,
                     void (*cb)(void*, zx_status_t), void* cookie, void* data, bool vmar_mapped);

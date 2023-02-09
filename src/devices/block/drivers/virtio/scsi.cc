@@ -154,15 +154,15 @@ zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec c
   return cookie.status;
 }
 
-static void ScsiLibCompletionCb(void* cookie, zx_status_t status) {
-  auto scsilib_op = static_cast<scsi::ScsiLibOp*>(cookie);
-  scsilib_op->Complete(status);
+static void DiskOpCompletionCb(void* cookie, zx_status_t status) {
+  auto disk_op = static_cast<scsi::DiskOp*>(cookie);
+  disk_op->Complete(status);
 }
 
 void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                     uint32_t block_size_bytes, scsi::ScsiLibOp* scsilib_op) {
+                                     uint32_t block_size_bytes, scsi::DiskOp* disk_op) {
   // TODO(fxbug.dev/121404): Check data arguments are cleared for flush commands.
-  const block_read_write_t& rw = scsilib_op->op.rw;
+  const block_read_write_t& rw = disk_op->op.rw;
   const zx_handle_t data_vmo = rw.vmo;
   const zx_off_t vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
   const size_t transfer_bytes = rw.length * block_size_bytes;
@@ -182,7 +182,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
       status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, data_vmo,
                            vmo_offset_bytes, transfer_bytes, &mapped_addr);
       if (status != ZX_OK) {
-        scsilib_op->Complete(status);
+        disk_op->Complete(status);
         return;
       }
       data = reinterpret_cast<void*>(mapped_addr);
@@ -193,7 +193,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
         status = zx_vmo_read(data_vmo, data, vmo_offset_bytes, transfer_bytes);
         if (status != ZX_OK) {
           free(data);
-          scsilib_op->Complete(status);
+          disk_op->Complete(status);
           return;
         }
       }
@@ -201,7 +201,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
   }
 
   return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
-                      transfer_bytes, ScsiLibCompletionCb, static_cast<void*>(scsilib_op), data,
+                      transfer_bytes, DiskOpCompletionCb, static_cast<void*>(disk_op), data,
                       vmar_mapped);
 }
 
@@ -338,40 +338,6 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
 constexpr uint32_t SCSI_SECTOR_SIZE = 512;
 constexpr uint32_t SCSI_MAX_XFER_SIZE = 1024;  // 512K clamp
 
-// Read Block Limits VPD Page (0xB0), if supported and return the max xfer size
-// (in blocks) supported by the target.
-zx_status_t ScsiDevice::TargetMaxXferSize(uint8_t target, uint16_t lun,
-                                          uint32_t& xfer_size_sectors) {
-  scsi::InquiryCDB inquiry_cdb = {};
-  scsi::VPDPageList vpd_pagelist = {};
-  inquiry_cdb.opcode = scsi::Opcode::INQUIRY;
-  // Query for all supported VPD pages.
-  inquiry_cdb.reserved_and_evpd = 0x1;
-  inquiry_cdb.page_code = 0x00;
-  inquiry_cdb.allocation_length = ntohs(sizeof(vpd_pagelist));
-  auto status = ExecuteCommandSync(target, lun, {&inquiry_cdb, sizeof(inquiry_cdb)},
-                                   /*is_write=*/false, {&vpd_pagelist, sizeof(vpd_pagelist)});
-  if (status != ZX_OK)
-    return status;
-  uint8_t i;
-  for (i = 0; i < vpd_pagelist.page_length; i++) {
-    if (vpd_pagelist.pages[i] == 0xB0)
-      break;
-  }
-  if (i == vpd_pagelist.page_length)
-    return ZX_ERR_NOT_SUPPORTED;
-  // The Block Limits VPD page is supported, fetch it.
-  scsi::VPDBlockLimits block_limits = {};
-  inquiry_cdb.page_code = 0xB0;
-  inquiry_cdb.allocation_length = ntohs(sizeof(block_limits));
-  status = ExecuteCommandSync(target, lun, {&inquiry_cdb, sizeof(inquiry_cdb)}, /*is_write=*/false,
-                              {&block_limits, sizeof(block_limits)});
-  if (status != ZX_OK)
-    return status;
-  xfer_size_sectors = block_limits.max_xfer_length_blocks;
-  return ZX_OK;
-}
-
 zx_status_t ScsiDevice::WorkerThread() {
   uint16_t max_target;
   uint32_t max_lun;
@@ -399,25 +365,23 @@ zx_status_t ScsiDevice::WorkerThread() {
   // TODO(fxbug.dev/32170): Move probe sequence to ScsiLib -- have it call down into LLDs to execute
   // commands.
   for (uint8_t target = 0u; target <= max_target; target++) {
-    const uint32_t luns_on_this_target = CountLuns(this, target);
-    if (luns_on_this_target == 0) {
+    zx::result luns_on_this_target = ReportLuns(target);
+    if (luns_on_this_target.is_error()) {
+      // For now, assume REPORT LUNS is supported. A failure indicates no LUNs on this target.
       continue;
     }
 
     uint16_t luns_found = 0;
     uint32_t max_xfer_size_sectors = 0;
     for (uint16_t lun = 0u; lun <= max_lun; lun++) {
-      scsi::TestUnitReadyCDB cdb = {};
-      cdb.opcode = scsi::Opcode::TEST_UNIT_READY;
-
-      auto status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, {});
+      auto status = TestUnitReady(target, lun);
       if ((status == ZX_OK) && (max_xfer_size_sectors == 0)) {
         // If we haven't queried the VPD pages for the target's xfer size
         // yet, do it now. We only query this once per target.
-        status = TargetMaxXferSize(target, lun, max_xfer_size_sectors);
-        if (status == ZX_OK) {
+        zx::result target_max_xfer_sectors = InquiryMaxTransferBlocks(target, lun);
+        if (target_max_xfer_sectors.is_ok()) {
           // smaller of controller and target max_xfer_sizes
-          max_xfer_size_sectors = std::min(max_xfer_size_sectors, max_sectors);
+          max_xfer_size_sectors = std::min(target_max_xfer_sectors.value(), max_sectors);
           // and the 512K clamp
           max_xfer_size_sectors = std::min(max_xfer_size_sectors, SCSI_MAX_XFER_SIZE);
         } else {
@@ -435,7 +399,7 @@ zx_status_t ScsiDevice::WorkerThread() {
       // Subtle detail - LUN 0 may respond to TEST UNIT READY even if it is not a valid LUN
       // and there is a valid LUN elsewhere on the target. Test for one more LUN than we
       // expect to work around that.
-      if (luns_found > luns_on_this_target) {
+      if (luns_found > luns_on_this_target.value()) {
         break;
       }
     }

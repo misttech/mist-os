@@ -15,7 +15,10 @@ zx_library("scsi") {
     "lib/scsi/scsilib.h",
     "lib/scsi/scsilib_controller.h",
   ]
-  sources = [ "scsilib.cc" ]
+  sources = [
+    "scsilib.cc",
+    "scsilib_controller.cc",
+  ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//src/devices/lib/driver",
