@@ -77,7 +77,6 @@ source_set("src") {
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:registers",
     "$magma_build_root/src/magma_util:ringbuffer",
-    "$magma_build_root/src/magma_util:semaphore_port",
     "$magma_build_root/src/magma_util:thread",
     "$magma_build_root/src/magma_util/platform:barriers",
     "$magma_build_root/src/magma_util/platform:buffer",

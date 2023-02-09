@@ -87,7 +87,6 @@ source_set("magma_util_tests") {
     "test_mapped_batch.cc",
     "test_register_io.cc",
     "test_ringbuffer.cc",
-    "test_semaphore_port.cc",
     "test_status.cc",
   ]
 
@@ -97,7 +96,6 @@ source_set("magma_util_tests") {
     "$magma_build_root/src/magma_util:mapped_batch",
     "$magma_build_root/src/magma_util:registers",
     "$magma_build_root/src/magma_util:ringbuffer",
-    "$magma_build_root/src/magma_util:semaphore_port",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/tests/mock:address_space",

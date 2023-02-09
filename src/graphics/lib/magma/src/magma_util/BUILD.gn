@@ -115,21 +115,6 @@ source_set("allocator") {
   ]
 }
 
-source_set("semaphore_port") {
-  visibility = visibility_list
-
-  public_configs = [ "$magma_build_root:magma_src_include_config" ]
-
-  sources = [ "semaphore_port.h" ]
-
-  public_deps = [
-    ":macros",
-    "$magma_build_root/src/magma_util/platform:trace",
-    "platform:port",
-    "platform:semaphore",
-  ]
-}
-
 source_set("registers") {
   visibility = visibility_list
 
