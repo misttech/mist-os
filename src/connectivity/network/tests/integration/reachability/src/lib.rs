@@ -36,7 +36,10 @@ use packet_formats::{
     testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
 };
 use reachability_core::{State, FIDL_TIMEOUT_ID};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use test_case::test_case;
 use tracing::info;
 
@@ -270,7 +273,7 @@ struct NetemulInterface<'a> {
     _network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
     fake_ep: netemul::TestFakeEndpoint<'a>,
-    state: Rc<RefCell<State>>,
+    state: Arc<Mutex<State>>,
 }
 
 impl<'a> NetemulInterface<'a> {
@@ -362,7 +365,7 @@ async fn handle_frame_stream<'a>(
     fake_ep: &'a netemul::TestFakeEndpoint<'_>,
     gateway_v4: net_types::ip::Ipv4Addr,
     gateway_v6: net_types::ip::Ipv6Addr,
-    state: Rc<RefCell<State>>,
+    state: Arc<Mutex<State>>,
     echo_notifier: &mpsc::UnboundedSender<()>,
 ) {
     let mut frame_stream = fake_ep.frame_stream();
@@ -371,7 +374,7 @@ async fn handle_frame_stream<'a>(
             echo_notifier.unbounded_send(()).expect("failed to send echo notice");
             assert_eq!(dropped, 0);
             if let Some(reply) =
-                reply_if_echo_request(frame, *state.borrow(), &gateway_v4, &gateway_v6)
+                reply_if_echo_request(frame, *state.lock().unwrap(), &gateway_v4, &gateway_v6)
             {
                 fake_ep
                     .write(reply.as_ref())
@@ -438,7 +441,7 @@ async fn create_netemul_interfaces<'a>(
                     .join_network(&network, name)
                     .await
                     .expect("failed to join network with netdevice endpoint");
-                let state = Rc::new(RefCell::new(*init_state));
+                let state = Arc::new(Mutex::new(*init_state));
 
                 configure_interface(&interface, &env.controller, &env.stack, config).await;
                 NetemulInterface { _network: network, interface, fake_ep, state }
@@ -692,7 +695,7 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
 struct ReachabilityTestHelper<'a> {
     env: &'a ReachabilityEnv<'a>,
     monitor: fnet_reachability::MonitorProxy,
-    iface_states: Vec<Rc<RefCell<State>>>,
+    iface_states: Vec<Arc<Mutex<State>>>,
     echo_reply_streams: std::pin::Pin<Box<dyn FusedFuture<Output = ()> + 'a>>,
     _echo_reply_receiver: mpsc::UnboundedReceiver<()>,
 }
@@ -777,7 +780,7 @@ impl<'a> ReachabilityTestHelper<'a> {
         self.iface_states
             .iter()
             .zip(states)
-            .for_each(|(iface_state, new_state)| *iface_state.borrow_mut() = new_state);
+            .for_each(|(iface_state, new_state)| *iface_state.lock().unwrap() = new_state);
     }
 }
 
