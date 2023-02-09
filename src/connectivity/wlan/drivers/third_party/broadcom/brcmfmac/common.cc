@@ -350,14 +350,13 @@ zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr, const wlan_phy_ps_mode_t*
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
-  BRCMF_INFO("Request to set PS Mode %d", fw_ps_mode);
   err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_PM, fw_ps_mode, &fw_err);
   if (err != ZX_OK) {
     BRCMF_ERR("Firmware rejected power save mode: %s fw err %s", zx_status_get_string(err),
               brcmf_fil_get_errstr(fw_err));
     return err;
   }
-  BRCMF_INFO("PS Mode set successfully");
+  BRCMF_INFO("PS Mode set to %s", (fw_ps_mode == PM_FAST) ? "PM FAST" : "PM OFF");
   return ZX_OK;
 }
 
