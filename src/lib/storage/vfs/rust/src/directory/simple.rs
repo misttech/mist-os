@@ -24,7 +24,6 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
-    MAX_NAME_LENGTH,
 };
 
 use {
@@ -126,7 +125,7 @@ where
     /// Returns the entry identified by `name`.
     pub fn get_entry(&self, name: &str) -> Result<Arc<dyn DirectoryEntry>, Status> {
         assert_eq_size!(u64, usize);
-        if name.len() as u64 > MAX_NAME_LENGTH {
+        if name.len() as u64 > fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
 
@@ -351,7 +350,7 @@ where
         overwrite: bool,
     ) -> Result<(), Status> {
         assert_eq_size!(u64, usize);
-        if name.len() as u64 > MAX_NAME_LENGTH {
+        if name.len() as u64 > fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
         if name.contains('/') {
@@ -376,7 +375,7 @@ where
         must_be_directory: bool,
     ) -> Result<Option<Arc<dyn DirectoryEntry>>, Status> {
         assert_eq_size!(u64, usize);
-        if name.len() as u64 >= MAX_NAME_LENGTH {
+        if name.len() as u64 >= fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
 
@@ -403,7 +402,7 @@ where
         src: String,
         to: Box<dyn FnOnce(Arc<dyn DirectoryEntry>) -> Result<(), Status>>,
     ) -> Result<(), Status> {
-        if src.len() as u64 >= MAX_NAME_LENGTH {
+        if src.len() as u64 >= fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
 
@@ -429,7 +428,7 @@ where
         dst: String,
         from: Box<dyn FnOnce() -> Result<Arc<dyn DirectoryEntry>, Status>>,
     ) -> Result<(), Status> {
-        if dst.len() as u64 >= MAX_NAME_LENGTH {
+        if dst.len() as u64 >= fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
 
@@ -444,7 +443,7 @@ where
     }
 
     fn rename_within(&self, src: String, dst: String) -> Result<(), Status> {
-        if src.len() as u64 >= MAX_NAME_LENGTH || dst.len() as u64 >= MAX_NAME_LENGTH {
+        if src.len() as u64 >= fio::MAX_FILENAME || dst.len() as u64 >= fio::MAX_FILENAME {
             return Err(Status::INVALID_ARGS);
         }
 

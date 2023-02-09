@@ -10,11 +10,11 @@
 mod tests;
 
 use {
+    fidl_fuchsia_io as fio,
     proc_macro2::{Span, TokenStream},
     quote::{quote, quote_spanned, ToTokens},
     std::collections::HashSet,
     syn::{
-        buffer::TokenBuffer,
         parse::{Parse, ParseStream},
         parse_quote,
         spanned::Spanned,
@@ -54,27 +54,6 @@ pub fn mut_pseudo_directory(input: proc_macro::TokenStream) -> proc_macro::Token
     // `str` when not connected to the compiler, while `proc_macro2::TokenStream` does provide for
     // this functionality.
     pseudo_directory_impl(true, input.into()).into()
-}
-
-/// Our own version of [`fidl_fuchsia_io::MAX_FILENAME`].  We can not depend on the fidl_fuchsia_io as
-/// there is not FIDL generation for the host.  So we keep our own copy and use
-/// [`pseudo_directory::check_max_filename_constant`] to make sure these two constants are in sync.
-const MAX_FILENAME: u64 = 255;
-
-/// A helper macro to expose the [`MAX_FILENAME`] value to tests in the [`fuchsia_vfs_pseudo_fs`]
-/// crate.
-#[proc_macro]
-pub fn pseudo_directory_max_filename(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let res = if !input.is_empty() {
-        let span = TokenBuffer::new(input).begin().span();
-        quote_spanned! {span=>
-            compile_error!("`pseudo_directory_max_filename!` should be given no input")
-        }
-    } else {
-        quote! { #MAX_FILENAME }
-    };
-
-    proc_macro::TokenStream::from(res)
 }
 
 fn pseudo_directory_impl(mutable: bool, input: TokenStream) -> TokenStream {
@@ -148,14 +127,14 @@ impl Parse for DirectoryEntry {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let mut seen = HashSet::new();
         let mut check_literal = |name: String, span| {
-            if name.len() as u64 > MAX_FILENAME {
+            if name.len() as u64 > fio::MAX_FILENAME {
                 let message = format!(
                     "Entry name is too long: '{}'\n\
                      Max entry name is {} bytes.\n\
                      This entry is {} bytes.",
                     name,
                     name.len(),
-                    MAX_FILENAME
+                    fio::MAX_FILENAME
                 );
                 return Err(syn::Error::new(span, message));
             }

@@ -32,26 +32,3 @@ pub fn unwrap_add_entry_span(entry: &str, location: &str, res: Result<(), Status
         location, error_text, entry
     );
 }
-
-#[cfg(test)]
-mod tests {
-    use {fidl_fuchsia_io as fio, vfs_macros::pseudo_directory_max_filename};
-
-    #[test]
-    fn macros_max_filename_constant() {
-        // `pseudo_directory!` needs access to [`fidl_fuchsia_io::MAX_FILENAME`], but the
-        // [`fidl_fuchsia_io`] crate is not available on the host.  So we hardcode the constant value
-        // in there and then make sure that the values are in sync.
-        let in_macros = pseudo_directory_max_filename! {};
-        assert!(
-            fio::MAX_FILENAME == in_macros,
-            "\n`fidl_fuchsia_io::MAX_FILENAME` and the value hardcoded in \
-             `vfs/rust/macros/src/lib.rs` have diverged.\n\
-             Please update the `MAX_FILENAME` value in `vfs/rust/macros/src/lib.rs`.\n\
-             `fidl_fuchsia_io::MAX_FILENAME`: {}\n\
-             vfs/rust/macros/src/lib.rs:MAX_FILENAME: {}",
-            fio::MAX_FILENAME,
-            in_macros
-        );
-    }
-}

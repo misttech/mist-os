@@ -83,7 +83,7 @@ mod tests {
     fn addable_with_result_remove_error() {
         let dir = vfs::directory::immutable::simple();
 
-        let entry_name = "x".repeat((vfs::MAX_NAME_LENGTH + 1).try_into().unwrap());
+        let entry_name = "x".repeat((fidl_fuchsia_io::MAX_FILENAME + 1).try_into().unwrap());
         assert!(dir.remove_node(&entry_name).is_err(), "remove node should fail");
     }
 }
