@@ -24,10 +24,6 @@ config("fidl-deprecated-c-bindings") {
   #
   # and replace the contents of `visibility` with the script output.
   visibility = [
-    "//src/devices/clock/bin/clock",
-
-    #------------------
-    #------------------
     "//src/devices/usb/bin/usb-fwloader",
 
     #------------------

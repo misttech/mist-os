@@ -2,20 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <ctype.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <fuchsia/hardware/rtc/c/fidl.h>
+#include <fidl/fuchsia.hardware.rtc/cpp/fidl.h>
 #include <getopt.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <libgen.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <zircon/syscalls.h>
+
+#include "src/lib/files/directory.h"
 
 int usage(const char *cmd) {
   fprintf(stderr,
@@ -29,86 +22,66 @@ int usage(const char *cmd) {
   return -1;
 }
 
-char *guess_dev(void) {
-  char path[19];  // strlen("/dev/class/rtc/###") + 1
-  DIR *d = opendir("/dev/class/rtc");
-  if (!d) {
-    return NULL;
+std::optional<std::string> guess_dev() {
+  const static std::string kDeviceDir = "/dev/class/rtc";
+  std::vector<std::string> files;
+  if (!files::ReadDirContents(kDeviceDir, &files)) {
+    return std::nullopt;
   }
 
-  struct dirent *de;
-  while ((de = readdir(d)) != NULL) {
-    if (strlen(de->d_name) != 3) {
+  for (const auto &file : files) {
+    if (file == ".") {
       continue;
     }
-
-    if (isdigit(de->d_name[0]) && isdigit(de->d_name[1]) && isdigit(de->d_name[2])) {
-      sprintf(path, "/dev/class/rtc/%.3s", de->d_name);
-      closedir(d);
-      return strdup(path);
-    }
+    return kDeviceDir + '/' + file;
   }
 
-  closedir(d);
-  return NULL;
+  return std::nullopt;
 }
 
-zx_status_t open_rtc(const char *path, zx_handle_t *handle) {
-  int rtc_fd = open(path, O_RDONLY);
-  if (rtc_fd < 0) {
-    printf("Can not open RTC device\n");
-  }
-  return fdio_get_service_handle(rtc_fd, handle);
-}
-
-int print_rtc(const char *path) {
-  zx_handle_t handle;
-  zx_status_t status = open_rtc(path, &handle);
-  if (status != ZX_OK) {
+int print_rtc(const fidl::SyncClient<fuchsia_hardware_rtc::Device> &client) {
+  auto result = client->Get();
+  if (result.is_error()) {
     return -1;
   }
-  fuchsia_hardware_rtc_Time rtc;
-
-  status = fuchsia_hardware_rtc_DeviceGet(handle, &rtc);
-  if (status != ZX_OK) {
-    return -1;
-  }
-  printf("%04d-%02d-%02dT%02d:%02d:%02d\n", rtc.year, rtc.month, rtc.day, rtc.hours, rtc.minutes,
-         rtc.seconds);
+  fuchsia_hardware_rtc::Time rtc = result->rtc();
+  printf("%04d-%02d-%02dT%02d:%02d:%02d\n", rtc.year(), rtc.month(), rtc.day(), rtc.hours(),
+         rtc.minutes(), rtc.seconds());
   return 0;
 }
 
-int set_rtc(const char *path, const char *time) {
-  fuchsia_hardware_rtc_Time rtc;
-  int n = sscanf(time, "%04hd-%02hhd-%02hhdT%02hhd:%02hhd:%02hhd", &rtc.year, &rtc.month, &rtc.day,
-                 &rtc.hours, &rtc.minutes, &rtc.seconds);
+int set_rtc(const fidl::SyncClient<fuchsia_hardware_rtc::Device> &client, const std::string &time) {
+  uint16_t year;
+  uint8_t month, day, hours, minutes, seconds;
+  int n = sscanf(time.c_str(), "%04hu-%02hhu-%02hhuT%02hhu:%02hhu:%02hhu", &year, &month, &day,
+                 &hours, &minutes, &seconds);
   if (n != 6) {
     printf("Bad time format.\n");
     return -1;
   }
-  zx_handle_t handle;
-  zx_status_t status = open_rtc(path, &handle);
-  if (status != ZX_OK) {
-    printf("Can not open RTC device\n");
-    return status;
+
+  auto result = client->Set({{{{
+      .seconds = seconds,
+      .minutes = minutes,
+      .hours = hours,
+      .day = day,
+      .month = month,
+      .year = year,
+  }}}});
+  if (result.is_error()) {
+    return result.error_value().status();
   }
 
-  zx_status_t set_status;
-  status = fuchsia_hardware_rtc_DeviceSet(handle, &rtc, &set_status);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  return set_status;
+  return result->status();
 }
 
-void print_monotonic(void) { printf("%lu\n", zx_clock_get_monotonic()); }
+void print_monotonic() { printf("%lu\n", zx_clock_get_monotonic()); }
 
 int main(int argc, char **argv) {
   int err = 0;
   const char *cmd = basename(argv[0]);
-  char *path = NULL;
-  char *set = NULL;
+  std::optional<std::string> path;
+  std::optional<std::string> set;
   static const struct option opts[] = {
       {"set", required_argument, NULL, 's'},
       {"dev", required_argument, NULL, 'd'},
@@ -119,21 +92,19 @@ int main(int argc, char **argv) {
   for (int opt; (opt = getopt_long(argc, argv, "", opts, NULL)) != -1;) {
     switch (opt) {
       case 's':
-        set = strdup(optarg);
+        set = optarg;
         break;
       case 'd':
-        path = strdup(optarg);
+        path = optarg;
         break;
       case 'm':
         print_monotonic();
-        goto done;
+        return 0;
       case 'h':
         usage(cmd);
-        err = 0;
-        goto done;
+        return 0;
       default:
-        err = usage(cmd);
-        goto done;
+        return usage(cmd);
     }
   }
 
@@ -141,35 +112,37 @@ int main(int argc, char **argv) {
   argc -= optind;
 
   if (argc != 0) {
-    err = usage(cmd);
-    goto done;
+    return usage(cmd);
   }
 
   if (!path) {
     path = guess_dev();
     if (!path) {
       fprintf(stderr, "No RTC found.\n");
-      err = usage(cmd);
-      goto done;
+      return usage(cmd);
     }
   }
 
+  auto client_end = component::Connect<fuchsia_hardware_rtc::Device>(path.value());
+  if (client_end.is_error()) {
+    fprintf(stderr, "Can not open RTC device\n");
+    return usage(cmd);
+  }
+
+  fidl::SyncClient client{std::move(*client_end)};
+
   if (set) {
-    err = set_rtc(path, set);
+    err = set_rtc(client, set.value());
     if (err) {
       printf("Set RTC failed.\n");
       usage(cmd);
     }
-    goto done;
+    return err;
   }
 
-  err = print_rtc(path);
+  err = print_rtc(client);
   if (err) {
     usage(cmd);
   }
-
-done:
-  free(path);
-  free(set);
   return err;
 }
