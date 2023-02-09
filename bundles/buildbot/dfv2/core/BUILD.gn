@@ -174,7 +174,6 @@ group("core") {
     "//src/ui/lib/escher/test:escher_unittests($host_toolchain)",
     "//src/ui/scenic:tests",
     "//src/ui/tests/integration_input_tests",
-    "//src/ui/tools/tiles:tiles_tests",
     "//src/virtualization:tests",
     "//third_party/boringssl:boringssl-fuzzers",
     "//third_party/boringssl:boringssl_tests",

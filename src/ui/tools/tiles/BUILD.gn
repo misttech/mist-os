@@ -3,85 +3,13 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
-import("//src/sys/core/build/core_shard.gni")
-
-source_set("tiles_lib") {
-  sources = [
-    "tiles.cc",
-    "tiles.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.developer.tiles:fuchsia.developer.tiles_hlcpp",
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/ui/base_view",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/zx",
-  ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
-    "//src/lib/fxl",
-  ]
-}
-
-executable("bin") {
-  output_name = "tiles"
-
-  sources = [ "main.cc" ]
-
-  deps = [
-    ":tiles_lib",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/trace-provider",
-  ]
-}
-
-fuchsia_component("tiles-gfx") {
-  component_name = "tiles"
-  manifest = "meta/tiles.cml"
-  deps = [ ":bin" ]
-}
 
 fuchsia_component("tiles-flatland") {
   manifest = "flatland/meta/tiles-flatland.cml"
   deps = [ "flatland:bin" ]
 }
 
+# TODO(https://fxbug.dev/107904) delete once tiles-session in use everywhere
 fuchsia_package("tiles") {
-  deps = [
-    ":tiles-flatland",
-    ":tiles-gfx",
-  ]
-}
-
-executable("tiles_unittests") {
-  testonly = true
-
-  sources = [ "tiles_unittest.cc" ]
-
-  deps = [
-    ":tiles_lib",
-    "//sdk/lib/sys/cpp/testing:unit",
-    "//src/lib/fxl",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-  ]
-}
-
-fuchsia_unittest_package("tiles_tests") {
-  deps = [ ":tiles_unittests" ]
-}
-
-core_shard("tiles_core_shard") {
-  shard_file = "meta/tiles.core_shard.cml"
+  deps = [ ":tiles-flatland" ]
 }

@@ -48,13 +48,10 @@ legacy_cache_package_labels += [
   "//src/ui:ui_packages",
   "//src/ui/bin/sensor-config:empty-sensor-config-pkg",
   "//src/ui/bin/terminal",
-  "//src/ui/tools/tiles",
 
   # Used to mock out display hardware in UI integration tests.
   "//src/ui/bin/hardware_display_controller_provider",
 ]
-
-core_realm_shards += [ "//src/ui/tools/tiles:tiles_core_shard" ]
 
 # End to end (E2E) `dart_inspect_benchmarks` test requires the dart runner.
 core_realm_shards += [ "//src/dart:dart_runner_core_shard" ]
@@ -108,7 +105,12 @@ core_realm_shards += [
 
 # Add cfv2 sl4f to base.
 core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]
-legacy_base_package_labels += [ "//src/sys/bin/start_sl4f" ]
+legacy_base_package_labels += [
+  "//src/sys/bin/start_sl4f",
+
+  # TODO(https://fxbug.dev/107904) remove once tiles-session is used for e2e tests
+  "//src/ui/tools/tiles",
+]
 
 legacy_universe_package_labels += [
   # E2E Product Tests. They don't produce fuchsia packages, but host
