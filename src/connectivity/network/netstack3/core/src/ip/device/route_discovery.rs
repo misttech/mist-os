@@ -218,7 +218,7 @@ fn send_event<DeviceId: Clone, C: Ipv6RouteDiscoveryNonSyncContext<DeviceId>>(
 mod tests {
     use core::{convert::TryInto as _, num::NonZeroU64, time::Duration};
 
-    use net_types::{ip::Ip as _, Witness as _};
+    use net_types::Witness as _;
     use packet::{BufferMut, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         icmp::{
@@ -243,7 +243,10 @@ mod tests {
             device::Ipv6DeviceTimerId, receive_ipv6_packet, testutil::FakeDeviceId,
             IPV6_DEFAULT_SUBNET,
         },
-        testutil::{DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _},
+        testutil::{
+            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
         Ctx, DeviceId, TimerId, TimerIdInner,
     };
 
@@ -588,7 +591,7 @@ mod tests {
         let mut ctx = crate::testutil::FakeCtx::default();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
         crate::ip::device::update_ipv6_configuration(
             &mut &*sync_ctx,
             non_sync_ctx,

@@ -60,7 +60,7 @@ use netstack3_core::{
     add_ip_addr_subnet,
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
-    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
+    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher, Mtu},
     error::NetstackError,
     handle_timer,
     ip::{
@@ -88,7 +88,7 @@ const LOOPBACK_NAME: &'static str = "lo";
 /// 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
 ///     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 /// ```
-const DEFAULT_LOOPBACK_MTU: u32 = 65536;
+const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(nonzero_ext::nonzero!(65536_u32));
 
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;

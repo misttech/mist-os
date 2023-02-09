@@ -1557,7 +1557,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use net_declare::net::ip_v6;
-    use net_types::{ethernet::Mac, ip::Ip as _, LinkLocalAddress as _};
+    use net_types::{ethernet::Mac, LinkLocalAddress as _};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         icmp::{
@@ -1583,7 +1583,10 @@ mod tests {
             device::testutil::with_assigned_ipv6_addr_subnets,
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ipv6_packet, testutil::FakeDeviceId,
         },
-        testutil::{assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _},
+        testutil::{
+            assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
         Ctx,
     };
 
@@ -2641,7 +2644,7 @@ mod tests {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,

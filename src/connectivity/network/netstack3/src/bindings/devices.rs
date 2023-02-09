@@ -10,7 +10,7 @@ use futures::stream::StreamExt as _;
 use net_types::{ethernet::Mac, ip::IpAddr, SpecifiedAddr, UnicastAddr};
 use netstack3_core::{
     data_structures::id_map_collection::{Entry, IdMapCollection, IdMapCollectionKey},
-    device::{handle_queued_rx_packets, DeviceId},
+    device::{handle_queued_rx_packets, DeviceId, Mtu},
     Ctx,
 };
 
@@ -178,7 +178,7 @@ pub(crate) fn spawn_rx_task(
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CommonInfo {
-    pub mtu: u32,
+    pub mtu: Mtu,
     pub admin_enabled: bool,
     pub events: super::InterfaceEventProducer,
     pub name: String,

@@ -22,7 +22,9 @@ use crate::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
         EventContext, FrameContext as _, InstantContext, TimerContext,
     },
-    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
+    device::{
+        ethernet, BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher, Mtu,
+    },
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
@@ -552,7 +554,7 @@ impl FakeEventDispatcherBuilder {
                     sync_ctx,
                     non_sync_ctx,
                     mac,
-                    Ipv6::MINIMUM_LINK_MTU.into(),
+                    IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                 );
                 crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);
                 match ip_subnet {
@@ -827,6 +829,11 @@ pub(crate) fn handle_timer(
 ) {
     crate::handle_timer(sync_ctx, non_sync_ctx, id)
 }
+
+pub(crate) const IPV6_MIN_MTU: Mtu = Mtu::new(nonzero_ext::nonzero!(Ipv6::MINIMUM_LINK_MTU as u32));
+
+pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: ethernet::MaxFrameSize =
+    const_unwrap::const_unwrap_option(ethernet::MaxFrameSize::from_mtu(IPV6_MIN_MTU));
 
 #[cfg(test)]
 mod tests {

@@ -14,7 +14,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
-use netstack3_core::Ctx;
+use netstack3_core::{device::ethernet, Ctx};
 
 use crate::bindings::{
     devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, StackTime,
@@ -176,7 +176,7 @@ impl DeviceHandler {
             return Err(Error::ConfigurationNotSupported);
         }
 
-        let netdevice_client::client::PortStatus { flags, mtu } =
+        let netdevice_client::client::PortStatus { flags, mtu: max_eth_frame_size } =
             status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
         let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);
 
@@ -248,14 +248,20 @@ impl DeviceHandler {
             })
             .transpose()?;
 
-        let core_id =
-            netstack3_core::device::add_ethernet_device(sync_ctx, non_sync_ctx, mac_addr, mtu);
+        let max_frame_size = ethernet::MaxFrameSize::new(max_eth_frame_size)
+            .ok_or(Error::ConfigurationNotSupported)?;
+        let core_id = netstack3_core::device::add_ethernet_device(
+            sync_ctx,
+            non_sync_ctx,
+            mac_addr,
+            max_frame_size,
+        );
         state_entry.insert(core_id.clone());
         let make_info = |id| {
             let name = name.unwrap_or_else(|| format!("eth{}", id));
             devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
                 common_info: devices::CommonInfo {
-                    mtu,
+                    mtu: max_frame_size.as_mtu(),
                     admin_enabled: false,
                     events: ns.create_interface_event_producer(
                         id,

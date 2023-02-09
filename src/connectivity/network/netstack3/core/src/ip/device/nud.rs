@@ -594,7 +594,7 @@ mod tests {
             device::update_ipv6_configuration, icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ipv6_packet, FrameDestination,
         },
-        testutil::{FakeEventDispatcherConfig, TestIpExt as _},
+        testutil::{FakeEventDispatcherConfig, TestIpExt as _, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
     };
 
     struct FakeNudContext<I: Ip, LinkAddr> {
@@ -1172,7 +1172,7 @@ mod tests {
             crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1256,7 +1256,7 @@ mod tests {
             crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,

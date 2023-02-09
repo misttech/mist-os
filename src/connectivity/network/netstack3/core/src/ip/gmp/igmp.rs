@@ -513,6 +513,7 @@ mod tests {
             testutil::{handle_timer_helper_with_sc_ref_mut, FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
+        device::{ethernet, Mtu},
         ip::{
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
@@ -1238,8 +1239,13 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv4::MINIMUM_LINK_MTU.into());
+        let device_id = sync_ctx.state.device.add_ethernet_device(
+            local_mac,
+            ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(
+                Ipv4::MINIMUM_LINK_MTU as u32
+            )))
+            .unwrap(),
+        );
         crate::ip::device::add_ipv4_addr_subnet(
             &mut sync_ctx,
             &mut non_sync_ctx,

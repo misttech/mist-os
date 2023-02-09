@@ -19,6 +19,7 @@ use packet_formats::{
     arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
     ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
+        ETHERNET_HDR_LEN_NO_TAG,
     },
     icmp::{
         ndp::{options::NdpOptionBuilder, NeighborSolicitation, OptionSequenceBuilder},
@@ -39,7 +40,7 @@ use crate::{
             ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId, BufferArpContext,
         },
         link::LinkDevice,
-        with_ethernet_state, Device, DeviceIdContext, EthernetDeviceId, FrameDestination,
+        with_ethernet_state, Device, DeviceIdContext, EthernetDeviceId, FrameDestination, Mtu,
         RecvIpFrameMeta,
     },
     error::ExistsError,
@@ -63,6 +64,8 @@ impl From<Mac> for FrameDestination {
         }
     }
 }
+
+const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The non-synchronized execution context for an Ethernet device.
 pub(crate) trait EthernetIpLinkDeviceNonSyncContext<DeviceId>:
@@ -349,47 +352,90 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
     }
 }
 
+/// The maximum frame size one ethernet device can send.
+///
+/// The frame size includes the ethernet header, the data payload, but excludes
+/// the 4 bytes from FCS (frame check sequence) as we don't calculate CRC and it
+/// is normally handled by the device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MaxFrameSize(NonZeroU32);
+
+impl MaxFrameSize {
+    /// The minimum ethernet frame size.
+    ///
+    /// We don't care about FCS, so the minimum frame size for us is 64 - 4.
+    pub(crate) const MIN: MaxFrameSize = MaxFrameSize(nonzero_ext::nonzero!(60_u32));
+
+    /// Creates from the maximum size of ethernet header and ethernet payload,
+    /// checks that it is valid, i.e., larger than the minimum frame size.
+    pub const fn new(frame_size: u32) -> Option<Self> {
+        if frame_size < Self::MIN.get().get() {
+            return None;
+        }
+        Some(Self(const_unwrap::const_unwrap_option(NonZeroU32::new(frame_size))))
+    }
+
+    const fn get(&self) -> NonZeroU32 {
+        let Self(frame_size) = *self;
+        frame_size
+    }
+
+    /// Converts the maximum frame size to its corresponding MTU.
+    pub const fn as_mtu(&self) -> Mtu {
+        // MTU must be positive because of the limit on minimum ethernet frame size
+        Mtu(const_unwrap::const_unwrap_option(NonZeroU32::new(
+            self.get().get().saturating_sub(ETHERNET_HDR_LEN_NO_TAG_U32),
+        )))
+    }
+
+    /// Creates the maximum ethernet frame size from MTU.
+    pub const fn from_mtu(mtu: Mtu) -> Option<MaxFrameSize> {
+        let frame_size = mtu.get().saturating_add(ETHERNET_HDR_LEN_NO_TAG_U32);
+        Self::new(frame_size.get())
+    }
+}
+
 /// Builder for [`EthernetDeviceState`].
 pub(crate) struct EthernetDeviceStateBuilder {
     mac: UnicastAddr<Mac>,
-    mtu: u32,
+    max_frame_size: MaxFrameSize,
 }
 
 impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
-    pub(crate) fn new(mac: UnicastAddr<Mac>, mtu: u32) -> Self {
-        // TODO(joshlf): Add a minimum MTU for all Ethernet devices such that
-        //  you cannot create an `EthernetDeviceState` with an MTU smaller than
-        //  the minimum. The absolute minimum needs to be at least the minimum
-        //  body size of an Ethernet frame. For IPv6-capable devices, the
-        //  minimum needs to be higher - the IPv6 minimum MTU. The easy path is
-        //  to simply use the IPv6 minimum MTU as the minimum in all cases,
-        //  although we may at some point want to figure out how to configure
-        //  devices which don't support IPv6, and allow smaller MTUs for those
-        //  devices.
+    pub(crate) fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxFrameSize) -> Self {
+        // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
+        // Ethernet devices such that you can't create an `EthernetDeviceState`
+        // with a `MaxFrameSize` smaller than the minimum. The absolute minimum
+        // needs to be at least the minimum body size of an Ethernet frame. For
+        // IPv6-capable devices, the minimum needs to be higher - the frame size
+        // implied by the IPv6 minimum MTU. The easy path is to simply use that
+        // frame size as the minimum in all cases, although we may at some point
+        // want to figure out how to configure devices which don't support IPv6,
+        // and allow smaller frame sizes for those devices.
         //
-        //  A few questions:
-        //  - How do we wire error information back up the call stack? Should
-        //    this just return a Result or something?
-        Self { mac, mtu }
+        // A few questions:
+        // - How do we wire error information back up the call stack? Should
+        //   this just return a Result or something?
+        Self { mac, max_frame_size }
     }
 
     /// Build the `EthernetDeviceState` from this builder.
     pub(super) fn build(self) -> EthernetDeviceState {
-        let Self { mac, mtu } = self;
+        let Self { mac, max_frame_size } = self;
 
         EthernetDeviceState {
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
-            static_state: StaticEthernetDeviceState { mac, hw_mtu: mtu },
-            dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(mtu)),
+            static_state: StaticEthernetDeviceState { mac, max_frame_size },
+            dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
         }
     }
 }
 
 pub(crate) struct DynamicEthernetDeviceState {
-    /// The value this netstack assumes as the device's current MTU.
-    mtu: u32,
+    /// The value this netstack assumes as the device's maximum frame size.
+    max_frame_size: MaxFrameSize,
 
     /// A flag indicating whether the device will accept all ethernet frames
     /// that it receives, regardless of the ethernet frame's destination MAC
@@ -401,8 +447,8 @@ pub(crate) struct DynamicEthernetDeviceState {
 }
 
 impl DynamicEthernetDeviceState {
-    fn new(mtu: u32) -> Self {
-        Self { mtu, promiscuous_mode: false, link_multicast_groups: Default::default() }
+    fn new(max_frame_size: MaxFrameSize) -> Self {
+        Self { max_frame_size, promiscuous_mode: false, link_multicast_groups: Default::default() }
     }
 }
 
@@ -410,8 +456,8 @@ pub(crate) struct StaticEthernetDeviceState {
     /// Mac address of the device this state is for.
     mac: UnicastAddr<Mac>,
 
-    /// The maximum MTU allowed by the hardware.
-    hw_mtu: u32,
+    /// The maximum frame size allowed by the hardware.
+    max_frame_size: MaxFrameSize,
 }
 
 /// The state associated with an Ethernet device.
@@ -530,7 +576,7 @@ where
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
 
-    let body = body.with_mtu(get_mtu(sync_ctx, device_id) as usize);
+    let body = body.with_mtu(get_mtu(sync_ctx, device_id).get().get() as usize);
 
     if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
         send_ip_frame_to_dst(
@@ -746,8 +792,10 @@ pub(super) fn get_mtu<
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
-) -> u32 {
-    sync_ctx.with_ethernet_device_state(device_id, |_static_state, dynamic_state| dynamic_state.mtu)
+) -> Mtu {
+    sync_ctx.with_ethernet_device_state(device_id, |_static_state, dynamic_state| {
+        dynamic_state.max_frame_size.as_mtu()
+    })
 }
 
 /// Insert a static entry into this device's ARP table.
@@ -884,21 +932,19 @@ pub(super) fn set_mtu<
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
-    mtu: NonZeroU32,
+    mtu: Mtu,
 ) {
     sync_ctx.with_ethernet_device_state_mut(device_id, |static_state, dynamic_state| {
-        let mut mtu = mtu.get();
-        let hw_mtu = static_state.hw_mtu;
-
-        // If `mtu` is greater than what the device supports, set `mtu` to the
-        // maximum MTU the device supports.
-        if mtu > hw_mtu {
-            trace!("ethernet::ndp_device::set_mtu: MTU of {:?} is greater than the device {:?}'s max MTU of {:?}, using device's max MTU instead", mtu, device_id, hw_mtu);
-            mtu = hw_mtu;
+        if let Some(mut frame_size ) = MaxFrameSize::from_mtu(mtu) {
+            // If `frame_size` is greater than what the device supports, set it
+            // to maximum frame size the device supports.
+            if frame_size > static_state.max_frame_size {
+                trace!("ethernet::ndp_device::set_mtu: MTU of {:?} is greater than the device {:?}'s max MTU of {:?}, using device's max MTU instead", mtu, device_id, static_state.max_frame_size.as_mtu());
+                frame_size = static_state.max_frame_size;
+            }
+            trace!("ethernet::ndp_device::set_mtu: setting link MTU to {:?}", mtu);
+            dynamic_state.max_frame_size = frame_size;
         }
-
-        trace!("ethernet::ndp_device::set_mtu: setting link MTU to {:?}", mtu);
-        dynamic_state.mtu = mtu;
     })
 }
 
@@ -946,7 +992,7 @@ mod tests {
         },
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng,
-            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V4,
+            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
     };
@@ -958,10 +1004,10 @@ mod tests {
     }
 
     impl FakeEthernetCtx {
-        fn new(mac: UnicastAddr<Mac>, mtu: u32) -> FakeEthernetCtx {
+        fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxFrameSize) -> FakeEthernetCtx {
             FakeEthernetCtx {
-                static_state: StaticEthernetDeviceState { hw_mtu: mtu, mac },
-                dynamic_state: DynamicEthernetDeviceState::new(mtu),
+                static_state: StaticEthernetDeviceState { max_frame_size, mac },
+                dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 static_arp_entries: Default::default(),
             }
         }
@@ -1152,7 +1198,7 @@ mod tests {
         fn test(size: usize, expect_frames_sent: usize) {
             let crate::context::testutil::FakeCtx { mut sync_ctx, mut non_sync_ctx } =
                 crate::context::testutil::FakeCtx::with_sync_ctx(FakeCtx::with_state(
-                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, Ipv6::MINIMUM_LINK_MTU.into()),
+                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
                 ));
 
             insert_static_arp_table_entry(
@@ -1189,7 +1235,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         let mut bytes = match I::VERSION {
@@ -1237,7 +1283,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         let expected_sent = if enable {
@@ -1301,7 +1347,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             FAKE_CONFIG_V4.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
     }
@@ -1548,7 +1594,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -1661,7 +1707,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -1828,7 +1874,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -1878,7 +1924,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -1905,7 +1951,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -2026,7 +2072,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);

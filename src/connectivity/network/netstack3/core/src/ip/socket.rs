@@ -1149,7 +1149,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{self, testutil::FakeInstant, EventContext},
-        device::DeviceId,
+        device::{DeviceId, Mtu},
         ip::{
             device::{
                 IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
@@ -1344,9 +1344,12 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
         let mut sync_ctx = &sync_ctx;
-        let loopback_device_id =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, u16::MAX.into())
-                .expect("create the loopback interface");
+        let loopback_device_id = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+        )
+        .expect("create the loopback interface");
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1507,9 +1510,12 @@ mod tests {
             .expect("install IPv6 device route on a fresh stack without routes"),
         }
 
-        let loopback_device_id =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, u16::MAX.into())
-                .expect("create the loopback interface");
+        let loopback_device_id = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+        )
+        .expect("create the loopback interface");
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,

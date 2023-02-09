@@ -5,7 +5,7 @@
 //! The device layer.
 
 pub(crate) mod arp;
-pub(crate) mod ethernet;
+pub mod ethernet;
 pub(crate) mod link;
 pub(crate) mod loopback;
 pub(crate) mod ndp;
@@ -73,6 +73,24 @@ pub(crate) trait Device: 'static {}
 /// layer internals to share.
 pub(crate) trait DeviceIdContext<D: Device> {
     type DeviceId: Clone + Display + Debug + Eq + Send + Sync + 'static;
+}
+
+/// The maximum transmit unit, i.e., the maximum size of an entire IP packet
+/// one link can transmit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Mtu(NonZeroU32);
+
+impl Mtu {
+    /// Creates MTU from the maximum size of an entire IP packet in bytes.
+    pub const fn new(mtu: NonZeroU32) -> Self {
+        Self(mtu)
+    }
+
+    /// Gets the numeric value of the MTU.
+    pub const fn get(&self) -> NonZeroU32 {
+        let Self(mtu) = self;
+        *mtu
+    }
 }
 
 struct RecvIpFrameMeta<D, I: Ip> {
@@ -191,7 +209,7 @@ fn with_ip_device_state<
 fn get_mtu<NonSyncCtx: NonSyncContext>(
     mut ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx::Instant>,
-) -> u32 {
+) -> Mtu {
     match device.inner() {
         DeviceIdInner::Ethernet(id) => self::ethernet::get_mtu(&mut ctx, &id),
         DeviceIdInner::Loopback(id) => self::loopback::get_mtu(&mut ctx, id),
@@ -304,7 +322,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         get_mtu(self, device_id)
     }
 
@@ -489,7 +507,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         get_mtu(self, device_id)
     }
 
@@ -568,8 +586,8 @@ impl<NonSyncCtx: NonSyncContext> Ipv6DeviceContext<NonSyncCtx> for &'_ SyncCtx<N
         }
     }
 
-    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: NonZeroU32) {
-        if mtu.get() < Ipv6::MINIMUM_LINK_MTU.into() {
+    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
+        if mtu.get().get() < Ipv6::MINIMUM_LINK_MTU.into() {
             return;
         }
 
@@ -869,23 +887,27 @@ impl<I: Instant> DeviceLayerState<I> {
     /// Add a new ethernet device to the device layer.
     ///
     /// `add` adds a new `EthernetDeviceState` with the given MAC address and
-    /// MTU. The MTU will be taken as a limit on the size of Ethernet payloads -
-    /// the Ethernet header is not counted towards the MTU.
-    pub(crate) fn add_ethernet_device(&self, mac: UnicastAddr<Mac>, mtu: u32) -> DeviceId<I> {
+    /// maximum frame size. The frame size is the limit on the size of the data
+    /// payload and the header but not the FCS.
+    pub(crate) fn add_ethernet_device(
+        &self,
+        mac: UnicastAddr<Mac>,
+        max_frame_size: ethernet::MaxFrameSize,
+    ) -> DeviceId<I> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
         let ptr = ReferenceCounted::new(IpLinkDeviceState::new(
-            EthernetDeviceStateBuilder::new(mac, mtu).build(),
+            EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
             self.origin.clone(),
         ));
         let weak_ptr = ReferenceCounted::downgrade(&ptr);
         let id = ethernet.push(ptr);
-        debug!("adding Ethernet device with ID {} and MTU {}", id, mtu);
+        debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
         EthernetDeviceId(id, weak_ptr).into()
     }
 
     /// Adds a new loopback device to the device layer.
-    pub(crate) fn add_loopback_device(&self, mtu: u32) -> Result<DeviceId<I>, ExistsError> {
+    pub(crate) fn add_loopback_device(&self, mtu: Mtu) -> Result<DeviceId<I>, ExistsError> {
         let Devices { ethernet: _, loopback } = &mut *self.devices.write();
 
         if let Some(_) = loopback {
@@ -1009,9 +1031,9 @@ pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     mac: UnicastAddr<Mac>,
-    mtu: u32,
+    max_frame_size: ethernet::MaxFrameSize,
 ) -> DeviceId<NonSyncCtx::Instant> {
-    let id = sync_ctx.state.device.add_ethernet_device(mac, mtu);
+    let id = sync_ctx.state.device.add_ethernet_device(mac, max_frame_size);
 
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
     crate::add_route(
@@ -1037,7 +1059,7 @@ pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
 pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    mtu: u32,
+    mtu: Mtu,
 ) -> Result<DeviceId<NonSyncCtx::Instant>, crate::error::ExistsError> {
     let id = sync_ctx.state.device.add_loopback_device(mtu)?;
 
@@ -1326,9 +1348,12 @@ mod tests {
         }
         check(&mut sync_ctx, &[][..]);
 
-        let loopback_device =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, 55 /* mtu */)
-                .expect("error adding loopback device");
+        let loopback_device = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            Mtu::new(nonzero_ext::nonzero!(55_u32)),
+        )
+        .expect("error adding loopback device");
         check(&mut sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
@@ -1342,7 +1367,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac,
-            0, /* mtu */
+            ethernet::MaxFrameSize::MIN,
         );
         check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
     }
@@ -1366,9 +1391,12 @@ mod tests {
     fn test_add_loopback_device_routes() {
         let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
 
-        let loopback_device =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, 55 /* mtu */)
-                .expect("error adding loopback device");
+        let loopback_device = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            Mtu::new(nonzero_ext::nonzero!(55_u32)),
+        )
+        .expect("error adding loopback device");
 
         let expected = [
             net_subnet_v4!("127.0.0.0/8").into(),
@@ -1388,7 +1416,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            55, /* mtu */
+            ethernet::MaxFrameSize::MIN,
         );
 
         let expected = [
@@ -1408,7 +1436,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            55, /* mtu */
+            ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32))).unwrap(),
         );
 
         // Enable the device, turning on a bunch of features that install

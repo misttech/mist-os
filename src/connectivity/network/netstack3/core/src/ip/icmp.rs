@@ -47,7 +47,7 @@ use crate::{
     data_structures::{
         id_map::IdMap, id_map_collection::IdMapCollectionKey, token_bucket::TokenBucket,
     },
-    device::FrameDestination,
+    device::{FrameDestination, Mtu},
     error::NotFoundError,
     ip::{
         device::{
@@ -1561,7 +1561,7 @@ fn receive_ndp_packet<
                         // not we should update the link's MTU in response to
                         // RAs.
                         if let Some(mtu) = NonZeroU32::new(mtu) {
-                            Ipv6DeviceHandler::set_link_mtu(sync_ctx, &device_id, mtu);
+                            Ipv6DeviceHandler::set_link_mtu(sync_ctx, &device_id, Mtu::new(mtu));
                         }
                     }
                 }
@@ -2984,12 +2984,7 @@ fn connect_icmp_inner<I: IcmpIpExt + IpExt, D>(
 #[cfg(test)]
 mod tests {
     use alloc::{format, vec, vec::Vec};
-    use core::{
-        convert::TryInto,
-        fmt::Debug,
-        num::{NonZeroU16, NonZeroU32},
-        time::Duration,
-    };
+    use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
@@ -3745,8 +3740,12 @@ mod tests {
 
         let loopback_device_id =
             net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx }| {
-                crate::device::add_loopback_device(&mut &*sync_ctx, non_sync_ctx, u16::MAX.into())
-                    .expect("create the loopback interface")
+                crate::device::add_loopback_device(
+                    &mut &*sync_ctx,
+                    non_sync_ctx,
+                    Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+                )
+                .expect("create the loopback interface")
             });
 
         let echo_body = vec![1, 2, 3, 4];
@@ -4187,7 +4186,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn set_link_mtu(&mut self, _device_id: &Self::DeviceId, _mtu: NonZeroU32) {
+        fn set_link_mtu(&mut self, _device_id: &Self::DeviceId, _mtu: Mtu) {
             unimplemented!()
         }
     }

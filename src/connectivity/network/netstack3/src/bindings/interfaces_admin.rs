@@ -1238,13 +1238,14 @@ fn close_address_state_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
     use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
     use net_declare::fidl_subnet;
-    use std::collections::HashMap;
 
     use crate::bindings::{
         interfaces_watcher::InterfaceEvent, interfaces_watcher::InterfaceUpdate, util::IntoFidl,
-        InterfaceEventProducer, NetstackContext,
+        InterfaceEventProducer, NetstackContext, DEFAULT_LOOPBACK_MTU,
     };
 
     // Verifies that when an an interface is removed, its addresses are
@@ -1260,12 +1261,11 @@ mod tests {
         let (event_sender, event_receiver) = futures::channel::mpsc::unbounded();
 
         // Add the interface.
-        const MTU: u32 = 65536;
         let build_fake_dev_info = |id| {
             const LOOPBACK_NAME: &'static str = "lo";
             devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
                 common_info: devices::CommonInfo {
-                    mtu: MTU,
+                    mtu: DEFAULT_LOOPBACK_MTU,
                     admin_enabled: true,
                     events: InterfaceEventProducer::new(id, event_sender),
                     name: LOOPBACK_NAME.to_string(),
@@ -1278,8 +1278,12 @@ mod tests {
         let binding_id = {
             let mut ctx = ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-            let core_id = netstack3_core::device::add_loopback_device(sync_ctx, non_sync_ctx, MTU)
-                .expect("failed to add loopback to core");
+            let core_id = netstack3_core::device::add_loopback_device(
+                sync_ctx,
+                non_sync_ctx,
+                DEFAULT_LOOPBACK_MTU,
+            )
+            .expect("failed to add loopback to core");
             non_sync_ctx
                 .devices
                 .add_device(core_id, build_fake_dev_info)

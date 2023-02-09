@@ -440,6 +440,7 @@ mod tests {
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, StackStateBuilder, TimerId, TimerIdInner,
     };
@@ -1163,7 +1164,7 @@ mod tests {
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
 
         let now = non_sync_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();

@@ -19,6 +19,7 @@ use net_types::{
 use packet::{Buf, BufferMut, SerializeError, Serializer};
 
 use crate::{
+    device::Mtu,
     device::{
         queue::{
             BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeueState, ReceiveQueue,
@@ -78,12 +79,12 @@ impl<NonSyncCtx: NonSyncContext> DeviceIdContext<LoopbackDevice> for &'_ SyncCtx
 }
 
 pub(super) struct LoopbackDeviceState {
-    mtu: u32,
+    mtu: Mtu,
     rx_queue: ReceiveQueue<IpVersion, Buf<Vec<u8>>>,
 }
 
 impl LoopbackDeviceState {
-    pub(super) fn new(mtu: u32) -> LoopbackDeviceState {
+    pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
         LoopbackDeviceState { mtu, rx_queue: Default::default() }
     }
 }
@@ -135,7 +136,7 @@ pub(super) fn send_ip_frame<
 pub(super) fn get_mtu<NonSyncCtx: NonSyncContext>(
     ctx: &SyncCtx<NonSyncCtx>,
     device_id: &LoopbackDeviceId<NonSyncCtx::Instant>,
-) -> u32 {
+) -> Mtu {
     with_loopback_state(ctx, device_id, |state| state.link.mtu)
 }
 
@@ -221,7 +222,7 @@ mod tests {
     };
 
     use crate::{
-        device::DeviceId,
+        device::{DeviceId, Mtu},
         error::NotFoundError,
         ip::device::state::{AssignedAddress, IpDeviceStateIpExt},
         testutil::{FakeEventDispatcherConfig, TestIpExt},
@@ -230,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_loopback_methods() {
-        const MTU: u32 = 66;
+        const MTU: Mtu = Mtu::new(nonzero_ext::nonzero!(66_u32));
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, MTU)

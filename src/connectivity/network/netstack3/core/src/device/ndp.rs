@@ -66,8 +66,9 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, link::LinkAddress, testutil::receive_frame_or_panic,
-            DeviceId, DeviceIdInner, EthernetDeviceId, FrameDestination,
+            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress,
+            testutil::receive_frame_or_panic, DeviceId, DeviceIdInner, EthernetDeviceId,
+            FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -88,7 +89,8 @@ mod tests {
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, set_logger_for_test,
-            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V6,
+            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            IPV6_MIN_MTU,
         },
         Ctx, Instant, TimerId, TimerIdInner,
     };
@@ -281,7 +283,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 mac,
-                Ipv6::MINIMUM_LINK_MTU.into(),
+                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             );
             (ctx, device_id)
         };
@@ -469,7 +471,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac(),
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -516,7 +518,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac(),
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let eth_dev_id: EthernetDeviceId<_> =
             dev_id.clone().try_into().expect("expected ethernet ID");
@@ -676,7 +678,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac(),
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let eth_dev_id: EthernetDeviceId<_> =
             dev_id.clone().try_into().expect("expected ethernet ID");
@@ -792,7 +794,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac(),
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let eth_dev_id: EthernetDeviceId<_> =
             dev_id.clone().try_into().expect("expected ethernet ID");
@@ -1117,12 +1119,12 @@ mod tests {
 
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let hw_mtu = 5000;
+        let hw_mtu = Mtu::new(nonzero_ext::nonzero!(5000_u32));
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
             local_mac(),
-            hw_mtu,
+            ethernet::MaxFrameSize::from_mtu(hw_mtu).unwrap(),
         );
         let src_mac = Mac::new([10, 11, 12, 13, 14, 15]);
         let src_ip = src_mac.to_ipv6_link_local().addr();
@@ -1180,7 +1182,7 @@ mod tests {
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device),
-            Ipv6::MINIMUM_LINK_MTU.into()
+            IPV6_MIN_MTU,
         );
     }
 
@@ -1225,7 +1227,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             fake_config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let eth_device_id: EthernetDeviceId<_> =
             device_id.clone().try_into().expect("expected ethernet ID");
@@ -1319,7 +1321,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             fake_config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let eth_device_id: EthernetDeviceId<_> =
             device_id.clone().try_into().expect("expected ethernet ID");
@@ -1391,7 +1393,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             fake_config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -1477,7 +1479,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             fake_config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
         assert_empty(non_sync_ctx.frames_sent());
@@ -1637,7 +1639,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
         set_ipv6_routing_enabled(&mut sync_ctx, &mut non_sync_ctx, &device, true)
@@ -1773,7 +1775,7 @@ mod tests {
             &mut sync_ctx,
             non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, non_sync_ctx, &device);
 
@@ -2087,7 +2089,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -2135,7 +2137,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -2360,7 +2362,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -2578,7 +2580,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         let router_mac = config.remote_mac;
@@ -2732,7 +2734,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         let router_mac = config.remote_mac;
@@ -2866,7 +2868,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
 
         let router_mac = config.remote_mac;
@@ -3049,7 +3051,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         let device_id: EthernetDeviceId<_> = device.clone().try_into().unwrap();
         // No DAD for the auto-generated link-local address.
@@ -3404,7 +3406,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,

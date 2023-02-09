@@ -541,7 +541,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::testutil::TestIpExt;
+    use crate::testutil::{TestIpExt, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE};
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
@@ -550,7 +550,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 

@@ -15,7 +15,6 @@ use zerocopy::{
     AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
 };
 
-use self::inner::*;
 use crate::error::{ParseError, ParseResult};
 
 const ETHERNET_MIN_ILLEGAL_ETHERTYPE: u16 = 1501;
@@ -280,19 +279,15 @@ impl PacketBuilder for EthernetFrameBuilder {
     }
 }
 
-/// A private module used to make sure that its contents are only accessible from
-/// the parent module and its `testutil` module.
-mod inner {
-    /// The length of an Ethernet header when it has no tags.
-    pub const ETHERNET_HDR_LEN_NO_TAG: usize = 14;
+/// The length of an Ethernet header when it has no tags.
+pub const ETHERNET_HDR_LEN_NO_TAG: usize = 14;
 
-    /// The minimum length of an Ethernet frame's body when the header contains no tags.
-    pub const ETHERNET_MIN_BODY_LEN_NO_TAG: usize = 46;
-}
+/// The minimum length of an Ethernet frame's body when the header contains no tags.
+pub const ETHERNET_MIN_BODY_LEN_NO_TAG: usize = 46;
 
 /// Constants useful for testing.
 pub mod testutil {
-    pub use super::inner::{ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG};
+    pub use super::{ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG};
 
     /// Ethernet frame, in bytes.
     pub const ETHERNET_DST_MAC_BYTE_OFFSET: usize = 0;

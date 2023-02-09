@@ -13,7 +13,7 @@ pub mod slaac;
 pub mod state;
 
 use alloc::{boxed::Box, vec::Vec};
-use core::num::{NonZeroU32, NonZeroU8};
+use core::num::NonZeroU8;
 
 #[cfg(test)]
 use net_types::ip::IpVersion;
@@ -28,6 +28,7 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
     },
+    device::Mtu,
     error::{ExistsError, NotFoundError},
     ip::{
         device::{
@@ -372,7 +373,7 @@ where
     /// Gets the MTU for a device.
     ///
     /// The MTU is the maximum size of an IP packet.
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32;
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 
     /// Joins the link-layer multicast group associated with the given IP
     /// multicast group.
@@ -418,7 +419,7 @@ pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceI
     fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]>;
 
     /// Sets the link MTU for the device.
-    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: NonZeroU32);
+    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
 }
 
 /// An implementation of an IP device.
@@ -475,7 +476,7 @@ pub(crate) trait Ipv6DeviceHandler<C>: IpDeviceHandler<Ipv6, C> {
     ) -> Result<bool, NotFoundError>;
 
     /// Sets the link MTU for the device.
-    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: NonZeroU32);
+    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
 }
 
 impl<
@@ -538,7 +539,7 @@ impl<
         })
     }
 
-    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: NonZeroU32) {
+    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
         Ipv6DeviceContext::set_link_mtu(self, device_id, mtu)
     }
 }
@@ -1436,9 +1437,11 @@ mod tests {
     use net_types::ip::Ipv6;
 
     use crate::{
+        device::ethernet,
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
             assert_empty, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, StackStateBuilder, TimerId, TimerIdInner,
     };
@@ -1450,8 +1453,13 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv4::MINIMUM_LINK_MTU.into());
+        let device_id = sync_ctx.state.device.add_ethernet_device(
+            local_mac,
+            ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(
+                Ipv4::MINIMUM_LINK_MTU as u32
+            )))
+            .unwrap(),
+        );
 
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
@@ -1549,7 +1557,7 @@ mod tests {
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
         let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, Ipv6::MINIMUM_LINK_MTU.into());
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.gmp_enabled = true;
 

@@ -49,7 +49,7 @@ use crate::{
         CounterContext, EventContext, InstantContext, NonTestCtxMarker, RngContext, TimerHandler,
     },
     data_structures::token_bucket::TokenBucket,
-    device::{DeviceId, FrameDestination},
+    device::{DeviceId, FrameDestination, Mtu},
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
@@ -520,7 +520,7 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
 
     /// Returns the MTU of the device.
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32;
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 }
 
 /// Events observed at the IP layer.
@@ -1826,7 +1826,7 @@ pub(crate) fn receive_ipv6_packet<
                             Icmpv6ErrorKind::PacketTooBig {
                                 proto,
                                 header_len: meta.header_len(),
-                                mtu,
+                                mtu: mtu.get().get(),
                             },
                         );
                     }
@@ -2740,6 +2740,7 @@ mod tests {
         testutil::{
             assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
             FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, IPV6_MIN_MTU,
         },
         Ctx, DeviceId, StackState,
     };
@@ -4021,7 +4022,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             config.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -4113,7 +4114,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             cfg.local_mac,
-            Ipv6::MINIMUM_LINK_MTU.into(),
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
@@ -4253,7 +4254,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 local_mac,
-                Ipv6::MINIMUM_LINK_MTU.into(),
+                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             );
             crate::ip::device::update_ipv6_configuration(
                 &mut sync_ctx,
@@ -4495,12 +4496,8 @@ mod tests {
         }
         let (Ctx { sync_ctx, mut non_sync_ctx }, mut device_ids) = builder.build();
         let mut sync_ctx = &sync_ctx;
-        let loopback_id = crate::device::add_loopback_device(
-            sync_ctx,
-            &mut non_sync_ctx,
-            I::MINIMUM_LINK_MTU.into(),
-        )
-        .unwrap();
+        let loopback_id =
+            crate::device::add_loopback_device(sync_ctx, &mut non_sync_ctx, IPV6_MIN_MTU).unwrap();
         crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
         crate::add_ip_addr_subnet(
             sync_ctx,

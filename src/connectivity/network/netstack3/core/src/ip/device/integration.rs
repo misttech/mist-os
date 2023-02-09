@@ -19,6 +19,7 @@ use packet_formats::icmp::{
 
 use crate::{
     context::FrameContext,
+    device::Mtu,
     error::{ExistsError, NotFoundError},
     ip::{
         self,
@@ -533,7 +534,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         DEFAULT_TTL
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         self.get_mtu(device_id)
     }
 }
@@ -590,7 +591,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         get_ipv6_hop_limit(self, device_id)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         self.get_mtu(device_id)
     }
 }

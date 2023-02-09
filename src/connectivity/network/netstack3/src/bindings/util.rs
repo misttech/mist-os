@@ -990,7 +990,6 @@ pub(crate) fn fidl_err_log_level(e: &fidl::Error) -> log::Level {
 
 #[cfg(test)]
 mod tests {
-
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
     use fuchsia_zircon_status as zx_status;
@@ -999,7 +998,10 @@ mod tests {
         ip::{Ipv4Addr, Ipv6Addr},
         UnicastAddr,
     };
-    use netstack3_core::Ctx;
+    use netstack3_core::{
+        device::{ethernet, Mtu},
+        Ctx,
+    };
     use test_case::test_case;
 
     use crate::bindings::NetstackContext;
@@ -1026,7 +1028,8 @@ mod tests {
                     &mut state.sync_ctx,
                     &mut state.non_sync_ctx,
                     UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap(),
-                    1500,
+                    ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32)))
+                        .unwrap(),
                 )
             });
 
