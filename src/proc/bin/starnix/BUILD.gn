@@ -276,6 +276,12 @@ rustc_binary("starnix_kernel_bin") {
     "vmex_resource.rs",
   ]
 
+  if (current_cpu == "x64") {
+    sources += [ "signals/signal_handling_x64.rs" ]
+  } else if (current_cpu == "arm64") {
+    sources += [ "signals/signal_handling_arm64.rs" ]
+  }
+
   features = []
   if (starnix_restricted_mode) {
     features += [ "restricted_mode" ]
