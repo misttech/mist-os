@@ -53,7 +53,7 @@ impl PkgfsVersions {
     async fn directory_entries(&self) -> BTreeMap<String, super::DirentType> {
         let active_packages = self.non_base_packages.read().await.active_packages();
         self.base_packages
-            .paths_and_hashes()
+            .root_paths_and_hashes()
             .map(|(_path, hash)| hash.to_string())
             .chain(active_packages.into_values().map(|hash| hash.to_string()))
             .map(|hash| (hash, super::DirentType::Directory))

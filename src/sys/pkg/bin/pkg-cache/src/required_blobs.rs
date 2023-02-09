@@ -31,6 +31,8 @@ pub(crate) enum FindRequiredBlobsError {
 /// meta.fars and content blobs) of package `meta_hash`.
 /// Caches intermediate results in `memoized_packages` to de-duplicate work in case there are
 /// shared subpackages.
+/// `memoized_packages` maps meta.fars to their required blobs and on success will contain entries
+/// for `meta_hash` and all its (transitive) subpackages.
 /// On error:
 ///   If `error_strategy` is `BestEffort`:
 ///     If some required blobs could be determined, return those blobs, otherwise return the error.

@@ -107,9 +107,7 @@ async fn assert_base_blob_count(
         hierarchy,
         root: contains {
             "base-packages": {
-                "base-blobs": {
-                    count: count,
-                }
+                "blob-count": count
             }
         }
     );

@@ -1080,7 +1080,7 @@ async fn serve_base_package_index(
     stream: PackageIndexIteratorRequestStream,
 ) {
     let mut package_entries = base_packages
-        .paths_and_hashes()
+        .root_paths_and_hashes()
         .map(|(path, hash)| PackageIndexEntry {
             package_url: fpkg::PackageUrl {
                 url: format!("fuchsia-pkg://{}/{}", package_host, path.name()),

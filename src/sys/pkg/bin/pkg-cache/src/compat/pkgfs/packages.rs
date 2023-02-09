@@ -56,7 +56,7 @@ impl PkgfsPackages {
         let mut res: HashMap<PackageName, HashMap<PackageVariant, Hash>> = HashMap::new();
 
         // First populate with base packages.
-        for (path, hash) in self.base_packages.paths_and_hashes() {
+        for (path, hash) in self.base_packages.root_paths_and_hashes() {
             let name = path.name().to_owned();
             let variant = path.variant().to_owned();
 

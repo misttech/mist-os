@@ -21,7 +21,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//src/lib/cobalt/rust/builders",
-    "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
