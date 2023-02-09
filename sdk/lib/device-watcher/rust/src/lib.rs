@@ -118,6 +118,13 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
         let component = components.next().ok_or(format_err!("cannot wait for empty path"))?;
         let file = match component {
             std::path::Component::Normal(file) => file,
+            // Per fuchsia.io/Directory.Open[0]:
+            //
+            // A leading '/' is allowed (and is treated the same way as if not present, i.e.
+            // "/foo/bar' and "foo/bar" are the same).
+            //
+            // [0] https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/directory.fidl;l=211-237;drc=02426e16b637b25a21b1e53f9861855d476aaf49
+            std::path::Component::RootDir => continue,
             component => {
                 return Err(format_err!("path contains non-normal component {:?}", component))
             }
@@ -289,5 +296,32 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_with_leading_slash() {
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+        let fs_scope = vfs::execution_scope::ExecutionScope::new();
+        let root = vfs::pseudo_directory! {
+            "test" => vfs::pseudo_directory! {},
+        };
+        root.open(
+            fs_scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            vfs::path::Path::dot(),
+            fidl::endpoints::ServerEnd::new(server.into_channel()),
+        );
+        fasync::Task::spawn(async move { fs_scope.wait().await }).detach();
+
+        let node_proxy = recursive_wait_and_open_with_flags::<fio::NodeMarker>(
+            client,
+            "/test",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
+        let (_status, _node_attrs) =
+            node_proxy.get_attr().await.expect("transport error on get_attr");
     }
 }
