@@ -2725,9 +2725,6 @@ mod tests {
                             .unwrap();
                         responder.send(&mut Ok(())).unwrap();
                     }
-                    ftest::RealmRequest::ReplaceConfigValue { .. } => {
-                        panic!("tests should not generate this out of date method call");
-                    }
                 }
             }
         }

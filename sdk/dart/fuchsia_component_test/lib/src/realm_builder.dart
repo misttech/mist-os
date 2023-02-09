@@ -993,8 +993,7 @@ class SubRealmBuilder {
     fconfig.ValueSpec value,
   ) {
     childRef.checkScope(realmPath);
-    // TODO(https://fxbug.dev/103951) switch to setConfigValue
-    return realmProxy.replaceConfigValue(childRef.name, key, value);
+    return realmProxy.setConfigValue(childRef.name, key, value);
   }
 
   /// Replaces a boolean value of a given configuration field

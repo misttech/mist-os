@@ -459,14 +459,20 @@ impl Realm {
 
                     responder.send(&mut Ok(()))?;
                 }
-                // TODO(https://fxbug.dev/103951) delete this
-                ftest::RealmRequest::ReplaceConfigValue { name, key, value, responder } => {
-                    self.handle_replace_config_value_soft_transition(name, key, value, responder)
-                        .await?;
-                }
                 ftest::RealmRequest::SetConfigValue { name, key, value, responder } => {
-                    self.handle_replace_config_value_soft_transition(name, key, value, responder)
-                        .await?;
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                    } else {
+                        match self.set_config_value(name, key, value).await {
+                            Ok(()) => {
+                                responder.send(&mut Ok(()))?;
+                            }
+                            Err(err) => {
+                                warn!(method = "Realm.SetConfigValue", message = %err);
+                                responder.send(&mut Err(err.into()))?;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -688,45 +694,6 @@ impl Realm {
                 to,
             )
             .await
-    }
-
-    // TODO(https://fxbug.dev/103951) inline this method
-    async fn handle_replace_config_value_soft_transition(
-        &self,
-        name: String,
-        key: String,
-        value: fconfig::ValueSpec,
-        responder: impl RealmBuilderNullResponder,
-    ) -> Result<(), fidl::Error> {
-        if self.realm_has_been_built.load(Ordering::Relaxed) {
-            responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
-        } else {
-            match self.set_config_value(name, key, value).await {
-                Ok(()) => {
-                    responder.send(&mut Ok(()))?;
-                }
-                Err(err) => {
-                    warn!(method = "Realm.SetConfigValue", message = %err);
-                    responder.send(&mut Err(err.into()))?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-// TODO(https://fxbug.dev/103951) delete this trait
-trait RealmBuilderNullResponder {
-    fn send(self, response: &mut Result<(), ftest::RealmBuilderError>) -> Result<(), fidl::Error>;
-}
-impl RealmBuilderNullResponder for ftest::RealmReplaceConfigValueResponder {
-    fn send(self, response: &mut Result<(), ftest::RealmBuilderError>) -> Result<(), fidl::Error> {
-        self.send(response)
-    }
-}
-impl RealmBuilderNullResponder for ftest::RealmSetConfigValueResponder {
-    fn send(self, response: &mut Result<(), ftest::RealmBuilderError>) -> Result<(), fidl::Error> {
-        self.send(response)
     }
 }
 

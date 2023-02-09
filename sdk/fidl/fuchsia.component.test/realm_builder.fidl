@@ -638,7 +638,7 @@ protocol Realm {
         name fuchsia.component.name;
     }) -> () error RealmBuilderError;
 
-    // TODO(https://fxbug.dev/103951) delete once all petals are on API level 9
+    @available(removed=12)
     ReplaceConfigValue(struct {
         name fuchsia.component.name;
         key fuchsia.component.decl.ConfigKey;

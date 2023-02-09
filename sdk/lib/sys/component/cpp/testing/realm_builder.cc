@@ -165,11 +165,10 @@ Realm& Realm::InitMutableConfigToEmpty(const std::string& name) {
 #endif
 
 Realm& Realm::SetConfigValue(const std::string& name, const std::string& key, ConfigValue value) {
-  // TODO(https://fxbug.dev/103951) switch to SetConfigValue
-  fuchsia::component::test::Realm_ReplaceConfigValue_Result result;
+  fuchsia::component::test::Realm_SetConfigValue_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
-      "Realm/SetConfigValue",
-      realm_proxy_->ReplaceConfigValue(name, key, value.TakeAsFidl(), &result), result);
+      "Realm/SetConfigValue", realm_proxy_->SetConfigValue(name, key, value.TakeAsFidl(), &result),
+      result);
   return *this;
 }
 
