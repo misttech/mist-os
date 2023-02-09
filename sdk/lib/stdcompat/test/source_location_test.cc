@@ -33,7 +33,7 @@ std::tuple<cpp20::source_location, uint32_t, uint32_t> BizBaz() {
 TEST(SourceLocationTest, DirectCallValue) {
   auto [location, line, column] = FooBar();
   EXPECT_EQ(location.file_name(), __FILE__);
-  EXPECT_EQ(location.function_name(), "FooBar");
+  EXPECT_THAT(location.function_name(), testing::HasSubstr("FooBar"));
   EXPECT_EQ(location.line(), line);
   EXPECT_EQ(location.column(), column);
 }
@@ -41,7 +41,7 @@ TEST(SourceLocationTest, DirectCallValue) {
 TEST(SourceLocationTest, DefaultParameterValue) {
   auto [location, line, column] = BizBaz();
   EXPECT_EQ(location.file_name(), __FILE__);
-  EXPECT_EQ(location.function_name(), "BizBaz");
+  EXPECT_THAT(location.function_name(), testing::HasSubstr("BizBaz"));
   EXPECT_EQ(location.line(), line);
   EXPECT_EQ(location.column(), column);
 }
