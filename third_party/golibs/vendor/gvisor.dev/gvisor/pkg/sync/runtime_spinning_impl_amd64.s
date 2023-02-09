@@ -1,4 +1,4 @@
-// Copyright 2020 The gVisor Authors.
+// Copyright 2018 The gVisor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package goid provides the Get function.
-package goid
+//go:build amd64
 
-import (
-	"runtime"
-)
+#include "textflag.h"
 
-// Dummy references for facts.
-const _ = runtime.Compiler
+#define NMSPINNING_OFFSET 92
 
-// goid returns the current goid, it is defined in assembly.
-func goid() int64
-
-// Get returns the ID of the current goroutine.
-func Get() int64 {
-	return goid()
-}
+TEXT ·addrOfSpinning(SB),NOSPLIT,$0-8
+	LEAQ runtime·sched(SB), AX
+	ADDQ $NMSPINNING_OFFSET, AX
+	MOVQ AX, ret+0(FP)
+	RET

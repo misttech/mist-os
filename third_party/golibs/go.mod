@@ -1,6 +1,6 @@
 module go.fuchsia.dev/fuchsia
 
-go 1.19
+go 1.20
 
 require (
 	cloud.google.com/go/storage v1.26.0
@@ -32,7 +32,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
-	gvisor.dev/gvisor v0.0.0-20230114010307-ba486da13ac4
+	gvisor.dev/gvisor v0.0.0-20230209005613-ed3cbf51ef0a
 )
 
 require (

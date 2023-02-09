@@ -12,20 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package goid provides the Get function.
-package goid
+#include "textflag.h"
 
-import (
-	"runtime"
-)
+#define GOID_OFFSET 152
 
-// Dummy references for facts.
-const _ = runtime.Compiler
-
-// goid returns the current goid, it is defined in assembly.
-func goid() int64
-
-// Get returns the ID of the current goroutine.
-func Get() int64 {
-	return goid()
-}
+// func goid() int64
+TEXT ·goid(SB),NOSPLIT,$0-8
+  MOVQ (TLS), R14
+  MOVQ GOID_OFFSET(R14), R14
+  MOVQ R14, ret+0(FP)
+  RET

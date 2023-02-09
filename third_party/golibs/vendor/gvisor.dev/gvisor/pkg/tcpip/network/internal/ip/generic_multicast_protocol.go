@@ -244,6 +244,7 @@ type protocolMode int
 
 const (
 	protocolModeV2 protocolMode = iota
+	protocolModeV1
 	protocolModeV1Compatibility
 )
 
@@ -289,6 +290,47 @@ type GenericMulticastProtocolState struct {
 
 	stateChangedReportV2Timer    tcpip.Timer
 	stateChangedReportV2TimerSet bool
+}
+
+// GetV1ModeLocked returns the V1 configuration.
+//
+// Precondition: g.protocolMU must be read locked.
+func (g *GenericMulticastProtocolState) GetV1ModeLocked() bool {
+	switch g.mode {
+	case protocolModeV2, protocolModeV1Compatibility:
+		return false
+	case protocolModeV1:
+		return true
+	default:
+		panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
+	}
+}
+
+func (g *GenericMulticastProtocolState) stopModeTimer() {
+	if g.modeTimer != nil {
+		g.modeTimer.Stop()
+	}
+}
+
+// SetV1ModeLocked sets the V1 configuration.
+//
+// Returns the previous configuration.
+//
+// Precondition: g.protocolMU must be locked.
+func (g *GenericMulticastProtocolState) SetV1ModeLocked(v bool) bool {
+	if g.GetV1ModeLocked() == v {
+		return v
+	}
+
+	if v {
+		g.stopModeTimer()
+		g.cancelV2ReportTimers()
+		g.mode = protocolModeV1
+		return false
+	}
+
+	g.mode = protocolModeV2
+	return true
 }
 
 func (g *GenericMulticastProtocolState) cancelV2ReportTimers() {
@@ -340,9 +382,7 @@ func (g *GenericMulticastProtocolState) MakeAllNonMemberLocked() {
 		return
 	}
 
-	if g.modeTimer != nil {
-		g.modeTimer.Stop()
-	}
+	g.stopModeTimer()
 	g.cancelV2ReportTimers()
 
 	var v2ReportBuilder MulticastGroupProtocolV2ReportBuilder
@@ -357,7 +397,7 @@ func (g *GenericMulticastProtocolState) MakeAllNonMemberLocked() {
 				groupAddress,
 			)
 		}
-	case protocolModeV1Compatibility:
+	case protocolModeV1Compatibility, protocolModeV1:
 		handler = g.transitionToNonMemberLocked
 	default:
 		panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
@@ -404,7 +444,7 @@ func (g *GenericMulticastProtocolState) InitializeGroupsLocked() {
 	switch g.mode {
 	case protocolModeV2:
 		v2ReportBuilder = g.opts.Protocol.NewReportV2Builder()
-	case protocolModeV1Compatibility:
+	case protocolModeV1Compatibility, protocolModeV1:
 	default:
 		panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
 	}
@@ -451,7 +491,7 @@ func (g *GenericMulticastProtocolState) SendQueuedReportsLocked() {
 			switch g.mode {
 			case protocolModeV2:
 				g.sendV2ReportAndMaybeScheduleChangedTimer(groupAddress, &info, MulticastGroupProtocolV2ReportRecordChangeToExcludeMode)
-			case protocolModeV1Compatibility:
+			case protocolModeV1Compatibility, protocolModeV1:
 				g.maybeSendReportLocked(groupAddress, &info)
 			default:
 				panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
@@ -498,7 +538,7 @@ func (g *GenericMulticastProtocolState) JoinGroupLocked(groupAddress tcpip.Addre
 					// Nothing meaningful we can do with the error here - we only try to
 					// send a delayed report once.
 					_, _ = reportBuilder.Send()
-				case protocolModeV1Compatibility:
+				case protocolModeV1Compatibility, protocolModeV1:
 					g.maybeSendReportLocked(groupAddress, &info)
 				default:
 					panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
@@ -644,7 +684,7 @@ func (g *GenericMulticastProtocolState) LeaveGroupLocked(groupAddress tcpip.Addr
 		} else {
 			delete(g.memberships, groupAddress)
 		}
-	case protocolModeV1Compatibility:
+	case protocolModeV1Compatibility, protocolModeV1:
 		g.transitionToNonMemberLocked(groupAddress, &info)
 		delete(g.memberships, groupAddress)
 	default:
@@ -663,7 +703,7 @@ func (g *GenericMulticastProtocolState) HandleQueryV2Locked(groupAddress tcpip.A
 	}
 
 	switch g.mode {
-	case protocolModeV1Compatibility:
+	case protocolModeV1Compatibility, protocolModeV1:
 		g.handleQueryInnerLocked(groupAddress, g.opts.Protocol.V2QueryMaxRespCodeToV1Delay(maxResponseCode))
 		return
 	case protocolModeV2:
@@ -847,42 +887,47 @@ func (g *GenericMulticastProtocolState) HandleQueryLocked(groupAddress tcpip.Add
 		return
 	}
 
-	// As per 3376 section 8.12 (for IGMPv3),
-	//
-	//   The Older Version Querier Interval is the time-out for transitioning
-	//   a host back to IGMPv3 mode once an older version query is heard.
-	//   When an older version query is received, hosts set their Older
-	//   Version Querier Present Timer to Older Version Querier Interval.
-	//
-	//   This value MUST be ((the Robustness Variable) times (the Query
-	//   Interval in the last Query received)) plus (one Query Response
-	//   Interval).
-	//
-	// As per RFC 3810 section 9.12 (for MLDv2),
-	//
-	//   The Older Version Querier Present Timeout is the time-out for
-	//   transitioning a host back to MLDv2 Host Compatibility Mode.  When an
-	//   MLDv1 query is received, MLDv2 hosts set their Older Version Querier
-	//   Present Timer to [Older Version Querier Present Timeout].
-	//
-	//   This value MUST be ([Robustness Variable] times (the [Query Interval]
-	//   in the last Query received)) plus ([Query Response Interval]).
-	modeRevertDelay := time.Duration(g.robustnessVariable) * g.queryInterval
-	if g.modeTimer == nil {
-		// TODO(https://issuetracker.google.com/264799098): Create timer on
-		// initialization instead of lazily creating the timer since the timer
-		// does not change after being created.
-		g.modeTimer = g.opts.Clock.AfterFunc(modeRevertDelay, func() {
-			g.protocolMU.Lock()
-			defer g.protocolMU.Unlock()
-			g.mode = protocolModeV2
-		})
-	} else {
-		g.modeTimer.Reset(modeRevertDelay)
+	switch g.mode {
+	case protocolModeV2, protocolModeV1Compatibility:
+		// As per 3376 section 8.12 (for IGMPv3),
+		//
+		//   The Older Version Querier Interval is the time-out for transitioning
+		//   a host back to IGMPv3 mode once an older version query is heard.
+		//   When an older version query is received, hosts set their Older
+		//   Version Querier Present Timer to Older Version Querier Interval.
+		//
+		//   This value MUST be ((the Robustness Variable) times (the Query
+		//   Interval in the last Query received)) plus (one Query Response
+		//   Interval).
+		//
+		// As per RFC 3810 section 9.12 (for MLDv2),
+		//
+		//   The Older Version Querier Present Timeout is the time-out for
+		//   transitioning a host back to MLDv2 Host Compatibility Mode.  When an
+		//   MLDv1 query is received, MLDv2 hosts set their Older Version Querier
+		//   Present Timer to [Older Version Querier Present Timeout].
+		//
+		//   This value MUST be ([Robustness Variable] times (the [Query Interval]
+		//   in the last Query received)) plus ([Query Response Interval]).
+		modeRevertDelay := time.Duration(g.robustnessVariable) * g.queryInterval
+		if g.modeTimer == nil {
+			// TODO(https://issuetracker.google.com/264799098): Create timer on
+			// initialization instead of lazily creating the timer since the timer
+			// does not change after being created.
+			g.modeTimer = g.opts.Clock.AfterFunc(modeRevertDelay, func() {
+				g.protocolMU.Lock()
+				defer g.protocolMU.Unlock()
+				g.mode = protocolModeV2
+			})
+		} else {
+			g.modeTimer.Reset(modeRevertDelay)
+		}
+		g.mode = protocolModeV1Compatibility
+		g.cancelV2ReportTimers()
+	case protocolModeV1:
+	default:
+		panic(fmt.Sprintf("unrecognized mode = %d", g.mode))
 	}
-	g.mode = protocolModeV1Compatibility
-	g.cancelV2ReportTimers()
-
 	g.handleQueryInnerLocked(groupAddress, maxResponseTime)
 }
 
@@ -961,7 +1006,7 @@ func (g *GenericMulticastProtocolState) initializeNewMemberLocked(groupAddress t
 			callersV2ReportBuilder.AddRecord(MulticastGroupProtocolV2ReportRecordChangeToExcludeMode, groupAddress)
 			info.transmissionLeft--
 		}
-	case protocolModeV1Compatibility:
+	case protocolModeV1Compatibility, protocolModeV1:
 		info.transmissionLeft = unsolicitedTransmissionCount
 		g.maybeSendReportLocked(groupAddress, info)
 	default:

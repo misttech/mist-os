@@ -1,4 +1,4 @@
-// Copyright 2018 The gVisor Authors.
+// Copyright 2020 The gVisor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build amd64 && go1.14 && !go1.21 && !goexperiment.staticlockranking
-// +build amd64,go1.14,!go1.21,!goexperiment.staticlockranking
-
 #include "textflag.h"
 
-TEXT ·addrOfSpinning(SB),NOSPLIT,$0-8
-	// The offset specified here is the nmspinning value in sched.
-	LEAQ runtime·sched(SB), AX
-	ADDQ $92, AX
-	MOVQ AX, ret+0(FP)
-	RET
+#define GOID_OFFSET 152
+
+// func goid() int64
+TEXT ·goid(SB),NOSPLIT,$0-8
+        MOVD g, R0      // g
+        MOVD GOID_OFFSET(R0), R0
+        MOVD R0, ret+0(FP)
+        RET

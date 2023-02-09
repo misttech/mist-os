@@ -33,6 +33,29 @@ const (
 	UnsolicitedReportIntervalMax = 10 * time.Second
 )
 
+// MLDVersion is the forced version of MLD.
+type MLDVersion int
+
+const (
+	_ MLDVersion = iota
+	// MLDVersion1 indicates MLDv1.
+	MLDVersion1
+	// MLDVersion2 indicates MLDv2. Note that MLD may still fallback to V1
+	// compatibility mode as required by MLDv2.
+	MLDVersion2
+)
+
+// MLDEndpoint is a network endpoint that supports MLD.
+type MLDEndpoint interface {
+	// SetMLDVersions sets the MLD version.
+	//
+	// Returns the previous MLD version.
+	SetMLDVersion(MLDVersion) MLDVersion
+
+	// GetMLDVersion returns the MLD version.
+	GetMLDVersion() MLDVersion
+}
+
 // MLDOptions holds options for MLD.
 type MLDOptions struct {
 	// Enabled indicates whether MLD will be performed.
@@ -298,6 +321,37 @@ func (mld *mldState) initializeAll() {
 // Precondition: mld.ep.mu must be locked.
 func (mld *mldState) sendQueuedReports() {
 	mld.genericMulticastProtocol.SendQueuedReportsLocked()
+}
+
+// setVersion sets the MLD version.
+//
+// Precondition: mld.ep.mu must be locked.
+func (mld *mldState) setVersion(v MLDVersion) MLDVersion {
+	var prev bool
+	switch v {
+	case MLDVersion2:
+		prev = mld.genericMulticastProtocol.SetV1ModeLocked(false)
+	case MLDVersion1:
+		prev = mld.genericMulticastProtocol.SetV1ModeLocked(true)
+	default:
+		panic(fmt.Sprintf("unrecognized version = %d", v))
+	}
+
+	return toMLDVersion(prev)
+}
+
+func toMLDVersion(v1Generic bool) MLDVersion {
+	if v1Generic {
+		return MLDVersion1
+	}
+	return MLDVersion2
+}
+
+// getVersion returns the MLD version.
+//
+// Precondition: mld.ep.mu must be read locked.
+func (mld *mldState) getVersion() MLDVersion {
+	return toMLDVersion(mld.genericMulticastProtocol.GetV1ModeLocked())
 }
 
 // writePacket assembles and sends an MLD packet.

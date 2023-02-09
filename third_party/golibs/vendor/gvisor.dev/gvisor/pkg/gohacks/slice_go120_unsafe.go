@@ -1,4 +1,4 @@
-// Copyright 2020 The gVisor Authors.
+// Copyright 2023 The gVisor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "textflag.h"
+//go:build go1.20
 
-// func getg() *g
-TEXT ·getg(SB),NOSPLIT,$0-8
-	MOVQ (TLS), R14
-	MOVQ R14, ret+0(FP)
-	RET
+package gohacks
+
+import (
+	"unsafe"
+)
+
+// Slice returns a slice whose underlying array starts at ptr an which length
+// and capacity are len.
+//
+// Slice is a wrapper around unsafe.Slice. Prefer to use unsafe.Slice directly
+// if possible.
+func Slice[T any](ptr *T, length int) []T {
+	return unsafe.Slice(ptr, length)
+}
