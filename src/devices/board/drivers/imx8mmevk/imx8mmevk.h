@@ -30,6 +30,7 @@ class Imx8mmEvk : public ddk::Device<Imx8mmEvk> {
   int Thread();
 
   zx_status_t GpioInit();
+  zx_status_t I2cInit();
 
   const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   const fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info_;

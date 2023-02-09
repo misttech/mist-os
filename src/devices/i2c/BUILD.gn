@@ -8,6 +8,7 @@ group("drivers") {
     "drivers/aml-i2c",
     "drivers/dw-i2c",
     "drivers/i2c",
+    "drivers/imx8m-i2c",
     "drivers/intel-i2c:drivers",
   ]
 }

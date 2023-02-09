@@ -1,0 +1,105 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/test.gni")
+
+driver_bind_rules("imx8m-i2c-bind") {
+  rules = "imx8m-i2c.bind"
+  header_output = "imx8m-i2c-bind.h"
+  bind_output = "imx8m-i2c.bindbc"
+  tests = "imx8m-i2c-bind-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.nxp.platform",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
+fuchsia_driver("imx8m-i2c-driver") {
+  output_name = "imx8m-i2c"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  sources = [ "imx8m-i2c.cc" ]
+  deps = [
+    ":imx8m-i2c-bind",
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/bus/lib/device-protocol-platform-device",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/sync",
+  ]
+}
+
+fuchsia_driver_component("imx8m-i2c") {
+  component_name = "imx8m-i2c"
+  deps = [ ":imx8m-i2c-driver" ]
+  info = "imx8m-i2c-info.json"
+  manifest = "meta/imx8m-i2c.cml"
+}
+
+test("imx8m-i2c-test-bin") {
+  output_name = "imx8m-i2c-test"
+  sources = [
+    "imx8m-i2c-test.cc",
+    "imx8m-i2c.cc",
+  ]
+  deps = [
+    ":imx8m-i2c-bind",
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/runtime/testing/runtime",
+    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/bus/lib/device-protocol-platform-device",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//src/devices/lib/nxp",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("imx8m-i2c-test") {
+  deps = [ ":imx8m-i2c-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":imx8m-i2c-bind_test",
+    ":imx8m-i2c-test",
+  ]
+}

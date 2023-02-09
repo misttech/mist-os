@@ -24,6 +24,7 @@ fuchsia_driver("imx8mmevk-driver") {
   ]
   sources = [
     "imx8mmevk-gpio.cc",
+    "imx8mmevk-i2c.cc",
     "imx8mmevk.cc",
   ]
   deps = [
@@ -33,6 +34,10 @@ fuchsia_driver("imx8mmevk-driver") {
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

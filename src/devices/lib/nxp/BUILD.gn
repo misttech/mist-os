@@ -6,6 +6,7 @@ source_set("nxp") {
   sources = [
     "include/soc/imx8m/gpio.h",
     "include/soc/imx8mm/gpio.h",
+    "include/soc/imx8mm/i2c.h",
   ]
   deps = [
     "//src/devices/lib/mmio",

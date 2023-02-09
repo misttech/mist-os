@@ -28,6 +28,7 @@ _common_bootfs_deps = [
   "//src/devices/bin/driver_host2",
   "//src/devices/board/drivers/imx8mmevk",
   "//src/devices/gpio/drivers/imx8m-gpio",
+  "//src/devices/i2c/drivers/imx8m-i2c",
 ]
 
 board_bootfs_labels += _common_bootfs_deps

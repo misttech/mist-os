@@ -15,6 +15,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   WIFI = 0x01,
+  I2C = 0x04,
   RTC_PCF8563 = 0x05,
   SR1XX = 0x06,
   GPIO = 0x07,

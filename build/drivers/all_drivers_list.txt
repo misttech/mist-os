@@ -147,6 +147,7 @@
 //src/devices/i2c/drivers/aml-i2c:aml-i2c-driver
 //src/devices/i2c/drivers/dw-i2c:dw-i2c-driver
 //src/devices/i2c/drivers/i2c:i2c-driver
+//src/devices/i2c/drivers/imx8m-i2c:imx8m-i2c-driver
 //src/devices/i2c/drivers/intel-i2c:intel-i2c-driver
 //src/devices/internal/drivers/fragment:fragment-driver
 //src/devices/internal/drivers/fragment:fragment.proxy-driver
