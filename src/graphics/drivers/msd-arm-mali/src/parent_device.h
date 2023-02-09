@@ -30,7 +30,7 @@ class ParentDevice {
 
   virtual zx_device_t* GetDeviceHandle();
 
-  std::unique_ptr<magma::PlatformHandle> GetBusTransactionInitiator() const;
+  zx::bti GetBusTransactionInitiator() const;
 
   // Get a driver-specific protocol implementation. |proto_id| identifies which
   // protocol to retrieve.

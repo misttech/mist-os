@@ -24,13 +24,15 @@ bool ParentDevice::GetProtocol(uint32_t proto_id, void* proto_out) {
   return true;
 }
 
-std::unique_ptr<magma::PlatformHandle> ParentDevice::GetBusTransactionInitiator() const {
+zx::bti ParentDevice::GetBusTransactionInitiator() const {
   zx_handle_t bti_handle;
   zx_status_t status = pdev_get_bti(&pdev_, 0, &bti_handle);
-  if (status != ZX_OK)
-    return DRETP(nullptr, "failed to get bus transaction initiator");
+  if (status != ZX_OK) {
+    DMESSAGE("failed to get bus transaction initiator");
+    return zx::bti();
+  }
 
-  return magma::PlatformHandle::Create(zx::handle(bti_handle));
+  return zx::bti(bti_handle);
 }
 
 std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(

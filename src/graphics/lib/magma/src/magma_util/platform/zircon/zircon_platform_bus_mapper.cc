@@ -99,4 +99,9 @@ std::unique_ptr<PlatformBusMapper> PlatformBusMapper::Create(
       std::static_pointer_cast<ZirconPlatformHandle>(bus_transaction_initiator));
 }
 
+std::unique_ptr<PlatformBusMapper> PlatformBusMapper::Create(zx::bti bus_transaction_initiator) {
+  return std::make_unique<ZirconPlatformBusMapper>(
+      std::make_shared<ZirconPlatformHandle>(std::move(bus_transaction_initiator)));
+}
+
 }  // namespace magma

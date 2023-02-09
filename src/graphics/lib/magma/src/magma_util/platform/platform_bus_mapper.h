@@ -5,6 +5,10 @@
 #ifndef PLATFORM_BUS_MAPPER_H
 #define PLATFORM_BUS_MAPPER_H
 
+#if defined(__Fuchsia__)
+#include <lib/zx/bti.h>
+#endif
+
 #include <memory>
 
 #include "platform_buffer.h"
@@ -35,6 +39,10 @@ class PlatformBusMapper {
 
   static std::unique_ptr<PlatformBusMapper> Create(
       std::shared_ptr<PlatformHandle> bus_transaction_initiator);
+
+#if defined(__Fuchsia__)
+  static std::unique_ptr<PlatformBusMapper> Create(zx::bti bus_transaction_initiator);
+#endif
 };
 
 }  // namespace magma
