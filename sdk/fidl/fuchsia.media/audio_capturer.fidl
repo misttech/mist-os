@@ -184,10 +184,10 @@ type AudioCapturerConfiguration = strict union {
 /// were any to discard) will be followed by an OnEndOfStream event.
 ///
 /// Two StreamPackets delivered by an AudioCapturer instance are 'continuous' if
-/// the first frame of audio contained in the second packet was capture exactly
+/// the first frame of audio contained in the second packet was captured exactly
 /// one nominal frame time after the final frame of audio in the first packet.
 /// If this relationship does not hold, the second StreamPacket will have the
-/// 'kFlagDiscontinuous' flag set in it's flags field.
+/// `STREAM_PACKET_FLAG_DISCONTINUITY` bit set in its `flags` field.
 ///
 /// Even though explicit timestamps are provided on every StreamPacket produced,
 /// users who have very precise timing requirements are encouraged to always
