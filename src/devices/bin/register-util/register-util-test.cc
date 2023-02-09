@@ -4,35 +4,17 @@
 
 #include "register-util.h"
 
-#include <errno.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/spawn.h>
-#include <lib/fidl/cpp/wire/server.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/process.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <zircon/process.h>
-#include <zircon/processargs.h>
-#include <zircon/syscalls.h>
-#include <zircon/syscalls/object.h>
 
 #include <zxtest/zxtest.h>
 
 class PhyServer : public fidl::WireServer<fuchsia_hardware_registers::Device> {
  public:
   PhyServer() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    zx::channel channels[2];
-    zx::channel::create(0, channels, channels + 1);
-    channel_ = std::move(channels[1]);
-    fidl::BindServer<fuchsia_hardware_registers::Device>(loop_.dispatcher(), std::move(channels[0]),
-                                                         this);
+    auto channels = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+    channel_ = std::move(channels->client);
+    fidl::BindServer(loop_.dispatcher(), std::move(channels->server), this);
     loop_.StartThread();
   }
   void ReadRegister8(ReadRegister8RequestView request,
@@ -70,16 +52,16 @@ class PhyServer : public fidl::WireServer<fuchsia_hardware_registers::Device> {
                        WriteRegister64Completer::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-  zx::channel TakeChannel() { return std::move(channel_); }
-  uint64_t address() { return address_; }
+  fidl::ClientEnd<fuchsia_hardware_registers::Device> TakeChannel() { return std::move(channel_); }
+  uint64_t address() const { return address_; }
 
-  uint64_t value() { return value_; }
+  uint64_t value() const { return value_; }
 
  private:
   uint64_t address_ = 0;
   uint32_t value_ = 0;
   async::Loop loop_;
-  zx::channel channel_;
+  fidl::ClientEnd<fuchsia_hardware_registers::Device> channel_;
 };
 
 TEST(RegisterUtil, RegisterReadTest) {

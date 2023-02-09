@@ -34,14 +34,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/bin/register-util",
-
-    #------------------
-    #------------------
-    "//src/devices/bin/register-util:bin",
-
-    #------------------
-    #------------------
     "//src/devices/block/bin/sdio",
 
     #------------------

@@ -4,8 +4,9 @@
 
 #ifndef SRC_DEVICES_BIN_REGISTER_UTIL_REGISTER_UTIL_H_
 #define SRC_DEVICES_BIN_REGISTER_UTIL_REGISTER_UTIL_H_
-#include <lib/zx/channel.h>
 
-int run(int argc, const char** argv, zx::channel channel);
+#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
+
+int run(int argc, const char** argv, fidl::ClientEnd<fuchsia_hardware_registers::Device> channel);
 
 #endif  // SRC_DEVICES_BIN_REGISTER_UTIL_REGISTER_UTIL_H_

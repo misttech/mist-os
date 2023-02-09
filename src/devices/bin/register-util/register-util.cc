@@ -4,15 +4,8 @@
 
 #include "register-util.h"
 
-#include <fcntl.h>
-#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <lib/fdio/fdio.h>
-#include <lib/zx/channel.h>
-#include <unistd.h>
-#include <zircon/status.h>
-
-int run(int argc, const char** argv, zx::channel channel) {
-  fidl::WireSyncClient<fuchsia_hardware_registers::Device> device(std::move(channel));
+int run(int argc, const char** argv, fidl::ClientEnd<fuchsia_hardware_registers::Device> channel) {
+  fidl::WireSyncClient device(std::move(channel));
   size_t address = strtoul(argv[2], nullptr, 16);
   zx_status_t status = ZX_OK;
   if (argc == 4) {
