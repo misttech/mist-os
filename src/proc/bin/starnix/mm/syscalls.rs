@@ -28,6 +28,17 @@ fn mmap_prot_to_vm_opt(prot: u32) -> zx::VmarFlags {
     flags
 }
 
+// Returns any platform-specific mmap flags. This is a separate function because as of this writing
+// "attributes on expressions are experimental."
+#[cfg(target_arch = "x86_64")]
+fn get_valid_platform_mmap_flags() -> u32 {
+    MAP_32BIT
+}
+#[cfg(target_arch = "aarch64")]
+fn get_valid_platform_mmap_flags() -> u32 {
+    0
+}
+
 pub fn sys_mmap(
     current_task: &CurrentTask,
     addr: UserAddress,
@@ -42,20 +53,19 @@ pub fn sys_mmap(
         not_implemented!(current_task, "mmap: prot: 0x{:x}", prot);
         return error!(EINVAL);
     }
-    if flags
-        & !(MAP_32BIT
-            | MAP_PRIVATE
-            | MAP_SHARED
-            | MAP_ANONYMOUS
-            | MAP_FIXED
-            | MAP_FIXED_NOREPLACE
-            | MAP_POPULATE
-            | MAP_NORESERVE
-            | MAP_STACK
-            | MAP_DENYWRITE
-            | MAP_GROWSDOWN)
-        != 0
-    {
+
+    let valid_flags: u32 = get_valid_platform_mmap_flags()
+        | MAP_PRIVATE
+        | MAP_SHARED
+        | MAP_ANONYMOUS
+        | MAP_FIXED
+        | MAP_FIXED_NOREPLACE
+        | MAP_POPULATE
+        | MAP_NORESERVE
+        | MAP_STACK
+        | MAP_DENYWRITE
+        | MAP_GROWSDOWN;
+    if flags & !valid_flags != 0 {
         not_implemented!(current_task, "mmap: flags: 0x{:x}", flags);
         return error!(EINVAL);
     }
@@ -99,6 +109,7 @@ pub fn sys_mmap(
     if flags & MAP_ANONYMOUS != 0 {
         options |= MappingOptions::ANONYMOUS;
     }
+    #[cfg(target_arch = "x86_64")]
     if flags & MAP_FIXED == 0 && flags & MAP_32BIT != 0 {
         options |= MappingOptions::LOWER_32BIT;
     }

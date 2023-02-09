@@ -24,9 +24,17 @@ use crate::types::*;
 #[cfg(target_arch = "x86_64")]
 const RED_ZONE_SIZE: u64 = 128;
 
+/// I can not find an authoritative source that the Linux AARCH ABI has or doesn't have a red zone.
+/// Apple aarch64 ABI uses a 128-byte one but the standard ARM ABI doc doesn't mention this and
+/// gvisor doesn't implement it.
+#[cfg(target_arch = "aarch64")]
+const RED_ZONE_SIZE: u64 = 0;
+
 /// The size of the syscall instruction in bytes.
 #[cfg(target_arch = "x86_64")]
 const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
+#[cfg(target_arch = "aarch64")]
+const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
 
 /// A `SignalStackFrame` contains all the state that is stored on the stack prior
 /// to executing a signal handler.
@@ -52,9 +60,19 @@ struct SignalStackFrame {
     fpstate: _fpstate_64,
 }
 
+/// Same as the x86_64 version above except that there is no separate fp state and the restorer
+/// address is instead saved in R30 (the link register) rather than here on the stack.
+#[repr(C)]
+#[cfg(target_arch = "aarch64")]
+struct SignalStackFrame {
+    siginfo_bytes: [u8; std::mem::size_of::<siginfo_t>()],
+    context: ucontext,
+}
+
 const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 
 impl SignalStackFrame {
+    #[cfg(target_arch = "x86_64")]
     fn new(siginfo: &SignalInfo, context: ucontext, restorer_address: u64) -> SignalStackFrame {
         SignalStackFrame {
             context,
@@ -62,6 +80,11 @@ impl SignalStackFrame {
             restorer_address,
             fpstate: Default::default(),
         }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn new(siginfo: &SignalInfo, context: ucontext) -> SignalStackFrame {
+        SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }
     }
 
     fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
