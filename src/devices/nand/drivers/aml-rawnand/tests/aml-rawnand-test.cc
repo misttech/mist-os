@@ -6,7 +6,6 @@
 
 #include <lib/ddk/io-buffer.h>
 #include <lib/fake-bti/bti.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 
@@ -17,6 +16,8 @@
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-common/aml-rawnand.h>
 #include <zxtest/zxtest.h>
+
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlrawnand {
 
@@ -139,8 +140,8 @@ class StubOnfi : public Onfi {
 class FakeAmlRawNand : public AmlRawNand {
  public:
   // Factory method so we can indicate failure by returning nullptr.
-  static std::unique_ptr<FakeAmlRawNand> Create(const uint32_t page0_valid_copy = 0,
-                                                bool rand_mode = false) {
+  static FakeAmlRawNand* Create(zx_device_t* parent, const uint32_t page0_valid_copy = 0,
+                                bool rand_mode = false) {
     // Zircon objects required by AmlRawNand.
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
@@ -168,7 +169,7 @@ class FakeAmlRawNand : public AmlRawNand {
     auto stub_onfi_raw = stub_onfi.get();
 
     auto nand = std::unique_ptr<FakeAmlRawNand>(
-        new FakeAmlRawNand(std::move(bti), std::move(interrupt), std::move(mock_nand_regs),
+        new FakeAmlRawNand(parent, std::move(bti), std::move(interrupt), std::move(mock_nand_regs),
                            std::move(mock_nand_reg_region), std::move(mock_clock_regs),
                            std::move(mock_clock_reg_region), std::move(stub_onfi), rand_mode));
     nand->stub_onfi_ = stub_onfi_raw;
@@ -191,7 +192,7 @@ class FakeAmlRawNand : public AmlRawNand {
     // with a blank slate for tests.
     nand->fake_page_map_.clear();
 
-    return nand;
+    return nand.release();
   }
 
   // On test exit, make sure we met all the expectations we had.
@@ -282,13 +283,13 @@ class FakeAmlRawNand : public AmlRawNand {
   }
 
  private:
-  FakeAmlRawNand(zx::bti bti, zx::interrupt interrupt,
+  FakeAmlRawNand(zx_device_t* parent, zx::bti bti, zx::interrupt interrupt,
                  std::unique_ptr<ddk_mock::MockMmioReg[]> mock_nand_regs,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_nand_reg_region,
                  std::unique_ptr<ddk_mock::MockMmioReg[]> mock_clock_regs,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_clock_reg_region,
                  std::unique_ptr<Onfi> onfi, bool rand_mode)
-      : AmlRawNand(fake_ddk::kFakeParent, fdf::MmioBuffer(mock_nand_reg_region->GetMmioBuffer()),
+      : AmlRawNand(parent, fdf::MmioBuffer(mock_nand_reg_region->GetMmioBuffer()),
                    fdf::MmioBuffer(mock_clock_reg_region->GetMmioBuffer()), std::move(bti),
                    std::move(interrupt), std::move(onfi)),
         rand_mode_(rand_mode),
@@ -429,18 +430,27 @@ class FakeAmlRawNand : public AmlRawNand {
   std::queue<uint8_t> fake_read_bytes_;
 };
 
-TEST(AmlRawnand, FakeNandCreate) {
-  auto nand = FakeAmlRawNand::Create();
+class AmlRawnand : public zxtest::Test {
+ public:
+  MockDevice* root() const { return root_.get(); }
+  MockDevice* mock_dev() { return root_->GetLatestChild(); }
+
+ private:
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+};
+
+TEST_F(AmlRawnand, FakeNandCreate) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 }
 
-TEST(AmlRawnand, FakeNandCreateWithPage0AtADifferentCopy) {
-  auto nand = FakeAmlRawNand::Create(7);
+TEST_F(AmlRawnand, FakeNandCreateWithPage0AtADifferentCopy) {
+  auto* nand = FakeAmlRawNand::Create(root(), 7);
   ASSERT_NOT_NULL(nand);
 }
 
-TEST(AmlRawnand, ReadPage) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadPage) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -468,8 +478,8 @@ TEST(AmlRawnand, ReadPage) {
   EXPECT_EQ(0xABCD, oob.back());
 }
 
-TEST(AmlRawnand, ReadPageNullEcc) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadPageNullEcc) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -495,8 +505,8 @@ TEST(AmlRawnand, ReadPageNullEcc) {
   EXPECT_EQ(0xABCD, oob.back());
 }
 
-TEST(AmlRawnand, ReadPageDataOnly) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadPageDataOnly) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -516,8 +526,8 @@ TEST(AmlRawnand, ReadPageDataOnly) {
   EXPECT_EQ(0xAA, data.back());
 }
 
-TEST(AmlRawnand, ReadPageOobOnly) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadPageOobOnly) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -538,8 +548,8 @@ TEST(AmlRawnand, ReadPageOobOnly) {
   EXPECT_EQ(0xABCD, oob.back());
 }
 
-TEST(AmlRawnand, ReadErasedPage) {
-  auto nand = FakeAmlRawNand::Create(0, true);
+TEST_F(AmlRawnand, ReadErasedPage) {
+  auto* nand = FakeAmlRawNand::Create(root(), 0, true);
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -583,8 +593,8 @@ TEST(AmlRawnand, ReadErasedPage) {
                                        kDefaultNumUserBytes, nullptr, &ecc_correct));
 }
 
-TEST(AmlRawnand, PartialErasedPage) {
-  auto nand = FakeAmlRawNand::Create(0, true);
+TEST_F(AmlRawnand, PartialErasedPage) {
+  auto* nand = FakeAmlRawNand::Create(root(), 0, true);
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -620,8 +630,8 @@ TEST(AmlRawnand, PartialErasedPage) {
   EXPECT_EQ(0xffff, oob.back());
 }
 
-TEST(AmlRawnand, ErasedPageAllOnes) {
-  auto nand = FakeAmlRawNand::Create(0, true);
+TEST_F(AmlRawnand, ErasedPageAllOnes) {
+  auto* nand = FakeAmlRawNand::Create(root(), 0, true);
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
@@ -654,8 +664,8 @@ TEST(AmlRawnand, ErasedPageAllOnes) {
   EXPECT_EQ(0xffff, oob.back());
 }
 
-TEST(AmlRawnand, WritePage) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePage) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint8_t> data(kTestNandWriteSize);
@@ -677,8 +687,8 @@ TEST(AmlRawnand, WritePage) {
   EXPECT_EQ(0xAABB, page.info[kDefaultNumEccPages - 1].info_bytes);
 }
 
-TEST(AmlRawnand, WritePageDataOnly) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePageDataOnly) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint8_t> data(kTestNandWriteSize);
@@ -692,8 +702,8 @@ TEST(AmlRawnand, WritePageDataOnly) {
   EXPECT_EQ(0x22, page.data[kTestNandWriteSize - 1]);
 }
 
-TEST(AmlRawnand, WritePageOobOnly) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePageOobOnly) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint16_t> oob(kDefaultNumEccPages);
@@ -707,8 +717,8 @@ TEST(AmlRawnand, WritePageOobOnly) {
   EXPECT_EQ(0xAABB, page.info[kDefaultNumEccPages - 1].info_bytes);
 }
 
-TEST(AmlRawnand, WritePageShortOob) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePageShortOob) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint16_t> oob(kDefaultNumEccPages);
@@ -724,8 +734,8 @@ TEST(AmlRawnand, WritePageShortOob) {
   EXPECT_EQ(0x0000, page.info[kDefaultNumEccPages - 1].info_bytes);
 }
 
-TEST(AmlRawnand, WritePageShortOobOddBytes) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePageShortOobOddBytes) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint16_t> oob(kDefaultNumEccPages);
@@ -741,8 +751,8 @@ TEST(AmlRawnand, WritePageShortOobOddBytes) {
   EXPECT_EQ(0x0000, page.info[kDefaultNumEccPages - 1].info_bytes);
 }
 
-TEST(AmlRawnand, WritePageShortOobZeroBytes) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePageShortOobZeroBytes) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint16_t> oob(kDefaultNumEccPages);
@@ -756,8 +766,8 @@ TEST(AmlRawnand, WritePageShortOobZeroBytes) {
   EXPECT_EQ(0x0000, page.info[kDefaultNumEccPages - 1].info_bytes);
 }
 
-TEST(AmlRawnand, WriteBl2Page) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WriteBl2Page) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   const uint32_t page_index = kNumBl2Pages - 1;
@@ -778,8 +788,8 @@ TEST(AmlRawnand, WriteBl2Page) {
   }
 }
 
-TEST(AmlRawnand, WriteBl2PageInvalidOobError) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WriteBl2PageInvalidOobError) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   std::vector<uint8_t> data(kTestNandWriteSize);
@@ -800,8 +810,8 @@ TEST(AmlRawnand, WriteBl2PageInvalidOobError) {
 // Read/write command tests - ensure we're sending the right commands to the
 // NAND control registers.
 
-TEST(AmlRawnand, WritePage0Command) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WritePage0Command) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We expect randomization to always be on for page0 metadata pages.
@@ -811,8 +821,8 @@ TEST(AmlRawnand, WritePage0Command) {
   ASSERT_OK(nand->RawNandWritePageHwecc(data.data(), kTestNandWriteSize, nullptr, 0, 0));
 }
 
-TEST(AmlRawnand, ReadPage0Command) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadPage0Command) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We expect randomization to always be on for page0 metadata pages.
@@ -826,8 +836,8 @@ TEST(AmlRawnand, ReadPage0Command) {
                                        nullptr, 0, nullptr, &ecc_correct));
 }
 
-TEST(AmlRawnand, WriteBl2Command) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WriteBl2Command) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We don't use randomization for other BL2 pages.
@@ -837,8 +847,8 @@ TEST(AmlRawnand, WriteBl2Command) {
   ASSERT_OK(nand->RawNandWritePageHwecc(data.data(), kTestNandWriteSize, nullptr, 0, 1));
 }
 
-TEST(AmlRawnand, ReadBl2Command) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadBl2Command) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We don't use randomization for other BL2 pages.
@@ -852,8 +862,8 @@ TEST(AmlRawnand, ReadBl2Command) {
                                        nullptr, 0, nullptr, &ecc_correct));
 }
 
-TEST(AmlRawnand, WriteCommand) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, WriteCommand) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We don't use randomization for normal pages.
@@ -864,8 +874,8 @@ TEST(AmlRawnand, WriteCommand) {
       nand->RawNandWritePageHwecc(data.data(), kTestNandWriteSize, nullptr, 0, kFirstNonBl2Page));
 }
 
-TEST(AmlRawnand, ReadCommand) {
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, ReadCommand) {
+  auto* nand = FakeAmlRawNand::Create(root());
   ASSERT_NOT_NULL(nand);
 
   // We don't use randomization for normal pages.
@@ -879,9 +889,8 @@ TEST(AmlRawnand, ReadCommand) {
                                        &data_bytes_read, nullptr, 0, nullptr, &ecc_correct));
 }
 
-TEST(AmlRawNand, SuspendReleasesAllPins) {
-  fake_ddk::Bind ddk;
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, SuspendReleasesAllPins) {
+  auto* nand = FakeAmlRawNand::Create(root());
   zx_info_bti_t bti_info;
   size_t actual = 0, avail = 0;
   ASSERT_EQ(nand->bti().get_info(ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail), ZX_OK);
@@ -889,14 +898,13 @@ TEST(AmlRawNand, SuspendReleasesAllPins) {
   ASSERT_NOT_NULL(nand);
   ddk::SuspendTxn txn(nand->zxdev(), 0, 0, 0);
   nand->DdkSuspend(std::move(txn));
-  ddk.WaitUntilSuspend();
+  mock_dev()->WaitUntilSuspendReplyCalled();
   ASSERT_EQ(nand->bti().get_info(ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail), ZX_OK);
   EXPECT_EQ(bti_info.pmo_count, 0);
 }
 
-TEST(AmlRawNand, OperationsCanceledAfterSuspend) {
-  fake_ddk::Bind ddk;
-  auto nand = FakeAmlRawNand::Create();
+TEST_F(AmlRawnand, OperationsCanceledAfterSuspend) {
+  auto* nand = FakeAmlRawNand::Create(root());
 
   nand->ExpectReadWriteCommand(kDefaultWriteCommand, FakeAmlRawNand::kNoRandomSeed);
   std::vector<uint8_t> data(kTestNandWriteSize);
@@ -905,7 +913,7 @@ TEST(AmlRawNand, OperationsCanceledAfterSuspend) {
 
   ddk::SuspendTxn txn(nand->zxdev(), 0, false, DEVICE_SUSPEND_REASON_REBOOT);
   nand->DdkSuspend(std::move(txn));
-  ddk.WaitUntilSuspend();
+  mock_dev()->WaitUntilSuspendReplyCalled();
 
   EXPECT_EQ(
       nand->RawNandWritePageHwecc(data.data(), kTestNandWriteSize, nullptr, 0, kFirstNonBl2Page),
