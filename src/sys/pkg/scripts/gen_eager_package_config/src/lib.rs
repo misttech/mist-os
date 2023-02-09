@@ -616,10 +616,10 @@ mod tests {
     #[test]
     fn test_serialize_version_or_path() {
         assert_eq!(
-            serde_json::to_value(&VersionOrPath::Version([1, 2, 3, 4].into())).unwrap(),
+            serde_json::to_value(VersionOrPath::Version([1, 2, 3, 4].into())).unwrap(),
             json!("1.2.3.4")
         );
-        assert_eq!(serde_json::to_value(&VersionOrPath::Path("//v".into())).unwrap(), json!("//v"));
+        assert_eq!(serde_json::to_value(VersionOrPath::Path("//v".into())).unwrap(), json!("//v"));
     }
 
     #[test]

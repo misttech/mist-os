@@ -659,7 +659,7 @@ mod tests {
         }));
 
         assert_eq!(
-            serde_json::to_value(&manifest).unwrap(),
+            serde_json::to_value(manifest).unwrap(),
             json!(
                 {
                     "version": "1",
@@ -698,7 +698,7 @@ mod tests {
         }));
 
         assert_eq!(
-            serde_json::to_value(&manifest).unwrap(),
+            serde_json::to_value(manifest).unwrap(),
             json!(
                 {
                     "version": "1",
