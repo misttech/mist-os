@@ -9,10 +9,8 @@
 
 #include <lib/page-table/internal/bits.h>
 #include <lib/page-table/types.h>
-#include <lib/stdcompat/atomic.h>
 #include <zircon/types.h>
 
-#include <atomic>  // TODO(mcgrathr): <lib/stdcompat/atomic.h>
 #include <optional>
 #include <type_traits>
 
@@ -153,18 +151,12 @@ static_assert(alignof(PageTableEntry) == sizeof(uint64_t));
 class alignas(kPageTableNodeBytes) PageTableNode {
  public:
   // Return the PTE at the given index.
-  PageTableEntry at(size_t index) { return Entry(index).load(std::memory_order_relaxed); }
+  PageTableEntry at(size_t index) { return entries_[index]; }
 
   // Set the PTE at the given index to the given value.
-  void set(size_t index, PageTableEntry entry) {
-    Entry(index).store(entry, std::memory_order_relaxed);
-  }
+  void set(size_t index, PageTableEntry entry) { entries_[index] = entry; }
 
  private:
-  cpp20::atomic_ref<PageTableEntry> Entry(size_t index) {
-    return cpp20::atomic_ref<PageTableEntry>(entries_[index]);
-  }
-
   PageTableEntry entries_[kEntriesPerNode] = {};
 };
 static_assert(sizeof(PageTableNode) == kPageTableNodeBytes);
