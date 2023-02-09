@@ -2,27 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
-#include <lib/fdio/fdio.h>
-#include <lib/zx/channel.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <unistd.h>
 
 #include <array>
-#include <cmath>
 #include <filesystem>
 #include <vector>
 
-#include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
 namespace backlight {
+
+namespace {
 
 namespace FidlBacklight = fuchsia_hardware_backlight;
 
 class BacklightDevice {
  public:
-  BacklightDevice(zx::channel ch)
-      : client_(fidl::WireSyncClient<FidlBacklight::Device>(std::move(ch))) {
+  explicit BacklightDevice(fidl::ClientEnd<FidlBacklight::Device> client_end)
+      : client_{std::move(client_end)} {
     if (GetBrightnessNormalized(&orig_brightness_) != ZX_OK) {
       printf("Error getting original brightness. Defaulting to 1.0\n");
       orig_brightness_ = 1.0;
@@ -96,18 +95,14 @@ class BacklightDevice {
 
 class BacklightTest : public zxtest::Test {
  public:
-  BacklightTest() {
+  void SetUp() override {
     constexpr char kDevicePath[] = "/dev/class/backlight/";
     if (std::filesystem::exists(kDevicePath)) {
       for (const auto& entry : std::filesystem::directory_iterator(kDevicePath)) {
         printf("Found backlight device: %s\n", entry.path().c_str());
-        fbl::unique_fd fd(open(entry.path().c_str(), O_RDONLY));
-        EXPECT_GE(fd.get(), 0);
-
-        // Open service handle.
-        zx::channel channel;
-        EXPECT_OK(fdio_get_service_handle(fd.release(), channel.reset_and_get_address()));
-        devices_.push_back(std::make_unique<BacklightDevice>(std::move(channel)));
+        zx::result client_end = component::Connect<FidlBacklight::Device>(entry.path().c_str());
+        ASSERT_OK(client_end);
+        devices_.push_back(std::make_unique<BacklightDevice>(std::move(client_end.value())));
       }
     }
     if (devices_.empty()) {
@@ -115,9 +110,9 @@ class BacklightTest : public zxtest::Test {
     }
   }
 
-  double Approx(double val) { return round(val * 100.0) / 100.0; }
+  static double Approx(double val) { return round(val * 100.0) / 100.0; }
 
-  void TestBrightnessNormalized(std::unique_ptr<BacklightDevice>& dev) {
+  static void TestBrightnessNormalized(std::unique_ptr<BacklightDevice>& dev) {
     std::array<double, 9> brightness_values = {0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25, 0.0};
 
     double brightness;
@@ -129,7 +124,7 @@ class BacklightTest : public zxtest::Test {
     }
   }
 
-  void TestBrightnessAbsolute(std::unique_ptr<BacklightDevice>& dev) {
+  static void TestBrightnessAbsolute(std::unique_ptr<BacklightDevice>& dev) {
     double brightness, max_brightness;
     auto status = dev->GetMaxAbsoluteBrightness(&max_brightness);
 
@@ -159,7 +154,7 @@ class BacklightTest : public zxtest::Test {
 
   static void RunWithDelays() { delayEnabled_ = true; }
 
-  void SleepIfDelayEnabled() {
+  static void SleepIfDelayEnabled() {
     if (delayEnabled_) {
       sleep(1);
     }
@@ -170,11 +165,13 @@ class BacklightTest : public zxtest::Test {
   static bool delayEnabled_;
 };
 
+bool backlight::BacklightTest::delayEnabled_ = false;
+
 TEST_F(BacklightTest, VaryBrightness) { TestAllDevices(); }
 
-}  // namespace backlight
+}  // namespace
 
-bool backlight::BacklightTest::delayEnabled_ = false;
+}  // namespace backlight
 
 int main(int argc, char** argv) {
   int opt;

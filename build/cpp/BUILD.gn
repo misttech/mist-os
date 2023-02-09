@@ -311,10 +311,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     #------------------
     #------------------
     "//src/ui/backlight/bin/backlight",
-
-    #------------------
-    #------------------
-    "//src/ui/backlight/tests:backlight-test",
   ]
 }
 
