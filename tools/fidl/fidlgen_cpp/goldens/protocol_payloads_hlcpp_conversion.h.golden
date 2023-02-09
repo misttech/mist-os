@@ -10,7 +10,6 @@
 #include <fidl/test.protocolpayloads.imported/cpp/hlcpp_conversion.h>
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/protocolpayloads/cpp/fidl.h>
 

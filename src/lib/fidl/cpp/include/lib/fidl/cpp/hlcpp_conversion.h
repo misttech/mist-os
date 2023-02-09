@@ -243,11 +243,11 @@ struct HLCPPToNaturalTraits<std::unique_ptr<HLCPP>> {
 };
 
 /* Natural to HLCPP trait for enums */
-template <typename Natural, typename HLCPP>
+template <typename Natural, typename HLCPP, typename Underlying>
 struct NaturalToHLCPPTraitsEnum {
   using HLCPPType = HLCPP;
   static inline HLCPPType Convert(const Natural& value) {
-    return HLCPPType(fidl::ToUnderlying(value));
+    return HLCPPType(static_cast<Underlying>(value));
   }
 };
 

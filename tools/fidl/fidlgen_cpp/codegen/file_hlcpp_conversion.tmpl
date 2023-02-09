@@ -26,7 +26,6 @@
   #include <{{ .Library | Filename "NaturalTypesHeader" }}>
   #include <{{ .Library | Filename "HLCPPHeader" }}>
 
-  #include <lib/fidl/cpp/wire/internal/transport_channel.h>
   #include <lib/fidl/cpp/wire/service_handler.h>
   #include <lib/fidl/cpp/hlcpp_conversion.h>
 
@@ -38,7 +37,7 @@
 
   {{- range .Enums }}
     template<>
-    struct NaturalToHLCPPTraits<{{ .Unified }}> : public NaturalToHLCPPTraitsEnum<{{ .Unified }}, {{ .HLCPP }}>{};
+    struct NaturalToHLCPPTraits<{{ .Unified }}> : public NaturalToHLCPPTraitsEnum<{{ .Unified }}, {{ .HLCPP }}, {{ .Type }}>{};
     template<>
     struct HLCPPToNaturalTraits<{{ .HLCPP }}> : public HLCPPToNaturalTraitsEnum<{{ .HLCPP }}, {{ .Unified }}>{};
   {{- end }}

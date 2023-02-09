@@ -9,7 +9,6 @@
 
 #include <fidl/test.requestflexibleenvelope/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/requestflexibleenvelope/cpp/fidl.h>
 

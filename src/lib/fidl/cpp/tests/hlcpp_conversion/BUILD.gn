@@ -14,6 +14,7 @@ test("fidl_hlcpp_conversion_tests_bin") {
   output_name = "fidl_hlcpp_conversion_tests"
   sources = [
     "bits_conversion_test.cc",
+    "enum_conversion_multi_library_test.cc",
     "enum_conversion_test.cc",
     "protocol_endpoint_conversion_test.cc",
     "protocol_handler_conversion_test.cc",
@@ -22,6 +23,8 @@ test("fidl_hlcpp_conversion_tests_bin") {
     "union_conversion_test.cc",
   ]
   deps = [
+    "fidl:test.enums.abc_cpp_hlcpp_conversion",
+    "fidl:test.enums.xyz_cpp_hlcpp_conversion",
     "//sdk/testing/fidl/protocols_tests:test.protocol.connector_cpp",
     "//sdk/testing/fidl/protocols_tests:test.protocol.connector_cpp_hlcpp_conversion",
     "//sdk/testing/fidl/types_tests:test.types_cpp_hlcpp_conversion",

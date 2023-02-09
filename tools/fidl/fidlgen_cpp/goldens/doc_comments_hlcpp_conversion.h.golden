@@ -9,7 +9,6 @@
 
 #include <fidl/test.doccomments/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/doccomments/cpp/fidl.h>
 
@@ -17,11 +16,11 @@ namespace fidl {
 namespace internal {
 
 template <>
-struct NaturalToHLCPPTraits<::test_doccomments::MyStrictEnum> : public NaturalToHLCPPTraitsEnum<::test_doccomments::MyStrictEnum, ::test::doccomments::MyStrictEnum> {};
+struct NaturalToHLCPPTraits<::test_doccomments::MyStrictEnum> : public NaturalToHLCPPTraitsEnum<::test_doccomments::MyStrictEnum, ::test::doccomments::MyStrictEnum, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::doccomments::MyStrictEnum> : public HLCPPToNaturalTraitsEnum<::test::doccomments::MyStrictEnum, ::test_doccomments::MyStrictEnum> {};
 template <>
-struct NaturalToHLCPPTraits<::test_doccomments::MyFlexibleEnum> : public NaturalToHLCPPTraitsEnum<::test_doccomments::MyFlexibleEnum, ::test::doccomments::MyFlexibleEnum> {};
+struct NaturalToHLCPPTraits<::test_doccomments::MyFlexibleEnum> : public NaturalToHLCPPTraitsEnum<::test_doccomments::MyFlexibleEnum, ::test::doccomments::MyFlexibleEnum, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::doccomments::MyFlexibleEnum> : public HLCPPToNaturalTraitsEnum<::test::doccomments::MyFlexibleEnum, ::test_doccomments::MyFlexibleEnum> {};
 template <>

@@ -9,7 +9,6 @@
 
 #include <fidl/test.anonymous/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/anonymous/cpp/fidl.h>
 
@@ -17,11 +16,11 @@ namespace fidl {
 namespace internal {
 
 template <>
-struct NaturalToHLCPPTraits<::test_anonymous::Op> : public NaturalToHLCPPTraitsEnum<::test_anonymous::Op, ::test::anonymous::Op> {};
+struct NaturalToHLCPPTraits<::test_anonymous::Op> : public NaturalToHLCPPTraitsEnum<::test_anonymous::Op, ::test::anonymous::Op, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::anonymous::Op> : public HLCPPToNaturalTraitsEnum<::test::anonymous::Op, ::test_anonymous::Op> {};
 template <>
-struct NaturalToHLCPPTraits<::test_anonymous::SomeProtocolSomeMethodError> : public NaturalToHLCPPTraitsEnum<::test_anonymous::SomeProtocolSomeMethodError, ::test::anonymous::SomeProtocol_SomeMethod_Error> {};
+struct NaturalToHLCPPTraits<::test_anonymous::SomeProtocolSomeMethodError> : public NaturalToHLCPPTraitsEnum<::test_anonymous::SomeProtocolSomeMethodError, ::test::anonymous::SomeProtocol_SomeMethod_Error, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::anonymous::SomeProtocol_SomeMethod_Error> : public HLCPPToNaturalTraitsEnum<::test::anonymous::SomeProtocol_SomeMethod_Error, ::test_anonymous::SomeProtocolSomeMethodError> {};
 template <>

@@ -11,7 +11,6 @@
 #include <fidl/test.middle/cpp/hlcpp_conversion.h>
 #include <fidl/test.transitivedependenciescompose/cpp/natural_types.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/transitivedependenciescompose/cpp/fidl.h>
 
