@@ -4,7 +4,10 @@
 
 use crate::{errors::Error, update_manager::TargetChannelUpdater, DEFAULT_UPDATE_PACKAGE_URL};
 use anyhow::{anyhow, Context as _};
-use fidl::endpoints::ServerEnd;
+use fidl::{
+    endpoints::{Proxy, ServerEnd},
+    AsHandleRef,
+};
 use fidl_fuchsia_update_ext::Initiator;
 use fidl_fuchsia_update_installer::{
     InstallerMarker, InstallerProxy, RebootControllerMarker, RebootControllerProxy,
@@ -15,6 +18,7 @@ use fidl_fuchsia_update_installer_ext::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_zircon as zx;
 use futures::{future::BoxFuture, prelude::*, stream::BoxStream};
 use tracing::info;
 
@@ -159,9 +163,21 @@ async fn monitor_update_progress(
 
             info!("Successful update, rebooting...");
 
+            // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
+            if reboot_controller
+                .as_channel()
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
+                .is_ok()
+            {
+                return Err((
+                    apply_progress,
+                    Error::RebootFailed(anyhow!("reboot controller peer closed")).into(),
+                ));
+            }
+
             reboot_controller
                 .unblock()
-                .map_err(Error::RebootFailed)
+                .map_err(|e| Error::RebootFailed(e.into()))
                 .context("notify installer it can reboot when ready")
                 .map_err(|e| (apply_progress, e))?;
             // On success, wait for reboot to happen.

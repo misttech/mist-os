@@ -26,7 +26,7 @@ pub enum Error {
     InstallationEndedUnexpectedly,
 
     #[error("reboot FIDL returned error")]
-    RebootFailed(#[source] fidl::Error),
+    RebootFailed(#[source] anyhow::Error),
 
     #[error("update package")]
     UpdatePackage(#[from] UpdatePackage),
