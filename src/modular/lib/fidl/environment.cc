@@ -38,7 +38,8 @@ fuchsia::sys::Launcher* Environment::GetLauncher() {
 
 fidl::InterfaceHandle<fuchsia::io::Directory> Environment::OpenAsDirectory() {
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  if (vfs_.ServeDirectory(services_dir_, dir.NewRequest().TakeChannel()) != ZX_OK) {
+  if (vfs_.ServeDirectory(services_dir_, fidl::ServerEnd<fuchsia_io::Directory>{
+                                             dir.NewRequest().TakeChannel()}) != ZX_OK) {
     return {};
   }
   return dir;
