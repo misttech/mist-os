@@ -4,11 +4,7 @@
 
 // @dart=2.12
 
-import 'package:logging/logging.dart';
-
 import 'sl4f_client.dart';
-
-final _log = Logger('flatland_example_sl4f');
 
 class FlatlandExample {
   final Sl4f _sl4f;
