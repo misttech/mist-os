@@ -17,10 +17,11 @@ namespace sdio {
 class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_sdio::Device> {
  public:
   SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
-    zx::channel server;
-    ASSERT_OK(zx::channel::create(0, &client_, &server));
-    ASSERT_OK(fidl::BindSingleInFlightOnly<fidl::WireServer<Device>>(loop_.dispatcher(),
-                                                                     std::move(server), this));
+    zx::result endpoints = fidl::CreateEndpoints<Device>();
+    ASSERT_OK(endpoints.status_value());
+    client_ = std::move(endpoints->client);
+    ASSERT_OK(fidl::BindSingleInFlightOnly<fidl::WireServer<Device>>(
+        loop_.dispatcher(), std::move(endpoints->server), this));
     loop_.StartThread("sdio-test-loop");
   }
 
@@ -108,7 +109,7 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   }
 
   async::Loop loop_;
-  zx::channel client_;
+  fidl::ClientEnd<Device> client_;
 
  private:
   uint8_t byte_ = 0;

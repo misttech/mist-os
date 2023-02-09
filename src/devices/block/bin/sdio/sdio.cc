@@ -6,8 +6,6 @@
 
 #include <lib/zx/clock.h>
 
-#include <fbl/algorithm.h>
-
 namespace sdio {
 
 using SdioClient = fidl::WireSyncClient<fuchsia_hardware_sdio::Device>;

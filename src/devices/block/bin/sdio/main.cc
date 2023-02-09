@@ -2,13 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <fbl/unique_fd.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include "sdio.h"
 
@@ -29,18 +23,11 @@ int main(int argc, const char** argv) {
     return 1;
   }
 
-  fbl::unique_fd fd(open(argv[1], O_RDWR));
-  if (fd.get() <= -1) {
-    fprintf(stderr, "Failed to open SDIO device: %d\n", fd.get());
+  zx::result handle = component::Connect<fuchsia_hardware_sdio::Device>(argv[1]);
+  if (handle.is_error()) {
+    fprintf(stderr, "Failed to open SDIO device: %s\n", handle.status_string());
     return 1;
   }
 
-  zx::channel handle;
-  zx_status_t status = fdio_get_service_handle(fd.release(), handle.reset_and_get_address());
-  if (status != ZX_OK) {
-    fprintf(stderr, "Failed to get FDIO handle for SDIO device: %d\n", status);
-    return 1;
-  }
-
-  return sdio::RunSdioTool(sdio::SdioClient(std::move(handle)), argc - 2, argv + 2);
+  return sdio::RunSdioTool(sdio::SdioClient(std::move(handle.value())), argc - 2, argv + 2);
 }
