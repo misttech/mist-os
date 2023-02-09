@@ -303,10 +303,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     #------------------
     #------------------
     "//src/sys/lib/stdout-to-debuglog/cpp",
-
-    #------------------
-    #------------------
-    "//src/sys/startup",
   ]
 }
 

@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
-#include <lib/fidl-async/cpp/bind.h>
-#include <lib/fit/function.h>
-
-#include <fbl/string.h>
+#include <fidl/fuchsia.component/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 /*
  * The startup component exists to start the `appmgr` component that exists
@@ -31,20 +26,9 @@
 
 namespace {
 void start_core() {
-  async::Loop loop((async::Loop(&kAsyncLoopConfigAttachToCurrentThread)));
-  zx::channel remote;
-  zx::channel local;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    exit(-1);
-  }
-  auto path = fbl::String("/svc/fuchsia.component.CoreBinder");
-
-  status = fdio_service_connect(path.data(), remote.release());
-  if (status != ZX_OK) {
-    // This failed, presumably because core is not available.
-    return;
-  }
+  zx::result client_end =
+      component::Connect<fuchsia_component::Binder>("/svc/fuchsia.component.CoreBinder");
+  std::ignore = client_end.status_value();
 }
 }  // namespace
 
