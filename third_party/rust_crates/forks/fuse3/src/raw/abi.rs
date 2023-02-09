@@ -150,7 +150,9 @@ pub const FUSE_ABORT_ERROR: u32 = 1 << 21;
 pub const FUSE_MAX_PAGES: u32 = 1 << 22;
 
 /// cache READLINK responses
-pub const FUSE_CACHE_SYMLINKS: u32 = 1 << 23;
+/// TODO(fxbug.dev/117461): Fix problem with symlinks cache in fuse3.
+/// Currently the symlinks cannot show correctly when this is enabled.
+pub const FUSE_CACHE_SYMLINKS: u32 = 0 << 23;
 
 /// kernel supports zero-message opendir
 pub const FUSE_NO_OPENDIR_SUPPORT: u32 = 1 << 24;
@@ -194,7 +196,15 @@ pub const FUSE_LK_FLOCK: u32 = 1 << 0;
 #[allow(dead_code)]
 // Write flags
 /// delayed write from page cache, file handle is guessed
-pub const FUSE_WRITE_CACHE: u32 = 1 << 0;
+/// # TODO(fxbug.dev/106164) This is a Google change in our fuse3 fork
+/// Without enabling FUSE_WRITE_CACHE, write_back() in
+/// mount_options.rs won't work and each kernel write() call
+/// received only has a content size of 4096.
+/// With FUSE_WRITE_CACHE enabled, write_back() works
+/// and the contents of multiple write() calls are
+/// buffered together and received all at once.
+/// See: https://github.com/Sherlock-Holo/fuse3/issues/65
+pub const FUSE_WRITE_CACHE: u32 = 1 << 1;
 
 #[allow(dead_code)]
 /// lock_owner field is valid
