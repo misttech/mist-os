@@ -62,6 +62,9 @@ assumptions about the type of performance test being written.
     *   **High level:** You can use the [fuchsia-criterion Rust
         library] to create microbenchmarks.
 
+    *   **Low level:** You can use [Fuchsiaperf Rust library] to
+        generate `fuchsiaperf.json` files.
+
 *   **Go:**
 
     *   **Low level:** You can use the [go-benchmarking] library to
@@ -74,3 +77,5 @@ assumptions about the type of performance test being written.
 [perftest/results.h]: /zircon/system/ulib/perftest/include/perftest/results.h
 [fuchsia-criterion Rust library]: /src/developer/fuchsia-criterion/
 [go-benchmarking]: /src/lib/go-benchmarking/
+[Fuchsiaperf Rust library]: /src/performance/lib/fuchsiaperf/src/lib.rs
+

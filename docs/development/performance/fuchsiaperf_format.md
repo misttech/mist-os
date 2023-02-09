@@ -13,12 +13,13 @@ the JSON data:
 * [C++]
 * [Go]
 * [Dart]
-* [Rust]
+* Rust - [Fuchsia Criterion], [Fuchsiaperf struct]
 
 [C++]: /zircon/system/ulib/perftest
 [Go]: /src/lib/go-benchmarking
 [Dart]: /sdk/testing/sl4f/client/lib/src/trace_processing/metrics_results.dart
-[Rust]: /src/developer/fuchsia-criterion
+[Fuchsia Criterion]: /src/developer/fuchsia-criterion
+[Fuchsiaperf struct]: /src/performance/lib/fuchsiaperf/src/lib.rs
 
 ## JSON Description
 

@@ -14,8 +14,8 @@ mod testing;
 
 use {
     async_trait::async_trait,
+    fuchsiaperf::FuchsiaPerfBenchmarkResult,
     regex::RegexSet,
-    serde::Serialize,
     serde_json,
     std::{io::Write, sync::Arc, time::Instant, vec::Vec},
     tracing::info,
@@ -280,15 +280,6 @@ impl BenchmarkSetResults {
             writer.write_all(result.csv_row().as_bytes()).unwrap();
         }
     }
-}
-
-/// A struct that can be json serialized to the fuchsiaperf.json format.
-#[derive(Serialize)]
-struct FuchsiaPerfBenchmarkResult {
-    label: String,
-    test_suite: String,
-    unit: String,
-    values: Vec<f64>,
 }
 
 fn format_u64_with_commas(num: u64) -> String {
