@@ -17,8 +17,8 @@ use {
 
 const VERSION_HISTORY_LEN: usize = version_history::VERSION_HISTORY.len();
 const COMPATIBLE_ABIS: [u64; 2] = [
-    version_history::VERSION_HISTORY[(VERSION_HISTORY_LEN - 1)].abi_revision.0,
-    version_history::VERSION_HISTORY[(VERSION_HISTORY_LEN - 2)].abi_revision.0,
+    version_history::VERSION_HISTORY[VERSION_HISTORY_LEN - 1].abi_revision.0,
+    version_history::VERSION_HISTORY[VERSION_HISTORY_LEN - 2].abi_revision.0,
 ];
 const BUFFER_SIZE: usize = 65536;
 
