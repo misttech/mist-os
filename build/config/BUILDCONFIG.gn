@@ -1527,6 +1527,14 @@ declare_args() {
       name = "gcc"
       tags = [ "gcc" ]
     },
+
+    # This variant builds C++ code under C++20.
+    {
+      name = "cxx20"
+      toolchain_args = {
+        experimental_cxx_version = 20
+      }
+    },
   ]
 
   # Additional variant toolchain configs to support.
