@@ -3,19 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        events::{
-            dispatcher::{EventDispatcher, EventDispatcherScope},
-            event::Event,
-            registry::ComponentEventRoute,
-        },
-        hooks::EventPayload,
+    crate::model::events::{
+        dispatcher::{EventDispatcher, EventDispatcherScope},
+        event::Event,
+        registry::ComponentEventRoute,
     },
-    cm_rust::DictionaryValue,
     futures::{channel::mpsc, poll, stream::Peekable, task::Context, Stream, StreamExt},
-    maplit::hashmap,
     moniker::ExtendedMoniker,
-    routing::event::EventFilter,
     std::{
         pin::Pin,
         sync::{Arc, Weak},
@@ -36,13 +30,6 @@ pub struct EventStream {
     /// The sending end of a channel of Events.
     tx: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
 
-    /// Filter for the stream. Events not matching this filter
-    /// will be discarded by the stream.
-    pub filter: EventFilter,
-
-    /// Optional subscriber, required when filtering is used.
-    pub subscriber: Option<ExtendedMoniker>,
-
     /// A vector of EventDispatchers to this EventStream.
     /// EventStream assumes ownership of the dispatchers. They are
     /// destroyed when this EventStream is destroyed.
@@ -61,15 +48,7 @@ pub struct EventStream {
 impl EventStream {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded();
-        Self {
-            rx: rx.peekable(),
-            tx,
-            dispatchers: vec![],
-            route: vec![],
-            tasks: vec![],
-            filter: EventFilter::new(None),
-            subscriber: None,
-        }
+        Self { rx: rx.peekable(), tx, dispatchers: vec![], route: vec![], tasks: vec![] }
     }
 
     pub fn create_dispatcher(
@@ -98,20 +77,6 @@ impl EventStream {
         self.tx.clone()
     }
 
-    fn matches_filter(&self, event: &Event) -> bool {
-        let filterable_fields = match &event.event.payload {
-            EventPayload::CapabilityRequested { name, .. } => Some(hashmap! {
-                "name".to_string() => DictionaryValue::Str(name.into())
-            }),
-            EventPayload::DirectoryReady { name, .. } => Some(hashmap! {
-                "name".to_string() => DictionaryValue::Str(name.into())
-            }),
-            _ => None,
-        };
-
-        self.filter.has_fields(&filterable_fields)
-    }
-
     /// Waits for an event with a particular EventType against a component with a
     /// particular moniker. Ignores all other events.
     #[cfg(test)]
@@ -137,20 +102,6 @@ impl Stream for EventStream {
     type Item = (Event, Option<Vec<ComponentEventRoute>>);
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // Filter by filter. At the Stream layer we are aware of the correct UseEventStreamDecl,
-        // whereas in the registry and dispatcher layers we (likely) receive incorrect
-        // decls from routing in the case of duplicate capability_requested event streams.
-        // Since the names are the same the routing layer has no way to differentiate the decls,
-        // so at that layer we ignore the "filter" attribute and apply the filter at the stream
-        // layer where we have full context.
-        loop {
-            let value = Pin::new(&mut self.rx).poll_next(cx);
-            if let (Poll::Ready(Some((event, _))), Some(_moniker)) = (&value, &self.subscriber) {
-                if !self.matches_filter(&event) {
-                    continue;
-                }
-            }
-            return value;
-        }
+        Pin::new(&mut self.rx).poll_next(cx)
     }
 }

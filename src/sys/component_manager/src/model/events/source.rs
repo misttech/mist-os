@@ -24,7 +24,6 @@ use {
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::future::{BoxFuture, FutureExt},
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,
     routing::component_instance::ComponentInstanceInterface,
@@ -77,46 +76,25 @@ impl EventSource {
     /// The client might request to subscribe to events that it's not allowed to see. Events
     /// that are allowed should have been defined in its manifest and either offered to it or
     /// requested from the current realm.
-    pub async fn subscribe_by_path(
+    pub async fn subscribe(
         &mut self,
         requests: Vec<EventSubscription>,
-        path: &str,
-    ) -> Result<EventStream, ModelError> {
-        let subscriber_moniker = self.subscriber.extended_moniker();
-        self.subscribe_by(requests, |stream_provider, event_name| {
-            let subscriber_moniker = subscriber_moniker.clone();
-            async move {
-                stream_provider
-                    .take_static_event_stream_by_path(&subscriber_moniker, &event_name, path)
-                    .await
-            }
-            .boxed()
-        })
-        .await
-    }
-
-    async fn subscribe_by<'a>(
-        &mut self,
-        requests: Vec<EventSubscription>,
-        event_stream_taker: impl Fn(
-            Arc<EventStreamProvider>,
-            String,
-        ) -> BoxFuture<'a, Option<EventStream>>,
     ) -> Result<EventStream, ModelError> {
         let registry = self.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
         let mut static_streams = vec![];
+        let subscriber_moniker = self.subscriber.extended_moniker();
         if let Some(stream_provider) = self.stream_provider.upgrade() {
             for request in requests {
-                if let Some(res) =
-                    event_stream_taker(stream_provider.clone(), request.event_name.to_string())
-                        .await
+                if let Some(res) = stream_provider
+                    .take_static_event_stream(&subscriber_moniker, request.event_name.to_string())
+                    .await
                 {
                     static_streams.push(res);
                 } else {
                     // Subscribe to events in the registry, discarding prior events
                     // from before this subscribe call if this is the second
                     // time opening the event stream.
-                    if request.event_name.str() == "capability_requested" {
+                    if request.event_name.to_string() == "capability_requested" {
                         // Don't support creating a new capability_requested stream.
                         return Err(ModelError::unsupported(
                             "capability_requested cannot be taken twice.",
@@ -142,26 +120,6 @@ impl EventSource {
         Ok(stream)
     }
 
-    /// Subscribes to events provided in the `events` vector.
-    ///
-    /// The client might request to subscribe to events that it's not allowed to see. Events
-    /// that are allowed should have been defined in its manifest and either offered to it or
-    /// requested from the current realm.
-    pub async fn subscribe(
-        &mut self,
-        requests: Vec<EventSubscription>,
-    ) -> Result<EventStream, ModelError> {
-        let subscriber_moniker = self.subscriber.extended_moniker();
-        self.subscribe_by(requests, |stream_provider, event_name| {
-            let subscriber_moniker = subscriber_moniker.clone();
-            async move {
-                stream_provider.take_static_event_stream(&subscriber_moniker, event_name).await
-            }
-            .boxed()
-        })
-        .await
-    }
-
     /// Subscribes to all applicable events in a single use statement.
     /// This method may be called once per path, and will return None
     /// if the event stream has already been consumed.
@@ -171,14 +129,12 @@ impl EventSource {
         path: String,
     ) -> Result<Option<EventStream>, ModelError> {
         if let Some(stream_provider) = self.stream_provider.upgrade() {
-            if let Some(event_names) =
-                stream_provider.take_events(subscriber_moniker, path.clone()).await
-            {
+            if let Some(event_names) = stream_provider.take_events(subscriber_moniker, path).await {
                 let subscriptions = event_names
                     .into_iter()
                     .map(|name| EventSubscription { event_name: CapabilityName::from(name) })
                     .collect();
-                return Ok(Some(self.subscribe_by_path(subscriptions, &path).await?));
+                return Ok(Some(self.subscribe(subscriptions).await?));
             }
         }
         Ok(None)
