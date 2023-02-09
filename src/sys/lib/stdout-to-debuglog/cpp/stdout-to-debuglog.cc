@@ -3,37 +3,31 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fdio.h>
 #include <lib/zx/debuglog.h>
 
 namespace StdoutToDebuglog {
 
 zx_status_t Init() {
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    return status;
+  zx::result client_end = component::Connect<fuchsia_boot::WriteOnlyLog>();
+  if (client_end.is_error()) {
+    return client_end.status_value();
   }
-  status = fdio_service_connect("/svc/fuchsia.boot.WriteOnlyLog", remote.release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  fidl::WireSyncClient<fuchsia_boot::WriteOnlyLog> write_only_log(std::move(local));
-  auto result = write_only_log->Get();
-  if (result.status() != ZX_OK) {
+  const fidl::WireSyncClient write_only_log(std::move(client_end.value()));
+  const fidl::WireResult result = write_only_log->Get();
+  if (!result.ok()) {
     return result.status();
   }
-  zx::debuglog log = std::move(result->log);
+  const auto& response = result.value();
+  const zx::debuglog& log = response.log;
   for (int fd = 1; fd <= 2; ++fd) {
     zx::debuglog dup;
-    zx_status_t status = log.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-    if (status != ZX_OK) {
+    if (zx_status_t status = log.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
       return status;
     }
     fdio_t* logger = nullptr;
-    status = fdio_create(dup.release(), &logger);
-    if (status != ZX_OK) {
+    if (zx_status_t status = fdio_create(dup.release(), &logger); status != ZX_OK) {
       return status;
     }
     const int out_fd = fdio_bind_to_fd(logger, fd, 0);

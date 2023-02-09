@@ -299,10 +299,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     #------------------
     #------------------
     "//src/sys/appmgr:unittest_bin",
-
-    #------------------
-    #------------------
-    "//src/sys/lib/stdout-to-debuglog/cpp",
   ]
 }
 
