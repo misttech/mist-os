@@ -115,7 +115,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
   }
 };
 
-class TglIntegrationTest : public ::testing::Test {
+class IntegrationTest : public ::testing::Test {
  protected:
   void SetUp() final {
     SetFramebuffer({});
@@ -170,7 +170,7 @@ class TglIntegrationTest : public ::testing::Test {
   std::shared_ptr<MockDevice> parent_;
 };
 
-TEST(IntelI915TglDisplay, SysmemRequirements) {
+TEST(IntelI915Display, SysmemRequirements) {
   Controller display(nullptr);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
@@ -191,7 +191,7 @@ TEST(IntelI915TglDisplay, SysmemRequirements) {
   EXPECT_TRUE(collection.set_constraints_called());
 }
 
-TEST(IntelI915TglDisplay, SysmemNoneFormat) {
+TEST(IntelI915Display, SysmemNoneFormat) {
   Controller display(nullptr);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
@@ -212,7 +212,7 @@ TEST(IntelI915TglDisplay, SysmemNoneFormat) {
   EXPECT_TRUE(collection.set_constraints_called());
 }
 
-TEST(IntelI915TglDisplay, SysmemInvalidFormat) {
+TEST(IntelI915Display, SysmemInvalidFormat) {
   Controller display(nullptr);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
@@ -233,7 +233,7 @@ TEST(IntelI915TglDisplay, SysmemInvalidFormat) {
   EXPECT_FALSE(collection.set_constraints_called());
 }
 
-TEST(IntelI915TglDisplay, SysmemInvalidType) {
+TEST(IntelI915Display, SysmemInvalidType) {
   Controller display(nullptr);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
@@ -256,7 +256,7 @@ TEST(IntelI915TglDisplay, SysmemInvalidType) {
 }
 
 // Tests that DDK basic DDK lifecycle hooks function as expected.
-TEST_F(TglIntegrationTest, BindAndInit) {
+TEST_F(IntegrationTest, BindAndInit) {
   ASSERT_OK(Controller::Create(parent()));
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
@@ -279,7 +279,7 @@ TEST_F(TglIntegrationTest, BindAndInit) {
 
 // Tests that the device can initialize even if bootloader framebuffer information is not available
 // and global GTT allocations start at offset 0.
-TEST_F(TglIntegrationTest, InitFailsIfBootloaderGetInfoFails) {
+TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
   ASSERT_EQ(ZX_OK, Controller::Create(parent()));
@@ -299,7 +299,7 @@ TEST_F(TglIntegrationTest, InitFailsIfBootloaderGetInfoFails) {
 // TODO(fxbug.dev/86314): Add test for HDMI display enumeration by InitOp.
 // TODO(fxbug.dev/86315): Add test for DVI display enumeration by InitOp.
 
-TEST_F(TglIntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
+TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   constexpr uint32_t kStride = 1920;
   constexpr uint32_t kHeight = 1080;
   SetFramebuffer({
@@ -321,7 +321,7 @@ TEST_F(TglIntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   EXPECT_EQ(ZX_ROUNDUP(kHeight * kStride * 3, PAGE_SIZE), addr);
 }
 
-TEST_F(TglIntegrationTest, SysmemImport) {
+TEST_F(IntegrationTest, SysmemImport) {
   ASSERT_OK(Controller::Create(parent()));
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
@@ -358,7 +358,7 @@ TEST_F(TglIntegrationTest, SysmemImport) {
   ctx->DisplayControllerImplReleaseImage(&image);
 }
 
-TEST_F(TglIntegrationTest, SysmemRotated) {
+TEST_F(IntegrationTest, SysmemRotated) {
   ASSERT_OK(Controller::Create(parent()));
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
