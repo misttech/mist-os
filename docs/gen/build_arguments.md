@@ -1590,7 +1590,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:37
+From //build/config/BUILD.gn:34
 
 ### deprecated_x86_legacy_boot_protocol
 
@@ -2620,7 +2620,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:29
+From //build/config/BUILD.gn:30
 
 ### enable_grpc_ares
 
@@ -2966,10 +2966,12 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:14
 
 **NOTE:** This is for **experimentation only** and should not normally be
 changed.  Set the version of the C++ standard to compile for, 17 or 20.
+Note also that GN code should never use this variable directly, but always
+instead use the `fuchsia_cxx_version` variable.
 
 **Current value (from the default):** `17`
 
-From //build/config/BUILD.gn:34
+From //build/config/fuchsia_cxx_version.gni:10
 
 ### experimental_wlan_client_mlme
 
