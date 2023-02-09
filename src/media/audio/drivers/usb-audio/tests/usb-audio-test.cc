@@ -34,19 +34,22 @@ audio_fidl::wire::PcmFormat GetDefaultPcmFormat() {
   return format;
 }
 
-fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
-    fidl::ClientEnd<audio_fidl::StreamConfigConnector> client) {
+// TODO(https://fxbug.dev/115087): Change the type of |client| to
+// fidl::ClientEnd<audio_fidl::StreamConfigConnector> when this target uses mock-ddk instead of
+// fake_ddk.
+fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(zx::channel channel) {
+  fidl::ClientEnd<audio_fidl::StreamConfigConnector> client{std::move(channel)};
   fidl::WireSyncClient client_wrap{std::move(client)};
   if (!client_wrap.is_valid()) {
     return {};
   }
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
+  zx::result endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
   if (!endpoints.is_ok()) {
     return {};
   }
-  auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client_wrap->Connect(std::move(stream_channel_remote));
+  auto& [stream_channel_local, stream_channel_remote] = endpoints.value();
+  const fidl::OneWayStatus status = client_wrap->Connect(std::move(stream_channel_remote));
+  EXPECT_OK(status);
   return fidl::WireSyncClient<audio_fidl::StreamConfig>(std::move(stream_channel_local));
 }
 
