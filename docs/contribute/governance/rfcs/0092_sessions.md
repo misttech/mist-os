@@ -21,7 +21,7 @@ protocols that developers can use to control the session. Product variants
 the same session.
 
 The intention of this document is to ratify design decisions that have been made
-since the [Modular Framework][modular] was deprecated.
+since the `Modular Framework` was deprecated.
 
 ## Motivation
 
@@ -142,7 +142,7 @@ capabilities from `session_manager`. This set contains a wide range of
 capabilities. However, the set of capabilities available to the session is
 smaller, and more auditable, than the set that is offered to components that run
 on product configurations that have not been migrated to use a session (i.e.,
-products that use the [Modular Framework][modular]).
+products that use the `Modular Framework`).
 
 It is important that the capabilities offered to the session go through security
 review. It unlikely that the Fuchsia team will be able to perform thorough
@@ -153,7 +153,7 @@ capabilities offered to the session.
 ## Privacy considerations
 
 `session_manager` only stores the URL of the current session, which may be
-logged. This is an improvement over the [Modular Framework][modular], which
+logged. This is an improvement over the `Modular Framework, which
 manages components that are launched by the user.
 
 Each session will require its own comprehensive privacy review.

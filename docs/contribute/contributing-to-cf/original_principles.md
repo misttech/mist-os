@@ -99,7 +99,7 @@ objects. Example: what looks to a component like its POSIX filesystem is derived
 from the parent's declaration of the component's sandbox.
 
 Component framework, except in the case of a few privileged
-APIs,[*][peer-exception] does not reveal to components the identity of their
+APIs,[*][#peer-exception] does not reveal to components the identity of their
 peers. This prevents components from misusing peer identity to build ambient
 authorities.
 

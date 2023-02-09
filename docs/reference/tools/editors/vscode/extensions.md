@@ -23,9 +23,9 @@ and can be used with the source tree and the SDK. For more information see the
 
 ## Community contributed extensions
 
-These extensions are developed by Fuchsia contributors. Extensions listed are unsupported 
-and could conflict with the official Fuchsia developer extension. It is recommended to use 
-the [Fuchsia developer extension.][extension-link]{: .external} 
+These extensions are developed by Fuchsia contributors. Extensions listed are unsupported
+and could conflict with the official Fuchsia developer extension. It is recommended to use
+the [Fuchsia developer extension.][extension-link]{: .external}
 
 ### Fuchsia.git Helper
 
@@ -212,18 +212,12 @@ directly from VS Code.
 
 [set-up-env]: /docs/get-started/get_fuchsia_source.md#set-up-environment-variables
 [fidl]: /docs/development/languages/fidl/README.md
-[rust-analyzer-latest]: https://github.com/rust-analyzer/rust-analyzer/releases
-[vscode-extension-guide]: /docs/reference/tools/editors/vscode/extensions.md#rust-analyzer
-[vscode-download]: https://code.visualstudio.com/Download
 [vscode-update]:  https://vscode-docs.readthedocs.io/en/stable/supporting/howtoupdate/
 [vscode-disable-telemetry]: https://code.visualstudio.com/docs/getstarted/telemetry#_disable-telemetry-reporting
-[vscode-rust-analyzer]: https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer
-[vscode-downgrade]: https://code.visualstudio.com/updates/v1_30#_install-previous-versions
-[supported-rust-analyzer-version]: /docs/development/languages/rust/editors.md#supported-rust-analyzer-version
 [lsp-definition]: https://microsoft.github.io/language-server-protocol/
 [vscode-remote-workspaces]: /docs/reference/tools/editors/vscode/remote-workspaces.md
 [extension-install]: /docs/reference/tools/editors/vscode/fuchsia-ext-install.md
 [extension-link]: https://marketplace.visualstudio.com/items?itemName=fuchsia-authors.vscode-fuchsia
 [structured-config-json5]: /docs/development/components/configuration/structured_config.md
-[bazel-extension]: https://marketplace.visualstudio.com/items?itemName=BazelBuild.vscode-bazel
+[bazel-vscode-ext]: https://marketplace.visualstudio.com/items?itemName=BazelBuild.vscode-bazel
 [sdk-get-started]: /docs/get-started/sdk/index.md?ide=vscode
