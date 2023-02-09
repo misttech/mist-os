@@ -87,14 +87,12 @@ if (current_toolchain == default_toolchain) {
     config("x86-32") {
       cflags = [
         "-m32",
+        "-march=i686",
+        "-mno-sse",
+        "-mcx16",
+
         "-fno-pic",
         "-fno-pie",
-
-        # It should be fine enough to use SSE instructions in phys32, though
-        # it's unlikely to come up.  But GCC refuses to emit CMPXCHG8B under
-        # -mno-sse so this is necessary to avoid an outcall for 64-bit atomics.
-        "-msse",
-        "-mcx16",
       ]
       ldflags = cflags + [ "-Wl,-m,elf_i386" ]
 
