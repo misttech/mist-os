@@ -26,10 +26,6 @@ config("fidl-deprecated-c-bindings") {
   visibility = [
     #------------------
     #------------------
-    "//src/devices/usb/tests/usb",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/simple_tests:bin",
 
     #------------------

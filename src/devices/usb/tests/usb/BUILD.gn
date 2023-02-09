@@ -9,14 +9,10 @@ test("usb") {
   output_name = "usb-test"
   sources = [ "usb-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.tester:fuchsia.hardware.usb.tester_c",
-    "//sdk/lib/fdio",
+    "//sdk/fidl/fuchsia.hardware.usb.tester:fuchsia.hardware.usb.tester_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
 bootfs_test("usb-bootfs-test") {
