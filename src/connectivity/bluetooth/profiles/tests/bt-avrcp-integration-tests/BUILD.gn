@@ -42,6 +42,12 @@ fuchsia_test_package("bt-avrcp-integration-tests") {
   test_specs = {
     # The profile integration tests tend to flake if tests are run in parallel.
     parallel = 1
+
+    # The max severity is set to ERROR as the bt-avrcp child logs an ERROR when the routed profile
+    # connection is closed, which sometimes races with the closing of the component.
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 
   deps = [

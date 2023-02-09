@@ -182,9 +182,6 @@ impl PeerInner {
                 Poll::Pending => return Ok(false),
                 Poll::Ready(Ok(size)) => size,
             };
-            if packet_size == 0 {
-                continue;
-            }
             trace!("received packet {:?}", buf);
             // Detects General Reject condition and sends the response back.
             // On other headers with errors, sends BAD_HEADER to the peer

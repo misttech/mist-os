@@ -79,14 +79,20 @@ impl Socket {
     pub fn from_socket(handle: zx::Socket) -> Result<Self, zx::Status> {
         let ehandle = EHandle::local();
 
-        // Optimistically assume that the handle is readable and writable.
+        // Optimistically assume that the handle is readable and writable for STREAM sockets,
+        // and writable for DATAGRAM sockets.
         // Reads and writes will be attempted before queueing a packet.
         // This makes handles slightly faster to read/write the first time
         // they're accessed after being created, provided they start off as
         // readable or writable. In return, there will be an extra wasted
         // syscall per read/write if the handle is not readable or writable.
+        let optimistic_signals = if handle.info()?.options.contains(zx::SocketOpts::STREAM) {
+            AtomicU32::new(Signals::SOCKET_READABLE.bits() | Signals::SOCKET_WRITABLE.bits())
+        } else {
+            AtomicU32::new(Signals::SOCKET_WRITABLE.bits())
+        };
         let receiver = ehandle.register_receiver(Arc::new(SocketPacketReceiver::new(
-            AtomicU32::new(Signals::SOCKET_READABLE.bits() | Signals::SOCKET_WRITABLE.bits()),
+            optimistic_signals,
             AtomicWaker::new(),
             AtomicWaker::new(),
         )));
@@ -490,6 +496,35 @@ mod tests {
         assert_eq!(two.len(), size.unwrap());
 
         assert_eq!([50, 0, 1, 2, 3, 4, 5], out.as_slice());
+    }
+
+    #[test]
+    fn datagram_no_spurious_zero_packet() {
+        let mut exec = TestExecutor::new();
+
+        let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let rx = Socket::from_socket(rx).unwrap();
+
+        let mut out = vec![10];
+        {
+            let datagram_read_fut = rx.read_datagram(&mut out);
+            futures::pin_mut!(datagram_read_fut);
+            assert!(exec.run_until_stalled(&mut datagram_read_fut).is_pending());
+
+            let one = &[0, 1];
+            assert!(tx.write(one).is_ok());
+
+            match exec.run_until_stalled(&mut datagram_read_fut) {
+                Poll::Ready(Ok(2)) => {}
+                x => panic!("Expected a 2-datagram length packet ready, got {x:?}"),
+            };
+        }
+
+        assert_eq!([10, 0, 1], out.as_slice());
+
+        let datagram_read_fut = rx.read_datagram(&mut out);
+        futures::pin_mut!(datagram_read_fut);
+        assert!(exec.run_until_stalled(&mut datagram_read_fut).is_pending());
     }
 
     #[test]
