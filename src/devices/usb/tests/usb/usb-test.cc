@@ -41,11 +41,11 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_usb_tester::Device>> open_test_devic
 }
 
 TEST(UsbTests, RootHubsTest) {
-  // TODO(ravoorir): There should be a matrix of hardware that should
+  // TODO(https://fxbug.dev/121596): There should be a matrix of hardware that should
   // be accessible from here. Depending on whether the hardware has
   // xhci/ehci, we should check the root hubs.
   if (zx_status_t status = check_xhci_root_hubs(); status != ZX_OK) {
-    // TODO(ravoorir): At the moment we cannot restrict a test
+    // TODO(https://fxbug.dev/121596): At the moment we cannot restrict a test
     // to only run on hardware(fxbug.dev/9362) and not the qemu instances.
     // We should fail here when running on hardware.
     printf("[SKIPPING] Root hub creation failed.\n");
