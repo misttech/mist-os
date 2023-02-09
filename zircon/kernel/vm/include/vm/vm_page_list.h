@@ -795,6 +795,18 @@ class VmPageList final {
             st = per_page_func(p, off);
             // Return any errors early before considering this page for contiguous_run_func.
             if (st != ZX_ERR_NEXT && st != ZX_ERR_STOP) {
+              // If there was an outstanding contiguous run, process it since it had to have ended
+              // before the failing offset.
+              if (contiguous_run_len > 0) {
+                zx_status_t prev_range_status = contiguous_run_func(
+                    contiguous_run_start, contiguous_run_start + contiguous_run_len);
+                contiguous_run_len = 0;
+                // If there was an error encountered, surface that instead of st, as it occurred on
+                // a range prior to this offset.
+                if (prev_range_status != ZX_ERR_NEXT && prev_range_status != ZX_ERR_STOP) {
+                  return prev_range_status;
+                }
+              }
               return st;
             }
             // Start tracking a new range first if no range is being tracked yet.

@@ -948,6 +948,7 @@ static bool vmpl_contiguous_traversal_end_test() {
     EXPECT_TRUE(AddPage(&list, &test_pages[i], i * PAGE_SIZE));
   }
 
+  bool page_visited[3] = {};
   uint64_t expected_offsets[2] = {0, 2};
   uint64_t range_offsets[2] = {};
   size_t index = 0;
@@ -955,7 +956,8 @@ static bool vmpl_contiguous_traversal_end_test() {
   // ZX_ERR_STOP in the per-page function.
   zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
       [](const VmPageOrMarker* p, uint64_t off) { return true; },
-      [](const VmPageOrMarker* p, uint64_t off) {
+      [&page_visited](const VmPageOrMarker* p, uint64_t off) {
+        page_visited[off / PAGE_SIZE] = true;
         // Stop the traversal at page 1. This means the last page processed should be page 1 and
         // should be included in the contiguous range. Traversal will stop *after* this page.
         return (off / PAGE_SIZE < 1) ? ZX_ERR_NEXT : ZX_ERR_STOP;
@@ -968,6 +970,11 @@ static bool vmpl_contiguous_traversal_end_test() {
       0, VmPageListNode::kPageFanOut * PAGE_SIZE);
 
   EXPECT_OK(status);
+  // Should have visited the first two pages.
+  EXPECT_TRUE(page_visited[0]);
+  EXPECT_TRUE(page_visited[1]);
+  EXPECT_FALSE(page_visited[2]);
+
   EXPECT_EQ(2u, index);
   for (size_t i = 0; i < 2; i++) {
     EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
@@ -976,7 +983,9 @@ static bool vmpl_contiguous_traversal_end_test() {
   // Attempt another traversal. This time it ends early because of ZX_ERR_STOP in the contiguous
   // range function.
   index = 0;
-  bool page_visited[3] = {};
+  page_visited[0] = false;
+  page_visited[1] = false;
+  page_visited[2] = false;
   status = list.ForEveryPageAndContiguousRunInRange(
       [](const VmPageOrMarker* p, uint64_t off) {
         // Include even indexed pages in the range.
@@ -995,6 +1004,96 @@ static bool vmpl_contiguous_traversal_end_test() {
       0, VmPageListNode::kPageFanOut * PAGE_SIZE);
 
   EXPECT_OK(status);
+  // Should only have visited the first page.
+  EXPECT_TRUE(page_visited[0]);
+  EXPECT_FALSE(page_visited[1]);
+  EXPECT_FALSE(page_visited[2]);
+
+  expected_offsets[0] = 0;
+  expected_offsets[1] = 1;
+  EXPECT_EQ(2u, index);
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
+  list_node_t free_list;
+  list_initialize(&free_list);
+  list.RemoveAllContent([&free_list](VmPageOrMarker&& p) {
+    list_add_tail(&free_list, &p.ReleasePage()->queue_node);
+  });
+  EXPECT_EQ(3u, list_length(&free_list));
+
+  END_TEST;
+}
+
+static bool vmpl_contiguous_traversal_error_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+  vm_page_t test_pages[3] = {};
+
+  // Add 3 consecutive pages.
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_TRUE(AddPage(&list, &test_pages[i], i * PAGE_SIZE));
+  }
+
+  bool page_visited[3] = {};
+  uint64_t range_offsets[2] = {};
+  size_t index = 0;
+  // The compare function evaluates to true for all pages, but the traversal ends early due to
+  // an error returned by the per-page function.
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [&page_visited](const VmPageOrMarker* p, uint64_t off) {
+        page_visited[off / PAGE_SIZE] = true;
+        // Only page 0 returns success.
+        return (off / PAGE_SIZE < 1) ? ZX_ERR_NEXT : ZX_ERR_BAD_STATE;
+      },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, VmPageListNode::kPageFanOut * PAGE_SIZE);
+
+  EXPECT_EQ(ZX_ERR_BAD_STATE, status);
+  // Should have visited the first two pages.
+  EXPECT_TRUE(page_visited[0]);
+  EXPECT_TRUE(page_visited[1]);
+  EXPECT_FALSE(page_visited[2]);
+
+  EXPECT_EQ(2u, index);
+  // Should have been able to process the contiguous range till right before the page that failed.
+  uint64_t expected_offsets[2] = {0, 1};
+  for (size_t i = 0; i < 2; i++) {
+    EXPECT_EQ(expected_offsets[i] * PAGE_SIZE, range_offsets[i]);
+  }
+
+  // Attempt another traversal. This time it ends early because of an error returned by the
+  // contiguous range function.
+  index = 0;
+  page_visited[0] = false;
+  page_visited[1] = false;
+  page_visited[2] = false;
+  status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) {
+        // Include even indexed pages in the range.
+        return (off / PAGE_SIZE) % 2 == 0;
+      },
+      [&page_visited](const VmPageOrMarker* p, uint64_t off) {
+        page_visited[off / PAGE_SIZE] = true;
+        return ZX_ERR_NEXT;
+      },
+      [&range_offsets, &index](uint64_t start, uint64_t end) {
+        range_offsets[index++] = start;
+        range_offsets[index++] = end;
+        // Error after the first range.
+        return ZX_ERR_BAD_STATE;
+      },
+      0, VmPageListNode::kPageFanOut * PAGE_SIZE);
+
+  EXPECT_EQ(ZX_ERR_BAD_STATE, status);
   // Should only have visited the first page.
   EXPECT_TRUE(page_visited[0]);
   EXPECT_FALSE(page_visited[1]);
@@ -1042,6 +1141,7 @@ VM_UNITTEST(vmpl_merge_marker_test)
 VM_UNITTEST(vmpl_contiguous_run_test)
 VM_UNITTEST(vmpl_contiguous_run_compare_test)
 VM_UNITTEST(vmpl_contiguous_traversal_end_test)
+VM_UNITTEST(vmpl_contiguous_traversal_error_test)
 UNITTEST_END_TESTCASE(vm_page_list_tests, "vmpl", "VmPageList tests")
 
 }  // namespace vm_unittest
