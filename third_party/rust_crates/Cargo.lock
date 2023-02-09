@@ -1544,14 +1544,13 @@ dependencies = [
 
 [[package]]
 name = "fuse3"
-version = "0.5.1"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "bincode",
  "bytes",
  "cstr",
  "futures-channel",
- "futures-core",
  "futures-util",
  "libc",
  "nix",

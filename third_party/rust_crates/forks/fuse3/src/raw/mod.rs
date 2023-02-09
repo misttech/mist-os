@@ -18,9 +18,6 @@ pub mod reply;
 mod request;
 pub(crate) mod session;
 
-#[cfg(all(not(feature = "async-std-runtime"), feature = "tokio-runtime"))]
-mod helper;
-
 pub mod prelude {
     pub use super::reply::FileAttr;
     pub use super::reply::*;

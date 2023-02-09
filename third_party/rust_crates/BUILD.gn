@@ -288,7 +288,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("fuse3") {
-    public_deps = [ ":fuse3-v0_5_1" ]
+    public_deps = [ ":fuse3-v0_6_1" ]
   }
 }
 
@@ -4340,10 +4340,10 @@ rust_library("fuchsia-cprng-v0_1_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("fuse3-v0_5_1") {
+rust_library("fuse3-v0_6_1") {
   crate_name = "fuse3"
   crate_root = "//third_party/rust_crates/forks/fuse3/src/lib.rs"
-  output_name = "fuse3-164da290d0714cc5"
+  output_name = "fuse3-2e97ecf83b22f6d3"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4352,7 +4352,6 @@ rust_library("fuse3-v0_5_1") {
   deps += [ ":bytes-v1_0_1" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
   deps += [ ":futures-channel-v0_3_19" ]
-  deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":futures-util-v0_3_19" ]
   deps += [ ":libc-v0_2_138" ]
   deps += [ ":nix-v0_26_2" ]
@@ -4367,8 +4366,8 @@ rust_library("fuse3-v0_5_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=164da290d0714cc5",
-    "-Cextra-filename=-164da290d0714cc5",
+    "-Cmetadata=2e97ecf83b22f6d3",
+    "-Cextra-filename=-2e97ecf83b22f6d3",
     "--cfg=feature=\"tokio\"",
     "--cfg=feature=\"tokio-runtime\"",
     "--cfg=feature=\"unprivileged\"",
@@ -11239,7 +11238,6 @@ rust_library("tokio-v1_19_2") {
     rustflags += [
       "--cfg=feature=\"libc\"",
       "--cfg=feature=\"fs\"",
-      "--cfg=feature=\"macro\"",
       "--cfg=feature=\"mio\"",
       "--cfg=feature=\"net\"",
       "--cfg=feature=\"num_cpus\"",

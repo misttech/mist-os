@@ -25,10 +25,6 @@ use futures_util::{pin_mut, select};
 use nix::mount;
 #[cfg(all(not(feature = "async-std-runtime"), feature = "tokio-runtime"))]
 use tokio::{fs::read_dir, task};
-// #[cfg(all(not(feature = "async-std-runtime"), feature = "tokio-runtime"))]
-// use tokio_stream::wrappers::ReadDirStream;
-#[cfg(all(not(feature = "async-std-runtime"), feature = "tokio-runtime"))]
-use crate::raw::helper::ReadDirStream;
 use tracing::{debug, debug_span, error, instrument, warn, Instrument, Span};
 
 use crate::helper::*;
@@ -99,10 +95,7 @@ impl<FS: Filesystem + Send + Sync + 'static> Session<FS> {
     pub async fn mount_empty_check(&self, mount_path: &Path) -> IoResult<()> {
         #[cfg(all(not(feature = "async-std-runtime"), feature = "tokio-runtime"))]
         if !self.mount_options.nonempty
-            && ReadDirStream::new(read_dir(mount_path).await?)
-                .next()
-                .await
-                .is_some()
+            && matches!(read_dir(mount_path).await?.next_entry().await, Ok(Some(_)))
         {
             return Err(IoError::new(
                 ErrorKind::AlreadyExists,
