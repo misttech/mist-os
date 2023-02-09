@@ -10,7 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 
-#include <map>
+#include <unordered_set>
 
 #include "image_pipe_surface.h"
 
@@ -50,7 +50,7 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   // This loop is manually pumped in method calls and doesn't have its own
   // thread.
   async::Loop loop_;
-  std::map<uint64_t, uint64_t> image_id_map;
+  std::unordered_set<uint64_t> image_ids;
 
   bool display_connection_exited_ = false;
   bool got_message_response_ = false;

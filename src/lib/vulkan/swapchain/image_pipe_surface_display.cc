@@ -497,14 +497,12 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
       return result;
     }
 
-    uint64_t fb_image_id;
-    display_controller_->ImportImage(
-        image_config, kBufferCollectionId, i,
-        [this, &status, &fb_image_id](zx_status_t import_status, uint64_t image_id) {
-          status = import_status;
-          fb_image_id = image_id;
-          got_message_response_ = true;
-        });
+    uint32_t image_id = next_image_id();
+    display_controller_->ImportImage2(image_config, kBufferCollectionId, image_id, i,
+                                      [this, &status](zx_status_t import_status) {
+                                        status = import_status;
+                                        got_message_response_ = true;
+                                      });
 
     if (!WaitForAsyncMessage()) {
       return false;
@@ -514,11 +512,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
       return false;
     }
 
-    ImageInfo info = {.image = image, .memory = memory, .image_id = next_image_id()};
+    ImageInfo info = {.image = image, .memory = memory, .image_id = image_id};
 
     image_info_out->push_back(info);
 
-    image_id_map[info.image_id] = fb_image_id;
+    image_ids.insert(image_id);
   }
 
   pDisp->DestroyBufferCollectionFUCHSIA(device, collection, pAllocator);
@@ -550,9 +548,9 @@ bool ImagePipeSurfaceDisplay::GetSize(uint32_t* width_out, uint32_t* height_out)
 }
 
 void ImagePipeSurfaceDisplay::RemoveImage(uint32_t image_id) {
-  auto iter = image_id_map.find(image_id);
-  if (iter != image_id_map.end()) {
-    image_id_map.erase(iter);
+  auto iter = image_ids.find(image_id);
+  if (iter != image_ids.end()) {
+    image_ids.erase(iter);
   }
 }
 
@@ -562,8 +560,8 @@ void ImagePipeSurfaceDisplay::PresentImage(
   assert(acquire_fences.size() <= 1);
   assert(release_fences.size() <= 1);
 
-  auto iter = image_id_map.find(image_id);
-  if (iter == image_id_map.end()) {
+  auto iter = image_ids.find(image_id);
+  if (iter == image_ids.end()) {
     fprintf(stderr, "%s::PresentImage: can't find image_id %u\n", kTag, image_id);
     return;
   }
@@ -606,7 +604,8 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
   }
 
-  display_controller_->SetLayerImage(layer_id_, iter->second, wait_event_id, signal_event_id);
+  // image_id is also used in DisplayController interface.
+  display_controller_->SetLayerImage(layer_id_, image_id, wait_event_id, signal_event_id);
   display_controller_->ApplyConfig();
 
   if (wait_event_id != fuchsia::hardware::display::INVALID_DISP_ID) {
