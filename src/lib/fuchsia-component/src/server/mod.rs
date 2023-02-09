@@ -519,20 +519,30 @@ macro_rules! add_functions {
         /// Adds a new remote directory served over the given DirectoryProxy.
         ///
         /// The name must not contain any '/' characters.
-        pub fn add_remote(&mut self, name: impl Into<String>, proxy: fio::DirectoryProxy) {
+        pub fn add_remote(
+            &mut self,
+            name: impl Into<String>,
+            proxy: fio::DirectoryProxy,
+        ) -> &mut Self {
             self.dir
                 .add_entry_impl(name.into(), remote_dir(proxy), false)
                 .expect("Unable to add entry");
+            self
         }
 
         /// Adds a new remote served over the given NodeProxy.  If the remote is a directory,
         /// add_remote should be used instead.
         ///
         /// The name must not contain any '/' characters.
-        pub fn add_remote_node(&mut self, name: impl Into<String>, proxy: fio::NodeProxy) {
+        pub fn add_remote_node(
+            &mut self,
+            name: impl Into<String>,
+            proxy: fio::NodeProxy,
+        ) -> &mut Self {
             self.dir
                 .add_entry_impl(name.into(), remote_node(proxy), false)
                 .expect("Unable to add entry");
+            self
         }
     };
 }

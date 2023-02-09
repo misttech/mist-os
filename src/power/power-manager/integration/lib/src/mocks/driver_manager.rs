@@ -90,7 +90,7 @@ impl MockDriverManager {
             server,
         );
         let mut fs = ServiceFs::new();
-        let () = fs.add_remote_node("dev", client);
+        let _: &mut ServiceFs<_> = fs.add_remote_node("dev", client);
         let fs = fs.serve_connection(handles.outgoing_dir).unwrap();
 
         let _: &mut ServiceFsDir<'_, _> = fs

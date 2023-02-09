@@ -790,11 +790,11 @@ async fn run_netemul_services(
 ) -> Result {
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> = fs
+        .add_remote(DEVFS, devfs)
         .dir("svc")
         .add_service_at(fnetemul_network::NetworkContextMarker::PROTOCOL_NAME, |channel| {
             Some(ServerEnd::<fnetemul_network::NetworkContextMarker>::new(channel))
         });
-    let () = fs.add_remote(DEVFS, devfs);
     let _: &mut ServiceFs<_> = fs.serve_connection(handles.outgoing_dir)?;
     let () = fs
         .for_each_concurrent(None, |server_end| {
