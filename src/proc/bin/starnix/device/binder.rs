@@ -489,8 +489,8 @@ impl BinderProcess {
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<(), Errno> {
-        let action = self.lock().handle_refcount_operation(current_task, command, handle)?;
-        if let Some(action) = action {
+        let actions = self.lock().handle_refcount_operation(current_task, command, handle)?;
+        for action in actions {
             action.execute();
         }
         Ok(())
@@ -504,8 +504,8 @@ impl BinderProcess {
         command: binder_driver_command_protocol,
         object: LocalBinderObject,
     ) -> Result<(), Errno> {
-        let action = self.lock().handle_refcount_operation_done(command, object)?;
-        if let Some(action) = action {
+        let actions = self.lock().handle_refcount_operation_done(command, object)?;
+        for action in actions {
             action.execute();
         }
         Ok(())
@@ -629,20 +629,20 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
     /// binder object.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn handle_refcount_operation(
         &mut self,
         current_task: &dyn RunningBinderTask,
         command: binder_driver_command_protocol,
         handle: Handle,
-    ) -> Result<Option<RefCountAction>, Errno> {
+    ) -> Result<Vec<RefCountAction>, Errno> {
         let idx = match handle {
             Handle::SpecialServiceManager => {
                 // TODO: Figure out how to acquire/release refs for the context manager
                 // object.
                 not_implemented!(current_task, "acquire/release refs for context manager object");
-                return Ok(None);
+                return Ok(vec![]);
             }
             Handle::Object { index } => index,
         };
@@ -659,13 +659,13 @@ impl<'a> BinderProcessGuard<'a> {
     /// Handle a binder thread's notification that it successfully incremented a strong/weak
     /// reference to a local (in-process) binder object. This is in response to a
     /// `BR_ACQUIRE`/`BR_INCREFS` command.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn handle_refcount_operation_done(
         &self,
         command: binder_driver_command_protocol,
         local: LocalBinderObject,
-    ) -> Result<Option<RefCountAction>, Errno> {
+    ) -> Result<Vec<RefCountAction>, Errno> {
         let object = self.find_object(&local).ok_or_else(|| errno!(EINVAL))?;
         match command {
             binder_driver_command_protocol_BC_INCREFS_DONE => object.ack_incref(),
@@ -1034,21 +1034,21 @@ impl BinderObjectRef {
     fn clean_refs(&mut self) -> Result<Vec<RefCountAction>, Errno> {
         let mut result = vec![];
         if self.weak_count > 0 {
-            result.push(self.binder_object.dec_weak()?);
+            result.append(&mut self.binder_object.dec_weak()?);
             self.weak_count = 0;
         }
         if self.strong_count > 0 {
-            result.push(self.binder_object.dec_strong()?);
+            result.append(&mut self.binder_object.dec_strong()?);
             self.strong_count = 0;
         }
-        Ok(result.into_iter().flatten().collect())
+        Ok(result)
     }
 
     /// Increments the strong reference count of the binder object reference.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_strong(&mut self) -> Result<Option<RefCountAction>, Errno> {
-        let mut result = None;
+    fn inc_strong(&mut self) -> Result<Vec<RefCountAction>, Errno> {
+        let mut result = vec![];
         if self.strong_count == 0 {
             result = self.binder_object.inc_strong()?;
         }
@@ -1057,10 +1057,10 @@ impl BinderObjectRef {
     }
 
     /// Increments the weak reference count of the binder object reference.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_weak(&mut self) -> Result<Option<RefCountAction>, Errno> {
-        let mut result = None;
+    fn inc_weak(&mut self) -> Result<Vec<RefCountAction>, Errno> {
+        let mut result = vec![];
         if self.weak_count == 0 {
             result = self.binder_object.inc_weak()?;
         }
@@ -1069,13 +1069,13 @@ impl BinderObjectRef {
     }
 
     /// Decrements the strong reference count of the binder object reference.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_strong(&mut self) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_strong(&mut self) -> Result<Vec<RefCountAction>, Errno> {
         if self.strong_count == 0 {
             return error!(EINVAL);
         }
-        let mut result = None;
+        let mut result = vec![];
         if self.strong_count == 1 {
             result = self.binder_object.dec_strong()?;
         }
@@ -1084,13 +1084,13 @@ impl BinderObjectRef {
     }
 
     /// Decrements the weak reference count of the binder object reference.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_weak(&mut self) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_weak(&mut self) -> Result<Vec<RefCountAction>, Errno> {
         if self.weak_count == 0 {
             return error!(EINVAL);
         }
-        let mut result = None;
+        let mut result = vec![];
         if self.weak_count == 1 {
             result = self.binder_object.dec_weak()?;
         }
@@ -1172,12 +1172,12 @@ impl HandleTable {
     /// may be an existing handle if the object was already present in the table. If the client does
     /// not acquire a strong reference to this handle before the transaction that inserted it is
     /// complete, the handle will be dropped.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess` and the handle representing the object.
     fn insert_for_transaction(
         &mut self,
         object: Arc<BinderObject>,
-    ) -> (Option<RefCountAction>, Handle) {
+    ) -> (Vec<RefCountAction>, Handle) {
         let index = {
             if let Some(existing_idx) = self.get_object_index(&object) {
                 existing_idx
@@ -1210,25 +1210,25 @@ impl HandleTable {
 
     /// Increments the strong reference count of the binder object reference at index `idx`,
     /// failing if the object no longer exists.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_strong(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
+    fn inc_strong(&mut self, idx: usize) -> Result<Vec<RefCountAction>, Errno> {
         self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_strong()
     }
 
     /// Increments the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_weak(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
+    fn inc_weak(&mut self, idx: usize) -> Result<Vec<RefCountAction>, Errno> {
         self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_weak()
     }
 
     /// Decrements the strong reference count of the binder object reference at index `idx`, failing
     /// if the object no longer exists.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_strong(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_strong(&mut self, idx: usize) -> Result<Vec<RefCountAction>, Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
         let refcount_action = object_ref.dec_strong()?;
         if !object_ref.has_ref() {
@@ -1239,9 +1239,9 @@ impl HandleTable {
 
     /// Decrements the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_weak(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_weak(&mut self, idx: usize) -> Result<Vec<RefCountAction>, Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
         let refcount_action = object_ref.dec_weak()?;
         if !object_ref.has_ref() {
@@ -1625,9 +1625,22 @@ struct BinderObject {
 impl Drop for BinderObject {
     fn drop(&mut self) {
         if self.owner.upgrade().is_some() {
-            assert!(!self.has_ref());
+            assert!(!self.has_ref(), "self: {self:?}");
         }
     }
+}
+
+/// The state of a given ref count (strong of weak).
+#[derive(Debug, Default, PartialEq, Eq)]
+enum ClientRefState {
+    /// The client is considered to have no reference count.
+    #[default]
+    NoRef,
+    /// The client has been send an increase to its reference count, but didn't yet acknowledge it.
+    WaitingAck,
+    /// The client did notified that it took into account an increase of the reference count, and
+    /// has not been send a decrease since.
+    HasRef,
 }
 
 /// Mutable state of a [`BinderObject`], mainly for handling the ordering guarantees of oneway
@@ -1654,14 +1667,14 @@ struct BinderObjectMutableState {
     /// When this is the case, no `BR_INCREFS` or `BR_DECREFS` are sent to the owner. Instead, a
     /// BR_DECREFS will be sent to the owner when receiving the `BC_INCREFS_DONE` if the reference
     /// count dropped to zero while waiting.
-    waiting_weak_ack: bool,
+    weak_client_state: ClientRefState,
 
     /// Whether a `BR_ACQUIRE` has been sent to the owner, and the `BC_ACQUIRE_DONE` has not been
     /// received yet.
     /// When this is the case, no `BR_ACQUIRE` or `BR_RELEASE` are sent to the owner. Instead, a
     /// BR_RELEASE will be sent to the owner when receiving the `BC_ACQUIRE_DONE` if the reference
     /// count dropped to zero while waiting.
-    waiting_strong_ack: bool,
+    strong_client_state: ClientRefState,
 }
 
 impl BinderObject {
@@ -1672,7 +1685,7 @@ impl BinderObject {
             owner: Arc::downgrade(owner),
             local,
             state: Mutex::new(BinderObjectMutableState {
-                waiting_strong_ack: true,
+                strong_client_state: ClientRefState::WaitingAck,
                 ..Default::default()
             }),
         })
@@ -1701,102 +1714,119 @@ impl BinderObject {
     /// true.
     fn has_ref(&self) -> bool {
         let state = self.state.lock();
-        state.weak_count > 0
-            || state.strong_count > 0
-            || state.waiting_weak_ack
-            || state.waiting_strong_ack
+        state.weak_client_state != ClientRefState::NoRef
+            || state.strong_client_state != ClientRefState::NoRef
     }
 
     /// Increments the strong reference count of the binder object.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_strong(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn inc_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
         state.strong_count += 1;
-        if state.strong_count == 1 && !state.waiting_strong_ack {
-            state.waiting_strong_ack = true;
-            Ok(Some(RefCountAction::Acquire(self.clone())))
+        if state.strong_count == 1 && state.strong_client_state == ClientRefState::NoRef {
+            state.strong_client_state = ClientRefState::WaitingAck;
+            Ok(vec![RefCountAction::Acquire(self.clone())])
         } else {
-            Ok(None)
+            Ok(vec![])
         }
     }
 
     /// Increments the weak reference count of the binder object.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_weak(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn inc_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
         state.weak_count += 1;
-        if state.weak_count == 1 && !state.waiting_weak_ack {
-            state.waiting_weak_ack = true;
-            Ok(Some(RefCountAction::IncRefs(self.clone())))
+        if state.weak_count == 1 && state.weak_client_state == ClientRefState::NoRef {
+            state.weak_client_state = ClientRefState::WaitingAck;
+            Ok(vec![RefCountAction::IncRefs(self.clone())])
         } else {
-            Ok(None)
+            Ok(vec![])
         }
     }
 
     /// Decrements the strong reference count of the binder object.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_strong(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
         if state.strong_count == 0 {
             return error!(EINVAL);
         }
         state.strong_count -= 1;
-        if state.strong_count == 0 && !state.waiting_strong_ack {
-            Ok(Some(RefCountAction::Release(self.clone())))
-        } else {
-            Ok(None)
-        }
+        Ok(self.compute_decrease_actions(&mut state))
     }
 
     /// Decrements the weak reference count of the binder object.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn dec_weak(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn dec_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
         if state.weak_count == 0 {
             return error!(EINVAL);
         }
         state.weak_count -= 1;
-        if state.weak_count == 0 && !state.waiting_weak_ack {
-            Ok(Some(RefCountAction::DecRefs(self.clone())))
-        } else {
-            Ok(None)
-        }
+        Ok(self.compute_decrease_actions(&mut state))
     }
 
     /// Acknowledge the BC_ACQUIRE_DONE command received from the object owner.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn ack_acquire(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn ack_acquire(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if !state.waiting_strong_ack {
+        if state.strong_client_state != ClientRefState::WaitingAck {
             return error!(EINVAL);
         }
-        state.waiting_strong_ack = false;
-        if state.strong_count == 0 {
-            Ok(Some(RefCountAction::Release(self.clone())))
-        } else {
-            Ok(None)
-        }
+        state.strong_client_state = ClientRefState::HasRef;
+        Ok(self.compute_decrease_actions(&mut state))
     }
 
     /// Acknowledge the BC_INCREFS_DONE command received from the object owner.
-    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
-    fn ack_incref(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+    fn ack_incref(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if !state.waiting_weak_ack {
+        if state.weak_client_state != ClientRefState::WaitingAck {
             return error!(EINVAL);
         }
-        state.waiting_weak_ack = false;
-        if state.weak_count == 0 {
-            Ok(Some(RefCountAction::DecRefs(self.clone())))
-        } else {
-            Ok(None)
+        state.weak_client_state = ClientRefState::HasRef;
+        Ok(self.compute_decrease_actions(&mut state))
+    }
+
+    /// Compute the list of `RefCountAction` to send to the client following a dec or an ack.
+    ///
+    /// A number of references decrements might have been enqueued while waiting for an
+    /// acknowledgement.
+    /// This method will compute these and returns the actions to send to the client.
+    fn compute_decrease_actions(
+        self: &Arc<Self>,
+        state: &mut BinderObjectMutableState,
+    ) -> Vec<RefCountAction> {
+        let mut result = vec![];
+        // No decrease action are sent when waiting for any acknowledgement.
+        if state.strong_client_state == ClientRefState::WaitingAck
+            || state.weak_client_state == ClientRefState::WaitingAck
+        {
+            return result;
         }
+        // If the current ref count is not 0, the state should consider the client has a
+        // reference.
+        debug_assert!(
+            state.strong_count == 0 || state.strong_client_state == ClientRefState::HasRef
+        );
+        debug_assert!(state.weak_count == 0 || state.weak_client_state == ClientRefState::HasRef);
+        // If the current ref count is 0, and the client has a reference, notify the client that
+        // it can release its reference.
+        if state.strong_count == 0 && state.strong_client_state == ClientRefState::HasRef {
+            state.strong_client_state = ClientRefState::NoRef;
+            result.push(RefCountAction::Release(self.clone()));
+        }
+        if state.weak_count == 0 && state.weak_client_state == ClientRefState::HasRef {
+            state.weak_client_state = ClientRefState::NoRef;
+            result.push(RefCountAction::DecRefs(self.clone()));
+        }
+        result
     }
 }
 
@@ -2928,9 +2958,9 @@ impl BinderDriver {
                             } else {
                                 // The binder object does not belong to the receiving process, so
                                 // dup the handle in the receiving process' handle table.
-                                let (action, new_handle) =
+                                let (actions, new_handle) =
                                     target_proc.lock().handles.insert_for_transaction(proxy);
-                                if let Some(action) = action {
+                                for action in actions {
                                     action.execute();
                                 }
 
@@ -2952,9 +2982,9 @@ impl BinderDriver {
 
                     // Create a handle in the receiving process that references the binder object
                     // in the sender's process.
-                    let (action, handle) =
+                    let (actions, handle) =
                         target_proc.lock().handles.insert_for_transaction(object);
-                    if let Some(action) = action {
+                    for action in actions {
                         action.execute();
                     }
 
@@ -3711,7 +3741,7 @@ mod tests {
             // Ack the initial acquire.
             transaction_ref.ack_acquire().expect("ack_acquire");
             // Ack the subsequent incref from the test.
-            transaction_ref.ack_incref().expect("ack_acquire");
+            transaction_ref.ack_incref().expect("ack_incref");
         }
 
         // The handle starts with a strong ref.
@@ -4009,8 +4039,10 @@ mod tests {
 
         let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT);
 
-        let command = object.ack_acquire().expect("ack_acquire").expect("has command");
-        command.execute();
+        let commands = object.ack_acquire().expect("ack_acquire");
+        for command in commands {
+            command.execute();
+        }
 
         assert_matches!(
             proc.command_queue.lock().commands.front(),
