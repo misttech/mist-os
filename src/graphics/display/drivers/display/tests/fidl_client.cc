@@ -391,7 +391,8 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  auto import_result = dc_->ImportImage(image_config, display_collection_id, 0);
+  auto image_id = next_image_id_++;
+  auto import_result = dc_->ImportImage2(image_config, display_collection_id, image_id, 0);
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
            import_result.value().res);
@@ -400,7 +401,7 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
 
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)sysmem_collection->Close();
-  return zx::ok(import_result.value().image_id);
+  return zx::ok(image_id);
 }
 
 }  // namespace display

@@ -111,6 +111,7 @@ class TestFidlClient {
   async_dispatcher_t* dispatcher_ = nullptr;
   uint64_t vsync_count_ TA_GUARDED(mtx()) = 0;
   uint64_t cookie_ = 0;
+  uint64_t next_image_id_ TA_GUARDED(mtx()) = 1;
   fuchsia_hardware_display::wire::ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem_;
 
