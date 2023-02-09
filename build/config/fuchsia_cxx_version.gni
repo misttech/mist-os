@@ -1,0 +1,22 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # **NOTE:** This is for **experimentation only** and should not normally be
+  # changed.  Set the version of the C++ standard to compile for, 17 or 20.
+  # Note also that GN code should never use this variable directly, but always
+  # instead use the `fuchsia_cxx_version` variable.
+  experimental_cxx_version = 17
+}
+
+assert(experimental_cxx_version == 17 || experimental_cxx_version == 20,
+       "`experimental_cxx_version` must be either 17 or 20")
+
+# The C++ standard version with which the Fuchsia build compiles C++ code.
+# Possible values are 17 and 20 (as an integer).
+#
+# GN code both in fuchsia.git and in cooperating repositories should use only
+# this variable, which can remain part of the Fuchsia build's internal GN API
+# after the `experimental_cxx_version` build argument is removed.
+fuchsia_cxx_version = experimental_cxx_version

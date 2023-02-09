@@ -8,6 +8,7 @@ import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia_cxx_version.gni")
 import("//build/config/linker.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
@@ -29,16 +30,9 @@ declare_args() {
     enable_frame_pointers = is_debug
   }
 
-  # **NOTE:** This is for **experimentation only** and should not normally be
-  # changed.  Set the version of the C++ standard to compile for, 17 or 20.
-  experimental_cxx_version = 17
-
   # Controls whether to promote warnings to errors.
   deny_warnings = true
 }
-
-assert(experimental_cxx_version == 17 || experimental_cxx_version == 20,
-       "`experimental_cxx_version` must be either 17 or 20")
 
 # No frame pointers for host compiles.
 if (!is_fuchsia) {
@@ -52,7 +46,7 @@ if (zircon_toolchain != false) {
 
 config("language") {
   cflags_c = [ "-std=c11" ]
-  cflags_cc = [ "-std=c++$experimental_cxx_version" ]
+  cflags_cc = [ "-std=c++$fuchsia_cxx_version" ]
   if (current_os == "mac") {
     # macOS needs this to not complain about C++17isms that older macOS
     # system libc++ doesn't support.  But we use our own toolchain's static
@@ -566,7 +560,7 @@ config("default_warnings") {
   ]
 
   cflags_cc = []
-  if (experimental_cxx_version == 20) {
+  if (fuchsia_cxx_version == 20) {
     # TODO(fxbug.dev/113689): Remove these after we switch to C++20.
     cflags_cc += [
       "-Wc++20-compat",
