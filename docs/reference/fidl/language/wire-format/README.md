@@ -507,7 +507,7 @@ The header has the following form:
 
 *   `zx_txid_t txid`, transaction ID (32 bits)
     * `txid`s with the high bit set are reserved for use by
-      [**zx_channel_write()**][channel write]
+      [**zx_channel_call()**][channel call]
     * `txid`s with the high bit unset are reserved for use by userspace
     * A value of `0` for `txid` is reserved for messages that do not
       require a response from the other side.
