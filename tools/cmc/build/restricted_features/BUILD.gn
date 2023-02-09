@@ -32,6 +32,7 @@ group("allow_non_hermetic_packages") {
     "//src/storage/f2fs/test/compatibility:*",
     "//src/sys/test_manager/tests:*",
     "//src/sys/test_manager/tests/nonhermetic_packaged_tests:*",
+    "//src/tests/intl/timezone:*",
     "//src/ui/a11y/lib/magnifier/tests:*",
     "//src/ui/a11y/lib/semantics/tests:*",
     "//src/ui/a11y/lib/view/tests:*",
