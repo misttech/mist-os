@@ -2594,12 +2594,20 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, 
     return;
   }
   wlan_fullmac_scan_result_t result = {};
+  bss_type_t bss_type = BSS_TYPE_INFRASTRUCTURE;
+
+  if ((capability & IEEE80211_BCN_CAPS_ESS) && !(capability & IEEE80211_BCN_CAPS_IBSS)) {
+    bss_type = BSS_TYPE_INFRASTRUCTURE;
+  } else if (!(capability & IEEE80211_BCN_CAPS_ESS) && (capability & IEEE80211_BCN_CAPS_IBSS)) {
+    bss_type = BSS_TYPE_INDEPENDENT;
+  } else if (!(capability & IEEE80211_BCN_CAPS_ESS) && !(capability & IEEE80211_BCN_CAPS_IBSS)) {
+    bss_type = BSS_TYPE_MESH;
+  }
 
   result.txn_id = ndev->scan_txn_id;
   result.timestamp_nanos = zx::clock::get_monotonic().get();
   memcpy(result.bss.bssid, bssid, ETH_ALEN);
-  // TODO(fxbug.dev/80230): The probably shouldn't be hardcoded.
-  result.bss.bss_type = BSS_TYPE_INFRASTRUCTURE;
+  result.bss.bss_type = bss_type;
   result.bss.beacon_period = 0;
   result.bss.capability_info = capability;
   result.bss.channel.primary = (uint8_t)channel;
