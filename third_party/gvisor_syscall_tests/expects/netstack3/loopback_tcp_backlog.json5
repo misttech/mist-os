@@ -1,0 +1,53 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            include: "../loopback_tcp_backlog_filter.json5",
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // Dual-stack TCP sockets are not supported.
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4MappedLoopback",
+            ],
+        },
+    ],
+}

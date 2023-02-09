@@ -25,10 +25,6 @@ void FilterTestsForLoopbackIsolatedTcpLingerTimeoutTarget(TestMap& tests);
 // included source files. This method skips all tests besides that subset.
 void FilterTestsForLoopbackIsolatedTarget(TestMap& tests);
 
-// The `loopback_tcp_backlog` target runs only a subset of the tests in its included
-// source files. This method skips all tests besides that subset.
-void FilterTestsForLoopbackTcpBacklogTarget(TestMap& tests);
-
 // Skips the subset of tests run by the `loopback_tcp_accept_backlog_listen_v4`
 // target.
 void SkipTestsRunByLoopbackTcpAcceptBacklogListenV4Target(TestMap& tests);
