@@ -36,10 +36,6 @@ config("fidl-deprecated-c-bindings") {
 
     #------------------
     #------------------
-    "//src/media/audio/bin/ihda",
-
-    #------------------
-    #------------------
     "//zircon/kernel/lib/userabi/userboot/*",
 
     #------------------

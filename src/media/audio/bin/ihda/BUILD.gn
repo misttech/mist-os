@@ -18,16 +18,11 @@ executable("ihda") {
     "zircon_device.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_c",
-    "//sdk/lib/fdio",
+    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }

@@ -6,9 +6,9 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <fuchsia/hardware/intel/hda/c/fidl.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/io.h>
+#include <fidl/fuchsia.hardware.intel.hda/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/wire/client.h>
 #include <stdio.h>
 #include <zircon/device/intel-hda.h>
 
@@ -19,41 +19,57 @@
 namespace audio {
 namespace intel_hda {
 
+namespace {
+
+// Wraps a call to ComponentController.GetChannel or CodecController.GetChannel.
+template <typename Protocol>
+zx::result<zx::channel> GetChannel(const char* device_path) {
+  auto channel = component::Connect<Protocol>(device_path);
+  if (!channel.is_ok()) {
+    printf("[%s] Failed to connect to device channel (%d)\n", device_path, channel.status_value());
+    return channel.take_error();
+  }
+  auto result = fidl::WireCall(*channel)->GetChannel();
+  if (!result.ok()) {
+    printf("[%s] Failed to fetch device channel (%d)\n", device_path, result.status());
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result->ch));
+}
+
+}  // namespace
+
 uint32_t ZirconDevice::transaction_id_ = 0;
 
 zx_status_t ZirconDevice::Connect() {
-  if (dev_channel_ != ZX_HANDLE_INVALID)
+  if (dev_channel_ != ZX_HANDLE_INVALID) {
     return ZX_OK;
-
-  if (!dev_name_)
+  }
+  if (!dev_name_) {
     return ZX_ERR_NO_MEMORY;
+  }
 
-  fbl::unique_fd fd{::open(dev_name_, O_RDONLY)};
-  if (!fd.is_valid())
-    return ZX_ERR_NOT_FOUND;
-
-  fdio_cpp::FdioCaller dev(std::move(fd));
-  zx_status_t (*thunk)(zx_handle_t, zx_handle_t*);
+  zx::result<zx::channel> dev_channel;
 
   switch (type_) {
     case Type::Controller:
-      thunk = fuchsia_hardware_intel_hda_ControllerDeviceGetChannel;
+      dev_channel = GetChannel<fuchsia_hardware_intel_hda::ControllerDevice>(dev_name_);
       break;
 
     case Type::Codec:
-      thunk = fuchsia_hardware_intel_hda_CodecDeviceGetChannel;
+      dev_channel = GetChannel<fuchsia_hardware_intel_hda::ControllerDevice>(dev_name_);
       break;
 
     default:
       return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t res = thunk(dev.borrow_channel(), dev_channel_.reset_and_get_address());
-  if (res != ZX_OK) {
-    printf("[%s] Failed to fetch device channel (%d)\n", dev_name(), res);
+  if (!dev_channel.is_ok()) {
+    return dev_channel.status_value();
   }
 
-  return res;
+  dev_channel_ = std::move(dev_channel.value());
+  return ZX_OK;
 }
 
 void ZirconDevice::Disconnect() { dev_channel_.reset(); }
