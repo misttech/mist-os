@@ -216,7 +216,7 @@ async fn create_new_kernel(
     // The name of the directory capability that is being offered to the starnix_kernel.
     const KERNEL_DIRECTORY: &str = "kernels";
     // The url of the starnix_kernel component, which is packaged with the starnix_manager.
-    const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
+    const KERNEL_URL: &str = "fuchsia-pkg://fuchsia.com/starnix_kernel#meta/starnix_kernel.cm";
 
     let kernel_start_info =
         generate_kernel_config(kernels_dir, KERNEL_DIRECTORY, component_start_info)?;

@@ -9,6 +9,9 @@ import("//src/sys/core/build/core_shard.gni")
 
 group("starnix_manager") {
   deps = [ ":starnix_package" ]
+  if (target_cpu == "x64") {
+    deps += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
 }
 
 rustc_binary("starnix_manager_bin") {
@@ -52,10 +55,6 @@ fuchsia_package_with_single_component("starnix_package") {
   component_name = "starnix_manager"
 
   deps = [ ":starnix_manager_bin" ]
-
-  if (target_cpu == "x64") {
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
-  }
 }
 
 if (target_cpu == "x64") {
