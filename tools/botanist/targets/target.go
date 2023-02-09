@@ -614,7 +614,6 @@ func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) 
 	for _, t := range targetSlice {
 		t := t
 		eg.Go(func() error {
-			// TODO(fxbug.dev/47910): Move outside gofunc once we get rid of downloading or ensure that it only happens once.
 			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)
 			if err != nil {
 				return err
