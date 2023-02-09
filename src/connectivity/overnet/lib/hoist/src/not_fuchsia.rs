@@ -14,6 +14,7 @@ use fidl_fuchsia_overnet::{
 };
 use fuchsia_async::TimeoutExt;
 use fuchsia_async::{Task, Timer};
+use futures::channel::mpsc::unbounded;
 use futures::future::Either;
 use futures::prelude::*;
 use overnet_core::{log_errors, ListPeersContext, Router, RouterOptions, SecurityContext};
@@ -108,25 +109,37 @@ impl Hoist {
     /// Runs a circuit link over the given socket. Assumes it is connected as a client.
     pub fn start_client_socket(&self, socket: fidl::Socket) -> Task<()> {
         let router = Arc::clone(&self.node);
-        Task::spawn(async move {
-            if let Err(e) = async move {
-                let (mut rx, mut tx) = fuchsia_async::Socket::from_socket(socket)?.split();
-                circuit::multi_stream::multi_stream_node_connection_to_async(
-                    router.circuit_node(),
-                    &mut rx,
-                    &mut tx,
-                    false,
-                    circuit::Quality::LOCAL_SOCKET,
-                    "client".to_owned(),
-                )
-                .await?;
-                Result::<(), Error>::Ok(())
-            }
-            .await
-            {
-                tracing::warn!("Client circuit failed: {:?}", e);
-            }
-        })
+        let (errors_sender, errors) = unbounded();
+        Task::spawn(
+            futures::future::join(
+                async move {
+                    if let Err(e) = async move {
+                        let (mut rx, mut tx) = fuchsia_async::Socket::from_socket(socket)?.split();
+                        circuit::multi_stream::multi_stream_node_connection_to_async(
+                            router.circuit_node(),
+                            &mut rx,
+                            &mut tx,
+                            false,
+                            circuit::Quality::LOCAL_SOCKET,
+                            errors_sender,
+                            "client".to_owned(),
+                        )
+                        .await?;
+                        Result::<(), Error>::Ok(())
+                    }
+                    .await
+                    {
+                        tracing::warn!("Client circuit failed: {:?}", e);
+                    }
+                },
+                errors
+                    .map(|e| {
+                        tracing::warn!("A client circuit stream failed: {e:?}");
+                    })
+                    .collect::<()>(),
+            )
+            .map(|((), ())| ()),
+        )
     }
 
     pub fn node(&self) -> Arc<Router> {
@@ -266,15 +279,25 @@ async fn run_ascendd_connection<'a>(
     let node = hoist.node.clone();
     let conn_fut = async move {
         if enable_circuit {
+            let (errors_sender, errors) = unbounded();
             tx.write_all(&CIRCUIT_ID).await?;
-            circuit::multi_stream::multi_stream_node_connection_to_async(
-                node.circuit_node(),
-                rx,
-                tx,
-                false,
-                circuit::Quality::LOCAL_SOCKET,
-                "ascendd".to_owned(),
+            futures::future::join(
+                circuit::multi_stream::multi_stream_node_connection_to_async(
+                    node.circuit_node(),
+                    rx,
+                    tx,
+                    false,
+                    circuit::Quality::LOCAL_SOCKET,
+                    errors_sender,
+                    "ascendd".to_owned(),
+                ),
+                errors
+                    .map(|e| {
+                        tracing::warn!("An ascendd circuit stream failed: {e:?}");
+                    })
+                    .collect::<()>(),
             )
+            .map(|(result, ())| result)
             .await
             .map_err(Error::from)
         } else {

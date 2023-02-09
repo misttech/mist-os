@@ -11,6 +11,7 @@ use argh::FromArgs;
 use async_net::unix::{UnixListener, UnixStream};
 use fuchsia_async::Task;
 use fuchsia_async::TimeoutExt;
+use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
 use hoist::Hoist;
 use overnet_core::AscenddClientRouting;
@@ -107,14 +108,24 @@ pub async fn run_stream<'a>(
     }
 
     if read == 8 && id == CIRCUIT_ID {
-        circuit::multi_stream::multi_stream_node_connection_to_async(
-            node.circuit_node(),
-            rx,
-            tx,
-            true,
-            circuit::Quality::LOCAL_SOCKET,
-            "ascendd client".to_owned(),
+        let (errors_sender, errors) = unbounded();
+        futures::future::join(
+            circuit::multi_stream::multi_stream_node_connection_to_async(
+                node.circuit_node(),
+                rx,
+                tx,
+                true,
+                circuit::Quality::LOCAL_SOCKET,
+                errors_sender,
+                "ascendd client".to_owned(),
+            ),
+            errors
+                .map(|e| {
+                    tracing::warn!("An ascendd client circuit stream failed: {e:?}");
+                })
+                .collect::<()>(),
         )
+        .map(|(result, ())| result)
         .await
         .map_err(Error::from)
     } else {

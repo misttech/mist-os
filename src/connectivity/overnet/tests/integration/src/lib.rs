@@ -17,6 +17,7 @@ use {
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_overnet::{Peer, ServiceProviderMarker},
     fuchsia_async::Task,
+    futures::channel::mpsc::unbounded,
     futures::prelude::*,
     overnet_core::{log_errors, ListPeersContext, NodeId, NodeIdGenerator, Router},
     parking_lot::Mutex,
@@ -120,12 +121,14 @@ async fn run_overnet_command(
         }
         OvernetCommand::AttachCircuitSocketLink(socket, is_server) => {
             let (mut rx, mut tx) = fidl::AsyncSocket::from_socket(socket)?.split();
+            let (errors_sender, _black_hole) = unbounded();
             multi_stream_node_connection_to_async(
                 node.circuit_node(),
                 &mut rx,
                 &mut tx,
                 is_server,
                 circuit::Quality::IN_PROCESS,
+                errors_sender,
                 "test node".to_owned(),
             )
             .await?;

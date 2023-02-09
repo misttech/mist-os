@@ -9,6 +9,7 @@ use {
     fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream},
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
+    futures::channel::mpsc::unbounded,
     futures::join,
     futures::prelude::*,
     hoist::{hoist, OvernetInstance},
@@ -40,16 +41,25 @@ async fn exec_server() -> Result<(), Error> {
                 match fidl::AsyncSocket::from_socket(socket) {
                     Ok(socket) => {
                         let (mut rx, mut tx) = socket.split();
-                        if let Err(e) =
+                        let (errors_sender, errors) = unbounded();
+                        if let Err(e) = futures::future::join(
                             circuit::multi_stream::multi_stream_node_connection_to_async(
                                 router.circuit_node(),
                                 &mut rx,
                                 &mut tx,
                                 true,
                                 circuit::Quality::NETWORK,
+                                errors_sender,
                                 "client".to_owned(),
-                            )
-                            .await
+                            ),
+                            errors
+                                .map(|e| {
+                                    tracing::warn!("A client circuit stream failed: {e:?}");
+                                })
+                                .collect::<()>(),
+                        )
+                        .map(|(result, ())| result)
+                        .await
                         {
                             error!("Error handling Overnet link: {:?}", e);
                         }

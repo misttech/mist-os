@@ -54,6 +54,7 @@ pub async fn multi_stream(
     is_server: bool,
     streams_out: UnboundedSender<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
     streams_in: UnboundedReceiver<(stream::Reader, stream::Writer)>,
+    stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> Result<()> {
     let (new_readers_sender, new_readers) = unbounded();
@@ -101,10 +102,19 @@ pub async fn multi_stream(
             Some((got, ()))
         });
 
-        let stream_errors = stream_errors.then(|x| async move {
-            x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
-                "Stream handler hung up without returning a status".to_owned(),
-            ))))
+        // Send stream errors to our error output. This functions as a stream that never returns anything
+        // so we can wrap it in a select with read_result_stream and thereby continuously poll it as
+        // we handle errors.
+        let stream_errors = stream_errors.filter_map(move |x| {
+            let stream_errors_out = stream_errors_out.clone();
+            async move {
+                if let Err(x) = x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
+                    "Stream handler hung up without returning a status".to_owned(),
+                )))) {
+                    let _ = stream_errors_out.unbounded_send(x);
+                }
+                None
+            }
         });
 
         let read_result_stream = futures::stream::select(stream_errors, read_result_stream);
@@ -389,6 +399,7 @@ pub fn multi_stream_node_connection(
     writer: stream::Writer,
     is_server: bool,
     quality: Quality,
+    stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> impl Future<Output = Result<()>> + Send {
     let (new_stream_sender, streams_in) = unbounded();
@@ -406,7 +417,15 @@ pub fn multi_stream_node_connection(
         None
     };
 
-    let stream_fut = multi_stream(reader, writer, is_server, streams_out, streams_in, remote_name);
+    let stream_fut = multi_stream(
+        reader,
+        writer,
+        is_server,
+        streams_out,
+        streams_in,
+        stream_errors_out,
+        remote_name,
+    );
     let node_fut = node.link_node(control_stream, new_stream_sender, new_stream_receiver, quality);
 
     async move {
@@ -430,6 +449,7 @@ pub async fn multi_stream_node_connection_to_async(
     tx: &mut (dyn AsyncWrite + Unpin + Send),
     is_server: bool,
     quality: Quality,
+    stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> Result<()> {
     let (reader, remote_writer) = stream::stream();
@@ -440,6 +460,7 @@ pub async fn multi_stream_node_connection_to_async(
         remote_writer,
         is_server,
         quality,
+        stream_errors_out,
         remote_name.clone(),
     );
     let remote_name = &remote_name;
@@ -508,11 +529,23 @@ mod test {
         let (_create_stream_b, b_streams_in) = unbounded();
         let (a_streams_out, _get_stream_a) = unbounded();
         let (b_streams_out, mut get_stream_b) = unbounded();
+        // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
+        // observe them in a test.
+        let (errors_sink_a, _black_hole) = unbounded();
+        let errors_sink_b = errors_sink_a.clone();
 
         let _a = fasync::Task::spawn(async move {
             assert!(matches!(
-                multi_stream(a_reader, a_writer, true, a_streams_out, a_streams_in, "b".to_owned())
-                    .await,
+                multi_stream(
+                    a_reader,
+                    a_writer,
+                    true,
+                    a_streams_out,
+                    a_streams_in,
+                    errors_sink_a,
+                    "b".to_owned()
+                )
+                .await,
                 Ok(()) | Err(Error::ConnectionClosed(None))
             ))
         });
@@ -524,12 +557,136 @@ mod test {
                     false,
                     b_streams_out,
                     b_streams_in,
+                    errors_sink_b,
                     "a".to_owned()
                 )
                 .await,
                 Ok(()) | Err(Error::ConnectionClosed(None))
             ))
         });
+
+        let (ab_reader_a, ab_reader_write) = stream::stream();
+        let (ab_writer_read, ab_writer_a) = stream::stream();
+
+        create_stream_a.unbounded_send((ab_writer_read, ab_reader_write)).unwrap();
+
+        ab_writer_a
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+
+        let (ab_reader_b, ab_writer_b, err) = get_stream_b.next().await.unwrap();
+        err.send(Ok(())).unwrap();
+
+        ab_writer_b
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[9, 10, 11, 12, 13, 14, 15, 16]);
+                Ok(8)
+            })
+            .unwrap();
+
+        ab_reader_b
+            .read(8, |buf| {
+                assert_eq!(&buf[..8], &[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(((), 8))
+            })
+            .await
+            .unwrap();
+        ab_reader_a
+            .read(8, |buf| {
+                assert_eq!(&buf[..8], &[9, 10, 11, 12, 13, 14, 15, 16]);
+                Ok(((), 8))
+            })
+            .await
+            .unwrap();
+
+        std::mem::drop(ab_writer_b);
+        assert!(matches!(
+            ab_reader_a.read::<_, ()>(1, |_| unreachable!()).await,
+            Err(Error::ConnectionClosed(_))
+        ));
+
+        std::mem::drop(ab_reader_b);
+        ab_writer_a
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn fallible_stream() {
+        let (a_reader, b_writer) = stream::stream();
+        let (b_reader, a_writer) = stream::stream();
+        let (create_stream_a, a_streams_in) = unbounded();
+        let (_create_stream_b, b_streams_in) = unbounded();
+        let (a_streams_out, _get_stream_a) = unbounded();
+        let (b_streams_out, mut get_stream_b) = unbounded();
+        let (errors_sink_a, _black_hole) = unbounded();
+        // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
+        // observe them in a test.
+        let (errors_sink_b, mut b_errors) = unbounded();
+
+        let _a = fasync::Task::spawn(async move {
+            assert!(matches!(
+                multi_stream(
+                    a_reader,
+                    a_writer,
+                    true,
+                    a_streams_out,
+                    a_streams_in,
+                    errors_sink_a,
+                    "b".to_owned()
+                )
+                .await,
+                Ok(()) | Err(Error::ConnectionClosed(None))
+            ))
+        });
+        let _b = fasync::Task::spawn(async move {
+            assert!(matches!(
+                multi_stream(
+                    b_reader,
+                    b_writer,
+                    false,
+                    b_streams_out,
+                    b_streams_in,
+                    errors_sink_b,
+                    "a".to_owned()
+                )
+                .await,
+                Ok(()) | Err(Error::ConnectionClosed(None))
+            ))
+        });
+
+        // The first stream fails to be created.
+        let (fail_reader, fail_reader_write) = stream::stream();
+        let (_ignore, fail_writer) = stream::stream();
+        create_stream_a.unbounded_send((fail_reader, fail_writer)).unwrap();
+
+        // There's a laziness to stream creation in the protocol so we need to send a little data to
+        // actually create the stream.
+        fail_reader_write
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+
+        let (_, _, err) = get_stream_b.next().await.unwrap();
+        err.send(Err(Error::ConnectionClosed(Some("Testing".to_owned())))).unwrap();
+
+        loop {
+            if let Some(Error::ConnectionClosed(Some(s))) = b_errors.next().await {
+                if s == "Testing" {
+                    break;
+                }
+            } else {
+                panic!("Error stream closed without reporting our error.");
+            }
+        }
 
         let (ab_reader_a, ab_reader_write) = stream::stream();
         let (ab_writer_read, ab_writer_a) = stream::stream();
@@ -591,6 +748,9 @@ mod test {
         let (create_stream_b, b_streams_in) = unbounded();
         let (a_streams_out, mut get_stream_a) = unbounded();
         let (b_streams_out, mut get_stream_b) = unbounded();
+        // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
+        // observe them in a test.
+        let (errors_sink, _black_hole) = unbounded();
 
         let _a = fasync::Task::spawn(multi_stream(
             a_reader,
@@ -598,6 +758,7 @@ mod test {
             true,
             a_streams_out,
             a_streams_in,
+            errors_sink.clone(),
             "b".to_owned(),
         ));
         let _b = fasync::Task::spawn(multi_stream(
@@ -606,6 +767,7 @@ mod test {
             false,
             b_streams_out,
             b_streams_in,
+            errors_sink.clone(),
             "a".to_owned(),
         ));
 
@@ -686,6 +848,9 @@ mod test {
         let (incoming_streams_sender_b, mut streams) = unbounded();
         let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
         let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
+        // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
+        // observe them in a test.
+        let (errors_sink, _black_hole) = unbounded();
 
         let (ab_reader, ab_writer) = stream::stream();
         let (ba_reader, ba_writer) = stream::stream();
@@ -696,6 +861,7 @@ mod test {
             ab_writer,
             true,
             Quality::IN_PROCESS,
+            errors_sink.clone(),
             "b".to_owned(),
         ));
         let _b_conn = fasync::Task::spawn(multi_stream_node_connection(
@@ -704,6 +870,7 @@ mod test {
             ba_writer,
             false,
             Quality::IN_PROCESS,
+            errors_sink.clone(),
             "a".to_owned(),
         ));
 
