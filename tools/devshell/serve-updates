@@ -103,8 +103,15 @@ if [[ "${err}" -ne 0 ]]; then
 fi
 
 pm_pid=
+package_tool_pid=
 ffx_server_started=
 cleanup() {
+  if [[ -n "${package_tool_pid}" ]]; then
+    if kill -0 "${package_tool_pid}" 2> /dev/null; then
+      kill -TERM "${package_tool_pid}" 2> /dev/null
+      wait "${package_tool_pid}" 2> /dev/null
+    fi
+  fi
   if [[ "${server_mode}" == "pm" ]]; then
     if [[ -n "${pm_pid}" ]]; then
       if kill -0 "${pm_pid}" 2> /dev/null; then
@@ -167,13 +174,16 @@ with-pinned-target() {
 
 repo_dir="${FUCHSIA_BUILD_DIR}/amber-files"
 
-if is_feature_enabled "incremental"; then
-  # FIXME(http://fxbug.dev/79636): ffx doesn't yet support incremental package building.
-  server_mode="pm"
+if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || is_feature_enabled "incremental_legacy"; then
+  if is_feature_enabled "incremental" || is_feature_enabled "incremental_legacy"; then
+    # FIXME(http://fxbug.dev/79636): use `incremental_legacy` as a safety fallback.
+    server_mode="pm"
+  fi
 
-  fx-info "Incremental package auto-publishing is enabled."
-  serve_flags+=( -p "all_package_manifests.list" )
-
+  if [[ "${server_mode}" = "pm" ]]; then
+    fx-info "Incremental package auto-publishing is enabled for pm."
+    serve_flags+=( -p "all_package_manifests.list" )
+  fi
   # macOS in particular has a low default for number of open file descriptors
   # per process, which is prohibitive for higher job counts. Here we raise
   # the number of allowed file descriptors per process if it appears to be
@@ -216,19 +226,11 @@ if [[ "${server_mode}" = "pm" ]]; then
   # the manifest list file has relative paths and "pm serve" looks for them
   # from PWD, so pm command needs to be executed in "$FUCHSIA_BUILD_DIR"
   cd "${FUCHSIA_BUILD_DIR}"
-else
-  # FIXME(http://fxbug.dev/79636): ffx doesn't yet support incremental package building.
-  if is_feature_enabled "incremental"; then
-    fx-error "The feature 'incremental' is not supported yet by ffx."
-    fx-error "To use the 'incremental' feature, switch to the legacy pm"
-    fx-error "package server with:"
-    fx-error ""
-    fx-error "$ ffx config set repository.server.mode pm"
-    fx-error "$ ffx repository server stop"
-    fx-error ""
-    fx-error "See http://fxbug.dev/79636 for more details."
-    exit 1
-  fi
+elif is_feature_enabled "incremental" || is_feature_enabled "incremental_legacy"; then
+  fx-error "The 'incremental' and 'incremental_legacy' features are not supported by ffx."
+  fx-error ""
+  fx-error "See http://fxbug.dev/79636 for more details."
+  exit 1
 fi
 
 # Error out if we can't start a package server.
@@ -289,6 +291,17 @@ else
     # denote traffic to the web server.
     fx-command-run ffx daemon log --follow --line-count 0 | grep ' \(fuchsia_repo::server\)\|\(ffx_daemon_service_repo\): ' &
     pm_pid=$!
+  fi
+
+  if is_feature_enabled "incremental_new"; then
+    fx-info "Incremental package auto-publishing is enabled for ffx."
+    package_tool_flags=( --watch --package-list "all_package_manifests.list" --trusted-root "${repo_dir}/repository/9.root.json" )
+    package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )
+
+    # the manifest list file has relative paths and package manifest watcher looks for them
+    # from PWD, so the command needs to be executed in "$FUCHSIA_BUILD_DIR"
+    cd "${FUCHSIA_BUILD_DIR}" && fx-command-exec host-tool package-tool "${package_tool_args[@]}" &
+    package_tool_pid=$!
   fi
 fi
 

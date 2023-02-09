@@ -6,6 +6,8 @@
 function list_optional_features {
   echo \
     "incremental" \
+    "incremental_legacy" \
+    "incremental_new" \
     "legacy_fastboot"
 }
 
@@ -13,6 +15,8 @@ function list_optional_features {
 function is_feature_enabled_by_default {
   case "$1" in
   "incremental") return 1 ;;
+  "incremental_legacy") return 1 ;;
+  "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;
   esac
 
@@ -24,7 +28,14 @@ _FX_INDENT="      "
 function help_optional_feature {
   local h=()
   case "$1" in
-  "incremental")
+  "incremental" | "incremental_legacy")
+    h=(
+      "Packages are published and served incrementally by 'fx serve-updates'"
+      "as they are built using the legacy incremental publisher. Explicit"
+      "'fx build' is not required for most operations."
+      )
+    ;;
+  "incremental_new")
     h=(
       "Packages are published and served incrementally by 'fx serve-updates'"
       "as they are built. Explicit 'fx build' is not required for most operations."

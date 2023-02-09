@@ -255,7 +255,7 @@ EOF
 
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  FUCHSIA_DISABLED_incremental_legacy=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
   local serve_updates_pid=$!
 
   # Give fx serve-updates some time to come up.
@@ -271,7 +271,7 @@ EOF
   wait "${serve_updates_pid}"
 
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stdout "Ready to push packages!"
-  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Incremental package auto-publishing is enabled."
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Incremental package auto-publishing is enabled for pm."
 }
 
 TEST_fx_serve_updates_exits_if_pm_fails_to_start() {
@@ -369,9 +369,21 @@ EOF
 
   BT_ASSERT _create_mock_pm "${serve_updates_port}"
 
-  # Even though the ffx config says we should use the ffx repository server, we
-  # should fall back to using pm.
+  # `package-tool` monitors filesystem and publishes package updates.
+  local package_tool="$(btf::make_installed_hosttools_mock package-tool)"
+
+  local shell="${FUCHSIA_DIR}/tools/devshell/shell"
+  btf::make_mock "${shell}"
+  cat > "${shell}.mock_side_effects" <<EOF
+if [[ "\$@" == "clock --monotonic" ]]; then
+  echo "0"
+fi
+EOF
+
+  # ffx repository server is used, but the package updates are handled by the `package-tool`.
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
+  local started_server="${BT_TEMP_DIR}/started-server"
+  local stopped_server="${BT_TEMP_DIR}/stopped-server"
   cat > "${ffx}.mock_side_effects" <<EOF
 if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
@@ -390,20 +402,22 @@ EOF
 
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  FUCHSIA_DISABLED_incremental_new=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
   local serve_updates_pid=$!
 
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout
 
-  # Request the list of targets. Confirm testpackage is one of the targets.
-  BT_ASSERT _check_targets "${serve_updates_port}"
-
-  # Shut down our fake pm, which should stop serve-updates.
+  # Shut down our fake ffx server, which should stop serve-updates.
   kill "${serve_updates_pid}"
   wait "${serve_updates_pid}"
 
+  BT_ASSERT_FILE_EXISTS "${started_server}"
+  BT_ASSERT_FILE_EXISTS "${stopped_server}"
+
+  btf::expect-mock-args "${package_tool}" "package-tool" "repository" "publish" "${REPODIR}" "--watch" "--package-list" "all_package_manifests.list" "--trusted-root" "${REPODIR}/repository/9.root.json"
+
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stdout "Ready to push packages!"
-  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Incremental package auto-publishing is enabled."
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Incremental package auto-publishing is enabled for ffx."
 }
 
 BT_RUN_TESTS "$@"
