@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/connectivity/network/meta/netstack-common.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -12,23 +13,8 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.net.debug.Diagnostics",
-                "fuchsia.net.debug.Interfaces",
-                "fuchsia.net.filter.Filter",
-                "fuchsia.net.interfaces.admin.Installer",
-                "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
-                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
-                "fuchsia.net.neighbor.Controller",
-                "fuchsia.net.neighbor.View",
-                "fuchsia.net.routes.State",
                 "fuchsia.net.stack.Log",
-                "fuchsia.net.stack.Stack",
-                "fuchsia.netstack.Netstack",
-                "fuchsia.posix.socket.packet.Provider",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.update.verify.NetstackVerifier",
             ],
         },
     ],
@@ -41,23 +27,8 @@
     expose: [
         {
             protocol: [
-                "fuchsia.net.debug.Diagnostics",
-                "fuchsia.net.debug.Interfaces",
-                "fuchsia.net.filter.Filter",
-                "fuchsia.net.interfaces.admin.Installer",
-                "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
-                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
-                "fuchsia.net.neighbor.Controller",
-                "fuchsia.net.neighbor.View",
-                "fuchsia.net.routes.State",
                 "fuchsia.net.stack.Log",
-                "fuchsia.net.stack.Stack",
-                "fuchsia.netstack.Netstack",
-                "fuchsia.posix.socket.packet.Provider",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.update.verify.NetstackVerifier",
             ],
             from: "self",
         },

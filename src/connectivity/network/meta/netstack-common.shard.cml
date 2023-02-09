@@ -1,0 +1,51 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Common capabilities for Netstack2 and Netstack3. Protocols that are exposed
+// by the system netstack should be listed here.
+{
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.net.debug.Diagnostics",
+                "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.filter.Filter",
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.neighbor.Controller",
+                "fuchsia.net.neighbor.View",
+                "fuchsia.net.routes.State",
+                "fuchsia.net.stack.Stack",
+                "fuchsia.netstack.Netstack",
+                "fuchsia.posix.socket.packet.Provider",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.update.verify.NetstackVerifier",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.net.debug.Diagnostics",
+                "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.filter.Filter",
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.neighbor.Controller",
+                "fuchsia.net.neighbor.View",
+                "fuchsia.net.routes.State",
+                "fuchsia.net.stack.Stack",
+                "fuchsia.netstack.Netstack",
+                "fuchsia.posix.socket.packet.Provider",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.update.verify.NetstackVerifier",
+            ],
+            from: "self",
+        },
+    ],
+}
