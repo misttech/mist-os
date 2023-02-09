@@ -47,7 +47,9 @@ impl Iterator for CollectionIdGenerator {
 
     fn next(&mut self) -> Option<u64> {
         static NEXT_ID: AtomicU64 = AtomicU64::new(100);
-        let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+        // NEXT_ID only increments so it only requires atomicity, and we can
+        // use Relaxed order.
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         // fetch_add wraps on overflow, which we'll use as a signal
         // that this generator is out of ids.
         if id == 0 {
@@ -59,6 +61,30 @@ impl Iterator for CollectionIdGenerator {
 }
 fn next_collection_id() -> u64 {
     CollectionIdGenerator::default().next().expect("collection_id")
+}
+
+#[derive(Default)]
+struct ImageIdGenerator {}
+
+impl Iterator for ImageIdGenerator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<u64> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+        // NEXT_ID only increments so it only requires atomicity, and we can
+        // use Relaxed order.
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        // fetch_add wraps on overflow, which we'll use as a signal
+        // that this generator is out of ids.
+        if id == 0 {
+            None
+        } else {
+            Some(id)
+        }
+    }
+}
+fn next_image_id() -> u64 {
+    ImageIdGenerator::default().next().expect("image_id")
 }
 
 async fn create_and_import_event(controller: &ControllerProxy) -> Result<(Event, u64), Error> {
@@ -333,9 +359,10 @@ impl DisplayDirectViewStrategy {
         let mut signal_events = WaitEvents::new();
         for index in 0..buffers.buffer_count as usize {
             let uindex = index as u32;
-            let (status, image_id) = display
+            let image_id = next_image_id();
+            let status = display
                 .controller
-                .import_image(&mut image_config, collection_id, uindex)
+                .import_image2(&mut image_config, collection_id, image_id, uindex)
                 .await
                 .context("controller import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);

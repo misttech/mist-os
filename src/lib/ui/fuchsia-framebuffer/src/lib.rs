@@ -17,7 +17,10 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use mapped_vmo::Mapping;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 #[cfg(test)]
@@ -327,9 +330,10 @@ impl Frame {
     ) -> Result<u64, Error> {
         let mut image_config = Self::create_image_config(image_type, config);
 
-        let (status, image_id) = framebuffer
+        let image_id = framebuffer.next_image_id();
+        let status = framebuffer
             .controller
-            .import_image(&mut image_config, collection_id, index)
+            .import_image2(&mut image_config, collection_id, image_id, index)
             .await
             .context("controller import_image")?;
 
@@ -642,6 +646,7 @@ pub struct FrameBuffer {
     layer_id: u64,
     pub usage: FrameUsage,
     initial_virtcon_mode: Option<VirtconMode>,
+    next_image_id: AtomicU64,
 }
 
 impl FrameBuffer {
@@ -835,8 +840,14 @@ impl FrameBuffer {
             .detach();
         }
 
-        let mut fb =
-            FrameBuffer { initial_virtcon_mode, controller: proxy, config, layer_id: 0, usage };
+        let mut fb = FrameBuffer {
+            initial_virtcon_mode,
+            controller: proxy,
+            config,
+            layer_id: 0,
+            usage,
+            next_image_id: AtomicU64::new(1),
+        };
 
         let layer_id = fb.create_layer().await?;
         fb.layer_id = layer_id;
@@ -914,6 +925,12 @@ impl FrameBuffer {
     pub fn acknowledge_vsync(&mut self, cookie: u64) -> Result<(), Error> {
         self.controller.acknowledge_vsync(cookie)?;
         Ok(())
+    }
+
+    pub fn next_image_id(&self) -> u64 {
+        // `self.next_image_id` only increments so it only requires atomicity,
+        // and thus we can use Relaxed order.
+        self.next_image_id.fetch_add(1, Ordering::Relaxed)
     }
 }
 
