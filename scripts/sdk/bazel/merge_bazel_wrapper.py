@@ -57,7 +57,7 @@ def main():
     print(unmergable_files)
 
     # Write meta/manifest.json
-    dest_file = os.path.join(dest_dir, "meta/manifest.json")
+    dest_file = os.path.join(args.dest_dir, "meta/manifest.json")
     if not os.path.exists(os.path.dirname(dest_file)):
         os.makedirs(os.path.dirname(dest_file))
     with open(dest_file, "w") as f:
