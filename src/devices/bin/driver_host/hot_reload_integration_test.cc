@@ -67,17 +67,16 @@ TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
   // Setup the environment for testing.
   SetupEnvironment(dev, &devmgr, &development_);
 
-  zx::channel chan_driver;
+  fidl::ClientEnd<TestDevice> chan_driver;
 
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:17:0/driver-host-restart-driver");
   ASSERT_OK(channel.status_value());
-  chan_driver = std::move(channel.value());
-  ASSERT_NE(chan_driver.get(), ZX_HANDLE_INVALID);
+  chan_driver = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
   ASSERT_TRUE(chan_driver.is_valid());
 
   // Get pid of driver before restarting.
-  auto result_before = fidl::WireCall<TestDevice>(zx::unowned(chan_driver))->GetPid();
+  auto result_before = fidl::WireCall(chan_driver)->GetPid();
   ASSERT_OK(result_before.status());
   ASSERT_FALSE(result_before->is_error(), "GetPid failed: %s",
                zx_status_get_string(result_before->error_value()));
@@ -101,11 +100,10 @@ TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
   channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
                                                  "sys/platform/11:17:0/driver-host-restart-driver");
   ASSERT_OK(channel.status_value());
-  chan_driver = std::move(channel.value());
-  ASSERT_NE(chan_driver.get(), ZX_HANDLE_INVALID);
+  chan_driver = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
   ASSERT_TRUE(chan_driver.is_valid());
 
-  auto result_after = fidl::WireCall<TestDevice>(zx::unowned(chan_driver))->GetPid();
+  auto result_after = fidl::WireCall(chan_driver)->GetPid();
   ASSERT_OK(result_after.status());
   ASSERT_FALSE(result_after->is_error(), "GetPid failed: %s",
                zx_status_get_string(result_after->error_value()));
@@ -133,14 +131,13 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversParent) {
   // Setup the environment for testing.
   SetupEnvironment(dev, &devmgr, &development_);
 
-  zx::channel chan_parent, chan_child;
+  zx::channel chan_child;
 
   // Open parent.
   zx::result parent_channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(parent_channel.status_value());
-  chan_parent = std::move(parent_channel.value());
-  ASSERT_NE(chan_parent.get(), ZX_HANDLE_INVALID);
+  auto chan_parent = fidl::ClientEnd<TestDevice>(std::move(parent_channel.value()));
   ASSERT_TRUE(chan_parent.is_valid());
 
   // Open child.
@@ -152,7 +149,7 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversParent) {
   ASSERT_TRUE(chan_child.is_valid());
 
   // Get pid of parent driver before restarting.
-  auto parent_before = fidl::WireCall<TestDevice>(zx::unowned(chan_parent))->GetPid();
+  auto parent_before = fidl::WireCall(chan_parent)->GetPid();
   ASSERT_OK(parent_before.status());
   ASSERT_FALSE(parent_before->is_error(), "GetPid for parent failed: %s",
                zx_status_get_string(parent_before->error_value()));
@@ -176,12 +173,11 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversParent) {
   parent_channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
                                                         "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(parent_channel.status_value());
-  chan_parent = std::move(parent_channel.value());
-  ASSERT_NE(chan_parent.get(), ZX_HANDLE_INVALID);
+  chan_parent = fidl::ClientEnd<TestDevice>(std::move(parent_channel.value()));
   ASSERT_TRUE(chan_parent.is_valid());
 
   // Get pid of parent driver after restarting.
-  auto parent_after = fidl::WireCall<TestDevice>(zx::unowned(chan_parent))->GetPid();
+  auto parent_after = fidl::WireCall(chan_parent)->GetPid();
   ASSERT_OK(parent_after.status());
   ASSERT_FALSE(parent_after->is_error(), "GetPid for parent failed: %s",
                zx_status_get_string(parent_after->error_value()));
@@ -218,23 +214,17 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversChild) {
   // Setup the environment for testing.
   SetupEnvironment(dev, &devmgr, &development_);
 
-  zx::channel chan_parent, chan_child;
-
   // Open parent.
   zx::result parent_channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(parent_channel.status_value());
-  chan_parent = std::move(parent_channel.value());
-  ASSERT_NE(chan_parent.get(), ZX_HANDLE_INVALID);
+  auto chan_parent = fidl::ClientEnd<TestDevice>{std::move(parent_channel.value())};
   ASSERT_TRUE(chan_parent.is_valid());
 
   // Open child.
   zx::result child_channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child");
   ASSERT_OK(child_channel.status_value());
-  chan_child = std::move(child_channel.value());
-  ASSERT_NE(chan_child.get(), ZX_HANDLE_INVALID);
-  ASSERT_TRUE(chan_child.is_valid());
 
   // Need to create DirWatchers to wait for the device to close.
   fbl::unique_fd fd_watcher(
@@ -243,7 +233,7 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversChild) {
   ASSERT_OK(device_watcher::DirWatcher::Create(fd_watcher.get(), &watcher));
 
   // Get pid of parent driver before restarting.
-  auto parent_before = fidl::WireCall<TestDevice>(zx::unowned(chan_parent))->GetPid();
+  auto parent_before = fidl::WireCall(chan_parent)->GetPid();
   ASSERT_OK(parent_before.status());
   ASSERT_FALSE(parent_before->is_error(), "GetPid for parent failed: %s",
                zx_status_get_string(parent_before->error_value()));
@@ -261,12 +251,11 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversChild) {
   parent_channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
                                                         "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(parent_channel.status_value());
-  chan_parent = std::move(parent_channel.value());
-  ASSERT_NE(chan_parent.get(), ZX_HANDLE_INVALID);
+  chan_parent = fidl::ClientEnd<TestDevice>{std::move(parent_channel.value())};
   ASSERT_TRUE(chan_parent.is_valid());
 
   // Get pid of parent driver after restarting.
-  auto parent_after = fidl::WireCall<TestDevice>(zx::unowned(chan_parent))->GetPid();
+  auto parent_after = fidl::WireCall(chan_parent)->GetPid();
   ASSERT_OK(parent_after.status());
   ASSERT_FALSE(parent_after->is_error(), "GetPid for parent failed: %s",
                zx_status_get_string(parent_after->error_value()));
@@ -278,9 +267,6 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversChild) {
   child_channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child");
   ASSERT_OK(child_channel.status_value());
-  chan_child = std::move(child_channel.value());
-  ASSERT_NE(chan_child.get(), ZX_HANDLE_INVALID);
-  ASSERT_TRUE(chan_child.is_valid());
 }
 
 }  // namespace

@@ -116,7 +116,7 @@ class DriverHostInspect {
   fs::PseudoDir& diagnostics_dir() { return *diagnostics_dir_; }
   InspectNodeCollection& drivers() { return drivers_; }
 
-  zx_status_t Serve(zx::channel remote, async_dispatcher_t* dispatcher);
+  zx_status_t Serve(fidl::ServerEnd<fuchsia_io::Directory> remote, async_dispatcher_t* dispatcher);
 
   // Public method for test purpose.
   inspect::Inspector& inspector() { return inspect_; }

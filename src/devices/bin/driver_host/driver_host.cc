@@ -899,7 +899,8 @@ int main(int argc, char** argv) {
 
   ctx.SetupDriverHostController(std::move(controller_request));
 
-  status = ctx.inspect().Serve(zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST)),
+  status = ctx.inspect().Serve(fidl::ServerEnd<fuchsia_io::Directory>{zx::channel{
+                                   zx_take_startup_handle(PA_DIRECTORY_REQUEST)}},
                                ctx.loop().dispatcher());
   if (status != ZX_OK) {
     LOGF(WARNING, "driver_host: error serving diagnostics directory: %s\n",

@@ -31,7 +31,8 @@ DriverHostInspect::DriverHostInspect() {
   static_values_.emplace(std::move(default_node));
 }
 
-zx_status_t DriverHostInspect::Serve(zx::channel remote, async_dispatcher_t* dispatcher) {
+zx_status_t DriverHostInspect::Serve(fidl::ServerEnd<fuchsia_io::Directory> remote,
+                                     async_dispatcher_t* dispatcher) {
   diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher);
   return diagnostics_vfs_->ServeDirectory(diagnostics_dir_, std::move(remote));
 }
