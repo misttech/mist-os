@@ -272,12 +272,14 @@ impl Controller {
     /// Register a sysmem buffer collection backed image to the display driver.
     pub(crate) async fn import_image(
         &self,
-        id: CollectionId,
+        collection_id: CollectionId,
+        image_id: ImageId,
         mut config: display::ImageConfig,
-    ) -> Result<ImageId> {
-        let (result, id) = self.proxy().import_image(&mut config, id.0, 0).await?;
-        let _ = zx::Status::ok(result)?;
-        Ok(ImageId(id))
+    ) -> Result<()> {
+        let result =
+            self.proxy().import_image2(&mut config, collection_id.0, image_id.0, 0).await?;
+        zx::Status::ok(result)?;
+        Ok(())
     }
 }
 

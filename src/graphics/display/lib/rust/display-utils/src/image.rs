@@ -48,7 +48,7 @@ pub struct ImageParameters {
 
 /// Represents an allocated image buffer that can be assigned to a display layer.
 pub struct Image {
-    /// The ID of the image as provided by the display driver.
+    /// The ID of the image provided to the display driver.
     pub id: ImageId,
 
     /// The ID of the sysmem buffer collection that backs this image.
@@ -75,11 +75,16 @@ pub struct Image {
 }
 
 impl Image {
-    /// Construct a new sysmem-buffer-backed image and register it with the display driver. If
-    /// successful, the image can be assigned to a primary layer in a display configuration.
-    pub async fn create(ctrl: Controller, params: &ImageParameters) -> Result<Image> {
+    /// Construct a new sysmem-buffer-backed image and register it with the display driver
+    /// using `image_id`. If successful, the image can be assigned to a primary layer in a
+    /// display configuration.
+    pub async fn create(
+        ctrl: Controller,
+        image_id: ImageId,
+        params: &ImageParameters,
+    ) -> Result<Image> {
         let mut collection = allocate_image_buffer(ctrl.clone(), params).await?;
-        let id = ctrl.import_image(collection.id, params.into()).await?;
+        ctrl.import_image(collection.id, image_id, params.into()).await?;
         let vmo = collection.info.buffers[0]
             .vmo
             .as_ref()
@@ -88,7 +93,7 @@ impl Image {
 
         collection.release();
         Ok(Image {
-            id,
+            id: image_id,
             collection_id: collection.id,
             vmo,
             parameters: params.clone(),

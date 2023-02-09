@@ -9,8 +9,8 @@
 use {
     anyhow::{Context, Result},
     display_utils::{
-        Controller, DisplayConfig, DisplayInfo, Image, ImageParameters, Layer, LayerConfig,
-        PixelFormat,
+        Controller, DisplayConfig, DisplayInfo, Image, ImageId, ImageParameters, Layer,
+        LayerConfig, PixelFormat,
     },
     std::{borrow::Borrow, cmp::min, io::Write},
 };
@@ -66,8 +66,8 @@ pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
     // Construct a single layer and two images. This represents our swapchain.
     let layer = controller.create_layer().await?;
     let images = vec![
-        MappedImage::create(Image::create(controller.clone(), &params).await?)?,
-        MappedImage::create(Image::create(controller.clone(), &params).await?)?,
+        MappedImage::create(Image::create(controller.clone(), ImageId(1), &params).await?)?,
+        MappedImage::create(Image::create(controller.clone(), ImageId(2), &params).await?)?,
     ];
     let retirement_events = vec![controller.create_event()?, controller.create_event()?];
 

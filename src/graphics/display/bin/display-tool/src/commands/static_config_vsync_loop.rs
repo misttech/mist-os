@@ -7,7 +7,8 @@
 use {
     anyhow::{format_err, Context, Result},
     display_utils::{
-        Controller, DisplayConfig, DisplayInfo, Image, Layer, LayerConfig, PixelFormat, VsyncEvent,
+        Controller, DisplayConfig, DisplayInfo, Image, ImageId, Layer, LayerConfig, PixelFormat,
+        VsyncEvent,
     },
     futures::StreamExt,
     std::io::Write,
@@ -37,7 +38,7 @@ pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
         color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
         name: Some("display-tool vsync layer".to_string()),
     };
-    let image = MappedImage::create(Image::create(controller.clone(), &params).await?)?;
+    let image = MappedImage::create(Image::create(controller.clone(), ImageId(1), &params).await?)?;
     // Fill with Fuchsia as the color ([blue, green, red, alpha])
     image.fill(&[255, 0, 255, 255]).context("failed to draw fill color")?;
 
