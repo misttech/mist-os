@@ -109,38 +109,20 @@ bool ZirconConnection::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary)
   return true;
 }
 
+void ZirconConnection::Shutdown() {
+  async::PostTask(async_loop()->dispatcher(), [this]() {
+    if (server_binding_) {
+      server_binding_->Close(ZX_ERR_CANCELED);
+    }
+    async_loop()->Quit();
+  });
+}
+
 bool ZirconConnection::HandleRequest() {
   zx_status_t status = async_loop_.Run(zx::time::infinite(), true /* once */);
   if (status != ZX_OK)
     return false;
   return true;
-}
-
-bool ZirconConnection::BeginShutdownWait() {
-  zx_status_t status = async_begin_wait(async_loop()->dispatcher(), &async_wait_shutdown_);
-  if (status != ZX_OK)
-    return DRETF(false, "Couldn't begin wait on shutdown: %s", zx_status_get_string(status));
-  return true;
-}
-
-void ZirconConnection::AsyncWaitHandler(async_dispatcher_t* dispatcher, AsyncWait* wait,
-                                        zx_status_t status, const zx_packet_signal_t* signal) {
-  if (status != ZX_OK)
-    return;
-
-  bool quit = false;
-  if (wait == &async_wait_shutdown_) {
-    DASSERT(signal->observed == ZX_EVENT_SIGNALED);
-    quit = true;
-    DLOG("got shutdown event");
-  } else {
-    DASSERT(false);
-  }
-
-  if (quit) {
-    server_binding_->Close(ZX_ERR_CANCELED);
-    async_loop()->Quit();
-  }
 }
 
 struct AsyncHandleWait : public async_wait {
@@ -539,19 +521,11 @@ std::shared_ptr<ZirconConnection> ZirconConnection::Create(
   if (!delegate)
     return DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
-  auto shutdown_event = magma::PlatformEvent::Create();
-  if (!shutdown_event)
-    return DRETP(nullptr, "Failed to create shutdown event");
-
-  auto connection = std::make_shared<ZirconConnection>(
-      std::move(delegate), client_id, std::move(notification),
-      std::shared_ptr<magma::PlatformEvent>(std::move(shutdown_event)));
+  auto connection =
+      std::make_shared<ZirconConnection>(std::move(delegate), client_id, std::move(notification));
 
   if (!connection->Bind(std::move(primary)))
     return DRETP(nullptr, "Bind failed");
-
-  if (!connection->BeginShutdownWait())
-    return DRETP(nullptr, "Failed to begin shutdown wait");
 
   return connection;
 }

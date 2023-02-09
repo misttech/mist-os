@@ -348,7 +348,7 @@ class TestPlatformConnection {
     EXPECT_EQ(0u, out_data_size);
 
     // Shutdown other end of pipe.
-    connection_->ShutdownEvent()->Signal();
+    connection_->Shutdown();
     connection_.reset();
     ipc_thread_.join();
     EXPECT_TRUE(shared_data_->got_null_notification);

@@ -36,12 +36,10 @@ void MagmaSystemDevice::StartConnectionThread(
     std::shared_ptr<magma::ZirconConnection> platform_connection, void* device_handle) {
   std::unique_lock<std::mutex> lock(connection_list_mutex_);
 
-  auto shutdown_event = platform_connection->ShutdownEvent();
-  std::thread thread(magma::ZirconConnection::RunLoop, std::move(platform_connection),
-                     device_handle);
+  std::thread thread(magma::ZirconConnection::RunLoop, platform_connection, device_handle);
 
   connection_map_->insert(std::pair<std::thread::id, Connection>(
-      thread.get_id(), Connection{std::move(thread), std::move(shutdown_event)}));
+      thread.get_id(), Connection{std::move(thread), platform_connection}));
 }
 
 void MagmaSystemDevice::ConnectionClosed(std::thread::id thread_id) {
@@ -64,7 +62,10 @@ void MagmaSystemDevice::Shutdown() {
   lock.unlock();
 
   for (auto& element : *map) {
-    element.second.shutdown_event->Signal();
+    auto locked = element.second.connection.lock();
+    if (locked) {
+      locked->Shutdown();
+    }
   }
 
   auto start = std::chrono::high_resolution_clock::now();

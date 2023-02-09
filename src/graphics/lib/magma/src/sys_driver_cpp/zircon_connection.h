@@ -80,17 +80,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     virtual magma::Status ClearPerformanceCounters(const uint64_t* counters,
                                                    uint64_t counter_count) = 0;
   };
-  struct AsyncWait : public async_wait {
-    AsyncWait(ZirconConnection* connection, zx_handle_t object, zx_signals_t trigger) {
-      this->state = ASYNC_STATE_INIT;
-      this->handler = AsyncWaitHandlerStatic;
-      this->object = object;
-      this->trigger = trigger;
-      this->options = 0;
-      this->connection = connection;
-    }
-    ZirconConnection* connection;
-  };
 
   static std::shared_ptr<ZirconConnection> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
@@ -98,16 +87,11 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
   ZirconConnection(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
-                   fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification,
-                   std::shared_ptr<magma::PlatformEvent> shutdown_event)
+                   fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification)
       : client_id_(client_id),
-        shutdown_event_(shutdown_event),
         delegate_(std::move(delegate)),
         server_notification_endpoint_(notification.TakeChannel()),
-        async_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        async_wait_shutdown_(
-            this, static_cast<magma::ZirconPlatformEvent*>(shutdown_event.get())->zx_handle(),
-            ZX_EVENT_SIGNALED) {
+        async_loop_(&kAsyncLoopConfigNeverAttachToThread) {
     delegate_->SetNotificationCallback(this);
   }
 
@@ -117,11 +101,9 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   bool HandleRequest();
 
-  bool BeginShutdownWait();
+  void Shutdown();
 
   async::Loop* async_loop() { return &async_loop_; }
-
-  std::shared_ptr<magma::PlatformEvent> ShutdownEvent() { return shutdown_event_; }
 
   static void RunLoop(std::shared_ptr<magma::ZirconConnection> connection, void* device_handle) {
     magma::PlatformThreadHelper::SetCurrentThreadName("ConnectionThread " +
@@ -150,15 +132,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   async_dispatcher_t* GetAsyncDispatcher() override { return async_loop_.dispatcher(); }
 
  private:
-  static void AsyncWaitHandlerStatic(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
-                                     zx_status_t status, const zx_packet_signal_t* signal) {
-    auto wait = static_cast<AsyncWait*>(async_wait);
-    wait->connection->AsyncWaitHandler(dispatcher, wait, status, signal);
-  }
-
-  void AsyncWaitHandler(async_dispatcher_t* dispatcher, AsyncWait* wait, zx_status_t status,
-                        const zx_packet_signal_t* signal);
-
   void ImportObject2(ImportObject2RequestView request,
                      ImportObject2Completer::Sync& _completer) override;
   void ReleaseObject(ReleaseObjectRequestView request,
@@ -213,7 +186,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   void FlowControl(uint64_t size = 0);
 
   msd_client_id_t client_id_;
-  std::shared_ptr<magma::PlatformEvent> shutdown_event_;
   std::atomic_uint request_count_{};
 
   // The binding will be valid after a successful |fidl::BindServer| operation,
@@ -225,7 +197,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   zx::channel server_notification_endpoint_;
   zx::channel performance_counter_event_channel_;
   async::Loop async_loop_;
-  AsyncWait async_wait_shutdown_;
 
   // Flow control
   bool flow_control_enabled_ = false;

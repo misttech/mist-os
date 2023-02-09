@@ -76,7 +76,7 @@ class MagmaSystemDevice {
 
   struct Connection {
     std::thread thread;
-    std::shared_ptr<magma::PlatformEvent> shutdown_event;
+    std::weak_ptr<magma::ZirconConnection> connection;
   };
 
   std::unique_ptr<std::unordered_map<std::thread::id, Connection>> connection_map_;
