@@ -901,7 +901,7 @@ impl FuseFilesystem for FuseFs {
 
     /// Set an extended attribute of an object with id `inode`.
     /// Fxfs currently doesn't support this feature.
-    /// TODO(fxbug.dev/117461): Add support for setting extended attributes.
+    /// TODO(fxbug.dev/121634): Add support for setting extended attributes.
     async fn setxattr(
         &self,
         _req: Request,
@@ -917,7 +917,7 @@ impl FuseFilesystem for FuseFs {
 
     /// Get an extended attribute of an object with id `inode`.
     /// Fxfs currently doesn't support this feature.
-    /// TODO(fxbug.dev/117461): Add support for getting extended attributes.
+    /// TODO(fxbug.dev/121634): Add support for getting extended attributes.
     async fn getxattr(
         &self,
         _req: Request,
