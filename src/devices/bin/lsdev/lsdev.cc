@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -17,25 +18,17 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  zx_handle_t local, remote;
-  zx_status_t status = zx_channel_create(0, &local, &remote);
-  if (status != ZX_OK) {
-    fprintf(stderr, "could not create channel\n");
-    return -1;
-  }
-  status = fdio_service_connect(argv[1], remote);
-  if (status != ZX_OK) {
-    zx_handle_close(local);
-    fprintf(stderr, "could not open %s: %s\n", argv[1], zx_status_get_string(status));
+  zx::result controller = component::Connect<fuchsia_device::Controller>(argv[1]);
+  if (controller.is_error()) {
+    fprintf(stderr, "could not open %s: %s\n", argv[1], controller.status_string());
     return -1;
   }
 
   char path[1025];
   size_t actual_len;
 
-  auto resp =
-      fidl::WireCall<fuchsia_device::Controller>(zx::unowned_channel(local))->GetTopologicalPath();
-  status = resp.status();
+  auto resp = fidl::WireCall(controller.value())->GetTopologicalPath();
+  zx_status_t status = resp.status();
 
   if (status == ZX_OK) {
     if (resp->is_error()) {
