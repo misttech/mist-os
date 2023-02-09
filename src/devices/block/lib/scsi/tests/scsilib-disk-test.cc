@@ -276,14 +276,14 @@ class DiskTest : public zxtest::Test {
 // Test that we can create a disk when the underlying controller successfully executes CDBs.
 TEST_F(DiskTest, TestCreateDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
+  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
 // Test creating a disk and executing read commands.
 TEST_F(DiskTest, TestCreateReadDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
+  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
   auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
   block_info_t info;

@@ -38,22 +38,22 @@ class Disk : public DeviceType,
  public:
   // Public so that we can use make_unique.
   // Clients should use Disk::Bind().
-  Disk(Controller* controller, zx_device_t* parent, uint8_t target, uint16_t lun,
-       uint32_t max_transfer_size_blocks)
+  Disk(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
+       uint32_t max_transfer_bytes)
       : DeviceType(parent),
         controller_(controller),
         target_(target),
         lun_(lun),
-        max_transfer_size_blocks_(max_transfer_size_blocks) {}
+        max_transfer_bytes_(max_transfer_bytes) {}
 
   // Create a Disk at a specific target/lun.
   // |controller| is a pointer to the scsi::Controller this disk is attached to.
   // |controller| must outlast Disk.
   // This disk does not take ownership of or any references on |controller|.
   // Returns a Disk* to allow for removal of removable media disks.
-  static zx::result<fbl::RefPtr<Disk>> Bind(Controller* controller, zx_device_t* parent,
+  static zx::result<fbl::RefPtr<Disk>> Bind(zx_device_t* parent, Controller* controller,
                                             uint8_t target, uint16_t lun,
-                                            uint32_t max_transfer_size_blocks);
+                                            uint32_t max_transfer_bytes);
 
   fbl::String DiskName() const { return fbl::StringPrintf("scsi-disk-%u-%u", target_, lun_); }
 
@@ -72,24 +72,24 @@ class Disk : public DeviceType,
   bool write_cache_enabled() const { return write_cache_enabled_; }
   uint64_t block_count() const { return block_count_; }
   uint32_t block_size_bytes() const { return block_size_bytes_; }
-  uint32_t max_transfer_size_blocks() const { return max_transfer_size_blocks_; }
+  uint32_t max_transfer_bytes() const { return max_transfer_bytes_; }
 
   Disk(const Disk&) = delete;
   Disk& operator=(const Disk&) = delete;
 
  private:
-  zx_status_t Add();
+  zx_status_t AddDisk();
 
   Controller* const controller_;
   const uint8_t target_;
   const uint16_t lun_;
+  const uint32_t max_transfer_bytes_;
 
   bool removable_;
   bool write_protected_;
   bool write_cache_enabled_;
   uint64_t block_count_;
   uint32_t block_size_bytes_;
-  uint32_t max_transfer_size_blocks_;  // In block_size_bytes_ units.
 };
 
 }  // namespace scsi

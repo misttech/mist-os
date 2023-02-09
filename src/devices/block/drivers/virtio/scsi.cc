@@ -336,19 +336,20 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
 }
 
 constexpr uint32_t SCSI_SECTOR_SIZE = 512;
-constexpr uint32_t SCSI_MAX_XFER_SIZE = 1024;  // 512K clamp
+constexpr uint32_t SCSI_MAX_XFER_SECTORS = 1024;  // 512K clamp
 
 zx_status_t ScsiDevice::WorkerThread() {
   uint16_t max_target;
   uint32_t max_lun;
-  uint32_t max_sectors;  // controller's max sectors.
+  uint32_t max_sectors;
   {
     fbl::AutoLock lock(&lock_);
     // virtio-scsi has a 16-bit max_target field, but the encoding we use limits us to one byte
     // target identifiers.
     max_target = std::min(config_.max_target, static_cast<uint16_t>(UINT8_MAX - 1));
     max_lun = config_.max_lun;
-    max_sectors = config_.max_sectors;
+    // Smaller of controller's max transfer sectors and the 512K clamp.
+    max_sectors = std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS);
   }
 
   // Execute TEST UNIT READY on every possible target to find potential disks.
@@ -366,7 +367,7 @@ zx_status_t ScsiDevice::WorkerThread() {
   // commands.
   for (uint8_t target = 0u; target <= max_target; target++) {
     zx::result luns_on_this_target = ReportLuns(target);
-    if (luns_on_this_target.is_error()) {
+    if (luns_on_this_target.is_error() || luns_on_this_target.value() == 0) {
       // For now, assume REPORT LUNS is supported. A failure indicates no LUNs on this target.
       continue;
     }
@@ -375,21 +376,22 @@ zx_status_t ScsiDevice::WorkerThread() {
     uint32_t max_xfer_size_sectors = 0;
     for (uint16_t lun = 0u; lun <= max_lun; lun++) {
       auto status = TestUnitReady(target, lun);
-      if ((status == ZX_OK) && (max_xfer_size_sectors == 0)) {
-        // If we haven't queried the VPD pages for the target's xfer size
-        // yet, do it now. We only query this once per target.
-        zx::result target_max_xfer_sectors = InquiryMaxTransferBlocks(target, lun);
-        if (target_max_xfer_sectors.is_ok()) {
-          // smaller of controller and target max_xfer_sizes
-          max_xfer_size_sectors = std::min(target_max_xfer_sectors.value(), max_sectors);
-          // and the 512K clamp
-          max_xfer_size_sectors = std::min(max_xfer_size_sectors, SCSI_MAX_XFER_SIZE);
-        } else {
-          max_xfer_size_sectors = std::min(max_sectors, SCSI_MAX_XFER_SIZE);
+      if (status == ZX_OK) {
+        if (max_xfer_size_sectors == 0) {
+          // If we haven't queried the VPD pages for the target's xfer size
+          // yet, do it now. We only query this once per target.
+          zx::result target_max_xfer_sectors = InquiryMaxTransferBlocks(target, lun);
+          if (target_max_xfer_sectors.is_ok()) {
+            // Smaller of |max_sectors| and target's max transfer sectors.
+            max_xfer_size_sectors = std::min(max_sectors, target_max_xfer_sectors.value());
+          } else {
+            max_xfer_size_sectors = max_sectors;
+          }
         }
-        zxlogf(INFO, "Virtio SCSI %u:%u Max Xfer Size %ukb", target, lun,
-               max_xfer_size_sectors * 2);
-        zx::result result = scsi::Disk::Bind(this, device_, target, lun, max_xfer_size_sectors);
+        zxlogf(INFO, "Virtio SCSI %u:%u Max Xfer Size %u bytes", target, lun,
+               max_xfer_size_sectors * SCSI_SECTOR_SIZE);
+        zx::result result =
+            scsi::Disk::Bind(device_, this, target, lun, max_xfer_size_sectors * SCSI_SECTOR_SIZE);
         if (result.is_error()) {
           return result.status_value();
         }
@@ -460,7 +462,7 @@ zx_status_t ScsiDevice::Init() {
       return err;
     }
     request_buffers_size_ =
-        (SCSI_SECTOR_SIZE * std::min(config_.max_sectors, SCSI_MAX_XFER_SIZE)) +
+        (SCSI_SECTOR_SIZE * std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS)) +
         (sizeof(struct virtio_scsi_req_cmd) + sizeof(struct virtio_scsi_resp_cmd));
     for (int i = 0; i < MAX_IOS; i++) {
       auto status = io_buffer_init(&scsi_io_slot_table_[i].request_buffer, bti().get(),

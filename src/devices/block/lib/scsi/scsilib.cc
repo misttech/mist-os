@@ -13,23 +13,23 @@
 
 namespace scsi {
 
-zx::result<fbl::RefPtr<Disk>> Disk::Bind(Controller* controller, zx_device_t* parent,
+zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* controller,
                                          uint8_t target, uint16_t lun,
-                                         uint32_t max_transfer_size_blocks) {
+                                         uint32_t max_transfer_bytes) {
   fbl::AllocChecker ac;
-  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, controller, parent, target, lun,
-                                               max_transfer_size_blocks);
+  auto disk =
+      fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun, max_transfer_bytes);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  auto status = disk->Add();
+  auto status = disk->AddDisk();
   if (status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(disk);
 }
 
-zx_status_t Disk::Add() {
+zx_status_t Disk::AddDisk() {
   zx::result inquiry_data = controller_->Inquiry(target_, lun_);
   if (inquiry_data.is_error()) {
     return inquiry_data.status_value();
@@ -87,7 +87,7 @@ void Disk::DdkRelease() {
 void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
   info_out->block_size = block_size_bytes_;
   info_out->block_count = block_count_;
-  info_out->max_transfer_size = block_size_bytes_ * max_transfer_size_blocks_;
+  info_out->max_transfer_size = max_transfer_bytes_;
   info_out->flags =
       (write_protected_ ? BLOCK_FLAG_READONLY : 0) | (removable_ ? BLOCK_FLAG_REMOVABLE : 0);
   *block_op_size_out = controller_->BlockOpSize();
