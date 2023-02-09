@@ -801,9 +801,13 @@ async fn test_internet_available(name: &str, state1: State, state2: State) {
     // We expect both this and a subsequent snapshot with the actual internet
     // available state.
     let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
     assert_eq!(snapshot.internet_available, Some(false));
 
     let snapshot = helper.next_snapshot_with_internet(true).await;
+    // Gateway reachability is a condition of internet availability,
+    // therefore, when internet is available, a gateway is reachable.
+    assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(true));
 }
 
@@ -821,10 +825,12 @@ async fn test_internet_comes_up(name: &str, state1: State, state2: State) {
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
     let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
     assert_eq!(snapshot.internet_available, Some(false));
 
     helper.set_iface_states(vec![state1, state2]);
     let snapshot = helper.next_snapshot_with_internet(true).await;
+    assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(true));
 }
 
@@ -841,13 +847,65 @@ async fn test_internet_goes_down(name: &str, state1: State, state2: State) {
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
     let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
     assert_eq!(snapshot.internet_available, Some(false));
 
     let snapshot = helper.next_snapshot_with_internet(true).await;
+    assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(true));
 
     helper.set_iface_states(vec![state1, state2]);
     let snapshot = helper.next_snapshot_with_internet(false).await;
+    assert_eq!(snapshot.internet_available, Some(false));
+}
+
+#[netstack_test]
+#[test_case(State::Gateway, State::Gateway)]
+#[test_case(State::Gateway, State::Up)]
+async fn test_gateway_goes_down(name: &str, state1: State, state2: State) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let env = setup_reachability_env(name, &sandbox, false).await;
+    let configs = vec![
+        (InterfaceConfig::new_primary(LOWER_METRIC), state1),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), state2),
+    ];
+    let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
+
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
+    assert_eq!(snapshot.internet_available, Some(false));
+
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(true));
+    assert_eq!(snapshot.internet_available, Some(false));
+
+    helper.set_iface_states(vec![State::Up, State::Up]);
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
+    assert_eq!(snapshot.internet_available, Some(false));
+}
+
+#[netstack_test]
+async fn test_internet_to_gateway_state(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let env = setup_reachability_env(name, &sandbox, false).await;
+    let configs = vec![
+        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Gateway),
+    ];
+    let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
+
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.gateway_reachable, Some(false));
+    assert_eq!(snapshot.internet_available, Some(false));
+
+    let snapshot = helper.next_snapshot_with_internet(true).await;
+    assert_eq!(snapshot.gateway_reachable, Some(true));
+    assert_eq!(snapshot.internet_available, Some(true));
+
+    helper.set_iface_states(vec![State::Gateway, State::Gateway]);
+    let snapshot = helper.next_snapshot_with_internet(false).await;
+    assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(false));
 }
 
