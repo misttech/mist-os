@@ -513,8 +513,7 @@ constexpr bool CheckBitWidth() {
   static_assert(cpp20::bit_width(static_cast<T>(0)) == 0, "has_single_bit failed.");
   static_assert(cpp20::bit_width(static_cast<T>(-1)) == std::numeric_limits<T>::digits,
                 "has_single_bit failed.");
-
-  for (T i = 0; i < std::numeric_limits<T>::digits; ++i) {
+  for (int i = 0; i < std::numeric_limits<T>::digits; ++i) {
     T t = static_cast<T>(T(1) << i);
     if (cpp20::bit_width(t) != i + 1) {
       return false;
