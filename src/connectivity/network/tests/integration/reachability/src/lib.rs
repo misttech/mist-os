@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
+#![deny(clippy::await_holding_refcell_ref)]
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
@@ -370,9 +371,11 @@ async fn handle_frame_stream<'a>(
         if let Some(Ok((frame, dropped))) = frame_stream.next().await {
             echo_notifier.unbounded_send(()).expect("failed to send echo notice");
             assert_eq!(dropped, 0);
-            if let Some(reply) =
-                reply_if_echo_request(frame, *state.borrow(), &gateway_v4, &gateway_v6)
-            {
+            let reply = {
+                let state_ref = state.borrow();
+                reply_if_echo_request(frame, *state_ref, &gateway_v4, &gateway_v6)
+            };
+            if let Some(reply) = reply {
                 fake_ep
                     .write(reply.as_ref())
                     .await
