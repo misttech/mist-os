@@ -44,6 +44,7 @@
 #include <wlan/common/macaddr.h>
 
 #include "fuchsia/wlan/ieee80211/c/banjo.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bcdc.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_utils.h"
@@ -1015,11 +1016,9 @@ static zx_status_t brcmf_run_escan(struct brcmf_cfg80211_info* cfg, struct brcmf
 
   // Validate command size
   size_t total_cmd_size = params_size + sizeof("escan");
-  // TODO(fxbug.dev/89549): This check seems to be roughly 32 bytes too long, but in practice
-  // we never expect to hit the limit.
-  if (total_cmd_size >= BRCMF_DCMD_MEDLEN) {
+  if (total_cmd_size > BCDC_TX_IOCTL_MAX_MSG_SIZE) {
     BRCMF_ERR("Escan params size (%zu) exceeds command max capacity (%d)", total_cmd_size,
-              BRCMF_DCMD_MEDLEN);
+              BCDC_TX_IOCTL_MAX_MSG_SIZE);
     return ZX_ERR_INVALID_ARGS;
   }
 
