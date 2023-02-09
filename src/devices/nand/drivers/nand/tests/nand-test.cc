@@ -4,7 +4,6 @@
 
 #include "src/devices/nand/drivers/nand/nand.h"
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -24,6 +23,7 @@
 #include "lib/inspect/cpp/inspector.h"
 #include "lib/inspect/cpp/reader.h"
 #include "lib/inspect/cpp/vmo/types.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -145,37 +145,32 @@ class FakeRawNand : public ddk::RawNandProtocol<FakeRawNand> {
 class NandTest : public zxtest::Test {
  public:
   NandTest() {
-    ddk_.SetProtocol(ZX_PROTOCOL_RAW_NAND, raw_nand_.proto());
-    ddk_.SetSize(kPageSize * kNumPages * kNumBlocks);
+    root_->AddProtocol(ZX_PROTOCOL_RAW_NAND, raw_nand_.proto()->ops, raw_nand_.proto()->ctx);
   }
 
-  fake_ddk::Bind& ddk() { return ddk_; }
+  MockDevice* root() { return root_.get(); }
   FakeRawNand& raw_nand() { return raw_nand_; }
 
  private:
-  fake_ddk::Bind ddk_;
   FakeRawNand raw_nand_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
 };
 
 TEST_F(NandTest, TrivialLifetime) {
-  nand::NandDevice device(fake_ddk::kFakeParent);
+  nand::NandDevice device(root());
   ASSERT_OK(device.Init());
 }
 
 TEST_F(NandTest, DdkLifetime) {
-  nand::NandDevice* device(new nand::NandDevice(fake_ddk::kFakeParent));
+  nand::NandDevice* device(new nand::NandDevice(root()));
 
   ASSERT_OK(device->Init());
   ASSERT_OK(device->Bind());
-  device->DdkAsyncRemove();
-  EXPECT_TRUE(ddk().Ok());
-
-  // This should delete the object, which means this test should not leak.
-  device->DdkRelease();
+  // mock-ddk will release the device.
 }
 
 TEST_F(NandTest, Query) {
-  nand::NandDevice device(fake_ddk::kFakeParent);
+  nand::NandDevice device(root());
   ASSERT_OK(device.Init());
 
   nand_info_t info;
@@ -292,6 +287,11 @@ class NandDeviceTest : public NandTest {
   NandDeviceTest();
   ~NandDeviceTest() {}
 
+  void TearDown() override {
+    // mock-ddk will clean up device.
+    device_.release();
+  }
+
   nand::NandDevice* device() { return device_.get(); }
 
   size_t op_size() const { return op_size_; }
@@ -327,7 +327,7 @@ class NandDeviceTest : public NandTest {
 };
 
 NandDeviceTest::NandDeviceTest() {
-  device_ = std::make_unique<nand::NandDevice>(fake_ddk::kFakeParent);
+  device_ = std::make_unique<nand::NandDevice>(root());
   ASSERT_NOT_NULL(device_.get());
 
   nand_info_t info;
@@ -946,7 +946,8 @@ TEST_F(NandDeviceTest, OperationsCanceledAfterSuspend) {
   // Issue DdkSuspend and verify that errors are returned for subsequent operations.
   ddk::SuspendTxn txn(device()->zxdev(), 0, false, DEVICE_SUSPEND_REASON_REBOOT);
   device()->DdkSuspend(std::move(txn));
-  ddk().WaitUntilSuspend();
+  ASSERT_EQ(1, root()->child_count());
+  root()->GetLatestChild()->WaitUntilSuspendReplyCalled();
 
   op->rw.command = NAND_OP_WRITE;
   op->rw.length = 4;

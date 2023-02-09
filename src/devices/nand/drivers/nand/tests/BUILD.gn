@@ -18,9 +18,7 @@ test("nand-unittest-bin") {
   ]
   deps = [
     "//src/devices/nand/drivers/nand:common",
-
-    # TODO(fxb/115058): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
@@ -33,6 +31,9 @@ fuchsia_unittest_package("nand-unittest") {
   deps = [ ":nand-unittest-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
