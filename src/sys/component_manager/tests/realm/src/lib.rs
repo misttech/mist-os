@@ -2,70 +2,118 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2::{InstanceState, RealmExplorerMarker, RealmQueryMarker};
+use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::*;
 
 #[fuchsia::test]
-pub async fn query_self() {
-    let query = connect_to_protocol::<RealmQueryMarker>().unwrap();
+pub async fn get_instance_self() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let (info, resolved) = query.get_instance_info("./").await.unwrap().unwrap();
-    assert!(info.url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
-    assert!(info.url.ends_with("#meta/realm_integration_test.cm"));
-    assert_eq!(info.state, InstanceState::Started);
+    let instance = query.get_instance("./").await.unwrap().unwrap();
+    let url = instance.url.unwrap();
+    assert!(url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
+    assert!(url.ends_with("#meta/realm_integration_test.cm"));
 
-    let resolved = resolved.unwrap();
-    assert_eq!(resolved.uses.len(), 4);
-    assert_eq!(resolved.exposes.len(), 1);
-    let execution = resolved.execution.unwrap();
-    execution.out_dir.unwrap();
-
-    // Test runners should provide "elf/job_id".
-    let runtime_dir = execution.runtime_dir.unwrap().into_proxy().unwrap();
-    let job_id_content = fuchsia_fs::directory::open_file(
-        &runtime_dir,
-        "elf/job_id",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .expect("cannot open elf/job_id")
-    .read(fio::MAX_BUF)
-    .await
-    .expect("failed to read elf/job_id")
-    .expect("failed to read elf/job_id");
-
-    let _job_id: u64 = String::from_utf8(job_id_content)
-        .expect("cannot parse job_id")
-        .parse()
-        .expect("cannot parse job_id");
+    let resolved = instance.resolved_info.unwrap();
+    let execution = resolved.execution_info.unwrap();
+    execution.start_reason.unwrap();
 }
 
 #[fuchsia::test]
-pub async fn query_echo_server_child() {
-    let query = connect_to_protocol::<RealmQueryMarker>().unwrap();
+pub async fn get_manifest_self() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let (info, resolved) = query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.url, "#meta/echo_server.cm");
-    assert_eq!(info.state, InstanceState::Unresolved);
-    assert!(resolved.is_none());
+    let decl = query.get_manifest("./").await.unwrap().unwrap();
+
+    let program = decl.program.unwrap();
+    program.runner.unwrap();
+
+    let uses = decl.uses.unwrap();
+    let exposes = decl.exposes.unwrap();
+    assert_eq!(uses.len(), 4);
+    assert_eq!(exposes.len(), 1);
+}
+
+#[fuchsia::test]
+pub async fn get_structured_config_self() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+
+    let err = query.get_structured_config("./").await.unwrap().unwrap_err();
+
+    assert_eq!(err, fsys::GetStructuredConfigError::NoConfig);
+}
+
+#[fuchsia::test]
+pub async fn echo_server() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+
+    let instance = query.get_instance("./echo_server").await.unwrap().unwrap();
+    let url = instance.url.unwrap();
+    assert_eq!(url, "#meta/echo_server.cm");
+    assert!(instance.resolved_info.is_none());
+
+    let err = query.get_manifest("./echo_server").await.unwrap().unwrap_err();
+    assert_eq!(err, fsys::GetManifestError::InstanceNotResolved);
+
+    let err = query.get_structured_config("./echo_server").await.unwrap().unwrap_err();
+    assert_eq!(err, fsys::GetStructuredConfigError::InstanceNotResolved);
+
+    let (_, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+    let err = query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::PackageDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(err, fsys::OpenError::InstanceNotResolved);
 
     // Now connect to the Echo protocol, thus starting the echo_server
     let echo = connect_to_protocol::<EchoMarker>().unwrap();
     let reply = echo.echo_string(Some("test")).await.unwrap();
     assert_eq!(reply.unwrap(), "test");
 
-    let (info, resolved) = query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.url, "#meta/echo_server.cm");
-    assert_eq!(info.state, InstanceState::Started);
+    let instance = query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved = instance.resolved_info.unwrap();
+    let resolved_url = resolved.resolved_url.unwrap();
+    assert!(resolved_url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
+    assert!(resolved_url.ends_with("#meta/echo_server.cm"));
 
-    let resolved = resolved.unwrap();
-    assert_eq!(resolved.uses.len(), 1);
-    assert_eq!(resolved.exposes.len(), 3);
+    let execution = resolved.execution_info.unwrap();
+    execution.start_reason.unwrap();
 
-    let pkg_dir = resolved.pkg_dir.unwrap();
-    let pkg_dir = pkg_dir.into_proxy().unwrap();
+    let decl = query.get_manifest("./echo_server").await.unwrap().unwrap();
+    let program = decl.program.unwrap();
+    program.runner.unwrap();
+
+    let uses = decl.uses.unwrap();
+    let exposes = decl.exposes.unwrap();
+    assert_eq!(uses.len(), 1);
+    assert_eq!(exposes.len(), 3);
+
+    let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::PackageDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
     let entries = fuchsia_fs::directory::readdir(&pkg_dir).await.unwrap();
     assert_eq!(
         entries,
@@ -89,7 +137,20 @@ pub async fn query_echo_server_child() {
         ]
     );
 
-    let exposed_dir = resolved.exposed_dir.into_proxy().unwrap();
+    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let entries = fuchsia_fs::directory::readdir(&exposed_dir).await.unwrap();
     assert_eq!(
         entries,
@@ -109,7 +170,20 @@ pub async fn query_echo_server_child() {
         ]
     );
 
-    let ns_dir = resolved.ns_dir.into_proxy().unwrap();
+    let (ns_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::NamespaceDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let entries = fuchsia_fs::directory::readdir(&ns_dir).await.unwrap();
     assert_eq!(
         entries,
@@ -125,13 +199,20 @@ pub async fn query_echo_server_child() {
         ]
     );
 
-    let svc_dir = fuchsia_fs::directory::open_directory(
-        &ns_dir,
-        "svc",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::NamespaceDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            "svc",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
     assert_eq!(
         entries,
@@ -141,23 +222,37 @@ pub async fn query_echo_server_child() {
         }]
     );
 
-    let execution = resolved.execution.unwrap();
-
-    let out_dir = execution.out_dir.unwrap();
-    let out_dir = out_dir.into_proxy().unwrap();
-    let echo = connect_to_protocol_at_dir_svc::<EchoMarker>(&out_dir).unwrap();
+    let (echo, server_end) = create_proxy::<EchoMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::OutgoingDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            "svc/fidl.examples.routing.echo.Echo",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let reply = echo.echo_string(Some("test")).await.unwrap();
     assert_eq!(reply.unwrap(), "test");
 
-    let runtime_dir = execution.runtime_dir.unwrap();
-    let runtime_dir = runtime_dir.into_proxy().unwrap();
-    let elf_dir = fuchsia_fs::directory::open_directory(
-        &runtime_dir,
-        "elf",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let (elf_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    query
+        .open(
+            "./echo_server",
+            fsys::OpenDirType::RuntimeDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            "elf",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
 
     // TODO(http://fxbug.dev/99823): The existence of "process_start_time_utc_estimate" is flaky.
@@ -186,97 +281,20 @@ pub async fn query_echo_server_child() {
 }
 
 #[fuchsia::test]
-pub async fn query_get_instance_directories() {
-    let query = connect_to_protocol::<RealmQueryMarker>().unwrap();
+pub async fn will_not_resolve() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let resolved_dirs = query.get_instance_directories("./").await.unwrap().unwrap().unwrap();
+    let instance = query.get_instance("./will_not_resolve").await.unwrap().unwrap();
+    let url = instance.url.unwrap();
+    assert_eq!(url, "fuchsia-pkg://fake.com");
 
-    let ns_entries = resolved_dirs.ns_entries;
-    assert_eq!(ns_entries.len(), 2);
-
-    for entry in ns_entries {
-        let path = entry.path.unwrap();
-        let dir = entry.directory.unwrap().into_proxy().unwrap();
-        match path.as_str() {
-            "/svc" => {
-                let entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
-                assert_eq!(
-                    entries,
-                    vec![
-                        fuchsia_fs::directory::DirEntry {
-                            name: "fidl.examples.routing.echo.Echo".to_string(),
-                            kind: fuchsia_fs::directory::DirentKind::Unknown,
-                        },
-                        fuchsia_fs::directory::DirEntry {
-                            name: "fuchsia.logger.LogSink".to_string(),
-                            kind: fuchsia_fs::directory::DirentKind::Unknown,
-                        },
-                        fuchsia_fs::directory::DirEntry {
-                            name: "fuchsia.sys2.RealmExplorer".to_string(),
-                            kind: fuchsia_fs::directory::DirentKind::Unknown,
-                        },
-                        fuchsia_fs::directory::DirEntry {
-                            name: "fuchsia.sys2.RealmQuery".to_string(),
-                            kind: fuchsia_fs::directory::DirentKind::Unknown,
-                        },
-                    ]
-                );
-            }
-            "/pkg" => {}
-            path => panic!("unexpected directory: {}", path),
-        }
-    }
-
-    let pkg_dir = resolved_dirs.pkg_dir.unwrap();
-    let pkg_dir = pkg_dir.into_proxy().unwrap();
-    let entries = fuchsia_fs::directory::readdir(&pkg_dir).await.unwrap();
-    assert_eq!(
-        entries,
-        vec![
-            fuchsia_fs::directory::DirEntry {
-                name: "bin".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Directory,
-            },
-            fuchsia_fs::directory::DirEntry {
-                name: "data".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Directory,
-            },
-            fuchsia_fs::directory::DirEntry {
-                name: "lib".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Directory,
-            },
-            fuchsia_fs::directory::DirEntry {
-                name: "meta".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Directory,
-            }
-        ]
-    );
-
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
-    let entries = fuchsia_fs::directory::readdir(&exposed_dir).await.unwrap();
-    assert_eq!(
-        entries,
-        vec![fuchsia_fs::directory::DirEntry {
-            name: "fuchsia.test.Suite".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::Unknown,
-        },]
-    );
+    assert!(instance.resolved_info.is_none());
 }
 
 #[fuchsia::test]
-pub async fn query_will_not_resolve_child() {
-    let query = connect_to_protocol::<RealmQueryMarker>().unwrap();
-
-    let (info, resolved) = query.get_instance_info("./will_not_resolve").await.unwrap().unwrap();
-    assert_eq!(info.url, "fuchsia-pkg://fake.com");
-    assert_eq!(info.state, InstanceState::Unresolved);
-    assert!(resolved.is_none());
-}
-
-#[fuchsia::test]
-pub async fn explorer_get_instances() {
-    let explorer = connect_to_protocol::<RealmExplorerMarker>().unwrap();
-    let iterator = explorer.get_all_instance_infos().await.unwrap().unwrap();
+pub async fn get_all_instances() {
+    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let iterator = query.get_all_instances().await.unwrap().unwrap();
     let iterator = iterator.into_proxy().unwrap();
     let mut instances = vec![];
 
@@ -292,19 +310,21 @@ pub async fn explorer_get_instances() {
     assert_eq!(instances.len(), 3);
 
     for instance in instances {
-        if instance.url.ends_with("#meta/realm_integration_test.cm") {
+        let url = instance.url.unwrap();
+        let moniker = instance.moniker.unwrap();
+        if url.ends_with("#meta/realm_integration_test.cm") {
             // This component is definitely resolved and started
-            assert_eq!(instance.moniker, ".");
-            assert_eq!(instance.state, InstanceState::Started);
-        } else if instance.url == "#meta/echo_server.cm" {
+            assert_eq!(moniker, ".");
+            assert!(instance.resolved_info.is_some());
+        } else if url.ends_with("#meta/echo_server.cm") {
             // The other test case may start this component so its state is not stable
-            assert_eq!(instance.moniker, "./echo_server");
-        } else if instance.url == "fuchsia-pkg://fake.com" {
+            assert_eq!(moniker, "./echo_server");
+        } else if url == "fuchsia-pkg://fake.com" {
             // This component can never be resolved or started
-            assert_eq!(instance.moniker, "./will_not_resolve");
-            assert_eq!(instance.state, InstanceState::Unresolved);
+            assert_eq!(moniker, "./will_not_resolve");
+            assert!(instance.resolved_info.is_none());
         } else {
-            panic!("Unknown instance: {}", instance.url);
+            panic!("Unknown instance: {}", url);
         }
     }
 }

@@ -18,9 +18,11 @@ rustc_library("lib") {
 
   deps = [
     ":measure_tape_for_events",
+    ":measure_tape_for_instance",
     ":measure_tape_for_instance_info",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
@@ -332,6 +334,12 @@ measure_tape("measure_tape_for_events") {
 measure_tape("measure_tape_for_instance_info") {
   target_binding = "rust"
   target_types = [ "fuchsia.sys2/InstanceInfo" ]
+  fidls = [ "//sdk/fidl/fuchsia.sys2" ]
+}
+
+measure_tape("measure_tape_for_instance") {
+  target_binding = "rust"
+  target_types = [ "fuchsia.sys2/Instance" ]
   fidls = [ "//sdk/fidl/fuchsia.sys2" ]
 }
 

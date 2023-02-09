@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
-rustc_test("realm_integration_test_bin") {
+rustc_test("realm_deprecated_integration_test_bin") {
   edition = "2021"
   testonly = true
   sources = [ "src/lib.rs" ]
@@ -13,17 +13,16 @@ rustc_test("realm_integration_test_bin") {
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
   ]
 }
 
-fuchsia_unittest_package("realm_integration_test") {
-  manifest = "meta/realm_integration_test.cml"
+fuchsia_unittest_package("realm_deprecated_integration_test") {
+  manifest = "meta/realm_deprecated_integration_test.cml"
   deps = [
-    ":realm_integration_test_bin",
+    ":realm_deprecated_integration_test_bin",
 
     # fxbug.dev/101490: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",

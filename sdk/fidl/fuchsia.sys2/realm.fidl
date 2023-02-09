@@ -15,7 +15,260 @@ using fuchsia.url;
 /// in hex notation is 64 characters long.
 const MAX_INSTANCE_ID_LENGTH uint32 = 64;
 
+/// The maximum length of the human-readable start reason.
+const MAX_START_REASON uint32 = 256;
+
+/// Errors that can be returned by the GetInstance call.
+type GetInstanceError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+};
+
+/// Errors that can be returned by the GetManifest call.
+type GetManifestError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The component manifest is only available when the instance is resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+};
+
+/// Errors that can be returned by the GetStructuredConfig call.
+type GetStructuredConfigError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The component manifest is only available when the instance is resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+
+    /// There is no structured configuration associated with this instance.
+    NO_CONFIG = 4;
+};
+
+/// Errors that can be returned by the GetAllInstances call.
+type GetAllInstancesError = flexible enum {
+    /// Could not find the scope root instance.
+    INSTANCE_NOT_FOUND = 1;
+};
+
+/// Errors that can be returned by the OpenDirectory call.
+type OpenError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The requested directory is available when the instance is resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+
+    /// The requested directory is available when the instance is running.
+    INSTANCE_NOT_RUNNING = 4;
+
+    /// Component manager's open request on the directory returned a FIDL error.
+    FIDL_ERROR = 5;
+
+    /// The instance does not have a directory of this type.
+    NO_SUCH_DIR = 6;
+
+    /// The given directory type could not be parsed.
+    BAD_DIR_TYPE = 7;
+
+    /// The given path could not be parsed by component manager.
+    BAD_PATH = 8;
+};
+
+/// Errors that can be returned by the ConstructNamespace call.
+type ConstructNamespaceError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// Namespace construction requires the instance to be resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+};
+
+/// Errors that can be returned by the ConnectToStorageAdmin call.
+type ConnectToStorageAdminError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The instance does not define a storage capability with the given name.
+    STORAGE_NOT_FOUND = 3;
+
+    /// This operation requires the instance to be resolved.
+    INSTANCE_NOT_RESOLVED = 4;
+};
+
+/// Describes a component instance under a realm.
+@available(added=11)
+type Instance = table {
+    /// The path to this instance relative to the scope root.
+    1: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+
+    /// The URL of the component manifest for this instance.
+    2: url fuchsia.url.Url;
+
+    /// The stable identifier for this instance, if one exists.
+    3: instance_id string:<MAX_INSTANCE_ID_LENGTH>;
+
+    /// Information about the resolved state of a component instance.
+    /// If the component is not resolved, this field is not set.
+    4: resolved_info ResolvedInfo;
+};
+
+/// Information about the resolved state of a component instance.
+@available(added=11)
+type ResolvedInfo = table {
+    /// The resolved URL of this instance.
+    1: resolved_url fuchsia.url.Url;
+
+    /// Information about the execution state of a component instance.
+    /// If the component is not running, this field is not set.
+    2: execution_info ExecutionInfo;
+};
+
+/// Information about the execution state of a component instance.
+@available(added=11)
+type ExecutionInfo = table {
+    /// The human-readable explanation for why this instance was started.
+    1: start_reason string:MAX_START_REASON;
+};
+
+/// The directories of an instance that can be opened by component manager.
+@available(added=11)
+type OpenDirType = flexible enum {
+    /// Served by the component's program. Rights unknown.
+    OUTGOING_DIR = 1;
+    /// Served by the component's runner. Rights unknown.
+    RUNTIME_DIR = 2;
+    /// Served by the component's resolver. Rights unknown.
+    PACKAGE_DIR = 3;
+    /// Served by component manager. Directory has RW rights.
+    EXPOSED_DIR = 4;
+    /// Served by component manager. Directory has RW rights.
+    NAMESPACE_DIR = 5;
+};
+
+/// Offers detailed introspection into component instances under a realm.
+@discoverable
+protocol RealmQuery {
+    /// Gets an instance identified by its relative moniker.
+    @available(added=11)
+    GetInstance(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (struct {
+        instance Instance;
+    }) error GetInstanceError;
+
+    /// Gets the manifest of an instance identified by its relative moniker.
+    @available(added=11)
+    GetManifest(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (struct {
+        manifest fuchsia.component.decl.Component;
+    }) error GetManifestError;
+
+    /// Gets the structured config of an instance identified by its relative moniker.
+    @available(added=11)
+    GetStructuredConfig(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (struct {
+        config fuchsia.component.config.ResolvedConfig;
+    }) error GetStructuredConfigError;
+
+    /// Returns an iterator over all instances in this realm.
+    @available(added=11)
+    GetAllInstances() -> (resource struct {
+        iterator client_end:InstanceIterator;
+    }) error GetAllInstancesError;
+
+    /// Constructs the namespace of an instance exactly as it would be given to the component's
+    /// runner.
+    @available(added=11)
+    ConstructNamespace(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (resource struct {
+        /// The directory handles + paths that constitute the component's namespace.
+        namespace vector<fuchsia.component.runner.ComponentNamespaceEntry>:MAX;
+    }) error ConstructNamespaceError;
+
+    /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
+    @available(added=11)
+    Open(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        dir_type OpenDirType;
+        flags fuchsia.io.OpenFlags;
+        mode fuchsia.io.ModeType;
+        path string:fuchsia.io.MAX_PATH_LENGTH;
+        object server_end:fuchsia.io.Node;
+    }) -> () error OpenError;
+
+    /// Connects to the StorageAdmin protocol of a storage declared by an instance.
+    @available(added=11)
+    ConnectToStorageAdmin(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        storage_name fuchsia.component.decl.name;
+        server_end server_end:StorageAdmin;
+    }) -> () error ConnectToStorageAdminError;
+
+    /// Gets the detailed information of a particular instance identified by its relative moniker.
+    /// This response contains handles to resources of the instance. As a result, component manager
+    /// pays a non-trivial cost when this method is invoked.
+    @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead", legacy=true)
+    GetInstanceInfo(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (resource struct {
+        /// Basic information about the component instance.
+        info InstanceInfo;
+
+        /// Detailed information about the resolved component instance.
+        /// If this object does not exist, the instance is not resolved.
+        resolved box<ResolvedState>;
+    }) error RealmQueryError;
+
+    /// Gets all directories relevant to a particular instance identified by its moniker.
+    /// This response contains directory handles served by component manager. As a result,
+    /// component manager pays a non-trivial cost when this method is invoked.
+    @available(added=11, deprecated=11, removed=12, note="Use CloneDirectory instead", legacy=true)
+    GetInstanceDirectories(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (resource struct {
+        /// The directories available because the component instance is in resolved state
+        /// If this object does not exist, the instance is not resolved.
+        resolved_dirs box<ResolvedDirectories>;
+    }) error RealmQueryError;
+};
+
+/// An iterator over all instances in the realm
+@available(added=11)
+protocol InstanceIterator {
+    Next() -> (struct {
+        infos vector<Instance>:MAX;
+    });
+};
+
+// ------------------------------------------------------------
+// All types below are marked deprecated and will be removed in
+// a newer API version.
+// ------------------------------------------------------------
+
 /// Describes the current state of instance
+@available(added=11, deprecated=11, removed=12, legacy=true)
 type InstanceState = strict enum {
     /// The component is created, but has not been resolved by component manager.
     /// Most information about this component is unknown.
@@ -30,6 +283,7 @@ type InstanceState = strict enum {
 
 /// Basic information about a component instance.
 /// This object contains information that is readily available to component manager.
+@available(added=11, deprecated=11, removed=12, note="Use Instance instead", legacy=true)
 type InstanceInfo = struct {
     /// The path to this instance relative to the scope root.
     moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
@@ -45,6 +299,7 @@ type InstanceInfo = struct {
 };
 
 /// The detailed resolved state of a component instance
+@available(added=11, deprecated=11, removed=12, note="Use ResolvedInfo instead", legacy=true)
 type ResolvedState = resource struct {
     /// All `use` declarations as defined in the component manifest.
     uses vector<fuchsia.component.decl.Use>:MAX;
@@ -74,6 +329,7 @@ type ResolvedState = resource struct {
 };
 
 /// The detailed execution state of a component instance
+@available(added=11, deprecated=11, removed=12, note="Use ExecutionInfo instead", legacy=true)
 type ExecutionState = resource struct {
     /// The outgoing directory of this instance, if one exists.
     out_dir client_end:<fuchsia.io.Directory, optional>;
@@ -86,6 +342,7 @@ type ExecutionState = resource struct {
 };
 
 /// The directories available because the component instance is in resolved state
+@available(added=11, deprecated=11, removed=12, legacy=true)
 type ResolvedDirectories = resource struct {
     /// The package directory containing the component manifest, if one exists.
     /// This directory has the same permissions given by the package resolver
@@ -105,6 +362,7 @@ type ResolvedDirectories = resource struct {
 };
 
 /// The directories available because the component instance is running
+@available(added=11, deprecated=11, removed=12, legacy=true)
 type ExecutionDirectories = resource struct {
     /// The outgoing directory of this instance, if one exists.
     out_dir client_end:<fuchsia.io.Directory, optional>;
@@ -114,6 +372,7 @@ type ExecutionDirectories = resource struct {
 };
 
 /// An iterator over basic information of all instances in the realm
+@available(added=11, deprecated=11, removed=12, note="Use InstanceIterator instead", legacy=true)
 protocol InstanceInfoIterator {
     Next() -> (struct {
         infos vector<InstanceInfo>:MAX;
@@ -129,36 +388,8 @@ type RealmQueryError = flexible enum {
     BAD_MONIKER = 2;
 };
 
-/// Offers detailed introspection into component instances under a realm.
-@discoverable
-protocol RealmQuery {
-    /// Gets the detailed information of a particular instance identified by its relative moniker.
-    /// This response contains handles to resources of the instance. As a result, component manager
-    /// pays a non-trivial cost when this method is invoked.
-    GetInstanceInfo(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (resource struct {
-        /// Basic information about the component instance.
-        info InstanceInfo;
-
-        /// Detailed information about the resolved component instance.
-        /// If this object does not exist, the instance is not resolved.
-        resolved box<ResolvedState>;
-    }) error RealmQueryError;
-
-    /// Gets all directories relevant to a particular instance identified by its moniker.
-    /// This response contains directory handles served by component manager. As a result,
-    /// component manager pays a non-trivial cost when this method is invoked.
-    GetInstanceDirectories(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (resource struct {
-        /// The directories available because the component instance is in resolved state
-        /// If this object does not exist, the instance is not resolved.
-        resolved_dirs box<ResolvedDirectories>;
-    }) error RealmQueryError;
-};
-
 /// Errors that can be returned by the RealmExplorer API.
+@available(added=11, deprecated=11, removed=12, legacy=true)
 type RealmExplorerError = flexible enum {
     /// Could not find the scope root instance.
     // TODO(https://fxbug.dev/108532): Close the connection when this error occurs.
@@ -172,6 +403,12 @@ protocol RealmExplorer {
     /// When the server receives this call, it will take a snapshot of the current component
     /// topology and relays that over the iterator. Any changes to the topology *after* this method
     /// call is received by the server will not be shown by the iterator.
+    @available(
+            added=11,
+            deprecated=11,
+            removed=12,
+            note="Use RealmQuery.GetAllInstances instead",
+            legacy=true)
     GetAllInstanceInfos() -> (resource struct {
         iterator client_end:InstanceInfoIterator;
     }) error RealmExplorerError;

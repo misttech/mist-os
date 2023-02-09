@@ -18,7 +18,7 @@ use {
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
-        namespace::{populate_and_get_logsink_decl, IncomingNamespace},
+        namespace::IncomingNamespace,
         ns_dir::NamespaceDir,
         routing::{
             self, route_and_open_capability,
@@ -52,7 +52,7 @@ use {
     cm_task_scope::TaskScope,
     cm_util::channel,
     config_encoder::ConfigFields,
-    fidl::endpoints::{self, ClientEnd, Proxy, ServerEnd},
+    fidl::endpoints::{self, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -501,122 +501,6 @@ impl ComponentInstance {
     /// success or error.
     pub async fn unresolve(self: &Arc<Self>) -> Result<(), UnresolveActionError> {
         ActionSet::register(self.clone(), UnresolveAction::new()).await
-    }
-
-    /// Locks on the instance and execution state of the component and creates a FIDL
-    /// fuchsia.sys2.ResolvedState object.
-    pub async fn create_fidl_resolved_state(
-        self: &Arc<ComponentInstance>,
-    ) -> Option<Box<fsys::ResolvedState>> {
-        let state = self.lock_state().await;
-        let execution = self.lock_execution().await;
-
-        match &*state {
-            InstanceState::Resolved(r) => {
-                let uses =
-                    r.decl().uses.clone().into_iter().map(|u| u.native_into_fidl()).collect();
-                let exposes =
-                    r.decl().exposes.clone().into_iter().map(|e| e.native_into_fidl()).collect();
-                let config = r.config().cloned().map(|c| Box::new(c.into()));
-
-                let pkg_dir = r.package().map(|p| &p.package_dir);
-                let pkg_dir = try_clone_dir_endpoint(pkg_dir);
-
-                let execution = if let Some(runtime) = &execution.runtime {
-                    let out_dir = try_clone_dir_endpoint(runtime.outgoing_dir.as_ref());
-                    let runtime_dir = try_clone_dir_endpoint(runtime.runtime_dir.as_ref());
-                    let start_reason = runtime.start_reason.to_string();
-
-                    Some(Box::new(fsys::ExecutionState { out_dir, runtime_dir, start_reason }))
-                } else {
-                    None
-                };
-
-                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
-                r.get_exposed_dir().open(
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
-                    vfs::path::Path::dot(),
-                    expose_server,
-                );
-                let exposed_dir = exposed_dir.into_channel();
-                let exposed_dir =
-                    fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(exposed_dir);
-
-                let (ns_dir, ns_server) = fidl::endpoints::create_endpoints().unwrap();
-                r.get_ns_dir().open(
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::RIGHT_EXECUTABLE
-                        | fio::OpenFlags::DIRECTORY,
-                    vfs::path::Path::dot(),
-                    ns_server,
-                );
-                let ns_dir = ns_dir.into_channel();
-                let ns_dir = fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(ns_dir);
-
-                Some(Box::new(fsys::ResolvedState {
-                    uses,
-                    exposes,
-                    config,
-                    pkg_dir,
-                    execution,
-                    exposed_dir,
-                    ns_dir,
-                }))
-            }
-            _ => None,
-        }
-    }
-
-    /// Locks on the instance and execution state of the component and creates a FIDL
-    /// fuchsia.sys2.ResolvedDirectories object.
-    pub async fn create_fidl_resolved_directories(
-        self: &Arc<Self>,
-    ) -> Option<Box<fsys::ResolvedDirectories>> {
-        let mut state = self.lock_state().await;
-        let execution = self.lock_execution().await;
-
-        match &mut *state {
-            InstanceState::Resolved(r) => {
-                let pkg_dir = r.package().map(|p| &p.package_dir);
-                let pkg_dir_endpoint = try_clone_dir_endpoint(pkg_dir);
-
-                let execution_dirs = if let Some(runtime) = &execution.runtime {
-                    let out_dir = try_clone_dir_endpoint(runtime.outgoing_dir.as_ref());
-                    let runtime_dir = try_clone_dir_endpoint(runtime.runtime_dir.as_ref());
-
-                    Some(Box::new(fsys::ExecutionDirectories { out_dir, runtime_dir }))
-                } else {
-                    None
-                };
-
-                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
-                r.get_exposed_dir().open(
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
-                    vfs::path::Path::dot(),
-                    expose_server,
-                );
-                let exposed_dir = exposed_dir.into_channel();
-                let exposed_dir =
-                    fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(exposed_dir);
-
-                let pkg_dir = r.package().map(|p| &p.package_dir);
-                let (ns_entries, _) =
-                    populate_and_get_logsink_decl(pkg_dir, &self, r.decl()).await.unwrap();
-
-                Some(Box::new(fsys::ResolvedDirectories {
-                    ns_entries,
-                    pkg_dir: pkg_dir_endpoint,
-                    exposed_dir,
-                    execution_dirs,
-                }))
-            }
-            _ => None,
-        }
     }
 
     /// Resolves a runner for this component.
@@ -1978,21 +1862,6 @@ async fn do_runner_stop<'a>(
     match futures::future::select(stop_timer, channel_close).await {
         Either::Left(((), _channel_close)) => None,
         Either::Right((_timer, _close_result)) => Some(Ok(StopRequestSuccess::Stopped)),
-    }
-}
-
-fn try_clone_dir_endpoint(
-    dir: Option<&fio::DirectoryProxy>,
-) -> Option<ClientEnd<fio::DirectoryMarker>> {
-    if let Some(dir) = dir {
-        if let Ok(cloned_dir) = fuchsia_fs::directory::clone_no_describe(&dir, None) {
-            let cloned_dir_channel = cloned_dir.into_channel().unwrap().into_zx_channel();
-            Some(ClientEnd::new(cloned_dir_channel))
-        } else {
-            None
-        }
-    } else {
-        None
     }
 }
 
