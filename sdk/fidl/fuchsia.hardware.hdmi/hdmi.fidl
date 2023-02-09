@@ -97,7 +97,9 @@ protocol Hdmi {
     /// The `write_segments_data` vector of segments specifies the data to write for each write
     /// segment. Each segment itself is a vector of uint8s, so `write_segments_data` is a vector of
     /// vectors of uint8s.
-    /// The `read_segments_length` vector specifies the length of the read segments.
+    /// The `read_segments_length` vector specifies the length of the read
+    /// segments. According to the E-DDC standard (v1.3, revised Dec 31, 2020),
+    /// EDIDs can be read in segments <= 256 bytes in length.
     /// If there is no error, `read_segments_data` returns a vector of segments, with each segment
     /// data itself returned in vectors.
     ///
@@ -109,7 +111,7 @@ protocol Hdmi {
     EdidTransfer(struct {
         ops vector<EdidOp>:MAX_COUNT_SEGMENTS;
         write_segments_data vector<vector<uint8>:MAX_TRANSFER_SIZE>:MAX_COUNT_SEGMENTS;
-        read_segments_length vector<uint8>:MAX_COUNT_SEGMENTS;
+        read_segments_length vector<uint16>:MAX_COUNT_SEGMENTS;
     }) -> (struct {
         read_segments_data vector<vector<uint8>:MAX_TRANSFER_SIZE>:MAX_COUNT_SEGMENTS;
     }) error zx.status;

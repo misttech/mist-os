@@ -6,6 +6,8 @@
 
 #include <lib/ddk/debug.h>
 
+#include <limits>
+
 #include "src/graphics/display/drivers/amlogic-display/cbus-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -195,17 +197,17 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
 zx_status_t HdmiHost::EdidTransfer(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
   auto ops = std::make_unique<EdidOp[]>(op_count);
   auto writes = std::make_unique<fidl::VectorView<uint8_t>[]>(op_count);
-  auto reads = std::make_unique<uint8_t[]>(op_count);
+  auto reads = std::make_unique<uint16_t[]>(op_count);
   size_t write_cnt = 0;
   size_t read_cnt = 0;
   for (size_t i = 0; i < op_count; ++i) {
     ops[i].address = op_list[i].address;
     ops[i].is_write = !op_list[i].is_read;
     if (op_list[i].is_read) {
-      // TODO(fxbug.dev/121409): Fix the data_size time and remove this check.
-      ZX_DEBUG_ASSERT_MSG(op_list[i].data_size <= std::numeric_limits<uint8_t>::max(), "%zu",
-                          op_list[i].data_size);
-      reads[read_cnt] = static_cast<uint8_t>(op_list[i].data_size);
+      if (op_list[i].data_size > std::numeric_limits<uint16_t>::max()) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      reads[read_cnt] = static_cast<uint16_t>(op_list[i].data_size);
       read_cnt++;
     } else {
       writes[write_cnt] = fidl::VectorView<uint8_t>::FromExternal(
@@ -216,7 +218,7 @@ zx_status_t HdmiHost::EdidTransfer(uint32_t bus_id, const i2c_impl_op_t* op_list
   auto all_ops = fidl::VectorView<EdidOp>::FromExternal(ops.get(), op_count);
   auto all_writes =
       fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(writes.get(), write_cnt);
-  auto all_reads = fidl::VectorView<uint8_t>::FromExternal(reads.get(), read_cnt);
+  auto all_reads = fidl::VectorView<uint16_t>::FromExternal(reads.get(), read_cnt);
 
   auto res = hdmi_->EdidTransfer(all_ops, all_writes, all_reads);
   if ((res.status() != ZX_OK) || res->is_error()) {
