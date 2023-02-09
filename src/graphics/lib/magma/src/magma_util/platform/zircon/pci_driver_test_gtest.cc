@@ -20,7 +20,9 @@ void* test_device_s = nullptr;
 
 magma::PlatformPciDevice* TestPlatformPciDevice::GetInstance() { return platform_pci_device_s; }
 
-void* GetTestDeviceHandle() { return test_device_s; }
+msd::DeviceHandle* GetTestDeviceHandle() {
+  return reinterpret_cast<msd::DeviceHandle*>(test_device_s);
+}
 
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_pci_device) {
   DLOG("running magma unit tests");

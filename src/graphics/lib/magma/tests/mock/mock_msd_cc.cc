@@ -9,8 +9,11 @@
 #include "msd_cc.h"
 #include "platform_handle.h"
 #include "platform_semaphore.h"
+#include "src/graphics/lib/magma/tests/helper/platform_msd_device_helper.h"
 
 std::unique_ptr<MsdMockBufferManager> g_bufmgr;
+
+msd::DeviceHandle* GetTestDeviceHandle() { return nullptr; }
 
 // static
 std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdMockDriver>(); }

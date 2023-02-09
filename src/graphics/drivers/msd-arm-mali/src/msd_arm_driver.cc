@@ -21,7 +21,7 @@ void MsdArmDriver::Destroy(MsdArmDriver* drv) { delete drv; }
 
 zx::vmo MsdArmDriver::DuplicateInspectHandle() { return inspector_.DuplicateVmo(); }
 
-std::unique_ptr<msd::Device> MsdArmDriver::CreateDevice(void* device_handle) {
+std::unique_ptr<msd::Device> MsdArmDriver::CreateDevice(msd::DeviceHandle* device_handle) {
   bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdArmDevice> device =

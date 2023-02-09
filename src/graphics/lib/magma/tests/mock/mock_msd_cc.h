@@ -162,7 +162,7 @@ class MsdMockDriver : public msd::Driver {
   MsdMockDriver() { magic_ = kMagic; }
   ~MsdMockDriver() override = default;
 
-  std::unique_ptr<msd::Device> CreateDevice(void* device_data) override {
+  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_data) override {
     return std::make_unique<MsdMockDevice>();
   }
 

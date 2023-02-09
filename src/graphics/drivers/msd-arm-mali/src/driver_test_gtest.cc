@@ -10,13 +10,14 @@
 
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
+#include "parent_device.h"
 #include "platform_logger.h"
 
 namespace {
 zx_device_t* test_device_s;
 }  // namespace
 
-void* GetTestDeviceHandle() { return test_device_s; }
+msd::DeviceHandle* GetTestDeviceHandle() { return ZxDeviceToDeviceHandle(test_device_s); }
 
 zx_status_t magma_indriver_test(zx_device_t* device) {
   DLOG("running magma unit tests");

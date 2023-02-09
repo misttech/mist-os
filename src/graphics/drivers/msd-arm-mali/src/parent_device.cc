@@ -10,6 +10,10 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"
 
+msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device) {
+  return reinterpret_cast<msd::DeviceHandle*>(device);
+}
+
 zx_device_t* ParentDevice::GetDeviceHandle() { return parent_; }
 
 bool ParentDevice::GetProtocol(uint32_t proto_id, void* proto_out) {
@@ -67,11 +71,11 @@ std::unique_ptr<magma::PlatformInterrupt> ParentDevice::RegisterInterrupt(unsign
 }
 
 // static
-std::unique_ptr<ParentDevice> ParentDevice::Create(zx_device_t* device_handle) {
+std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_handle) {
   if (!device_handle)
     return DRETP(nullptr, "device_handle is null, cannot create PlatformDevice");
 
-  zx_device_t* zx_device = static_cast<zx_device_t*>(device_handle);
+  zx_device_t* zx_device = reinterpret_cast<zx_device_t*>(device_handle);
 
   pdev_protocol_t pdev;
   zx_status_t status = device_get_protocol(zx_device, ZX_PROTOCOL_PDEV, &pdev);

@@ -22,6 +22,10 @@ class Semaphore;
 class Buffer;
 class Context;
 
+// This struct represents all the information about the device that the driver needs to interact
+// with it. The implementation of this struct is driver-specific.
+struct DeviceHandle;
+
 // This represents the driver for a device. It's a singleton that can't access device registers.
 class Driver {
  public:
@@ -37,7 +41,7 @@ class Driver {
 
   // Creates a device at system startup. `device_data` is a pointer to a platform-specific device
   // object which is guaranteed to outlive the returned Device.
-  virtual std::unique_ptr<Device> CreateDevice(void* device_data) { return {}; }
+  virtual std::unique_ptr<Device> CreateDevice(DeviceHandle* device_data) { return {}; }
 
   // Creates a buffer that owns the provided handle. Can be called on any thread.
   virtual std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }

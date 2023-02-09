@@ -25,6 +25,7 @@
 #include "platform_logger.h"
 #include "platform_trace_provider.h"
 #include "platform_trace_provider_with_fdio.h"
+#include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_device.h"
@@ -59,7 +60,7 @@ class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GP
 };
 
 zx_status_t GpuDevice::MagmaStart() {
-  set_magma_system_device(magma_driver()->CreateDevice(parent()));
+  set_magma_system_device(magma_driver()->CreateDevice(ZxDeviceToDeviceHandle(parent())));
   if (!magma_system_device())
     return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
   InitSystemDevice();

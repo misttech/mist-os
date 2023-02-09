@@ -25,7 +25,7 @@ class MsdArmDriver : public msd::Driver {
   // msd::Driver implementation.
   void Configure(uint32_t flags) override { configure_flags_ = flags; }
   zx::vmo DuplicateInspectHandle() override;
-  std::unique_ptr<msd::Device> CreateDevice(void* device_handle) override;
+  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
   std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
   magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
                                  std::unique_ptr<msd::Semaphore>* out) override;

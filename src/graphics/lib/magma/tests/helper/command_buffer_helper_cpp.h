@@ -7,8 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include "helper/platform_msd_device_helper.h"
 #include "msd/msd_cc.h"
-#include "platform_pci_device.h"
 #include "platform_semaphore.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_connection.h"
@@ -17,16 +17,14 @@
 // a class to create and own the command buffer were trying to execute
 class CommandBufferHelper final : public msd::NotificationHandler {
  public:
-  static std::unique_ptr<CommandBufferHelper> Create(
-      magma::PlatformPciDevice* platform_device = nullptr) {
+  static std::unique_ptr<CommandBufferHelper> Create() {
     auto msd_drv = msd::Driver::Create();
     if (!msd_drv)
       return DRETP(nullptr, "failed to create msd driver");
 
     msd_drv->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
-    void* device_handle = platform_device ? platform_device->GetDeviceHandle() : nullptr;
-    auto msd_dev = msd_drv->CreateDevice(device_handle);
+    auto msd_dev = msd_drv->CreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return DRETP(nullptr, "failed to create msd device");
     auto dev = std::shared_ptr<MagmaSystemDevice>(

@@ -21,6 +21,7 @@
 #include "magma_util/thread.h"
 #include "mali_register_io.h"
 #include "msd.h"
+#include "msd_cc.h"
 #include "msd_defs.h"
 #include "parent_device.h"
 #include "platform_interrupt.h"
@@ -42,7 +43,8 @@ class MsdArmDevice : public msd::Device,
   // Creates a device for the given |device_handle| and returns ownership.
   // If |start_device_thread| is false, then StartDeviceThread should be called
   // to enable device request processing.
-  static std::unique_ptr<MsdArmDevice> Create(void* device_handle, bool start_device_thread,
+  static std::unique_ptr<MsdArmDevice> Create(msd::DeviceHandle* device_handle,
+                                              bool start_device_thread,
                                               inspect::Node* parent_node = nullptr);
 
   MsdArmDevice();
@@ -58,7 +60,7 @@ class MsdArmDevice : public msd::Device,
 
   void set_inspect(inspect::Node node) { inspect_ = std::move(node); }
 
-  bool Init(void* device_handle);
+  bool Init(msd::DeviceHandle* device_handle);
   bool Init(std::unique_ptr<ParentDevice> platform_device,
             std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 

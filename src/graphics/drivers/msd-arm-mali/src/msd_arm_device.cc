@@ -128,7 +128,8 @@ class MsdArmDevice::TimestampRequest : public DeviceRequest {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::unique_ptr<MsdArmDevice> MsdArmDevice::Create(void* device_handle, bool start_device_thread,
+std::unique_ptr<MsdArmDevice> MsdArmDevice::Create(msd::DeviceHandle* device_handle,
+                                                   bool start_device_thread,
                                                    inspect::Node* parent_node) {
   auto device = std::make_unique<MsdArmDevice>();
   if (parent_node) {
@@ -192,9 +193,9 @@ void MsdArmDevice::Destroy() {
   }
 }
 
-bool MsdArmDevice::Init(void* device_handle) {
+bool MsdArmDevice::Init(msd::DeviceHandle* device_handle) {
   DLOG("Init");
-  auto platform_device = ParentDevice::Create(static_cast<zx_device_t*>(device_handle));
+  auto platform_device = ParentDevice::Create(device_handle);
   if (!platform_device)
     return DRETF(false, "Failed to initialize device");
   auto bus_mapper = magma::PlatformBusMapper::Create(platform_device->GetBusTransactionInitiator());

@@ -19,7 +19,9 @@ void* test_device_s;
 
 magma::PlatformDevice* TestPlatformDevice::GetInstance() { return platform_device_s.get(); }
 
-void* GetTestDeviceHandle() { return test_device_s; }
+msd::DeviceHandle* GetTestDeviceHandle() {
+  return reinterpret_cast<msd::DeviceHandle*>(test_device_s);
+}
 
 zx_status_t magma_indriver_test(zx_device_t* device) {
   DLOG("running magma unit tests");

@@ -13,10 +13,14 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/status.h"
+#include "msd_cc.h"
 #include "platform_buffer.h"
 #include "platform_handle.h"
 #include "platform_interrupt.h"
 #include "platform_mmio.h"
+
+// zx_device_t* == msd::DeviceHandle*.
+msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device);
 
 class ParentDevice {
  public:
@@ -40,7 +44,7 @@ class ParentDevice {
   virtual std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index);
 
   // Ownership of |device_handle| is *not* transferred to the ParentDevice.
-  static std::unique_ptr<ParentDevice> Create(zx_device_t* device_handle);
+  static std::unique_ptr<ParentDevice> Create(msd::DeviceHandle* device_handle);
 
  private:
   zx_device_t* parent_;
