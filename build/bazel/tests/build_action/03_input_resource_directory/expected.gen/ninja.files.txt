@@ -1,0 +1,3 @@
+external/legacy_ninja_build_outputs/tests/bazel_action/03_input_resource_directory/a.txt
+external/legacy_ninja_build_outputs/tests/bazel_action/03_input_resource_directory/b.lst
+external/legacy_ninja_build_outputs/tests/bazel_action/03_input_resource_directory/c.json

@@ -12,11 +12,13 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 
 
 def copy_file_if_changed(src_path, dst_path):
+    """Copy |src_path| to |dst_path| if they are different."""
     # NOTE: For some reason, filecmp.cmp() will return True if
     # dst_path does not exist, even if src_path is not empty!?
     if os.path.exists(dst_path) and filecmp.cmp(src_path, dst_path,
@@ -26,14 +28,26 @@ def copy_file_if_changed(src_path, dst_path):
     # Use lexists to make sure broken symlinks are removed as well.
     if os.path.lexists(dst_path):
         os.remove(dst_path)
-    try:
-        os.link(src_path, dst_path)
-    except OSError as e:
-        if e.errno == errno.EXDEV:
-            # Cross-device link, simple copy.
-            shutil.copy2(src_path, dst_path)
-        else:
-            raise
+
+    # See https://fxbug.dev/121003 for context.
+    # If the file is writable, try to hard-link it directly. Otherwise,
+    # or if hard-linking fails due to a cross-device link, do a simple
+    # copy.
+    do_copy = True
+    file_mode = os.stat(src_path).st_mode
+    is_src_readonly = file_mode & stat.S_IWUSR == 0
+    if not is_src_readonly:
+        try:
+            os.link(src_path, dst_path)
+            do_copy = False
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
+
+    if do_copy:
+        shutil.copy2(src_path, dst_path)
+        if is_src_readonly:
+            os.chmod(dst_path, file_mode | stat.S_IWUSR)
 
 
 def main():

@@ -26,6 +26,7 @@ import argparse
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -53,6 +54,28 @@ def get_fx_build_dir(fuchsia_dir):
 # to _FALLBACK_PRODUCT_NAME
 _KNOWN_PRODUCT_NAMES = ('bringup', 'minimal', 'core', 'workstation_eng')
 _FALLBACK_PRODUCT_NAME = 'minimal'
+
+
+def remove_directory(directory):
+    """Safely remove a directory, even if it contains read-only files."""
+
+    # Error handler for rmtree call below, to deal with read-only files
+    # that need to be removed explicitly.
+    def on_error(action, path, excinfo):
+        # Make file writable, taking care of parent directories as well.
+        file_path = path
+        while True:
+            file_mode = os.stat(file_path).st_mode
+            if file_mode & stat.S_IWRITE != 0:
+                break
+            os.chmod(file_path, file_mode | stat.S_IWRITE)
+            file_path = os.path.dirname(file_path)
+            if file_path == '/':
+                break
+
+        os.remove(path)
+
+    shutil.rmtree(directory, onerror=on_error)
 
 
 def get_product_name(fuchsia_build_dir):
@@ -380,17 +403,13 @@ def main():
     log('@prebuilt_clang test suite')
     run_bazel_command(['test', '@prebuilt_clang//:test_suite'])
 
-    log('bazel_build_action() checks.')
-    # This verifies that bazel_build_action() works properly, i.e. that
-    # it invokes a Bazel build command that takes inputs from a
-    # @legacy_ninja_build_outputs filegroup(), which generates the
-    # expected output, copied to the appropriate Ninja output directory
-    # location.
-    run_fx_command(['build', 'build/bazel/tests/build_action'])
+    # Run the bazel_action() checks.
+    log('bazel_action() checks.')
+    command_launcher.run(['build/bazel/tests/build_action/run_tests.py'])
 
     log('//build/bazel:generate_fuchsia_sdk_repository check')
     output_base_dir = os.path.join(bazel_main_top_dir, 'output_base')
-    shutil.rmtree(output_base_dir)
+    remove_directory(output_base_dir)
 
     fuchsia_sdk_symlink = os.path.join(bazel_main_top_dir, 'fuchsia_sdk')
 

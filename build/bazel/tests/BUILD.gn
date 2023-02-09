@@ -3,5 +3,5 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "build_action:verify_build_action" ]
+  deps = [ "build_action" ]
 }

@@ -1,0 +1,13 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# See README.txt for details
+
+load(":list_directory.bzl", "list_directory")
+
+list_directory(
+    name = "list_directory",
+    output = "files.txt",
+    src_dir = "@legacy_ninja_build_outputs//:03_input_resource_directory",
+)

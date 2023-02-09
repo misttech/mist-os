@@ -1,0 +1,15 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+
+# See README.md for details
+bazel_action("test") {
+  command = "build"
+  bazel_targets =
+      [ "//build/bazel/tests/build_action/00_no_inputs:generate_foo" ]
+  bazel_outputs =
+      [ "bazel-bin/build/bazel/tests/build_action/00_no_inputs/foo.out" ]
+  ninja_outputs = [ "foo.ninja.out" ]
+}

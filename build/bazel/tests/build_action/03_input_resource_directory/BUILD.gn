@@ -1,0 +1,44 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_inputs.gni")
+
+# See README.txt for details
+
+# Generate a source directory whose content is not known to GN or Ninja.
+
+source_dir_target = "generated_source_directory"
+source_dir_path =
+    get_label_info(":${source_dir_target}", "target_gen_dir") + "/source_dir"
+
+action(source_dir_target) {
+  script = "generate-dir.py"
+  outputs = [ "${source_dir_path}.stamp" ]
+  args = [
+    "--stamp",
+    rebase_path(outputs[0], root_build_dir),
+    "--output-dir",
+    rebase_path(source_dir_path, root_build_dir),
+  ]
+
+  # This action cannot be hermetic, since its point is to generate
+  # a directory with arbitrary content.
+  hermetic_deps = false
+}
+
+bazel_input_resource_directory("bazel_input") {
+  name = "03_input_resource_directory"
+  source_dir = source_dir_path
+  dest_dir = "tests/bazel_action/03_input_resource_directory"
+  deps = [ ":$source_dir_target" ]
+}
+
+bazel_action("test") {
+  command = "build"
+  bazel_targets = [ "//build/bazel/tests/build_action/03_input_resource_directory:list_directory" ]
+  bazel_inputs = [ ":bazel_input" ]
+  bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/03_input_resource_directory/files.txt" ]
+  ninja_outputs = [ "ninja.files.txt" ]
+}
