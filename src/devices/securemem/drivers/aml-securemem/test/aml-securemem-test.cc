@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/fpromise/result.h>
@@ -21,38 +20,7 @@
 
 #include "device.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-
-struct Context {
-  std::shared_ptr<amlogic_secure_mem::AmlogicSecureMemDevice> dev;
-};
-
-class Binder : public fake_ddk::Bind {
-  zx_status_t DeviceRemove(zx_device_t* dev) override {
-    Context* context = reinterpret_cast<Context*>(dev);
-    if (context->dev != nullptr) {
-      context->dev->DdkRelease();
-    }
-    context->dev = nullptr;
-    return ZX_OK;
-  }
-
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    *out = parent;
-    Context* context = reinterpret_cast<Context*>(parent);
-    context->dev.reset(reinterpret_cast<amlogic_secure_mem::AmlogicSecureMemDevice*>(args->ctx));
-
-    if (args && args->ops) {
-      if (args->ops->message) {
-        zx_status_t status;
-        if ((status = fidl_.SetMessageOp(args->ctx, args->ops->message)) < 0) {
-          return status;
-        }
-      }
-    }
-    return ZX_OK;
-  }
-};
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
  public:
@@ -113,22 +81,9 @@ class AmlogicSecureMemTest : public zxtest::Test {
   AmlogicSecureMemTest() {
     pdev_.UseFakeBti();
 
-    static constexpr size_t kNumBindFragments = 3;
-
-    fbl::Array<fake_ddk::FragmentEntry> fragments(new fake_ddk::FragmentEntry[kNumBindFragments],
-                                                  kNumBindFragments);
-    fragments[0].name = "pdev";
-    fragments[0].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_PDEV, *reinterpret_cast<const fake_ddk::Protocol*>(pdev_.proto())});
-
-    fragments[1].name = "sysmem";
-    fragments[1].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_SYSMEM, *reinterpret_cast<const fake_ddk::Protocol*>(sysmem_.proto())});
-    fragments[2].name = "tee";
-    fragments[2].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_TEE, *reinterpret_cast<const fake_ddk::Protocol*>(tee_.proto())});
-
-    ddk_.SetFragments(std::move(fragments));
+    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_.proto()->ops, sysmem_.proto()->ctx, "sysmem");
+    root_->AddProtocol(ZX_PROTOCOL_TEE, tee_.proto()->ops, tee_.proto()->ctx, "tee");
 
     // We initialize this in a dispatcher thread so that fdf_dispatcher_get_current_dispatcher
     // works. This dispatcher isn't actually used in the test.
@@ -145,6 +100,9 @@ class AmlogicSecureMemTest : public zxtest::Test {
       completion.Signal();
     });
     completion.Wait();
+    ASSERT_EQ(root_->child_count(), 1);
+    auto child = root_->GetLatestChild();
+    dev_ = child->GetDeviceContext<amlogic_secure_mem::AmlogicSecureMemDevice>();
   }
 
   void TearDown() override {
@@ -170,16 +128,16 @@ class AmlogicSecureMemTest : public zxtest::Test {
     shutdown_completion_.Signal();
   }
 
-  zx_device_t* parent() { return reinterpret_cast<zx_device_t*>(&ctx_); }
+  zx_device_t* parent() { return root_.get(); }
 
-  amlogic_secure_mem::AmlogicSecureMemDevice* dev() { return ctx_.dev.get(); }
+  amlogic_secure_mem::AmlogicSecureMemDevice* dev() { return dev_; }
 
  private:
-  Binder ddk_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   fake_pdev::FakePDev pdev_;
   FakeSysmem sysmem_;
   FakeTee tee_;
-  Context ctx_ = {};
+  amlogic_secure_mem::AmlogicSecureMemDevice* dev_;
   fdf::Dispatcher dispatcher_;
 
   libsync::Completion shutdown_completion_;

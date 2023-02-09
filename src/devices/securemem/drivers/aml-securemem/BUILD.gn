@@ -98,9 +98,7 @@ test("aml-securemem-test-bin") {
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/driver-runtime-main:zxtest",
-
-    # TODO(fxb/115064): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/security/lib/tee/tee-client-api:tee-client-api-static",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -121,4 +119,9 @@ test("aml-securemem-test-bin") {
 
 fuchsia_unittest_package("aml-securemem-test") {
   deps = [ ":aml-securemem-test-bin" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
