@@ -122,12 +122,6 @@ void SkipAllTestsRunByLoopbackTcpAcceptBacklogTargets(TestMap& tests) {
   SkipTestsRunByLoopbackTcpAcceptBacklogListenV6Target(tests);
 }
 
-void FilterTestsForLoopbackTcpAcceptTarget(TestMap& tests) {
-  SkipTestsRunByLoopbackTarget(tests);
-  SkipTestsRunByLoopbackTcpBacklogTarget(tests);
-  SkipAllTestsRunByLoopbackTcpAcceptBacklogTargets(tests);
-}
-
 void FilterTestsForLoopbackTcpBacklogTarget(TestMap& tests) {
   SkipTestsRunByLoopbackTarget(tests);
   SkipAllTestsRunByLoopbackTcpAcceptBacklogTargets(tests);

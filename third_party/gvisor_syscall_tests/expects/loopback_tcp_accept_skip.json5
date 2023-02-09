@@ -1,0 +1,17 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "skip",
+            matchers: [
+                // Skip test run by loopback_tcp_accept target.
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
+                "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
+                "All/SocketInetLoopbackTest.TCPDeferAccept/*",
+                "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
+            ],
+        },
+    ],
+}

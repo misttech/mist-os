@@ -4,13 +4,13 @@
 {
     actions: [
         {
-            include: "./loopback_skip.json5",
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
         },
         {
-            include: "./loopback_tcp_backlog_skip.json5",
-        },
-        {
-            include: "./loopback_tcp_accept_skip.json5",
+            include: "../loopback_tcp_accept_filter.json5",
         },
     ],
 }
