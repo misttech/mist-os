@@ -164,7 +164,8 @@ void Namespace::GetServices(fidl::InterfaceRequest<fuchsia::sys::ServiceProvider
 
 zx_status_t Namespace::ServeServiceDirectory(
     fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) {
-  return vfs_.ServeDirectory(services_, directory_request.TakeChannel());
+  return vfs_.ServeDirectory(
+      services_, fidl::ServerEnd<fuchsia_io::Directory>{directory_request.TakeChannel()});
 }
 
 void Namespace::CreateComponent(

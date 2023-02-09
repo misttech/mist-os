@@ -46,7 +46,8 @@ std::string Util::GetArgsString(const ::fidl::VectorPtr<::std::string>& argument
 fidl::InterfaceHandle<fuchsia::io::Directory> Util::OpenAsDirectory(fs::FuchsiaVfs* vfs,
                                                                     fbl::RefPtr<fs::Vnode> node) {
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  if (vfs->ServeDirectory(std::move(node), dir.NewRequest().TakeChannel(),
+  if (vfs->ServeDirectory(std::move(node),
+                          fidl::ServerEnd<fuchsia_io::Directory>{dir.NewRequest().TakeChannel()},
                           fs::Rights::ReadWrite()) != ZX_OK) {
     return {};
   }

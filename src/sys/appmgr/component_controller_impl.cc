@@ -156,8 +156,8 @@ ComponentControllerBase::ComponentControllerBase(
           return;
         }
         out_ready_ = true;
-        auto output_dir =
-            fbl::MakeRefCounted<fs::RemoteDir>(cloned_exported_dir_.Unbind().TakeChannel());
+        auto output_dir = fbl::MakeRefCounted<fs::RemoteDir>(
+            fidl::ClientEnd<fuchsia_io::Directory>{cloned_exported_dir_.Unbind().TakeChannel()});
         hub_.PublishOut(std::move(output_dir));
         NotifyDiagnosticsDirReady(diagnostics_max_retries_);
         TRACE_DURATION_BEGIN("appmgr", "ComponentController::OnDirectoryReady");
@@ -319,7 +319,8 @@ ComponentControllerImpl::ComponentControllerImpl(
   hub()->AddIncomingServices(this->incoming_services());
 
   if (package_handle.is_valid()) {
-    hub()->AddPackageHandle(fbl::MakeRefCounted<fs::RemoteDir>(std::move(package_handle)));
+    hub()->AddPackageHandle(fbl::MakeRefCounted<fs::RemoteDir>(
+        fidl::ClientEnd<fuchsia_io::Directory>{std::move(package_handle)}));
   }
 
   zx::job watch_job;
@@ -465,7 +466,8 @@ ComponentBridge::ComponentBridge(fidl::InterfaceRequest<fuchsia::sys::ComponentC
 
   hub()->AddIncomingServices(this->incoming_services());
   if (package_handle.has_value() && package_handle->is_valid()) {
-    hub()->AddPackageHandle(fbl::MakeRefCounted<fs::RemoteDir>(std::move(*package_handle)));
+    hub()->AddPackageHandle(fbl::MakeRefCounted<fs::RemoteDir>(
+        fidl::ClientEnd<fuchsia_io::Directory>{std::move(*package_handle)}));
   }
 }
 

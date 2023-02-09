@@ -26,9 +26,8 @@
 namespace component {
 
 struct AppmgrArgs {
-  // outgoing service directory
-  zx_handle_t pa_directory_request;
-  zx_handle_t lifecycle_request;
+  fidl::ServerEnd<fuchsia_io::Directory> pa_directory_request;
+  fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle_request;
   std::unordered_set<Moniker> lifecycle_allowlist;
   fuchsia::sys::ServiceListPtr root_realm_services;
   const std::shared_ptr<sys::ServiceDirectory> environment_services;

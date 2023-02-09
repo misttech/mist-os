@@ -53,8 +53,11 @@ class AppmgrLifecycleTest : public gtest::TestWithEnvironmentFixture,
     appmgr_services_ = sys::ServiceDirectory::CreateWithRequest(&appmgr_service_request);
 
     component::AppmgrArgs args{
-        .pa_directory_request = appmgr_service_request.release(),
-        .lifecycle_request = appmgr_lifecycle_.NewRequest().TakeChannel().release(),
+        .pa_directory_request =
+            fidl::ServerEnd<fuchsia_io::Directory>{std::move(appmgr_service_request)},
+        .lifecycle_request =
+            fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>{
+                appmgr_lifecycle_.NewRequest().TakeChannel()},
         .lifecycle_allowlist = std::move(lifecycle_allowlist),
         .root_realm_services = std::move(root_realm_services),
         .environment_services = real_services(),

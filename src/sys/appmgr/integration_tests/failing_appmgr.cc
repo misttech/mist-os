@@ -42,7 +42,8 @@ class AppmgrHarness : public fuchsia::sys::internal::LogConnectionListener {
 
     fuchsia::sys::ServiceListPtr root_realm_services(new fuchsia::sys::ServiceList);
     component::AppmgrArgs args{
-        .pa_directory_request = appmgr_service_request.release(),
+        .pa_directory_request =
+            fidl::ServerEnd<fuchsia_io::Directory>{std::move(appmgr_service_request)},
         .root_realm_services = std::move(root_realm_services),
         .environment_services = std::move(environment_services),
         .sysmgr_url =

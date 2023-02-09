@@ -283,22 +283,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     #------------------
     #------------------
     "//src/modular/lib/fidl:environment",
-
-    #------------------
-    #------------------
-    "//src/sys/appmgr:appmgr_for_test",
-
-    #------------------
-    #------------------
-    "//src/sys/appmgr:bin",
-
-    #------------------
-    #------------------
-    "//src/sys/appmgr:lib",
-
-    #------------------
-    #------------------
-    "//src/sys/appmgr:unittest_bin",
   ]
 }
 

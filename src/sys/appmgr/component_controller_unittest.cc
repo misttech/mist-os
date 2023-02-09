@@ -391,7 +391,9 @@ TEST_F(ComponentControllerTest, DetachController) {
 
 TEST_F(ComponentControllerTest, Hub) {
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(fbl::MakeRefCounted<fs::PseudoDir>(), export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      fbl::MakeRefCounted<fs::PseudoDir>(),
+      fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
 
@@ -421,7 +423,9 @@ TEST_F(ComponentControllerTest, Hub) {
 
 TEST_F(ComponentControllerTest, HubWithIncomingServices) {
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(fbl::MakeRefCounted<fs::PseudoDir>(), export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      fbl::MakeRefCounted<fs::PseudoDir>(),
+      fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
 
@@ -443,7 +447,8 @@ TEST_F(ComponentControllerTest, GetDiagnosticsDirExists) {
   auto out_dir = fbl::MakeRefCounted<fs::PseudoDir>();
 
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(out_dir, export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      out_dir, fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
   auto component = CreateComponent(component_ptr, std::move(export_dir));
@@ -504,7 +509,9 @@ TEST_F(ComponentControllerTest, GetDiagnosticsDirExists) {
 
 TEST_F(ComponentControllerTest, GetDiagnosticsDirMissing) {
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(fbl::MakeRefCounted<fs::PseudoDir>(), export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      fbl::MakeRefCounted<fs::PseudoDir>(),
+      fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
   auto component = CreateComponent(component_ptr, std::move(export_dir));
@@ -667,7 +674,9 @@ TEST_F(ComponentBridgeTest, DetachController) {
 
 TEST_F(ComponentBridgeTest, Hub) {
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(fbl::MakeRefCounted<fs::PseudoDir>(), export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      fbl::MakeRefCounted<fs::PseudoDir>(),
+      fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
 
@@ -692,7 +701,9 @@ TEST_F(ComponentBridgeTest, Hub) {
 
 TEST_F(ComponentBridgeTest, HubWithIncomingServices) {
   fidl::InterfaceHandle<fuchsia::io::Directory> export_dir;
-  vfs_.ServeDirectory(fbl::MakeRefCounted<fs::PseudoDir>(), export_dir.NewRequest().TakeChannel());
+  vfs_.ServeDirectory(
+      fbl::MakeRefCounted<fs::PseudoDir>(),
+      fidl::ServerEnd<fuchsia_io::Directory>{export_dir.NewRequest().TakeChannel()});
 
   fuchsia::sys::ComponentControllerPtr component_ptr;
 

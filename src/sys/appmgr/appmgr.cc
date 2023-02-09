@@ -119,9 +119,9 @@ Appmgr::Appmgr(async_dispatcher_t* dispatcher, AppmgrArgs args)
   FX_CHECK(root_realm_) << "Cannot create root realm ";
 
   // 2. Listen for lifecycle requests
-  if (args.lifecycle_request != ZX_HANDLE_INVALID) {
+  if (args.lifecycle_request.is_valid()) {
     if (zx_status_t status =
-            lifecycle_server_.Create(dispatcher, zx::channel(std::move(args.lifecycle_request)));
+            lifecycle_server_.Create(dispatcher, std::move(args.lifecycle_request));
         status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to bind lifecycle service.";
       return;
@@ -164,7 +164,9 @@ Appmgr::Appmgr(async_dispatcher_t* dispatcher, AppmgrArgs args)
       fuchsia::sys::ServiceListPtr service_list(new fuchsia::sys::ServiceList);
       sys_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
       sys_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher);
-      sys_vfs_->ServeDirectory(sys_dir_, service_list->host_directory.NewRequest().TakeChannel());
+      sys_vfs_->ServeDirectory(sys_dir_,
+                               fidl::ServerEnd<fuchsia_io::Directory>{
+                                   service_list->host_directory.NewRequest().TakeChannel()});
       root_realm_->CreateNestedEnvironment(sys_env_.NewRequest(), sys_env_controller_.NewRequest(),
                                            "sys", std::move(service_list), options);
     };
@@ -191,8 +193,9 @@ Appmgr::Appmgr(async_dispatcher_t* dispatcher, AppmgrArgs args)
     // fails, let's still proceed.
   }
 
-  if (args.pa_directory_request != ZX_HANDLE_INVALID) {
-    auto svc = fbl::MakeRefCounted<fs::RemoteDir>(handle.TakeChannel());
+  if (args.pa_directory_request.is_valid()) {
+    auto svc = fbl::MakeRefCounted<fs::RemoteDir>(
+        fidl::ClientEnd<fuchsia_io::Directory>{handle.TakeChannel()});
     auto diagnostics = fbl::MakeRefCounted<fs::PseudoDir>();
     diagnostics->AddEntry(
         fuchsia::inspect::Tree::Name_,
@@ -231,7 +234,7 @@ Appmgr::Appmgr(async_dispatcher_t* dispatcher, AppmgrArgs args)
     publish_dir_->AddEntry("svc", svc);
     publish_dir_->AddEntry("diagnostics", diagnostics);
     publish_dir_->AddEntry("appmgr_svc", appmgr_svc);
-    publish_vfs_.ServeDirectory(publish_dir_, zx::channel(args.pa_directory_request));
+    publish_vfs_.ServeDirectory(publish_dir_, std::move(args.pa_directory_request));
   }
 
   async::PostTask(dispatcher, [this, dispatcher] { MeasureCpu(dispatcher); });

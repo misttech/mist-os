@@ -151,15 +151,18 @@ int main(int argc, char** argv) {
       return ZX_ERR_INVALID_ARGS;
     }
   }
-  component::AppmgrArgs args{.pa_directory_request = std::move(pa_directory_request),
-                             .lifecycle_request = std::move(lifecycle_request),
-                             .lifecycle_allowlist = std::move(lifecycle_allowlist),
-                             .root_realm_services = std::move(root_realm_services),
-                             .environment_services = std::move(environment_services),
-                             .sysmgr_url = sysmgr_url,
-                             .sysmgr_args = sysmgr_args,
-                             .trace_server_channel = std::move(trace_server),
-                             .stop_callback = [](zx_status_t status) { exit(status); }};
+  component::AppmgrArgs args{
+      .pa_directory_request =
+          fidl::ServerEnd<fuchsia_io::Directory>{zx::channel{pa_directory_request}},
+      .lifecycle_request =
+          fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>{zx::channel{lifecycle_request}},
+      .lifecycle_allowlist = std::move(lifecycle_allowlist),
+      .root_realm_services = std::move(root_realm_services),
+      .environment_services = std::move(environment_services),
+      .sysmgr_url = sysmgr_url,
+      .sysmgr_args = sysmgr_args,
+      .trace_server_channel = std::move(trace_server),
+      .stop_callback = [](zx_status_t status) { exit(status); }};
   component::Appmgr appmgr(loop.dispatcher(), std::move(args));
 
   loop.Run();

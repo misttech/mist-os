@@ -4,15 +4,14 @@
 
 #include "src/sys/appmgr/lifecycle.h"
 
-#include <lib/fidl-async/cpp/bind.h>
-
 #include "src/sys/appmgr/appmgr.h"
 
 namespace component {
 
-zx_status_t LifecycleServer::Create(async_dispatcher_t* dispatcher, zx::channel channel) {
-  lifecycle_ =
-      fidl::BindServer<fuchsia_process_lifecycle::Lifecycle>(dispatcher, std::move(channel), this);
+zx_status_t LifecycleServer::Create(
+    async_dispatcher_t* dispatcher,
+    fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> server_end) {
+  lifecycle_ = fidl::BindServer(dispatcher, std::move(server_end), this);
   return ZX_OK;
 }
 
