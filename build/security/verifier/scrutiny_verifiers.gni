@@ -256,17 +256,3 @@ template("scrutiny_verifiers") {
     ]
   }
 }
-
-# Pass-through to scrutiny_verifiers.
-# TODO(fxbug.dev/93041): Delete this file once all clients move back to
-# scrutiny_verifiers.
-template("scrutiny_verifiers2") {
-  scrutiny_verifiers(target_name) {
-    forward_variables_from(invoker, "*", [ "assembly_image_name" ])
-
-    # In some cases, assembly_image_name is added to the invoker ambiently,
-    # therefore we have to forward it explicitly.
-    # (* does not forward ambiently added variables)
-    forward_variables_from(invoker, [ "assembly_image_name" ])
-  }
-}
