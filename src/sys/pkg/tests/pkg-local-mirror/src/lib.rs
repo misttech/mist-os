@@ -18,8 +18,7 @@ use {
     },
     fuchsia_url::RepositoryUrl,
     fuchsia_zircon::Status,
-    futures::{channel::oneshot, prelude::*},
-    parking_lot::Mutex,
+    futures::prelude::*,
     std::sync::Arc,
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
@@ -170,22 +169,17 @@ fn repo_url() -> RepositoryUrl {
     "fuchsia-pkg://fuchsia.com".parse().unwrap()
 }
 
-/// The purpose of this DirectoryEntry impl (for use with vfs) is to guarantee that channels to usb
-/// subdirectories /usb/0/fuchsia_pkg/[repository_metadata|blobs] are closed before
-/// pkg-local-mirror makes open calls on them, so that the open calls fail with fidl errors.
-/// In practice, this will prevent flakes in the tests.
-struct DropAndSignal(Mutex<Option<oneshot::Sender<()>>>);
+struct DropAfterOpen;
 
-impl DropAndSignal {
-    /// Creates a new `Arc<dyn DirectoryEntry>` which when opened, reports a successful open event
-    /// on the pipelined channel before dropping it. `closed_sender` is signaled, guaranteeing to
-    /// the caller that the directory is no longer open once the signal is received.
-    fn new(closed_sender: oneshot::Sender<()>) -> Arc<DropAndSignal> {
-        Arc::new(DropAndSignal(Mutex::new(Some(closed_sender))))
+impl DropAfterOpen {
+    /// Creates a new `Arc<dyn DirectoryEntry>` which when opened, reports a
+    /// successful open event on the pipelined channel before dropping it.
+    fn new() -> Arc<Self> {
+        Arc::new(Self)
     }
 }
 
-impl DirectoryEntry for DropAndSignal {
+impl DirectoryEntry for DropAfterOpen {
     fn open(
         self: Arc<Self>,
         _scope: ExecutionScope,
@@ -202,19 +196,6 @@ impl DirectoryEntry for DropAndSignal {
             Some(&mut fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
         )
         .unwrap();
-
-        // Make sure the connection is dropped before signalling.
-        drop(ch);
-
-        match self.0.lock().take() {
-            Some(sender) => {
-                // Signal that the connection to this directory is dropped.
-                sender.send(()).unwrap();
-            }
-            None => {
-                panic!("already signaled");
-            }
-        }
     }
 
     fn entry_info(&self) -> EntryInfo {

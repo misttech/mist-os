@@ -4,13 +4,8 @@
 
 /// This module tests calls to the get_metadata API.
 use {
-    super::*,
-    assert_matches::assert_matches,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{GetMetadataError, RepositoryUrl},
-    fuchsia_zircon::Status,
-    futures::channel::oneshot,
+    super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy,
+    fidl_fuchsia_io as fio, fidl_fuchsia_pkg::RepositoryUrl, fuchsia_zircon::Status,
     vfs::file::vmo::read_only_static,
 };
 
@@ -134,23 +129,18 @@ async fn missing_metadata_file() {
 }
 
 #[fuchsia::test]
-async fn error_opening_metadata() {
-    let (metadata_closed_sender, metadata_closed_recv) = oneshot::channel();
+async fn metadata_directory_closed() {
     let env = TestEnv::builder()
         .usb_dir(pseudo_directory! {
             "0" => pseudo_directory! {
                 "fuchsia_pkg" => pseudo_directory! {
                     "blobs" => pseudo_directory! {},
-                    "repository_metadata" => DropAndSignal::new(metadata_closed_sender),
+                    "repository_metadata" => DropAfterOpen::new(),
                 }
             }
         })
         .build()
         .await;
-
-    // Wait for the channel connecting the pkg-local-mirror to the metadata dir to close.
-    // This ensures that GetMetadata calls will fail with the expected fidl error.
-    let () = metadata_closed_recv.await.unwrap();
 
     let (file_proxy, server_end) = create_proxy().unwrap();
     let res = env
@@ -158,7 +148,7 @@ async fn error_opening_metadata() {
         .get_metadata(&mut RepositoryUrl { url: repo_url().to_string() }, "1.root.json", server_end)
         .await;
 
-    assert_eq!(res.unwrap(), Err(GetMetadataError::ErrorOpeningMetadata));
+    assert_eq!(res.unwrap(), Ok(()));
     assert_matches!(file_proxy.take_event_stream().next().await, None);
     assert_matches!(fuchsia_fs::file::read_to_string(&file_proxy).await, Err(_));
 }

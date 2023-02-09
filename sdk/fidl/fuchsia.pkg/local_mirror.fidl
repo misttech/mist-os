@@ -21,6 +21,7 @@ protocol LocalMirror {
     ///     client end will receive a fuchsia.io/Node.OnOpen with
     ///     `Status::NOT_FOUND`.
     /// * error a `GetMetadataError` value
+    // TODO(fxbug.dev/121253): Make this method one-way.
     GetMetadata(resource struct {
         repo_url RepositoryUrl;
         path fuchsia.io.Path;
@@ -36,6 +37,7 @@ protocol LocalMirror {
     ///     client end will receive a fuchsia.io/Node.OnOpen with
     ///     `Status::NOT_FOUND`.
     /// * error a `GetBlobError` value
+    // TODO(fxbug.dev/121253): Make this method one-way.
     GetBlob(resource struct {
         blob_id BlobId;
         blob server_end:fuchsia.io.File;
@@ -43,6 +45,7 @@ protocol LocalMirror {
 };
 
 /// Error type for [`fuchsia.pkg/LocalMirror.GetMetadata`].
+// TODO(fxbug.dev/121253): Remove this enum.
 type GetMetadataError = strict enum {
     /// An error occurred when opening the requested metadata file. This may (though
     /// does not necessarily) indicate the metadata directory does not exist.
@@ -50,6 +53,7 @@ type GetMetadataError = strict enum {
 };
 
 /// Error type for [`fuchsia.pkg/LocalMirror.GetBlob`].
+// TODO(fxbug.dev/121253): Remove this enum.
 type GetBlobError = strict enum {
     /// An error occurred when opening the requested blob. This may (though
     /// does not necessarily) indicate the blobs directory does not exist.
