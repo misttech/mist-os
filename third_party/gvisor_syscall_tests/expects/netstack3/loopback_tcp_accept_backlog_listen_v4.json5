@@ -1,0 +1,20 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            include: "../loopback_tcp_accept_backlog_listen_v4_filter.json5",
+        },
+        {
+            // Skip all tests on this target for netstack3.
+            include: "../loopback_tcp_accept_backlog_listen_v4_skip.json5",
+        },
+    ],
+}

@@ -128,30 +128,6 @@ void FilterTestsForLoopbackTcpAcceptTarget(TestMap& tests) {
   SkipAllTestsRunByLoopbackTcpAcceptBacklogTargets(tests);
 }
 
-void SkipTestsSkippedByEveryLoopbackTcpAcceptBacklogTarget(TestMap& tests) {
-  SkipTestsRunByLoopbackTarget(tests);
-  SkipTestsRunByLoopbackTcpBacklogTarget(tests);
-  SkipTestsRunByLoopbackTcpAcceptTarget(tests);
-}
-
-void FilterTestsForLoopbackTcpAcceptBacklogListenV4Target(TestMap& tests) {
-  SkipTestsSkippedByEveryLoopbackTcpAcceptBacklogTarget(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV4MappedTarget(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV6Target(tests);
-}
-
-void FilterTestsForLoopbackTcpAcceptBacklogListenV4MappedTarget(TestMap& tests) {
-  SkipTestsSkippedByEveryLoopbackTcpAcceptBacklogTarget(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV4Target(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV6Target(tests);
-}
-
-void FilterTestsForLoopbackTcpAcceptBacklogListenV6Target(TestMap& tests) {
-  SkipTestsSkippedByEveryLoopbackTcpAcceptBacklogTarget(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV4Target(tests);
-  SkipTestsRunByLoopbackTcpAcceptBacklogListenV4MappedTarget(tests);
-}
-
 void FilterTestsForLoopbackTcpBacklogTarget(TestMap& tests) {
   SkipTestsRunByLoopbackTarget(tests);
   SkipAllTestsRunByLoopbackTcpAcceptBacklogTargets(tests);

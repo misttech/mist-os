@@ -1,0 +1,21 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "skip",
+            matchers: [
+                // Skip tests run by loopback_tcp_accept_backlog_listen_v6 target.
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV6Loopback_ConnectV6Loopback",
+            ],
+        },
+    ],
+}

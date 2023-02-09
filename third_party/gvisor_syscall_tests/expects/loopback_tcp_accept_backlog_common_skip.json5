@@ -1,0 +1,54 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "skip",
+            matchers: [
+                // Skip tests run by loopback target.
+                "All/DualStackSocketTest.AddressOperations/*",
+                "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
+                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
+                "All/SocketInetLoopbackTest.TCP/*",
+                "All/SocketInetLoopbackTest.TCPListenUnbound/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/*",
+                "All/SocketInetLoopbackTest.TCPListenClose/*",
+                "All/SocketInetLoopbackTest.TCPInfoState/*",
+                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/*",
+                "All/SocketInetLoopbackTest.TCPListenCloseConnectingRead/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdownConnectingRead/*",
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/*",
+                "All/SocketInetLoopbackTest.TCPResetAfterClose/*",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedLoopbackOnlyReservesV4/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrDoesNotReserveV4Any/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrListenReservesV4Any/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyWithListenReservesEverything/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.MultipleBindsAllowedNoListeningReuseAddr/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.PortReuseTwoSockets/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.NoReusePortFollowingReusePort/*",
+
+                // Skip tests run by loopback_tcp_backlog target.
+                "All/SocketInetLoopbackTest.TCPBacklog/*",
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/*",
+
+                // Skip test run by loopback_tcp_accept target.
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
+                "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
+                "All/SocketInetLoopbackTest.TCPDeferAccept/*",
+                "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
+            ],
+        },
+    ],
+}
