@@ -14,21 +14,11 @@
         binary: "bin/base_resolver_fake_dependencies_bin",
     },
     capabilities: [
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.pkg.PackageCache",
-            ],
-        },
+        { protocol: "fuchsia.boot.Arguments" },
         {
             directory: "blob-exec",
             rights: [ "rx*" ],
             path: "/blob",
-        },
-        {
-            directory: "pkgfs-packages",
-            rights: [ "rx*" ],
-            path: "/pkgfs-packages",
         },
     ],
     use: [
@@ -37,6 +27,12 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
             ],
+        },
+        {
+            directory: "the-subpackage",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/the-subpackage",
         },
     ],
     offer: [
@@ -48,17 +44,11 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.pkg.PackageCache",
-            ],
+            protocol: "fuchsia.boot.Arguments",
             from: "self",
         },
         {
-            directory: [
-                "blob-exec",
-                "pkgfs-packages",
-            ],
+            directory: "blob-exec",
             from: "self",
         },
     ],

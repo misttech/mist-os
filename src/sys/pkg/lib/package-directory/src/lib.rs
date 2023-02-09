@@ -12,7 +12,6 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::entry::{DirectoryEntry, EntryInfo},
-        path::Path as VfsPath,
     },
 };
 
@@ -24,7 +23,7 @@ mod non_meta_subdir;
 mod root_dir;
 
 pub use root_dir::{PathError, ReadFileError, RootDir, SubpackagesError};
-pub use vfs::execution_scope::ExecutionScope;
+pub use vfs::{execution_scope::ExecutionScope, path::Path as VfsPath};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

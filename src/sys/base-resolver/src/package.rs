@@ -117,9 +117,7 @@ pub(crate) async fn resolve_with_context_impl(
     match package_url {
         fuchsia_url::PackageUrl::Absolute(url) => {
             if !context.bytes.is_empty() {
-                return Err(crate::ResolverError::ReadingContext(anyhow::anyhow!(
-                    "context must be empty if url is absolute"
-                )));
+                return Err(crate::ResolverError::ContextWithAbsoluteUrl);
             }
             resolve_impl(url, dir, base_packages, authenticator, blobfs).await
         }
@@ -194,13 +192,12 @@ async fn resolve_subpackage(
     let super_package = package_directory::RootDir::new(blobfs.clone(), super_hash)
         .await
         .map_err(crate::ResolverError::CreatePackageDirectory)?;
-    let subpackage =
-        *super_package.subpackages().await?.subpackages().get(package_url).ok_or_else(|| {
-            crate::ResolverError::SubpackageNotFound(anyhow::format_err!(
-                "subpackage not in manifest {:?}",
-                package_url
-            ))
-        })?;
+    let subpackage = *super_package
+        .subpackages()
+        .await?
+        .subpackages()
+        .get(package_url)
+        .ok_or_else(|| crate::ResolverError::SubpackageNotFound)?;
     let () = package_directory::serve(
         package_directory::ExecutionScope::new(),
         blobfs.clone(),

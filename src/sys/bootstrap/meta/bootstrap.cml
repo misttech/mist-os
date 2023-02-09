@@ -107,10 +107,6 @@
             url: "fuchsia-boot:///#meta/base-resolver.cm",
         },
         {
-            name: "pkg_cache_resolver",
-            url: "fuchsia-boot:///#meta/pkg-cache-resolver.cm",
-        },
-        {
             name: "power_manager",
             url: "fuchsia-boot:///#meta/power-manager.cm",
         },
@@ -128,8 +124,8 @@
         },
         {
             name: "pkg-cache",
-            url: "fuchsia-pkg-cache:///#meta/pkg-cache.cm",
-            environment: "#pkg-cache-env",
+            url: "fuchsia-pkg://fuchsia.com/pkg-cache#meta/pkg-cache.cm",
+            environment: "#base-resolver-env",
         },
     ],
     collections: [
@@ -687,12 +683,18 @@
         },
         {
             directory: [
-                "bin",
                 "pkgfs",
                 "root-ssl-certificates",
                 "system",
             ],
             from: "#pkg-cache",
+            to: "#console-launcher",
+            dependency: "weak_for_migration",
+        },
+        {
+            directory: "shell-commands-bin",
+            from: "#base_resolver",
+            as: "bin",
             to: "#console-launcher",
             dependency: "weak_for_migration",
         },
@@ -874,7 +876,6 @@
                 "#miscsvc",
                 "#netsvc",
                 "#pkg-drivers",
-                "#pkg_cache_resolver",
                 "#power_manager",
                 "#ptysvc",
                 "#pwrbtn-monitor",
@@ -1020,26 +1021,16 @@
 
         // -- End Archivist offers --
         {
-            directory: "pkgfs-packages",
-            from: "#pkg-cache",
-            to: "#base_resolver",
-        },
-        {
-            protocol: "fuchsia.pkg.PackageCache",
-            from: "#pkg-cache",
-            to: "#base_resolver",
-        },
-        {
             protocol: "fuchsia.boot.Arguments",
             from: "parent",
-            to: "#pkg_cache_resolver",
+            to: "#base_resolver",
         },
         {
             directory: "blob-exec",
             from: "#fshost",
             to: [
+                "#base_resolver",
                 "#pkg-cache",
-                "#pkg_cache_resolver",
             ],
         },
         {
@@ -1083,7 +1074,6 @@
     expose: [
         {
             directory: [
-                "bin",
                 "build-info",
                 "config-data",
                 "pkgfs",
@@ -1091,6 +1081,11 @@
                 "system",
             ],
             from: "#pkg-cache",
+        },
+        {
+            directory: "shell-commands-bin",
+            from: "#base_resolver",
+            as: "bin",
         },
         {
             directory: [
@@ -1328,17 +1323,6 @@
 
             // 1 second
             __stop_timeout_ms: 1000,
-        },
-        {
-            name: "pkg-cache-env",
-            extends: "realm",
-            resolvers: [
-                {
-                    resolver: "pkg_cache_resolver",
-                    from: "#pkg_cache_resolver",
-                    scheme: "fuchsia-pkg-cache",
-                },
-            ],
         },
     ],
 }

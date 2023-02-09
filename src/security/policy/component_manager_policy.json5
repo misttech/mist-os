@@ -346,7 +346,7 @@
                     "/bootstrap/fshost",
                     "/bootstrap/fshost/blobfs",
                     "/bootstrap/pkg-cache",
-                    "/bootstrap/pkg_cache_resolver",
+                    "/bootstrap/base_resolver",
                 ],
             },
             {

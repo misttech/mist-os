@@ -9,21 +9,32 @@
     program: {
         runner: "elf",
         binary: "bin/base_resolver",
-        args: [ "base_resolver" ],
     },
     capabilities: [
         {
             resolver: "base_resolver",
             path: "/svc/fuchsia.component.resolution.Resolver",
         },
-        { protocol: "fuchsia.component.resolution.Resolver" },
+        {
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.pkg.PackageResolver",
+            ],
+        },
+        {
+            directory: "shell-commands-bin",
+            rights: [ "rx*" ],
+            path: "/shell-commands-bin",
+        },
     ],
     use: [
-        { protocol: "fuchsia.pkg.PackageCache" },
         {
-            directory: "pkgfs-packages",
+            directory: "blob-exec",
             rights: [ "rx*" ],
-            path: "/pkgfs/packages",
+            path: "/blob",
+        },
+        {
+            protocol: [ "fuchsia.boot.Arguments" ],
         },
     ],
     expose: [
@@ -32,12 +43,15 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.component.resolution.Resolver",
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.pkg.PackageResolver",
+            ],
+            from: "self",
+        },
+        {
+            directory: "shell-commands-bin",
             from: "self",
         },
     ],
-    config: {
-        // Whether base-resolver should only resolve base packages.
-        only_base_packages: { type: "bool" },
-    },
 }

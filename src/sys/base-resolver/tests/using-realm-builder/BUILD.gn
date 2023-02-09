@@ -9,10 +9,7 @@ rustc_test("driver") {
   name = "base_resolver_integration_test"
   edition = "2021"
   source_root = "src/lib.rs"
-  sources = [
-    "src/lib.rs",
-    "src/true_base_resolver.rs",
-  ]
+  sources = [ "src/lib.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
@@ -24,6 +21,7 @@ rustc_test("driver") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/versioning/version-history/rust:version-history",
     "//src/sys/lib/mem_util",
@@ -44,9 +42,7 @@ fuchsia_component("component") {
     ":driver",
     "//src/storage/bin/blobfs",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/base-resolver:pkg-cache-resolver-component",
-    "//src/sys/base-resolver:true-base-resolver-component",
-    "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
+    "//src/sys/base-resolver:base-resolver-component",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }

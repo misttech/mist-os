@@ -47,22 +47,15 @@ rustc_binary("fake_dependencies_bin") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/fuchsia-url",
     "//src/lib/storage/vfs/rust:vfs",
-    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-hash",
-    "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/system-image",
     "//src/sys/pkg/testing/blobfs-ramdisk",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:tracing",
   ]
   sources = [ "fake_dependencies.rs" ]
@@ -77,6 +70,26 @@ fuchsia_component("fake-dependencies") {
     "//src/storage/bin/blobfs",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
+}
+
+rustc_binary("package_directory_exposer_bin") {
+  edition = "2021"
+  testonly = true
+  name = "package_directory_exposer_bin"
+  source_root = "package_directory_exposer.rs"
+  deps = [
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:futures",
+  ]
+  sources = [ "package_directory_exposer.rs" ]
+}
+
+fuchsia_component("package-directory-exposer") {
+  testonly = true
+  manifest = "meta/package-directory-exposer.cml"
+  deps = [ ":package_directory_exposer_bin" ]
 }
 
 group("driver_test_realm") {
@@ -130,22 +143,12 @@ fuchsia_component("mock-superpackage-component") {
   deps = [ ":bridge_to_subpackaged_component_bin" ]
 }
 
-fuchsia_package_with_single_component("subpackaged-component") {
+fuchsia_package("subpackaged-component") {
   testonly = true
-
-  # The component name must match a component in the `base-resolver-tests`
-  # package because the test is set up to resolve the component from the
-  # `base-resolver-tests`'s "/pkg" directory.
-  component_name = "mock-component"
-  manifest = "meta/mock-component.cml"
-  deps = [ ":mock_component_bin" ]
-}
-
-fuchsia_component("mock-pkg-cache-component") {
-  testonly = true
-  manifest = "meta/mock-component.cml"
-  component_name = "pkg-cache"
-  deps = [ ":mock_component_bin" ]
+  deps = [
+    ":mock-component",
+    ":package-directory-exposer",
+  ]
 }
 
 fidl("test.ping") {
@@ -158,11 +161,8 @@ fuchsia_test_package("base-resolver-tests") {
     ":fake-dependencies",
     ":integration-test",
     ":mock-component",
-    ":mock-pkg-cache-component",
     ":mock-superpackage-component",
     "//src/sys/base-resolver:base-resolver-component",
-    "//src/sys/base-resolver:pkg-cache-resolver-component",
-    "//src/sys/base-resolver:values-from-gn",
   ]
 
   subpackages = [ ":subpackaged-component" ]

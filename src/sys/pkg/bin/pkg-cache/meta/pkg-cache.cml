@@ -34,11 +34,6 @@
             path: "/pkgfs/packages",
         },
         {
-            directory: "bin",
-            rights: [ "rx*" ],
-            path: "/pkgfs/packages/shell-commands/0/bin",
-        },
-        {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/pkgfs/packages/config-data/0/meta/data",
@@ -91,7 +86,6 @@
         },
         {
             directory: [
-                "bin",
                 "build-info",
                 "config-data",
                 "pkgfs",
