@@ -25,3 +25,8 @@ node "gpio-enable" {
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_4;
 }
 
+node "gpio-wakeup" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOT_PIN_ID.PIN_6;
+}
+

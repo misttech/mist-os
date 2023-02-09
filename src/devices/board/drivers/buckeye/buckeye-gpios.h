@@ -29,6 +29,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 // GPIO T Bank
 #define GPIO_UNKNOWN_SPI_SS0    A5_GPIOT(4)
+#define GPIO_UWB_SPI_WAKEUP     A5_GPIOT(6)
 #define GPIO_RF_SPI_RESETN      A5_GPIOT(7)
 #define GPIO_PANEL_SPI_SS0      A5_GPIOT(10)
 
