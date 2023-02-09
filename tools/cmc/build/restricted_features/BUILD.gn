@@ -29,6 +29,7 @@ group("allow_non_hermetic_packages") {
   visibility = [
     "//src/connectivity/bluetooth/lib/fuchsia-audio-codec:*",
     "//src/connectivity/network/testing/netemul/guest/test:*",
+    "//src/storage/f2fs/test/compatibility:*",
     "//src/sys/test_manager/tests:*",
     "//src/sys/test_manager/tests/nonhermetic_packaged_tests:*",
     "//src/ui/a11y/lib/magnifier/tests:*",
