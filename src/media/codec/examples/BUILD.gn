@@ -71,6 +71,7 @@ resource("test-25fps.vp9") {
 # Test amlogic-video h264 decode.  Can also work in QEMU using SW decode, but
 # when decode HW is present we'll use that to decode.
 fuchsia_test_component("use_h264_decoder_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_test.cml"
   deps = [
     ":bear_h264",
@@ -95,6 +96,7 @@ fuchsia_test_package("use_h264_decoder_tests") {
 }
 
 fuchsia_test_component("use_h264_decoder_tiled_output_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_tiled_output_test.cml"
   deps = [
     ":bear_h264",
@@ -118,6 +120,7 @@ fuchsia_test_package("use_h264_decoder_tests_x86") {
 # or crash.  At the moment we also verify that the decoder outputs at least a few output frames
 # beyond the first missing input frame.
 fuchsia_unittest_component("use_h264_decoder_frame_num_gaps_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_frame_num_gaps_test.cml"
   deps = [
     ":bear_h264",
@@ -143,6 +146,7 @@ fuchsia_test_package("use_h264_decoder_frame_num_gaps_tests") {
 
 # Force SW decode.  Only run in environments where we include a SW h264 decoder.
 fuchsia_test_component("use_h264_sw_decoder_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_sw_decoder_test.cml"
   deps = [
     ":1080p_10_frames_h264",
@@ -184,6 +188,7 @@ fuchsia_test_package("use_h264_decoder_flake_repro_tests") {
 # Test amlogic-video h264 decode with stream switching.  Can also work in QEMU
 # using SW decode, but when decode HW is present we'll use that to decode.
 fuchsia_unittest_component("use_h264_decoder_stream_switching_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_stream_switching_test.cml"
   deps = [
     ":bear_h264",
@@ -228,6 +233,7 @@ fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
 # Test amlogic-video h264 decode with stream switching.
 fuchsia_test_component(
     "use_h264_decoder_concurrent_stream_switching_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_concurrent_stream_switching_test.cml"
   deps = [
     ":bear_h264",
@@ -255,6 +261,7 @@ fuchsia_test_package("use_h264_decoder_concurrent_stream_switching_tests") {
 
 # Test amlogic-video h264 decode + vp9 decode + PCMM stress (where applicable).
 fuchsia_test_component("use_h264_and_vp9_decoders_and_pcmm_stress_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_and_vp9_decoders_and_pcmm_stress_test.cml"
   deps = [
     ":bear_h264",
@@ -279,6 +286,7 @@ fuchsia_test_package("use_h264_and_vp9_decoders_and_pcmm_stress_test") {
 }
 
 fuchsia_unittest_component("use_h264_decoder_secure_output_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_h264_decoder_secure_output_test.cml"
   deps = [
     "//src/media/codec:codec_factory",
@@ -302,6 +310,7 @@ fuchsia_test_package("use_h264_decoder_secure_output_tests") {
 }
 
 fuchsia_unittest_package("use_h264_decoder_secure_input_output_test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest =
       "use_media_decoder/meta/use_h264_decoder_secure_input_output_test.cml"
   deps = [
@@ -318,6 +327,7 @@ fuchsia_unittest_package("use_h264_decoder_secure_input_output_test") {
 }
 
 fuchsia_unittest_component("h264_decoder_fuzzer_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/h264_decoder_fuzzer_test.cml"
   deps = [
     "//src/media/codec:codec_factory",
@@ -326,6 +336,7 @@ fuchsia_unittest_component("h264_decoder_fuzzer_test_comp") {
 }
 
 fuchsia_unittest_component("h264_decoder_malformed_stream_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/h264_decoder_malformed_stream_test.cml"
   deps = [ "//src/media/codec/examples/use_media_decoder:h264_decoder_malformed_stream_test" ]
 }
@@ -350,6 +361,7 @@ fuchsia_test_package("h264_decoder_fuzzer_tests") {
 }
 
 fuchsia_unittest_component("vp9_decoder_fuzzer_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/vp9_decoder_fuzzer_test.cml"
   deps = [
     ":bear_vp9",
@@ -369,6 +381,7 @@ fuchsia_test_package("vp9_decoder_fuzzer_tests") {
 }
 
 fuchsia_unittest_component("use_vp9_decoder_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_test.cml"
   deps = [
     ":bear_vp9",
@@ -378,6 +391,7 @@ fuchsia_unittest_component("use_vp9_decoder_test_comp") {
 }
 
 fuchsia_unittest_component("use_vp9_decoder_tiled_output_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_tiled_output_test.cml"
   deps = [
     ":bear_vp9",
@@ -387,6 +401,7 @@ fuchsia_unittest_component("use_vp9_decoder_tiled_output_test_comp") {
 }
 
 fuchsia_unittest_component("use_vp9_decoder_1280x546_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_1280x546_test.cml"
   deps = [
     "//src/media/codec:codec_factory",
@@ -432,6 +447,7 @@ fuchsia_test_package("use_vp9_decoder_tests_x86") {
 
 # Test amlogic-video vp9 decode, with stream switching.
 fuchsia_unittest_component("use_vp9_decoder_stream_switching_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_stream_switching_test.cml"
   deps = [
     ":bear_vp9",
@@ -454,6 +470,7 @@ fuchsia_test_package("use_vp9_decoder_stream_switching_tests") {
 # Test vp9 decoder's ability to skip frames until keyframe when
 # input starts at non-keyframe.
 fuchsia_unittest_component("use_vp9_decoder_skip_first_frame_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_skip_first_frame_test.cml"
   deps = [
     ":test-25fps.vp9",
@@ -479,6 +496,7 @@ fuchsia_test_package("use_vp9_decoder_skip_first_frame_tests") {
 # Test amlogic-video vp9 decode with max output frame count, on environments
 # that have enough contiguous SYSTEM_RAM configured for sysmem.
 fuchsia_test_component("use_vp9_decoder_24_output_frames_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_24_output_frames_test.cml"
   deps = [
     ":bear_vp9",
@@ -499,6 +517,7 @@ fuchsia_test_package("use_vp9_decoder_24_output_frames_tests") {
 }
 
 fuchsia_test_component("use_vp9_decoder_secure_output_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_vp9_decoder_secure_output_test.cml"
   deps = [
     ":bear_vp9",
@@ -519,6 +538,7 @@ fuchsia_test_package("use_vp9_decoder_secure_output_tests") {
 }
 
 fuchsia_unittest_package("use_vp9_decoder_secure_input_output_test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest =
       "use_media_decoder/meta/use_vp9_decoder_secure_input_output_test.cml"
   deps = [
@@ -535,6 +555,7 @@ fuchsia_unittest_package("use_vp9_decoder_secure_input_output_test") {
 }
 
 fuchsia_unittest_component("use_mjpeg_decoder_test_component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/use_mjpeg_decoder_test.cml"
   deps = [
     ":bear_mjpeg",
