@@ -21,6 +21,7 @@
 
 #include <forward_list>
 #include <queue>
+#include <random>
 #include <stack>
 #include <unordered_set>
 
@@ -166,6 +167,13 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       composite_node_spec_manager_(this) {
   inspector.GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspector);
+
+  // Pick a non-zero starting id so that folks cannot rely on the driver host process names being
+  // stable.
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distrib(0, 1000);
+  next_driver_host_id_ = distrib(gen);
 }
 
 void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllOrphansUntracked(); }

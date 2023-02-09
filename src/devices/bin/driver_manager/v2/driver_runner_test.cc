@@ -335,18 +335,20 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     });
   }
 
-  void StartDriverHost(std::string coll, std::string name) {
+  void StartDriverHost(std::string coll) {
+    constexpr std::string_view kDriverHostName = "driver-host-";
     realm().SetCreateChildHandler(
-        [coll, name](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
+        [coll, kDriverHostName](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
           EXPECT_EQ(coll, collection.name);
-          EXPECT_EQ(name, decl.name());
+          EXPECT_EQ(kDriverHostName, decl.name().substr(0, kDriverHostName.size()));
           EXPECT_EQ("#meta/driver_host2.cm", decl.url());
         });
-    realm().SetOpenExposedDirHandler([this, coll, name](fdecl::ChildRef child, auto exposed_dir) {
-      EXPECT_EQ(coll, child.collection.value_or(""));
-      EXPECT_EQ(name, child.name);
-      driver_host_dir_.Bind(std::move(exposed_dir));
-    });
+    realm().SetOpenExposedDirHandler(
+        [this, coll, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {
+          EXPECT_EQ(coll, child.collection.value_or(""));
+          EXPECT_EQ(kDriverHostName, child.name.substr(0, kDriverHostName.size()));
+          driver_host_dir_.Bind(std::move(exposed_dir));
+        });
     driver_host_dir_.SetOpenHandler([this](std::string path, auto object) {
       EXPECT_EQ(fdh::DriverHost::Name_, path);
       EXPECT_EQ(ZX_OK, driver_host_binding_.Bind(object.TakeChannel(), dispatcher()));
@@ -417,7 +419,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     }
     EXPECT_TRUE(RunLoopUntilIdle());
 
-    StartDriverHost("driver-hosts", "driver-host-0");
+    StartDriverHost("driver-hosts");
     auto controller = StartDriver(driver_runner, {
                                                      .url = "fuchsia-boot:///#meta/root-driver.cm",
                                                      .binary = "driver/root-driver.so",
@@ -896,7 +898,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
   });
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1207,7 +1209,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindSecondNode) {
         second_test_driver = BindDriver(std::move(request), std::move(second_node));
       });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1263,7 +1265,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_CloseSecondDriver) {
         EXPECT_EQ(ZX_OK, second_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
       });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1344,7 +1346,7 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
           }
         });
 
-    StartDriverHost("driver-hosts", "driver-host-" + std::to_string(i));
+    StartDriverHost("driver-hosts");
     drivers.emplace_back(StartDriver(driver_runner, {
                                                         .url = "fuchsia-boot:///#meta/node-" +
                                                                std::to_string(i - 1) + "-driver.cm",
@@ -1404,7 +1406,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindRootNode) {
     BindDriver(std::move(request), std::move(second_node));
   });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1470,7 +1472,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootNode) {
         });
       });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1528,7 +1530,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootDriver) {
     BindDriver(std::move(request), std::move(node));
   });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1584,7 +1586,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BlockOnSecondDriver) {
         second_test_driver = BindDriver(std::move(request), std::move(node));
       });
 
-  StartDriverHost("driver-hosts", "driver-host-1");
+  StartDriverHost("driver-hosts");
   auto second_driver =
       StartDriver(driver_runner, {
                                      .url = "fuchsia-boot:///#meta/second-driver.cm",
