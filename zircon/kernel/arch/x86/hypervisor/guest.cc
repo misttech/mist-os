@@ -98,7 +98,7 @@ zx::result<ktl::unique_ptr<Guest>> NormalGuest::Create() {
     return guest.take_error();
   }
   guest->gpa_ = ktl::move(*gpa);
-  return ktl::move(guest);
+  return zx::ok(*ktl::move(guest));
 }
 
 zx::result<> NormalGuest::SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len,
@@ -156,7 +156,7 @@ zx::result<ktl::unique_ptr<Guest>> DirectGuest::Create() {
   }
   guest->dpas_ = ktl::move(*dpa);
   guest->shared_aspace_ = ktl::move(shared_aspace);
-  return ktl::move(guest);
+  return zx::ok(*ktl::move(guest));
 }
 
 DirectGuest::~DirectGuest() {
