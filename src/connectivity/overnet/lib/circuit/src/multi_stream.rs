@@ -140,12 +140,25 @@ pub async fn multi_stream(
             }
         }
 
+        let mut streams = streams.lock().unwrap();
+
+        for (_, stream) in streams.drain() {
+            if let StreamStatus::Open(writer) = stream {
+                writer.close(format!("Multi-stream terminated: {ret:?}"));
+            }
+        }
+
         ret
     };
 
     let writer = Arc::new(SyncMutex::new(writer));
     let handle_write = new_readers.for_each_concurrent(None, move |(id, stream)| {
-        write_as_chunks(id, stream, Arc::clone(&writer))
+        let writer = Arc::clone(&writer);
+        async move {
+            let res = write_as_chunks(id, &stream, writer).await;
+            stream.close(format!("Stream terminated: {res:?}"));
+            res
+        }
     });
 
     futures::pin_mut!(handle_read);
@@ -290,7 +303,7 @@ fn handle_one_chunk<'a>(
 ///
 /// The point, of course, is that multiple functions can do this to the same writer, and since the
 /// chunks are labeled, the data can be parsed back out into separate streams on the other end.
-async fn write_as_chunks(id: u32, reader: stream::Reader, writer: Arc<SyncMutex<stream::Writer>>) {
+async fn write_as_chunks(id: u32, reader: &stream::Reader, writer: Arc<SyncMutex<stream::Writer>>) {
     loop {
         // We want to handle errors with the read and errors with the write differently, so we
         // return a nested result.
@@ -427,16 +440,24 @@ pub async fn multi_stream_node_connection_to_async(
         remote_writer,
         is_server,
         quality,
-        remote_name,
+        remote_name.clone(),
     );
+    let remote_name = &remote_name;
 
     let read_fut = async move {
         let mut buf = [0u8; 4096];
         loop {
-            let n = rx.read(&mut buf).await?;
-            if n == 0 {
-                break Ok(());
-            }
+            let n = match rx.read(&mut buf).await {
+                Ok(0) => {
+                    writer.close(format!("{remote_name} closed the connection"));
+                    break Ok(());
+                }
+                Ok(n) => n,
+                Err(e) => {
+                    writer.close(format!("{remote_name} connection failed (read): {e:?}"));
+                    return Err(Error::from(e));
+                }
+            };
             writer.write(n, |write_buf| {
                 write_buf[..n].copy_from_slice(&buf[..n]);
                 Ok(n)
@@ -454,8 +475,17 @@ pub async fn multi_stream_node_connection_to_async(
                     Ok((read_buf.len(), read_buf.len()))
                 })
                 .await?;
-            tx.write_all(&buf[..len]).await?;
-            tx.flush().await?;
+            let write_res = async {
+                tx.write_all(&buf[..len]).await?;
+                tx.flush().await?;
+                Result::<_, Error>::Ok(())
+            }
+            .await;
+
+            if let Err(e) = write_res {
+                reader.close(format!("{remote_name} connection failed (write): {e:?}"));
+                return Err(e.into());
+            }
         }
     };
 
