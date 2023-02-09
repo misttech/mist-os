@@ -61,7 +61,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1787
+From //build/config/BUILDCONFIG.gn:1795
 
 ### allow_legacy_data_partition_names
 
@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2704,7 +2704,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2739,7 +2739,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3046,7 +3046,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1534
+From //build/config/BUILDCONFIG.gn:1542
 
 ### extra_vbmeta_descriptors
 
@@ -3693,7 +3693,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3905,6 +3905,14 @@ Path to file to use for recovery logo
 
 From //src/recovery/system/system_recovery_args.gni:7
 
+### icu_copy_icudata_to_root_build_dir
+
+If set, the ":icudata" target will copy the ICU data to $root_build_dir.
+
+**Current value (from the default):** `false`
+
+From //build/icu.gni:27
+
 ### icu_disable_thin_archive
 
 If true, compile icu into a standalone static library. Currently this is
@@ -3912,7 +3920,7 @@ only useful on Chrome OS.
 
 **Current value (from the default):** `false`
 
-From //third_party/icu/default/config.gni:17
+From //build/icu.gni:19
 
 ### icu_fuchsia_override_data_dir
 
@@ -3922,7 +3930,7 @@ inside the Fuchsia source tree.
 
 **Current value (from the default):** `""`
 
-From //third_party/icu/default/config.gni:22
+From //build/icu.gni:24
 
 ### icu_major_version_number
 
@@ -3932,7 +3940,7 @@ is only useful in Fuchsia.
 
 **Current value (from the default):** `"72"`
 
-From //third_party/icu/default/version.gni:9
+From //third_party/icu/default/version.gni:13
 
 ### icu_root
 
@@ -3971,7 +3979,7 @@ being linked directly into the binary.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:8
+From //build/icu.gni:10
 
 ### icu_use_stub_data
 
@@ -3981,7 +3989,16 @@ symbols.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:13
+From //build/icu.gni:15
+
+### icu_use_target_out_dir
+
+If set, the built libraries will live in their respective default output
+directories, not the root_build_dir.
+
+**Current value (from the default):** `true`
+
+From //build/icu.gni:31
 
 ### images_config_label
 
@@ -4418,6 +4435,11 @@ Each element of the list is one variant, which is a scope defining:
 }, {
   name = "gcc"
   tags = ["gcc"]
+}, {
+  name = "cxx20"
+  toolchain_args = {
+  experimental_cxx_version = 20
+}
 }]
 ```
 
@@ -7447,7 +7469,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1777
+From //build/config/BUILDCONFIG.gn:1785
 
 ### select_variant_canonical
 
@@ -7457,7 +7479,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1782
+From //build/config/BUILDCONFIG.gn:1790
 
 ### select_variant_shortcuts
 
@@ -7509,7 +7531,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1580
+From //build/config/BUILDCONFIG.gn:1588
 
 ### size_checker_input
 
@@ -7856,7 +7878,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7945,7 +7967,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1564
+From //build/config/BUILDCONFIG.gn:1572
 
 ### universe_package_labels
 
@@ -8213,7 +8235,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
