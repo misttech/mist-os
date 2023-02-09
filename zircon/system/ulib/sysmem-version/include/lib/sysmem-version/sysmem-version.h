@@ -5,14 +5,71 @@
 #ifndef LIB_SYSMEM_VERSION_SYSMEM_VERSION_H_
 #define LIB_SYSMEM_VERSION_SYSMEM_VERSION_H_
 
-#include <fidl/fuchsia.sysmem/cpp/natural_types.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem2/cpp/natural_types.h>
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#ifndef _LIBCPP_ENABLE_ASSERTIONS
+#define _LIBCPP_ENABLE_ASSERTIONS 1
+#endif
+
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fpromise/result.h>
 
 #include <type_traits>
+
+// In sysmem V1, there's a PixelFormat FIDL struct that includes both pixel_format and
+// pixel_format_modifier, used as a self-contained structure / sub-structure in various places in
+// FIDL and C++ code. While that's sensible from a data organization point of view and handy for
+// the sysmem server, the sub-structure means more typing than necessary for a typical sysmem usage.
+//
+// In V2 we instead just have two separate fields in each parent table. We use this C++ struct in
+// the C++ code to avoid needing to plumb two values everywhere in the sysmem server. This is also
+// used as the V2 analog of fuchsia_sysmem::PixelFormat (V1) when converting between V1 and V2.
+struct PixelFormatAndModifier {
+  // Inits fields to zero when default-constructed.
+  PixelFormatAndModifier()
+      : pixel_format(fuchsia_images2::PixelFormat::kInvalid),
+        pixel_format_modifier(fuchsia_images2::kFormatModifierNone) {
+    static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
+  }
+  PixelFormatAndModifier(fuchsia_images2::PixelFormat pixel_format_param,
+                         uint64_t pixel_format_modifier_param)
+      : pixel_format(pixel_format_param), pixel_format_modifier(pixel_format_modifier_param) {}
+
+  fuchsia_images2::PixelFormat pixel_format;
+  uint64_t pixel_format_modifier;
+};
+
+inline PixelFormatAndModifier PixelFormatAndModifierFromConstraints(
+    const fuchsia_sysmem2::ImageFormatConstraints& constraints) {
+  ZX_ASSERT(constraints.pixel_format().has_value());
+  static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
+  uint64_t pixel_format_modifier = constraints.pixel_format_modifier().has_value()
+                                       ? *constraints.pixel_format_modifier()
+                                       : fuchsia_images2::kFormatModifierNone;
+  return PixelFormatAndModifier(*constraints.pixel_format(), pixel_format_modifier);
+}
+
+inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
+    const fuchsia_images2::ImageFormat& image_format) {
+  ZX_ASSERT(image_format.pixel_format().has_value());
+  static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
+  uint64_t pixel_format_modifier = image_format.pixel_format_modifier().has_value()
+                                       ? *image_format.pixel_format_modifier()
+                                       : fuchsia_images2::kFormatModifierNone;
+  return PixelFormatAndModifier(*image_format.pixel_format(), pixel_format_modifier);
+}
+
+inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
+    const fuchsia_images2::wire::ImageFormat& image_format) {
+  ZX_ASSERT(image_format.has_pixel_format());
+  static_assert(fuchsia_images2::wire::kFormatModifierLinear ==
+                fuchsia_images2::wire::kFormatModifierNone);
+  uint64_t pixel_format_modifier = image_format.has_pixel_format_modifier()
+                                       ? image_format.pixel_format_modifier()
+                                       : fuchsia_images2::wire::kFormatModifierNone;
+  return PixelFormatAndModifier(image_format.pixel_format(), pixel_format_modifier);
+}
 
 namespace sysmem {
 
@@ -35,7 +92,7 @@ struct HasOperatorUInt32<
     : std::true_type {};
 
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::PixelFormatType>::value);
-static_assert(HasOperatorUInt32<fuchsia_sysmem2::PixelFormatType>::value);
+static_assert(HasOperatorUInt32<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::HeapType>::value);
 static_assert(!HasOperatorUInt32<fuchsia_sysmem2::HeapType>::value);
 
@@ -48,7 +105,7 @@ struct HasOperatorUInt64<
     : std::true_type {};
 
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::PixelFormatType>::value);
-static_assert(!HasOperatorUInt64<fuchsia_sysmem2::PixelFormatType>::value);
+static_assert(!HasOperatorUInt64<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::HeapType>::value);
 static_assert(HasOperatorUInt64<fuchsia_sysmem2::HeapType>::value);
 
@@ -73,7 +130,7 @@ enum TestEnum {
 };
 static_assert(!IsFidlEnum<TestEnum>::value);
 static_assert(IsFidlEnum<fuchsia_sysmem::ColorSpaceType>::value);
-static_assert(IsFidlEnum<fuchsia_sysmem2::ColorSpaceType>::value);
+static_assert(IsFidlEnum<fuchsia_images2::ColorSpace>::value);
 static_assert(!IsFidlEnum<uint32_t>::value);
 static_assert(!IsFidlEnum<uint64_t>::value);
 
@@ -102,8 +159,8 @@ static_assert(
     std::is_same<uint32_t, FidlUnderlyingTypeOrType<fuchsia_sysmem::PixelFormatType>::type>::value);
 static_assert(
     std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem::HeapType>::type>::value);
-static_assert(std::is_same<
-              uint32_t, FidlUnderlyingTypeOrType<fuchsia_sysmem2::PixelFormatType>::type>::value);
+static_assert(
+    std::is_same<uint32_t, FidlUnderlyingTypeOrType<fuchsia_images2::PixelFormat>::type>::value);
 static_assert(
     std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem2::HeapType>::type>::value);
 
@@ -135,15 +192,17 @@ static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2
 
 [[nodiscard]] fuchsia_sysmem2::wire::HeapType V2CopyFromV1HeapType(
     fuchsia_sysmem::wire::HeapType heap_type);
-[[nodiscard]] fuchsia_sysmem2::PixelFormat V2CopyFromV1PixelFormat(
-    const fuchsia_sysmem::PixelFormat& v1);
-[[nodiscard]] fuchsia_sysmem2::wire::PixelFormat V2CopyFromV1PixelFormat(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::PixelFormat& v1);
 
-[[nodiscard]] fuchsia_sysmem2::ColorSpace V2CopyFromV1ColorSpace(
+[[nodiscard]] PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1);
+[[nodiscard]] PixelFormatAndModifier V2CopyFromV1PixelFormat(
+    const fuchsia_sysmem::wire::PixelFormat& v1);
+
+[[nodiscard]] uint64_t V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier);
+
+[[nodiscard]] fuchsia_images2::ColorSpace V2CopyFromV1ColorSpace(
     const fuchsia_sysmem::ColorSpace& v1);
-[[nodiscard]] fuchsia_sysmem2::wire::ColorSpace V2CopyFromV1ColorSpace(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ColorSpace& v1);
+[[nodiscard]] fuchsia_images2::wire::ColorSpace V2CopyFromV1ColorSpace(
+    const fuchsia_sysmem::wire::ColorSpace& v1);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::ImageFormatConstraints>
 V2CopyFromV1ImageFormatConstraints(const fuchsia_sysmem::ImageFormatConstraints& v1);
@@ -171,9 +230,9 @@ V2CopyFromV1BufferCollectionConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferCollectionConstraints* v1,
     const fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers* aux_buffers_v1);
 
-[[nodiscard]] fpromise::result<fuchsia_sysmem2::ImageFormat> V2CopyFromV1ImageFormat(
+[[nodiscard]] fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
     const fuchsia_sysmem::ImageFormat2& v1);
-[[nodiscard]] fpromise::result<fuchsia_sysmem2::wire::ImageFormat> V2CopyFromV1ImageFormat(
+[[nodiscard]] fpromise::result<fuchsia_images2::wire::ImageFormat> V2CopyFromV1ImageFormat(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ImageFormat2& v1);
 
 [[nodiscard]] fuchsia_sysmem2::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
@@ -228,15 +287,16 @@ V1CopyFromV2BufferMemoryConstraints(const fuchsia_sysmem2::wire::BufferMemoryCon
 [[nodiscard]] fuchsia_sysmem::wire::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
     const fuchsia_sysmem2::wire::BufferMemorySettings& v2);
 
-[[nodiscard]] fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(
-    const fuchsia_sysmem2::PixelFormat& v2);
-[[nodiscard]] fuchsia_sysmem::wire::PixelFormat V1CopyFromV2PixelFormat(
-    const fuchsia_sysmem2::wire::PixelFormat& v2);
+[[nodiscard]] fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier& v2);
+[[nodiscard]] fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(
+    const PixelFormatAndModifier& v2);
+
+[[nodiscard]] uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier);
 
 [[nodiscard]] fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(
-    const fuchsia_sysmem2::ColorSpace& v2);
-[[nodiscard]] fuchsia_sysmem::wire::ColorSpace V1CopyFromV2ColorSpace(
-    const fuchsia_sysmem2::wire::ColorSpace& v2);
+    const fuchsia_images2::ColorSpace& v2);
+[[nodiscard]] fuchsia_sysmem::wire::ColorSpace V1WireCopyFromV2ColorSpace(
+    const fuchsia_images2::wire::ColorSpace& v2);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormatConstraints>
 V1CopyFromV2ImageFormatConstraints(const fuchsia_sysmem2::ImageFormatConstraints& v2);
@@ -244,9 +304,9 @@ V1CopyFromV2ImageFormatConstraints(const fuchsia_sysmem2::ImageFormatConstraints
 V1CopyFromV2ImageFormatConstraints(const fuchsia_sysmem2::wire::ImageFormatConstraints& v2);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_sysmem2::ImageFormat& v2);
+    fuchsia_images2::ImageFormat& v2);
 [[nodiscard]] fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_sysmem2::wire::ImageFormat& v2);
+    fuchsia_images2::wire::ImageFormat& v2);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem::SingleBufferSettings>
 V1CopyFromV2SingleBufferSettings(const fuchsia_sysmem2::SingleBufferSettings& v2);
@@ -279,10 +339,6 @@ V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollecti
 // For natural types, we only need an explicit clone if copy construction / assignment isn't
 // provided by codegen, which is when IsResource<>.
 
-[[nodiscard]] fuchsia_sysmem2::wire::PixelFormat V2ClonePixelFormat(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::PixelFormat& src);
-[[nodiscard]] fuchsia_sysmem2::wire::ColorSpace V2CloneColorSpace(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::ColorSpace& src);
 [[nodiscard]] fuchsia_sysmem2::wire::BufferMemorySettings V2CloneBufferMemorySettings(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemorySettings& src);
 [[nodiscard]] fuchsia_sysmem2::wire::ImageFormatConstraints V2CloneImageFormatConstraints(

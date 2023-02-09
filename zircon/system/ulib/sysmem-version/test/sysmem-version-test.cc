@@ -496,8 +496,12 @@ v1::ImageFormatConstraints V1RandomImageFormatConstraints() {
   random(&r.required_max_coded_width());
   random(&r.required_min_coded_height());
   random(&r.required_max_coded_height());
-  random(&r.required_min_bytes_per_row());
-  random(&r.required_max_bytes_per_row());
+
+  // V2 does not have required_min_bytes_per_row, required_max_bytes_per_row, so we leave those zero
+  // here.
+  ZX_DEBUG_ASSERT(r.required_min_bytes_per_row() == 0);
+  ZX_DEBUG_ASSERT(r.required_max_bytes_per_row() == 0);
+
   return r;
 }
 
@@ -529,8 +533,12 @@ v1::wire::ImageFormatConstraints V1WireRandomImageFormatConstraints() {
   random(&r.required_max_coded_width);
   random(&r.required_min_coded_height);
   random(&r.required_max_coded_height);
-  random(&r.required_min_bytes_per_row);
-  random(&r.required_max_bytes_per_row);
+
+  // V2 does not have required_min_bytes_per_row, required_max_bytes_per_row, so we leave those zero
+  // here.
+  ZX_DEBUG_ASSERT(r.required_min_bytes_per_row == 0);
+  ZX_DEBUG_ASSERT(r.required_max_bytes_per_row == 0);
+
   return r;
 }
 
@@ -773,9 +781,10 @@ TEST(SysmemVersion, PixelFormatWire) {
     fidl::Arena allocator;
     auto v1_1 = V1WireRandomPixelFormat();
     auto snap_1 = SnapMoveFrom(std::move(v1_1));
-    auto v2_1 = sysmem::V2CopyFromV1PixelFormat(allocator, snap_1->value());
-    auto v2_2 = sysmem::V2ClonePixelFormat(allocator, v2_1);
-    auto v1_2 = sysmem::V1CopyFromV2PixelFormat(v2_2);
+    auto v2_1 = sysmem::V2CopyFromV1PixelFormat(snap_1->value());
+    // struct copy
+    auto v2_2 = v2_1;
+    auto v1_2 = sysmem::V1WireCopyFromV2PixelFormat(v2_2);
     auto snap_2 = SnapMoveFrom(std::move(v1_2));
     EXPECT_TRUE(IsEqual(*snap_1, *snap_2));
   }
@@ -799,9 +808,9 @@ TEST(SysmemVersion, ColorSpaceWire) {
     fidl::Arena allocator;
     auto v1_1 = V1WireRandomColorSpace();
     auto snap_1 = SnapMoveFrom(std::move(v1_1));
-    auto v2_1 = sysmem::V2CopyFromV1ColorSpace(allocator, snap_1->value());
-    auto v2_2 = sysmem::V2CloneColorSpace(allocator, v2_1);
-    auto v1_2 = sysmem::V1CopyFromV2ColorSpace(v2_2);
+    auto v2_1 = sysmem::V2CopyFromV1ColorSpace(snap_1->value());
+    auto v2_2 = v2_1;
+    auto v1_2 = sysmem::V1WireCopyFromV2ColorSpace(v2_2);
     auto snap_2 = SnapMoveFrom(std::move(v1_2));
     EXPECT_TRUE(IsEqual(*snap_1, *snap_2));
   }

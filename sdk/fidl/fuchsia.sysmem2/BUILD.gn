@@ -12,14 +12,13 @@ fidl("fuchsia.sysmem2") {
     "collection.fidl",
     "constraints.fidl",
     "driver_connector.fidl",
-    "format_modifier.fidl",
     "heap.fidl",
-    "image_formats.fidl",
     "overview.fidl",
     "results.fidl",
     "usages.fidl",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.images2",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.sysmem",
     "//zircon/vdso/zx",

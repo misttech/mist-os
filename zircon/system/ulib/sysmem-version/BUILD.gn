@@ -12,7 +12,10 @@ zx_library("sysmem-version") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
   ]
-  deps = [ "//sdk/lib/fidl" ]
+  deps = [
+    "//sdk/lib/fidl",
+    "//zircon/third_party/ulib/safemath",
+  ]
 
   # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.

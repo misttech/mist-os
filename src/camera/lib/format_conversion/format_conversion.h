@@ -5,6 +5,10 @@
 #ifndef SRC_CAMERA_LIB_FORMAT_CONVERSION_FORMAT_CONVERSION_H_
 #define SRC_CAMERA_LIB_FORMAT_CONVERSION_FORMAT_CONVERSION_H_
 
+#ifndef _LIBCPP_ENABLE_ASSERTIONS
+#define _LIBCPP_ENABLE_ASSERTIONS 1
+#endif
+
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 

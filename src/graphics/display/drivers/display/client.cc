@@ -42,7 +42,6 @@
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace fhd = fuchsia_hardware_display;
-namespace sysmem = fuchsia_sysmem;
 
 namespace {
 
@@ -84,7 +83,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     _completer.Reply(ZX_ERR_INVALID_ARGS, 0);
     return;
   }
-  fidl::WireSyncClient<sysmem::BufferCollection>& collection = it->second.driver;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
 
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
@@ -116,7 +115,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
       _completer.Reply(ZX_ERR_NO_MEMORY, 0);
       return;
     }
-    sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
+    fuchsia_sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
 
     if (!info.settings.has_image_format_constraints || request->index >= info.buffer_count) {
       _completer.Reply(ZX_ERR_OUT_OF_RANGE, 0);
@@ -173,7 +172,7 @@ void Client::ImportImage2(ImportImage2RequestView request,
     return;
   }
 
-  fidl::WireSyncClient<sysmem::BufferCollection>& collection = it->second.driver;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
 
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
@@ -205,7 +204,7 @@ void Client::ImportImage2(ImportImage2RequestView request,
       _completer.Reply(ZX_ERR_NO_MEMORY);
       return;
     }
-    sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
+    fuchsia_sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
 
     if (!info.settings.has_image_format_constraints || request->index >= info.buffer_count) {
       _completer.Reply(ZX_ERR_OUT_OF_RANGE);
@@ -273,20 +272,22 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     return;
   }
 
-  fidl::WireSyncClient<sysmem::BufferCollection> vc_collection;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> vc_collection;
 
   // Make a second handle to represent the kernel's usage of the buffer as a
   // framebuffer, so we can set constraints and get VMOs for zx_framebuffer_set_range.
   if (use_kernel_framebuffer_) {
     zx::channel vc_token_server, vc_token_client;
     zx::channel::create(0, &vc_token_server, &vc_token_client);
-    if (!fidl::WireCall<sysmem::BufferCollectionToken>(request->collection_token.borrow().channel())
+    if (!fidl::WireCall<fuchsia_sysmem::BufferCollectionToken>(
+             request->collection_token.borrow().channel())
              ->Duplicate(UINT32_MAX, std::move(vc_token_server))
              .ok()) {
       _completer.Reply(ZX_ERR_INTERNAL);
       return;
     }
-    if (!fidl::WireCall<sysmem::BufferCollectionToken>(request->collection_token.borrow().channel())
+    if (!fidl::WireCall<fuchsia_sysmem::BufferCollectionToken>(
+             request->collection_token.borrow().channel())
              ->Sync()
              .ok()) {
       _completer.Reply(ZX_ERR_INTERNAL);
@@ -314,9 +315,9 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     return;
   }
 
-  collection_map_[request->collection_id] =
-      Collections{fidl::WireSyncClient<sysmem::BufferCollection>(std::move(collection_client)),
-                  std::move(vc_collection)};
+  collection_map_[request->collection_id] = Collections{
+      fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>(std::move(collection_client)),
+      std::move(vc_collection)};
   _completer.Reply(ZX_OK);
 }
 
@@ -357,29 +358,30 @@ void Client::SetBufferCollectionConstraints(
     ZX_ASSERT(it->second.kernel.is_valid());
 
     // Constraints to be used with zx_framebuffer_set_range.
-    sysmem::wire::BufferCollectionConstraints constraints;
-    constraints.usage.display = sysmem::wire::kDisplayUsageLayer;
+    fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
+    constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
     constraints.has_buffer_memory_constraints = true;
-    sysmem::wire::BufferMemoryConstraints& buffer_constraints =
+    fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
         constraints.buffer_memory_constraints;
     buffer_constraints.min_size_bytes = 0;
     buffer_constraints.max_size_bytes = 0xffffffff;
     buffer_constraints.secure_required = false;
     buffer_constraints.ram_domain_supported = true;
     constraints.image_format_constraints_count = 1;
-    sysmem::wire::ImageFormatConstraints& image_constraints =
+    fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
         constraints.image_format_constraints[0];
     switch (request->config.pixel_format) {
       case ZX_PIXEL_FORMAT_RGB_x888:
       case ZX_PIXEL_FORMAT_ARGB_8888:
-        image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgra32;
+        image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
         image_constraints.pixel_format.has_format_modifier = true;
-        image_constraints.pixel_format.format_modifier.value = sysmem::wire::kFormatModifierLinear;
+        image_constraints.pixel_format.format_modifier.value =
+            fuchsia_sysmem::wire::kFormatModifierLinear;
         break;
     }
 
     image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = sysmem::wire::ColorSpaceType::kSrgb;
+    image_constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
     image_constraints.min_coded_width = 0;
     image_constraints.max_coded_width = 0xffffffff;
     image_constraints.min_coded_height = 0;
@@ -395,7 +397,7 @@ void Client::SetBufferCollectionConstraints(
     image_constraints.display_width_divisor = 1;
     image_constraints.display_height_divisor = 1;
 
-    if (image_constraints.pixel_format.type != sysmem::wire::PixelFormatType::kInvalid) {
+    if (image_constraints.pixel_format.type != fuchsia_sysmem::wire::PixelFormatType::kInvalid) {
       _completer.Reply(it->second.kernel->SetConstraints(true, constraints).status());
       return;
     }
@@ -899,7 +901,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   }
 
   // Check whether buffer has already been allocated for the requested collection id.
-  fidl::WireSyncClient<sysmem::BufferCollection>& collection = it->second.driver;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
     _completer.ReplyError(ZX_ERR_SHOULD_WAIT);
@@ -1624,7 +1626,8 @@ Client::Init(zx::channel server_channel) {
     // TODO(fxbug.dev/33157) TODO: Fail creation once all drivers implement this.
     zxlogf(ERROR, "GetSysmemConnection failed (continuing) - status: %d", status);
   } else {
-    sysmem_allocator_ = fidl::WireSyncClient<sysmem::Allocator>(std::move(sysmem_allocator_client));
+    sysmem_allocator_ =
+        fidl::WireSyncClient<fuchsia_sysmem::Allocator>(std::move(sysmem_allocator_client));
 
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
     std::string debug_name = std::string("display[") + fsl::GetCurrentProcessName() + "]";

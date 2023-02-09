@@ -309,13 +309,13 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   bool AccumulateConstraintImageFormat(fuchsia_sysmem2::ImageFormatConstraints* acc,
                                        fuchsia_sysmem2::ImageFormatConstraints c);
 
-  bool AccumulateConstraintColorSpaces(std::vector<fuchsia_sysmem2::ColorSpace>* acc,
-                                       std::vector<fuchsia_sysmem2::ColorSpace> c);
+  bool AccumulateConstraintColorSpaces(std::vector<fuchsia_images2::ColorSpace>* acc,
+                                       std::vector<fuchsia_images2::ColorSpace> c);
 
   size_t InitialCapacityOrZero(CheckSanitizeStage stage, size_t initial_capacity);
 
-  bool IsColorSpaceEqual(const fuchsia_sysmem2::ColorSpace& a,
-                         const fuchsia_sysmem2::ColorSpace& b);
+  bool IsColorSpaceEqual(const fuchsia_images2::ColorSpace& a,
+                         const fuchsia_images2::ColorSpace& b);
 
   fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t>
   GenerateUnpopulatedBufferCollectionInfo(
@@ -491,6 +491,18 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                                  field_name.c_str(), o.get(), field_name.c_str(), n.get());
     }
   };
+  template <>
+  struct DiffPrinter<fuchsia_math::SizeU, void> {
+    static void PrintDiff(const LogicalBufferCollection& buffer_collection,
+                          const std::string& field_name, const fuchsia_math::SizeU& o,
+                          const fuchsia_math::SizeU& n) {
+      if (o.width() != n.width() || o.height() != n.height()) {
+        buffer_collection.LogError(FROM_HERE, "o%s: %u x %u n%s: %u x %u", field_name.c_str(),
+                                   o.width(), o.height(), field_name.c_str(), n.width(),
+                                   n.height());
+      }
+    }
+  };
 
   template <typename Table>
   void LogTableDiffs(const std::string& field_name, const Table& o, const Table& n) const;
@@ -507,45 +519,23 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   }
 
   template <>
-  void LogTableDiffs<fuchsia_sysmem2::PixelFormat>(const std::string& field_name,
-                                                   const fuchsia_sysmem2::PixelFormat& o,
-                                                   const fuchsia_sysmem2::PixelFormat& n) const {
-    PRINT_DIFF(type);
-    PRINT_DIFF(format_modifier_value);
-  }
-
-  template <>
-  void LogTableDiffs<fuchsia_sysmem2::ColorSpace>(const std::string& field_name,
-                                                  const fuchsia_sysmem2::ColorSpace& o,
-                                                  const fuchsia_sysmem2::ColorSpace& n) const {
-    PRINT_DIFF(type);
-  }
-
-  template <>
   void LogTableDiffs<fuchsia_sysmem2::ImageFormatConstraints>(
       const std::string& field_name, const fuchsia_sysmem2::ImageFormatConstraints& o,
       const fuchsia_sysmem2::ImageFormatConstraints& n) const {
     PRINT_DIFF(pixel_format);
+    PRINT_DIFF(pixel_format_modifier);
     PRINT_DIFF(color_spaces);
-    PRINT_DIFF(min_coded_width);
-    PRINT_DIFF(max_coded_width);
-    PRINT_DIFF(min_coded_height);
-    PRINT_DIFF(max_coded_height);
+    PRINT_DIFF(min_surface_size);
+    PRINT_DIFF(max_surface_size);
     PRINT_DIFF(min_bytes_per_row);
     PRINT_DIFF(max_bytes_per_row);
-    PRINT_DIFF(max_coded_width_times_coded_height);
-    PRINT_DIFF(coded_width_divisor);
-    PRINT_DIFF(coded_height_divisor);
+    PRINT_DIFF(max_surface_width_times_surface_height);
+    PRINT_DIFF(surface_size_alignment);
+    PRINT_DIFF(display_size_alignment);
+    PRINT_DIFF(required_min_surface_size);
+    PRINT_DIFF(required_max_surface_size);
     PRINT_DIFF(bytes_per_row_divisor);
     PRINT_DIFF(start_offset_divisor);
-    PRINT_DIFF(display_width_divisor);
-    PRINT_DIFF(display_height_divisor);
-    PRINT_DIFF(required_min_coded_width);
-    PRINT_DIFF(required_max_coded_width);
-    PRINT_DIFF(required_min_coded_height);
-    PRINT_DIFF(required_max_coded_height);
-    PRINT_DIFF(required_min_bytes_per_row);
-    PRINT_DIFF(required_max_bytes_per_row);
   }
 
   template <>

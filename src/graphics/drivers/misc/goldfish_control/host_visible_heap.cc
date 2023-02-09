@@ -66,12 +66,11 @@ zx_status_t CheckSingleBufferSettings(
 
   if (has_image_format_constraints) {
     const auto& image_constraints = single_buffer_settings.image_format_constraints();
-    if (!image_constraints.has_pixel_format() || !image_constraints.pixel_format().has_type() ||
-        !image_constraints.has_min_coded_width() || !image_constraints.has_min_coded_height()) {
+    if (!image_constraints.has_pixel_format() || !image_constraints.has_min_surface_size()) {
       zxlogf(ERROR,
-             "[%s][%s] image_constraints missing arguments: pixel_format %d width %d height %d",
+             "[%s][%s] image_constraints missing arguments: pixel_format %d min_surface_size %d",
              kTag, __func__, image_constraints.has_pixel_format(),
-             image_constraints.has_min_coded_width(), image_constraints.has_min_coded_height());
+             image_constraints.has_min_surface_size());
       return ZX_ERR_INVALID_ARGS;
     }
   }
@@ -94,51 +93,49 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
                             uint64_t paddr) {
   using fuchsia_hardware_goldfish::wire::ColorBufferFormatType;
   using fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params;
-  using fuchsia_sysmem2::wire::PixelFormatType;
+  using fuchsia_images2::wire::PixelFormat;
 
   ZX_DEBUG_ASSERT(buffer_settings.has_image_format_constraints());
   const auto& image_constraints = buffer_settings.image_format_constraints();
 
-  ZX_DEBUG_ASSERT(
-      image_constraints.has_pixel_format() && image_constraints.pixel_format().has_type() &&
-      image_constraints.has_min_coded_width() && image_constraints.has_min_coded_height());
+  ZX_DEBUG_ASSERT(image_constraints.has_pixel_format() && image_constraints.has_min_surface_size());
 
   // TODO(fxbug.dev/59804): Support other pixel formats.
-  const auto& pixel_format_type = image_constraints.pixel_format().type();
+  const auto& pixel_format = image_constraints.pixel_format();
   ColorBufferFormatType color_buffer_format;
-  switch (pixel_format_type) {
-    case PixelFormatType::kBgra32:
+  switch (pixel_format) {
+    case PixelFormat::kBgra32:
       color_buffer_format = ColorBufferFormatType::kBgra;
       break;
-    case PixelFormatType::kR8G8B8A8:
+    case PixelFormat::kR8G8B8A8:
       color_buffer_format = ColorBufferFormatType::kRgba;
       break;
-    case PixelFormatType::kR8:
+    case PixelFormat::kR8:
       color_buffer_format = ColorBufferFormatType::kLuminance;
       break;
-    case PixelFormatType::kR8G8:
+    case PixelFormat::kR8G8:
       color_buffer_format = ColorBufferFormatType::kRg;
       break;
     default:
-      zxlogf(ERROR, "[%s][%s] pixel_format_type unsupported: type %u", __func__, kTag,
-             static_cast<uint32_t>(pixel_format_type));
+      zxlogf(ERROR, "[%s][%s] pixel_format unsupported: type %u", __func__, kTag,
+             static_cast<uint32_t>(pixel_format));
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  uint32_t width = image_constraints.min_coded_width();
-  if (image_constraints.has_required_max_coded_width()) {
-    width = std::max(width, image_constraints.required_max_coded_width());
+  uint32_t width = image_constraints.min_surface_size().width;
+  if (image_constraints.has_required_max_surface_size()) {
+    width = std::max(width, image_constraints.required_max_surface_size().width);
   }
-  width = fbl::round_up(width, image_constraints.has_coded_width_divisor()
-                                   ? image_constraints.coded_width_divisor()
+  width = fbl::round_up(width, image_constraints.has_surface_size_alignment()
+                                   ? image_constraints.surface_size_alignment().width
                                    : 1);
 
-  uint32_t height = image_constraints.min_coded_height();
-  if (image_constraints.has_required_max_coded_height()) {
-    height = std::max(height, image_constraints.required_max_coded_height());
+  uint32_t height = image_constraints.min_surface_size().height;
+  if (image_constraints.has_required_max_surface_size()) {
+    height = std::max(height, image_constraints.required_max_surface_size().height);
   }
-  height = fbl::round_up(height, image_constraints.has_coded_height_divisor()
-                                     ? image_constraints.coded_height_divisor()
+  height = fbl::round_up(height, image_constraints.has_surface_size_alignment()
+                                     ? image_constraints.surface_size_alignment().height
                                      : 1);
 
   CreateColorBuffer2Params buffer2_params(allocator);
@@ -154,7 +151,6 @@ fuchsia_hardware_goldfish::wire::CreateBuffer2Params GetCreateBuffer2Params(
     fidl::AnyArena& allocator,
     const fuchsia_sysmem2::wire::SingleBufferSettings& single_buffer_settings, uint64_t paddr) {
   using fuchsia_hardware_goldfish::wire::CreateBuffer2Params;
-  using fuchsia_sysmem2::wire::PixelFormatType;
 
   ZX_DEBUG_ASSERT(single_buffer_settings.has_buffer_settings());
 
@@ -266,7 +262,6 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
                                      CreateResourceCompleter::Sync& completer) {
   using fuchsia_hardware_goldfish::wire::ColorBufferFormatType;
   using fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params;
-  using fuchsia_sysmem2::wire::PixelFormatType;
 
   ZX_DEBUG_ASSERT(request->vmo.is_valid());
 
@@ -281,12 +276,12 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
   TRACE_DURATION(
       "gfx", "HostVisibleHeap::CreateResource", "type", is_image ? "image" : "buffer",
       "image:width",
-      is_image ? request->buffer_settings.image_format_constraints().min_coded_width() : 0,
+      is_image ? request->buffer_settings.image_format_constraints().min_surface_size().width : 0,
       "image:height",
-      is_image ? request->buffer_settings.image_format_constraints().min_coded_height() : 0,
+      is_image ? request->buffer_settings.image_format_constraints().min_surface_size().height : 0,
       "image:format",
       is_image ? static_cast<uint32_t>(
-                     request->buffer_settings.image_format_constraints().pixel_format().type())
+                     request->buffer_settings.image_format_constraints().pixel_format())
                : 0,
       "buffer:size", is_image ? 0 : request->buffer_settings.buffer_settings().size_bytes());
 

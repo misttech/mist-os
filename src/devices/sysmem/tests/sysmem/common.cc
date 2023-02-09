@@ -13,8 +13,6 @@
 
 #include <zxtest/zxtest.h>
 
-const char* kSysmemClassPath = "/dev/class/sysmem";
-
 zx_koid_t get_koid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   ZX_ASSERT(ZX_OK == zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,

@@ -37,18 +37,17 @@
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display-bind.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 
-namespace sysmem = fuchsia_sysmem;
-
 namespace amlogic_display {
 
 namespace {
 constexpr uint32_t kCanvasLittleEndian64Bit = 7;
 constexpr uint32_t kBufferAlignment = 64;
 
-void SetDefaultImageFormatConstraints(sysmem::wire::PixelFormatType format, uint64_t modifier,
-                                      sysmem::wire::ImageFormatConstraints& constraints) {
+void SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType format,
+                                      uint64_t modifier,
+                                      fuchsia_sysmem::wire::ImageFormatConstraints& constraints) {
   constraints.color_spaces_count = 1;
-  constraints.color_space[0].type = sysmem::wire::ColorSpaceType::kSrgb;
+  constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
   constraints.pixel_format = {
       .type = format,
       .has_format_modifier = true,
@@ -153,9 +152,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return status;
   }
 
-  fidl::WireResult result =
-      fidl::WireCall(fidl::UnownedClientEnd<sysmem::BufferCollection>(zx::unowned_channel(handle)))
-          ->WaitForBuffersAllocated();
+  fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(
+                                               zx::unowned_channel(handle)))
+                                ->WaitForBuffersAllocated();
   if (!result.ok()) {
     return result.status();
   }
@@ -163,7 +162,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return result.value().status;
   }
 
-  sysmem::wire::BufferCollectionInfo2& collection_info = result.value().buffer_collection_info;
+  fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
+      result.value().buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints ||
       index >= collection_info.buffer_count) {
@@ -177,8 +177,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
       collection_info.settings.image_format_constraints.pixel_format.format_modifier.value;
 
   switch (format_modifier) {
-    case sysmem::wire::kFormatModifierArmAfbc16X16:
-    case sysmem::wire::kFormatModifierArmAfbc16X16Te: {
+    case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16:
+    case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16Te: {
       // AFBC does not use canvas.
       uint64_t offset = collection_info.buffers[index].vmo_usable_start;
       size_t size =
@@ -200,8 +200,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
       import_info->image_width = image->width;
       import_info->is_afbc = true;
     } break;
-    case sysmem::wire::kFormatModifierLinear:
-    case sysmem::wire::kFormatModifierArmLinearTe: {
+    case fuchsia_sysmem::wire::kFormatModifierLinear:
+    case fuchsia_sysmem::wire::kFormatModifierArmLinearTe: {
       uint32_t minimum_row_bytes;
       if (!ImageFormatMinimumRowBytes(collection_info.settings.image_format_constraints,
                                       image->width, &minimum_row_bytes)) {
@@ -492,32 +492,35 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t handle) {
-  fidl::UnownedClientEnd<sysmem::BufferCollection> collection{handle};
-  sysmem::wire::BufferCollectionConstraints constraints = {};
+  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{handle};
+  fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
   if (config->type == IMAGE_TYPE_CAPTURE) {
-    constraints.usage.cpu = sysmem::wire::kCpuUsageReadOften | sysmem::wire::kCpuUsageWriteOften;
+    constraints.usage.cpu =
+        fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
   } else {
-    constraints.usage.display = sysmem::wire::kDisplayUsageLayer;
+    constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
   }
   constraints.has_buffer_memory_constraints = true;
-  sysmem::wire::BufferMemoryConstraints& buffer_constraints = constraints.buffer_memory_constraints;
+  fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
+      constraints.buffer_memory_constraints;
   buffer_constraints.physically_contiguous_required = true;
   buffer_constraints.secure_required = false;
   buffer_constraints.ram_domain_supported = true;
   buffer_constraints.cpu_domain_supported = false;
   buffer_constraints.inaccessible_domain_supported = true;
   buffer_constraints.heap_permitted_count = 2;
-  buffer_constraints.heap_permitted[0] = sysmem::wire::HeapType::kSystemRam;
-  buffer_constraints.heap_permitted[1] = sysmem::wire::HeapType::kAmlogicSecure;
+  buffer_constraints.heap_permitted[0] = fuchsia_sysmem::wire::HeapType::kSystemRam;
+  buffer_constraints.heap_permitted[1] = fuchsia_sysmem::wire::HeapType::kAmlogicSecure;
 
   if (config->type == IMAGE_TYPE_CAPTURE) {
     constraints.image_format_constraints_count = 1;
-    sysmem::wire::ImageFormatConstraints& image_constraints =
+    fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
         constraints.image_format_constraints[0];
 
-    SetDefaultImageFormatConstraints(sysmem::wire::PixelFormatType::kBgr24,
-                                     sysmem::wire::kFormatModifierLinear, image_constraints);
+    SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType::kBgr24,
+                                     fuchsia_sysmem::wire::kFormatModifierLinear,
+                                     image_constraints);
     image_constraints.min_coded_width = vout_->display_width();
     image_constraints.max_coded_width = vout_->display_width();
     image_constraints.min_coded_height = vout_->display_height();
@@ -537,22 +540,22 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     ZX_DEBUG_ASSERT(format_support_check_ != nullptr);
     if (format_support_check_(ZX_PIXEL_FORMAT_RGB_x888) ||
         format_support_check_(ZX_PIXEL_FORMAT_ARGB_8888)) {
-      for (const auto format_modifier :
-           {sysmem::wire::kFormatModifierLinear, sysmem::wire::kFormatModifierArmLinearTe}) {
+      for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierLinear,
+                                         fuchsia_sysmem::wire::kFormatModifierArmLinearTe}) {
         const size_t index = constraints.image_format_constraints_count++;
         auto& image_constraints = constraints.image_format_constraints[index];
-        SetDefaultImageFormatConstraints(sysmem::wire::PixelFormatType::kBgra32, format_modifier,
-                                         image_constraints);
+        SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType::kBgra32,
+                                         format_modifier, image_constraints);
       }
     }
     if (format_support_check_(ZX_PIXEL_FORMAT_BGR_888x) ||
         format_support_check_(ZX_PIXEL_FORMAT_ABGR_8888)) {
-      for (const auto format_modifier : {sysmem::wire::kFormatModifierArmAfbc16X16,
-                                         sysmem::wire::kFormatModifierArmAfbc16X16Te}) {
+      for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16,
+                                         fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16Te}) {
         const size_t index = constraints.image_format_constraints_count++;
         auto& image_constraints = constraints.image_format_constraints[index];
-        SetDefaultImageFormatConstraints(sysmem::wire::PixelFormatType::kR8G8B8A8, format_modifier,
-                                         image_constraints);
+        SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8,
+                                         format_modifier, image_constraints);
       }
     }
     buffer_name = "Display";
@@ -597,7 +600,7 @@ void AmlogicDisplay::DisplayCaptureImplSetDisplayCaptureInterface(
 
 zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
     zx_unowned_handle_t collection_handle, uint32_t index, uint64_t* out_capture_handle) {
-  fidl::UnownedClientEnd<sysmem::BufferCollection> collection{
+  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{
       zx::unowned_channel(collection_handle)};
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
@@ -612,7 +615,8 @@ zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
     return result.value().status;
   }
 
-  sysmem::wire::BufferCollectionInfo2& collection_info = result.value().buffer_collection_info;
+  fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
+      result.value().buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints ||
       index >= collection_info.buffer_count) {
@@ -621,7 +625,7 @@ zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
 
   // Ensure the proper format
   ZX_DEBUG_ASSERT(collection_info.settings.image_format_constraints.pixel_format.type ==
-                  sysmem::wire::PixelFormatType::kBgr24);
+                  fuchsia_sysmem::wire::PixelFormatType::kBgr24);
 
   // Allocate a canvas for the capture image
   canvas_info_t canvas_info = {};

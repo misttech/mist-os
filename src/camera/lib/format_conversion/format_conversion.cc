@@ -39,6 +39,9 @@ fuchsia_sysmem::wire::ImageFormat2 ConvertToWireType(fuchsia::sysmem::ImageForma
   };
 }
 
+// TODO: Please use fidl::ToWire() instead.  See sysmem-version.cc for an UnusedArena that can
+// avoid the caller needing to pass in a real arena, since sysmem V1 flat structs don't really need
+// one (but fidl::ToWire() requires an arena param).
 fuchsia_sysmem::wire::ImageFormatConstraints ConvertToWireType(
     fuchsia::sysmem::ImageFormatConstraints constraints) {
   return {
@@ -99,6 +102,7 @@ fuchsia_sysmem::wire::ImageFormat2 GetImageFormatFromConstraints(
                   constraints.max_bytes_per_row, coded_width);
   }
   ZX_ASSERT(success);
+  ZX_ASSERT(bytes_per_row != 0);
   return {
       .pixel_format = constraints.pixel_format,
       .coded_width = coded_width,

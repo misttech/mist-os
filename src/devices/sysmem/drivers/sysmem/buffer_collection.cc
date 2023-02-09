@@ -645,6 +645,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       }
     }
   }
+
   return fpromise::ok(std::move(v2_b));
 }
 

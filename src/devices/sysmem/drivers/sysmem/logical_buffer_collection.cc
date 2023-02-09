@@ -4,6 +4,7 @@
 
 #include "logical_buffer_collection.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/ddk/trace/event.h>
@@ -29,7 +30,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <fbl/string_printf.h>
-#include <safemath/safe_conversions.h>
+#include <safemath/safe_math.h>
 
 #include "buffer_collection.h"
 #include "buffer_collection_token.h"
@@ -41,6 +42,11 @@
 #include "node_properties.h"
 #include "orphaned_node.h"
 #include "usage_pixel_format_cost.h"
+
+using safemath::CheckAdd;
+using safemath::CheckDiv;
+using safemath::CheckMul;
+using safemath::CheckSub;
 
 namespace sysmem_driver {
 
@@ -61,20 +67,19 @@ const uint32_t kMaxGroupChildCombinations = 64;
 // Map of all supported color spaces to an unique semi arbitrary number. A higher number means
 // that the color space is less desirable and a lower number means that a color space is more
 // desirable.
-const std::unordered_map<sysmem::FidlUnderlyingTypeOrType_t<fuchsia_sysmem2::ColorSpaceType>,
-                         uint32_t>
+const std::unordered_map<sysmem::FidlUnderlyingTypeOrType_t<fuchsia_images2::ColorSpace>, uint32_t>
     kColorSpaceRanking = {
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kInvalid),
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kInvalid),
          std::numeric_limits<uint32_t>::max()},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kSrgb), 1},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec601Ntsc), 8},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec601NtscFullRange), 7},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec601Pal), 6},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec601PalFullRange), 5},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec709), 4},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec2020), 3},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kRec2100), 2},
-        {sysmem::fidl_underlying_cast(fuchsia_sysmem2::ColorSpaceType::kPassThrough), 9}};
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kSrgb), 1},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec601Ntsc), 8},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec601NtscFullRange), 7},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec601Pal), 6},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec601PalFullRange), 5},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec709), 4},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec2020), 3},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec2100), 2},
+        {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kPassthrough), 9}};
 
 // Zero-initialized, so it shouldn't take up space on-disk.
 constexpr uint64_t kZeroBytes = 8192;
@@ -285,14 +290,14 @@ fit::result<zx_status_t, bool> IsImageFormatConstraintsPixelFormatDoNotCare(
   if (!x.pixel_format().has_value()) {
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
-  if (!x.pixel_format()->type().has_value()) {
+  if (!x.pixel_format().has_value()) {
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
-  if (*x.pixel_format()->type() != fuchsia_sysmem2::wire::PixelFormatType::kDoNotCare) {
+  if (*x.pixel_format() != fuchsia_images2::PixelFormat::kDoNotCare) {
     return fit::ok(false);
   }
-  if (x.pixel_format()->format_modifier_value().has_value() &&
-      *x.pixel_format()->format_modifier_value() != fuchsia_sysmem2::kFormatModifierNone) {
+  if (x.pixel_format_modifier().has_value() &&
+      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierNone) {
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
   return fit::ok(true);
@@ -318,16 +323,13 @@ fit::result<zx_status_t, bool> IsImageFormatConstraintsArrayPixelFormatDoNotCare
 }
 
 fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
-    const std::vector<fuchsia_sysmem2::ColorSpace>& x) {
+    const std::vector<fuchsia_images2::ColorSpace>& x) {
   if (x.size() == 0) {
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
   uint32_t do_not_care_count = 0;
   for (uint32_t i = 0; i < x.size(); ++i) {
-    if (!x[i].type().has_value()) {
-      return fit::error(ZX_ERR_INVALID_ARGS);
-    }
-    if (*x[i].type() == fuchsia_sysmem2::ColorSpaceType::kDoNotCare) {
+    if (x[i] == fuchsia_images2::ColorSpace::kDoNotCare) {
       ++do_not_care_count;
     }
   }
@@ -357,20 +359,24 @@ void ReplicatePixelFormatDoNotCare(
   for (uint32_t i = 0; i < to_match.size(); ++i) {
     // copy / clone
     to_update[i] = stash;
-    // parameter is copied / cloned
-    to_update[i].pixel_format().emplace(*to_match[i].pixel_format());
+
+    // Normalized/set by caller.
+    ZX_DEBUG_ASSERT(to_match[i].pixel_format().has_value());
+    ZX_DEBUG_ASSERT(to_match[i].pixel_format_modifier().has_value());
+    to_update[i].pixel_format() = *to_match[i].pixel_format();
+    to_update[i].pixel_format_modifier() = *to_match[i].pixel_format_modifier();
   }
   ZX_DEBUG_ASSERT(to_update.size() == to_match.size());
   ZX_DEBUG_ASSERT(!to_update.empty());
   ZX_DEBUG_ASSERT(!to_match.empty());
-  ZX_DEBUG_ASSERT(*to_update[0].pixel_format()->type() == *to_match[0].pixel_format()->type());
-  ZX_DEBUG_ASSERT(to_update[0].pixel_format()->format_modifier_value().has_value() ==
-                  to_match[0].pixel_format()->format_modifier_value().has_value());
+  ZX_DEBUG_ASSERT(*to_update[0].pixel_format() == *to_match[0].pixel_format());
+  ZX_DEBUG_ASSERT(to_update[0].pixel_format_modifier().has_value() ==
+                  to_match[0].pixel_format_modifier().has_value());
   // The format_modifier_value (if any) also matches.
 }
 
-void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_sysmem2::ColorSpace>& to_match,
-                                  std::vector<fuchsia_sysmem2::ColorSpace>& to_update) {
+void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_images2::ColorSpace>& to_match,
+                                  std::vector<fuchsia_images2::ColorSpace>& to_update) {
   // error result excluded by caller
   ZX_DEBUG_ASSERT(!IsColorSpaceArrayDoNotCare(to_match).value());
   // error result excluded by caller
@@ -381,17 +387,14 @@ void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_sysmem2::ColorSpace>
     return;
   }
   ZX_DEBUG_ASSERT(!to_match.empty());
-  auto stash = std::move(to_update[0]);
   to_update.resize(to_match.size());
   for (uint32_t i = 0; i < to_match.size(); ++i) {
-    // copy / clone
-    to_update[i] = stash;
-    to_update[i].type().emplace(*to_match[i].type());
+    to_update[i] = to_match[i];
   }
   ZX_DEBUG_ASSERT(to_update.size() == to_match.size());
   ZX_DEBUG_ASSERT(!to_update.empty());
   ZX_DEBUG_ASSERT(!to_match.empty());
-  ZX_DEBUG_ASSERT(*to_update[0].type() == *to_match[0].type());
+  ZX_DEBUG_ASSERT(to_update[0] == to_match[0]);
 }
 
 TokenServerEndCombinedV1AndV2 ConvertV1TokenRequestToCombinedTokenRequest(
@@ -1965,16 +1968,14 @@ bool LogicalBufferCollection::IsMinBufferSizeSpecifiedByAnyParticipant(
     }
     if (constraints.image_format_constraints().has_value()) {
       for (auto& image_format_constraints : constraints.image_format_constraints().value()) {
-        if (image_format_constraints.min_coded_width().has_value() &&
-            image_format_constraints.min_coded_height().has_value() &&
-            image_format_constraints.min_coded_width().value() > 0 &&
-            image_format_constraints.min_coded_height().value() > 0) {
+        if (image_format_constraints.min_surface_size().has_value() &&
+            image_format_constraints.min_surface_size()->width() > 0 &&
+            image_format_constraints.min_surface_size()->height() > 0) {
           return true;
         }
-        if (image_format_constraints.required_max_coded_width().has_value() &&
-            image_format_constraints.required_max_coded_height().has_value() &&
-            image_format_constraints.required_max_coded_width().value() > 0 &&
-            image_format_constraints.required_max_coded_height().value() > 0) {
+        if (image_format_constraints.required_max_surface_size().has_value() &&
+            image_format_constraints.required_max_surface_size()->width() > 0 &&
+            image_format_constraints.required_max_surface_size()->height() > 0) {
           return true;
         }
       }
@@ -2365,10 +2366,8 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
           LogInfo(FROM_HERE,
                   "per-PixelFormatType, at least one participant must specify ColorSpaceType != "
                   "kDoNotCare - removing PixelFormatType: type: %u modifier: 0x%" PRIx64,
-                  *ifc.pixel_format()->type(),
-                  ifc.pixel_format()->format_modifier_value().has_value()
-                      ? *ifc.pixel_format()->format_modifier_value()
-                      : 0ull);
+                  *ifc.pixel_format(),
+                  ifc.pixel_format_modifier().has_value() ? *ifc.pixel_format_modifier() : 0ull);
           // Remove by copying down last PixelFormat to this index and processing this index again,
           // if this isn't already the last PixelFormat.
           if (i != constraints.image_format_constraints()->size() - 1) {
@@ -2393,25 +2392,21 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
     for (auto& image_constraint : constraints.image_format_constraints().value()) {
       // We are guaranteed that color spaces are valid for the current pixel format
       if (image_constraint.color_spaces().has_value()) {
-        auto best_color_space = fuchsia_sysmem2::ColorSpaceType::kInvalid;
+        auto best_color_space = fuchsia_images2::ColorSpace::kInvalid;
 
         for (auto& color_space : image_constraint.color_spaces().value()) {
-          if (color_space.type().has_value()) {
-            auto best_ranking =
-                kColorSpaceRanking.at(sysmem::fidl_underlying_cast(best_color_space));
-            auto current_ranking =
-                kColorSpaceRanking.at(sysmem::fidl_underlying_cast(color_space.type().value()));
+          auto best_ranking = kColorSpaceRanking.at(sysmem::fidl_underlying_cast(best_color_space));
+          auto current_ranking = kColorSpaceRanking.at(sysmem::fidl_underlying_cast(color_space));
 
-            if (best_ranking > current_ranking) {
-              best_color_space = color_space.type().value();
-            }
+          if (best_ranking > current_ranking) {
+            best_color_space = color_space;
           }
         }
 
         // Set the best color space
         image_constraint.color_spaces()->resize(0);
-        fuchsia_sysmem2::ColorSpace color_space;
-        color_space.type().emplace(best_color_space);
+        fuchsia_images2::ColorSpace color_space;
+        color_space = best_color_space;
         image_constraint.color_spaces()->emplace_back(std::move(color_space));
       }
     }
@@ -2421,9 +2416,12 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
     // As an optimization, only check the unaggregated inputs.
     for (uint32_t i = 0; i < constraints.image_format_constraints()->size(); ++i) {
       for (uint32_t j = i + 1; j < constraints.image_format_constraints()->size(); ++j) {
-        if (ImageFormatIsPixelFormatEqual(
-                constraints.image_format_constraints()->at(i).pixel_format().value(),
-                constraints.image_format_constraints()->at(j).pixel_format().value())) {
+        auto i_pixel_format_and_modifier =
+            PixelFormatAndModifierFromConstraints(constraints.image_format_constraints()->at(i));
+        auto j_pixel_format_and_modifier =
+            PixelFormatAndModifierFromConstraints(constraints.image_format_constraints()->at(j));
+        if (ImageFormatIsPixelFormatEqual(i_pixel_format_and_modifier,
+                                          j_pixel_format_and_modifier)) {
           LogError(FROM_HERE, "image format constraints %d and %d have identical formats", i, j);
           return false;
         }
@@ -2475,35 +2473,51 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   // We never CheckSanitizeImageFormatConstraints() on empty (aka initial) constraints.
   ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kInitial);
 
-  FIELD_DEFAULT_SET(constraints, pixel_format);
-  FIELD_DEFAULT_ZERO(constraints.pixel_format().value(), type);
-  FIELD_DEFAULT_ZERO_64_BIT(constraints.pixel_format().value(), format_modifier_value);
+  FIELD_DEFAULT_ZERO(constraints, pixel_format);
+  // kFormatModifierNone
+  FIELD_DEFAULT_ZERO_64_BIT(constraints, pixel_format_modifier);
 
   FIELD_DEFAULT_SET_VECTOR(constraints, color_spaces, 0);
 
-  FIELD_DEFAULT_ZERO(constraints, min_coded_width);
-  FIELD_DEFAULT_MAX(constraints, max_coded_width);
-  FIELD_DEFAULT_ZERO(constraints, min_coded_height);
-  FIELD_DEFAULT_MAX(constraints, max_coded_height);
+  if (!constraints.min_surface_size().has_value()) {
+    constraints.min_surface_size() = {0, 0};
+  }
+
+  if (!constraints.max_surface_size().has_value()) {
+    constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                      std::numeric_limits<uint32_t>::max()};
+  }
+
   FIELD_DEFAULT_ZERO(constraints, min_bytes_per_row);
   FIELD_DEFAULT_MAX(constraints, max_bytes_per_row);
-  FIELD_DEFAULT_MAX(constraints, max_coded_width_times_coded_height);
+  FIELD_DEFAULT_MAX(constraints, max_surface_width_times_surface_height);
 
-  FIELD_DEFAULT_1(constraints, coded_width_divisor);
-  FIELD_DEFAULT_1(constraints, coded_height_divisor);
+  if (!constraints.surface_size_alignment().has_value()) {
+    constraints.surface_size_alignment() = {1, 1};
+  }
+
+  if (!constraints.display_size_alignment().has_value()) {
+    constraints.display_size_alignment() = {1, 1};
+  }
+
+  if (!constraints.required_min_surface_size().has_value()) {
+    constraints.required_min_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                               std::numeric_limits<uint32_t>::max()};
+  }
+
+  if (!constraints.required_max_surface_size().has_value()) {
+    constraints.required_max_surface_size() = {0, 0};
+  }
+
+  // "Packed" by default (for example, kBgr24 3 bytes per pixel is allowed to have zero padding per
+  // row of pixels and just continue with the next row of pixels in the very next byte even if that
+  // next row of pixels' offset from start of buffer and memory address of the start of the next row
+  // is odd).
   FIELD_DEFAULT_1(constraints, bytes_per_row_divisor);
+
   FIELD_DEFAULT_1(constraints, start_offset_divisor);
-  FIELD_DEFAULT_1(constraints, display_width_divisor);
-  FIELD_DEFAULT_1(constraints, display_height_divisor);
 
-  FIELD_DEFAULT_MAX(constraints, required_min_coded_width);
-  FIELD_DEFAULT_ZERO(constraints, required_max_coded_width);
-  FIELD_DEFAULT_MAX(constraints, required_min_coded_height);
-  FIELD_DEFAULT_ZERO(constraints, required_max_coded_height);
-  FIELD_DEFAULT_MAX(constraints, required_min_bytes_per_row);
-  FIELD_DEFAULT_ZERO(constraints, required_max_bytes_per_row);
-
-  if (constraints.pixel_format()->type().value() == fuchsia_sysmem2::PixelFormatType::kInvalid) {
+  if (constraints.pixel_format().value() == fuchsia_images2::PixelFormat::kInvalid) {
     LogError(FROM_HERE, "PixelFormatType INVALID not allowed");
     return false;
   }
@@ -2514,54 +2528,75 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   ZX_DEBUG_ASSERT(is_pixel_format_do_not_care_result.is_ok());
   bool is_pixel_format_do_not_care = is_pixel_format_do_not_care_result.value();
   if (!is_pixel_format_do_not_care) {
-    if (!ImageFormatIsSupported(constraints.pixel_format().value())) {
+    auto pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(constraints);
+    if (!ImageFormatIsSupported(pixel_format_and_modifier)) {
       LogError(FROM_HERE, "Unsupported pixel format");
       return false;
     }
     uint32_t min_bytes_per_row_given_min_width =
-        ImageFormatStrideBytesPerWidthPixel(constraints.pixel_format().value()) *
-        constraints.min_coded_width().value();
-    constraints.min_bytes_per_row().emplace(
-        std::max(constraints.min_bytes_per_row().value(), min_bytes_per_row_given_min_width));
+        ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier) *
+        constraints.min_surface_size()->width();
+    constraints.min_bytes_per_row() =
+        std::max(constraints.min_bytes_per_row().value(), min_bytes_per_row_given_min_width);
   }
 
+  if (!constraints.color_spaces().has_value()) {
+    LogError(FROM_HERE, "!color_spaces.has_value() not allowed");
+    return false;
+  }
   if (constraints.color_spaces()->empty()) {
     LogError(FROM_HERE, "color_spaces.empty() not allowed");
     return false;
   }
 
-  if (constraints.min_coded_width().value() > constraints.max_coded_width().value()) {
-    LogError(FROM_HERE, "min_coded_width > max_coded_width");
+  if (constraints.min_surface_size()->width() > constraints.max_surface_size()->width()) {
+    LogError(FROM_HERE, "min_surface_size.width > max_surface_size.width");
     return false;
   }
-  if (constraints.min_coded_height().value() > constraints.max_coded_height().value()) {
-    LogError(FROM_HERE, "min_coded_height > max_coded_height");
+  if (constraints.min_surface_size()->height() > constraints.max_surface_size()->height()) {
+    LogError(FROM_HERE, "min_surface_size.height > max_surface_size.height");
     return false;
   }
+
   if (constraints.min_bytes_per_row().value() > constraints.max_bytes_per_row().value()) {
     LogError(FROM_HERE, "min_bytes_per_row > max_bytes_per_row");
     return false;
   }
-  if (constraints.min_coded_width().value() * constraints.min_coded_height().value() >
-      constraints.max_coded_width_times_coded_height().value()) {
-    LogError(FROM_HERE,
-             "min_coded_width * min_coded_height > "
-             "max_coded_width_times_coded_height");
+
+  uint32_t min_width_times_min_height;
+  if (!CheckMul(constraints.min_surface_size()->width(), constraints.min_surface_size()->height())
+           .AssignIfValid(&min_width_times_min_height)) {
+    LogError(FROM_HERE, "min_surface_size.width * min_surface_size.height failed");
+    return false;
+  }
+  if (min_width_times_min_height > constraints.max_surface_width_times_surface_height().value()) {
+    LogError(FROM_HERE, "min_width_times_min_height > max_surface_width_times_surface_height");
     return false;
   }
 
-  if (!IsNonZeroPowerOf2(*constraints.coded_width_divisor())) {
-    LogError(FROM_HERE, "non-power-of-2 coded_width_divisor not supported");
+  if (!IsNonZeroPowerOf2(constraints.surface_size_alignment()->width())) {
+    LogError(FROM_HERE, "non-power-of-2 surface_size_alignment.width not supported");
     return false;
   }
-  if (!IsNonZeroPowerOf2(*constraints.coded_height_divisor())) {
-    LogError(FROM_HERE, "non-power-of-2 coded_width_divisor not supported");
+  if (!IsNonZeroPowerOf2(constraints.surface_size_alignment()->height())) {
+    LogError(FROM_HERE, "non-power-of-2 surface_size_alignment.height not supported");
     return false;
   }
+
+  if (!IsNonZeroPowerOf2(constraints.display_size_alignment()->width())) {
+    LogError(FROM_HERE, "non-power-of-2 display_size_alignment.width not supported");
+    return false;
+  }
+  if (!IsNonZeroPowerOf2(constraints.display_size_alignment()->height())) {
+    LogError(FROM_HERE, "non-power-of-2 display_size_alignment.height not supported");
+    return false;
+  }
+
   if (!IsNonZeroPowerOf2(*constraints.bytes_per_row_divisor())) {
     LogError(FROM_HERE, "non-power-of-2 bytes_per_row_divisor not supported");
     return false;
   }
+
   if (!IsNonZeroPowerOf2(*constraints.start_offset_divisor())) {
     LogError(FROM_HERE, "non-power-of-2 start_offset_divisor not supported");
     return false;
@@ -2570,23 +2605,6 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     LogError(FROM_HERE,
              "support for start_offset_divisor > zx_system_get_page_size() not yet implemented");
     return false;
-  }
-  if (!IsNonZeroPowerOf2(*constraints.display_width_divisor())) {
-    LogError(FROM_HERE, "non-power-of-2 display_width_divisor not supported");
-    return false;
-  }
-  if (!IsNonZeroPowerOf2(*constraints.display_height_divisor())) {
-    LogError(FROM_HERE, "non-power-of-2 display_height_divisor not supported");
-    return false;
-  }
-
-  // Pre-check this to make error easier to diagnose vs. error from IsColorSpaceArrayDoNotCare(),
-  // since this requirement applies regardless of DO_NOT_CARE true or false.
-  for (uint32_t i = 0; i < constraints.color_spaces()->size(); ++i) {
-    if (!constraints.color_spaces()->at(i).type().has_value()) {
-      LogError(FROM_HERE, "color_spaces.type must be set");
-      return false;
-    }
   }
 
   if (!is_pixel_format_do_not_care) {
@@ -2600,68 +2618,50 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     bool is_color_space_do_not_care = is_color_space_do_not_care_result.value();
     if (!is_color_space_do_not_care) {
       for (uint32_t i = 0; i < constraints.color_spaces()->size(); ++i) {
+        auto pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(constraints);
         if (!ImageFormatIsSupportedColorSpaceForPixelFormat(constraints.color_spaces()->at(i),
-                                                            *constraints.pixel_format())) {
-          auto colorspace_type = constraints.color_spaces()->at(i).type().has_value()
-                                     ? *constraints.color_spaces()->at(i).type()
-                                     : fuchsia_sysmem2::wire::ColorSpaceType::kInvalid;
+                                                            pixel_format_and_modifier)) {
+          auto color_space = constraints.color_spaces()->at(i);
           LogError(FROM_HERE,
                    "!ImageFormatIsSupportedColorSpaceForPixelFormat() "
-                   "color_space.type: %u "
-                   "pixel_format.type: %u",
-                   sysmem::fidl_underlying_cast(colorspace_type),
-                   sysmem::fidl_underlying_cast(*constraints.pixel_format()->type()));
+                   "color_space: %u pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
+                   sysmem::fidl_underlying_cast(color_space),
+                   sysmem::fidl_underlying_cast(*constraints.pixel_format()),
+                   *constraints.pixel_format_modifier());
           return false;
         }
       }
     }
   }
 
-  if (*constraints.required_min_coded_width() == 0) {
-    LogError(FROM_HERE, "required_min_coded_width == 0");
+  if (constraints.required_min_surface_size()->width() == 0) {
+    LogError(FROM_HERE, "required_min_surface_size.width == 0");
     return false;
   }
-  ZX_DEBUG_ASSERT(*constraints.required_min_coded_width() != 0);
-  if (*constraints.required_min_coded_width() < *constraints.min_coded_width()) {
-    LogError(FROM_HERE, "required_min_coded_width < min_coded_width");
+  ZX_DEBUG_ASSERT(constraints.required_min_surface_size()->width() != 0);
+  if (constraints.required_min_surface_size()->width() < constraints.min_surface_size()->width()) {
+    LogError(FROM_HERE, "required_min_surface_size.width < min_surface_size.width");
     return false;
   }
-  if (*constraints.required_max_coded_width() > *constraints.max_coded_width()) {
-    LogError(FROM_HERE, "required_max_coded_width > max_coded_width");
+  if (constraints.required_max_surface_size()->width() > constraints.max_surface_size()->width()) {
+    LogError(FROM_HERE, "required_max_surface_size.width > max_surface_size.width");
     return false;
   }
-  if (*constraints.required_min_coded_height() == 0) {
-    LogError(FROM_HERE, "required_min_coded_height == 0");
+  if (constraints.required_min_surface_size()->height() == 0) {
+    LogError(FROM_HERE, "required_min_surface_size.height == 0");
     return false;
   }
-  ZX_DEBUG_ASSERT(*constraints.required_min_coded_height() != 0);
-  if (*constraints.required_min_coded_height() < *constraints.min_coded_height()) {
-    LogError(FROM_HERE, "required_min_coded_height < min_coded_height");
+  ZX_DEBUG_ASSERT(constraints.required_min_surface_size()->height() != 0);
+  if (constraints.required_min_surface_size()->height() <
+      constraints.min_surface_size()->height()) {
+    LogError(FROM_HERE, "required_min_surface_size.height < min_surface_size.height");
     return false;
   }
-  if (*constraints.required_max_coded_height() > *constraints.max_coded_height()) {
-    LogError(FROM_HERE, "required_max_coded_height > max_coded_height");
+  if (constraints.required_max_surface_size()->height() >
+      constraints.max_surface_size()->height()) {
+    LogError(FROM_HERE, "required_max_surface_size.height > max_surface_size.height");
     return false;
   }
-  if (*constraints.required_min_bytes_per_row() == 0) {
-    LogError(FROM_HERE, "required_min_bytes_per_row == 0");
-    return false;
-  }
-  ZX_DEBUG_ASSERT(*constraints.required_min_bytes_per_row() != 0);
-  if (*constraints.required_min_bytes_per_row() < *constraints.min_bytes_per_row()) {
-    LogError(FROM_HERE, "required_min_bytes_per_row < min_bytes_per_row");
-    return false;
-  }
-  if (*constraints.required_max_bytes_per_row() > *constraints.max_bytes_per_row()) {
-    LogError(FROM_HERE, "required_max_bytes_per_row > max_bytes_per_row");
-    return false;
-  }
-
-  // TODO(dustingreen): Check compatibility of color_space[] entries vs. the
-  // pixel_format.  In particular, 2020 and 2100 don't have 8 bpp, only 10 or
-  // 12 bpp, while a given PixelFormat.type is a specific bpp.  There's
-  // probably no reason to allow 2020 or 2100 to be specified along with a
-  // PixelFormat.type that's 8 bpp for example.
 
   return true;
 }
@@ -2868,7 +2868,10 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormats(
   for (uint32_t ai = 0; ai < acc->size(); ++ai) {
     bool is_found_in_c = false;
     for (size_t ci = 0; ci < c.size(); ++ci) {
-      if (ImageFormatIsPixelFormatEqual(*(*acc)[ai].pixel_format(), *c[ci].pixel_format())) {
+      auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints((*acc)[ai]);
+      auto c_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(c[ci]);
+      if (ImageFormatIsPixelFormatEqual(acc_pixel_format_and_modifier,
+                                        c_pixel_format_and_modifier)) {
         // Move last entry into the entry we're consuming, since LLCPP FIDL tables don't have any
         // way to detect that they've been moved out of, so we need to keep c tightly packed with
         // not-moved-out-of entries.  We don't need to adjust ci to stay at the same entry for the
@@ -2927,10 +2930,13 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormats(
 
 bool LogicalBufferCollection::AccumulateConstraintImageFormat(
     fuchsia_sysmem2::ImageFormatConstraints* acc, fuchsia_sysmem2::ImageFormatConstraints c) {
-  ZX_DEBUG_ASSERT(ImageFormatIsPixelFormatEqual(*acc->pixel_format(), *c.pixel_format()));
+  ZX_DEBUG_ASSERT(ImageFormatIsPixelFormatEqual(PixelFormatAndModifierFromConstraints(*acc),
+                                                PixelFormatAndModifierFromConstraints(c)));
   // Checked previously.
+  ZX_DEBUG_ASSERT(acc->color_spaces().has_value());
   ZX_DEBUG_ASSERT(!acc->color_spaces()->empty());
   // Checked previously.
+  ZX_DEBUG_ASSERT(c.color_spaces().has_value());
   ZX_DEBUG_ASSERT(!c.color_spaces()->empty());
 
   if (!AccumulateConstraintColorSpaces(&*acc->color_spaces(), std::move(*c.color_spaces()))) {
@@ -2939,21 +2945,42 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   // Else AccumulateConstraintColorSpaces() would have returned false.
   ZX_DEBUG_ASSERT(!acc->color_spaces()->empty());
 
-  acc->min_coded_width() = std::max(*acc->min_coded_width(), *c.min_coded_width());
-  acc->max_coded_width() = std::min(*acc->max_coded_width(), *c.max_coded_width());
-  acc->min_coded_height() = std::max(*acc->min_coded_height(), *c.min_coded_height());
-  acc->max_coded_height() = std::min(*acc->max_coded_height(), *c.max_coded_height());
+  ZX_DEBUG_ASSERT(acc->min_surface_size().has_value());
+  ZX_DEBUG_ASSERT(c.min_surface_size().has_value());
+  acc->min_surface_size()->width() =
+      std::max(acc->min_surface_size()->width(), c.min_surface_size()->width());
+  acc->min_surface_size()->height() =
+      std::max(acc->min_surface_size()->height(), c.min_surface_size()->height());
+
+  ZX_DEBUG_ASSERT(acc->max_surface_size().has_value());
+  ZX_DEBUG_ASSERT(c.max_surface_size().has_value());
+  acc->max_surface_size()->width() =
+      std::min(acc->max_surface_size()->width(), c.max_surface_size()->width());
+  acc->max_surface_size()->height() =
+      std::min(acc->max_surface_size()->height(), c.max_surface_size()->height());
+
   acc->min_bytes_per_row() = std::max(*acc->min_bytes_per_row(), *c.min_bytes_per_row());
   acc->max_bytes_per_row() = std::min(*acc->max_bytes_per_row(), *c.max_bytes_per_row());
-  acc->max_coded_width_times_coded_height() =
-      std::min(*acc->max_coded_width_times_coded_height(), *c.max_coded_width_times_coded_height());
+
+  ZX_DEBUG_ASSERT(acc->max_surface_width_times_surface_height().has_value());
+  ZX_DEBUG_ASSERT(c.max_surface_width_times_surface_height().has_value());
+  acc->max_surface_width_times_surface_height() = std::min(
+      *acc->max_surface_width_times_surface_height(), *c.max_surface_width_times_surface_height());
 
   // For these, see also the conditional statement below that ensures these are fixed up with any
   // pixel-format-dependent adjustment.
-  acc->coded_width_divisor() = std::max(*acc->coded_width_divisor(), *c.coded_width_divisor());
-  acc->coded_height_divisor() = std::max(*acc->coded_height_divisor(), *c.coded_height_divisor());
+  ZX_DEBUG_ASSERT(acc->surface_size_alignment().has_value());
+  ZX_DEBUG_ASSERT(c.surface_size_alignment().has_value());
+  acc->surface_size_alignment()->width() =
+      std::max(acc->surface_size_alignment()->width(), c.surface_size_alignment()->width());
+  acc->surface_size_alignment()->height() =
+      std::max(acc->surface_size_alignment()->height(), c.surface_size_alignment()->height());
+
   acc->bytes_per_row_divisor() =
       std::max(*acc->bytes_per_row_divisor(), *c.bytes_per_row_divisor());
+
+  ZX_DEBUG_ASSERT(acc->start_offset_divisor().has_value());
+  ZX_DEBUG_ASSERT(c.start_offset_divisor().has_value());
   acc->start_offset_divisor() = std::max(*acc->start_offset_divisor(), *c.start_offset_divisor());
 
   // When acc still has kDoNotCare (when this condition is false), we're guaranteed to either end up
@@ -2966,50 +2993,56 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   ZX_DEBUG_ASSERT(acc_is_pixel_format_do_not_care_result.is_ok());
   bool acc_is_pixel_format_do_not_care = acc_is_pixel_format_do_not_care_result.value();
   if (!acc_is_pixel_format_do_not_care) {
-    acc->coded_width_divisor() = std::max(*acc->coded_width_divisor(),
-                                          ImageFormatCodedWidthMinDivisor(*acc->pixel_format()));
-    acc->coded_height_divisor() = std::max(*acc->coded_height_divisor(),
-                                           ImageFormatCodedHeightMinDivisor(*acc->pixel_format()));
-    acc->bytes_per_row_divisor() =
-        std::max(*acc->bytes_per_row_divisor(), ImageFormatSampleAlignment(*acc->pixel_format()));
-    acc->start_offset_divisor() =
-        std::max(*acc->start_offset_divisor(), ImageFormatSampleAlignment(*acc->pixel_format()));
+    auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(*acc);
+    acc->surface_size_alignment()->width() =
+        std::max(acc->surface_size_alignment()->width(),
+                 ImageFormatSurfaceWidthMinDivisor(acc_pixel_format_and_modifier));
+    acc->surface_size_alignment()->height() =
+        std::max(acc->surface_size_alignment()->height(),
+                 ImageFormatSurfaceHeightMinDivisor(acc_pixel_format_and_modifier));
+    acc->bytes_per_row_divisor() = std::max(
+        *acc->bytes_per_row_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
+    acc->start_offset_divisor() = std::max(
+        *acc->start_offset_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
   }
 
-  acc->display_width_divisor() =
-      std::max(*acc->display_width_divisor(), *c.display_width_divisor());
-  acc->display_height_divisor() =
-      std::max(*acc->display_height_divisor(), *c.display_height_divisor());
+  ZX_DEBUG_ASSERT(acc->display_size_alignment().has_value());
+  ZX_DEBUG_ASSERT(c.display_size_alignment().has_value());
+  acc->display_size_alignment()->width() =
+      std::max(acc->display_size_alignment()->width(), c.display_size_alignment()->width());
+  acc->display_size_alignment()->height() =
+      std::max(acc->display_size_alignment()->height(), c.display_size_alignment()->height());
 
   // The required_ space is accumulated by taking the union, and must be fully
   // within the non-required_ space, else fail.  For example, this allows a
   // video decoder to indicate that it's capable of outputting a wide range of
   // output dimensions, but that it has specific current dimensions that are
   // presently required_ (min == max) for decode to proceed.
-  ZX_DEBUG_ASSERT(*acc->required_min_coded_width() != 0);
-  ZX_DEBUG_ASSERT(*c.required_min_coded_width() != 0);
-  acc->required_min_coded_width() =
-      std::min(*acc->required_min_coded_width(), *c.required_min_coded_width());
-  acc->required_max_coded_width() =
-      std::max(*acc->required_max_coded_width(), *c.required_max_coded_width());
-  ZX_DEBUG_ASSERT(*acc->required_min_coded_height() != 0);
-  ZX_DEBUG_ASSERT(*c.required_min_coded_height() != 0);
-  acc->required_min_coded_height() =
-      std::min(*acc->required_min_coded_height(), *c.required_min_coded_height());
-  acc->required_max_coded_height() =
-      std::max(*acc->required_max_coded_height(), *c.required_max_coded_height());
-  ZX_DEBUG_ASSERT(*acc->required_min_bytes_per_row() != 0);
-  ZX_DEBUG_ASSERT(*c.required_min_bytes_per_row() != 0);
-  acc->required_min_bytes_per_row() =
-      std::min(*acc->required_min_bytes_per_row(), *c.required_min_bytes_per_row());
-  acc->required_max_bytes_per_row() =
-      std::max(*acc->required_max_bytes_per_row(), *c.required_max_bytes_per_row());
+  ZX_DEBUG_ASSERT(acc->required_min_surface_size().has_value());
+  ZX_DEBUG_ASSERT(c.required_min_surface_size().has_value());
+  ZX_DEBUG_ASSERT(acc->required_max_surface_size().has_value());
+  ZX_DEBUG_ASSERT(c.required_max_surface_size().has_value());
+
+  ZX_DEBUG_ASSERT(acc->required_min_surface_size()->width() != 0);
+  ZX_DEBUG_ASSERT(c.required_min_surface_size()->width() != 0);
+  ZX_DEBUG_ASSERT(acc->required_min_surface_size()->height() != 0);
+  ZX_DEBUG_ASSERT(c.required_min_surface_size()->height() != 0);
+
+  acc->required_min_surface_size()->width() =
+      std::min(acc->required_min_surface_size()->width(), c.required_min_surface_size()->width());
+  acc->required_max_surface_size()->width() =
+      std::max(acc->required_max_surface_size()->width(), c.required_max_surface_size()->width());
+
+  acc->required_min_surface_size()->height() =
+      std::min(acc->required_min_surface_size()->height(), c.required_min_surface_size()->height());
+  acc->required_max_surface_size()->height() =
+      std::max(acc->required_max_surface_size()->height(), c.required_max_surface_size()->height());
 
   return true;
 }
 
 bool LogicalBufferCollection::AccumulateConstraintColorSpaces(
-    std::vector<fuchsia_sysmem2::ColorSpace>* acc, std::vector<fuchsia_sysmem2::ColorSpace> c) {
+    std::vector<fuchsia_images2::ColorSpace>* acc, std::vector<fuchsia_images2::ColorSpace> c) {
   // Any ColorSpace kDoNotCare can only happen with count() == 1, checked previously.  If both acc
   // and c are indicating kDoNotCare, the result still needs to be kDoNotCare.  If only one of acc
   // or c is indicating kDoNotCare, we need to fan out the kDoNotCare into each color space
@@ -3057,7 +3090,7 @@ bool LogicalBufferCollection::AccumulateConstraintColorSpaces(
       } else {
         // Stuff under this item would get deleted later anyway, but delete now to avoid keeping
         // cruft we don't need.
-        (*acc)[ai] = fuchsia_sysmem2::ColorSpace();
+        (*acc)[ai] = fuchsia_images2::ColorSpace();
       }
       // remove last item
       acc->resize(acc->size() - 1);
@@ -3078,9 +3111,10 @@ bool LogicalBufferCollection::AccumulateConstraintColorSpaces(
   return true;
 }
 
-bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_sysmem2::ColorSpace& a,
-                                                const fuchsia_sysmem2::ColorSpace& b) {
-  return *a.type() == *b.type();
+// TODO: remove in a later CL.
+bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_images2::ColorSpace& a,
+                                                const fuchsia_images2::ColorSpace& b) {
+  return a == b;
 }
 
 static fpromise::result<fuchsia_sysmem2::HeapType, zx_status_t> GetHeap(
@@ -3259,9 +3293,10 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     uint32_t best_index = UINT32_MAX;
     bool found_unsupported_when_protected = false;
     for (uint32_t i = 0; i < constraints.image_format_constraints()->size(); ++i) {
+      auto pixel_format_and_modifier =
+          PixelFormatAndModifierFromConstraints(constraints.image_format_constraints()->at(i));
       if (*buffer_settings.is_secure() &&
-          !ImageFormatCompatibleWithProtectedMemory(
-              *constraints.image_format_constraints()->at(i).pixel_format())) {
+          !ImageFormatCompatibleWithProtectedMemory(pixel_format_and_modifier)) {
         found_unsupported_when_protected = true;
         continue;
       }
@@ -3287,34 +3322,51 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   if (settings.image_format_constraints().has_value()) {
     const fuchsia_sysmem2::ImageFormatConstraints& image_format_constraints =
         *settings.image_format_constraints();
-    fuchsia_sysmem2::ImageFormat min_image;
-    // copy / clone
-    min_image.pixel_format() = *image_format_constraints.pixel_format();
-    // We use required_max_coded_width because that's the max width that the producer (or
+    auto pixel_format_and_modifier =
+        PixelFormatAndModifierFromConstraints(image_format_constraints);
+    fuchsia_images2::ImageFormat min_image;
+    min_image.pixel_format() = pixel_format_and_modifier.pixel_format;
+    min_image.pixel_format_modifier() = pixel_format_and_modifier.pixel_format_modifier;
+
+    min_image.surface_size().emplace();
+
+    // We use required_max_surface_size.width because that's the max width that the producer (or
     // initiator) wants these buffers to be able to hold.
-    min_image.coded_width() =
-        AlignUp(std::max(*image_format_constraints.min_coded_width(),
-                         *image_format_constraints.required_max_coded_width()),
-                *image_format_constraints.coded_width_divisor());
-    if (*min_image.coded_width() > *image_format_constraints.max_coded_width()) {
-      LogError(FROM_HERE, "coded_width_divisor caused coded_width > max_coded_width");
+    min_image.surface_size()->width() =
+        AlignUp(std::max(image_format_constraints.min_surface_size()->width(),
+                         image_format_constraints.required_max_surface_size()->width()),
+                image_format_constraints.surface_size_alignment()->width());
+    if (min_image.surface_size()->width() > image_format_constraints.max_surface_size()->width()) {
+      LogError(FROM_HERE,
+               "surface_size_alignment.width caused surface_size.width > max_surface_size.width");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
-    // We use required_max_coded_height because that's the max height that the producer (or
-    // initiator) wants these buffers to be able to hold.
-    min_image.coded_height() =
-        AlignUp(std::max(*image_format_constraints.min_coded_height(),
-                         *image_format_constraints.required_max_coded_height()),
-                *image_format_constraints.coded_height_divisor());
-    if (*min_image.coded_height() > *image_format_constraints.max_coded_height()) {
-      LogError(FROM_HERE, "coded_height_divisor caused coded_height > max_coded_height");
+
+    // We use required_max_surface_size.height because that's the max height that the producer (or
+    // initiator) needs these buffers to be able to hold.
+    min_image.surface_size()->height() =
+        AlignUp(std::max(image_format_constraints.min_surface_size()->height(),
+                         image_format_constraints.required_max_surface_size()->height()),
+                image_format_constraints.surface_size_alignment()->height());
+    if (min_image.surface_size()->height() >
+        image_format_constraints.max_surface_size()->height()) {
+      LogError(
+          FROM_HERE,
+          "surface_size_alignment.height caused surface_size.height > max_surface_size.height");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
-    min_image.bytes_per_row() = AlignUp(
-        std::max(*image_format_constraints.min_bytes_per_row(),
-                 ImageFormatStrideBytesPerWidthPixel(*image_format_constraints.pixel_format()) *
-                     *min_image.coded_width()),
-        *image_format_constraints.bytes_per_row_divisor());
+
+    uint32_t one_row_non_padding_bytes;
+    if (!CheckMul(ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier),
+                  min_image.surface_size()->width())
+             .AssignIfValid(&one_row_non_padding_bytes)) {
+      LogError(FROM_HERE, "stride_bytes_per_width_pixel * surface_size.width failed");
+      return fpromise::error(ZX_ERR_NOT_SUPPORTED);
+    }
+    // TODO: Make/use a safemath-y version of AlignUp().
+    min_image.bytes_per_row() =
+        AlignUp(std::max(one_row_non_padding_bytes, *image_format_constraints.min_bytes_per_row()),
+                *image_format_constraints.bytes_per_row_divisor());
     if (*min_image.bytes_per_row() > *image_format_constraints.max_bytes_per_row()) {
       LogError(FROM_HERE,
                "bytes_per_row_divisor caused bytes_per_row > "
@@ -3322,17 +3374,21 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
-    if (*min_image.coded_width() * *min_image.coded_height() >
-        *image_format_constraints.max_coded_width_times_coded_height()) {
-      LogError(FROM_HERE,
-               "coded_width * coded_height > "
-               "max_coded_width_times_coded_height");
+    uint32_t min_image_width_times_height;
+    if (!CheckMul(min_image.surface_size()->width(), min_image.surface_size()->height())
+             .AssignIfValid(&min_image_width_times_height)) {
+      LogError(FROM_HERE, "min_image width*height failed");
+      return fpromise::error(ZX_ERR_NOT_SUPPORTED);
+    }
+    if (min_image_width_times_height >
+        *image_format_constraints.max_surface_width_times_surface_height()) {
+      LogError(FROM_HERE, "min_image_width_times_height > max_surface_width_times_surface_height");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
-    // These don't matter for computing size in bytes.
-    ZX_DEBUG_ASSERT(!min_image.display_width().has_value());
-    ZX_DEBUG_ASSERT(!min_image.display_height().has_value());
+    // The display size and valid size don't matter for computing size in bytes.
+    ZX_DEBUG_ASSERT(!min_image.display_size().has_value());
+    ZX_DEBUG_ASSERT(!min_image.valid_size().has_value());
 
     // Checked previously.
     ZX_DEBUG_ASSERT(image_format_constraints.color_spaces()->size() >= 1);
@@ -3433,31 +3489,31 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
   if (settings.image_format_constraints().has_value()) {
     const fuchsia_sysmem2::ImageFormatConstraints& image_format_constraints =
         *settings.image_format_constraints();
-    inspect_node_.CreateUint(
-        "pixel_format",
-        sysmem::fidl_underlying_cast(*image_format_constraints.pixel_format()->type()),
-        &vmo_properties_);
-    if (image_format_constraints.pixel_format()->format_modifier_value().has_value()) {
+    inspect_node_.CreateUint("pixel_format",
+                             sysmem::fidl_underlying_cast(*image_format_constraints.pixel_format()),
+                             &vmo_properties_);
+    if (image_format_constraints.pixel_format_modifier().has_value()) {
       inspect_node_.CreateUint("pixel_format_modifier",
-                               *image_format_constraints.pixel_format()->format_modifier_value(),
+                               *image_format_constraints.pixel_format_modifier(), &vmo_properties_);
+    }
+    if (image_format_constraints.min_surface_size()->width() > 0) {
+      inspect_node_.CreateUint("min_surface_size_width",
+                               image_format_constraints.min_surface_size()->width(),
                                &vmo_properties_);
     }
-    if (*image_format_constraints.min_coded_width() > 0) {
-      inspect_node_.CreateUint("min_coded_width", *image_format_constraints.min_coded_width(),
+    if (image_format_constraints.min_surface_size()->height() > 0) {
+      inspect_node_.CreateUint("min_surface_size_height",
+                               image_format_constraints.min_surface_size()->height(),
                                &vmo_properties_);
     }
-    if (*image_format_constraints.min_coded_height() > 0) {
-      inspect_node_.CreateUint("min_coded_height", *image_format_constraints.min_coded_height(),
+    if (image_format_constraints.required_max_surface_size()->width() > 0) {
+      inspect_node_.CreateUint("required_max_surface_size_width",
+                               image_format_constraints.required_max_surface_size()->width(),
                                &vmo_properties_);
     }
-    if (*image_format_constraints.required_max_coded_width() > 0) {
-      inspect_node_.CreateUint("required_max_coded_width",
-                               *image_format_constraints.required_max_coded_width(),
-                               &vmo_properties_);
-    }
-    if (*image_format_constraints.required_max_coded_height() > 0) {
-      inspect_node_.CreateUint("required_max_coded_height",
-                               *image_format_constraints.required_max_coded_height(),
+    if (image_format_constraints.required_max_surface_size()->height() > 0) {
+      inspect_node_.CreateUint("required_max_surface_size_height",
+                               image_format_constraints.required_max_surface_size()->height(),
                                &vmo_properties_);
     }
   }
@@ -3802,24 +3858,22 @@ int32_t LogicalBufferCollection::CompareImageFormatConstraintsTieBreaker(
   // If there's not any cost difference, fall back to choosing the
   // pixel_format that has the larger type enum value as a tie-breaker.
 
-  int32_t result = clamp_difference(sysmem::fidl_underlying_cast(*a.pixel_format()->type()),
-                                    sysmem::fidl_underlying_cast(*b.pixel_format()->type()));
+  int32_t result = clamp_difference(sysmem::fidl_underlying_cast(*a.pixel_format()),
+                                    sysmem::fidl_underlying_cast(*b.pixel_format()));
 
   if (result != 0) {
     return result;
   }
 
-  result = clamp_difference(a.pixel_format()->format_modifier_value().has_value(),
-                            b.pixel_format()->format_modifier_value().has_value());
+  result = clamp_difference(a.pixel_format_modifier().has_value(),
+                            b.pixel_format_modifier().has_value());
 
   if (result != 0) {
     return result;
   }
 
-  if (a.pixel_format()->format_modifier_value().has_value() &&
-      b.pixel_format()->format_modifier_value().has_value()) {
-    result = clamp_difference(*a.pixel_format()->format_modifier_value(),
-                              *b.pixel_format()->format_modifier_value());
+  if (a.pixel_format_modifier().has_value() && b.pixel_format_modifier().has_value()) {
+    result = clamp_difference(*a.pixel_format_modifier(), *b.pixel_format_modifier());
   }
 
   return result;
@@ -4089,31 +4143,49 @@ void LogicalBufferCollection::LogConstraints(
   for (uint32_t i = 0; i < image_format_constraints_count; ++i) {
     LogInfo(FROM_HERE, "image_format_constraints[%u] (ifc):", i);
     const fuchsia_sysmem2::ImageFormatConstraints& ifc = c.image_format_constraints()->at(i);
+
     if (!ifc.pixel_format().has_value()) {
       LogInfo(FROM_HERE, "!ifc.has_pixel_format()");
     } else {
-      LOG_UINT32_FIELD(FROM_HERE, *ifc.pixel_format(), type);
-      LOG_UINT64_FIELD(FROM_HERE, *ifc.pixel_format(), format_modifier_value);
+      LOG_UINT32_FIELD(FROM_HERE, ifc, pixel_format);
     }
-    LOG_UINT32_FIELD(FROM_HERE, ifc, min_coded_width);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, max_coded_width);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, min_coded_height);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, max_coded_height);
+
+    if (!ifc.pixel_format_modifier().has_value()) {
+      LogInfo(FROM_HERE, "!ifc.has_pixel_format_modifier()");
+    } else {
+      LOG_UINT64_FIELD(FROM_HERE, ifc, pixel_format_modifier);
+    }
+
+    LogInfo(FROM_HERE, "min_surface_size.width: %u", ifc.min_surface_size()->width());
+    LogInfo(FROM_HERE, "min_surface_size.height: %u", ifc.min_surface_size()->height());
+
+    LogInfo(FROM_HERE, "max_surface_size.width: %u", ifc.max_surface_size()->width());
+    LogInfo(FROM_HERE, "max_surface_size.height: %u", ifc.max_surface_size()->height());
+
     LOG_UINT32_FIELD(FROM_HERE, ifc, min_bytes_per_row);
     LOG_UINT32_FIELD(FROM_HERE, ifc, max_bytes_per_row);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, max_coded_width_times_coded_height);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, coded_width_divisor);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, coded_height_divisor);
+
+    LOG_UINT32_FIELD(FROM_HERE, ifc, max_surface_width_times_surface_height);
+
+    LogInfo(FROM_HERE, "surface_size_alignment.width: %u", ifc.surface_size_alignment()->width());
+    LogInfo(FROM_HERE, "surface_size_alignment.height: %u", ifc.surface_size_alignment()->height());
+
+    LogInfo(FROM_HERE, "display_size_alignment.width: %u", ifc.display_size_alignment()->width());
+    LogInfo(FROM_HERE, "display_size_alignment.height: %u", ifc.display_size_alignment()->height());
+
+    LogInfo(FROM_HERE, "required_min_surface_size.width: %u",
+            ifc.required_min_surface_size()->width());
+    LogInfo(FROM_HERE, "required_min_surface_size.height: %u",
+            ifc.required_min_surface_size()->height());
+
+    LogInfo(FROM_HERE, "required_max_surface_size.width: %u",
+            ifc.required_max_surface_size()->width());
+    LogInfo(FROM_HERE, "required_max_surface_size.height: %u",
+            ifc.required_max_surface_size()->height());
+
     LOG_UINT32_FIELD(FROM_HERE, ifc, bytes_per_row_divisor);
+
     LOG_UINT32_FIELD(FROM_HERE, ifc, start_offset_divisor);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, display_width_divisor);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, display_height_divisor);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_min_coded_width);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_max_coded_width);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_min_coded_height);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_max_coded_height);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_min_bytes_per_row);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, required_max_bytes_per_row);
   }
 }
 

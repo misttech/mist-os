@@ -490,32 +490,28 @@ bool AttachTokenSucceedsV2(
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   constraints_1.image_format_constraints().emplace(1);
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
-  image_constraints_1.pixel_format().emplace();
-  image_constraints_1.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints_1.color_spaces().emplace(1);
-  image_constraints_1.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+  image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints_1.min_coded_width() = 256;
-  image_constraints_1.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.min_coded_height() = 256;
-  image_constraints_1.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints_1.min_surface_size() = {256, 256};
+  image_constraints_1.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                            std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.coded_width_divisor() = 2;
-  image_constraints_1.coded_height_divisor() = 2;
+  image_constraints_1.max_surface_width_times_surface_height() =
+      std::numeric_limits<uint32_t>::max();
+  image_constraints_1.surface_size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
-  image_constraints_1.display_width_divisor() = 1;
-  image_constraints_1.display_height_divisor() = 1;
+  image_constraints_1.display_size_alignment() = {1, 1};
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
   v2::BufferCollectionConstraints constraints_2(constraints_1);
   // Modify constraints_2 to require double the width and height.
-  constraints_2.image_format_constraints()->at(0).min_coded_width() = 512;
-  constraints_2.image_format_constraints()->at(0).min_coded_height() = 512;
+  constraints_2.image_format_constraints()->at(0).min_surface_size() = {512, 512};
 
   // TODO(fxb/115937): Fix this to work for sysmem2.
 #if SYSMEM_FUZZ_CORPUS
@@ -987,13 +983,11 @@ TEST(Sysmem, TokenOneParticipantColorspaceRankingV2) {
   buffer_memory.cpu_domain_supported() = true;
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = fuchsia_sysmem2::PixelFormatType::kNv12;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(3);
-  image_constraints.color_spaces()->at(0).type() = fuchsia_sysmem2::ColorSpaceType::kRec601Pal;
-  image_constraints.color_spaces()->at(1).type() =
-      fuchsia_sysmem2::ColorSpaceType::kRec601PalFullRange;
-  image_constraints.color_spaces()->at(2).type() = fuchsia_sysmem2::ColorSpaceType::kRec709;
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec601Pal;
+  image_constraints.color_spaces()->at(1) = fuchsia_images2::ColorSpace::kRec601PalFullRange;
+  image_constraints.color_spaces()->at(2) = fuchsia_images2::ColorSpace::kRec709;
 
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
   request.constraints() = std::move(constraints);
@@ -1009,36 +1003,14 @@ TEST(Sysmem, TokenOneParticipantColorspaceRankingV2) {
   ASSERT_TRUE(buffer_collection_info.settings()->image_format_constraints().has_value());
   ASSERT_TRUE(
       buffer_collection_info.settings()->image_format_constraints()->pixel_format().has_value());
-  ASSERT_TRUE(buffer_collection_info.settings()
-                  ->image_format_constraints()
-                  ->pixel_format()
-                  ->type()
-                  .has_value());
-  ASSERT_TRUE(buffer_collection_info.settings()
-                  ->image_format_constraints()
-                  ->pixel_format()
-                  ->type()
-                  .has_value());
-  ASSERT_EQ(
-      buffer_collection_info.settings()->image_format_constraints()->pixel_format()->type().value(),
-      fuchsia_sysmem2::PixelFormatType::kNv12);
+  ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->pixel_format().value(),
+            fuchsia_images2::PixelFormat::kNv12);
   ASSERT_TRUE(
       buffer_collection_info.settings()->image_format_constraints()->color_spaces().has_value());
   ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->color_spaces()->size(),
             1);
-  ASSERT_TRUE(buffer_collection_info.settings()
-                  ->image_format_constraints()
-                  ->color_spaces()
-                  ->at(0)
-                  .type()
-                  .has_value());
-  ASSERT_EQ(buffer_collection_info.settings()
-                ->image_format_constraints()
-                ->color_spaces()
-                ->at(0)
-                .type()
-                .value(),
-            fuchsia_sysmem2::ColorSpaceType::kRec709);
+  ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->color_spaces()->at(0),
+            fuchsia_images2::ColorSpace::kRec709);
 }
 
 TEST(Sysmem, AttachLifetimeTrackingV2) {
@@ -1241,25 +1213,21 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = fuchsia_sysmem2::PixelFormatType::kNv12;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
-  image_constraints.color_spaces()->at(0).type() = fuchsia_sysmem2::ColorSpaceType::kRec709;
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_coded_width() = 256;
-  image_constraints.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_coded_height() = 256;
-  image_constraints.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.min_surface_size() = {256, 256};
+  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                          std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.coded_width_divisor() = 2;
-  image_constraints.coded_height_divisor() = 2;
+  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.surface_size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
-  image_constraints.display_width_divisor() = 1;
-  image_constraints.display_height_divisor() = 1;
+  image_constraints.display_size_alignment() = {1, 1};
 
   // TODO(fxb/115937): Make this work for sysmem2.
 #if 0
@@ -1652,32 +1620,28 @@ TEST(Sysmem, MultipleParticipantsV2) {
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   constraints_1.image_format_constraints().emplace(1);
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
-  image_constraints_1.pixel_format().emplace();
-  image_constraints_1.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints_1.color_spaces().emplace(1);
-  image_constraints_1.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+  image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints_1.min_coded_width() = 256;
-  image_constraints_1.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.min_coded_height() = 256;
-  image_constraints_1.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints_1.min_surface_size() = {256, 256};
+  image_constraints_1.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                            std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.coded_width_divisor() = 2;
-  image_constraints_1.coded_height_divisor() = 2;
+  image_constraints_1.max_surface_width_times_surface_height() =
+      std::numeric_limits<uint32_t>::max();
+  image_constraints_1.surface_size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
-  image_constraints_1.display_width_divisor() = 1;
-  image_constraints_1.display_height_divisor() = 1;
+  image_constraints_1.display_size_alignment() = {1, 1};
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
   v2::BufferCollectionConstraints constraints_2 = constraints_1;
   // Modify constraints_2 to require double the width and height.
-  constraints_2.image_format_constraints()->at(0).min_coded_width() = 512;
-  constraints_2.image_format_constraints()->at(0).min_coded_height() = 512;
+  constraints_2.image_format_constraints()->at(0).min_surface_size() = {512, 512};
 
   // TODO(fxb/115937): Make this work for sysmem2.
 #if 0
@@ -1919,20 +1883,19 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
   constraints_1.min_buffer_count_for_camping() = 1;
 
   constexpr uint64_t kFormatModifiers[] = {
-      v2::kFormatModifierLinear, v2::kFormatModifierIntelI915XTiled,
-      v2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
-      v2::kFormatModifierArmAfbc16X16Te};
+      fuchsia_images2::kFormatModifierLinear, fuchsia_images2::kFormatModifierIntelI915XTiled,
+      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
+      fuchsia_images2::kFormatModifierArmAfbc16X16Te};
   constraints_1.image_format_constraints().emplace(std::size(kFormatModifiers));
 
   for (uint32_t i = 0; i < std::size(kFormatModifiers); i++) {
     auto& image_constraints_1 = constraints_1.image_format_constraints()->at(i);
 
-    image_constraints_1.pixel_format().emplace();
-    image_constraints_1.pixel_format()->type() =
-        i < 2 ? v2::PixelFormatType::kR8G8B8A8 : v2::PixelFormatType::kBgra32;
-    image_constraints_1.pixel_format()->format_modifier_value() = kFormatModifiers[i];
+    image_constraints_1.pixel_format() =
+        i < 2 ? fuchsia_images2::PixelFormat::kR8G8B8A8 : fuchsia_images2::PixelFormat::kBgra32;
+    image_constraints_1.pixel_format_modifier() = kFormatModifiers[i];
     image_constraints_1.color_spaces().emplace(1);
-    image_constraints_1.color_spaces()->at(0).type() = v2::ColorSpaceType::kSrgb;
+    image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   }
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
@@ -1941,8 +1904,9 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
 
   for (uint32_t i = 0; i < constraints_2.image_format_constraints()->size(); ++i) {
     // Modify constraints_2 to require nonzero image dimensions.
-    constraints_2.image_format_constraints()->at(i).required_max_coded_height() = 512;
-    constraints_2.image_format_constraints()->at(i).required_max_coded_width() = 512;
+    constraints_2.image_format_constraints()->at(i).required_max_surface_size().emplace();
+    constraints_2.image_format_constraints()->at(i).required_max_surface_size()->width() = 512;
+    constraints_2.image_format_constraints()->at(i).required_max_surface_size()->height() = 512;
   }
 
   // TODO(fxb/115937): Make this work for sysmem2.
@@ -2039,20 +2003,19 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
   buffer_memory.cpu_domain_supported() = true;
   constraints_1.image_format_constraints().emplace(1);
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
-  image_constraints_1.pixel_format().emplace();
-  image_constraints_1.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints_1.color_spaces().emplace(3);
-  image_constraints_1.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec601Pal;
-  image_constraints_1.color_spaces()->at(1).type() = v2::ColorSpaceType::kRec601PalFullRange;
-  image_constraints_1.color_spaces()->at(2).type() = v2::ColorSpaceType::kRec709;
+  image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec601Pal;
+  image_constraints_1.color_spaces()->at(1) = fuchsia_images2::ColorSpace::kRec601PalFullRange;
+  image_constraints_1.color_spaces()->at(2) = fuchsia_images2::ColorSpace::kRec709;
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
   v2::BufferCollectionConstraints constraints_2(constraints_1);
   v2::ImageFormatConstraints& image_constraints_2 = constraints_2.image_format_constraints()->at(0);
   image_constraints_2.color_spaces().emplace(2);
-  image_constraints_2.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec601PalFullRange;
-  image_constraints_2.color_spaces()->at(1).type() = v2::ColorSpaceType::kRec709;
+  image_constraints_2.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec601PalFullRange;
+  image_constraints_2.color_spaces()->at(1) = fuchsia_images2::ColorSpace::kRec709;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints_1);
@@ -2090,26 +2053,14 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
     ASSERT_TRUE(buffer_collection_info.settings()->image_format_constraints().has_value());
     ASSERT_TRUE(
         buffer_collection_info.settings()->image_format_constraints()->pixel_format().has_value());
-    ASSERT_TRUE(buffer_collection_info.settings()
-                    ->image_format_constraints()
-                    ->pixel_format()
-                    ->type()
-                    .has_value());
-    ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->pixel_format()->type(),
-              v2::PixelFormatType::kNv12);
+    ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->pixel_format(),
+              fuchsia_images2::PixelFormat::kNv12);
     ASSERT_TRUE(
         buffer_collection_info.settings()->image_format_constraints()->color_spaces().has_value());
     ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->color_spaces()->size(),
               1);
-    ASSERT_TRUE(buffer_collection_info.settings()
-                    ->image_format_constraints()
-                    ->color_spaces()
-                    ->at(0)
-                    .type()
-                    .has_value());
-    ASSERT_EQ(
-        buffer_collection_info.settings()->image_format_constraints()->color_spaces()->at(0).type(),
-        v2::ColorSpaceType::kRec709);
+    ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->color_spaces()->at(0),
+              fuchsia_images2::ColorSpace::kRec709);
   };
 
   check_allocation_results(collection_1->WaitForAllBuffersAllocated());
@@ -2155,17 +2106,15 @@ TEST(Sysmem,
       if (include_rec601) {
         auto& image_constraints =
             constraints.image_format_constraints()->at(image_constraints_index);
-        image_constraints.pixel_format().emplace();
-        image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+        image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
         image_constraints.color_spaces().emplace(1);
-        image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec601Ntsc;
+        image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec601Ntsc;
         ++image_constraints_index;
       }
       auto& image_constraints = constraints.image_format_constraints()->at(image_constraints_index);
-      image_constraints.pixel_format().emplace();
-      image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+      image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
       image_constraints.color_spaces().emplace(1);
-      image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+      image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
       return constraints;
     };
 
@@ -2415,11 +2364,10 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
 
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
 
-  image_constraints_1.pixel_format().emplace();
-  image_constraints_1.pixel_format()->type() = v2::PixelFormatType::kR8G8B8A8;
-  image_constraints_1.pixel_format()->format_modifier_value() = v2::kFormatModifierLinear;
+  image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
+  image_constraints_1.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
   image_constraints_1.color_spaces().emplace(1);
-  image_constraints_1.color_spaces()->at(0).type() = v2::ColorSpaceType::kSrgb;
+  image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints_1);
@@ -2714,25 +2662,20 @@ TEST(Sysmem, RequiredSizeV2) {
   ZX_DEBUG_ASSERT(!constraints.buffer_memory_constraints().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
-  image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-  image_constraints.min_coded_width() = 256;
-  image_constraints.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_coded_height() = 256;
-  image_constraints.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
+  image_constraints.min_surface_size() = {256, 256};
+  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                          std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.coded_width_divisor() = 1;
-  image_constraints.coded_height_divisor() = 1;
+  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.surface_size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = 1;
   image_constraints.start_offset_divisor() = 1;
-  image_constraints.display_width_divisor() = 1;
-  image_constraints.display_height_divisor() = 1;
-  image_constraints.required_max_coded_width() = 512;
-  image_constraints.required_max_coded_height() = 1024;
+  image_constraints.display_size_alignment() = {1, 1};
+  image_constraints.required_max_surface_size() = {512, 1024};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3218,25 +3161,21 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = v2::PixelFormatType::kBgr24;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kBgr24;
   image_constraints.color_spaces().emplace(1);
-  image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kSrgb;
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_coded_width() = kWidth;
-  image_constraints.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_coded_height() = kHeight;
-  image_constraints.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.min_surface_size() = {kWidth, kHeight};
+  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                          std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = kStride;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.coded_width_divisor() = 1;
-  image_constraints.coded_height_divisor() = 1;
+  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.surface_size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = divisor;
   image_constraints.start_offset_divisor() = divisor;
-  image_constraints.display_width_divisor() = 1;
-  image_constraints.display_height_divisor() = 1;
+  image_constraints.display_size_alignment() = {1, 1};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3260,9 +3199,8 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   // image_format_constraints.
   ASSERT_TRUE(buffer_collection_info.settings()->image_format_constraints().has_value());
 
-  ASSERT_EQ(
-      buffer_collection_info.settings()->image_format_constraints()->pixel_format()->type().value(),
-      v2::PixelFormatType::kBgr24);
+  ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->pixel_format().value(),
+            fuchsia_images2::PixelFormat::kBgr24);
 
   for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
     ASSERT_NE(buffer_collection_info.buffers()->at(i).vmo()->get(), ZX_HANDLE_INVALID);
@@ -3852,12 +3790,12 @@ TEST(Sysmem, DefaultAttributesV2) {
   ZX_DEBUG_ASSERT(!constraints.buffer_memory_constraints().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
-  image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-  image_constraints.required_max_coded_width() = 512;
-  image_constraints.required_max_coded_height() = 1024;
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
+  image_constraints.required_max_surface_size().emplace();
+  image_constraints.required_max_surface_size()->width() = 512;
+  image_constraints.required_max_surface_size()->height() = 1024;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3916,12 +3854,12 @@ TEST(Sysmem, TooManyFormatsV2) {
   for (uint32_t i = 0; i < v2::kMaxCountBufferCollectionConstraintsImageFormatConstraints + 1;
        i++) {
     auto& image_constraints = constraints.image_format_constraints()->at(i);
-    image_constraints.pixel_format().emplace();
-    image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
     image_constraints.color_spaces().emplace(1);
-    image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-    image_constraints.required_max_coded_width() = 512;
-    image_constraints.required_max_coded_height() = 1024;
+    image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
+    image_constraints.required_max_surface_size().emplace();
+    image_constraints.required_max_surface_size()->width() = 512;
+    image_constraints.required_max_surface_size()->height() = 1024;
   }
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3992,25 +3930,21 @@ bool BasicAllocationSucceedsV2(
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format().emplace();
-  image_constraints.pixel_format()->type() = v2::PixelFormatType::kNv12;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
-  image_constraints.color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+  image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_coded_width() = 256;
-  image_constraints.max_coded_width() = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_coded_height() = 256;
-  image_constraints.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.min_surface_size() = {256, 256};
+  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
+                                          std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.coded_width_divisor() = 2;
-  image_constraints.coded_height_divisor() = 2;
+  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.surface_size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
-  image_constraints.display_width_divisor() = 1;
-  image_constraints.display_height_divisor() = 1;
+  image_constraints.display_size_alignment() = {1, 1};
 
   modify_constraints(constraints);
 
@@ -4089,7 +4023,13 @@ TEST(Sysmem, ZeroRequiredMinCodedWidth_FailsInV2) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_FALSE(BasicAllocationSucceedsV2([](v2::BufferCollectionConstraints& to_modify) {
-    to_modify.image_format_constraints()->at(0).required_min_coded_width() = 0;
+    auto& ifc = to_modify.image_format_constraints()->at(0);
+    if (!ifc.required_min_surface_size().has_value()) {
+      ifc.required_min_surface_size().emplace();
+      // not testing height 0, so set height to 1
+      ifc.required_min_surface_size()->height() = 1;
+    }
+    ifc.required_min_surface_size()->width() = 0;
   }));
 }
 
@@ -4097,15 +4037,13 @@ TEST(Sysmem, ZeroRequiredMinCodedHeight_FailsInV2) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_FALSE(BasicAllocationSucceedsV2([](v2::BufferCollectionConstraints& to_modify) {
-    to_modify.image_format_constraints()->at(0).required_min_coded_height() = 0;
-  }));
-}
-
-TEST(Sysmem, ZeroRequiredMinBytesPerRow_FailsInV2) {
-  // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
-  // interpreted as replace with default.
-  EXPECT_FALSE(BasicAllocationSucceedsV2([](v2::BufferCollectionConstraints& to_modify) {
-    to_modify.image_format_constraints()->at(0).required_min_bytes_per_row() = 0;
+    auto& ifc = to_modify.image_format_constraints()->at(0);
+    if (!ifc.required_min_surface_size().has_value()) {
+      ifc.required_min_surface_size().emplace();
+      // not testing width 0, so set width to 1
+      ifc.required_min_surface_size()->width() = 1;
+    }
+    ifc.required_min_surface_size()->height() = 0;
   }));
 }
 
@@ -5241,22 +5179,19 @@ TEST(Sysmem, PixelFormatDoNotCare_SuccessV2) {
   c2.image_format_constraints().emplace(1);
   c2.image_format_constraints()->at(0) = {};
   c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-  c2.image_format_constraints()->at(0).color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-  c2.image_format_constraints()->at(0).min_coded_width() = 32;
-  c2.image_format_constraints()->at(0).min_coded_height() = 32;
+  c2.image_format_constraints()->at(0).color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
+  c2.image_format_constraints()->at(0).min_surface_size().emplace();
+  c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+  c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
   // clone / copy
   auto c1 = c2;
 
-  c1.image_format_constraints()->at(0).pixel_format().emplace();
-  c1.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kDoNotCare;
-  c2.image_format_constraints()->at(0).pixel_format().emplace();
-  c2.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
+  c1.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kDoNotCare;
+  c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
 
-  EXPECT_FALSE(
-      c1.image_format_constraints()->at(0).pixel_format()->format_modifier_value().has_value());
-  EXPECT_FALSE(
-      c2.image_format_constraints()->at(0).pixel_format()->format_modifier_value().has_value());
+  EXPECT_FALSE(c1.image_format_constraints()->at(0).pixel_format_modifier().has_value());
+  EXPECT_FALSE(c2.image_format_constraints()->at(0).pixel_format_modifier().has_value());
 
   auto set_verbose_result = collection1->SetVerboseLogging();
   ASSERT_TRUE(set_verbose_result.is_ok());
@@ -5278,11 +5213,10 @@ TEST(Sysmem, PixelFormatDoNotCare_SuccessV2) {
   ASSERT_TRUE(wait_result2.is_ok());
 
   ASSERT_EQ(2, wait_result1->buffer_collection_info()->buffers()->size());
-  ASSERT_EQ(v2::PixelFormatType::kNv12, wait_result1->buffer_collection_info()
-                                            ->settings()
-                                            ->image_format_constraints()
-                                            ->pixel_format()
-                                            ->type());
+  ASSERT_EQ(fuchsia_images2::PixelFormat::kNv12, wait_result1->buffer_collection_info()
+                                                     ->settings()
+                                                     ->image_format_constraints()
+                                                     ->pixel_format());
 }
 
 TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFailsV2) {
@@ -5302,32 +5236,32 @@ TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFailsV2) {
     c2.min_buffer_count_for_camping() = 1;
     c2.image_format_constraints().emplace(1);
     c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-    c2.image_format_constraints()->at(0).color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-    c2.image_format_constraints()->at(0).min_coded_width() = 32;
-    c2.image_format_constraints()->at(0).min_coded_height() = 32;
+    c2.image_format_constraints()->at(0).color_spaces()->at(0) =
+        fuchsia_images2::ColorSpace::kRec709;
+    c2.image_format_constraints()->at(0).min_surface_size().emplace();
+    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
 
     // Setting two pixel_format values will intentionally cause failure.
-    c1.image_format_constraints()->at(0).pixel_format().emplace();
-    c1.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kDoNotCare;
+    c1.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kDoNotCare;
     if (pass != 0) {
       c1.image_format_constraints()->resize(2);
       c1.image_format_constraints()->at(1) = c1.image_format_constraints()->at(0);
       switch (pass) {
         case 1:
-          c1.image_format_constraints()->at(1).pixel_format()->type() = v2::PixelFormatType::kNv12;
+          c1.image_format_constraints()->at(1).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
           break;
         case 2:
-          c1.image_format_constraints()->at(1).pixel_format()->type() =
-              v2::PixelFormatType::kInvalid;
+          c1.image_format_constraints()->at(1).pixel_format() =
+              fuchsia_images2::PixelFormat::kInvalid;
           break;
       }
     }
 
-    c2.image_format_constraints()->at(0).pixel_format().emplace();
-    c2.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
+    c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
     set_constraints_request.constraints() = std::move(c2);
@@ -5345,12 +5279,11 @@ TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFailsV2) {
     if (pass == 0) {
       ASSERT_TRUE(wait_result1.is_ok());
       ASSERT_TRUE(wait_result2.is_ok());
-      ASSERT_EQ(v2::PixelFormatType::kNv12, wait_result1->buffer_collection_info()
-                                                ->settings()
-                                                ->image_format_constraints()
-                                                ->pixel_format()
-                                                ->type()
-                                                .value());
+      ASSERT_EQ(fuchsia_images2::PixelFormat::kNv12, wait_result1->buffer_collection_info()
+                                                         ->settings()
+                                                         ->image_format_constraints()
+                                                         ->pixel_format()
+                                                         .value());
     } else {
       ASSERT_FALSE(wait_result1.is_ok());
       ASSERT_FALSE(wait_result2.is_ok());
@@ -5374,25 +5307,25 @@ TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFailsV2) {
     c2.min_buffer_count_for_camping() = 1;
     c2.image_format_constraints().emplace(1);
     c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-    c2.image_format_constraints()->at(0).color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
-    c2.image_format_constraints()->at(0).min_coded_width() = 32;
-    c2.image_format_constraints()->at(0).min_coded_height() = 32;
+    c2.image_format_constraints()->at(0).color_spaces()->at(0) =
+        fuchsia_images2::ColorSpace::kRec709;
+    c2.image_format_constraints()->at(0).min_surface_size().emplace();
+    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
 
-    c1.image_format_constraints()->at(0).pixel_format().emplace();
-    c1.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kDoNotCare;
+    c1.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kDoNotCare;
 
-    c2.image_format_constraints()->at(0).pixel_format().emplace();
     switch (pass) {
       case 0:
-        c2.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
+        c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
         break;
       case 1:
         // Not constraining the pixel format overall will intentionally cause failure.
-        c2.image_format_constraints()->at(0).pixel_format()->type() =
-            v2::PixelFormatType::kDoNotCare;
+        c2.image_format_constraints()->at(0).pixel_format() =
+            fuchsia_images2::PixelFormat::kDoNotCare;
         break;
     }
 
@@ -5412,12 +5345,11 @@ TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFailsV2) {
     if (pass == 0) {
       ASSERT_TRUE(wait_result1.is_ok());
       ASSERT_TRUE(wait_result2.is_ok());
-      ASSERT_EQ(v2::PixelFormatType::kNv12, wait_result1->buffer_collection_info()
-                                                ->settings()
-                                                ->image_format_constraints()
-                                                ->pixel_format()
-                                                ->type()
-                                                .value());
+      ASSERT_EQ(fuchsia_images2::PixelFormat::kNv12, wait_result1->buffer_collection_info()
+                                                         ->settings()
+                                                         ->image_format_constraints()
+                                                         ->pixel_format()
+                                                         .value());
     } else {
       ASSERT_FALSE(wait_result1.is_ok());
       ASSERT_FALSE(wait_result2.is_ok());
@@ -5437,20 +5369,20 @@ TEST(Sysmem, ColorSpaceDoNotCare_SuccessV2) {
   c2.usage()->cpu() = v2::kCpuUsageWriteOften;
   c2.min_buffer_count_for_camping() = 1;
   c2.image_format_constraints().emplace(1);
-  c2.image_format_constraints()->at(0).pixel_format().emplace();
-  c2.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
-  c2.image_format_constraints()->at(0).min_coded_width() = 32;
-  c2.image_format_constraints()->at(0).min_coded_height() = 32;
+  c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+  c2.image_format_constraints()->at(0).min_surface_size().emplace();
+  c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+  c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
   // clone / copy
   auto c1 = c2;
 
   c1.image_format_constraints()->at(0).color_spaces().emplace(1);
-  c1.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-      v2::ColorSpaceType::kDoNotCare;
+  c1.image_format_constraints()->at(0).color_spaces()->at(0) =
+      fuchsia_images2::ColorSpace::kDoNotCare;
 
   c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-  c2.image_format_constraints()->at(0).color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+  c2.image_format_constraints()->at(0).color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(c1);
@@ -5469,19 +5401,16 @@ TEST(Sysmem, ColorSpaceDoNotCare_SuccessV2) {
   ASSERT_TRUE(wait_result2.is_ok());
 
   ASSERT_EQ(2, wait_result1->buffer_collection_info()->buffers()->size());
-  ASSERT_EQ(v2::PixelFormatType::kNv12, wait_result1->buffer_collection_info()
-                                            ->settings()
-                                            ->image_format_constraints()
-                                            ->pixel_format()
-                                            ->type()
-                                            .value());
-  ASSERT_EQ(v2::ColorSpaceType::kRec709, wait_result1->buffer_collection_info()
-                                             ->settings()
-                                             ->image_format_constraints()
-                                             ->color_spaces()
-                                             ->at(0)
-                                             .type()
-                                             .value());
+  ASSERT_EQ(fuchsia_images2::PixelFormat::kNv12, wait_result1->buffer_collection_info()
+                                                     ->settings()
+                                                     ->image_format_constraints()
+                                                     ->pixel_format()
+                                                     .value());
+  ASSERT_EQ(fuchsia_images2::ColorSpace::kRec709, wait_result1->buffer_collection_info()
+                                                      ->settings()
+                                                      ->image_format_constraints()
+                                                      ->color_spaces()
+                                                      ->at(0));
 }
 
 TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV2) {
@@ -5504,10 +5433,10 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV2) {
     c2.usage()->cpu() = v2::kCpuUsageWriteOften;
     c2.min_buffer_count_for_camping() = 1;
     c2.image_format_constraints().emplace(1);
-    c2.image_format_constraints()->at(0).pixel_format().emplace();
-    c2.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
-    c2.image_format_constraints()->at(0).min_coded_width() = 32;
-    c2.image_format_constraints()->at(0).min_coded_height() = 32;
+    c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+    c2.image_format_constraints()->at(0).min_surface_size().emplace();
+    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
@@ -5517,27 +5446,28 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV2) {
     switch (pass) {
       case 0:
         c1.image_format_constraints()->at(0).color_spaces().emplace(1);
-        c1.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-            v2::ColorSpaceType::kDoNotCare;
+        c1.image_format_constraints()->at(0).color_spaces()->at(0) =
+            fuchsia_images2::ColorSpace::kDoNotCare;
         break;
       case 1:
         c1.image_format_constraints()->at(0).color_spaces().emplace(2);
-        c1.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-            v2::ColorSpaceType::kDoNotCare;
-        c1.image_format_constraints()->at(0).color_spaces()->at(1).type() =
-            v2::ColorSpaceType::kRec709;
+        c1.image_format_constraints()->at(0).color_spaces()->at(0) =
+            fuchsia_images2::ColorSpace::kDoNotCare;
+        c1.image_format_constraints()->at(0).color_spaces()->at(1) =
+            fuchsia_images2::ColorSpace::kRec709;
         break;
       case 2:
         c1.image_format_constraints()->at(0).color_spaces().emplace(2);
-        c1.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-            v2::ColorSpaceType::kInvalid;
-        c1.image_format_constraints()->at(0).color_spaces()->at(1).type() =
-            v2::ColorSpaceType::kDoNotCare;
+        c1.image_format_constraints()->at(0).color_spaces()->at(0) =
+            fuchsia_images2::ColorSpace::kInvalid;
+        c1.image_format_constraints()->at(0).color_spaces()->at(1) =
+            fuchsia_images2::ColorSpace::kDoNotCare;
         break;
     }
 
     c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-    c2.image_format_constraints()->at(0).color_spaces()->at(0).type() = v2::ColorSpaceType::kRec709;
+    c2.image_format_constraints()->at(0).color_spaces()->at(0) =
+        fuchsia_images2::ColorSpace::kRec709;
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
     set_constraints_request.constraints() = std::move(c1);
@@ -5555,13 +5485,11 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV2) {
     if (pass == 0) {
       ASSERT_TRUE(wait_result1.is_ok());
       ASSERT_TRUE(wait_result2.is_ok());
-      ASSERT_EQ(v2::ColorSpaceType::kRec709, wait_result1->buffer_collection_info()
-                                                 ->settings()
-                                                 ->image_format_constraints()
-                                                 ->color_spaces()
-                                                 ->at(0)
-                                                 .type()
-                                                 .value());
+      ASSERT_EQ(fuchsia_images2::ColorSpace::kRec709, wait_result1->buffer_collection_info()
+                                                          ->settings()
+                                                          ->image_format_constraints()
+                                                          ->color_spaces()
+                                                          ->at(0));
     } else {
       ASSERT_FALSE(wait_result1.is_ok());
       ASSERT_FALSE(wait_result2.is_ok());
@@ -5600,24 +5528,24 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormatV2) {
     c1.usage()->cpu() = v2::kCpuUsageWriteOften;
     c1.min_buffer_count_for_camping() = 1;
     c1.image_format_constraints().emplace(1);
-    c1.image_format_constraints()->at(0).pixel_format().emplace();
-    c1.image_format_constraints()->at(0).pixel_format()->type() = v2::PixelFormatType::kNv12;
+    c1.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
     // c1 is logically kDoNotCare, via ForceUnsetColorSpaceConstraint() sent below.  This field is
     // copied but then overridden for c2 (pass 0 only).
-    c1.image_format_constraints()->at(0).min_coded_width() = 32;
-    c1.image_format_constraints()->at(0).min_coded_height() = 32;
+    c1.image_format_constraints()->at(0).min_surface_size().emplace();
+    c1.image_format_constraints()->at(0).min_surface_size()->width() = 32;
+    c1.image_format_constraints()->at(0).min_surface_size()->height() = 32;
 
     // clone / copy
     auto c2 = c1;
     c1.image_format_constraints()->at(0).color_spaces().emplace(1);
-    c1.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-        v2::ColorSpaceType::kDoNotCare;
+    c1.image_format_constraints()->at(0).color_spaces()->at(0) =
+        fuchsia_images2::ColorSpace::kDoNotCare;
     if (pass == 0) {
       // c2 will constrain the pixel format (by setting a valid one here and not sending
       // ForceUnsetColorSpaceConstraint() below).
       c2.image_format_constraints()->at(0).color_spaces().emplace(1);
-      c2.image_format_constraints()->at(0).color_spaces()->at(0).type() =
-          v2::ColorSpaceType::kRec709;
+      c2.image_format_constraints()->at(0).color_spaces()->at(0) =
+          fuchsia_images2::ColorSpace::kRec709;
     }
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -5640,13 +5568,11 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormatV2) {
       ASSERT_TRUE(wait_result2.is_ok());
       // may as well check that the color space is indeed kRec709, but this is also checked by the
       // _Success test above.
-      ASSERT_EQ(v2::ColorSpaceType::kRec709, wait_result1->buffer_collection_info()
-                                                 ->settings()
-                                                 ->image_format_constraints()
-                                                 ->color_spaces()
-                                                 ->at(0)
-                                                 .type()
-                                                 .value());
+      ASSERT_EQ(fuchsia_images2::ColorSpace::kRec709, wait_result1->buffer_collection_info()
+                                                          ->settings()
+                                                          ->image_format_constraints()
+                                                          ->color_spaces()
+                                                          ->at(0));
     } else {
       // Expect failed because c2's constraining of the color space is missing in pass 1, leaving
       // the color space completely unconstrained.  By design, sysmem doesn't arbitrarily select a

@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 // TODO(dalesat): Consider changing this library name.
 // fuchsia.images is currently occupied by ImagePipe. Will we be able to use that name? When?
 // Is the term 'image' too generic?
@@ -15,60 +16,282 @@ type ImageFormat = table {
     /// Describes the manner in which pixels are encoded.
     1: pixel_format PixelFormat;
 
-    /// Vendor-specific pixel format modifier.
+    /// Vendor-specific pixel format modifier. See format_modifier.fidl.
     2: pixel_format_modifier uint64;
 
     /// Indicates the color space used to interpret pixel values.
     3: color_space ColorSpace;
 
-    /// The size of a frame in terms of the number of pixels that
-    /// are represented in a frame payload.
-    4: coded_size fuchsia.math.Size;
+    /// The size of the image in pixels.
+    ///
+    /// See also `bytes_per_row` which is also necessary (along with `size`) to
+    /// find where each pixel's data is within a buffer.
+    ///
+    /// Not all of the addressable pixel positions in the buffer are necessarily
+    /// populated with valid pixel data. See `valid_size` for the
+    /// potentially-smaller rectangle of valid pixels.
+    ///
+    /// The right and bottom of the image may have some valid pixels which are
+    /// not to be displayed.  See `display_size`.
+    //
+    // TODO: Consider renaming this to "image_size" or "size".
+    4: surface_size fuchsia.math.SizeU;
 
-    /// The size of a frame in terms of the number of pixels that
-    /// should be displayed. These values will always be less than
-    /// or equal to the corresponding `coded_size` values.
-    5: display_size fuchsia.math.Size;
+    /// Number of bytes per row. For multi-plane YUV formats, this is the number
+    /// of bytes per row in the Y plane.
+    ///
+    /// When this field is not set, there is no padding at the end of each row
+    /// of pixels. In other words, when not set, the stride is equal to the
+    /// "stride bytes per width pixel" times the `surface_size.width`.
+    ///
+    /// When set, the value in this field must be >= the "stride bytes per width
+    /// pixel" times the `surface_size.width`. If equal, there is no padding at
+    /// the end of each row of pixels. If greater, the difference is how much
+    /// padding is at the end of each row of pixels, in bytes.
+    ///
+    /// This is also known as the "stride", "line to line offset", "row to row
+    /// offset", and other names.
+    ///
+    /// As a specific example, it's not uncommon (but also not always required)
+    /// for BGR24 (3 bytes per pixel) to have some padding at the end of each
+    /// row so that each row of pixels starts at a 4 byte aligned offset from
+    /// the start of the image (the upper left pixel). That padding's size is
+    /// not necessarily divisible by the size in bytes of a pixel ("stride bytes
+    /// per width pixel"), so we indicate the padding using this field rather
+    /// than trying to incorporate the padding as a larger "fake"
+    /// `surface_size.width`.
+    5: bytes_per_row uint32;
 
-    /// Aspect ratio of a single pixel as the video is intended to
-    /// be displayed.
-    6: aspect_ratio fuchsia.math.Size;
+    /// The size of a frame for display purposes. This is the size in pixels of
+    /// the rectangle of pixels that should be displayed.  This must be <= the
+    /// `surface_size` in both dimensions.
+    ///
+    /// This field is intentionally limited to only allow cropping on the right
+    /// and bottom, not on the top or left. This addresses video codecs, but is
+    /// not meant to address arbitrary downstream UI transforms which may
+    /// perform their own additional cropping/culling.
+    ///
+    /// For output from a video decoder, pixels outside the display_size are
+    /// never to be displayed (outside of test programs), but must be preserved
+    /// for correct decoder function.  The `display_size` will always be less
+    /// than or equal to the corresponding `valid_size` values (in both
+    /// dimensions), when `valid_size` is set.  The `display_size` will always
+    /// be less than or equal to the corresponding `surface_size` values. In
+    /// other words, `display_size` <= 'valid_size` <= `surface_size`.
+    ///
+    /// Downstream texture filtering operations should avoid letting any pixel
+    /// outside of display_size influence the visual appearance of any displayed
+    /// pixel, to avoid the potential for the right or bottom edge leaking in
+    /// arbitrary pixels defined by the decode process but not intended for
+    /// display.
+    ///
+    /// Behavior when this field is not set is protocol-specific. In some
+    /// protocols, fallback to `valid_size`, then to `surface_size` may be
+    /// implemented. In other protocols, this field must be set or the channel
+    /// will close.
+    6: display_size fuchsia.math.SizeU;
 
-    /// Number of bytes per row. For planar YUV formats, this is the number of bytes per
-    /// row in the Y plane.
-    7: bytes_per_row uint32;
+    /// The size of a frame in terms of the number of pixels that have valid
+    /// pixel data in terms of video decoding, but not in terms of which pixels
+    /// are intended for display.
+    ///
+    /// In the case of a video decoder, this can include some pixels beyond
+    /// `display_size`. The extra pixels are not meant to be displayed, and may
+    /// or may not contain any real image data. Typically anything that looks
+    /// like real image data in these regions is only an artifact of video
+    /// compression and the existence of the remainder of a macroblock which can
+    /// be referenced by later frames despite not being within the displayed
+    /// region, and not really any additional "real" pixels from the source. The
+    /// pixel values in this region are defined by the codec decode process and
+    /// must be retained for correct decoder operation. Typically the difference
+    /// between `valid_size` and `display_size` will be up to the size of a
+    /// macroblock minus 1. The `valid_size` is can be useful for testing video
+    /// decoders and for certain transcoding scenarios.
+    7: valid_size fuchsia.math.SizeU;
+
+    /// Aspect ratio of a single pixel as the video is intended to be displayed.
+    ///
+    /// For YUV formats, this is the pixel aspect ratio (AKA sample aspect ratio
+    /// aka SAR) for the luma (AKA Y) samples.
+    ///
+    /// Producers should ensure the width and height values are relatively prime
+    /// by reducing the fraction (dividing both by GCF) if necessary.
+    ///
+    /// A consumer should interpret this field being un-set as an unknown pixel
+    /// aspect ratio.  A default of 1:1 can be appropriate in some cases, but a
+    /// consumer may determine the actual pixel aspect ratio by OOB means.
+    8: pixel_aspect_ratio fuchsia.math.SizeU;
 };
 
 /// Expresses the manner in which video pixels are encoded.
+///
+/// The ordering of the channels in the format name reflects the actual layout
+/// of the channel.
+///
+/// Each of these values is opinionated re. the color spaces that should be
+/// contained within (in contrast with Vulkan).
 type PixelFormat = flexible enum {
     INVALID = 0;
+
+    /// RGB only, 8 bits per each of R/G/B/A sample
+    ///
+    /// Compatible with VK_FORMAT_R8G8B8A8_UNORM.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_ABGR_8888 and ZX_PIXEL_FORMAT_BGR_x8888.
     R8G8B8A8 = 1;
+
+    /// 32bpp BGRA, 1 plane.  RGB only, 8 bits per each of B/G/R/A sample.
+    ///
+    /// Compatible with VK_FORMAT_B8G8R8A8_UNORM.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_RGB_x888 and ZX_PIXEL_FORMAT_ARGB_8888.
     BGRA32 = 101;
+
+    /// YUV only, 8 bits per Y sample
+    ///
+    /// Compatible with VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM.
     I420 = 102;
+
+    /// YUV only, 8 bits per Y sample
+    ///
+    /// Not compatible with any vulkan format.
     M420 = 103;
+
+    /// YUV only, 8 bits per Y sample
+    ///
+    /// Compatible with VK_FORMAT_G8_B8R8_2PLANE_420_UNORM.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_NV12.
     NV12 = 104;
+
+    /// YUV only, 8 bits per Y sample
+    ///
+    /// Compatible with VK_FORMAT_G8B8G8R8_422_UNORM.
     YUY2 = 105;
+
+    /// This value is reserved, and not currently used.
     MJPEG = 106;
+
+    /// YUV only, 8 bits per Y sample
+    ///
+    /// Compatible with VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM with B and R
+    /// swizzled.
     YV12 = 107;
+
+    /// 24bpp BGR, 1 plane. RGB only, 8 bits per each of B/G/R sample
+    ///
+    /// Compatible with VK_FORMAT_B8G8R8_UNORM.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_RGB_888.
     BGR24 = 108;
+
+    /// 16bpp RGB, 1 plane. 5 bits R, 6 bits G, 5 bits B
+    ///
+    /// Compatible with VK_FORMAT_R5G6B5_UNORM_PACK16.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_RGB_565.
     RGB565 = 109;
+
+    /// 8bpp RGB, 1 plane. 3 bits R, 3 bits G, 2 bits B
+    ///
+    /// Not compatible with any vulkan format.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_RGB_332.
     RGB332 = 110;
+
+    /// 8bpp RGB, 1 plane. 2 bits R, 2 bits G, 2 bits B
+    ///
+    /// Not compatible with any vulkan format.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_RGB_2220.
     RGB2220 = 111;
+
+    /// 8bpp, Luminance-only (red, green and blue have identical values.)
+    ///
+    /// Compatible with VK_FORMAT_R8_UNORM.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_GRAY_8 and ZX_PIXEL_FORMAT_MONO_8.
     L8 = 112;
+
+    /// 8bpp, Red-only (Green and Blue are to be interpreted as 0).
+    ///
+    /// Compatible with VK_FORMAT_R8_UNORM.
     R8 = 113;
+
+    /// 16bpp RG, 1 plane. 8 bits R, 8 bits G.
+    ///
+    /// Compatible with VK_FORMAT_R8G8_UNORM.
     R8G8 = 114;
+
+    /// 32bpp RGBA, 1 plane. 2 bits A, 10 bits R/G/B.
+    ///
+    /// Compatible with VK_FORMAT_A2R10G10B10_UNORM_PACK32.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_ARGB_2_10_10_10.
+    A2R10G10B10 = 115;
+
+    /// 32bpp BGRA, 1 plane. 2 bits A, 10 bits R/G/B.
+    ///
+    /// Compatible with VK_FORMAT_A2B10G10R10_UNORM_PACK32.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_ABGR_2_10_10_10.
+    A2B10G10R10 = 116;
+
+    /// A client is explicitly indicating that the client does not care which
+    /// pixel format is chosen / used.  When setting this value, the client must
+    /// not set `pixel_format_modifier`.
+    DO_NOT_CARE = 0xFFFFFFFE;
 };
 
 /// Expresses the color space used to interpret video pixel values.
+///
+/// This list has a separate entry for each variant of a color space standard.
+///
+/// For this reason, should we ever add support for the RGB variant of 709, for
+/// example, we'd add a separate entry to this list for that variant.  Similarly
+/// for the RGB variants of 2020 or 2100.  Similarly for the YcCbcCrc variant of
+/// 2020.  Similarly for the ICtCp variant of 2100.
+///
+/// See ImageFormatIsSupportedColorSpaceForPixelFormat() for whether a
+/// combination of `PixelFormat` and `ColorSpace` is potentially supported.
+///
+/// Generally, a `ColorSpace` is not supported for any `PixelFormat` whose
+/// bits-per-sample isn't compatible with the color space's spec, nor for any
+/// `PixelFormat` which is a mismatch in terms of RGB vs. YUV.
 type ColorSpace = flexible enum {
+    /// Not a valid color space type.
     INVALID = 0;
-    PASSTHROUGH = 1;
-    SRGB = 2;
-    REC601_NTSC = 3;
-    REC601_NTSC_FULL_RANGE = 4;
-    REC601_PAL = 5;
-    REC601_PAL_FULL_RANGE = 6;
-    REC709 = 7;
-    REC2020 = 8;
-    REC2100 = 9;
+
+    /// sRGB
+    SRGB = 1;
+
+    /// 601 NTSC ("525 line") YCbCr primaries, narrow
+    REC601_NTSC = 2;
+
+    /// 601 NTSC ("525 line") YCbCr primaries, wide
+    REC601_NTSC_FULL_RANGE = 3;
+
+    /// 601 PAL ("625 line") YCbCr primaries, narrow
+    REC601_PAL = 4;
+
+    /// 601 PAL ("625 line") YCbCr primaries, wide
+    REC601_PAL_FULL_RANGE = 5;
+
+    /// 709 YCbCr (not RGB)
+    REC709 = 6;
+
+    /// 2020 YCbCr (not RGB, not YcCbcCrc)
+    REC2020 = 7;
+
+    /// 2100 YCbCr (not RGB, not ICtCp)
+    REC2100 = 8;
+
+    /// Either the pixel format doesn't represent a color, or it's in an
+    /// application-specific colorspace that isn't describable by another entry
+    /// in this enum.
+    PASSTHROUGH = 9;
+
+    /// A client is explicitly indicating that the client does not care which
+    /// color space is chosen / used.
+    DO_NOT_CARE = 0xFFFFFFFE;
 };

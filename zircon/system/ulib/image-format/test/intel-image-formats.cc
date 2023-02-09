@@ -15,13 +15,10 @@ namespace sysmem_v1 = fuchsia_sysmem;
 namespace sysmem_v2 = fuchsia_sysmem2;
 
 TEST(ImageFormat, IntelYTiledFormat_V2) {
-  sysmem_v2::PixelFormat pixel_format;
-  pixel_format.type().emplace(sysmem_v2::PixelFormatType::kNv12);
-  pixel_format.format_modifier_value().emplace(sysmem_v2::kFormatModifierIntelI915YTiled);
   sysmem_v2::ImageFormatConstraints constraints;
-  constraints.pixel_format().emplace(std::move(pixel_format));
-  constraints.min_coded_width().emplace(128u);
-  constraints.min_coded_height().emplace(32u);
+  constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierIntelI915YTiled;
+  constraints.min_surface_size() = {128u, 32u};
 
   auto image_format_result = ImageConstraintsToFormat(constraints, 3440u, 1440u);
   EXPECT_TRUE(image_format_result.is_ok());
@@ -60,14 +57,11 @@ TEST(ImageFormat, IntelYTiledFormat_V2) {
 
 TEST(ImageFormat, IntelYTiledFormat_V2_wire) {
   fidl::Arena allocator;
-  sysmem_v2::wire::PixelFormat pixel_format(allocator);
-  pixel_format.set_type(sysmem_v2::wire::PixelFormatType::kNv12);
-  pixel_format.set_format_modifier_value(allocator,
-                                         sysmem_v2::wire::kFormatModifierIntelI915YTiled);
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
-  constraints.set_pixel_format(allocator, pixel_format);
-  constraints.set_min_coded_width(128u);
-  constraints.set_min_coded_height(32u);
+  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kNv12);
+  constraints.set_pixel_format_modifier(allocator,
+                                        fuchsia_images2::wire::kFormatModifierIntelI915YTiled);
+  constraints.set_min_surface_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
 
   auto image_format_result = ImageConstraintsToFormat(allocator, constraints, 3440u, 1440u);
   EXPECT_TRUE(image_format_result.is_ok());
@@ -211,14 +205,11 @@ TEST(ImageFormat, IntelCcsFormats_V1_wire) {
 
 TEST(ImageFormat, IntelYTiledFormat_V2BytesPerRowDivisor) {
   fidl::Arena allocator;
-  sysmem_v2::wire::PixelFormat pixel_format(allocator);
-  pixel_format.set_type(sysmem_v2::wire::PixelFormatType::kBgra32);
-  pixel_format.set_format_modifier_value(allocator,
-                                         sysmem_v2::wire::kFormatModifierIntelI915YTiled);
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
-  constraints.set_pixel_format(allocator, std::move(pixel_format));
-  constraints.set_min_coded_width(128u);
-  constraints.set_min_coded_height(32u);
+  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+  constraints.set_pixel_format_modifier(allocator,
+                                        fuchsia_images2::wire::kFormatModifierIntelI915YTiled);
+  constraints.set_min_surface_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
   constraints.set_bytes_per_row_divisor(512u);
 
   constexpr uint32_t kImageWidth = 540u / 4;

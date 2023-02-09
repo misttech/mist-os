@@ -4,9 +4,9 @@
 
 #include "lib/sysmem-version/sysmem-version.h"
 
-#include <fidl/fuchsia.sysmem/cpp/common_types.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <zircon/assert.h>
@@ -14,7 +14,14 @@
 #include <map>
 #include <set>
 
+#include <safemath/safe_math.h>
+
 #include "log.h"
+
+using safemath::CheckAdd;
+using safemath::CheckDiv;
+using safemath::CheckMul;
+using safemath::CheckSub;
 
 namespace sysmem {
 namespace {
@@ -171,6 +178,18 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
         static_cast<DstType>(static_cast<DstUnderlyingType>(static_cast<SrcUnderlyingType>(src))); \
   } while (false)
 
+// In V1, there's not any out-of-band allocation since V1 only uses flat structs, but fidl::ToWire()
+// still requires an arena. For sysmem-version.h function prototypes, we don't require an arena from
+// the caller since it'd be pointless for V1. UnusedArena smooths over the difference by being an
+// arena for API parameter / function signature purposes when calling fidl::ToWire, but panicing if
+// it's ever actually used (it isn't).
+class UnusedArena : public fidl::AnyArena {
+  uint8_t* Allocate(size_t item_size, size_t count,
+                    void (*destructor_function)(uint8_t* data, size_t count)) override {
+    ZX_PANIC("Unexpected usage of UnusedArena::Allocate()");
+  }
+};
+
 template <size_t N>
 fpromise::result<std::vector<fuchsia_sysmem2::HeapType>> V2CopyFromV1HeapPermittedArrayNatural(
     const std::array<fuchsia_sysmem::HeapType, N>& v1a, const uint32_t v1_count) {
@@ -203,14 +222,14 @@ fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::HeapType>> V2CopyFromV1
 }
 
 template <size_t N>
-fpromise::result<std::vector<fuchsia_sysmem2::ColorSpace>> V2CopyFromV1ColorSpaceArrayNatural(
+fpromise::result<std::vector<fuchsia_images2::ColorSpace>> V2CopyFromV1ColorSpaceArrayNatural(
     const std::array<fuchsia_sysmem::ColorSpace, N>& v1a, uint32_t v1_count) {
   ZX_DEBUG_ASSERT(v1_count);
   if (v1_count > v1a.size()) {
     LOG(ERROR, "v1_count > v1a.size() - v1_count: %u v1a.size(): %zu", v1_count, v1a.size());
     return fpromise::error();
   }
-  std::vector<fuchsia_sysmem2::ColorSpace> v2a(v1_count);
+  std::vector<fuchsia_images2::ColorSpace> v2a(v1_count);
   for (uint32_t i = 0; i < v1_count; i++) {
     v2a[i] = V2CopyFromV1ColorSpace(v1a[i]);
   }
@@ -218,7 +237,7 @@ fpromise::result<std::vector<fuchsia_sysmem2::ColorSpace>> V2CopyFromV1ColorSpac
 }
 
 template <size_t N>
-fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::ColorSpace>> V2CopyFromV1ColorSpaceArray(
+fpromise::result<fidl::VectorView<fuchsia_images2::wire::ColorSpace>> V2CopyFromV1ColorSpaceArray(
     fidl::AnyArena& allocator, const fidl::Array<fuchsia_sysmem::wire::ColorSpace, N>& v1a,
     uint32_t v1_count) {
   ZX_DEBUG_ASSERT(v1_count);
@@ -226,7 +245,7 @@ fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::ColorSpace>> V2CopyFrom
     LOG(ERROR, "v1_count > v1a.size() - v1_count: %u v1a.size(): %zu", v1_count, v1a.size());
     return fpromise::error();
   }
-  fidl::VectorView<fuchsia_sysmem2::wire::ColorSpace> v2a(allocator, v1_count);
+  fidl::VectorView<fuchsia_images2::wire::ColorSpace> v2a(allocator, v1_count);
   for (uint32_t i = 0; i < v1_count; i++) {
     v2a[i] = V2CopyFromV1ColorSpace(allocator, v1a[i]);
   }
@@ -284,7 +303,7 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
   {
     auto result = V2CopyFromV1BufferUsage(v1.usage());
     OK_OR_RET_ERROR(result);
-    v2b.usage().emplace(result.take_value());
+    v2b.usage() = result.take_value();
   }
 
   PROCESS_SCALAR_FIELD_V1(min_buffer_count_for_camping);
@@ -295,13 +314,13 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
   if (v1.has_buffer_memory_constraints()) {
     auto result = V2CopyFromV1BufferMemoryConstraints(v1.buffer_memory_constraints());
     OK_OR_RET_ERROR(result);
-    v2b.buffer_memory_constraints().emplace(result.take_value());
+    v2b.buffer_memory_constraints() = result.take_value();
   }
   if (v1.image_format_constraints_count()) {
     auto result = V2CopyFromV1ImageFormatConstraintsArrayNatural(
         v1.image_format_constraints(), v1.image_format_constraints_count());
     OK_OR_RET_ERROR(result);
-    v2b.image_format_constraints().emplace(result.take_value());
+    v2b.image_format_constraints() = result.take_value();
   }
   return fpromise::ok();
 }
@@ -363,116 +382,144 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsAuxBuffers(
 
 }  // namespace
 
-fuchsia_sysmem2::PixelFormat V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {
-  fuchsia_sysmem2::PixelFormat v2b;
-  PROCESS_SCALAR_FIELD_V1(type);
+PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {
+  PixelFormatAndModifier v2b;
+  v2b.pixel_format = static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1.type()));
   if (v1.has_format_modifier()) {
-    v2b.format_modifier_value().emplace(v1.format_modifier().value());
+    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier().value());
   }
   return v2b;
 }
 
-fuchsia_sysmem2::wire::PixelFormat V2CopyFromV1PixelFormat(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::PixelFormat& v1) {
-  fuchsia_sysmem2::wire::PixelFormat v2b(allocator);
-  PROCESS_WIRE_SCALAR_FIELD_V1(type);
+PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::wire::PixelFormat& v1) {
+  PixelFormatAndModifier v2b;
+  v2b.pixel_format = static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1.type));
   if (v1.has_format_modifier) {
-    v2b.set_format_modifier_value(allocator, v1.format_modifier.value);
+    v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier.value);
   }
-  return v2b;
+  return V2CopyFromV1PixelFormat(fidl::ToNatural(v1));
 }
 
-fuchsia_sysmem2::ColorSpace V2CopyFromV1ColorSpace(const fuchsia_sysmem::ColorSpace& v1) {
-  fuchsia_sysmem2::ColorSpace v2b;
-  PROCESS_SCALAR_FIELD_V1(type);
-  return v2b;
+uint64_t V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier) {
+  if (v1_pixel_format_modifier == fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal) {
+    return fuchsia_images2::kFormatModifierGoogleGoldfishOptimal;
+  }
+  return v1_pixel_format_modifier;
 }
 
-fuchsia_sysmem2::wire::ColorSpace V2CopyFromV1ColorSpace(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ColorSpace& v1) {
-  fuchsia_sysmem2::wire::ColorSpace v2b(allocator);
-  PROCESS_WIRE_SCALAR_FIELD_V1(type);
-  return v2b;
+uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier) {
+  if (v2_pixel_format_modifier == fuchsia_images2::kFormatModifierGoogleGoldfishOptimal) {
+    return fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal;
+  }
+  return v2_pixel_format_modifier;
+}
+
+fuchsia_images2::ColorSpace V2CopyFromV1ColorSpace(const fuchsia_sysmem::ColorSpace& v1) {
+  return static_cast<fuchsia_images2::ColorSpace>(static_cast<uint32_t>(v1.type()));
+}
+
+fuchsia_images2::wire::ColorSpace V2CopyFromV1ColorSpace(
+    const fuchsia_sysmem::wire::ColorSpace& v1) {
+  return static_cast<fuchsia_images2::wire::ColorSpace>(static_cast<uint32_t>(v1.type));
 }
 
 fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageFormatConstraints(
     const fuchsia_sysmem::ImageFormatConstraints& v1) {
   fuchsia_sysmem2::ImageFormatConstraints v2b;
-  v2b.pixel_format().emplace(V2CopyFromV1PixelFormat(v1.pixel_format()));
+
+  PixelFormatAndModifier v2_pixel_format = V2CopyFromV1PixelFormat(v1.pixel_format());
+  // Below, we only use stride_bytes_per_width_pixel_result.value() if the result is ok, since we
+  // only need the value for some less-critical version translation fixups, and the method only
+  // fails for INVALID, DO_NOT_CARE, and MJPEG, for which those fixups are not relevant.
+
+  v2b.pixel_format() = v2_pixel_format.pixel_format;
+  v2b.pixel_format_modifier() = v2_pixel_format.pixel_format_modifier;
   if (v1.color_spaces_count()) {
     auto result = V2CopyFromV1ColorSpaceArrayNatural(v1.color_space(), v1.color_spaces_count());
     OK_OR_RET_ERROR(result);
-    v2b.color_spaces().emplace(result.take_value());
+    v2b.color_spaces() = result.take_value();
   }
-  PROCESS_SCALAR_FIELD_V1(min_coded_width);
-  PROCESS_SCALAR_FIELD_V1(max_coded_width);
-  PROCESS_SCALAR_FIELD_V1(min_coded_height);
-  PROCESS_SCALAR_FIELD_V1(max_coded_height);
+
+  if (v1.min_coded_width() != 0 || v1.min_coded_height() != 0) {
+    v2b.min_surface_size() = {v1.min_coded_width(), v1.min_coded_height()};
+  }
+
+  if (v1.max_coded_width() != 0 || v1.max_coded_height() != 0) {
+    v2b.max_surface_size() = {v1.max_coded_width(), v1.max_coded_height()};
+  }
+
   PROCESS_SCALAR_FIELD_V1(min_bytes_per_row);
   PROCESS_SCALAR_FIELD_V1(max_bytes_per_row);
-  PROCESS_SCALAR_FIELD_V1(max_coded_width_times_coded_height);
+
+  if (v1.max_coded_width_times_coded_height() != 0) {
+    v2b.max_surface_width_times_surface_height() = v1.max_coded_width_times_coded_height();
+  }
+
+  // v2 ImageFormatConstraints intentionally doesn't have the layers field. In practice this v1
+  // field is always either 0 implying a default of 1, or 1.
   if (v1.layers()) {
     if (v1.layers() > 1) {
       LOG(ERROR, "v1.layers > 1");
       return fpromise::error();
     }
-    // v2 ImageFormatConstraints doesn't have layers field (at least not yet), on purpose.  If it
-    // ever gains a layers field, most likely we won't translate the v1 layers field to any v2
-    // layers field.
   }
-  PROCESS_SCALAR_FIELD_V1(coded_width_divisor);
-  PROCESS_SCALAR_FIELD_V1(coded_height_divisor);
+
+  if (v1.coded_width_divisor() != 0 || v1.coded_height_divisor() != 0) {
+    ZX_DEBUG_ASSERT(!v2b.surface_size_alignment().has_value());
+    v2b.surface_size_alignment() = {1, 1};
+    v2b.surface_size_alignment()->width() =
+        std::max(v2b.surface_size_alignment()->width(), v1.coded_width_divisor());
+    v2b.surface_size_alignment()->height() =
+        std::max(v2b.surface_size_alignment()->height(), v1.coded_height_divisor());
+  }
+
   PROCESS_SCALAR_FIELD_V1(bytes_per_row_divisor);
   PROCESS_SCALAR_FIELD_V1(start_offset_divisor);
-  PROCESS_SCALAR_FIELD_V1(display_width_divisor);
-  PROCESS_SCALAR_FIELD_V1(display_height_divisor);
-  PROCESS_SCALAR_FIELD_V1(required_min_coded_width);
-  PROCESS_SCALAR_FIELD_V1(required_max_coded_width);
-  PROCESS_SCALAR_FIELD_V1(required_min_coded_height);
-  PROCESS_SCALAR_FIELD_V1(required_max_coded_height);
-  PROCESS_SCALAR_FIELD_V1(required_min_bytes_per_row);
-  PROCESS_SCALAR_FIELD_V1(required_max_bytes_per_row);
+
+  if (v1.display_width_divisor() != 0 || v1.display_height_divisor() != 0) {
+    ZX_DEBUG_ASSERT(!v2b.display_size_alignment().has_value());
+    v2b.display_size_alignment() = {1, 1};
+    v2b.display_size_alignment()->width() =
+        std::max(v2b.display_size_alignment()->width(), v1.display_width_divisor());
+    v2b.display_size_alignment()->height() =
+        std::max(v2b.display_size_alignment()->height(), v1.display_height_divisor());
+  }
+
+  if (v1.required_min_coded_width() != 0 || v1.required_min_coded_height() != 0) {
+    if (v1.required_min_coded_width() == 0 || v1.required_min_coded_height() == 0) {
+      LOG(ERROR,
+          "required_min_coded_width and required_min_coded_height must both be set or both be un-set");
+      return fpromise::error();
+    }
+    ZX_DEBUG_ASSERT(!v2b.required_min_surface_size().has_value());
+    v2b.required_min_surface_size() = {v1.required_min_coded_width(),
+                                       v1.required_min_coded_height()};
+  }
+
+  if (v1.required_max_coded_width() != 0 || v1.required_max_coded_height() != 0) {
+    if (v1.required_max_coded_width() == 0 || v1.required_max_coded_height() == 0) {
+      LOG(ERROR,
+          "required_max_coded_width and required_max_coded_height must both be set or both be un-set");
+      return fpromise::error();
+    }
+    ZX_DEBUG_ASSERT(!v2b.required_max_surface_size().has_value());
+    v2b.required_max_surface_size() = {v1.required_max_coded_width(),
+                                       v1.required_max_coded_height()};
+  }
+
   return fpromise::ok(std::move(v2b));
 }
 
 fpromise::result<fuchsia_sysmem2::wire::ImageFormatConstraints> V2CopyFromV1ImageFormatConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ImageFormatConstraints& v1) {
-  fuchsia_sysmem2::wire::ImageFormatConstraints v2b(allocator);
-  v2b.set_pixel_format(allocator, V2CopyFromV1PixelFormat(allocator, v1.pixel_format));
-  if (v1.color_spaces_count) {
-    auto result = V2CopyFromV1ColorSpaceArray(allocator, v1.color_space, v1.color_spaces_count);
-    OK_OR_RET_ERROR(result);
-    v2b.set_color_spaces(allocator, result.take_value());
+  // While most of the conversion routines convert directly, this conversion is complicated enough
+  // that we convert to natural, do the convert, convert back to wire.
+  auto v1_natural = fidl::ToNatural(std::move(v1));
+  auto v2_natural_result = V2CopyFromV1ImageFormatConstraints(std::move(v1_natural));
+  if (v2_natural_result.is_error()) {
+    return fpromise::error();
   }
-  PROCESS_WIRE_SCALAR_FIELD_V1(min_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(max_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(min_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V1(max_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V1(min_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V1(max_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V1(max_coded_width_times_coded_height);
-  if (v1.layers) {
-    if (v1.layers > 1) {
-      LOG(ERROR, "v1.layers > 1");
-      return fpromise::error();
-    }
-    // v2 ImageFormatConstraints doesn't have layers field (at least not yet), on purpose.  If it
-    // ever gains a layers field, most likely we won't translate the v1 layers field to any v2
-    // layers field.
-  }
-  PROCESS_WIRE_SCALAR_FIELD_V1(coded_width_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(coded_height_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(bytes_per_row_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(start_offset_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(display_width_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(display_height_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_min_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_max_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_min_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_max_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_min_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V1(required_max_bytes_per_row);
-  return fpromise::ok(v2b);
+  return fpromise::ok(fidl::ToWire(allocator, v2_natural_result.take_value()));
 }
 
 fpromise::result<fuchsia_sysmem2::BufferUsage> V2CopyFromV1BufferUsage(
@@ -513,7 +560,7 @@ fpromise::result<fuchsia_sysmem2::BufferMemoryConstraints> V2CopyFromV1BufferMem
     auto result =
         V2CopyFromV1HeapPermittedArrayNatural(v1.heap_permitted(), v1.heap_permitted_count());
     OK_OR_RET_ERROR(result);
-    v2b.heap_permitted().emplace(result.take_value());
+    v2b.heap_permitted() = result.take_value();
   }
   return fpromise::ok(std::move(v2b));
 }
@@ -583,52 +630,57 @@ V2CopyFromV1BufferCollectionConstraints(
   return fpromise::ok(v2b);
 }
 
-fpromise::result<fuchsia_sysmem2::ImageFormat> V2CopyFromV1ImageFormat(
+fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
     const fuchsia_sysmem::ImageFormat2& v1) {
-  fuchsia_sysmem2::ImageFormat v2b;
-  v2b.pixel_format().emplace(V2CopyFromV1PixelFormat(v1.pixel_format()));
-  PROCESS_SCALAR_FIELD_V1(coded_width);
-  PROCESS_SCALAR_FIELD_V1(coded_height);
-  PROCESS_SCALAR_FIELD_V1(bytes_per_row);
-  PROCESS_SCALAR_FIELD_V1(display_width);
-  PROCESS_SCALAR_FIELD_V1(display_height);
   if (v1.layers() > 1) {
     LOG(ERROR, "v1.layers > 1");
     return fpromise::error();
   }
-  v2b.color_space().emplace(V2CopyFromV1ColorSpace(v1.color_space()));
-  if (v1.has_pixel_aspect_ratio()) {
-    v2b.pixel_aspect_ratio_width().emplace(v1.pixel_aspect_ratio_width());
-    v2b.pixel_aspect_ratio_height().emplace(v1.pixel_aspect_ratio_height());
-  } else {
-    ZX_DEBUG_ASSERT(!v2b.pixel_aspect_ratio_width().has_value());
-    ZX_DEBUG_ASSERT(!v2b.pixel_aspect_ratio_height().has_value());
+
+  fuchsia_images2::ImageFormat v2b;
+  PixelFormatAndModifier v2_pixel_format = V2CopyFromV1PixelFormat(v1.pixel_format());
+  v2b.pixel_format() = v2_pixel_format.pixel_format;
+  if (v1.pixel_format().has_format_modifier()) {
+    v2b.pixel_format_modifier() = v2_pixel_format.pixel_format_modifier;
   }
+
+  v2b.color_space() = V2CopyFromV1ColorSpace(v1.color_space());
+
+  // V2 is more expressive in these fields, so the conversion is intentionally
+  // asymmetric.
+  v2b.surface_size() = {v1.coded_width(), v1.coded_height()};
+  PROCESS_SCALAR_FIELD_V1(bytes_per_row);
+  v2b.display_size() = {v1.display_width(), v1.display_height()};
+
+  // The coded_width and coded_height may or may not actually be the "valid" pixels from a video
+  // decoder.  V2 allows us to be more precise here.  Since output from a video decoder will
+  // _typically_ have surface_size == valid_size, and because coded_width,coded_height is documented
+  // to be the valid non-padding actual pixels, which can include some that are outside the
+  // display_size, we go ahead and place coded_width,coded_height in valid_size as well as in
+  // surface_size above.  The ability to be more precise here in V2 is one of the reasons to switch
+  // to V2.  V1 lacks any way to specify the UV plane offset separately from the coded_height, so
+  // there can be situations in which coded_height is artificially larger than the valid_size.height
+  // as the only way to make the UV offset correct, which sacrifices the ability to specify the real
+  // valid_size.height (in the V1 struct; in V2 it's conveyed separately).
+  v2b.valid_size() = {v1.coded_width(), v1.coded_height()};
+
+  if (v1.has_pixel_aspect_ratio()) {
+    v2b.pixel_aspect_ratio() = {v1.pixel_aspect_ratio_width(), v1.pixel_aspect_ratio_height()};
+  } else {
+    ZX_DEBUG_ASSERT(!v2b.pixel_aspect_ratio().has_value());
+  }
+
   return fpromise::ok(std::move(v2b));
 }
 
-fpromise::result<fuchsia_sysmem2::wire::ImageFormat> V2CopyFromV1ImageFormat(
+fpromise::result<fuchsia_images2::wire::ImageFormat> V2CopyFromV1ImageFormat(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::ImageFormat2& v1) {
-  fuchsia_sysmem2::wire::ImageFormat v2b(allocator);
-  v2b.set_pixel_format(allocator, V2CopyFromV1PixelFormat(allocator, v1.pixel_format));
-  PROCESS_WIRE_SCALAR_FIELD_V1(coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V1(bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V1(display_width);
-  PROCESS_WIRE_SCALAR_FIELD_V1(display_height);
-  if (v1.layers > 1) {
-    LOG(ERROR, "v1.layers > 1");
+  auto v1_natural = fidl::ToNatural(v1);
+  auto v2_natural_result = V2CopyFromV1ImageFormat(v1_natural);
+  if (v2_natural_result.is_error()) {
     return fpromise::error();
   }
-  v2b.set_color_space(allocator, V2CopyFromV1ColorSpace(allocator, v1.color_space));
-  if (v1.has_pixel_aspect_ratio) {
-    v2b.set_pixel_aspect_ratio_width(v1.pixel_aspect_ratio_width);
-    v2b.set_pixel_aspect_ratio_height(v1.pixel_aspect_ratio_height);
-  } else {
-    ZX_DEBUG_ASSERT(!v2b.has_pixel_aspect_ratio_width());
-    ZX_DEBUG_ASSERT(!v2b.has_pixel_aspect_ratio_height());
-  }
-  return fpromise::ok(v2b);
+  return fpromise::ok(fidl::ToWire(allocator, v2_natural_result.value()));
 }
 
 fuchsia_sysmem2::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
@@ -656,7 +708,7 @@ fuchsia_sysmem2::wire::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
 fpromise::result<fuchsia_sysmem2::SingleBufferSettings> V2CopyFromV1SingleBufferSettings(
     const fuchsia_sysmem::SingleBufferSettings& v1) {
   fuchsia_sysmem2::SingleBufferSettings v2b;
-  v2b.buffer_settings().emplace(V2CopyFromV1BufferMemorySettings(v1.buffer_settings()));
+  v2b.buffer_settings() = V2CopyFromV1BufferMemorySettings(v1.buffer_settings());
   if (v1.has_image_format_constraints()) {
     auto image_format_constraints_result =
         V2CopyFromV1ImageFormatConstraints(v1.image_format_constraints());
@@ -664,7 +716,7 @@ fpromise::result<fuchsia_sysmem2::SingleBufferSettings> V2CopyFromV1SingleBuffer
       LOG(ERROR, "!image_format_constraints_result.is_ok()");
       return fpromise::error();
     }
-    v2b.image_format_constraints().emplace(image_format_constraints_result.take_value());
+    v2b.image_format_constraints() = image_format_constraints_result.take_value();
   }
   return fpromise::ok(std::move(v2b));
 }
@@ -689,7 +741,7 @@ fpromise::result<fuchsia_sysmem2::wire::SingleBufferSettings> V2CopyFromV1Single
 fuchsia_sysmem2::VmoBuffer V2MoveFromV1VmoBuffer(fuchsia_sysmem::VmoBuffer v1) {
   fuchsia_sysmem2::VmoBuffer v2b;
   if (v1.vmo().is_valid()) {
-    v2b.vmo().emplace(std::move(v1.vmo()));
+    v2b.vmo() = std::move(v1.vmo());
   }
   PROCESS_SCALAR_FIELD_V1(vmo_usable_start);
   ZX_DEBUG_ASSERT(!v2b.aux_vmo().has_value());
@@ -715,7 +767,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> V2MoveFromV1BufferCollec
     LOG(ERROR, "!settings_result.is_ok()");
     return fpromise::error();
   }
-  v2b.settings().emplace(settings_result.take_value());
+  v2b.settings() = settings_result.take_value();
   if (v1.buffer_count()) {
     v2b.buffers().emplace(v1.buffer_count());
     for (uint32_t i = 0; i < v1.buffer_count(); ++i) {
@@ -807,7 +859,7 @@ V1CopyFromV2BufferCollectionConstraints(const fuchsia_sysmem2::BufferCollectionC
     fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers v1;
     PROCESS_SCALAR_FIELD_V2(need_clear_aux_buffers_for_secure);
     PROCESS_SCALAR_FIELD_V2(allow_clear_aux_buffers_for_secure);
-    v1_aux_buffers.emplace(v1);
+    v1_aux_buffers = v1;
   }
 
   return fpromise::ok(std::make_pair(std::move(v1), std::move(v1_aux_buffers)));
@@ -870,7 +922,7 @@ V1CopyFromV2BufferCollectionConstraints(
     fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers v1{};
     PROCESS_WIRE_SCALAR_FIELD_V2(need_clear_aux_buffers_for_secure);
     PROCESS_WIRE_SCALAR_FIELD_V2(allow_clear_aux_buffers_for_secure);
-    v1_aux_buffers.emplace(v1);
+    v1_aux_buffers = v1;
   }
 
   return fpromise::ok(std::make_pair(v1, v1_aux_buffers));
@@ -971,45 +1023,46 @@ fuchsia_sysmem::wire::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
   return v1;
 }
 
-fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const fuchsia_sysmem2::PixelFormat& v2) {
+fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier& v2) {
   fuchsia_sysmem::PixelFormat v1;
-  PROCESS_SCALAR_FIELD_V2(type);
-  v1.has_format_modifier() = v2.format_modifier_value().has_value();
-  if (v2.format_modifier_value().has_value()) {
-    v1.format_modifier().value() = v2.format_modifier_value().value();
-  }
+  v1.type() = static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2.pixel_format));
+  v1.has_format_modifier() = true;
+  v1.format_modifier().value() = V1ConvertFromV2PixelFormatModifier(v2.pixel_format_modifier);
   return v1;
 }
 
-fuchsia_sysmem::wire::PixelFormat V1CopyFromV2PixelFormat(
-    const fuchsia_sysmem2::wire::PixelFormat& v2) {
+fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(const PixelFormatAndModifier& v2) {
   fuchsia_sysmem::wire::PixelFormat v1;
-  PROCESS_WIRE_SCALAR_FIELD_V2(type);
-  v1.has_format_modifier = v2.has_format_modifier_value();
-  if (v2.has_format_modifier_value()) {
-    v1.format_modifier.value = v2.format_modifier_value();
-  }
+  v1.type = static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2.pixel_format));
+  v1.has_format_modifier = true;
+  v1.format_modifier.value = V1ConvertFromV2PixelFormatModifier(v2.pixel_format_modifier);
   return v1;
 }
 
-[[nodiscard]] fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(
-    const fuchsia_sysmem2::ColorSpace& v2) {
+fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(const fuchsia_images2::ColorSpace& v2) {
   fuchsia_sysmem::ColorSpace v1;
-  PROCESS_SCALAR_FIELD_V2(type);
+  v1.type() = static_cast<fuchsia_sysmem::ColorSpaceType>(static_cast<uint32_t>(v2));
   return v1;
 }
 
-fuchsia_sysmem::wire::ColorSpace V1CopyFromV2ColorSpace(
-    const fuchsia_sysmem2::wire::ColorSpace& v2) {
-  fuchsia_sysmem::wire::ColorSpace v1{};
-  PROCESS_WIRE_SCALAR_FIELD_V2(type);
+fuchsia_sysmem::wire::ColorSpace V1WireCopyFromV2ColorSpace(
+    const fuchsia_images2::wire::ColorSpace& v2) {
+  fuchsia_sysmem::wire::ColorSpace v1;
+  v1.type = static_cast<fuchsia_sysmem::wire::ColorSpaceType>(static_cast<uint32_t>(v2));
   return v1;
 }
 
 fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormatConstraints(
     const fuchsia_sysmem2::ImageFormatConstraints& v2) {
   fuchsia_sysmem::ImageFormatConstraints v1;
-  v1.pixel_format() = V1CopyFromV2PixelFormat(v2.pixel_format().value());
+
+  if (!v2.pixel_format().has_value()) {
+    LOG(ERROR, "!v2.pixel_format().has_value()");
+    return fpromise::error();
+  }
+  auto v2_pixel_format = PixelFormatAndModifierFromConstraints(v2);
+  v1.pixel_format() = V1CopyFromV2PixelFormat(v2_pixel_format);
+
   ZX_DEBUG_ASSERT(!v1.color_spaces_count());
   if (v2.color_spaces().has_value()) {
     if (v2.color_spaces()->size() >
@@ -1024,116 +1077,154 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
       v1.color_space()[i] = V1CopyFromV2ColorSpace(v2.color_spaces()->at(i));
     }
   }
-  PROCESS_SCALAR_FIELD_V2(min_coded_width);
-  PROCESS_SCALAR_FIELD_V2(max_coded_width);
-  PROCESS_SCALAR_FIELD_V2(min_coded_height);
-  PROCESS_SCALAR_FIELD_V2(max_coded_height);
+
+  if (v2.min_surface_size().has_value()) {
+    v1.min_coded_width() = v2.min_surface_size()->width();
+    v1.min_coded_height() = v2.min_surface_size()->height();
+  }
+  if (v2.max_surface_size().has_value()) {
+    v1.max_coded_width() = v2.max_surface_size()->width();
+    v1.max_coded_height() = v2.max_surface_size()->height();
+  }
+
   PROCESS_SCALAR_FIELD_V2(min_bytes_per_row);
   PROCESS_SCALAR_FIELD_V2(max_bytes_per_row);
-  PROCESS_SCALAR_FIELD_V2(max_coded_width_times_coded_height);
+
+  if (v2.max_surface_width_times_surface_height().has_value()) {
+    v1.max_coded_width_times_coded_height() = *v2.max_surface_width_times_surface_height();
+  }
   v1.layers() = 1;
-  PROCESS_SCALAR_FIELD_V2(coded_width_divisor);
-  PROCESS_SCALAR_FIELD_V2(coded_height_divisor);
+
+  if (v2.surface_size_alignment().has_value()) {
+    v1.coded_width_divisor() = v2.surface_size_alignment()->width();
+    v1.coded_height_divisor() = v2.surface_size_alignment()->height();
+  }
+
   PROCESS_SCALAR_FIELD_V2(bytes_per_row_divisor);
   PROCESS_SCALAR_FIELD_V2(start_offset_divisor);
-  PROCESS_SCALAR_FIELD_V2(display_width_divisor);
-  PROCESS_SCALAR_FIELD_V2(display_height_divisor);
-  PROCESS_SCALAR_FIELD_V2(required_min_coded_width);
-  PROCESS_SCALAR_FIELD_V2(required_max_coded_width);
-  PROCESS_SCALAR_FIELD_V2(required_min_coded_height);
-  PROCESS_SCALAR_FIELD_V2(required_max_coded_height);
-  PROCESS_SCALAR_FIELD_V2(required_min_bytes_per_row);
-  PROCESS_SCALAR_FIELD_V2(required_max_bytes_per_row);
+
+  if (v2.display_size_alignment().has_value()) {
+    v1.display_width_divisor() = v2.display_size_alignment()->width();
+    v1.display_height_divisor() = v2.display_size_alignment()->height();
+  }
+
+  if (v2.required_min_surface_size().has_value()) {
+    v1.required_min_coded_width() = v2.required_min_surface_size()->width();
+    v1.required_min_coded_height() = v2.required_min_surface_size()->height();
+  }
+
+  if (v2.required_max_surface_size().has_value()) {
+    v1.required_max_coded_width() = v2.required_max_surface_size()->width();
+    v1.required_max_coded_height() = v2.required_max_surface_size()->height();
+  }
+
+  // V2 doesn't have these fields.  A similar constraint, though not exactly the same, can be
+  // achieved with required_min_surface_size.width, required_max_surface_size.width.
+  v1.required_min_bytes_per_row() = 0;
+  v1.required_max_bytes_per_row() = 0;
+
   return fpromise::ok(std::move(v1));
 }
 
 fpromise::result<fuchsia_sysmem::wire::ImageFormatConstraints> V1CopyFromV2ImageFormatConstraints(
     const fuchsia_sysmem2::wire::ImageFormatConstraints& v2) {
-  fuchsia_sysmem::wire::ImageFormatConstraints v1{};
-  v1.pixel_format = V1CopyFromV2PixelFormat(v2.pixel_format());
-  ZX_DEBUG_ASSERT(!v1.color_spaces_count);
-  if (v2.has_color_spaces()) {
-    if (v2.color_spaces().count() >
-        fuchsia_sysmem::wire::kMaxCountImageFormatConstraintsColorSpaces) {
-      LOG(ERROR,
-          "v2.color_spaces().count() > "
-          "fuchsia_sysmem::wire::kMaxCountImageFormatConstraintsColorSpaces");
-      return fpromise::error();
-    }
-    v1.color_spaces_count = static_cast<uint32_t>(v2.color_spaces().count());
-    for (uint32_t i = 0; i < v2.color_spaces().count(); ++i) {
-      v1.color_space[i] = V1CopyFromV2ColorSpace(v2.color_spaces()[i]);
-    }
+  auto v2_natural = fidl::ToNatural(v2);
+  auto v1_result = V1CopyFromV2ImageFormatConstraints(v2_natural);
+  if (v1_result.is_error()) {
+    return fpromise::error();
   }
-  PROCESS_WIRE_SCALAR_FIELD_V2(min_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(max_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(min_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V2(max_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V2(min_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V2(max_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V2(max_coded_width_times_coded_height);
-  v1.layers = 1;
-  PROCESS_WIRE_SCALAR_FIELD_V2(coded_width_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(coded_height_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(bytes_per_row_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(start_offset_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(display_width_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(display_height_divisor);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_min_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_max_coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_min_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_max_coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_min_bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V2(required_max_bytes_per_row);
-  return fpromise::ok(v1);
+  UnusedArena unused_arena;
+  auto v1_wire = fidl::ToWire(unused_arena, v1_result.take_value());
+  return fpromise::ok(std::move(v1_wire));
 }
 
-[[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_sysmem2::ImageFormat& v2) {
-  fuchsia_sysmem::ImageFormat2 v1;
-  if (v2.pixel_format().has_value()) {
-    v1.pixel_format() = V1CopyFromV2PixelFormat(v2.pixel_format().value());
+fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
+    fuchsia_images2::ImageFormat& v2) {
+  fuchsia_sysmem::ImageFormat2 v1{};
+
+  if (!v2.pixel_format().has_value()) {
+    LOG(ERROR, "!v2.pixel_format().has_value()");
+    return fpromise::error();
   }
-  PROCESS_SCALAR_FIELD_V2(coded_width);
-  PROCESS_SCALAR_FIELD_V2(coded_height);
+  auto v2_pixel_format = PixelFormatAndModifierFromImageFormat(v2);
+  v1.pixel_format() = V1CopyFromV2PixelFormat(v2_pixel_format);
+  // Preserve round-trip "has" bit for pixel_format_modifier conversion from V1 to V2 and back.
+  if (!v2.pixel_format_modifier().has_value()) {
+    v1.pixel_format().has_format_modifier() = false;
+  }
+
+  // The conversion is intentionally asymmetric, in that conversion from V2 to V1 loses the ability
+  // to have valid_size different from surface_size. The conversion is based mostly on typical usage
+  // of V1 fields, and to a lesser extent, V1 field comments in the V1 FIDL file.
+  //
+  // Specifically, in typical usage, coded_width and coded_height are actually conveying the
+  // surface_size.width and surface_size.height, not the valid_size.width and valid_size.height,
+  // because in V1, coded_height being larger than the actual valid pixels height is the only way to
+  // indicate a UV plane offset that's larger than the minimum required to hold the valid pixels. In
+  // contrast to the height situation, re. width, both V1 and V2 have the ability to indicate the
+  // bytes_per_row separately from the width in pixels, so it's possible in V1 to indicate
+  // coded_width * bytes per pixel substantially smaller than bytes_per_row. In other words, in V1,
+  // for width, it's possible to indicate the amount of padding between valid pixels width and
+  // bytes_per_row, so it's possible to convey both valid_size.width and a larger bytes_per_row
+  // (with width converted to bytes for "larger" comparison purposes). In V1 this can mean that
+  // coded_height is unnaturally larger than it "should be" per V1 doc comments because it's the
+  // only way to indicate UV plane offset, while coded_width is the valid pixels width as it "should
+  // be" per V1 doc comments. In V2 the situation is cleaned up by providing a way to specify
+  // valid_size and surface_size separately, both with width and height in pixels, and retain
+  // bytes_per_row since that's still needed for formats like BGR24 (3 bytes per pixel but fairly
+  // often 4 byte aligned row start offsets), where the row start alignment isn't a multiple of the
+  // bytes per pixel * width in valid pixels.
+  //
+  // In practice, V1 coded_height is surface_size.height, despite the V1 FIDL comments making it
+  // sound like coded_height holds valid_size.height. Essentially, in V1 it's not actually possible
+  // to convey the valid_size.height in all situations, as the coded_height is the only way to
+  // specify the UV plane offset, so coded_height must be used to define the UV plane offset, not
+  // the valid_size.height.
+  //
+  // In practice, V1 coded_width can be surface_size.width (typically with little or no padding
+  // implied by bytes_per_row) or can be valid_size.width (sometimes with a lot more padding implied
+  // by bytes_per_row). In this V2 -> V1 conversion we choose to store V2 surface_size.width in
+  // coded_width, partly for consistency with coded_height being surface_size.height, partly so that
+  // we're eliminating both parts of valid_size instead of trying to keep only one part of it, and
+  // partly because the more typical V1 usage is for coded_width and coded_height to store the
+  // surface_size.width and surface_size.height (in contrast to splitting them and "leaning harder"
+  // on bytes_per_row), so we go with that more typical V1 usage pattern here, despite some
+  // unfortunate mismatch with V1 FIDL doc comments stemming from V1 limitations.
+  if (v2.surface_size().has_value()) {
+    v1.coded_width() = v2.surface_size()->width();
+    v1.coded_height() = v2.surface_size()->height();
+  }
+
   PROCESS_SCALAR_FIELD_V2(bytes_per_row);
-  PROCESS_SCALAR_FIELD_V2(display_width);
-  PROCESS_SCALAR_FIELD_V2(display_height);
+
+  if (v2.display_size().has_value()) {
+    v1.display_width() = v2.display_size()->width();
+    v1.display_height() = v2.display_size()->height();
+  }
+
   v1.layers() = 1;
+
   if (v2.color_space().has_value()) {
     v1.color_space() = V1CopyFromV2ColorSpace(v2.color_space().value());
   }
-  v1.has_pixel_aspect_ratio() =
-      v2.pixel_aspect_ratio_width().has_value() && v2.pixel_aspect_ratio_height().has_value();
+  v1.has_pixel_aspect_ratio() = v2.pixel_aspect_ratio().has_value();
   if (v1.has_pixel_aspect_ratio()) {
-    v1.pixel_aspect_ratio_width() = v2.pixel_aspect_ratio_width().value();
-    v1.pixel_aspect_ratio_height() = v2.pixel_aspect_ratio_height().value();
+    v1.pixel_aspect_ratio_width() = v2.pixel_aspect_ratio()->width();
+    v1.pixel_aspect_ratio_height() = v2.pixel_aspect_ratio()->height();
   }
+
   return fpromise::ok(std::move(v1));
 }
 
 fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_sysmem2::wire::ImageFormat& v2) {
-  fuchsia_sysmem::wire::ImageFormat2 v1{};
-  if (v2.has_pixel_format()) {
-    v1.pixel_format = V1CopyFromV2PixelFormat(v2.pixel_format());
+    fuchsia_images2::wire::ImageFormat& v2) {
+  auto v2_natural = fidl::ToNatural(v2);
+  auto v1_natural_result = V1CopyFromV2ImageFormat(v2_natural);
+  if (v1_natural_result.is_error()) {
+    return fpromise::error();
   }
-  PROCESS_WIRE_SCALAR_FIELD_V2(coded_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(coded_height);
-  PROCESS_WIRE_SCALAR_FIELD_V2(bytes_per_row);
-  PROCESS_WIRE_SCALAR_FIELD_V2(display_width);
-  PROCESS_WIRE_SCALAR_FIELD_V2(display_height);
-  v1.layers = 1;
-  if (v2.has_color_space()) {
-    v1.color_space = V1CopyFromV2ColorSpace(v2.color_space());
-  }
-  v1.has_pixel_aspect_ratio =
-      v2.has_pixel_aspect_ratio_width() && v2.has_pixel_aspect_ratio_height();
-  if (v1.has_pixel_aspect_ratio) {
-    v1.pixel_aspect_ratio_width = v2.pixel_aspect_ratio_width();
-    v1.pixel_aspect_ratio_height = v2.pixel_aspect_ratio_height();
-  }
-  return fpromise::ok(v1);
+  UnusedArena unused_arena;
+  return fpromise::ok(fidl::ToWire(unused_arena, v1_natural_result.value()));
 }
 
 fpromise::result<fuchsia_sysmem::SingleBufferSettings> V1CopyFromV2SingleBufferSettings(
@@ -1317,135 +1408,31 @@ V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollecti
   return fpromise::ok(std::move(v1));
 }
 
-fuchsia_sysmem2::wire::PixelFormat V2ClonePixelFormat(
-    fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::PixelFormat& src) {
-  fuchsia_sysmem2::wire::PixelFormat pixel_format(allocator);
-  if (src.has_type()) {
-    pixel_format.set_type(src.type());
-  }
-  if (src.has_format_modifier_value()) {
-    pixel_format.set_format_modifier_value(allocator, src.format_modifier_value());
-  }
-  return pixel_format;
-}
-
-fuchsia_sysmem2::wire::ColorSpace V2CloneColorSpace(fidl::AnyArena& allocator,
-                                                    const fuchsia_sysmem2::wire::ColorSpace& src) {
-  fuchsia_sysmem2::wire::ColorSpace color_space(allocator);
-  if (src.has_type()) {
-    color_space.set_type(src.type());
-  }
-  return color_space;
-}
-
 fuchsia_sysmem2::wire::BufferMemorySettings V2CloneBufferMemorySettings(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemorySettings& src) {
-  fuchsia_sysmem2::wire::BufferMemorySettings buffer_memory_settings(allocator);
-  if (src.has_size_bytes()) {
-    buffer_memory_settings.set_size_bytes(src.size_bytes());
-  }
-  if (src.has_is_physically_contiguous()) {
-    buffer_memory_settings.set_is_physically_contiguous(src.is_physically_contiguous());
-  }
-  if (src.has_is_secure()) {
-    buffer_memory_settings.set_is_secure(src.is_secure());
-  }
-  if (src.has_coherency_domain()) {
-    buffer_memory_settings.set_coherency_domain(src.coherency_domain());
-  }
-  if (src.has_heap()) {
-    buffer_memory_settings.set_heap(allocator, src.heap());
-  }
-  return buffer_memory_settings;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::ImageFormatConstraints V2CloneImageFormatConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::ImageFormatConstraints& src) {
-  fuchsia_sysmem2::wire::ImageFormatConstraints image_format_constraints(allocator);
-  if (src.has_pixel_format()) {
-    image_format_constraints.set_pixel_format(allocator,
-                                              V2ClonePixelFormat(allocator, src.pixel_format()));
-  }
-  if (src.has_color_spaces()) {
-    image_format_constraints.set_color_spaces(allocator, allocator, src.color_spaces().count());
-    for (uint32_t i = 0; i < src.color_spaces().count(); ++i) {
-      image_format_constraints.color_spaces()[i] =
-          V2CloneColorSpace(allocator, src.color_spaces()[i]);
-    }
-  }
-  if (src.has_min_coded_width()) {
-    image_format_constraints.set_min_coded_width(src.min_coded_width());
-  }
-  if (src.has_max_coded_width()) {
-    image_format_constraints.set_max_coded_width(src.max_coded_width());
-  }
-  if (src.has_min_coded_height()) {
-    image_format_constraints.set_min_coded_height(src.min_coded_height());
-  }
-  if (src.has_max_coded_height()) {
-    image_format_constraints.set_max_coded_height(src.max_coded_height());
-  }
-  if (src.has_min_bytes_per_row()) {
-    image_format_constraints.set_min_bytes_per_row(src.min_bytes_per_row());
-  }
-  if (src.has_max_bytes_per_row()) {
-    image_format_constraints.set_max_bytes_per_row(src.max_bytes_per_row());
-  }
-  if (src.has_max_coded_width_times_coded_height()) {
-    image_format_constraints.set_max_coded_width_times_coded_height(
-        src.max_coded_width_times_coded_height());
-  }
-  if (src.has_coded_width_divisor()) {
-    image_format_constraints.set_coded_width_divisor(src.coded_width_divisor());
-  }
-  if (src.has_coded_height_divisor()) {
-    image_format_constraints.set_coded_height_divisor(src.coded_height_divisor());
-  }
-  if (src.has_bytes_per_row_divisor()) {
-    image_format_constraints.set_bytes_per_row_divisor(src.bytes_per_row_divisor());
-  }
-  if (src.has_start_offset_divisor()) {
-    image_format_constraints.set_start_offset_divisor(src.start_offset_divisor());
-  }
-  if (src.has_display_width_divisor()) {
-    image_format_constraints.set_display_width_divisor(src.display_width_divisor());
-  }
-  if (src.has_display_height_divisor()) {
-    image_format_constraints.set_display_height_divisor(src.display_height_divisor());
-  }
-  if (src.has_required_min_coded_width()) {
-    image_format_constraints.set_required_min_coded_width(src.required_min_coded_width());
-  }
-  if (src.has_required_max_coded_width()) {
-    image_format_constraints.set_required_max_coded_width(src.required_max_coded_width());
-  }
-  if (src.has_required_min_coded_height()) {
-    image_format_constraints.set_required_min_coded_height(src.required_min_coded_height());
-  }
-  if (src.has_required_max_coded_height()) {
-    image_format_constraints.set_required_max_coded_height(src.required_max_coded_height());
-  }
-  if (src.has_required_min_bytes_per_row()) {
-    image_format_constraints.set_required_min_bytes_per_row(src.required_min_bytes_per_row());
-  }
-  if (src.has_required_max_bytes_per_row()) {
-    image_format_constraints.set_required_max_bytes_per_row(src.required_max_bytes_per_row());
-  }
-  return image_format_constraints;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::SingleBufferSettings V2CloneSingleBufferSettings(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::SingleBufferSettings& src) {
-  fuchsia_sysmem2::wire::SingleBufferSettings single_buffer_settings(allocator);
-  if (src.has_buffer_settings()) {
-    single_buffer_settings.set_buffer_settings(
-        allocator, V2CloneBufferMemorySettings(allocator, src.buffer_settings()));
-  }
-  if (src.has_image_format_constraints()) {
-    single_buffer_settings.set_image_format_constraints(
-        allocator, V2CloneImageFormatConstraints(allocator, src.image_format_constraints()));
-  }
-  return single_buffer_settings;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
@@ -1470,10 +1457,10 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
     } else {
       ZX_DEBUG_ASSERT(clone_vmo.get() == ZX_HANDLE_INVALID);
     }
-    vmo_buffer.vmo().emplace(std::move(clone_vmo));
+    vmo_buffer.vmo() = std::move(clone_vmo);
   }
   if (src.vmo_usable_start().has_value()) {
-    vmo_buffer.vmo_usable_start().emplace(src.vmo_usable_start().value());
+    vmo_buffer.vmo_usable_start() = src.vmo_usable_start().value();
   }
   if (src.aux_vmo().has_value()) {
     zx::vmo clone_vmo;
@@ -1494,7 +1481,7 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
     } else {
       ZX_DEBUG_ASSERT(clone_vmo.get() == ZX_HANDLE_INVALID);
     }
-    vmo_buffer.aux_vmo().emplace(std::move(clone_vmo));
+    vmo_buffer.aux_vmo() = std::move(clone_vmo);
   }
   return fpromise::ok(std::move(vmo_buffer));
 }
@@ -1556,7 +1543,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBuff
   fuchsia_sysmem2::BufferCollectionInfo buffer_collection_info;
   if (src.settings().has_value()) {
     // clone via generated copy
-    buffer_collection_info.settings().emplace(src.settings().value());
+    buffer_collection_info.settings() = src.settings().value();
   }
   if (src.buffers().has_value()) {
     buffer_collection_info.buffers().emplace(src.buffers()->size());
@@ -1597,136 +1584,47 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
 
 fuchsia_sysmem2::wire::CoherencyDomainSupport V2CloneCoherencyDomainSuppoort(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::CoherencyDomainSupport& src) {
-  fuchsia_sysmem2::wire::CoherencyDomainSupport coherency_domain_support(allocator);
-  if (src.has_cpu_supported()) {
-    coherency_domain_support.set_cpu_supported(src.cpu_supported());
-  }
-  if (src.has_ram_supported()) {
-    coherency_domain_support.set_ram_supported(src.ram_supported());
-  }
-  if (src.has_inaccessible_supported()) {
-    coherency_domain_support.set_inaccessible_supported(src.inaccessible_supported());
-  }
-  return coherency_domain_support;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::HeapProperties V2CloneHeapProperties(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::HeapProperties& src) {
-  fuchsia_sysmem2::wire::HeapProperties heap_properties(allocator);
-  if (src.has_coherency_domain_support()) {
-    heap_properties.set_coherency_domain_support(
-        allocator, V2CloneCoherencyDomainSuppoort(allocator, src.coherency_domain_support()));
-  }
-  if (src.has_need_clear()) {
-    heap_properties.set_need_clear(src.need_clear());
-  }
-  return heap_properties;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::BufferCollectionConstraints V2CloneBufferCollectionConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferCollectionConstraints& src) {
-  fuchsia_sysmem2::wire::BufferCollectionConstraints buffer_collection_constraints(allocator);
-  if (src.has_usage()) {
-    buffer_collection_constraints.set_usage(allocator, V2CloneBufferUsage(allocator, src.usage()));
-  }
-  if (src.has_min_buffer_count_for_camping()) {
-    buffer_collection_constraints.set_min_buffer_count_for_camping(
-        src.min_buffer_count_for_camping());
-  }
-  if (src.has_min_buffer_count_for_dedicated_slack()) {
-    buffer_collection_constraints.set_min_buffer_count_for_dedicated_slack(
-        src.min_buffer_count_for_dedicated_slack());
-  }
-  if (src.has_min_buffer_count_for_shared_slack()) {
-    buffer_collection_constraints.set_min_buffer_count_for_shared_slack(
-        src.min_buffer_count_for_shared_slack());
-  }
-  if (src.has_min_buffer_count()) {
-    buffer_collection_constraints.set_min_buffer_count(src.min_buffer_count());
-  }
-  if (src.has_max_buffer_count()) {
-    buffer_collection_constraints.set_max_buffer_count(src.max_buffer_count());
-  }
-  if (src.has_buffer_memory_constraints()) {
-    buffer_collection_constraints.set_buffer_memory_constraints(
-        allocator, V2CloneBufferMemoryConstraints(allocator, src.buffer_memory_constraints()));
-  }
-  if (src.has_image_format_constraints()) {
-    buffer_collection_constraints.set_image_format_constraints(
-        allocator, allocator, src.image_format_constraints().count());
-    for (uint32_t i = 0; i < src.image_format_constraints().count(); ++i) {
-      buffer_collection_constraints.image_format_constraints()[i] =
-          V2CloneImageFormatConstraints(allocator, src.image_format_constraints()[i]);
-    }
-  }
-  if (src.has_need_clear_aux_buffers_for_secure()) {
-    buffer_collection_constraints.set_need_clear_aux_buffers_for_secure(
-        src.need_clear_aux_buffers_for_secure());
-  }
-  if (src.has_allow_clear_aux_buffers_for_secure()) {
-    buffer_collection_constraints.set_allow_clear_aux_buffers_for_secure(
-        src.allow_clear_aux_buffers_for_secure());
-  }
-  return buffer_collection_constraints;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::BufferUsage V2CloneBufferUsage(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferUsage& src) {
-  fuchsia_sysmem2::wire::BufferUsage buffer_usage(allocator);
-  if (src.has_none()) {
-    buffer_usage.set_none(src.none());
-  }
-  if (src.has_cpu()) {
-    buffer_usage.set_cpu(src.cpu());
-  }
-  if (src.has_vulkan()) {
-    buffer_usage.set_vulkan(src.vulkan());
-  }
-  if (src.has_display()) {
-    buffer_usage.set_display(src.display());
-  }
-  if (src.has_video()) {
-    buffer_usage.set_video(src.video());
-  }
-  return buffer_usage;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 fuchsia_sysmem2::wire::BufferMemoryConstraints V2CloneBufferMemoryConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemoryConstraints& src) {
-  fuchsia_sysmem2::wire::BufferMemoryConstraints buffer_memory_constraints(allocator);
-  if (src.has_min_size_bytes()) {
-    buffer_memory_constraints.set_min_size_bytes(src.min_size_bytes());
-  }
-  if (src.has_max_size_bytes()) {
-    buffer_memory_constraints.set_max_size_bytes(src.max_size_bytes());
-  }
-  if (src.has_physically_contiguous_required()) {
-    buffer_memory_constraints.set_physically_contiguous_required(
-        src.physically_contiguous_required());
-  }
-  if (src.has_secure_required()) {
-    buffer_memory_constraints.set_secure_required(src.secure_required());
-  }
-  if (src.has_cpu_domain_supported()) {
-    buffer_memory_constraints.set_cpu_domain_supported(src.cpu_domain_supported());
-  }
-  if (src.has_ram_domain_supported()) {
-    buffer_memory_constraints.set_ram_domain_supported(src.ram_domain_supported());
-  }
-  if (src.has_inaccessible_domain_supported()) {
-    buffer_memory_constraints.set_inaccessible_domain_supported(
-        src.inaccessible_domain_supported());
-  }
-  if (src.has_heap_permitted()) {
-    buffer_memory_constraints.set_heap_permitted(allocator, allocator,
-                                                 src.heap_permitted().count());
-    ZX_DEBUG_ASSERT(buffer_memory_constraints.heap_permitted().count() ==
-                    src.heap_permitted().count());
-    for (uint32_t i = 0; i < src.heap_permitted().count(); ++i) {
-      buffer_memory_constraints.heap_permitted()[i] = src.heap_permitted()[i];
-    }
-  }
-  return buffer_memory_constraints;
+  // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
+  // accomplishes a clone overall. This probably isn't the fastest way but should be smaller code
+  // size than a custom clone, and avoids maintenance when adding a field.
+  auto src_natural = fidl::ToNatural(src);
+  return fidl::ToWire(allocator, src_natural);
 }
 
 }  // namespace sysmem

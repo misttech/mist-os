@@ -16,11 +16,12 @@ zx_library("image-format") {
   public_deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//zircon/system/ulib/sysmem-version",
   ]
   deps = [
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sysmem-version",
+    "//zircon/third_party/ulib/safemath",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings

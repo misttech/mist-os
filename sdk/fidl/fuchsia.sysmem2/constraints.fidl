@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 library fuchsia.sysmem2;
 
+using fuchsia.images2;
+using fuchsia.math;
+
 const MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS uint32 = 64;
 const MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED uint32 = 64;
 const MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES uint32 = 32;
@@ -234,163 +237,180 @@ type ImageFormatConstraints = table {
     /// and required_max_coded_height fields to force allocating large-enough
     /// buffers to hold particular video dimensions, without needing to list
     /// every PixelFormat.
-    1: pixel_format PixelFormat;
+    1: pixel_format fuchsia.images2.PixelFormat;
+
+    2: pixel_format_modifier uint64;
 
     /// Empty is an error.  Redundant entries are an error.  Arbitrary ordering
     /// is not an error.
-    2: color_spaces vector<ColorSpace>:MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES;
+    3: color_spaces
+            vector<fuchsia.images2.ColorSpace>:MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES;
 
-    /// Minimum permitted width in pixels.
+    /// Minimum permitted size in pixels.
     ///
     /// For example a video decoder participant may set this field to the
-    /// minimum coded_width that might potentially be specified by a stream.  In
-    /// contrast, required_min_coded_width would be set to the current
-    /// coded_width specified by the stream.  While min_coded_width aggregates
-    /// by taking the max, required_min_coded_width aggregates by taking the
-    /// min.
+    /// minimum size that might potentially be specified by a stream.  In
+    /// contrast, `required_min_surface_size` would be set to the current size
+    /// specified by the stream.  While `min_surface_size` aggregates by taking
+    /// the max, `required_min_surface_size` aggregates by taking the min.
     ///
-    /// See also required_min_coded_width.
-    3: min_coded_width uint32;
-    /// Maximum width in pixels.  For example Scenic may set this field
-    /// (directly or via sub-participants) to the maximum width that can be
-    /// composited.
-    /// un-set is treated as 0xFFFFFFFF.
-    4: max_coded_width uint32;
+    /// When sending to sysmem, this field can be un-set if the participant is
+    /// prepared to deal with the smallest possible non-zero image layout
+    /// limited only by the constraints implicitly imposed by the `pixel_format`
+    /// and `pixel_format_modifier`. Or this field can be set to the actual
+    /// minimum size the participant can handle.
+    ///
+    /// Producers should set min_surface_size and set both width and height to
+    /// the actual non-zero smallest width and height that the producer might
+    /// generate.  For example, a video decoder can set the size of a single
+    /// macroblock here.
+    ///
+    /// When receiving from sysmem, this field will always be set, and neither
+    /// width nor height will be 0, because at least one participant must
+    /// specify a non-zero minimum size (where both width and height aren't
+    /// zero).
+    ///
+    /// See also `required_min_surface_size`.
+    4: min_surface_size fuchsia.math.SizeU;
+    /// Maximum size in pixels.  For example Scenic may set this field (directly
+    /// or via sub-participants) to the maximum size that can be composited.
+    ///
+    /// Sending to sysmem, un-set is treated as 0xFFFFFFFF, 0xFFFFFFFF.
+    ///
+    /// Receiving from sysmem, this field will always be set. For width and
+    /// height separately, if there is no enforced max, that sub-field will be
+    /// 0xFFFFFFFF.
+    5: max_surface_size fuchsia.math.SizeU;
 
-    /// Minimum height in pixels.  For example a video decoder participant may
-    /// set this field to the coded_height specified by a stream.
-    5: min_coded_height uint32;
-    /// Maximum height in pixels.  For example Scenic may set this field
-    /// (directly or via sub-participants) to the maximum height that can be
-    /// composited.
-    /// un-set is treated as 0xFFFFFFFF.
-    6: max_coded_height uint32;
+    /// The minimum number of bytes per row, including any padding beyond the
+    /// last image data in a row.
+    ///
+    /// This is sometimes called the "stride" or the "line to line offset". For
+    /// single-plane formats, this is the number of bytes per row of pixels. For
+    /// multi-plane formats, this is the number of bytes per row of samples in
+    /// plane 0 (for example, the number of bytes per row of luma samples in the
+    /// case of a multi-plane YUV format). For multi-plane formats, the bytes
+    /// per row in planes other than plane 0 is format specific but always a
+    /// specific relationship to the plane 0 bytes per row.
+    ///
+    /// When sending `ImageFormatConstraints` to sysmem, setting this field is
+    /// optional. Not setting this field is recommended unless the participant
+    /// needs to force the `bytes_per_row` to be larger than the minimum value
+    /// implied by min_surface_size.width, the "stride bytes per width pixel" of
+    /// the `pixel_format` plus `pixel_format_modifier` (see also
+    /// `ImageFormatStrideBytesPerWidthPixel`), and `bytes_per_row_divisor`.
+    ///
+    /// When this structure is received from sysmem, this field will always be
+    /// set (when the parent structure is present), and will always be at least
+    /// the value implied by min_surface_size.width, the "stride bytes per width
+    /// pixel" of the `pixel_format` plus `pixel_format_modifier`, and
+    /// `bytes_per_row_divisor`. Some producer participants may prefer to simply
+    /// set `ImageFormat.bytes_per_row` to
+    /// `ImageFormatConstraints.min_bytes_per_row` since sysmem is guaranteeing
+    /// that `min_bytes_per_row` is compatible with an image of width
+    /// min_surface_size.width. Producer participants that need to have
+    /// `surface_size.width` > `min_surface_size.width` can get a corresponding
+    /// `min_bytes_per_row` from ImageFormatMinimumRowBytes (in C++), or can
+    /// just calculate the `bytes_per_row` directly.
+    6: min_bytes_per_row uint32;
 
-    /// Must be >= the value implied by min_coded_width for plane 0.
-    7: min_bytes_per_row uint32;
-    /// Must be >= the value implied by max_coded_width for plane 0.
-    /// un-set is treated as 0xFFFFFFFF.
-    8: max_bytes_per_row uint32;
+    /// The maximum number of bytes per row, including any padding beyond the
+    /// last image data in a row.
+    ///
+    /// When sent to sysmem, must be >= the value implied by
+    /// `max_surface_size.width`, "stride bytes per width pixel", and
+    /// `bytes_per_row_divisor`, or constraints aggregation will fail. Un-set
+    /// means the participant doesn't need/want to set a strict max.
+    ///
+    /// When a participant wants to not specify any maximum, the participant can
+    /// either not set this field, or set this field to 0xFFFFFFFF.
+    ///
+    /// When received from sysmem, this field will always be set. If the max is
+    /// effectively infinite, the value will be 0xFFFFFFFF (not zero).
+    7: max_bytes_per_row uint32;
 
     /// The max image area in pixels is limited indirectly via
-    /// BufferSettings.size_bytes, and can also be enforced directly via this
+    /// `BufferSettings.size_bytes`, and can also be enforced directly via this
     /// field.
-    /// un-set is treated as 0xFFFFFFFF.
-    9: max_coded_width_times_coded_height uint32;
-
-    /// coded_width % width_divisor must be 0.
-    /// un-set is treated as 1.
-   10: coded_width_divisor uint32;
-
-    /// coded_height % height_divisor must be 0.
-    /// un-set is treated as 1.
-   11: coded_height_divisor uint32;
-
-    /// bytes_per_row % bytes_per_row_divisor must be 0.
-    /// un-set is treated as 1.
-   12: bytes_per_row_divisor uint32;
-
-    /// vmo_usable_start % start_offset_divisor must be 0.
-    /// un-set is treated as 1.
-   13: start_offset_divisor uint32;
-
-    /// display_width % display_width_divisor must be 0.
-    /// un-set is treated as 1.
-   14: display_width_divisor uint32;
-
-    /// display_height % display_height_divisor must be 0.
-    /// un-set is treated as 1.
-   15: display_height_divisor uint32;
-
-    /// required_ dimension bounds.
     ///
-    /// In contrast to the corresponding fields without "required_" at the
-    /// start, these fields (when set to non-zero values) express a requirement
-    /// that the resulting aggregated non-required_ fields specify a space that
-    /// fully contain the space expressed by each participant's required_
-    /// fields.
+    /// Sending to sysmem, un-set is treated as 0xFFFFFFFF.
     ///
-    /// For example, a producer video decoder is perfectly happy for the
-    /// consumer to be willing to accept anything, and the video decoder doesn't
-    /// really want to constrain the potential space of dimensions that might be
-    /// seen in a stream and may be acceptable to the consumer, but the video
-    /// decoder needs to ensure that the resulting dimension ranges contain
-    /// at least the current dimensions decoded from the stream.
+    /// Receiving from sysmem, this field will always be set, and can be set to
+    /// 0xFFFFFFFF.
+    8: max_surface_width_times_surface_height uint32;
+
+    /// `surface_size.width % surface_size_alignment.width` must be 0.
+    /// `surface_size.height % surface_size_alignment.height` must be 0.
+    /// Un-set is treated as 1, 1.
+    9: surface_size_alignment fuchsia.math.SizeU;
+
+    /// `display_size.width % display_size_alignment.width` must be 0.
+    /// `display_size.height % display_size_alignment.height` must be 0.
+    /// Un-set is treated as 1, 1.
+   10: display_size_alignment fuchsia.math.SizeU;
+
+    /// These fields can be used to ensure the aggregated constraints have
+    /// min_surface_size and max_surface_size such that both
+    /// required_min_surface_size and required_max_surface_size (and anything in
+    /// between) are permitted values of ImageFormat.surface_size.
     ///
-    /// Similarly, an initiator with a particular dynamic-dimension scenario in
-    /// mind may wish to require up front that participants agree to handle at
-    /// least the range of dimensions expected by the initiator in that
-    /// scenario (else fail earlier rather than later, maybe trying again with
-    /// smaller required_ space).
+    /// For example, a producer video decoder doesn't want to constrain the
+    /// allowed ImageFormat.surface_size, as a compressed stream can change
+    /// dimensions mid-stream, but the producer video decoder needs to ensure
+    /// that the aggregated constraints allow for at least the current
+    /// dimensions of uncompressed frames at the current position in the stream.
+    ///
+    /// As another example, an initiator that's intending to decode video may
+    /// know what the maximum expected size of frames in the stream(s) can be,
+    /// so by setting `required_max_surface_size`, can ensure that the allocated
+    /// buffers are large enough to support that max `surface_size`. In addition
+    /// on successful allocation the initiator also knows that the consumer
+    /// participants are ok with receiving up to that max `surface_size`.
     ///
     /// It's much more common for a producer or initiator to set these fields
     /// than for a consumer to set these fields.
     ///
-    /// While the non-required_ fields aggregate by taking the intersection, the
-    /// required_ fields aggregate by taking the union.
+    /// While `min_surface_size` and `max_surface_size` aggregate by effectively
+    /// taking the intersection, the `required_min_surface_size` and
+    /// `required_max_surface_size` aggregate by effectively taking the union.
     ///
-    /// If set, the required_max_coded_width and required_max_coded_height will
-    /// cause the allocated buffers to be large enough to hold an image that is
-    /// required_max_coded_width * required_max_coded_height.
+    /// TODO(fxbug.dev/34192): Make it easier to allocate buffers of minimal
+    /// size that can (optionally) also handle 90 degree rotated version of the
+    /// max dimensions / alternate required bounds for another main aspect
+    /// ratio. Un-set is treated as 0xFFFFFFFF, 0xFFFFFFFF.
+   11: required_min_surface_size fuchsia.math.SizeU;
+    /// See also required_min_surface_size. Un-set is treated as 0, 0.
+   12: required_max_surface_size fuchsia.math.SizeU;
+
+    /// `fuchsia_images2.ImageFormat.bytes_per_row % bytes_per_row_divisor` must
+    /// be 0. un-set is treated as 1. When set, this must be a power of 2.
     ///
-    /// TODO(fxbug.dev/34192): Make it easier to allocate buffers of minimal size
-    /// that can (optionally) also handle 90 degree rotated version of the max
-    /// dimensions / alternate required bounds for another main aspect ratio.
-    /// un-set is treated as 0xFFFFFFFF.
-   16: required_min_coded_width uint32;
-   17: required_max_coded_width uint32;
-    /// un-set is treated as 0xFFFFFFFF.
-   18: required_min_coded_height uint32;
-   19: required_max_coded_height uint32;
-    /// un-set is treated as 0xFFFFFFFF.
-   20: required_min_bytes_per_row uint32;
-   21: required_max_bytes_per_row uint32;
-};
-
-/// Describes how an image is represented.
-// TODO(fxbug.dev/32119): Currently this table is not considered ready for use between
-// processes, but should be fairly soon.
-type ImageFormat = table {
-    /// Pixel format.
-    1: pixel_format PixelFormat;
-
-    /// Row width in pixels that exist in the buffer.  Must be >= display_width.
-    /// Can be < the width implied by stride_bytes.
-    2: coded_width uint32;
-
-    /// Number of rows.  Must be >= display_height.
-    3: coded_height uint32;
-
-    /// Stride in bytes of plane 0.  Planes beyond plane 0 (if any, depending on
-    /// pixel_format) have a known fixed relationship with plane 0's stride.
-    /// For Intel tiled textures, the stride is for the linearized version of the texture.
-    4: bytes_per_row uint32;
-
-    /// Row width in pixels that are to be displayed.  This can be <=
-    /// coded_width.  Any cropping occurs on the right of the image (not left).
-    5: display_width uint32;
-
-    /// Number of rows to be displayed.  This can be <= coded_height, with any
-    /// cropping on the bottom (not top).
-    6: display_height uint32;
-
-    /// Color space.
-    7: color_space ColorSpace;
-
-    /// The pixel_aspect_ratio_width : pixel_aspect_ratio_height is the pixel
-    /// aspect ratio (AKA sample aspect ratio aka SAR) for the luma (AKA Y)
-    /// samples. A pixel_aspect_ratio of 1:1 mean square pixels. A
-    /// pixel_aspect_ratio of 2:1 would mean pixels that are displayed twice as
-    /// wide as they are tall. Codec implementation should ensure these two
-    /// values are relatively prime by reducing the fraction (dividing both by
-    /// GCF) if necessary.
+    /// Prefer to use `surface_size_alignment.width` when the intent is to
+    /// ensure that the width in pixels is aligned. In contrast, this field can
+    /// specify that the "stride" (byte offset from start of image to start of
+    /// row n minus byte offset from start of image to start of row n-1, with
+    /// result in bytes) needs to be aligned to the specified number of bytes.
+    /// For example, when `PixelFormat.BGR24` (24 bit color; 3 bytes per pixel)
+    /// is used, it's not uncommon for a participant to need each row of pixels
+    /// to start at a 4 byte aligned offset from the start of the image, which
+    /// can imply some padding bytes at the end of each row of pixels, before
+    /// the start of the next row of pixels.
     ///
-    /// A producer should set both these fields, or neither of them.
+    /// While any value of `bytes_per_row_divisor` could instead be enforced by
+    /// setting `surface_size_alignment.width` to the least-common-multiple of
+    /// the "stride bytes per width pixel" and the stride alignment requirement,
+    /// enforcing the stride alignment requirement that way can lead to more
+    /// padding than necessary (implying larger buffer than necessary), and also
+    /// results in a "fake" `surface_size.width`; this field exists to avoid
+    /// that situation. Instead, the stride alignment requirement in bytes is
+    /// specified directly here.
+   13: bytes_per_row_divisor uint32;
+
+    /// `vmo_usable_start % start_offset_divisor` must be 0. Un-set is treated
+    /// as 1.
     ///
-    /// A consumer should interpret either of these fields being un-set as an
-    /// unknown pixel_aspect_ratio.  A default of 1:1 can be appropriate in some
-    /// cases, but a consumer may determine the actual pixel_aspect_ratio by OOB
-    /// means.
-    8: pixel_aspect_ratio_width uint32;
-    9: pixel_aspect_ratio_height uint32;
+    /// Producer participants are discouraged from setting non-zero image start
+    /// offset (from the buffer base) unless actually required, as not all
+    /// participants correctly handle non-zero image start offset.
+   14: start_offset_divisor uint32;
 };

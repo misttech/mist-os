@@ -41,7 +41,6 @@ static constexpr uint32_t kAfbcBytesPerBlockHeader = 16u;
 static constexpr uint32_t kAfbcTilePixelWidth = 16u;
 static constexpr uint32_t kAfbcTilePixelHeight = 16u;
 
-namespace sysmem = fuchsia_sysmem;
 namespace fhd = fuchsia_hardware_display;
 
 namespace testing {
@@ -64,7 +63,7 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t 
 Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t width,
                      uint32_t height, zx_pixel_format_t format, Pattern pattern, uint32_t fg_color,
                      uint32_t bg_color, uint64_t modifier) {
-  fidl::WireSyncClient<sysmem::Allocator> allocator;
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator;
   {
     zx::channel client, server;
     if (zx::channel::create(0, &client, &server) != ZX_OK ||
@@ -72,10 +71,10 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
       fprintf(stderr, "Failed to connect to sysmem\n");
       return nullptr;
     }
-    allocator = fidl::WireSyncClient<sysmem::Allocator>(std::move(client));
+    allocator = fidl::WireSyncClient<fuchsia_sysmem::Allocator>(std::move(client));
   }
 
-  fidl::WireSyncClient<sysmem::BufferCollectionToken> token;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token;
   {
     zx::channel client, server;
     if (zx::channel::create(0, &client, &server) != ZX_OK ||
@@ -83,7 +82,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
       fprintf(stderr, "Failed to allocate shared collection\n");
       return nullptr;
     }
-    token = fidl::WireSyncClient<sysmem::BufferCollectionToken>(std::move(client));
+    token = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>(std::move(client));
   }
   zx_handle_t display_token_handle;
   {
@@ -119,7 +118,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
     return nullptr;
   }
 
-  fidl::WireSyncClient<sysmem::BufferCollection> collection;
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection;
   {
     zx::channel client, server;
     if (zx::channel::create(0, &client, &server) != ZX_OK ||
@@ -127,34 +126,37 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
       fprintf(stderr, "Failed to bind shared collection\n");
       return nullptr;
     }
-    collection = fidl::WireSyncClient<sysmem::BufferCollection>(std::move(client));
+    collection = fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>(std::move(client));
   }
 
-  sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.usage.cpu = sysmem::wire::kCpuUsageReadOften | sysmem::wire::kCpuUsageWriteOften;
+  fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
+  constraints.usage.cpu =
+      fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
   constraints.min_buffer_count_for_camping = 1;
   constraints.has_buffer_memory_constraints = true;
-  sysmem::wire::BufferMemoryConstraints& buffer_constraints = constraints.buffer_memory_constraints;
+  fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
+      constraints.buffer_memory_constraints;
   buffer_constraints.ram_domain_supported = true;
   constraints.image_format_constraints_count = 1;
-  sysmem::wire::ImageFormatConstraints& image_constraints = constraints.image_format_constraints[0];
+  fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
+      constraints.image_format_constraints[0];
   if (format == ZX_PIXEL_FORMAT_ARGB_8888 || format == ZX_PIXEL_FORMAT_RGB_x888) {
-    image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgra32;
+    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
     image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = sysmem::wire::ColorSpace{
-        .type = sysmem::wire::ColorSpaceType::kSrgb,
+    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
+        .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
     };
   } else if (format == ZX_PIXEL_FORMAT_ABGR_8888 || format == ZX_PIXEL_FORMAT_BGR_888x) {
-    image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kR8G8B8A8;
+    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
     image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = sysmem::wire::ColorSpace{
-        .type = sysmem::wire::ColorSpaceType::kSrgb,
+    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
+        .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
     };
   } else {
-    image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kNv12;
+    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kNv12;
     image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = sysmem::wire::ColorSpace{
-        .type = sysmem::wire::ColorSpaceType::kRec709,
+    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
+        .type = fuchsia_sysmem::wire::ColorSpaceType::kRec709,
     };
   }
   image_constraints.pixel_format.has_format_modifier = true;
@@ -218,7 +220,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
   for (unsigned i = 0; i < buffer_size / sizeof(uint32_t); i++) {
     ptr[i] = bg_color;
   }
-  if (modifier == sysmem::wire::kFormatModifierArmAfbc16X16) {
+  if (modifier == fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16) {
     uint32_t width_in_tiles = (width + kAfbcTilePixelWidth - 1) / kAfbcTilePixelWidth;
     uint32_t height_in_tiles = (height + kAfbcTilePixelHeight - 1) / kAfbcTilePixelHeight;
     uint32_t tile_count = width_in_tiles * height_in_tiles;
@@ -265,7 +267,7 @@ void Image::Render(int32_t prev_step, int32_t step_num) {
         return color;
       };
 
-      if (modifier_ == sysmem::wire::kFormatModifierLinear) {
+      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierLinear) {
         RenderLinear(pixel_generator, start, end);
       } else {
         RenderTiled(pixel_generator, start, end);
@@ -278,7 +280,7 @@ void Image::Render(int32_t prev_step, int32_t step_num) {
         return color;
       };
 
-      if (modifier_ == sysmem::wire::kFormatModifierLinear) {
+      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierLinear) {
         RenderLinear(pixel_generator, start, end);
       } else {
         RenderTiled(pixel_generator, start, end);
@@ -339,13 +341,13 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
   uint8_t* body = nullptr;
   uint32_t width_in_tiles = 0;
   switch (modifier_) {
-    case sysmem::wire::kFormatModifierIntelI915YTiled: {
+    case fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled: {
       tile_pixel_width = kIntelTilePixelWidth;
       tile_pixel_height = kIntelTilePixelHeight;
       body = static_cast<uint8_t*>(buf_);
       width_in_tiles = (stride_ + tile_pixel_width - 1) / tile_pixel_width;
     } break;
-    case sysmem::wire::kFormatModifierArmAfbc16X16: {
+    case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16: {
       tile_pixel_width = kAfbcTilePixelWidth;
       tile_pixel_height = kAfbcTilePixelHeight;
       width_in_tiles = (width_ + tile_pixel_width - 1) / tile_pixel_width;
@@ -374,7 +376,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
         uint32_t tile_idx = (y / tile_pixel_height) * width_in_tiles + (x / tile_pixel_width);
         ptr += (tile_num_pixels * tile_idx);
         switch (modifier_) {
-          case sysmem::wire::kFormatModifierIntelI915YTiled: {
+          case fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled: {
             constexpr uint32_t kSubtileColumnWidth = 4u;
             // Add the offset within the pixel's tile
             uint32_t subtile_column_offset =
@@ -383,7 +385,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
                 (subtile_column_offset + (y % tile_pixel_height)) * kSubtileColumnWidth;
             ptr += subtile_line_offset + (x % kSubtileColumnWidth);
           } break;
-          case sysmem::wire::kFormatModifierArmAfbc16X16: {
+          case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16: {
             constexpr uint32_t kAfbcSubtileOffset[4][4] = {
                 {2u, 1u, 14u, 13u},
                 {3u, 0u, 15u, 12u},
@@ -414,7 +416,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
       zx_cache_flush(body + offset, tile_num_bytes, ZX_CACHE_FLUSH_DATA);
 
       // We also need to update block header when using AFBC.
-      if (modifier_ == sysmem::wire::kFormatModifierArmAfbc16X16) {
+      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16) {
         unsigned hdr_offset = kAfbcBytesPerBlockHeader * (j * width_in_tiles + i);
         uint8_t* hdr_ptr = reinterpret_cast<uint8_t*>(buf_) + hdr_offset;
         // Store offset of uncompressed tile memory in byte 0-3.
@@ -434,7 +436,7 @@ void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
   config_out->height = height_;
   config_out->width = width_;
   config_out->pixel_format = format_;
-  if (modifier_ != sysmem::wire::kFormatModifierIntelI915YTiled) {
+  if (modifier_ != fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled) {
     config_out->type = IMAGE_TYPE_SIMPLE;
   } else {
     config_out->type = 2;  // IMAGE_TYPE_Y_LEGACY

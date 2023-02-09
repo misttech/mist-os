@@ -5,7 +5,15 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.images2") {
-  sources = [ "image_format.fidl" ]
+  sdk_category = "internal"
+  api = "fuchsia.images2.api"
+
+  sources = [
+    "format_modifier.fidl",
+    "image_format.fidl",
+  ]
 
   public_deps = [ "//sdk/fidl/fuchsia.math" ]
+
+  enable_hlcpp = true
 }

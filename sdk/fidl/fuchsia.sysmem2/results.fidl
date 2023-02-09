@@ -5,18 +5,6 @@ library fuchsia.sysmem2;
 
 using zx;
 
-// The contents of this file are not final.  Incompatible changes are still
-// being made to this file.  Do not rely on the contents of this file to provide
-// backward compatibility (yet).
-//
-// TODO(fxbug.dev/34192): Sysmem should use llcpp and FIDL tables.  The definitions in
-// this file are part of that transition, but the definitions here are not
-// final.  For now, the definition here is only used internally to sysmem (not
-// between processes), and therefore this definition can change for now.  Later
-// after we're happy with this representation, we'll create
-// fuchsia.sysmem2.BufferCollection.SetConstraints() which will accept
-// constraints as defined here.
-
 type VmoBuffer = resource table {
     /// The same VMO can be used by more than one CodecBuffer (only of the same
     /// buffer_lifetime_ordinal), but each vmo handle must be a separate handle.
@@ -39,6 +27,9 @@ type VmoBuffer = resource table {
     ///
     /// |aux_vmo| will be un-set if there are no aux buffers, or in the same
     /// cases that |vmo| can be un-set.
+    //
+    // TODO: finish deprecating / fail in sysmemm v1, remove from v2, and allow
+    // re-use of ordinal 6 because nothing actually used aux_vmo in sysmem2.
     3: aux_vmo zx.handle:VMO;
 };
 

@@ -26,8 +26,6 @@
 
 #define LOCAL_TRACE 0
 
-namespace sysmem = fuchsia_sysmem;
-
 namespace virtio {
 
 namespace {
@@ -84,7 +82,7 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
 zx_status_t GpuDevice::GetVmoAndStride(image_t* image, zx_unowned_handle_t handle, uint32_t index,
                                        zx::vmo* vmo_out, size_t* offset_out,
                                        uint32_t* pixel_size_out, uint32_t* row_bytes_out) const {
-  auto wait_result = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(handle))
+  auto wait_result = fidl::WireCall<fuchsia_sysmem::BufferCollection>(zx::unowned_channel(handle))
                          ->WaitForBuffersAllocated();
   if (!wait_result.ok()) {
     zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated %d", tag(), wait_result.status());
@@ -96,7 +94,8 @@ zx_status_t GpuDevice::GetVmoAndStride(image_t* image, zx_unowned_handle_t handl
     return wait_result.value().status;
   }
 
-  sysmem::wire::BufferCollectionInfo2& collection_info = wait_result.value().buffer_collection_info;
+  fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
+      wait_result.value().buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints) {
     zxlogf(ERROR, "%s: bad image format constraints", tag());
@@ -108,12 +107,12 @@ zx_status_t GpuDevice::GetVmoAndStride(image_t* image, zx_unowned_handle_t handl
   }
 
   ZX_DEBUG_ASSERT(collection_info.settings.image_format_constraints.pixel_format.type ==
-                  sysmem::wire::PixelFormatType::kBgra32);
+                  fuchsia_sysmem::wire::PixelFormatType::kBgra32);
   ZX_DEBUG_ASSERT(
       collection_info.settings.image_format_constraints.pixel_format.has_format_modifier);
   ZX_DEBUG_ASSERT(
       collection_info.settings.image_format_constraints.pixel_format.format_modifier.value ==
-      sysmem::wire::kFormatModifierLinear);
+      fuchsia_sysmem::wire::kFormatModifierLinear);
 
   const auto& format_constraints = collection_info.settings.image_format_constraints;
   uint32_t minimum_row_bytes;
@@ -248,10 +247,11 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
 
 zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t collection) {
-  sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.display = sysmem::wire::kDisplayUsageLayer;
+  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
+  constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
   constraints.has_buffer_memory_constraints = true;
-  sysmem::wire::BufferMemoryConstraints& buffer_constraints = constraints.buffer_memory_constraints;
+  fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
+      constraints.buffer_memory_constraints;
   buffer_constraints.min_size_bytes = 0;
   buffer_constraints.max_size_bytes = 0xffffffff;
   buffer_constraints.physically_contiguous_required = true;
@@ -259,12 +259,14 @@ zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.ram_domain_supported = true;
   buffer_constraints.cpu_domain_supported = true;
   constraints.image_format_constraints_count = 1;
-  sysmem::wire::ImageFormatConstraints& image_constraints = constraints.image_format_constraints[0];
-  image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgra32;
+  fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
+      constraints.image_format_constraints[0];
+  image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
   image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = sysmem::wire::kFormatModifierLinear;
+  image_constraints.pixel_format.format_modifier.value =
+      fuchsia_sysmem::wire::kFormatModifierLinear;
   image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0].type = sysmem::wire::ColorSpaceType::kSrgb;
+  image_constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
   image_constraints.min_coded_width = 0;
   image_constraints.max_coded_width = 0xffffffff;
   image_constraints.min_coded_height = 0;
@@ -281,9 +283,10 @@ zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
   image_constraints.display_width_divisor = 1;
   image_constraints.display_height_divisor = 1;
 
-  zx_status_t status = fidl::WireCall<sysmem::BufferCollection>(zx::unowned_channel(collection))
-                           ->SetConstraints(true, constraints)
-                           .status();
+  zx_status_t status =
+      fidl::WireCall<fuchsia_sysmem::BufferCollection>(zx::unowned_channel(collection))
+          ->SetConstraints(true, constraints)
+          .status();
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "virtio::GpuDevice: Failed to set constraints");
