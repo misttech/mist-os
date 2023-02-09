@@ -83,7 +83,6 @@ group("usb-host-stack") {
     "//src/devices/serial/drivers/usb-cdc-acm",
     "//src/devices/usb/drivers/usb-bus",
     "//src/devices/usb/drivers/usb-composite",
-    "//src/devices/usb/drivers/usb-dfu",
     "//src/devices/usb/drivers/usb-hub",
   ]
 }
@@ -136,7 +135,6 @@ group("manual_testing") {
     "//src/devices/gpio/drivers/gpio-test",
     "//src/devices/misc/drivers/test",
     "//src/devices/tests/sysdev",
-    "//src/devices/usb/bin/usb-fwloader",
     "//src/devices/usb/drivers/usb-peripheral-test",
   ]
 }

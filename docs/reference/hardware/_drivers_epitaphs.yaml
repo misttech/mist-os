@@ -326,3 +326,9 @@
   available_in_git: 'c90782f99960bc373a79d1948575ff0eb92980e6'
   areas: ['Board']
   path: '/src/devices/board/drivers/sherlock'
+- short_description: 'USB DFU'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '798008'
+  available_in_git: '07c54ed670c4dd5b25fbe509943bc660932e046a'
+  areas: ['USB']
+  path: '/src/devices/usb/drivers/usb-dfu'

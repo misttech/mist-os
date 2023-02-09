@@ -64,7 +64,7 @@ DDK_PROTOCOL_DEF(USB_HCI,                 42,   "usb-hci", 0)  // Host Controlle
 DDK_PROTOCOL_DEF(USB_MODE_SWITCH,         43,   "usb-mode-switch", 0)
 DDK_PROTOCOL_DEF(USB_DBC,                 44,   "usb-dbc", 0) // Debug Capability
 DDK_PROTOCOL_DEF(USB_TESTER,              45,   "usb-tester", 0)
-DDK_PROTOCOL_DEF(USB_FWLOADER,            46,   "usb-fwloader", 0)
+// 46 was usb-fwloader
 DDK_PROTOCOL_DEF(BT_HCI,                  47,   "bt-hci", 0)
 DDK_PROTOCOL_DEF(BT_EMULATOR,             48,   "bt-emulator", 0)  // Bluetooth hardware emulator interface
 DDK_PROTOCOL_DEF(BT_TRANSPORT,            49,   "bt-transport", 0)

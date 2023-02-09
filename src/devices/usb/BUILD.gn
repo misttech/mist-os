@@ -14,7 +14,6 @@ group("drivers") {
     "drivers/nelson-usb-phy",
     "drivers/usb-bus",
     "drivers/usb-composite",
-    "drivers/usb-dfu",
     "drivers/usb-hub",
     "drivers/usb-peripheral",
     "drivers/usb-peripheral-test",

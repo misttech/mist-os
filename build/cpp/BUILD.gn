@@ -202,10 +202,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/usb/bin/usb-fwloader",
-
-    #------------------
-    #------------------
     "//src/devices/usb/bin/usbctl",
 
     #------------------
