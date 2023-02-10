@@ -42,13 +42,7 @@ class BootTest(object):
         self.build_dir = build_dir
         test = test_json["test"]
 
-        # The "name" JSON field is a path, so just use the extensionless
-        # basename as a shorthand.
-        name, ext = os.path.splitext(os.path.basename(test["name"]))
-        while ext:
-            name, ext = os.path.splitext(name)
-        self.name = name
-
+        self.name = test["name"]
         self.label = test["label"]
         self.path = test["path"]
 

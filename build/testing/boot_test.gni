@@ -26,8 +26,12 @@ _all_emu_types = [
 #
 # Parameters
 #
+#  * output_name
+#    - Optional: The name of the associated test.
+#    - Default: target_name
+#
 #  * cpu_for_host
-#    Required: the host CPU to generate the test for.
+#    - Required: The host CPU to generate the test for.
 #
 # See boot_test() for all other parameters.
 template("_boot_test") {
@@ -60,6 +64,10 @@ template("_boot_test") {
 
   test_spec(main_target) {
     target = get_label_info(invoker.label, "label_with_toolchain")
+    name = target_name
+    if (defined(invoker.output_name)) {
+      name = invoker.output_name
+    }
     path = test_script
     os = host_os
     cpu = invoker.cpu_for_host
@@ -183,10 +191,12 @@ template("boot_test") {
           defined(invoker.vbmeta) || defined(invoker.efi_disk),
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
 
+  main_target = target_name
+
   hw_types = invoker.device_types + _all_emu_types - _all_emu_types
   emu_types = invoker.device_types - hw_types
   if (emu_types == [] && hw_types == []) {  # Disabled
-    group(target_name) {
+    group(main_target) {
       testonly = true
       forward_variables_from(invoker,
                              [
@@ -211,8 +221,8 @@ template("boot_test") {
     }
     not_needed(invoker, [ "timeout" ])
   } else if (emu_types == [] || host_cpu == target_cpu) {
-    _boot_test(target_name) {
-      label = ":$target_name"
+    _boot_test(main_target) {
+      label = ":$main_target"
       forward_variables_from(invoker, "*")
       cpu_for_host = host_cpu
     }
@@ -226,28 +236,29 @@ template("boot_test") {
                                "visibility",
                              ])
       visibility = [ ":*" ]
-      label = ":$target_name"
+      output_name = main_target
+      label = ":$main_target"
     }
 
     # If an emulator is specified and $host_cpu != $target_cpu, then we make
     # sure to define a separate boot test for a $target_cpu host in order to
     # take advantage of KVM, HVF, etc.
-    _boot_test("$target_name.emu") {
+    _boot_test("$main_target.emu") {
       cpu_for_host = target_cpu
       device_types = emu_types
       forward_variables_from(common_params, "*")
     }
-    group_deps = [ ":$target_name.emu" ]
+    group_deps = [ ":$main_target.emu" ]
 
     if (hw_types != []) {
-      _boot_test("$target_name.hw") {
+      _boot_test("$main_target.hw") {
         cpu_for_host = host_cpu
         device_types = hw_types
         forward_variables_from(common_params, "*")
       }
-      group_deps += [ ":$target_name.hw" ]
+      group_deps += [ ":$main_target.hw" ]
     }
-    group(target_name) {
+    group(main_target) {
       forward_variables_from(invoker,
                              [
                                "assert_no_deps",

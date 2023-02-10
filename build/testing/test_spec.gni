@@ -29,6 +29,10 @@ _max_severity_allowed_val = [
 #   path (optional for fuchsia; required for host)
 #     [string]: The path on the target OS at which the test will be installed.
 #
+#   name (optional)
+#     [string]: A name to associate with the test. Defaults to `package_url`
+#     for Fuchsia tests, or a variant-stable version of `path` for host.
+#
 #   target (required)
 #     [label_with_toolchain]: The test target. This will be used directly as the
 #     `label` field.
@@ -384,6 +388,7 @@ template("test_spec") {
                              [
                                "cpu",
                                "isolated",
+                               "name",
                                "os",
                                "path",
                                "package_url",
@@ -404,9 +409,19 @@ template("test_spec") {
       if (is_fuchsia) {
         log_settings = _log_settings
       }
-      if (defined(package_url)) {
-        name = package_url
-      } else {
+
+      if (!defined(name)) {
+        if (defined(package_url)) {
+          name = package_url
+        } else {
+          # We want the test name to be the same regardless of variant.
+          # Path is of the form <toolchain_variant.name>/<basename>, so
+          # removing the left-most appearance should do what we want.
+          name = string_replace(path, toolchain_variant.suffix, "", 1)
+        }
+      }
+
+      if (!defined(package_url)) {
         assert(defined(path), "path or package_url must be defined.")
         if (is_linux || is_mac ||
             (defined(invoker.os) &&
@@ -414,12 +429,8 @@ template("test_spec") {
           # Trim leading //.
           path = rebase_path(path, root_build_dir)
         }
-
-        # We want the test name to be the same regardless of variant.
-        # Path is of the form <toolchain_variant.name>/<basename>, so
-        # removing the left-most appearance should do what we want.
-        name = string_replace(path, toolchain_variant.suffix, "", 1)
       }
+
       if (!defined(os)) {
         os = current_os
       }
