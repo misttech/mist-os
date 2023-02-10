@@ -6,7 +6,7 @@
 use {
     super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg::RepositoryUrl, fuchsia_zircon::Status,
-    vfs::file::vmo::read_only_static,
+    vfs::file::vmo::read_only,
 };
 
 async fn verify_get_metadata_with_read_success(env: &TestEnv, path: &str, file_contents: &str) {
@@ -37,8 +37,8 @@ async fn success() {
                     "blobs" => pseudo_directory! {},
                     "repository_metadata" => pseudo_directory! {
                         repo_url().host() => pseudo_directory! {
-                            "1.root.json" => read_only_static("beep"),
-                            "2.root.json" => read_only_static("boop"),
+                            "1.root.json" => read_only("beep"),
+                            "2.root.json" => read_only("boop"),
                         },
                     },
                 },
@@ -62,11 +62,11 @@ async fn success_multiple_path_segments() {
                         repo_url().host() => pseudo_directory! {
                             "foo" => pseudo_directory! {
                                 "bar" => pseudo_directory! {
-                                    "1.root.json" => read_only_static("beep"),
+                                    "1.root.json" => read_only("beep"),
                                 },
                             },
                             "baz" => pseudo_directory! {
-                                "2.root.json" => read_only_static("boop"),
+                                "2.root.json" => read_only("boop"),
                             }
                         },
                     },
@@ -116,7 +116,7 @@ async fn missing_metadata_file() {
                     "blobs" => pseudo_directory! {},
                     "repository_metadata" => pseudo_directory! {
                         repo_url().host() => pseudo_directory! {
-                            "2.root.json" => read_only_static("boop"),
+                            "2.root.json" => read_only("boop"),
                         },
                     },
                 },

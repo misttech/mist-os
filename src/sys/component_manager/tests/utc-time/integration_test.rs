@@ -14,7 +14,7 @@ use fuchsia_component_test::*;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use tracing::*;
 use vfs::{
-    directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only_static,
+    directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
     pseudo_directory,
 };
 
@@ -30,7 +30,7 @@ fn mock_boot_handles(
         "config" => pseudo_directory! {
             "build_info" => pseudo_directory! {
                 // The backstop time is stored in seconds.
-                "minimum_utc_stamp" => read_only_static(EXPECTED_BACKSTOP_TIME_SEC_STR),
+                "minimum_utc_stamp" => read_only(EXPECTED_BACKSTOP_TIME_SEC_STR),
             },
         },
     };

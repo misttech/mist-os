@@ -250,11 +250,8 @@ mod tests {
         futures::{channel::mpsc, lock::Mutex, SinkExt as _},
         std::{boxed::Box, sync::Arc},
         vfs::{
-            directory::entry::DirectoryEntry,
-            execution_scope::ExecutionScope,
-            file::vmo::{read_only_const, read_only_static},
-            path::Path,
-            pseudo_directory,
+            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
+            file::vmo::read_only, path::Path, pseudo_directory,
         },
     };
 
@@ -393,7 +390,7 @@ mod tests {
             let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone()).unwrap();
             let fs = pseudo_directory! {
                 "meta" => pseudo_directory! {
-                    "test.cm" => read_only_static(cm_bytes),
+                    "test.cm" => read_only(cm_bytes),
                 },
             };
             match server.try_next().await.unwrap().expect("client makes one request") {
@@ -441,7 +438,7 @@ mod tests {
             let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone()).unwrap();
             let fs = pseudo_directory! {
                 "meta" => pseudo_directory! {
-                    "test.cm" => read_only_static(cm_bytes),
+                    "test.cm" => read_only(cm_bytes),
                 },
             };
             match server.try_next().await.unwrap().expect("client makes one request") {
@@ -619,8 +616,8 @@ mod tests {
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {
-                "test_with_config.cm" => read_only_static(cm_bytes),
-                "test_with_config.cvf" => read_only_static(cvf_bytes),
+                "test_with_config.cm" => read_only(cm_bytes),
+                "test_with_config.cvf" => read_only(cvf_bytes),
             },
         }
         .clone()
@@ -668,7 +665,7 @@ mod tests {
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {
-                "test_with_config.cm" => read_only_static(cm_bytes),
+                "test_with_config.cm" => read_only(cm_bytes),
             },
         }
         .clone()
@@ -701,8 +698,8 @@ mod tests {
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {
-                "test_with_config.cm" => read_only_static(cm_bytes),
-                "test_with_config.cvf" => read_only_static(cvf_bytes),
+                "test_with_config.cm" => read_only(cm_bytes),
+                "test_with_config.cvf" => read_only(cvf_bytes),
             },
         }
         .clone()
@@ -731,9 +728,9 @@ mod tests {
             .expect("failed to encode ComponentDecl FIDL");
         pseudo_directory! {
             "meta" => pseudo_directory! {
-                "test.cm" => read_only_const(&cm_bytes),
+                "test.cm" => read_only(cm_bytes),
                 "fuchsia.abi" => pseudo_directory! {
-                  "abi-revision" => read_only_static(1u64.to_le_bytes()),
+                  "abi-revision" => read_only(1u64.to_le_bytes()),
                 }
             },
         }

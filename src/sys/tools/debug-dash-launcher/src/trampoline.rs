@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::create_proxy;
-use fidl::HandleBased;
 use fidl_fuchsia_dash::LauncherError;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_kernel as fkernel;
@@ -233,16 +232,10 @@ fn make_executable_vmo_file(
 
     // Make it into a VMO that can be loaded as an executable.
     let exec_vmo = vmo.replace_as_executable(&resource).map_err(|_| LauncherError::Internal)?;
-
-    // Serve as a VMO file that accepts the read and executable Open rights.
-    let init_vmo = move || {
-        let dup = exec_vmo
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .expect("failed to duplicate VMO in make_vfs().");
-        futures::future::ok(dup)
-    };
-    let read_exec_vmo = vmo::read_exec(init_vmo);
-    Ok(read_exec_vmo)
+    let exec_file = vmo::VmoFile::new_from_vmo(
+        exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,
+    );
+    Ok(exec_file)
 }
 
 // Return a proxy to the given directory, first opening it as executable.
@@ -327,7 +320,7 @@ mod tests {
     use std::fmt;
     use vfs::directory::immutable::connection::io1::ImmutableConnection;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::read_only_static;
+    use vfs::file::vmo::read_only;
     use vfs::path::Path;
 
     #[fuchsia::test]
@@ -453,15 +446,15 @@ mod tests {
             let root = vfs::pseudo_directory! {
                 "Nasa" => vfs::pseudo_directory! {
                     "bin" => vfs::pseudo_directory! {
-                        "go2moon_v1969" => read_only_static(b"Apollo"),
-                        "go2moon_v2024" => read_only_static(b"Artemis"),
+                        "go2moon_v1969" => read_only(b"Apollo"),
+                        "go2moon_v2024" => read_only(b"Artemis"),
                     },
                 },
                 "SpaceX" => vfs::pseudo_directory! {
                     "bin" => vfs::pseudo_directory! {
-                        "go2orbit" => read_only_static(b"Falcon 9"),
-                        "go2mars" => read_only_static(b"Starship"),
-                        "bogus_dir" => vfs::pseudo_directory! {"bogus_file" => read_only_static(b"bogus_content"),}
+                        "go2orbit" => read_only(b"Falcon 9"),
+                        "go2mars" => read_only(b"Starship"),
+                        "bogus_dir" => vfs::pseudo_directory! {"bogus_file" => read_only(b"bogus_content"),}
                     },
                 },
                 "BlueOrigin" => vfs::pseudo_directory! {
@@ -521,12 +514,12 @@ mod tests {
         let root = vfs::pseudo_directory! {
             "Nasa" => vfs::pseudo_directory! {
                 "bin" => vfs::pseudo_directory! {
-                    "collision" => read_only_static(b"Apollo"),
+                    "collision" => read_only(b"Apollo"),
                 },
             },
             "SpaceX" => vfs::pseudo_directory! {
                 "bin" => vfs::pseudo_directory! {
-                    "collision" => read_only_static(b"Falcon 9"),
+                    "collision" => read_only(b"Falcon 9"),
                 },
             },
         };
@@ -596,14 +589,14 @@ mod tests {
         let root = vfs::pseudo_directory! {
             "UpGoer" => vfs::pseudo_directory! {
                 "bin" => vfs::pseudo_directory! {
-                    "apollo" => read_only_static(b"Apollo"),
+                    "apollo" => read_only(b"Apollo"),
                 },
             }
         };
         let root1 = vfs::pseudo_directory! {
             "UpGoer" => vfs::pseudo_directory! {
                 "bin" => vfs::pseudo_directory! {
-                    "falcon9" => read_only_static(b"Falcon 9"),
+                    "falcon9" => read_only(b"Falcon 9"),
                 },
              }
         };

@@ -11,8 +11,8 @@ use {
     fuchsia_component::client::connect_to_protocol,
     futures::StreamExt,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, pseudo_directory,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        pseudo_directory,
     },
 };
 
@@ -155,7 +155,7 @@ async fn test_legacy_echo_with_directory() {
     const TEST_VALUE: &str = "TEST";
 
     let config_data_dir = pseudo_directory! {
-        "default_reply.txt" => read_only_static(TEST_VALUE),
+        "default_reply.txt" => read_only(TEST_VALUE),
     };
     let (client_end, server_end) =
         fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();

@@ -962,8 +962,8 @@ mod tests {
     };
 
     use vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, pseudo_directory,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        pseudo_directory,
     };
 
     use super::*;
@@ -991,7 +991,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_svc_connector_connect_with_dir() -> Result<(), Error> {
         let dir = pseudo_directory! {
-            ServiceBMarker::PROTOCOL_NAME => read_only_static("read_only"),
+            ServiceBMarker::PROTOCOL_NAME => read_only("read_only"),
         };
         let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
         let scope = ExecutionScope::new();

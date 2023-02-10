@@ -118,7 +118,7 @@ fn generate_kernel_config_directory(
 
     // Add the galaxy configuration file to the directory that is provided to the starnix_kernel.
     let kernel_config_file =
-        vfs::file::vmo::read_only_static(fidl::encoding::persist(&mut program_block)?);
+        vfs::file::vmo::read_only(fidl::encoding::persist(&mut program_block)?);
 
     let kernel_config_dir = vfs::directory::immutable::simple();
     kernel_config_dir.add_entry(CONFIG_FILE, kernel_config_file)?;

@@ -37,7 +37,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             execution_scope::ExecutionScope,
-            file::vmo::{read_only_static, read_write, simple_init_vmo_with_capacity},
+            file::vmo::{read_only, read_write, simple_init_vmo_with_capacity},
             pseudo_directory,
         },
     };
@@ -99,7 +99,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn flags_test() -> Result<(), Error> {
         let example_dir = pseudo_directory! {
-            "read_only" => read_only_static("read_only"),
+            "read_only" => read_only("read_only"),
             "read_write" => read_write(
                 simple_init_vmo_with_capacity("read_write".as_bytes(), 100)
             ),

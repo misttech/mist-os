@@ -415,7 +415,7 @@ mod tests {
         std::{mem, sync::Weak},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, path, pseudo_directory,
+            file::vmo::read_only, path, pseudo_directory,
         },
     };
 
@@ -604,7 +604,7 @@ mod tests {
         let test_content_bytes = test_content.clone().into_bytes();
         let (dir_server, dir_client) = zx::Channel::create();
         let dir = pseudo_directory! {
-            "test_file" => read_only_static(test_content_bytes),
+            "test_file" => read_only(test_content_bytes),
         };
         dir.clone().open(
             ExecutionScope::new(),

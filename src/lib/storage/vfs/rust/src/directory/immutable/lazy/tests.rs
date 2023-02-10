@@ -21,7 +21,7 @@ use crate::{
         traversal_position::TraversalPosition::{self, End, Name, Start},
     },
     execution_scope::ExecutionScope,
-    file::vmo::{read_only_const, read_only_static},
+    file::vmo::read_only,
 };
 
 use {
@@ -186,8 +186,7 @@ fn static_entries() {
 
     let get_entry = |name: &str| {
         let content = format!("File {} content", name);
-        let bytes = content.into_bytes();
-        Ok(read_only_static(bytes) as Arc<dyn DirectoryEntry>)
+        Ok(read_only(content) as Arc<dyn DirectoryEntry>)
     };
 
     run_server_client(
@@ -211,14 +210,14 @@ fn static_entries_with_traversal() {
     let get_entry = |name: &str| match name {
         "etc" => {
             let etc = pseudo_directory! {
-                "fstab" => read_only_static(b"/dev/fs /"),
+                "fstab" => read_only(b"/dev/fs /"),
                 "ssh" => pseudo_directory! {
-                    "sshd_config" => read_only_static(b"# Empty"),
+                    "sshd_config" => read_only(b"# Empty"),
                 },
             };
             Ok(etc as Arc<dyn DirectoryEntry>)
         }
-        "files" => Ok(read_only_static(b"Content") as Arc<dyn DirectoryEntry>),
+        "files" => Ok(read_only(b"Content") as Arc<dyn DirectoryEntry>),
         _ => Err(Status::NOT_FOUND),
     };
 
@@ -356,7 +355,7 @@ fn dynamic_entries() {
         let entry = |count: u8| {
             let content = format!("Content: {}", count);
 
-            Ok(read_only_const(content.as_bytes()) as Arc<dyn DirectoryEntry>)
+            Ok(read_only(content) as Arc<dyn DirectoryEntry>)
         };
 
         match name {

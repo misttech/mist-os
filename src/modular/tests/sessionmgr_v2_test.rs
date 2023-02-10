@@ -25,7 +25,7 @@ use {
     std::collections::HashMap,
     std::sync::Arc,
     test_util::Counter,
-    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_static, pseudo_directory},
+    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory},
 };
 
 mod fake_appmgr;
@@ -112,12 +112,9 @@ impl TestFixture {
         return Ok(TestFixture { builder, sessionmgr });
     }
 
-    async fn with_config<Bytes>(self, config: Bytes) -> Result<TestFixture, Error>
-    where
-        Bytes: AsRef<[u8]> + Send + Sync + 'static,
-    {
+    async fn with_config(self, config: &'static str) -> Result<TestFixture, Error> {
         let config_data_dir = pseudo_directory! {
-            "startup.config" => read_only_static(config),
+            "startup.config" => read_only(config),
         };
 
         // Add a local component that provides the `config-data` directory to the realm.

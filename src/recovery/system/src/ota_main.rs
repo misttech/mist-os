@@ -146,7 +146,7 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_recovery_ui::ProgressRendererRequest;
     use futures::stream::StreamExt;
-    use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_static};
+    use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only};
 
     async fn fake_wipe_storage() -> Result<fio::DirectoryProxy, Error> {
         let (client, server) = create_endpoints::<fio::DirectoryMarker>().unwrap();
@@ -154,7 +154,7 @@ mod tests {
         let scope = vfs::execution_scope::ExecutionScope::new();
 
         let dir = vfs::pseudo_directory! {
-            "testfile" => read_only_static("test1")
+            "testfile" => read_only("test1")
         };
 
         dir.open(

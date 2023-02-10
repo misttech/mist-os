@@ -702,7 +702,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             execution_scope::ExecutionScope,
-            file::vmo::{read_only_static, read_write, simple_init_vmo_with_capacity},
+            file::vmo::{read_only, read_write, simple_init_vmo_with_capacity},
             pseudo_directory,
         },
     };
@@ -929,7 +929,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn open_file_flags() {
         let example_dir = pseudo_directory! {
-            "read_only" => read_only_static("read_only"),
+            "read_only" => read_only("read_only"),
             "read_write" => read_write(
                 simple_init_vmo_with_capacity("read_write".as_bytes(), 100)
             ),
@@ -1255,10 +1255,10 @@ mod tests {
         let (dir_client, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let dir = pseudo_directory! {
-            "afile" => read_only_static(""),
-            "zzz" => read_only_static(""),
+            "afile" => read_only(""),
+            "zzz" => read_only(""),
             "subdir" => pseudo_directory! {
-                "ignored" => read_only_static(""),
+                "ignored" => read_only(""),
             },
         };
         let scope = ExecutionScope::new();
@@ -1288,10 +1288,10 @@ mod tests {
         let (dir_client, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let dir = pseudo_directory! {
-            "afile" => read_only_static(""),
-            "zzz" => read_only_static(""),
+            "afile" => read_only(""),
+            "zzz" => read_only(""),
             "subdir" => pseudo_directory! {
-                "ignored" => read_only_static(""),
+                "ignored" => read_only(""),
             },
         };
         let scope = ExecutionScope::new();

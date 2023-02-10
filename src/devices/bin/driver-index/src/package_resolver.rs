@@ -116,8 +116,7 @@ mod tests {
         ];
 
         let merkle_root: Hash = MERKLE_ROOT.into();
-        let merkle_root_str = merkle_root.to_string();
-        let meta_file = vfs::file::vmo::read_only_static(merkle_root_str.into_bytes());
+        let meta_file = vfs::file::vmo::read_only(merkle_root.to_string());
         let packages = vfs::pseudo_directory! {
                 PACKAGE_NAME => vfs::pseudo_directory! {
                     "0" => vfs::pseudo_directory! {

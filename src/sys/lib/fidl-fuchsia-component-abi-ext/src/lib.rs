@@ -63,7 +63,7 @@ mod tests {
         std::sync::Arc,
         version_history::AbiRevision,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope, file::vmo::read_only_static,
+            directory::entry::DirectoryEntry, execution_scope, file::vmo::read_only,
             pseudo_directory, remote::remote_dir,
         },
     };
@@ -80,36 +80,37 @@ mod tests {
         dir_proxy
     }
 
-    fn init_fuchsia_abi_dir(filename: &'static str, content: &[u8]) -> fio::DirectoryProxy {
+    fn init_fuchsia_abi_dir(filename: &'static str, content: &'static [u8]) -> fio::DirectoryProxy {
         let dir = pseudo_directory! {
         "meta" => pseudo_directory! {
               "fuchsia.abi" => pseudo_directory! {
-                filename => read_only_static(content),
+                filename => read_only(content),
               }
           }
         };
         serve_dir(dir)
     }
 
+    const ABI_REV_MAX: &'static [u8] = &u64::MAX.to_le_bytes();
+    const ABI_REV_ZERO: &'static [u8] = &0u64.to_le_bytes();
+
     #[fuchsia::test]
     async fn test_read_abi_revision_impl() -> Result<(), AbiRevisionFileError> {
         // Test input that cannot be decoded into a u64 fails
-        let invalid = b"A string that is not an Abi Revision";
-        let dir = init_fuchsia_abi_dir("abi-revision", invalid);
+        let dir = init_fuchsia_abi_dir("abi-revision", b"Invalid ABI revision string");
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await;
         assert!(matches!(res.unwrap_err(), AbiRevisionFileError::Decode));
 
-        let invalid = b"";
-        let dir = init_fuchsia_abi_dir("abi-revision", invalid);
+        let dir = init_fuchsia_abi_dir("abi-revision", b"");
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await;
         assert!(matches!(res.unwrap_err(), AbiRevisionFileError::Decode));
 
         // Test u64 inputs can be read
-        let dir = init_fuchsia_abi_dir("abi-revision", &u64::MAX.to_le_bytes());
+        let dir = init_fuchsia_abi_dir("abi-revision", ABI_REV_MAX);
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await.unwrap();
         assert_eq!(res, Some(u64::MAX));
 
-        let dir = init_fuchsia_abi_dir("abi-revision", &0u64.to_le_bytes());
+        let dir = init_fuchsia_abi_dir("abi-revision", ABI_REV_ZERO);
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await.unwrap();
         assert_eq!(res, Some(0u64));
 
@@ -120,7 +121,7 @@ mod tests {
     async fn test_read_abi_revision_optional_allows_absent_file() -> Result<(), AbiRevisionFileError>
     {
         // Test abi-revision file not found produces Ok(None)
-        let dir = init_fuchsia_abi_dir("abi-revision-staging", &u64::MAX.to_le_bytes());
+        let dir = init_fuchsia_abi_dir("abi-revision-staging", ABI_REV_MAX);
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await.unwrap();
         assert_eq!(res, None);
 
@@ -129,7 +130,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_abi_revision_fails_absent_file() -> Result<(), AbiRevisionFileError> {
-        let dir = init_fuchsia_abi_dir("a-different-file", &u64::MAX.to_le_bytes());
+        let dir = init_fuchsia_abi_dir("a-different-file", ABI_REV_MAX);
         let err = read_abi_revision(&dir, AbiRevision::PATH).await.unwrap_err();
         assert!(matches!(err, AbiRevisionFileError::Open(OpenError::OpenError(Status::NOT_FOUND))));
         Ok(())

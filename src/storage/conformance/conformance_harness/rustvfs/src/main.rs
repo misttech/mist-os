@@ -50,14 +50,15 @@ fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<dyn DirectoryEntry>, Error> {
 /// Creates and returns a Rust VFS VmoFile-backed executable file using the contents of the
 /// conformance test harness binary itself.
 fn new_executable_file() -> Result<Arc<dyn DirectoryEntry>, Error> {
-    let init_vmo = || async {
-        let file = fdio::open_fd(
-            HARNESS_EXEC_PATH,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
-        Ok(fdio::get_vmo_exec_from_file(&file)?)
-    };
-    Ok(vmo::read_exec(init_vmo))
+    let file = fdio::open_fd(
+        HARNESS_EXEC_PATH,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+    )?;
+    let exec_vmo = fdio::get_vmo_exec_from_file(&file)?;
+    let exec_file = vmo::VmoFile::new_from_vmo(
+        exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,
+    );
+    Ok(exec_file)
 }
 
 fn add_entry(

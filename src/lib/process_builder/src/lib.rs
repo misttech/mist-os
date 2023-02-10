@@ -1021,7 +1021,7 @@ mod tests {
         std::mem,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_const, pseudo_directory,
+            file::vmo::read_only, pseudo_directory,
         },
         zerocopy::LayoutVerified,
     };
@@ -1467,11 +1467,10 @@ mod tests {
         zx::cprng_draw(&mut randbuf);
         let test_content2 = format!("test content 2 {}", u64::from_le_bytes(randbuf));
 
-        let test_content1_bytes = test_content1.clone().into_bytes();
         let (dir1_server, dir1_client) = zx::Channel::create();
         let dir_scope = ExecutionScope::new();
         let dir1 = pseudo_directory! {
-            "test_file1" => read_only_const(test_content1_bytes.as_ref()),
+            "test_file1" => read_only(test_content1.clone()),
         };
         dir1.open(
             dir_scope.clone(),
@@ -1480,10 +1479,9 @@ mod tests {
             ServerEnd::new(dir1_server),
         );
 
-        let test_content2_bytes = test_content2.clone().into_bytes();
         let (dir2_server, dir2_client) = zx::Channel::create();
         let dir2 = pseudo_directory! {
-            "test_file2" => read_only_const(test_content2_bytes.as_ref()),
+            "test_file2" => read_only(test_content2.clone()),
         };
         dir2.open(
             dir_scope.clone(),

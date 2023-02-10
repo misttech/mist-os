@@ -213,7 +213,7 @@ mod tests {
         maplit::hashmap,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, path::Path as VfsPath, pseudo_directory,
+            file::vmo::read_only, path::Path as VfsPath, pseudo_directory,
         },
     };
 
@@ -226,7 +226,7 @@ mod tests {
         let (_outgoing_dir_client_end, outgoing_dir_server_end) = create_endpoints().unwrap();
 
         let data_dir = pseudo_directory!(
-            file_name => read_only_static(file_contents.to_string().into_bytes()),
+            file_name => read_only(file_contents),
         );
 
         let (data_dir_proxy, data_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();

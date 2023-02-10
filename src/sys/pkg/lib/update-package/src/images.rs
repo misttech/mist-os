@@ -600,7 +600,7 @@ mod legacy_tests {
         std::sync::Arc,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, pseudo_directory,
+            file::vmo::read_only, pseudo_directory,
         },
     };
 
@@ -702,10 +702,10 @@ mod legacy_tests {
     async fn list_images_ignores_directories() {
         let proxy = spawn_vfs(pseudo_directory! {
             "ignore_directories" => pseudo_directory! {
-                "and_their_contents" => read_only_static(""),
+                "and_their_contents" => read_only(""),
             },
-            "first" => read_only_static(""),
-            "second" => read_only_static(""),
+            "first" => read_only(""),
+            "second" => read_only(""),
         });
 
         assert_eq!(
@@ -809,7 +809,7 @@ mod tests {
         std::{fs::File, io::Write, sync::Arc},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, pseudo_directory,
+            file::vmo::read_only, pseudo_directory,
         },
     };
 
@@ -1228,7 +1228,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn image_packages_detects_invalid_json() {
         let proxy = spawn_vfs(pseudo_directory! {
-            "images.json" => read_only_static("not json!"),
+            "images.json" => read_only("not json!"),
         });
 
         assert_matches!(image_packages(&proxy).await, Err(ImagePackagesError::Parse(_)));
@@ -1237,7 +1237,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn image_packages_loads_valid_manifest() {
         let proxy = spawn_vfs(pseudo_directory! {
-            "images.json" => read_only_static(r#"{
+            "images.json" => read_only(r#"{
 "version": "1",
 "contents": { "partitions" : [], "firmware" : [] }
 }"#),

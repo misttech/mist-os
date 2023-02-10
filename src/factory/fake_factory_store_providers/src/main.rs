@@ -21,8 +21,8 @@ use {
     std::{collections::HashMap, fs::File, str::FromStr, sync::Arc},
     structopt::StructOpt,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_const, tree_builder::TreeBuilder,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        tree_builder::TreeBuilder,
     },
 };
 
@@ -51,11 +51,7 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
     let mut tree = TreeBuilder::empty_dir();
 
     for (name, contents) in files.into_iter() {
-        tree.add_entry(
-            &name.split("/").collect::<Vec<&str>>(),
-            read_only_const(contents.as_bytes()),
-        )
-        .unwrap();
+        tree.add_entry(&name.split("/").collect::<Vec<&str>>(), read_only(contents)).unwrap();
     }
 
     let test_dir = tree.build();

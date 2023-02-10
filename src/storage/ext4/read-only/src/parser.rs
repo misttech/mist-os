@@ -49,7 +49,7 @@ use {
         str,
         sync::Arc,
     },
-    vfs::{directory::immutable, file::vmo::read_only_const, tree_builder::TreeBuilder},
+    vfs::{directory::immutable, file::vmo::read_only, tree_builder::TreeBuilder},
     zerocopy::ByteSlice,
 };
 
@@ -501,8 +501,7 @@ impl<T: 'static + Reader> Parser<T> {
             match entry_type {
                 EntryType::RegularFile => {
                     let data = my_self.read_data(entry.e2d_ino.into())?;
-                    let bytes = data.as_slice();
-                    tree.add_entry(path.clone(), read_only_const(bytes))
+                    tree.add_entry(path.clone(), read_only(data))
                         .map_err(|_| ParsingError::BadFile(path.join("/")))?;
                 }
                 EntryType::Directory => {

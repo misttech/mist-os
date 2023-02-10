@@ -32,7 +32,7 @@ use {
     parking_lot::Mutex,
     std::collections::BTreeSet,
     vfs::directory::entry::DirectoryEntry,
-    vfs::file::vmo::read_only_static,
+    vfs::file::vmo::read_only,
 };
 
 struct TestResult {
@@ -134,7 +134,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                     "repositories" => vfs::remote::remote_dir(fuchsia_fs::directory::open_in_namespace(params.repo_config_dir.path().to_str().unwrap(), fio::OpenFlags::RIGHT_READABLE).unwrap())
                 },
                 "build-info" => vfs::pseudo_directory!{
-                    "build" => read_only_static(b"test")
+                    "build" => read_only(b"test")
                 },
             "ssl" => vfs::remote::remote_dir(
                     params.ssl_certs

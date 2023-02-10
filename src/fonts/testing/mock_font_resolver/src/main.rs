@@ -14,8 +14,8 @@ use {
     futures::{StreamExt, TryStreamExt},
     tracing::*,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, pseudo_directory,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        pseudo_directory,
     },
 };
 
@@ -56,18 +56,18 @@ async fn resolve(
     let root = match package_url.as_ref() {
         // From ephemeral.font_manifest.json
         "fuchsia-pkg://fuchsia.com/font-package-ephemeral-ttf" => pseudo_directory! {
-            "Ephemeral.ttf" => read_only_static(b"not actually a font"),
+            "Ephemeral.ttf" => read_only(b"not actually a font"),
         },
 
         // From aliases.font_manifest.json
         "fuchsia-pkg://fuchsia.com/font-package-alphasans-regular-ttf" => pseudo_directory! {
-            "AlphaSans-Regular.ttf" => read_only_static(b"alpha"),
+            "AlphaSans-Regular.ttf" => read_only(b"alpha"),
         },
         "fuchsia-pkg://fuchsia.com/font-package-alphasans-condensed-ttf" => pseudo_directory! {
-            "AlphaSans-Condensed.ttf" => read_only_static(b"alpha"),
+            "AlphaSans-Condensed.ttf" => read_only(b"alpha"),
         },
         "fuchsia-pkg://fuchsia.com/font-package-alphasanshebrew-regular-ttf" => pseudo_directory! {
-            "AlphaSansHebrew-Regular.ttf" => read_only_static(b"alpha"),
+            "AlphaSansHebrew-Regular.ttf" => read_only(b"alpha"),
         },
         _ => {
             return Err(Status::NOT_FOUND);

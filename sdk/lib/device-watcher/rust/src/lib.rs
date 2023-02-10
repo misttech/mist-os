@@ -168,8 +168,7 @@ mod tests {
         futures::StreamExt,
         std::{collections::HashSet, str::FromStr, sync::Arc},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static,
+            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
         },
     };
 
@@ -216,8 +215,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn watch_for_two_files() {
         let dir = vfs::pseudo_directory! {
-          "a" => read_only_static(b"/a"),
-          "b" => read_only_static(b"/b"),
+          "a" => read_only(b"/a"),
+          "b" => read_only(b"/b"),
         };
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -246,12 +245,12 @@ mod tests {
     async fn wait_for_device_topo_path_allows_files_and_dirs() {
         let dir = vfs::pseudo_directory! {
           "1" => vfs::pseudo_directory! {
-            "test" => read_only_static("test file 1"),
-            "test2" => read_only_static("test file 2"),
+            "test" => read_only("test file 1"),
+            "test2" => read_only("test file 2"),
           },
-          "2" => read_only_static("file 2"),
+          "2" => read_only("file 2"),
           "x" => create_controller_service("/dev/test2/x/dev".to_string()),
-          "3" => read_only_static("file 3"),
+          "3" => read_only("file 3"),
         };
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

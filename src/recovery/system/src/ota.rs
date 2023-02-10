@@ -227,8 +227,8 @@ impl OtaEnv {
                     proxy_from_file(self.ssl_certificates)?
                 ),
                 "build-info" => vfs::pseudo_directory!{
-                    "board" => vfs::file::vmo::read_only_static(self.board_name.into_bytes()),
-                    "version" => vfs::file::vmo::read_only_static(version.as_bytes()),
+                    "board" => vfs::file::vmo::read_only(self.board_name),
+                    "version" => vfs::file::vmo::read_only(String::from(version)),
                 }
             },
         )?;

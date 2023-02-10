@@ -12,8 +12,8 @@ use {
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
     vfs::{
         self, directory::entry::DirectoryEntry, directory::immutable::simple as pfs,
-        execution_scope::ExecutionScope, file::vmo::read_only_const, remote::remote_dir,
-        service::host, tree_builder::TreeBuilder,
+        execution_scope::ExecutionScope, file::vmo::read_only, remote::remote_dir, service::host,
+        tree_builder::TreeBuilder,
     },
 };
 
@@ -40,7 +40,7 @@ impl OutDir {
 
     /// Adds a static file at the given path.
     pub fn add_static_file(&mut self, path: CapabilityPath, contents: &str) {
-        self.add_entry(path, read_only_const(contents.as_bytes()));
+        self.add_entry(path, read_only(String::from(contents)));
     }
 
     /// Adds the given directory proxy at location "/data".

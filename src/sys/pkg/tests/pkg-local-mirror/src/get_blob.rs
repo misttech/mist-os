@@ -6,7 +6,7 @@
 use {
     super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext::BlobId, fuchsia_zircon::Status,
-    vfs::file::vmo::read_only_static,
+    vfs::file::vmo::read_only,
 };
 
 async fn verify_get_blob_with_read_success(env: &TestEnv, blob: &str, file_contents: &str) {
@@ -37,13 +37,13 @@ async fn success() {
                     "blobs" => pseudo_directory! {
                         "00" => pseudo_directory! {
                             "00000000000000000000000000000000000000000000000000000000000000" =>
-                                read_only_static("ben"),
+                                read_only("ben"),
                             "11111111111111111111111111111111111111111111111111111111111111" =>
-                                read_only_static("dan"),
+                                read_only("dan"),
                         },
                         "aa" => pseudo_directory! {
                             "bbccddeeff00112233445566778899aabbccddeeff00112233445566778899" =>
-                                read_only_static("kevin"),
+                                read_only("kevin"),
                         },
                     },
                     "repository_metadata" => pseudo_directory! {},

@@ -25,7 +25,7 @@ use mock_omaha_server::OmahaResponse;
 use mock_paver::{MockPaverService, PaverEvent};
 use ota_lib::config::{JsonUpdateConfig, JsonUpdateType};
 use std::{collections::BTreeSet, sync::Arc};
-use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_const};
+use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only};
 
 type ProgressRendererSender = mpsc::Sender<frui::ProgressRendererRender2Request>;
 
@@ -252,9 +252,9 @@ async fn route_config_data(
 
     let out_dir = vfs::pseudo_directory! {
         "config" => vfs::pseudo_directory! {
-            "recovery-config.json" => read_only_const(&recovery_config),
+            "recovery-config.json" => read_only(recovery_config),
             "ota-configs" => vfs::pseudo_directory! {
-                "ota_config.json" => read_only_const(&ota_config)
+                "ota_config.json" => read_only(ota_config)
             },
         },
     };

@@ -14,7 +14,7 @@ use {
     futures::prelude::*,
     std::sync::Arc,
     tracing::info,
-    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_static, pseudo_directory},
+    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory},
 };
 
 const BASEMGR_FOR_TESTING_V1_TO_V2_URL: &str = "#meta/basemgr-for-testing-v1-to-v2.cm";
@@ -25,7 +25,7 @@ const MOCK_COBALT_URL: &str = "#meta/mock_cobalt.cm";
 async fn basemgr_v1_to_v2_test() -> Result<(), Error> {
     let config_data_dir = pseudo_directory! {
         "basemgr" => pseudo_directory! {
-            "startup.config" => read_only_static(r##"
+            "startup.config" => read_only(r##"
 {
     "basemgr": {
         "enable_cobalt": false

@@ -118,16 +118,16 @@ mod tests {
     use vfs::{
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
-        file::vmo::read_only_static,
+        file::vmo::read_only,
         pseudo_directory,
         remote::{remote_boxed_with_type, RoutingFn},
     };
 
     #[fuchsia::test]
-    async fn bytes_from_read_only_static() {
+    async fn bytes_from_read_only() {
         let fs = pseudo_directory! {
-            // `read_only_static` is a vmo file, returns the buffer in OnOpen
-            "foo" => read_only_static("hello, world!"),
+            // `read_only` is a vmo file, returns the buffer in OnOpen
+            "foo" => read_only("hello, world!"),
         };
         let directory = serve_vfs_dir(fs);
 

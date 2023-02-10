@@ -506,7 +506,7 @@ mod tests {
         std::convert::TryFrom,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, path::Path as pfsPath, pseudo_directory,
+            file::vmo::read_only, path::Path as pfsPath, pseudo_directory,
         },
     };
 
@@ -514,9 +514,9 @@ mod tests {
     fn foo_out_dir_fn() -> Box<dyn Fn(ServerEnd<fio::DirectoryMarker>) + Send + Sync> {
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
             let out_dir = pseudo_directory!(
-                "foo" => read_only_static(b"bar"),
+                "foo" => read_only(b"bar"),
                 "test" => pseudo_directory!(
-                    "aaa" => read_only_static(b"bbb"),
+                    "aaa" => read_only(b"bbb"),
                 ),
             );
 
@@ -535,7 +535,7 @@ mod tests {
     fn bleep_runtime_dir_fn() -> Box<dyn Fn(ServerEnd<fio::DirectoryMarker>) + Send + Sync> {
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
             let pseudo_dir = pseudo_directory!(
-                "bleep" => read_only_static(b"blah"),
+                "bleep" => read_only(b"blah"),
             );
 
             pseudo_dir.clone().open(

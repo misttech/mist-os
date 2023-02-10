@@ -17,7 +17,7 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc, future::join_all, prelude::*},
     std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_static, pseudo_directory},
+    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory},
 };
 
 const BASEMGR_URL: &str = "#meta/basemgr.cm";
@@ -111,13 +111,10 @@ impl TestFixture {
         return Ok(TestFixture { builder, basemgr, placeholder });
     }
 
-    async fn with_config<Bytes>(self, config: Bytes) -> Result<TestFixture, Error>
-    where
-        Bytes: AsRef<[u8]> + Send + Sync + 'static,
-    {
+    async fn with_config(self, config: &'static str) -> Result<TestFixture, Error> {
         let config_data_dir = pseudo_directory! {
             "basemgr" => pseudo_directory! {
-                "startup.config" => read_only_static(config),
+                "startup.config" => read_only(config),
             }
         };
 

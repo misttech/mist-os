@@ -857,7 +857,7 @@ mod tests {
                 traversal_position::TraversalPosition,
             },
             execution_scope::ExecutionScope,
-            file::vmo::read_only_static,
+            file::vmo::read_only,
             mut_pseudo_directory,
             path::Path,
         },
@@ -938,8 +938,8 @@ mod tests {
         let component_storage_dir_name =
             "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
         let component_storage_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only_static(b"hello world"),
-            "file2" => read_only_static(b"hi there!"),
+            "file1.txt" => read_only(b"hello world"),
+            "file2" => read_only(b"hi there!"),
         };
         let storage_host = mut_pseudo_directory! {
             component_storage_dir_name => component_storage_dir.clone(),
@@ -977,17 +977,17 @@ mod tests {
         let nested_subdir_name = "subdir2";
 
         let nested_subdir = mut_pseudo_directory! {
-            "file.text" => read_only_static(b"hola!")
+            "file.text" => read_only(b"hola!")
         };
 
         let subdir = mut_pseudo_directory! {
-            "file" => read_only_static(b"so we meet again!"),
+            "file" => read_only(b"so we meet again!"),
             nested_subdir_name => nested_subdir.clone(),
         };
 
         let component_storage_dir = mut_pseudo_directory! {
             subdir_name => subdir.clone(),
-            "something.png" => read_only_static(b"not really a picture"),
+            "something.png" => read_only(b"not really a picture"),
         };
 
         let storage_host = mut_pseudo_directory! {
@@ -1026,7 +1026,7 @@ mod tests {
         let component2_dir_name = "component";
 
         let storage_data_dir1 = mut_pseudo_directory! {
-            "file.txt" => read_only_static(b"hello world!"),
+            "file.txt" => read_only(b"hello world!"),
         };
 
         let component1_dir = mut_pseudo_directory! {
@@ -1034,7 +1034,7 @@ mod tests {
         };
 
         let storage_data_dir2 = mut_pseudo_directory! {
-            "file.txt" => read_only_static(b"hello yourself"),
+            "file.txt" => read_only(b"hello yourself"),
         };
 
         let component2_dir = mut_pseudo_directory! {
@@ -1085,11 +1085,11 @@ mod tests {
         let subdir_name = "subdir";
 
         let subdir = mut_pseudo_directory! {
-            "a_file" => read_only_static(b"content"),
+            "a_file" => read_only(b"content"),
         };
 
         let data_dir = mut_pseudo_directory! {
-            "b_file" => read_only_static(b"other content"),
+            "b_file" => read_only(b"other content"),
             subdir_name => subdir.clone(),
         };
 
@@ -1131,8 +1131,8 @@ mod tests {
         let child_dir_name = "b:0";
 
         let child_data_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only_static(b"hello"),
-            "file2.txt" => read_only_static(b" world!"),
+            "file1.txt" => read_only(b"hello"),
+            "file2.txt" => read_only(b" world!"),
         };
 
         let child_dir = mut_pseudo_directory! {
@@ -1191,7 +1191,7 @@ mod tests {
         let child2_name = "c:0";
 
         let child1_data_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only_static(b"hello"),
+            "file1.txt" => read_only(b"hello"),
         };
 
         let child1_dir = mut_pseudo_directory! {
@@ -1199,7 +1199,7 @@ mod tests {
         };
 
         let child2_data_dir = mut_pseudo_directory! {
-            "file2.txt" => read_only_static(b" world!"),
+            "file2.txt" => read_only(b" world!"),
         };
 
         let child2_dir = mut_pseudo_directory! {
@@ -1287,12 +1287,12 @@ mod tests {
         let filename_ignored = "file";
 
         let nested_storage_dir = mut_pseudo_directory! {
-            filename3 => read_only_static(b"hellow world"),
+            filename3 => read_only(b"hellow world"),
         };
 
         let storage_dir = mut_pseudo_directory! {
-            filename1 => read_only_static(b"{}"),
-            filename2 => read_only_static(b"fa la la da da te da"),
+            filename1 => read_only(b"{}"),
+            filename2 => read_only(b"fa la la da da te da"),
             nested_dir_name => nested_storage_dir.clone(),
         };
 
@@ -1301,7 +1301,7 @@ mod tests {
             .expect("Adding entry failed");
 
         let test_dir = mut_pseudo_directory! {
-            filename_ignored => read_only_static(b"hello world!"),
+            filename_ignored => read_only(b"hello world!"),
             hex_storage_id => storage_dir.clone(),
         };
 

@@ -8,8 +8,8 @@ use {
     std::sync::Arc,
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, path::Path as fvfsPath, tree_builder::TreeBuilder,
+        directory::immutable::simple as pfs, execution_scope::ExecutionScope, file::vmo::read_only,
+        path::Path as fvfsPath, tree_builder::TreeBuilder,
     },
 };
 
@@ -19,13 +19,13 @@ pub struct RuntimeDirectory(Arc<pfs::Simple>);
 impl RuntimeDirectory {
     pub fn add_process_id(&self, process_id: u64) {
         self.elf_dir()
-            .add_entry("process_id", read_only_static(process_id.to_string()))
+            .add_entry("process_id", read_only(process_id.to_string()))
             .expect("failed to add process_id");
     }
 
     pub fn add_process_start_time(&self, process_start_time: i64) {
         self.elf_dir()
-            .add_entry("process_start_time", read_only_static(process_start_time.to_string()))
+            .add_entry("process_start_time", read_only(process_start_time.to_string()))
             .expect("failed to add process_start_time");
     }
 
@@ -33,7 +33,7 @@ impl RuntimeDirectory {
         self.elf_dir()
             .add_entry(
                 "process_start_time_utc_estimate",
-                read_only_static(process_start_time_utc_estimate),
+                read_only(process_start_time_utc_estimate),
             )
             .expect("failed to add process_start_time_utc_estimate");
     }
@@ -94,7 +94,7 @@ impl RuntimeDirBuilder {
         let mut count: u32 = 0;
         for arg in self.args.drain(..) {
             runtime_tree_builder
-                .add_entry(["args", &count.to_string()], read_only_static(arg))
+                .add_entry(["args", &count.to_string()], read_only(arg))
                 .expect("Failed to add arg to runtime directory");
             count += 1;
         }
@@ -104,7 +104,7 @@ impl RuntimeDirBuilder {
 
         if let Some(job_id) = self.job_id {
             runtime_tree_builder
-                .add_entry(["elf", "job_id"], read_only_static(job_id.to_string()))
+                .add_entry(["elf", "job_id"], read_only(job_id.to_string()))
                 .expect("Failed to add job_id to runtime/elf directory");
         }
 

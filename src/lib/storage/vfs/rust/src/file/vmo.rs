@@ -29,6 +29,8 @@ use {
 /// Helper trait to avoid generics in the [`VmoFile`] type by using dynamic dispatch.
 #[async_trait]
 trait AsyncInitVmoFile: Send + Sync {
+    // TODO(http://fxbug.dev/99448): Making this non-async FnOnce() can greatly simplify things
+    // and would remove the need for a separate trait.
     async fn init_vmo(&self) -> InitVmoResult;
 }
 
@@ -51,67 +53,58 @@ where
 /// an error code.
 pub type InitVmoResult = Result<Vmo, Status>;
 
-/// Creates a new read-only `VmoFile` backed by the specified `init_vmo` handler.
+/// Create new read-only `VmoFile` which serves constant content.
 ///
-/// The `init_vmo` handler is called to initialize a VMO for the very first connection to the file.
-///
-/// New connections are only allowed when they specify "read-only" access to the file content.
-///
-/// For more details on this interaction, see the module documentation.
-pub fn read_only<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
+/// ## Examples
+/// ```
+/// // Using static data:
+/// let from_str = read_only("str");
+/// let from_bytes = read_only(b"bytes");
+/// // Using owned data:
+/// let from_string = read_only(String::from("owned"));
+/// let from_vec = read_only(vec![0u8; 2]);
+/// ```
+pub fn read_only<Bytes>(bytes: Bytes) -> Arc<VmoFile>
 where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+    Bytes: 'static + AsRef<[u8]> + Send + Sync,
 {
-    VmoFile::new(init_vmo, true, false, false)
+    let bytes = Arc::new(bytes);
+    VmoFile::new(
+        move || {
+            let bytes = bytes.clone();
+            Box::pin(async move {
+                let bytes: &[u8] = bytes.as_ref().as_ref();
+                let vmo = Vmo::create(bytes.len().try_into().unwrap())?;
+                vmo.write(&bytes, 0)?;
+                Ok(vmo)
+            })
+        },
+        true,
+        false,
+        false,
+    )
 }
 
-/// Creates a new read-exec-only `VmoFile` backed by the specified `init_vmo` handler. It is the
-/// responsibility of the caller to ensure that the handler provides a VMO with the correct rights
-/// (namely, it must have both ZX_RIGHT_READ and ZX_RIGHT_EXECUTE).
+/// DEPRECATED - DO NOT USE. Use [`read_only`] instead.
 ///
-/// The `init_vmo` handler is called to initialize a VMO for the very first connection to the file.
-/// New connections are only allowed when they specify read and/or execute access to the file.
-///
-/// For more details on this interaction, see the module documentation.
-pub fn read_exec<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    VmoFile::new(init_vmo, true, false, true)
-}
-
-fn init_vmo<'a>(content: Arc<[u8]>) -> impl Fn() -> BoxFuture<'a, InitVmoResult> + Send + Sync {
-    move || {
-        // In "production" code we would instead wrap `content` in a smart pointer to be able to
-        // share it with the async block, but for tests it is fine to just clone it.
-        let content = content.clone();
-        Box::pin(async move {
-            let size = content.len() as u64;
-            let vmo = Vmo::create(size)?;
-            vmo.write(&content, 0)?;
-            Ok(vmo)
-        })
-    }
-}
-
 /// Creates a new read-only `VmoFile` which serves static content.  Also see
 /// `read_only_const` which allows you to pass the ownership to the file itself.
+// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_only`.
 pub fn read_only_static<Bytes>(bytes: Bytes) -> Arc<VmoFile>
 where
-    Bytes: AsRef<[u8]> + Send + Sync,
+    Bytes: 'static + AsRef<[u8]> + Send + Sync,
 {
-    let content: Arc<[u8]> = bytes.as_ref().to_vec().clone().into();
-    read_only(init_vmo(content.clone()))
+    read_only(bytes)
 }
 
+/// DEPRECATED - DO NOT USE. Use [`read_only`] instead.
+///
 /// Create a new read-only `VmoFile` which servers a constant content.  The difference with
 /// `read_only_static` is that this function takes a run time values that it will own, while
 /// `read_only_static` requires a reference to something with a static lifetime.
-pub fn read_only_const(bytes: &[u8]) -> Arc<VmoFile> {
-    let content: Arc<[u8]> = bytes.to_vec().clone().into();
-    read_only(init_vmo(content.clone()))
+// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_only`.
+pub fn read_only_const(bytes: impl AsRef<[u8]>) -> Arc<VmoFile> {
+    read_only(bytes.as_ref().to_vec())
 }
 
 /// Just like `simple_init_vmo`, but allows one to specify the capacity explicitly, instead of
@@ -146,6 +139,9 @@ pub fn simple_init_vmo_with_capacity(
 /// New connections may specify any kind of access to the file content.
 ///
 /// For more details on these interaction, see the module documentation.
+// TODO(http://fxbug.dev/99448): Every call to this function is combined with
+// `simple_init_vmo_with_capacity` using some kind of owned data or empty strings. The signature
+// should match that of `read_only` but with optional data/capacity fields.
 pub fn read_write<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
 where
     InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,

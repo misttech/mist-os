@@ -279,7 +279,7 @@ mod file_tests {
         vfs::{
             directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::Simple},
             execution_scope::ExecutionScope,
-            file::vmo::read_only_static,
+            file::vmo::read_only,
             pseudo_directory,
         },
     };
@@ -365,7 +365,7 @@ mod file_tests {
             (
                 "single file",
                 pseudo_directory! {
-                    "test_file.txt" => read_only_static("Hello, World!"),
+                    "test_file.txt" => read_only("Hello, World!"),
                 },
                 hashmap! {
                     "test_file.txt".to_string().into() => b"Hello, World!".to_vec()
@@ -375,7 +375,7 @@ mod file_tests {
                 "subdir",
                 pseudo_directory! {
                     "sub" => pseudo_directory! {
-                        "nested.txt" => read_only_static("Nested file!"),
+                        "nested.txt" => read_only("Nested file!"),
                     }
                 },
                 hashmap! {
@@ -385,7 +385,7 @@ mod file_tests {
             (
                 "empty file",
                 pseudo_directory! {
-                    "empty.txt" => read_only_static(""),
+                    "empty.txt" => read_only(""),
                 },
                 hashmap! {
                     "empty.txt".to_string().into() => b"".to_vec()
@@ -394,7 +394,7 @@ mod file_tests {
             (
                 "big file",
                 pseudo_directory! {
-                    "big.txt" => read_only_static(vec![b's'; (fio::MAX_BUF as usize)*2]),
+                    "big.txt" => read_only(vec![b's'; (fio::MAX_BUF as usize)*2]),
                 },
                 hashmap! {
                     "big.txt".to_string().into() => vec![b's'; (fio::MAX_BUF as usize) *2 as usize]
@@ -407,7 +407,7 @@ mod file_tests {
                     for i in 0..100 {
                         dir.add_entry(
                             format!("{:?}.txt", i),
-                            read_only_static(format!("contents for {:?}", i)),
+                            read_only(format!("contents for {:?}", i)),
                         )
                         .expect("add file");
                     }

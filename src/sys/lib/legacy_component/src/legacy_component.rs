@@ -14,8 +14,8 @@ use {
     tracing::*,
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, path::Path as VfsPath, pseudo_directory,
+        directory::immutable::simple as pfs, execution_scope::ExecutionScope, file::vmo::read_only,
+        path::Path as VfsPath, pseudo_directory,
     },
 };
 
@@ -241,8 +241,8 @@ impl LegacyComponent {
     ) -> Result<(), Error> {
         // Run the runtime dir for component manager
         let runtime_dir = pseudo_directory!(
-            "legacy_url" => read_only_static(self.legacy_url.into_bytes()),
-            "realm_label" => read_only_static(self.realm_label.into_bytes()),
+            "legacy_url" => read_only(self.legacy_url),
+            "realm_label" => read_only(self.realm_label),
         );
         if let Some(runtime_dir_server) = self.runtime_dir.take() {
             runtime_dir.open(

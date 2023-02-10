@@ -35,7 +35,7 @@ use {
     vfs::{
         directory::{self, entry::DirectoryEntry},
         execution_scope::ExecutionScope,
-        file::vmo::read_only_const,
+        file::vmo::read_only,
         tree_builder::TreeBuilder,
     },
 };
@@ -82,7 +82,7 @@ fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
                 tree_builder
                     .add_entry(
                         &path_parts,
-                        read_only_const(&payload.unwrap_or_else(|| {
+                        read_only(payload.unwrap_or_else(|| {
                             syslog::fx_log_err!("Failed to buffer bootfs entry {}", name);
                             Vec::new()
                         })),
@@ -162,8 +162,7 @@ async fn create_dir_from_context<'a>(
         // Do not allow files that failed validation or have not been validated at all.
         if !failed_validation && validated {
             let path_parts: Vec<&str> = dest.split("/").collect();
-            let content = contents.to_vec();
-            let file = read_only_const(&content);
+            let file = read_only(contents);
             tree_builder.add_entry(&path_parts, file).unwrap_or_else(|err| {
                 syslog::fx_log_err!("Failed to add file {} to directory: {}", dest, err);
             });
@@ -440,16 +439,16 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::create_endpoints,
-        vfs::{file::vmo::read_only_static, pseudo_directory},
+        vfs::{file::vmo::read_only, pseudo_directory},
     };
 
     #[fasync::run_singlethreaded(test)]
     async fn test_open_factory_verity() {
         // Bind a vfs to /factory.
         let dir = pseudo_directory! {
-            "a" => read_only_static("a content"),
+            "a" => read_only("a content"),
             "b" => pseudo_directory! {
-                "c" => read_only_static("c content"),
+                "c" => read_only("c content"),
             },
         };
         let (dir_client, dir_server) = create_endpoints().unwrap();

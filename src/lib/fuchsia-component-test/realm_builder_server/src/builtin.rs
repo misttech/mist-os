@@ -12,7 +12,7 @@ use {
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
         directory::immutable::simple as simpledir, execution_scope::ExecutionScope,
-        file::vmo::read_only, path::Path as VfsPath,
+        file::vmo::VmoFile, path::Path as VfsPath,
     },
 };
 
@@ -113,15 +113,11 @@ fn build_directory(
                 .add_entry(&path, build_directory(sub_directory)?)
                 .context("could not add directory to directory")?,
             DirectoryOrFile::File(vmo) => {
+                let vmo_handle = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
+                let file = VmoFile::new_from_vmo(vmo_handle, true, false, false);
                 directory
                     .clone()
-                    .add_entry(
-                        &path,
-                        read_only(move || {
-                            let vmo = vmo.clone();
-                            async move { Ok(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?) }
-                        }),
-                    )
+                    .add_entry(&path, file)
                     .context("could not add file to directory")?;
             }
         }

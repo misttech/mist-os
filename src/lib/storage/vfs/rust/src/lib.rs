@@ -57,14 +57,14 @@ pub mod pseudo_directory;
 /// ```
 /// let root = pseudo_directory! {
 ///     "etc" => pseudo_directory! {
-///         "fstab" => read_only_static(b"/dev/fs /"),
-///         "passwd" => read_only_static(b"[redacted]"),
-///         "shells" => read_only_static(b"/bin/bash"),
+///         "fstab" => read_only(b"/dev/fs /"),
+///         "passwd" => read_only(b"[redacted]"),
+///         "shells" => read_only(b"/bin/bash"),
 ///         "ssh" => pseudo_directory! {
-///           "sshd_config" => read_only_static(b"# Empty"),
+///           "sshd_config" => read_only(b"# Empty"),
 ///         },
 ///     },
-///     "uname" => read_only_static(b"Fuchsia"),
+///     "uname" => read_only(b"Fuchsia"),
 /// };
 /// ```
 ///

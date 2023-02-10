@@ -199,7 +199,7 @@ mod tests {
         futures::{StreamExt, TryStreamExt},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, tree_builder::TreeBuilder,
+            file::vmo::read_only, tree_builder::TreeBuilder,
         },
     };
 
@@ -248,10 +248,8 @@ mod tests {
         contents2: &'static [u8],
     ) -> Result<fio::DirectoryProxy, Error> {
         let mut tree = TreeBuilder::empty_dir();
-        tree.add_entry(&name.split("/").collect::<Vec<&str>>(), read_only_static(contents))
-            .unwrap();
-        tree.add_entry(&name2.split("/").collect::<Vec<&str>>(), read_only_static(contents2))
-            .unwrap();
+        tree.add_entry(&name.split("/").collect::<Vec<&str>>(), read_only(contents)).unwrap();
+        tree.add_entry(&name2.split("/").collect::<Vec<&str>>(), read_only(contents2)).unwrap();
         let test_dir = tree.build();
 
         let (test_dir_proxy, test_dir_service) =

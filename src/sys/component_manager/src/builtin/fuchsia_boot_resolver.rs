@@ -409,7 +409,7 @@ mod tests {
         std::sync::{Arc, Weak},
         vfs::{
             self, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, pseudo_directory, remote::remote_dir,
+            file::vmo::read_only, pseudo_directory, remote::remote_dir,
         },
     };
 
@@ -548,8 +548,8 @@ mod tests {
         let values_data_encoded = persist(&mut values_data).unwrap();
         let root = pseudo_directory! {
             "meta" => pseudo_directory! {
-                "has_config.cm" => read_only_static(manifest_encoded),
-                "has_config.cvf" => read_only_static(values_data_encoded),
+                "has_config.cm" => read_only(manifest_encoded),
+                "has_config.cvf" => read_only(values_data_encoded),
             }
         };
         let (_task, bootfs) = serve_vfs_dir(root);
@@ -609,7 +609,7 @@ mod tests {
         let manifest_encoded = persist(&mut manifest).unwrap();
         let root = pseudo_directory! {
             "meta" => pseudo_directory! {
-                "has_config.cm" => read_only_static(manifest_encoded),
+                "has_config.cm" => read_only(manifest_encoded),
             }
         };
         let (_task, bootfs) = serve_vfs_dir(root);
@@ -656,7 +656,7 @@ mod tests {
         let root = pseudo_directory! {
             "meta" => pseudo_directory! {
                 // Provide a cm that will fail due to a missing runner.
-                "invalid.cm" => read_only_static(manifest_encoded),
+                "invalid.cm" => read_only(manifest_encoded),
             },
         };
         let (_task, bootfs) = serve_vfs_dir(root);

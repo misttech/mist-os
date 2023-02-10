@@ -36,8 +36,7 @@ impl MutableDirectory for Directory {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, assert_matches::assert_matches, std::convert::TryInto,
-        vfs::file::vmo::read_only_static,
+        super::*, assert_matches::assert_matches, std::convert::TryInto, vfs::file::vmo::read_only,
     };
 
     #[fuchsia::test]
@@ -45,7 +44,7 @@ mod tests {
         let dir = vfs::directory::immutable::simple();
 
         assert!(
-            dir.add_node("node_name", read_only_static(b"test"),).is_ok(),
+            dir.add_node("node_name", read_only(b"test"),).is_ok(),
             "add node with valid name should succeed"
         );
     }
@@ -55,7 +54,7 @@ mod tests {
         let dir = vfs::directory::immutable::simple();
 
         let err = dir
-            .add_node("node_name/with/separators", read_only_static(b"test"))
+            .add_node("node_name/with/separators", read_only(b"test"))
             .expect_err("add entry with path separator should fail");
         assert_matches!(err, VfsError::AddNodeError { .. });
     }
@@ -64,7 +63,7 @@ mod tests {
     fn addable_with_result_remove_ok() {
         let dir = vfs::directory::immutable::simple();
 
-        dir.add_node("node_name", read_only_static(b"test"))
+        dir.add_node("node_name", read_only(b"test"))
             .expect("add node with valid name should succeed");
 
         let entry = dir.remove_node("node_name").expect("remove node should succeed");

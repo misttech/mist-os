@@ -34,8 +34,8 @@ use {
     thiserror::Error,
     tracing::{error, info, warn},
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, tree_builder::TreeBuilder,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        tree_builder::TreeBuilder,
     },
     zx::{HandleBased, Task},
 };
@@ -486,7 +486,7 @@ where
         .map_err(|s| ComponentError::ServeRuntimeDir(anyhow!("cannot get job koid: {}", s)))?
         .raw_koid();
     runtime_dir_builder
-        .add_entry(&["elf", "job_id"], read_only_static(job_id.to_string()))
+        .add_entry(&["elf", "job_id"], read_only(job_id.to_string()))
         .map_err(|e| ComponentError::ServeRuntimeDir(anyhow!("cannot add elf/job_id: {}", e)))?;
     runtime_dir_builder.build().open(
         ExecutionScope::new(),

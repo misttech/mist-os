@@ -43,8 +43,8 @@ use {
     tracing::warn,
     version_history,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::read_only_static, path::Path, pseudo_directory, remote::RoutingFn,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+        path::Path, pseudo_directory, remote::RoutingFn,
     },
 };
 
@@ -126,7 +126,7 @@ fn new_proxy_routing_fn(ty: CapabilityType) -> RoutingFn {
                 }
                 CapabilityType::Directory | CapabilityType::Storage => {
                     let sub_dir = pseudo_directory!(
-                        "hello" => read_only_static(b"friend"),
+                        "hello" => read_only(b"friend"),
                     );
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
@@ -189,7 +189,7 @@ impl MockResolver {
             create_endpoints().unwrap();
 
         let sub_dir = pseudo_directory!(
-            "fake_file" => read_only_static(b"content"),
+            "fake_file" => read_only(b"content"),
         );
         sub_dir.open(
             ExecutionScope::new(),

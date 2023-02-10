@@ -491,17 +491,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::vmo::read_only_static;
+    use crate::file::vmo::read_only;
 
     #[test]
     fn name_with_path_separator() {
         let dir = crate::directory::mutable::simple();
         let status = dir
-            .add_entry("path/with/separators", read_only_static(b"test"))
+            .add_entry("path/with/separators", read_only(b"test"))
             .expect_err("add entry with path separator should fail");
         assert_eq!(status, Status::INVALID_ARGS);
         assert_eq!(
-            dir.add_entry("path_without_separators", read_only_static(b"test")),
+            dir.add_entry("path_without_separators", read_only(b"test")),
             Ok(()),
             "add entry with valid filename should succeed"
         );

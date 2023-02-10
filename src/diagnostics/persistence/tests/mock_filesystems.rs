@@ -11,13 +11,13 @@ use futures::prelude::*;
 use std::fs;
 use std::sync::Arc;
 use vfs::test_utils::assertions::reexport::StreamExt;
-use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only_static, pseudo_directory};
+use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory};
 
 pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRef, Error> {
     let config_data_dir = pseudo_directory! {
         "data" => pseudo_directory! {
             "test_config.persist" =>
-                read_only_static(include_str!("test_data/config/test_config.persist")),
+                read_only(include_str!("test_data/config/test_config.persist")),
         }
     };
 

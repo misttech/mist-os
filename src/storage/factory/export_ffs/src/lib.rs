@@ -350,7 +350,7 @@ mod tests {
         ramdevice_client::RamdiskClient,
         vfs::{
             directory::entry::DirectoryEntry as _, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, pseudo_directory,
+            file::vmo::read_only, pseudo_directory,
         },
     };
 
@@ -435,9 +435,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_export() {
         let dir = pseudo_directory! {
-            "a" => read_only_static("a content"),
+            "a" => read_only("a content"),
             "b" => pseudo_directory! {
-                "c" => read_only_static("c content"),
+                "c" => read_only("c content"),
             },
         };
         let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -460,10 +460,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_entries() {
         let dir = pseudo_directory! {
-            "a" => read_only_static("a content"),
-            "d" => read_only_static("d content"),
+            "a" => read_only("a content"),
+            "d" => read_only("d content"),
             "b" => pseudo_directory! {
-                "c" => read_only_static("c content"),
+                "c" => read_only("c content"),
             },
         };
         let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

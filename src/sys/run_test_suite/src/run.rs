@@ -459,7 +459,7 @@ mod test {
         std::task::Poll,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only_static, pseudo_directory,
+            file::vmo::read_only, pseudo_directory,
         },
     };
 
@@ -705,7 +705,7 @@ mod test {
         });
 
         let dir = pseudo_directory! {
-            "test_file.txt" => read_only_static("Hello, World!"),
+            "test_file.txt" => read_only("Hello, World!"),
         };
 
         let (directory_client, directory_service) =
@@ -853,7 +853,7 @@ mod test {
         });
 
         let dir = pseudo_directory! {
-            "test_file.profraw" => read_only_static("Not a real profile"),
+            "test_file.profraw" => read_only("Not a real profile"),
         };
 
         let (file_client, file_service) =

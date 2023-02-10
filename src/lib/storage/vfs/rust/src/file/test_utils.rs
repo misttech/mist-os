@@ -92,7 +92,7 @@ pub fn simple_init_vmo_with_capacity(
 /// It is very common in tests to create a read-only file that backed by a non-resizable VMO.  This
 /// function does just that.
 pub fn simple_read_only(content: &[u8]) -> Arc<VmoFile> {
-    read_only(simple_init_vmo(content))
+    VmoFile::new(simple_init_vmo(content), true, false, false)
 }
 
 /// Similar to [`simple_read_only()`], but allows specifying an inode.

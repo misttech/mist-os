@@ -59,7 +59,7 @@ fn one_entry() {
     check_pseudo_directory_impl(
         indoc!(
             r#"
-            "name" => read_only_static("content"),
+            "name" => read_only("content"),
         "#
         ),
         "{ \
@@ -67,7 +67,7 @@ fn one_entry() {
              let __dir = :: vfs :: directory :: immutable :: simple () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"name\" , \"bytes(1..7)\" , \
-                 __dir . clone () . add_entry (\"name\" , read_only_static (\"content\"))) ; \
+                 __dir . clone () . add_entry (\"name\" , read_only (\"content\"))) ; \
              __dir \
         }"
     );
@@ -79,8 +79,8 @@ fn two_entries() {
     check_pseudo_directory_impl(
         indoc!(
             r#"
-            "first" => read_only_static("A"),
-            "second" => read_only_static("B"),
+            "first" => read_only("A"),
+            "second" => read_only("B"),
         "#
         ),
         "{ \
@@ -88,10 +88,10 @@ fn two_entries() {
              let __dir = :: vfs :: directory :: immutable :: simple () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"first\" , \"bytes(1..8)\" , \
-                 __dir . clone () . add_entry (\"first\" , read_only_static (\"A\"))) ; \
+                 __dir . clone () . add_entry (\"first\" , read_only (\"A\"))) ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
-                 \"second\" , \"bytes(35..43)\" , \
-                 __dir . clone () . add_entry (\"second\" , read_only_static (\"B\"))) ; \
+                 \"second\" , \"bytes(28..36)\" , \
+                 __dir . clone () . add_entry (\"second\" , read_only (\"B\"))) ; \
              __dir \
          }"
     );
@@ -104,8 +104,8 @@ fn assign_to() {
         indoc!(
             r#"
             my_dir ->
-            "first" => read_only_static("A"),
-            "second" => read_only_static("B"),
+            "first" => read_only("A"),
+            "second" => read_only("B"),
         "#
         ),
         "{ \
@@ -113,10 +113,10 @@ fn assign_to() {
              my_dir = :: vfs :: directory :: immutable :: simple () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"first\" , \"bytes(11..18)\" , \
-                 my_dir . clone () . add_entry (\"first\" , read_only_static (\"A\"))) ; \
+                 my_dir . clone () . add_entry (\"first\" , read_only (\"A\"))) ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
-                 \"second\" , \"bytes(45..53)\" , \
-                 my_dir . clone () . add_entry (\"second\" , read_only_static (\"B\"))) ; \
+                 \"second\" , \"bytes(38..46)\" , \
+                 my_dir . clone () . add_entry (\"second\" , read_only (\"B\"))) ; \
              my_dir . clone () \
          }"
     );
@@ -128,7 +128,7 @@ fn entry_has_name_from_ref() {
     check_pseudo_directory_impl(
         indoc!(
             r#"
-            test_name => read_only_static("content"),
+            test_name => read_only("content"),
         "#
         ),
         "{ \
@@ -136,7 +136,7 @@ fn entry_has_name_from_ref() {
              let __dir = :: vfs :: directory :: immutable :: simple () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  test_name , \"bytes(1..10)\" , \
-                 __dir . clone () . add_entry (test_name , read_only_static (\"content\"))) ; \
+                 __dir . clone () . add_entry (test_name , read_only (\"content\"))) ; \
              __dir \
          }"
     );
