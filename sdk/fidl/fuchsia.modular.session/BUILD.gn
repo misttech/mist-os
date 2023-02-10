@@ -14,7 +14,6 @@ fidl("fuchsia.modular.session") {
   sdk_category = "internal"
 
   sources = [
-    "launcher.fidl",
     "modular_config.fidl",
     "overview.fidl",
   ]
