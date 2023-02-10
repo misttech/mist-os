@@ -15,6 +15,7 @@
 
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <ddktl/device.h>
@@ -53,7 +54,9 @@ class Register : public RegisterType<T>,
 
  public:
   explicit Register(zx_device_t* device, std::shared_ptr<MmioInfo> mmio)
-      : RegisterType<T>(device), mmio_(mmio), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+      : RegisterType<T>(device),
+        mmio_(std::move(mmio)),
+        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   zx_status_t Init(const RegistersMetadataEntry& config);
 
@@ -63,7 +66,7 @@ class Register : public RegisterType<T>,
   }
   void DdkRelease() { delete this; }
 
-  void RegistersConnect(zx::channel chan);
+  void RegistersConnect(zx::channel channel);
 
   void ReadRegister8(Device::ReadRegister8RequestView request,
                      Device::ReadRegister8Completer::Sync& completer) override {

@@ -39,11 +39,12 @@ class FakeRegistersDevice : public RegistersDevice<T> {
         std::make_unique<Register<T>>(nullptr, RegistersDevice<T>::mmios_[config.mmio_id()]));
     registers_.back()->Init(config);
 
-    zx::channel client_end, server_end;
-    if (zx::channel::create(0, &client_end, &server_end) != ZX_OK) {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+    if (endpoints.is_error()) {
       return;
     }
-    registers_.back()->RegistersConnect(std::move(server_end));
+    auto& [client_end, server_end] = endpoints.value();
+    registers_.back()->RegistersConnect(server_end.TakeChannel());
     clients_.emplace(config.bind_id(),
                      std::make_shared<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>(
                          std::move(client_end)));
@@ -89,8 +90,8 @@ class RegistersDeviceTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    for (uint32_t i = 0; i < mock_mmio_.size(); i++) {
-      ASSERT_NO_FATAL_FAILURE(mock_mmio_[i]->VerifyAll());
+    for (const auto& i : mock_mmio_) {
+      ASSERT_NO_FATAL_FAILURE(i->VerifyAll());
     }
   }
 

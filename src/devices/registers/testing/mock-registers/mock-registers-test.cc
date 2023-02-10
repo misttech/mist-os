@@ -13,19 +13,15 @@ namespace mock_registers {
 class MockRegistersTest : public zxtest::Test {
  public:
   void SetUp() override {
-    zx_status_t status;
-
     loop_.StartThread();
 
     device_ = std::make_unique<MockRegistersDevice>(loop_.dispatcher());
 
-    zx::channel client_end, server_end;
-    if ((status = zx::channel::create(0, &client_end, &server_end)) != ZX_OK) {
-      printf("Could not create channel %d\n", status);
-      return;
-    }
-    device_->RegistersConnect(std::move(server_end));
-    client_ = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(std::move(client_end));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    device_->RegistersConnect(server_end.TakeChannel());
+    client_.Bind(std::move(client_end));
   }
 
   void TearDown() override {

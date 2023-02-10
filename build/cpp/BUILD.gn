@@ -109,18 +109,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/registers/drivers/registers:registers-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/registers/drivers/registers:registers-test",
-
-    #------------------
-    #------------------
-    "//src/devices/registers/testing/mock-registers:mock-registers-test",
-
-    #------------------
-    #------------------
     "//src/devices/temperature/drivers/tmp112:tmp112-test-bin",
 
     #------------------

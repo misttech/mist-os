@@ -15,7 +15,7 @@ namespace registers {
 
 namespace {
 
-const static std::map<fuchsia_hardware_registers::wire::Mask::Tag, uint8_t> kTagToBytes = {
+const std::map<fuchsia_hardware_registers::wire::Mask::Tag, uint8_t> kTagToBytes = {
     {fuchsia_hardware_registers::wire::Mask::Tag::kR8, 1},
     {fuchsia_hardware_registers::wire::Mask::Tag::kR16, 2},
     {fuchsia_hardware_registers::wire::Mask::Tag::kR32, 4},
@@ -61,24 +61,23 @@ zx_status_t Register<T>::Init(const RegistersMetadataEntry& config) {
 }
 
 template <typename T>
-void Register<T>::RegistersConnect(zx::channel chan) {
+void Register<T>::RegistersConnect(zx::channel channel) {
+  fidl::ServerEnd<fuchsia_hardware_registers::Device> server_end{std::move(channel)};
   zx_status_t status;
   char name[20];
   snprintf(name, sizeof(name), "register-%lu-thread", id_);
   if (!loop_started_ && (status = loop_.StartThread(name)) != ZX_OK) {
     zxlogf(ERROR, "%s: failed to start registers thread: %d", __func__, status);
-    fidl_epitaph_write(chan.get(), status);
+    server_end.Close(status);
     return;
   }
 
   loop_started_ = true;
 
-  status = fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(chan), this);
+  status = fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server_end), this);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to bind channel: %d", __func__, status);
   }
-
-  return;
 }
 
 // Returns: true if mask requested is covered by allowed mask.
@@ -248,7 +247,7 @@ zx_status_t RegistersDevice<T>::Create(zx_device_t* parent, Metadata metadata) {
 
   auto* device_ptr = device.release();
 
-  if ((status = device_ptr->Init(parent, std::move(metadata))) != ZX_OK) {
+  if ((status = device_ptr->Init(parent, metadata)) != ZX_OK) {
     device_ptr->DdkAsyncRemove();
     zxlogf(ERROR, "%s: Init failed", __func__);
     return status;

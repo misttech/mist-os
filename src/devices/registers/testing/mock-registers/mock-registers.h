@@ -17,12 +17,11 @@ namespace mock_registers {
 class MockRegisters : public fidl::WireServer<fuchsia_hardware_registers::Device> {
  public:
   explicit MockRegisters(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-  ~MockRegisters() {}
+  ~MockRegisters() override = default;
 
   // Manage the Fake FIDL Message Loop
-  void Init(zx::channel remote) {
-    fidl::BindServer(dispatcher_,
-                     fidl::ServerEnd<fuchsia_hardware_registers::Device>(std::move(remote)), this);
+  void Init(fidl::ServerEnd<fuchsia_hardware_registers::Device> server_end) {
+    fidl::BindServer(dispatcher_, std::move(server_end), this);
   }
 
   template <typename T>
@@ -151,10 +150,12 @@ class MockRegisters : public fidl::WireServer<fuchsia_hardware_registers::Device
 // Mock Registers Device implementing Banjo protocol to connect to FIDL implementation.
 class MockRegistersDevice : public ddk::RegistersProtocol<MockRegistersDevice> {
  public:
-  MockRegistersDevice(async_dispatcher_t* dispatcher)
+  explicit MockRegistersDevice(async_dispatcher_t* dispatcher)
       : proto_({&registers_protocol_ops_, this}), fidl_service_(dispatcher) {}
 
-  void RegistersConnect(zx::channel chan) { fidl_service_.Init(std::move(chan)); }
+  void RegistersConnect(zx::channel channel) {
+    fidl_service_.Init(fidl::ServerEnd<fuchsia_hardware_registers::Device>{std::move(channel)});
+  }
 
   const registers_protocol_t* proto() const { return &proto_; }
   MockRegisters* fidl_service() { return &fidl_service_; }
