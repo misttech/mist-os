@@ -6,73 +6,58 @@
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_BUS_H_
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
-#include <lib/sync/completion.h>
-#include <threads.h>
 
-#include <fbl/mutex.h>
+#include <vector>
+
 #include <fbl/ref_counted.h>
-
-#include "src/lib/listnode/listnode.h"
 
 namespace i2c {
 
 class I2cBus : public fbl::RefCounted<I2cBus> {
  public:
-  struct TransactOp {
-    const uint8_t* data_buffer;
-    size_t data_size;
-    bool is_read;
-    bool stop;
-  };
+  using TransferRequestView = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferRequestView;
+  using TransferCompleter = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferCompleter;
 
-  using TransactCallback = void (*)(void* ctx, zx_status_t status, const TransactOp* op_list,
-                                    size_t op_count);
+  I2cBus(zx_device_t* parent, ddk::I2cImplProtocolClient i2c, uint32_t bus_id,
+         uint64_t max_transfer_size)
+      : i2c_(i2c), bus_id_(bus_id), max_transfer_(max_transfer_size) {
+    impl_ops_.resize(kInitialOpCount);
+    read_vectors_.resize(kInitialOpCount);
+    read_buffer_.resize(kInitialReadBufferSize);
+  }
 
   static zx_status_t CreateAndAddChildren(
       zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
       const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels,
       async_dispatcher_t* dispatcher);
 
-  explicit I2cBus(zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
-                  uint64_t max_transfer_size);
-  virtual ~I2cBus() {
-    AsyncStop();
-    WaitForStop();
-  }
-  zx_status_t Start(zx_device_t* parent);
-  void AsyncStop();
-  void WaitForStop();
-  virtual void Transact(uint16_t address, const TransactOp* op_list, size_t op_count,
-                        TransactCallback callback, void* cookie);
+  void Transact(uint16_t address, TransferRequestView request, TransferCompleter::Sync& completer);
 
  private:
-  // struct representing an I2C transaction.
-  struct I2cTxn {
-    list_node_t node;
-    uint16_t address;
-    TransactCallback transact_cb;
-    void* cookie;
-    size_t length;
-    size_t op_count;
-    uint64_t trace_id;
-  };
+  static constexpr size_t kInitialOpCount = 16;
+  static constexpr size_t kInitialReadBufferSize = 512;
 
-  int I2cThread();
+  static void CreateAndAddChildrenOnDispatcher(
+      zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
+      uint64_t max_transfer_size,
+      const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels,
+      async_dispatcher_t* dispatcher);
 
-  zx_device_t* parent_;
+  zx_status_t GrowContainersIfNeeded(
+      const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions);
+
   const ddk::I2cImplProtocolClient i2c_;
   const uint32_t bus_id_;
   const uint64_t max_transfer_;
 
-  list_node_t queued_txns_ __TA_GUARDED(mutex_);
-  list_node_t free_txns_ __TA_GUARDED(mutex_);
-  sync_completion_t txn_signal_;
-
-  bool shutdown_ __TA_GUARDED(mutex_) = false;
-  thrd_t thread_;
-  fbl::Mutex mutex_;
+  // Ops and read data/vectors to be used in Transact(). Set to the initial capacities specified
+  // above; more space is dyamically allocated if needed.
+  std::vector<i2c_impl_op_t> impl_ops_;
+  std::vector<fidl::VectorView<uint8_t>> read_vectors_;
+  std::vector<uint8_t> read_buffer_;
 };
 
 }  // namespace i2c

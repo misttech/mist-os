@@ -7,8 +7,8 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
+#include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/fdf/cpp/dispatcher.h>
 
 #include <string>
 
@@ -36,11 +36,12 @@ class I2cChild : public I2cChildType {
         name_(name),
         dispatcher_(dispatcher) {}
 
-  static zx_status_t CreateAndAddDevice(
+  // Must be run on the bus's dispatcher.
+  static zx_status_t CreateAndAddDeviceOnDispatcher(
       zx_device_t* parent, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
       const fbl::RefPtr<I2cBus>& bus, async_dispatcher_t* dispatcher);
 
-  void DdkRelease() { delete this; }
+  void DdkRelease();
 
   void Transfer(TransferRequestView request, TransferCompleter::Sync& completer) override;
 
@@ -50,7 +51,7 @@ class I2cChild : public I2cChildType {
   friend class I2cChildTest;
 
   void Bind(fidl::ServerEnd<fidl_i2c::Device> request) {
-    fidl::BindServer(dispatcher_, std::move(request), this);
+    bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
   }
 
   component::OutgoingDirectory outgoing_dir_;
@@ -59,6 +60,7 @@ class I2cChild : public I2cChildType {
   const uint16_t address_;
   const std::string name_;
   async_dispatcher_t* const dispatcher_;
+  fidl::ServerBindingGroup<fidl_i2c::Device> bindings_;
 };
 
 }  // namespace i2c

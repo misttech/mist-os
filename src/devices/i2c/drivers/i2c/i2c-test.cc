@@ -6,13 +6,14 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
+#include <lib/fdf/env.h>
 
 #include <ddktl/device.h>
 #include <zxtest/zxtest.h>
 
 #include "lib/ddk/metadata.h"
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/i2c/drivers/i2c/i2c-child.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
@@ -69,24 +70,25 @@ fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint32_t bus_id, uint16_t ad
 
 class I2cMetadataTest : public zxtest::Test {
  public:
-  I2cMetadataTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
-
   void SetUp() override {
-    loop_.StartThread();
+    EXPECT_TRUE(dispatcher_.Start({}, "i2c-test dispatcher").is_ok());
     fake_root_ = MockDevice::FakeRootParent();
   }
 
   void TearDown() override {
-    for (auto& device : fake_root_->children()) {
-      device_async_remove(device.get());
-    }
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [parent = fake_root_.get()]() {
+      for (auto& device : parent->children()) {
+        device_async_remove(device.get());
+      }
 
-    mock_ddk::ReleaseFlaggedDevices(fake_root_.get());
+      mock_ddk::ReleaseFlaggedDevices(parent);
+    });
+    EXPECT_TRUE(result.is_ok());
   }
 
  protected:
-  async::Loop loop_;
   std::shared_ptr<zx_device> fake_root_;
+  fdf::TestSynchronizedDispatcher dispatcher_;
 };
 
 TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
@@ -96,26 +98,52 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
   channels.emplace_back(MakeChannel(arena, 0, 0xb));
 
   auto impl = FakeI2cImpl::Create(fake_root_.get(), std::move(channels));
-  // Make the fake I2C driver.
-  ASSERT_OK(i2c::I2cDevice::Create(nullptr, impl->zxdev(), loop_.dispatcher()));
+
+  {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [parent = impl->zxdev()]() {
+      // Make the fake I2C driver.
+      ASSERT_OK(i2c::I2cDevice::Create(nullptr, parent));
+    });
+    EXPECT_TRUE(result.is_ok());
+  }
 
   // Check the number of devices we have makes sense.
   ASSERT_EQ(impl->zxdev()->child_count(), 1);
-  zx_device_t* i2c = impl->zxdev()->GetLatestChild();
-  // There should be two devices per channel.
-  ASSERT_EQ(i2c->child_count(), 2);
 
-  for (auto& child : i2c->children()) {
-    uint16_t expected_addr = 0xff;
-    for (const auto& prop : child->GetProperties()) {
-      if (prop.id == BIND_I2C_ADDRESS) {
-        expected_addr = static_cast<uint16_t>(prop.value);
+  auto* const i2c_device = impl->zxdev()->GetLatestChild()->GetDeviceContext<i2c::I2cDevice>();
+  ASSERT_EQ(i2c_device->dispatchers().size(), 1);
+
+  async_dispatcher_t* const dispatcher = i2c_device->dispatchers()[0]->dispatcher();
+
+  // I2cDevice::Create has posted a task to create children on its dispatcher. Verify device
+  // properties on that dispatcher to ensure we are running after the children have been added.
+  {
+    auto result = fdf::RunOnDispatcherSync(dispatcher, [impl]() {
+      zx_device_t* i2c = impl->zxdev()->GetLatestChild();
+      // There should be two devices per channel.
+      ASSERT_EQ(i2c->child_count(), 2);
+
+      for (auto& child : i2c->children()) {
+        uint16_t expected_addr = 0xff;
+        for (const auto& prop : child->GetProperties()) {
+          if (prop.id == BIND_I2C_ADDRESS) {
+            expected_addr = static_cast<uint16_t>(prop.value);
+          }
+        }
+
+        auto decoded =
+            ddk::GetEncodedMetadata<fi2c::I2CChannel>(child.get(), DEVICE_METADATA_I2C_DEVICE);
+        ASSERT_TRUE(decoded.is_ok());
+        ASSERT_EQ(decoded->address(), expected_addr);
       }
-    }
-
-    auto decoded =
-        ddk::GetEncodedMetadata<fi2c::I2CChannel>(child.get(), DEVICE_METADATA_I2C_DEVICE);
-    ASSERT_TRUE(decoded.is_ok());
-    ASSERT_EQ(decoded->address(), expected_addr);
+    });
+    EXPECT_TRUE(result.is_ok());
   }
+}
+
+int main(int argc, char** argv) {
+  // This must be called exactly once before any test cases run.
+  fdf_env_start();
+  setlinebuf(stdout);
+  return RUN_ALL_TESTS(argc, argv);
 }

@@ -4,17 +4,11 @@
 
 #include "i2c-bus.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/zx/profile.h>
-#include <lib/zx/thread.h>
-#include <lib/zx/time.h>
-#include <zircon/threads.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/array.h>
-#include <fbl/auto_lock.h>
-#include <fbl/ref_ptr.h>
 
 #include "i2c-child.h"
 
@@ -30,262 +24,117 @@ zx_status_t I2cBus::CreateAndAddChildren(
     return status;
   }
 
-  auto bus = fbl::MakeRefCounted<I2cBus>(parent, i2c, bus_id, max_transfer_size);
-  if (zx_status_t status = bus->Start(parent); status != ZX_OK) {
-    return status;
+  return async::PostTask(dispatcher, [=, &channels]() {
+    CreateAndAddChildrenOnDispatcher(parent, i2c, bus_id, max_transfer_size, channels, dispatcher);
+  });
+}
+
+void I2cBus::Transact(const uint16_t address, TransferRequestView request,
+                      TransferCompleter::Sync& completer) {
+  TRACE_DURATION("i2c", "I2cBus Process Queued Transacts");
+
+  const auto& transactions = request->transactions;
+  if (zx_status_t status = GrowContainersIfNeeded(transactions); status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
   }
+
+  uint8_t* read_buffer = read_buffer_.data();
+  size_t read_ops = 0;
+
+  for (size_t i = 0; i < transactions.count(); ++i) {
+    // Same address for all ops, since there is one address per channel.
+    impl_ops_[i].address = address;
+    impl_ops_[i].stop = transactions[i].has_stop() && transactions[i].stop();
+    impl_ops_[i].is_read = transactions[i].data_transfer().is_read_size();
+
+    if (impl_ops_[i].is_read) {
+      impl_ops_[i].data_buffer = read_buffer;
+      impl_ops_[i].data_size = transactions[i].data_transfer().read_size();
+
+      // Create a VectorView pointing to the read buffer ahead of time so that we don't have to loop
+      // again to create the reply vector.
+      read_vectors_[read_ops++] =
+          fidl::VectorView<uint8_t>::FromExternal(impl_ops_[i].data_buffer, impl_ops_[i].data_size);
+      read_buffer += impl_ops_[i].data_size;
+    } else {
+      impl_ops_[i].data_buffer = transactions[i].data_transfer().write_data().data();
+      impl_ops_[i].data_size = transactions[i].data_transfer().write_data().count();
+    }
+
+    if (impl_ops_[i].data_size == 0 || impl_ops_[i].data_size > max_transfer_) {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+  }
+  impl_ops_[transactions.count() - 1].stop = true;
+
+  zx_status_t status = i2c_.Transact(bus_id_, impl_ops_.data(), transactions.count());
+  if (status == ZX_OK) {
+    completer.ReplySuccess(
+        fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_.data(), read_ops));
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void I2cBus::CreateAndAddChildrenOnDispatcher(
+    zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, const uint32_t bus_id,
+    const uint64_t max_transfer_size,
+    const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels,
+    async_dispatcher_t* const dispatcher) {
+  auto bus = fbl::MakeRefCounted<I2cBus>(parent, i2c, bus_id, max_transfer_size);
 
   for (const auto& channel : channels) {
     const uint32_t child_bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
     if (bus_id == child_bus_id) {
-      zx_status_t status = I2cChild::CreateAndAddDevice(parent, channel, bus, dispatcher);
+      zx_status_t status =
+          I2cChild::CreateAndAddDeviceOnDispatcher(parent, channel, bus, dispatcher);
       if (status != ZX_OK) {
-        return status;
+        return;
       }
     }
+  }
+}
+
+zx_status_t I2cBus::GrowContainersIfNeeded(
+    const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions) {
+  if (transactions.count() < 1) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (transactions.count() > fuchsia_hardware_i2c::wire::kMaxCountTransactions) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  size_t total_read_size = 0, total_write_size = 0;
+  for (const auto transaction : transactions) {
+    if (!transaction.has_data_transfer()) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    if (transaction.data_transfer().is_write_data()) {
+      total_write_size += transaction.data_transfer().write_data().count();
+    } else if (transaction.data_transfer().is_read_size()) {
+      total_read_size += transaction.data_transfer().read_size();
+    } else {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
+  if (total_read_size + total_write_size > fuchsia_hardware_i2c::wire::kMaxTransferSize) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  // Allocate space for all ops up front, if needed.
+  if (transactions.count() > impl_ops_.size() || transactions.count() > read_vectors_.size()) {
+    impl_ops_.resize(transactions.count());
+    read_vectors_.resize(transactions.count());
+  }
+  if (total_read_size > read_buffer_.capacity()) {
+    read_buffer_.resize(total_read_size);
   }
 
   return ZX_OK;
-}
-
-I2cBus::I2cBus(zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
-               uint64_t max_transfer_size)
-    : parent_(parent), i2c_(i2c), bus_id_(bus_id), max_transfer_(max_transfer_size) {
-  list_initialize(&queued_txns_);
-  list_initialize(&free_txns_);
-  sync_completion_reset(&txn_signal_);
-}
-
-zx_status_t I2cBus::Start(zx_device_t* parent) {
-  char name[32];
-  snprintf(name, sizeof(name), "I2cBus[%u]", bus_id_);
-  auto thunk = [](void* arg) -> int { return static_cast<I2cBus*>(arg)->I2cThread(); };
-  thrd_create_with_name(&thread_, thunk, this, name);
-
-  // Set profile for bus transaction thread.
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  {
-    const zx::duration capacity = zx::usec(100);
-    const zx::duration deadline = zx::msec(1);
-    const zx::duration period = deadline;
-
-    zx::profile bus_profile;
-    zx_status_t status =
-        device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(), name,
-                                    bus_profile.reset_and_get_address());
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "I2cBus::Start: Failed to get deadline profile: %s",
-             zx_status_get_string(status));
-    } else {
-      status = zx_object_set_profile(thrd_get_zx_handle(thread_), bus_profile.get(), 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "I2cBus::Start: Failed to apply deadline profile to bus thread: %s",
-               zx_status_get_string(status));
-      }
-    }
-  }
-
-  return ZX_OK;
-}
-
-void I2cBus::AsyncStop() {
-  mutex_.Acquire();
-  shutdown_ = true;
-  mutex_.Release();
-  sync_completion_signal(&txn_signal_);
-}
-
-void I2cBus::WaitForStop() { thrd_join(thread_, nullptr); }
-
-int I2cBus::I2cThread() {
-  fbl::AllocChecker ac;
-  fbl::Array<uint8_t> read_buffer(new (&ac) uint8_t[I2C_IMPL_MAX_TOTAL_TRANSFER],
-                                  I2C_IMPL_MAX_TOTAL_TRANSFER);
-  if (!ac.check()) {
-    zxlogf(ERROR, "%s could not allocate read_buffer", __FUNCTION__);
-    return 0;
-  }
-
-  while (1) {
-    sync_completion_wait(&txn_signal_, ZX_TIME_INFINITE);
-    sync_completion_reset(&txn_signal_);
-    I2cTxn* txn;
-
-    mutex_.Acquire();
-    if (shutdown_) {
-      mutex_.Release();
-      break;
-    }
-    while ((txn = list_remove_head_type(&queued_txns_, I2cTxn, node)) != nullptr) {
-      mutex_.Release();
-
-      TRACE_DURATION("i2c", "I2cBus Process Queued Transacts");
-      TRACE_FLOW_END("i2c", "I2cBus Transact Flow", txn->trace_id, "Flow", txn->trace_id);
-
-      auto op_list = reinterpret_cast<I2cBus::TransactOp*>(txn + 1);
-      auto op_count = txn->op_count;
-      auto p_writes = reinterpret_cast<uint8_t*>(op_list) + op_count * sizeof(I2cBus::TransactOp);
-      uint8_t* p_reads = read_buffer.data();
-
-      ZX_ASSERT(op_count <= I2C_IMPL_MAX_RW_OPS);
-      i2c_impl_op_t impl_ops[I2C_IMPL_MAX_RW_OPS];
-      for (size_t i = 0; i < op_count; ++i) {
-        // Same address for all ops, since there is one address per channel.
-        impl_ops[i].address = txn->address;
-        impl_ops[i].data_size = op_list[i].data_size;
-        impl_ops[i].is_read = op_list[i].is_read;
-        impl_ops[i].stop = op_list[i].stop;
-        if (impl_ops[i].is_read) {
-          impl_ops[i].data_buffer = p_reads;
-          p_reads += impl_ops[i].data_size;
-        } else {
-          impl_ops[i].data_buffer = p_writes;
-          p_writes += impl_ops[i].data_size;
-        }
-      }
-      auto status = i2c_.Transact(bus_id_, impl_ops, op_count);
-
-      if (status == ZX_OK) {
-        I2cBus::TransactOp read_ops[I2C_IMPL_MAX_RW_OPS];
-        size_t read_ops_cnt = 0;
-        for (size_t i = 0; i < op_count; ++i) {
-          if (op_list[i].is_read) {
-            read_ops[read_ops_cnt] = op_list[i];
-            read_ops[read_ops_cnt].data_buffer = impl_ops[i].data_buffer;
-            read_ops_cnt++;
-          }
-        }
-        txn->transact_cb(txn->cookie, ZX_OK, read_ops, read_ops_cnt);
-      } else {
-        txn->transact_cb(txn->cookie, status, nullptr, 0);
-      }
-
-      mutex_.Acquire();
-      list_add_tail(&free_txns_, &txn->node);
-    }
-    mutex_.Release();
-  }
-
-  fbl::AutoLock lock(&mutex_);
-
-  I2cTxn* txn;
-
-  // Cancel txns that clients are waiting on, and free all remaining txns.
-  while ((txn = list_remove_head_type(&queued_txns_, I2cTxn, node)) != nullptr) {
-    txn->transact_cb(txn->cookie, ZX_ERR_CANCELED, nullptr, 0);
-    free(txn);
-  }
-
-  while ((txn = list_remove_head_type(&free_txns_, I2cTxn, node)) != nullptr) {
-    free(txn);
-  }
-
-  return 0;
-}
-
-void I2cBus::Transact(uint16_t address, const I2cBus::TransactOp* op_list, size_t op_count,
-                      TransactCallback callback, void* cookie) {
-  TRACE_DURATION("i2c", "I2cBus Queue Transact");
-
-  // TODO(fxbug.dev/52177): This is a hack to apply a deadline profile to the dispatch
-  // thread for this devhost. Replace this with a proper solution.
-  static std::once_flag profile_flag;
-  std::call_once(profile_flag, [device = parent_] {
-    // Set profile for bus transaction thread.
-    // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-    // coding parameters.
-    const zx::duration capacity = zx::usec(150);
-    const zx::duration deadline = zx::msec(1);
-    const zx::duration period = deadline;
-
-    zx::profile profile;
-    zx_status_t status =
-        device_get_deadline_profile(device, capacity.get(), deadline.get(), period.get(),
-                                    "I2cBus Dispatcher", profile.reset_and_get_address());
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "I2cBus::Transact: Failed to get deadline profile: %s",
-             zx_status_get_string(status));
-    } else {
-      status = zx::thread::self()->set_profile(profile, 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "I2cBus::Transact: Failed to apply deadline profile to dispatch thread: %s",
-               zx_status_get_string(status));
-      }
-    }
-  });
-
-  size_t writes_length = 0;
-  for (size_t i = 0; i < op_count; ++i) {
-    if (op_list[i].data_size == 0 || op_list[i].data_size > max_transfer_) {
-      callback(cookie, ZX_ERR_INVALID_ARGS, nullptr, 0);
-      return;
-    }
-    if (!op_list[i].is_read) {
-      writes_length += op_list[i].data_size;
-    }
-  }
-  // Add space for requests and writes data.
-  size_t req_length = sizeof(I2cTxn) + op_count * sizeof(I2cBus::TransactOp) + writes_length;
-  if (req_length >= I2C_IMPL_MAX_TOTAL_TRANSFER) {
-    callback(cookie, ZX_ERR_BUFFER_TOO_SMALL, nullptr, 0);
-    return;
-  }
-
-  fbl::AutoLock lock(&mutex_);
-
-  if (shutdown_) {
-    callback(cookie, ZX_ERR_CANCELED, nullptr, 0);
-    return;
-  }
-
-  I2cTxn* txn = list_remove_head_type(&free_txns_, I2cTxn, node);
-  if (txn && txn->length < req_length) {
-    free(txn);
-    txn = nullptr;
-  }
-
-  if (!txn) {
-    // add space for write buffer
-    txn = static_cast<I2cTxn*>(calloc(1, req_length));
-    if (!txn) {
-      callback(cookie, ZX_ERR_NO_MEMORY, nullptr, 0);
-      return;
-    }
-    txn->length = req_length;
-  }
-
-  txn->address = address;
-  txn->op_count = op_count;
-  txn->transact_cb = callback;
-  txn->cookie = cookie;
-  if (TRACE_ENABLED()) {
-    txn->trace_id = TRACE_NONCE();
-    TRACE_FLOW_BEGIN("i2c", "I2cBus Transact Flow", txn->trace_id, "Flow", txn->trace_id);
-  }
-
-  // copy the op_list
-  auto* dest = reinterpret_cast<uint8_t*>(txn + 1);
-  memcpy(dest, op_list, op_count * sizeof(op_list[0]));
-  dest += op_count * sizeof(op_list[0]);
-  // copy the write buffers
-  for (size_t i = 0; i < op_count; ++i) {
-    if (!op_list[i].is_read) {
-      memcpy(dest, op_list[i].data_buffer, op_list[i].data_size);
-      dest += op_list[i].data_size;
-    }
-  }
-
-  list_add_tail(&queued_txns_, &txn->node);
-
-  // Make sure to release this lock before signaling the worker thread.  If we
-  // are still holding the lock when the signal is asserted, we will be racing
-  // with the worker thread to see if we can drop the lock before it attempts to
-  // acquire it.  In a uniprocessor system (or just a system where the worker
-  // thread gets scheduled on our core, preempting us) this produces unnecessary
-  // thrash which negatively impacts performance.
-  lock.release();
-  sync_completion_signal(&txn_signal_);
 }
 
 }  // namespace i2c

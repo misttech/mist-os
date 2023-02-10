@@ -4,13 +4,16 @@
 
 #include "i2c-child.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
 #include <lib/ddk/metadata.h>
+
+#include <algorithm>
+#include <optional>
 
 #include <zxtest/zxtest.h>
 
 #include "i2c.h"
+#include "lib/ddk/metadata.h"
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace i2c {
@@ -54,17 +57,18 @@ class FakeI2cImpl : public ddk::I2cImplProtocol<FakeI2cImpl> {
 
 class I2cChildTest : public zxtest::Test {
  public:
-  I2cChildTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
-  void SetUp() override {
-    fake_root_ = MockDevice::FakeRootParent();
-    ASSERT_OK(loop_.StartThread("i2c-child-test-fidl"));
-  }
+  void SetUp() override { EXPECT_TRUE(dispatcher_.Start({}, "i2c-test dispatcher").is_ok()); }
 
   void TearDown() override {
-    for (auto& device : fake_root_->children()) {
-      device_async_remove(device.get());
-    }
-    mock_ddk::ReleaseFlaggedDevices(fake_root_.get());
+    // Destruction must happen on the framework dispatcher.
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [this]() {
+      device_async_remove(fake_root_->GetLatestChild());
+      for (auto& child : fake_root_->GetLatestChild()->children()) {
+        device_async_remove(child.get());
+      }
+      EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root_.get()));
+    });
+    EXPECT_TRUE(result.is_ok());
   }
 
  protected:
@@ -111,21 +115,34 @@ class I2cChildTest : public zxtest::Test {
 
     *client = fidl::WireSyncClient<fuchsia_hardware_i2c::Device>(std::move(endpoints->client));
 
-    EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get(), loop_.dispatcher()));
+    {
+      auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [&]() {
+        EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get()));
+      });
+
+      EXPECT_TRUE(result.is_ok());
+    }
 
     ASSERT_EQ(fake_root_->child_count(), 1);
     zx_device_t* i2c_root = fake_root_->GetLatestChild();
 
-    ASSERT_EQ(i2c_root->child_count(), 1);
+    auto* const i2c_device = i2c_root->GetDeviceContext<i2c::I2cDevice>();
+    ASSERT_EQ(i2c_device->dispatchers().size(), 1);
 
-    auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<i2c::I2cChild>();
+    async_dispatcher_t* const dispatcher = i2c_device->dispatchers()[0]->dispatcher();
 
-    i2c_child->Bind(std::move(endpoints->server));
+    {
+      auto result = fdf::RunOnDispatcherSync(
+          dispatcher, [=, server = std::move(endpoints->server)]() mutable {
+            auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
+            i2c_child->Bind(std::move(server));
+          });
+      EXPECT_TRUE(result.is_ok());
+    }
   }
 
- protected:
-  std::shared_ptr<zx_device> fake_root_;
-  async::Loop loop_;
+  std::shared_ptr<zx_device> fake_root_{MockDevice::FakeRootParent()};
+  fdf::TestSynchronizedDispatcher dispatcher_;
 };
 
 TEST_F(I2cChildTest, Write3BytesOnce) {
@@ -410,6 +427,50 @@ TEST_F(I2cChildTest, GetEmptyNameTest) {
 
   // Empty string here means this endpoint returns an error.
   ASSERT_TRUE(name->is_error());
+}
+
+TEST_F(I2cChildTest, HugeTransfer) {
+  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+    for (size_t i = 0; i < op_count; i++) {
+      cpp20::span data(op_list[i].data_buffer, op_list[i].data_size);
+      if (op_list[i].is_read) {
+        if (data.size() != 1024) {
+          return ZX_ERR_IO;
+        }
+        memset(data.data(), 'r', data.size());
+      } else if (std::any_of(data.begin(), data.end(), [](uint8_t b) { return b != 'w'; })) {
+        return ZX_ERR_IO;
+      }
+    }
+    return ZX_OK;
+  });
+
+  auto client_wrap = GetI2cChildClient(i2c.GetClient());
+  ASSERT_TRUE(client_wrap.is_valid());
+
+  auto write_buffer = std::make_unique<uint8_t[]>(1024);
+  auto write_data = fidl::VectorView<uint8_t>::FromExternal(write_buffer.get(), 1024);
+  memset(write_data.data(), 'w', write_data.count());
+
+  fidl::Arena arena;
+  auto write_transfer = fidl_i2c::wire::DataTransfer::WithWriteData(arena, write_data);
+  auto read_transfer = fidl_i2c::wire::DataTransfer::WithReadSize(1024);
+
+  auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 2);
+  transactions[0] =
+      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(write_transfer).Build();
+  transactions[1] =
+      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
+
+  auto read = client_wrap->Transfer(transactions);
+
+  ASSERT_OK(read.status());
+  ASSERT_FALSE(read->is_error());
+
+  ASSERT_EQ(read->value()->read_data.count(), 1);
+  ASSERT_EQ(read->value()->read_data[0].count(), 1024);
+  cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
+  EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
 }
 
 }  // namespace i2c

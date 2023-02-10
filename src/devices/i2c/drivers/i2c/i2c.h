@@ -7,7 +7,12 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/dispatcher.h>
+#include <lib/sync/completion.h>
+
+#include <memory>
+#include <vector>
 
 #include <ddktl/device.h>
 
@@ -23,16 +28,19 @@ class I2cDevice : public I2cDeviceType {
       : I2cDeviceType(parent), metadata_(std::move(metadata)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
-  static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
 
   void DdkRelease() { delete this; }
 
+  // Visible for testing.
+  std::vector<std::unique_ptr<async::Loop>>& dispatchers() { return dispatchers_; }
+
  private:
-  zx_status_t Init(const ddk::I2cImplProtocolClient& i2c, uint32_t bus_base, uint32_t bus_count,
-                   async_dispatcher_t* dispatcher);
+  zx_status_t Init(const ddk::I2cImplProtocolClient& i2c, uint32_t bus_base, uint32_t bus_count);
+  zx_status_t SetDeadlineProfile(uint32_t bus_id, async_dispatcher_t* dispatcher);
 
   // Retain ownership of the metadata so we can pass references to children.
   ddk::DecodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata> metadata_;
+  std::vector<std::unique_ptr<async::Loop>> dispatchers_;
 };
 
 }  // namespace i2c

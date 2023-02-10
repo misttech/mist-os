@@ -4,9 +4,11 @@
 
 #include "i2c.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/zx/profile.h>
+#include <lib/zx/thread.h>
 
 #include <memory>
 
@@ -18,10 +20,6 @@
 namespace i2c {
 
 zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
-  return Create(ctx, parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-}
-
-zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher) {
   ddk::I2cImplProtocolClient i2c(parent);
   if (!i2c.is_valid()) {
     zxlogf(ERROR, "Failed to get i2cimpl client");
@@ -70,7 +68,7 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
     return status;
   }
 
-  status = device->Init(i2c, bus_base, bus_count, dispatcher);
+  status = device->Init(i2c, bus_base, bus_count);
 
   [[maybe_unused]] auto* unused = device.release();
 
@@ -78,10 +76,30 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
 }
 
 zx_status_t I2cDevice::Init(const ddk::I2cImplProtocolClient& i2c, const uint32_t bus_base,
-                            const uint32_t bus_count, async_dispatcher_t* const dispatcher) {
+                            const uint32_t bus_count) {
+  ZX_DEBUG_ASSERT(metadata_->has_channels());
+
   zxlogf(DEBUG, "%zu channels supplied.", metadata_->channels().count());
 
+  dispatchers_.reserve(bus_count);
+
   for (uint32_t i = 0; i < bus_count; i++) {
+    dispatchers_.emplace_back(new async::Loop(&kAsyncLoopConfigNeverAttachToThread));
+
+    char name[32];
+    snprintf(name, sizeof(name), "I2cBus[%u]", i + bus_base);
+
+    if (zx_status_t status = dispatchers_.back()->StartThread(name); status != ZX_OK) {
+      zxlogf(ERROR, "Failed to start dispatcher: %s", zx_status_get_string(status));
+      return status;
+    }
+
+    async_dispatcher_t* const dispatcher = dispatchers_.back()->dispatcher();
+
+    if (zx_status_t status = SetDeadlineProfile(i + bus_base, dispatcher); status != ZX_OK) {
+      return status;
+    }
+
     zx_status_t status =
         I2cBus::CreateAndAddChildren(zxdev(), i2c, i + bus_base, metadata_->channels(), dispatcher);
     if (status != ZX_OK) {
@@ -90,6 +108,41 @@ zx_status_t I2cDevice::Init(const ddk::I2cImplProtocolClient& i2c, const uint32_
   }
 
   return ZX_OK;
+}
+
+zx_status_t I2cDevice::SetDeadlineProfile(const uint32_t bus_id,
+                                          async_dispatcher_t* const dispatcher) {
+  zx_status_t status = async::PostTask(dispatcher, [device = zxdev(), bus_id]() {
+    char name[32];
+    snprintf(name, sizeof(name), "I2cBus[%u]", bus_id);
+
+    // Set profile for bus transaction thread.
+    // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
+    // coding parameters.
+    const zx::duration capacity = zx::usec(150);
+    const zx::duration deadline = zx::msec(1);
+    const zx::duration period = deadline;
+
+    zx::profile profile;
+    zx_status_t status =
+        device_get_deadline_profile(device, capacity.get(), deadline.get(), period.get(),
+                                    "I2cBus Dispatcher", profile.reset_and_get_address());
+    if (status != ZX_OK) {
+      zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
+    } else {
+      status = zx::thread::self()->set_profile(profile, 0);
+      if (status != ZX_OK) {
+        zxlogf(WARNING, "Failed to apply deadline profile to dispatch thread: %s",
+               zx_status_get_string(status));
+      }
+    }
+  });
+
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to post deadline profile task: %s", zx_status_get_string(status));
+  }
+
+  return status;
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

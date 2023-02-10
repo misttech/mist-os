@@ -4,6 +4,7 @@
 
 #include "i2c-child.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/sync/completion.h>
@@ -14,7 +15,7 @@
 
 namespace i2c {
 
-zx_status_t I2cChild::CreateAndAddDevice(
+zx_status_t I2cChild::CreateAndAddDeviceOnDispatcher(
     zx_device_t* parent, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
     const fbl::RefPtr<I2cBus>& bus, async_dispatcher_t* dispatcher) {
   const uint32_t bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
@@ -109,72 +110,22 @@ zx_status_t I2cChild::CreateAndAddDevice(
   return status;
 }
 
-void I2cChild::Transfer(fidl::WireServer<fidl_i2c::Device>::TransferRequestView request,
-                        fidl::WireServer<fidl_i2c::Device>::TransferCompleter::Sync& completer) {
-  if (request->transactions.count() < 1) {
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
-  auto op_list = std::make_unique<I2cBus::TransactOp[]>(request->transactions.count());
-  for (size_t i = 0; i < request->transactions.count(); ++i) {
-    if (!request->transactions[i].has_data_transfer()) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    const auto& transfer = request->transactions[i].data_transfer();
-    const bool stop = request->transactions[i].has_stop() && request->transactions[i].stop();
-
-    if (transfer.is_write_data()) {
-      if (transfer.write_data().count() <= 0) {
-        completer.ReplyError(ZX_ERR_INVALID_ARGS);
-        return;
-      }
-      op_list[i].data_buffer = transfer.write_data().data();
-      op_list[i].data_size = transfer.write_data().count();
-      op_list[i].is_read = false;
-      op_list[i].stop = stop;
-    } else {
-      if (transfer.read_size() <= 0) {
-        completer.ReplyError(ZX_ERR_INVALID_ARGS);
-        return;
-      }
-      op_list[i].data_buffer = nullptr;  // unused.
-      op_list[i].data_size = transfer.read_size();
-      op_list[i].is_read = true;
-      op_list[i].stop = stop;
-    }
-  }
-  op_list[request->transactions.count() - 1].stop = true;
-
-  struct Ctx {
-    sync_completion_t done = {};
-    fidl::WireServer<fidl_i2c::Device>::TransferCompleter::Sync* completer;
-  } ctx;
-  ctx.completer = &completer;
-  auto callback = [](void* ctx, zx_status_t status, const I2cBus::TransactOp* op_list,
-                     size_t op_count) {
-    auto ctx2 = static_cast<Ctx*>(ctx);
-    if (status == ZX_OK) {
-      auto reads = std::make_unique<fidl::VectorView<uint8_t>[]>(op_count);
-      for (size_t i = 0; i < op_count; ++i) {
-        reads[i] = fidl::VectorView<uint8_t>::FromExternal(
-            const_cast<uint8_t*>(op_list[i].data_buffer), op_list[i].data_size);
-      }
-      auto all_reads =
-          fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(reads.get(), op_count);
-      ctx2->completer->ReplySuccess(all_reads);
-    } else {
-      ctx2->completer->ReplyError(status);
-    }
-    sync_completion_signal(&ctx2->done);
-  };
-  bus_->Transact(address_, op_list.get(), request->transactions.count(), callback, &ctx);
-  sync_completion_wait(&ctx.done, zx::duration::infinite().get());
+void I2cChild::DdkRelease() {
+  // Synchronously delete ourselves to prevent our parent's release hook from being called until
+  // after we're gone. At that point it will be safe to wait for our dispatcher to stop.
+  sync_completion_t delete_done;
+  async::PostTask(dispatcher_, [this, delete_done = &delete_done]() {
+    delete this;
+    sync_completion_signal(delete_done);
+  });
+  sync_completion_wait(&delete_done, ZX_TIME_INFINITE);
 }
 
-void I2cChild::GetName(fidl::WireServer<fidl_i2c::Device>::GetNameCompleter::Sync& completer) {
+void I2cChild::Transfer(TransferRequestView request, TransferCompleter::Sync& completer) {
+  bus_->Transact(address_, request, completer);
+}
+
+void I2cChild::GetName(GetNameCompleter::Sync& completer) {
   if (name_.empty()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
