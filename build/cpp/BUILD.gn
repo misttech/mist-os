@@ -145,30 +145,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/testing/fake_ddk",
-
-    #------------------
-    #------------------
-    "//src/devices/tests/bind-fail-test:tests",
-
-    #------------------
-    #------------------
-    "//src/devices/tests/ddk-environment-test:ddk-environment",
-
-    #------------------
-    #------------------
-    "//src/devices/tests/ddk-metadata-test:tests",
-
-    #------------------
-    #------------------
-    "//src/devices/tests/ddk-power",
-
-    #------------------
-    #------------------
-    "//src/devices/tests/mock-device:mock-device-driver",
-
-    #------------------
-    #------------------
     "//src/devices/thermal/drivers/as370-thermal:as370-thermal-test-bin",
 
     #------------------

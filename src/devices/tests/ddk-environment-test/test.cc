@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.device.environment.test/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver-integration-test/fixture.h>
-#include <lib/fdio/directory.h>
 #include <zircon/syscalls.h>
 
 #include <unordered_set>
@@ -31,24 +30,23 @@ class EnvironmentTest : public zxtest::Test {
     ASSERT_OK(status);
     zx::result channel = device_watcher::RecursiveWaitForFile(
         devmgr_.devfs_root().get(), "sys/platform/11:14:0/ddk-environment-test");
-    ASSERT_OK(channel.status_value());
-
-    chan_ = std::move(channel.value());
-    ASSERT_NE(chan_.get(), ZX_HANDLE_INVALID);
+    ASSERT_OK(channel);
+    client_.Bind(fidl::ClientEnd<TestDevice>{std::move(channel.value())});
   }
 
  protected:
-  zx::channel chan_;
+  fidl::WireSyncClient<TestDevice> client_;
   IsolatedDevmgr devmgr_;
 };
 
 TEST_F(EnvironmentTest, GetServiceList) {
-  auto result = fidl::WireCall<TestDevice>(zx::unowned(chan_))->GetServiceList();
+  const fidl::WireResult result = client_->GetServiceList();
   ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().services.count(), 3);
+  const fidl::WireResponse response = result.value();
+  ASSERT_EQ(response.services.count(), 3);
 
   std::unordered_set<std::string> actual;
-  for (const auto& service : result.value().services) {
+  for (const auto& service : response.services) {
     actual.emplace(service.data(), service.size());
   }
   std::unordered_set<std::string> kExpectedServices = {

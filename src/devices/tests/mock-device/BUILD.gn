@@ -25,7 +25,6 @@ fuchsia_driver("mock-device-driver") {
     ":fuchsia.device.mock_tables",
     ":mock-device-bind",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//sdk/lib/fidl/cpp:cpp_base",
     "//src/devices/lib/driver",
@@ -35,11 +34,6 @@ fuchsia_driver("mock-device-driver") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 }
 
 fuchsia_driver_component("mock-device") {

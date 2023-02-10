@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/devmgr-integration-test/fixture.h>
-#include <lib/fdio/directory.h>
 #include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 
@@ -30,19 +29,21 @@ TEST(BindFailTest, BindFail) {
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());
 
-  zx::channel sys_chan;
+  fidl::ClientEnd<fuchsia_device::Controller> client_end;
   {
     zx::result channel =
         device_watcher::RecursiveWaitForFile(devmgr.value().devfs_root().get(), "sys/test/test");
-    ASSERT_OK(channel.status_value());
-    sys_chan = std::move(channel.value());
+    ASSERT_OK(channel);
+    client_end.channel() = std::move(channel.value());
   }
-  fidl::WireSyncClient<fuchsia_device::Controller> sys_dev(std::move(sys_chan));
+  fidl::WireSyncClient controller(std::move(client_end));
 
-  auto result = sys_dev->Bind(fidl::StringView{kDriver});
+  const fidl::WireResult result = controller->Bind(fidl::StringView{kDriver});
   ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_EQ(result->error_value(), ZX_ERR_NOT_SUPPORTED);
+  const fit::result response = result.value();
+  // The driver will run its tests in its bind routine, and return ZX_OK on success.
+  ASSERT_TRUE(response.is_error());
+  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, response.error_value());
 }
 
 }  // namespace
