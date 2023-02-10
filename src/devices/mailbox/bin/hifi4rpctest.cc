@@ -4,19 +4,15 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <getopt.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/unsafe.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <zircon/status.h>
-
-#include <fbl/unique_fd.h>
 
 #include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
 

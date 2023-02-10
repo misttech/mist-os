@@ -62,10 +62,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/mailbox/bin:hifi4rpctest",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }
