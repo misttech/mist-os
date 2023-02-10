@@ -57,11 +57,13 @@ class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
   // Get/Set functions
   zx::channel& GetCtrlChannel() { return ctrl_channel_; }
   zx::port& GetCtrlChannelPort() { return ctrl_channel_port_; }
-  zx::channel& GetCtrlSnoopChannel() { return snoop_client_end_.channel(); }
+  const fidl::ClientEnd<fuchsia_telephony_snoop::Publisher>& GetCtrlSnoopChannel() const {
+    return snoop_client_end_;
+  }
   zx::port& GetCtrlSnoopChannelPort() { return snoop_port_; }
   std::thread& GetCtrlThrd() { return fake_ctrl_thread_; }
 
-  bool GetConnectStatus() { return connected_; }
+  bool GetConnectStatus() const { return connected_; }
   zx_device_t* GetParentDevice() { return parent_; }
   zx_device_t*& GetTelDevPtr() { return tel_dev_; }
 

@@ -18,17 +18,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
   visibility = [
     #------------------
     #------------------
-
-    #------------------
-    #------------------
-    "//src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver-driver",
-
-    #------------------
-    #------------------
-    "//src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver",
-
-    #------------------
-    #------------------
     "//src/devices/bin/acpidump:src",
 
     #------------------
