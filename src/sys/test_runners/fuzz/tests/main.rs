@@ -46,7 +46,7 @@ async fn connect(
     assert_eq!(status, zx::Status::OK.into_raw());
 
     // Forward syslog. This isn't strictly necessary for testing, but is very useful when debugging.
-    let (rx, tx) = zx::Socket::create(zx::SocketOpts::empty()).expect("failed to create sockets");
+    let (rx, tx) = zx::Socket::create_stream();
     let status = fuzz_manager
         .get_output(FUZZER_URL, fuzz::TestOutput::Syslog, tx)
         .await
@@ -80,7 +80,7 @@ async fn connect(
 
 // Constructs a `fuzz::Input` that can be sent over FIDL, and the socket to write into it.
 fn make_fidl_input(input: &str) -> Result<(fasync::Socket, fuzz::Input)> {
-    let (rx, tx) = zx::Socket::create(zx::SocketOpts::STREAM).context("failed to create socket")?;
+    let (rx, tx) = zx::Socket::create_stream();
     let fidl_input = fuzz::Input { socket: rx, size: input.len() as u64 };
     let tx = fasync::Socket::from_socket(tx).context("failed to covert socket")?;
     Ok((tx, fidl_input))

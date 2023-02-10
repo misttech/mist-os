@@ -224,10 +224,8 @@ impl TestServer {
                                 let spec = spec.clone();
                                 let proxy = proxy.clone();
                                 tasks.push(async move {
-                                    let (stdout_end, stdout) = fuchsia_zircon::Socket::create(
-                                        fuchsia_zircon::SocketOpts::empty(),
-                                    )
-                                    .expect("cannot create socket.");
+                                    let (stdout_end, stdout) =
+                                        fuchsia_zircon::Socket::create_stream();
 
                                     let name = test.name.clone().unwrap_or_default();
 

@@ -266,7 +266,7 @@ mod tests {
             }))
         );
 
-        let (sock1, _sock2) = zx::Socket::create(zx::SocketOpts::empty()).unwrap();
+        let (sock1, _sock2) = zx::Socket::create_stream();
         let event = SuiteEvents::case_stdout(2, sock1).into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));
         assert_matches!(
@@ -277,7 +277,7 @@ mod tests {
             }))
         );
 
-        let (sock1, _sock2) = zx::Socket::create(zx::SocketOpts::empty()).unwrap();
+        let (sock1, _sock2) = zx::Socket::create_stream();
         let event = SuiteEvents::case_stderr(2, sock1).into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));
         assert_matches!(
