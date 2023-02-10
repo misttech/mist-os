@@ -103,7 +103,7 @@ TEST_F(BpfTest, Map) {
 
 TEST_F(BpfTest, PinMap) {
   const char *pin_path = "/sys/fs/bpf/foo";
-  // Hack for the starmium galaxy environment
+  // Hack for the chromiumos galaxy environment
   if (access("/sys/fs/bpf", F_OK) != 0) {
     pin_path = "/var/fs/bpf/foo";
   }

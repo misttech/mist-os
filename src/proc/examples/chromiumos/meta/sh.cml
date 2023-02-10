@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     program: {
-        runner: "starmium",
+        runner: "starnix_chromiumos",
         binary: "/bin/sh",
         args: [ "-i" ],
         user: "root:x:0:0",

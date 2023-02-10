@@ -18,8 +18,9 @@
             url: "fuchsia-pkg://fuchsia.com/stardroid#meta/starnix_kernel.cm",
         },
         {
-            name: "starmium",
-            url: "fuchsia-pkg://fuchsia.com/starmium#meta/starnix_kernel.cm",
+            name: "chromiumos",
+            url: "fuchsia-pkg://fuchsia.com/starmium#meta/chromiumos_galaxy.cm",
+            environment: "#galaxy-env",
         },
         {
             name: "starless",
@@ -69,8 +70,9 @@
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#starmium",
-            path: "/starmium/fuchsia.starnix.galaxy.Controller",
+            from: "#chromiumos",
+            path: "/chromiumos/fuchsia.starnix.galaxy.Controller",
+            dependency: "weak",
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
@@ -98,7 +100,6 @@
                 "#kernels",
                 "#stardroid",
                 "#starless",
-                "#starmium",
             ],
         },
         {
@@ -114,7 +115,6 @@
                 "#kernels",
                 "#stardroid",
                 "#starless",
-                "#starmium",
             ],
             availability: "optional",
         },
@@ -130,7 +130,6 @@
                 "#kernels",
                 "#stardroid",
                 "#starless",
-                "#starmium",
             ],
         },
         {
@@ -139,7 +138,6 @@
             to: [
                 "#stardroid",
                 "#starless",
-                "#starmium",
             ],
             availability: "optional",
         },
@@ -157,8 +155,8 @@
         },
         {
             runner: "starnix",
-            from: "#starmium",
-            as: "starmium",
+            from: "#chromiumos",
+            as: "starnix_chromiumos",
         },
         {
             runner: "starnix",
@@ -186,8 +184,8 @@
                 },
                 {
                     runner: "starnix",
-                    from: "#starmium",
-                    as: "starmium",
+                    from: "#chromiumos",
+                    as: "starnix_chromiumos",
                 },
                 {
                     runner: "starnix",

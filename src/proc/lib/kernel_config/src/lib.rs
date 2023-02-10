@@ -23,6 +23,7 @@ pub const PKG_HANDLE_INFO: fruntime::HandleInfo = fruntime::HandleInfo::new(HAND
 pub const GALAXY_OUTGOING_DIR_HANDLE_INFO: fruntime::HandleInfo =
     fruntime::HandleInfo::new(HANDLE_TYPE, 1);
 
+#[derive(Debug)]
 pub struct KernelStartInfo {
     pub args: fcomponent::CreateChildArgs,
     pub name: String,

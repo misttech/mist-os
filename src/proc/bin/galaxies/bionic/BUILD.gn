@@ -8,12 +8,6 @@ group("bionic") {
   deps = [ ":bionic_package" ]
 }
 
-# Mount point for when we need to mount an image with testcases.
-resource("testcases_mount_point") {
-  sources = [ "//src/proc/bin/galaxies/placeholder" ]
-  outputs = [ "data/testcases/.placeholder" ]
-}
-
 # The system image for the galaxy.
 resource("system_image") {
   sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
@@ -25,8 +19,5 @@ fuchsia_package_with_single_component("bionic_package") {
   package_name = "starbionic"
   component_name = "bionic_galaxy"
 
-  deps = [
-    ":system_image",
-    ":testcases_mount_point",
-  ]
+  deps = [ ":system_image" ]
 }

@@ -23,7 +23,7 @@
                     from: "#starnix_manager",
                 },
                 {
-                    runner: "starmium",
+                    runner: "starnix_chromiumos",
                     from: "#starnix_manager",
                 },
             ],
