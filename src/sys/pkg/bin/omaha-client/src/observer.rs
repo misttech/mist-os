@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    app_set::FuchsiaAppSet,
-    cobalt::notify_cobalt_current_software_distribution,
     fidl::{FidlServer, StateMachineController},
     inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode},
     installer::{FuchsiaInstallError, InstallerFailureReason},
@@ -12,7 +10,7 @@ use crate::{
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy};
 use fuchsia_inspect::Node;
-use futures::{future::LocalBoxFuture, lock::Mutex, prelude::*};
+use futures::{future::LocalBoxFuture, prelude::*};
 use omaha_client::{
     clock,
     common::{ProtocolState, UpdateCheckSchedule},
@@ -39,8 +37,6 @@ where
     protocol_state_node: ProtocolStateNode,
     last_results_node: LastResultsNode,
     last_update_start_time: SystemTime,
-    app_set: Rc<Mutex<FuchsiaAppSet>>,
-    notified_cobalt: bool,
     target_version: Option<String>,
     platform_metrics_emitter: platform::Emitter,
     crash_reporter: Option<crash_report::CrashReportControlHandle>,
@@ -56,8 +52,6 @@ where
         schedule_node: ScheduleNode,
         protocol_state_node: ProtocolStateNode,
         last_results_node: LastResultsNode,
-        app_set: Rc<Mutex<FuchsiaAppSet>>,
-        notified_cobalt: bool,
         platform_metrics_node: Node,
     ) -> Self {
         FuchsiaObserver {
@@ -66,8 +60,6 @@ where
             protocol_state_node,
             last_results_node,
             last_update_start_time: SystemTime::UNIX_EPOCH,
-            app_set,
-            notified_cobalt,
             target_version: None,
             platform_metrics_emitter: platform::Emitter::from_node(platform_metrics_node),
             crash_reporter: None,
@@ -218,22 +210,6 @@ where
         result: &Result<update_check::Response, UpdateCheckError>,
     ) {
         self.last_results_node.add_result(self.last_update_start_time, result);
-
-        // TODO(senj): Remove once channel is in vbmeta.
-        let no_update = result
-            .as_ref()
-            .map(|response| {
-                response
-                    .app_responses
-                    .iter()
-                    .all(|app_response| app_response.result == update_check::Action::NoUpdate)
-            })
-            .unwrap_or(false);
-
-        if !self.notified_cobalt && no_update {
-            notify_cobalt_current_software_distribution(Rc::clone(&self.app_set)).await;
-            self.notified_cobalt = true;
-        }
     }
 
     async fn on_progress_change(&mut self, progress: InstallProgress) {
@@ -255,7 +231,6 @@ where
 mod tests {
     use super::crash_report::assert_signature;
     use super::*;
-    use crate::app_set::{AppIdSource, AppMetadata};
     use crate::fidl::{FidlServerBuilder, MockOrRealStateMachineController};
     use crate::installer::InstallerFailure;
     use anyhow::anyhow;
@@ -267,11 +242,7 @@ mod tests {
     use mock_crash_reporter::{MockCrashReporterService, ThrottleHook};
     use omaha_client::time::MockTimeSource;
     use omaha_client::{
-        common::{App, UserCounting},
-        protocol::{
-            response::{self, Manifest, UpdateCheck},
-            Cohort,
-        },
+        protocol::response::{self, Manifest, UpdateCheck},
         storage::MemStorage,
     };
     use std::{sync::Arc, time::Duration};
@@ -284,41 +255,13 @@ mod tests {
             ProtocolStateNode::new(inspector.root().create_child("protocol_state"));
         let last_results_node = LastResultsNode::new(inspector.root().create_child("last_results"));
         let platform_metrics_node = inspector.root().create_child("platform_metrics");
-        let app_metadata = AppMetadata { appid_source: AppIdSource::VbMetadata };
-        let app_set = Rc::new(Mutex::new(FuchsiaAppSet::new(
-            App::builder().id("id").version([1, 2]).build(),
-            app_metadata,
-        )));
         FuchsiaObserver::new(
             fidl,
             schedule_node,
             protocol_state_node,
             last_results_node,
-            app_set,
-            false,
             platform_metrics_node,
         )
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_notify_cobalt() {
-        let mut observer = new_test_observer().await;
-
-        assert!(!observer.notified_cobalt);
-        observer
-            .on_update_check_result(&Err(UpdateCheckError::InstallPlan(anyhow!("some error"))))
-            .await;
-        assert!(!observer.notified_cobalt);
-
-        let app_response = update_check::AppResponse {
-            app_id: "".to_string(),
-            cohort: Cohort::default(),
-            user_counting: UserCounting::ClientRegulatedByDate(None),
-            result: update_check::Action::NoUpdate,
-        };
-        let result = Ok(update_check::Response { app_responses: vec![app_response] });
-        observer.on_update_check_result(&result).await;
-        assert!(observer.notified_cobalt);
     }
 
     #[fasync::run_singlethreaded(test)]

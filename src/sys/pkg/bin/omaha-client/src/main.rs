@@ -30,7 +30,7 @@ mod observer;
 mod policy;
 mod storage;
 
-use configuration::{ChannelSource, ClientConfiguration};
+use configuration::ClientConfiguration;
 
 #[fuchsia::main]
 pub fn main() -> Result<(), Error> {
@@ -133,12 +133,9 @@ async fn main_inner() -> Result<(), Error> {
     .await;
 
     // Notify Cobalt of the current channel and set the current app id in any feedback reports.
-    let notify_cobalt = channel_data.source == ChannelSource::VbMeta;
-    if notify_cobalt {
-        futures.push(
-            cobalt::notify_cobalt_current_software_distribution(Rc::clone(&app_set)).boxed_local(),
-        );
-    }
+    futures.push(
+        cobalt::notify_cobalt_current_software_distribution(Rc::clone(&app_set)).boxed_local(),
+    );
 
     futures.push(feedback_annotation::publish_ids_to_feedback(Rc::clone(&app_set)).boxed_local());
 
@@ -146,7 +143,7 @@ async fn main_inner() -> Result<(), Error> {
     let fidl = fidl::FidlServer::new(
         state_machine_control,
         stash_ref,
-        Rc::clone(&app_set),
+        app_set,
         apps_node,
         state_node,
         channel_configs,
@@ -161,8 +158,6 @@ async fn main_inner() -> Result<(), Error> {
         schedule_node,
         protocol_state_node,
         last_results_node,
-        app_set,
-        notify_cobalt,
         platform_metrics_node,
     );
 

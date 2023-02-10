@@ -883,8 +883,6 @@ mod stub {
                 schedule_node,
                 protocol_state_node,
                 last_results_node,
-                app_set,
-                true,
                 platform_metrics_node,
             );
             fasync::Task::local(async move {
