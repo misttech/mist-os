@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_DISPLAY_TESTS_FIDL_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/fidl/cpp/message.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/pixelformat.h>
@@ -16,8 +17,8 @@
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-
-#include "src/graphics/display/drivers/display/tests/base.h"
+#include <fbl/vector.h>
+#include <zxtest/zxtest.h>
 
 namespace display {
 
@@ -25,7 +26,7 @@ class TestFidlClient {
  public:
   class Display {
    public:
-    Display(const fuchsia_hardware_display::wire::Info& info);
+    explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
     uint64_t id_;
     fbl::Vector<zx_pixel_format_t> pixel_formats_;
@@ -44,7 +45,8 @@ class TestFidlClient {
 
   ~TestFidlClient();
 
-  bool CreateChannel(zx_handle_t provider, bool is_vc);
+  bool CreateChannel(const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
+                     bool is_vc);
   // Enable vsync for a display and wait for events using |dispatcher|.
   bool Bind(async_dispatcher_t* dispatcher) TA_EXCL(mtx());
 

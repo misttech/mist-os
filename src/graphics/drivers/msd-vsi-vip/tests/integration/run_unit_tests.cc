@@ -34,10 +34,13 @@ TEST(UnitTests, UnitTests) {
 
   test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_VSI);
 
-  auto result = fidl::WireCall<fuchsia_gpu_magma::TestDevice>(test_base->channel()->borrow())
-                    ->GetUnitTestStatus();
-  EXPECT_EQ(ZX_OK, result.status()) << "Device connection lost, check syslog for any errors.";
-  EXPECT_EQ(ZX_OK, result.value().status) << "Tests reported errors, check syslog.";
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{
+      test_base->channel().channel()->borrow()};
+  const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
+  ASSERT_TRUE(result.ok()) << result.FormatDescription();
+  const fidl::WireResponse response = result.value();
+  ASSERT_EQ(response.status, ZX_OK) << zx_status_get_string(response.status);
 
   test_base->ShutdownDevice();
   test_base.reset();

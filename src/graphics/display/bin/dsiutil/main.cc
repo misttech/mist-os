@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/zx/channel.h>
@@ -79,19 +79,12 @@ int main(int argc, char* argv[]) {
   }
 
   // connect to the DSI fidl service
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    printf("Could not create channel (%d)\n", status);
+  zx::result client_end = component::Connect<fidl_dsi::DsiBase>(dev_path);
+  if (client_end.is_error()) {
+    printf("Could not create channel (%d)\n", client_end.error_value());
     return -1;
   }
-
-  status = fdio_service_connect(dev_path.c_str(), remote.release());
-  if (status != ZX_OK) {
-    printf("Failed to connect to dsi-base %d\n", status);
-    return -1;
-  }
-  fidl::WireSyncClient<fidl_dsi::DsiBase> client(std::move(local));
+  fidl::WireSyncClient client(std::move(client_end.value()));
 
   // issue commands
   uint8_t tbuf[4] = {0, 0, 0, 0};

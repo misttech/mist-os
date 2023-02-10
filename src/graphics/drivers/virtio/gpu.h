@@ -47,9 +47,10 @@ class GpuDevice : public Device,
 
   const char* tag() const override { return "virtio-gpu"; }
 
-  zx_status_t GetVmoAndStride(image_t* image, zx_unowned_handle_t handle, uint32_t index,
-                              zx::vmo* vmo_out, size_t* offset_out, uint32_t* pixel_size_out,
-                              uint32_t* row_bytes_out) const;
+  zx_status_t GetVmoAndStride(image_t* image,
+                              fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> client_end,
+                              uint32_t index, zx::vmo* vmo_out, size_t* offset_out,
+                              uint32_t* pixel_size_out, uint32_t* row_bytes_out) const;
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);

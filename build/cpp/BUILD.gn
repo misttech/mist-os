@@ -201,62 +201,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/graphics/display/bin/dsiutil",
-
-    #------------------
-    #------------------
-    "//src/graphics/display/drivers/display:shared",
-
-    #------------------
-    #------------------
-    "//src/graphics/display/drivers/display/tests:base",
-
-    #------------------
-    #------------------
-    "//src/graphics/display/drivers/display/tests:display-core-unittests",
-
-    #------------------
-    #------------------
-    "//src/graphics/display/testing",
-
-    #------------------
-    #------------------
-    "//src/graphics/drivers/msd-arm-mali/tests/integration:msd_arm_mali_integration_tests",
-
-    #------------------
-    #------------------
-    "//src/graphics/drivers/msd-intel-gen/tests/integration:msd_intel_gen_integration_tests",
-
-    #------------------
-    #------------------
-    "//src/graphics/drivers/msd-vsi-vip/tests/integration:msd_vsi_vip_integration_tests",
-
-    #------------------
-    #------------------
-    "//src/graphics/drivers/virtio:gpu_lib",
-
-    #------------------
-    #------------------
-    "//src/graphics/drivers/virtio:virtio-gpu-test",
-
-    #------------------
-    #------------------
-    "//src/graphics/lib/magma/src/tools:magma-info-bin",
-
-    #------------------
-    #------------------
-    "//src/graphics/lib/magma/tests/helper:test_device_helper",
-
-    #------------------
-    #------------------
-    "//src/graphics/tests/vkloop",
-
-    #------------------
-    #------------------
-    "//src/graphics/tests/vkloop:vkloop_bin",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }

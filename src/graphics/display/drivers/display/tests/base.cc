@@ -81,10 +81,11 @@ bool TestBase::RunLoopWithTimeoutOrUntil(fit::function<bool()>&& condition, zx::
   return result->load();
 }
 
-fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> TestBase::sysmem_fidl() {
+const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& TestBase::sysmem_fidl() {
   return tree_->sysmem_client();
 }
-
-zx::unowned_channel TestBase::display_fidl() { return tree_->display_client(); }
+const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& TestBase::display_fidl() {
+  return tree_->display_client();
+}
 
 }  // namespace display

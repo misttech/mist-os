@@ -17,12 +17,15 @@
 TEST(TestIcd, IcdList) {
   magma::TestDeviceBase test_device(MAGMA_VENDOR_ID_VSI);
 
-  auto rsp =
-      fidl::WireCall<fuchsia_gpu_magma::IcdLoaderDevice>(test_device.channel())->GetIcdList();
-  EXPECT_TRUE(rsp.ok());
-  EXPECT_EQ(rsp.value().icd_list.count(), 2u);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::IcdLoaderDevice> channel{
+      test_device.channel().channel()->borrow()};
+  const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
+  EXPECT_TRUE(result.ok()) << result.FormatDescription();
+  const fidl::WireResponse response = result.value();
+  EXPECT_EQ(response.icd_list.count(), 2u);
 
-  const auto& icd_item = rsp.value().icd_list[0];
+  const auto& icd_item = response.icd_list[0];
 
   EXPECT_TRUE(icd_item.has_flags());
   const auto& flags = icd_item.flags();

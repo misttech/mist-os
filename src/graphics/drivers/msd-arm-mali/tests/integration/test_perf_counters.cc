@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <lib/fdio/directory.h>
+#include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <poll.h>
@@ -39,13 +39,12 @@ class TestConnection : public magma::TestDeviceBase {
 
   bool AccessPerfCounters() {
     for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu-performance-counters")) {
-      zx::channel server_end, client_end;
-      zx::channel::create(0, &server_end, &client_end);
+      zx::result client_end =
+          component::Connect<fuchsia_gpu_magma::PerformanceCounterAccess>(p.path().c_str());
+      EXPECT_TRUE(client_end.is_ok()) << client_end.status_string();
 
-      zx_status_t zx_status = fdio_service_connect(p.path().c_str(), server_end.release());
-      EXPECT_EQ(ZX_OK, zx_status);
-      magma_status_t status =
-          magma_connection_enable_performance_counter_access(connection_, client_end.release());
+      magma_status_t status = magma_connection_enable_performance_counter_access(
+          connection_, client_end.value().TakeChannel().release());
       EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_ACCESS_DENIED);
       if (status == MAGMA_STATUS_OK) {
         return true;

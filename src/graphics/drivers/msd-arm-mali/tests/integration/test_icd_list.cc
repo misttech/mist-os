@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
-#include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/channel.h>
 
@@ -23,12 +22,16 @@ namespace {
 
 TEST(Mali, IcdList) {
   magma::TestDeviceBase test_device(MAGMA_VENDOR_ID_MALI);
-  auto rsp =
-      fidl::WireCall<fuchsia_gpu_magma::IcdLoaderDevice>(test_device.channel())->GetIcdList();
-  EXPECT_TRUE(rsp.ok());
-  EXPECT_EQ(rsp.value().icd_list.count(), 3u);
+
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::IcdLoaderDevice> channel{
+      test_device.channel().channel()->borrow()};
+  const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
+  EXPECT_TRUE(result.ok()) << result.FormatDescription();
+  const fidl::WireResponse response = result.value();
+  EXPECT_EQ(response.icd_list.count(), 3u);
   {
-    auto& icd_item = rsp.value().icd_list[0];
+    auto& icd_item = response.icd_list[0];
     EXPECT_TRUE(icd_item.has_flags());
     EXPECT_TRUE(icd_item.flags() & fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan);
     std::string res_string(icd_item.component_url().get());
@@ -37,7 +40,7 @@ TEST(Mali, IcdList) {
     EXPECT_THAT(res_string, testing::EndsWith("_test#meta/vulkan.cm"));
   }
   {
-    auto& icd_item = rsp.value().icd_list[1];
+    auto& icd_item = response.icd_list[1];
     std::string res_string(icd_item.component_url().get());
     EXPECT_EQ(0u, res_string.find("fuchsia-pkg://fuchsia.com/libvulkan_arm_mali_"));
     EXPECT_THAT(res_string, testing::EndsWith("_test#meta/vulkan.cm"));

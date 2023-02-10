@@ -27,11 +27,11 @@ TEST(DisplayTest, ClientVSyncOk) {
   constexpr uint64_t kControllerStampValue = 1u;
   constexpr uint64_t kClientStampValue = 2u;
 
-  zx::channel server_chl, client_chl;
-  zx_status_t status = zx::channel::create(0, &server_chl, &client_chl);
-  EXPECT_OK(status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_chl));
+  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
@@ -39,10 +39,9 @@ TEST(DisplayTest, ClientVSyncOk) {
       .client_stamp = {.value = kClientStampValue},
   });
 
-  status = clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValue});
-  EXPECT_OK(status);
+  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValue}));
 
-  fidl::WireSyncClient<fuchsia_hardware_display::Controller> client(std::move(client_chl));
+  fidl::WireSyncClient client(std::move(client_end));
 
   class EventHandler
       : public fidl::testing::WireSyncEventHandlerTestBase<fuchsia_hardware_display::Controller> {
@@ -73,28 +72,26 @@ TEST(DisplayTest, ClientVSyncOk) {
 }
 
 TEST(DisplayTest, ClientVSynPeerClosed) {
-  zx::channel server_chl, client_chl;
-  zx_status_t status = zx::channel::create(0, &server_chl, &client_chl);
-  EXPECT_OK(status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_chl));
+  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
-  client_chl.reset();
-  status = clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO);
-  EXPECT_TRUE(status == ZX_OK);
+  client_end.reset();
+  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO));
   clientproxy.CloseTest();
 }
 
 TEST(DisplayTest, ClientVSyncNotSupported) {
-  zx::channel server_chl, client_chl;
-  zx_status_t status = zx::channel::create(0, &server_chl, &client_chl);
-  EXPECT_OK(status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_chl));
+  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
-  status = clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO);
-  EXPECT_TRUE(status == ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO));
   clientproxy.CloseTest();
 }
 
@@ -103,11 +100,11 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
-  zx::channel server_chl, client_chl;
-  zx_status_t status = zx::channel::create(0, &server_chl, &client_chl);
-  EXPECT_OK(status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_chl));
+  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
   clientproxy.EnableVsync(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
@@ -117,8 +114,8 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
     });
   }
 
-  status = clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValues.back()});
-  EXPECT_EQ(status, ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
+                clientproxy.OnDisplayVsync(0, 0, {.value = kControllerStampValues.back()}));
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.

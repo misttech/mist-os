@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/channel.h>
 
@@ -109,7 +108,7 @@ class TestDeviceBase {
     }
   }
 
-  zx::unowned_channel channel() { return zx::unowned_channel(device_controller_.channel()); }
+  const fidl::UnownedClientEnd<fuchsia_device::Controller>& channel() { return device_controller_; }
 
   magma_device_t device() const { return device_; }
 

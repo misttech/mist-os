@@ -106,12 +106,14 @@ fidl::ClientEnd<fuchsia_io::Directory> MockDisplayDeviceTree::SetUpPDevFidlServe
   return std::move(endpoints->client);
 }
 
-zx::unowned_channel MockDisplayDeviceTree::display_client() {
-  return display_provider_client_.client_end().borrow().channel();
+const fidl::WireSyncClient<fuchsia_hardware_display::Provider>&
+MockDisplayDeviceTree::display_client() {
+  return display_provider_client_;
 }
 
-fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> MockDisplayDeviceTree::sysmem_client() {
-  return sysmem_client_.client_end().borrow();
+const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>&
+MockDisplayDeviceTree::sysmem_client() {
+  return sysmem_client_;
 }
 
 void MockDisplayDeviceTree::AsyncShutdown() {

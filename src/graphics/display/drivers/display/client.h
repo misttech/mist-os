@@ -181,12 +181,12 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
 
   // This is used for testing
   Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-         uint32_t id, zx::channel server_channel);
+         uint32_t id, fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   ~Client() override;
 
   fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Controller>, zx_status_t> Init(
-      zx::channel server_channel);
+      fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   void OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
                          const uint64_t* displays_removed, size_t removed_count);
@@ -199,7 +199,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   // This is used for testing
   void TearDownTest();
 
-  bool IsValid() { return server_handle_ != ZX_HANDLE_INVALID; }
+  bool IsValid() const { return running_; }
   uint32_t id() const { return id_; }
   void CaptureCompleted();
 
@@ -299,7 +299,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   const bool use_kernel_framebuffer_;
   uint64_t console_fb_display_id_ = -1;
   const uint32_t id_;
-  zx_handle_t server_handle_;
+  bool running_;
   uint64_t next_image_id_ = 1;         // Only INVALID_ID == 0 is invalid
   uint64_t next_capture_image_id = 1;  // Only INVALID_ID == 0 is invalid
   Image::Map images_;
@@ -367,10 +367,11 @@ class ClientProxy {
 
   // This is used for testing
   ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer, uint32_t client_id,
-              zx::channel server_channel);
+              fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   ~ClientProxy();
-  zx_status_t Init(inspect::Node* parent_node, zx::channel server_channel);
+  zx_status_t Init(inspect::Node* parent_node,
+                   fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   // Schedule a task on the controller loop to close this ClientProxy and
   // have it be freed.

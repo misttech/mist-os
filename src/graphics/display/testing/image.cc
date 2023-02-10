@@ -7,10 +7,7 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/unsafe.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zx/channel.h>
@@ -20,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <zircon/process.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
@@ -28,7 +26,6 @@
 #include <fbl/algorithm.h>
 
 #include "utils.h"
-#include "zircon/status.h"
 
 static constexpr uint32_t kRenderPeriod = 120;
 
@@ -63,36 +60,44 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t 
 Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t width,
                      uint32_t height, zx_pixel_format_t format, Pattern pattern, uint32_t fg_color,
                      uint32_t bg_color, uint64_t modifier) {
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator;
-  {
-    zx::channel client, server;
-    if (zx::channel::create(0, &client, &server) != ZX_OK ||
-        fdio_service_connect("/svc/fuchsia.sysmem.Allocator", server.release()) != ZX_OK) {
-      fprintf(stderr, "Failed to connect to sysmem\n");
-      return nullptr;
-    }
-    allocator = fidl::WireSyncClient<fuchsia_sysmem::Allocator>(std::move(client));
+  zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
+  if (client_end.is_error()) {
+    fprintf(stderr, "Failed to connect to sysmem: %s\n", client_end.status_string());
+    return nullptr;
   }
+  fidl::WireSyncClient allocator{std::move(client_end.value())};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token;
   {
-    zx::channel client, server;
-    if (zx::channel::create(0, &client, &server) != ZX_OK ||
-        !allocator->AllocateSharedCollection(std::move(server)).ok()) {
-      fprintf(stderr, "Failed to allocate shared collection\n");
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    if (endpoints.is_error()) {
+      fprintf(stderr, "Failed to allocate shared collection: %s\n", endpoints.status_string());
       return nullptr;
     }
-    token = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>(std::move(client));
+    auto& [client, server] = endpoints.value();
+    const fidl::OneWayStatus result = allocator->AllocateSharedCollection(std::move(server));
+    if (!result.ok()) {
+      fprintf(stderr, "Failed to allocate shared collection: %s\n",
+              result.FormatDescription().c_str());
+      return nullptr;
+    }
+    token.Bind(std::move(client));
   }
-  zx_handle_t display_token_handle;
+  fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> display_token_handle;
   {
-    zx::channel client, server;
-    if (zx::channel::create(0, &client, &server) != ZX_OK ||
-        !token->Duplicate(/*rights_attenuation_mask=*/0xffffffff, std::move(server)).ok()) {
-      fprintf(stderr, "Failed to duplicate token\n");
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    if (endpoints.is_error()) {
+      fprintf(stderr, "Failed to duplicate token: %s\n", endpoints.status_string());
       return nullptr;
     }
-    display_token_handle = client.release();
+    auto& [client, server] = endpoints.value();
+    const fidl::OneWayStatus result =
+        token->Duplicate(/*rights_attenuation_mask=*/0xffffffff, std::move(server));
+    if (!result.ok()) {
+      fprintf(stderr, "Failed to duplicate token: %s\n", result.FormatDescription().c_str());
+      return nullptr;
+    }
+    display_token_handle = std::move(client);
   }
 
   static uint32_t next_collection_id = fhd::wire::kInvalidDispId + 1;
@@ -101,7 +106,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
     fprintf(stderr, "Failed to sync token\n");
     return nullptr;
   }
-  auto import_result = dc->ImportBufferCollection(collection_id, zx::channel(display_token_handle));
+  auto import_result = dc->ImportBufferCollection(collection_id, std::move(display_token_handle));
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     fprintf(stderr, "Failed to import buffer collection\n");
     return nullptr;
@@ -120,13 +125,19 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection;
   {
-    zx::channel client, server;
-    if (zx::channel::create(0, &client, &server) != ZX_OK ||
-        !allocator->BindSharedCollection(token.TakeClientEnd(), std::move(server)).ok()) {
-      fprintf(stderr, "Failed to bind shared collection\n");
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+    if (endpoints.is_error()) {
+      fprintf(stderr, "Failed to bind shared collection: %s\n", endpoints.status_string());
       return nullptr;
     }
-    collection = fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>(std::move(client));
+    auto& [client, server] = endpoints.value();
+    const fidl::OneWayStatus result =
+        allocator->BindSharedCollection(token.TakeClientEnd(), std::move(server));
+    if (!result.ok()) {
+      fprintf(stderr, "Failed to bind shared collection: %s\n", result.FormatDescription().c_str());
+      return nullptr;
+    }
+    collection.Bind(std::move(client));
   }
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};

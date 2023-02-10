@@ -754,9 +754,10 @@ static void PrintChannelKoids(bool is_vc, const zx::channel& channel) {
          info.related_koid, info.koid);
 }
 
-zx_status_t Controller::CreateClient(bool is_vc, zx::channel client_channel,
-                                     fit::function<void()> on_client_dead) {
-  PrintChannelKoids(is_vc, client_channel);
+zx_status_t Controller::CreateClient(
+    bool is_vc, fidl::ServerEnd<fidl_display::Controller> controller_server_end,
+    fit::function<void()> on_display_client_dead) {
+  PrintChannelKoids(is_vc, controller_server_end.channel());
   fbl::AllocChecker ac;
   std::unique_ptr<async::Task> task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
@@ -782,9 +783,9 @@ zx_status_t Controller::CreateClient(bool is_vc, zx::channel client_channel,
   bool use_kernel_framebuffer = is_vc && kernel_framebuffer_enabled_;
 
   auto client = std::make_unique<ClientProxy>(this, is_vc, use_kernel_framebuffer,
-                                              next_client_id_++, std::move(on_client_dead));
+                                              next_client_id_++, std::move(on_display_client_dead));
 
-  zx_status_t status = client->Init(&root_, std::move(client_channel));
+  zx_status_t status = client->Init(&root_, std::move(controller_server_end));
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Failed to init client %d", status);
     return status;
@@ -838,13 +839,13 @@ zx_status_t Controller::CreateClient(bool is_vc, zx::channel client_channel,
 }
 
 void Controller::OpenVirtconController(OpenVirtconControllerRequestView request,
-                                       OpenVirtconControllerCompleter::Sync& _completer) {
-  _completer.Reply(CreateClient(/*is_vc=*/true, request->controller.TakeChannel()));
+                                       OpenVirtconControllerCompleter::Sync& completer) {
+  completer.Reply(CreateClient(/*is_vc=*/true, std::move(request->controller)));
 }
 
 void Controller::OpenController(OpenControllerRequestView request,
-                                OpenControllerCompleter::Sync& _completer) {
-  _completer.Reply(CreateClient(/*is_vc=*/false, request->controller.TakeChannel()));
+                                OpenControllerCompleter::Sync& completer) {
+  completer.Reply(CreateClient(/*is_vc=*/false, std::move(request->controller)));
 }
 
 void Controller::OnVsyncMonitor() {

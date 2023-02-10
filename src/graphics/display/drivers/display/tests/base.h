@@ -35,8 +35,8 @@ class TestBase : public zxtest::Test {
   Controller* controller() { return tree_->controller(); }
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> sysmem_fidl();
-  zx::unowned_channel display_fidl();
+  const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_fidl();
+  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_fidl();
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
   bool RunLoopWithTimeoutOrUntil(fit::function<bool()>&& condition,

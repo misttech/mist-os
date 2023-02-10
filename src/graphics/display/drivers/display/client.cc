@@ -77,17 +77,17 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
       node_.CreateBool("pending_apply_layer_change", pending_apply_layer_change_);
 }
 
-void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) {
+void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
-    _completer.Reply(ZX_ERR_INVALID_ARGS, 0);
+    completer.Reply(ZX_ERR_INVALID_ARGS, 0);
     return;
   }
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
 
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
-    _completer.Reply(ZX_ERR_SHOULD_WAIT, 0);
+    completer.Reply(ZX_ERR_SHOULD_WAIT, 0);
     return;
   }
 
@@ -100,7 +100,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   zx_status_t status = controller_->dc()->ImportImage(
       &dc_image, collection.client_end().borrow().channel()->get(), request->index);
   if (status != ZX_OK) {
-    _completer.Reply(status, 0);
+    completer.Reply(status, 0);
     return;
   }
 
@@ -112,20 +112,20 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     ZX_ASSERT(it->second.kernel.is_valid());
     auto res = it->second.kernel->WaitForBuffersAllocated();
     if (!res.ok() || res.value().status != ZX_OK) {
-      _completer.Reply(ZX_ERR_NO_MEMORY, 0);
+      completer.Reply(ZX_ERR_NO_MEMORY, 0);
       return;
     }
     fuchsia_sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
 
     if (!info.settings.has_image_format_constraints || request->index >= info.buffer_count) {
-      _completer.Reply(ZX_ERR_OUT_OF_RANGE, 0);
+      completer.Reply(ZX_ERR_OUT_OF_RANGE, 0);
       return;
     }
     uint32_t minimum_row_bytes;
     if (!ImageFormatMinimumRowBytes(info.settings.image_format_constraints, dc_image.width,
                                     &minimum_row_bytes)) {
       zxlogf(DEBUG, "Cannot determine minimum row bytes.\n");
-      _completer.Reply(ZX_ERR_INVALID_ARGS, 0);
+      completer.Reply(ZX_ERR_INVALID_ARGS, 0);
       return;
     }
     vmo = std::move(info.buffers[request->index].vmo);
@@ -137,7 +137,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
       new (&ac) Image(controller_, dc_image, std::move(vmo), stride, &proxy_->node(), id_));
   if (!ac.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
-    _completer.Reply(ZX_ERR_NO_MEMORY, 0);
+    completer.Reply(ZX_ERR_NO_MEMORY, 0);
     return;
   }
 
@@ -154,21 +154,20 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   release_image.cancel();
   images_.insert(std::move(image));
 
-  _completer.Reply(0, image_id);
+  completer.Reply(0, image_id);
 }
 
-void Client::ImportImage2(ImportImage2RequestView request,
-                          ImportImage2Completer::Sync& _completer) {
+void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer::Sync& completer) {
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
-    _completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   // Can't import an image with an id that's already in use.
   auto image_check = images_.find(request->image_id);
   if (image_check.IsValid()) {
-    _completer.Reply(ZX_ERR_ALREADY_EXISTS);
+    completer.Reply(ZX_ERR_ALREADY_EXISTS);
     return;
   }
 
@@ -176,7 +175,7 @@ void Client::ImportImage2(ImportImage2RequestView request,
 
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
-    _completer.Reply(ZX_ERR_SHOULD_WAIT);
+    completer.Reply(ZX_ERR_SHOULD_WAIT);
     return;
   }
 
@@ -189,7 +188,7 @@ void Client::ImportImage2(ImportImage2RequestView request,
   zx_status_t status = controller_->dc()->ImportImage(
       &dc_image, collection.client_end().borrow().channel()->get(), request->index);
   if (status != ZX_OK) {
-    _completer.Reply(status);
+    completer.Reply(status);
     return;
   }
 
@@ -201,20 +200,20 @@ void Client::ImportImage2(ImportImage2RequestView request,
     ZX_ASSERT(it->second.kernel.is_valid());
     auto res = it->second.kernel->WaitForBuffersAllocated();
     if (!res.ok() || res.value().status != ZX_OK) {
-      _completer.Reply(ZX_ERR_NO_MEMORY);
+      completer.Reply(ZX_ERR_NO_MEMORY);
       return;
     }
     fuchsia_sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
 
     if (!info.settings.has_image_format_constraints || request->index >= info.buffer_count) {
-      _completer.Reply(ZX_ERR_OUT_OF_RANGE);
+      completer.Reply(ZX_ERR_OUT_OF_RANGE);
       return;
     }
     uint32_t minimum_row_bytes;
     if (!ImageFormatMinimumRowBytes(info.settings.image_format_constraints, dc_image.width,
                                     &minimum_row_bytes)) {
       zxlogf(DEBUG, "Cannot determine minimum row bytes.\n");
-      _completer.Reply(ZX_ERR_INVALID_ARGS);
+      completer.Reply(ZX_ERR_INVALID_ARGS);
       return;
     }
     vmo = std::move(info.buffers[request->index].vmo);
@@ -226,7 +225,7 @@ void Client::ImportImage2(ImportImage2RequestView request,
       new (&ac) Image(controller_, dc_image, std::move(vmo), stride, &proxy_->node(), id_));
   if (!ac.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
-    _completer.Reply(ZX_ERR_NO_MEMORY);
+    completer.Reply(ZX_ERR_NO_MEMORY);
     return;
   }
 
@@ -235,11 +234,11 @@ void Client::ImportImage2(ImportImage2RequestView request,
   release_image.cancel();
   images_.insert(std::move(image));
 
-  _completer.Reply(0);
+  completer.Reply(0);
 }
 
 void Client::ReleaseImage(ReleaseImageRequestView request,
-                          ReleaseImageCompleter::Sync& _completer) {
+                          ReleaseImageCompleter::Sync& /*_completer*/) {
   auto image = images_.find(request->image_id);
   if (!image.IsValid()) {
     return;
@@ -250,7 +249,8 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
   }
 }
 
-void Client::ImportEvent(ImportEventRequestView request, ImportEventCompleter::Sync& _completer) {
+void Client::ImportEvent(ImportEventRequestView request,
+                         ImportEventCompleter::Sync& /*_completer*/) {
   if (request->id == INVALID_ID) {
     zxlogf(ERROR, "Cannot import events with an invalid ID #%i", INVALID_ID);
     TearDown();
@@ -260,15 +260,15 @@ void Client::ImportEvent(ImportEventRequestView request, ImportEventCompleter::S
 }
 
 void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
-                                    ImportBufferCollectionCompleter::Sync& _completer) {
+                                    ImportBufferCollectionCompleter::Sync& completer) {
   if (!sysmem_allocator_.is_valid()) {
-    _completer.Reply(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
   // TODO: Switch to .contains() when C++20.
   if (collection_map_.count(request->collection_id)) {
-    _completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -277,52 +277,59 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   // Make a second handle to represent the kernel's usage of the buffer as a
   // framebuffer, so we can set constraints and get VMOs for zx_framebuffer_set_range.
   if (use_kernel_framebuffer_) {
-    zx::channel vc_token_server, vc_token_client;
-    zx::channel::create(0, &vc_token_server, &vc_token_client);
-    if (!fidl::WireCall<fuchsia_sysmem::BufferCollectionToken>(
-             request->collection_token.borrow().channel())
-             ->Duplicate(UINT32_MAX, std::move(vc_token_server))
-             .ok()) {
-      _completer.Reply(ZX_ERR_INTERNAL);
+    zx::result vc_token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    if (vc_token_endpoints.is_error()) {
+      completer.Reply(ZX_ERR_INTERNAL);
       return;
     }
-    if (!fidl::WireCall<fuchsia_sysmem::BufferCollectionToken>(
-             request->collection_token.borrow().channel())
-             ->Sync()
+    auto& [vc_token_client, vc_token_server] = vc_token_endpoints.value();
+    if (!fidl::WireCall(request->collection_token)
+             ->Duplicate(UINT32_MAX, std::move(vc_token_server))
              .ok()) {
-      _completer.Reply(ZX_ERR_INTERNAL);
+      completer.Reply(ZX_ERR_INTERNAL);
+      return;
+    }
+    if (!fidl::WireCall(request->collection_token)->Sync().ok()) {
+      completer.Reply(ZX_ERR_INTERNAL);
       return;
     }
 
-    zx::channel collection_server, collection_client;
-    zx::channel::create(0, &collection_server, &collection_client);
+    zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+    if (collection_endpoints.is_error()) {
+      completer.Reply(ZX_ERR_INTERNAL);
+      return;
+    }
+    auto& [collection_client, collection_server] = collection_endpoints.value();
     if (!sysmem_allocator_
              ->BindSharedCollection(std::move(vc_token_client), std::move(collection_server))
              .ok()) {
-      _completer.Reply(ZX_ERR_INTERNAL);
+      completer.Reply(ZX_ERR_INTERNAL);
       return;
     }
     vc_collection.Bind(std::move(collection_client));
   }
 
-  zx::channel collection_server, collection_client;
-  zx::channel::create(0, &collection_server, &collection_client);
+  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  if (collection_endpoints.is_error()) {
+    completer.Reply(ZX_ERR_INTERNAL);
+    return;
+  }
+  auto& [collection_client, collection_server] = collection_endpoints.value();
   if (!sysmem_allocator_
-           ->BindSharedCollection(request->collection_token.TakeChannel(),
+           ->BindSharedCollection(std::move(request->collection_token),
                                   std::move(collection_server))
            .ok()) {
-    _completer.Reply(ZX_ERR_INTERNAL);
+    completer.Reply(ZX_ERR_INTERNAL);
     return;
   }
 
-  collection_map_[request->collection_id] = Collections{
-      fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>(std::move(collection_client)),
-      std::move(vc_collection)};
-  _completer.Reply(ZX_OK);
+  collection_map_[request->collection_id] =
+      Collections{fidl::WireSyncClient(std::move(collection_client)), std::move(vc_collection)};
+  completer.Reply(ZX_OK);
 }
 
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
-                                     ReleaseBufferCollectionCompleter::Sync& _completer) {
+                                     ReleaseBufferCollectionCompleter::Sync& /*_completer*/) {
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
     return;
@@ -339,10 +346,10 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
 
 void Client::SetBufferCollectionConstraints(
     SetBufferCollectionConstraintsRequestView request,
-    SetBufferCollectionConstraintsCompleter::Sync& _completer) {
+    SetBufferCollectionConstraintsCompleter::Sync& completer) {
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
-    _completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
   image_t dc_image;
@@ -398,22 +405,22 @@ void Client::SetBufferCollectionConstraints(
     image_constraints.display_height_divisor = 1;
 
     if (image_constraints.pixel_format.type != fuchsia_sysmem::wire::PixelFormatType::kInvalid) {
-      _completer.Reply(it->second.kernel->SetConstraints(true, constraints).status());
+      completer.Reply(it->second.kernel->SetConstraints(true, constraints).status());
       return;
     }
   }
 
-  _completer.Reply(status);
+  completer.Reply(status);
 }
 
 void Client::ReleaseEvent(ReleaseEventRequestView request,
-                          ReleaseEventCompleter::Sync& _completer) {
+                          ReleaseEventCompleter::Sync& /*_completer*/) {
   fences_.ReleaseEvent(request->id);
 }
 
-void Client::CreateLayer(CreateLayerCompleter::Sync& _completer) {
+void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   if (layers_.size() == kMaxLayers) {
-    _completer.Reply(ZX_ERR_NO_RESOURCES, 0);
+    completer.Reply(ZX_ERR_NO_RESOURCES, 0);
     return;
   }
 
@@ -422,17 +429,17 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& _completer) {
   auto new_layer = fbl::make_unique_checked<Layer>(&ac, layer_id);
   if (!ac.check()) {
     --layer_id;
-    _completer.Reply(ZX_ERR_NO_MEMORY, 0);
+    completer.Reply(ZX_ERR_NO_MEMORY, 0);
     return;
   }
 
   layers_.insert(std::move(new_layer));
 
-  _completer.Reply(ZX_OK, layer_id);
+  completer.Reply(ZX_OK, layer_id);
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
-                          DestroyLayerCompleter::Sync& _completer) {
+                          DestroyLayerCompleter::Sync& /*_completer*/) {
   auto layer = layers_.find(request->layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "Tried to destroy invalid layer %ld", request->layer_id);
@@ -449,7 +456,7 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 }
 
 void Client::ImportGammaTable(ImportGammaTableRequestView request,
-                              ImportGammaTableCompleter::Sync& _completer) {
+                              ImportGammaTableCompleter::Sync& /*_completer*/) {
   fbl::AllocChecker ac;
   auto gt = fbl::AdoptRef(new (&ac) GammaTables(request->r, request->g, request->b));
   if (!ac.check()) {
@@ -460,12 +467,12 @@ void Client::ImportGammaTable(ImportGammaTableRequestView request,
 }
 
 void Client::ReleaseGammaTable(ReleaseGammaTableRequestView request,
-                               ReleaseGammaTableCompleter::Sync& _completer) {
+                               ReleaseGammaTableCompleter::Sync& /*_completer*/) {
   gamma_table_map_.erase(request->gamma_table_id);
 }
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
-                            SetDisplayModeCompleter::Sync& _completer) {
+                            SetDisplayModeCompleter::Sync& /*_completer*/) {
   auto config = configs_.find(request->display_id);
   if (!config.IsValid()) {
     return;
@@ -496,7 +503,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 }
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
-                                       SetDisplayColorConversionCompleter::Sync& _completer) {
+                                       SetDisplayColorConversionCompleter::Sync& /*_completer*/) {
   auto config = configs_.find(request->display_id);
   if (!config.IsValid()) {
     return;
@@ -529,7 +536,7 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 }
 
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
-                              SetDisplayLayersCompleter::Sync& _completer) {
+                              SetDisplayLayersCompleter::Sync& /*_completer*/) {
   auto config = configs_.find(request->display_id);
   if (!config.IsValid()) {
     return;
@@ -556,7 +563,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
 }
 
 void Client::SetDisplayGammaTable(SetDisplayGammaTableRequestView request,
-                                  SetDisplayGammaTableCompleter::Sync& _completer) {
+                                  SetDisplayGammaTableCompleter::Sync& /*_completer*/) {
   auto config = configs_.find(request->display_id);
   if (!config.IsValid()) {
     return;
@@ -714,7 +721,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   // no Reply defined
 }
 
-void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) {
+void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
   fhd::wire::ConfigResult res;
   std::vector<fhd::wire::ClientCompositionOp> ops;
 
@@ -750,7 +757,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
     pending_config_valid_ = true;
   }
 
-  _completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
+  completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
 }
 
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
@@ -881,22 +888,22 @@ void Client::SetVirtconMode(SetVirtconModeRequestView request,
   // no Reply defined
 }
 
-void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& _completer) {
-  _completer.ReplySuccess(controller_->dc_capture() != nullptr);
+void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
+  completer.ReplySuccess(controller_->dc_capture() != nullptr);
 }
 
 void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
-                                   ImportImageForCaptureCompleter::Sync& _completer) {
+                                   ImportImageForCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture.
   if (controller_->dc_capture() == nullptr) {
-    _completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
   // Ensure a previously imported collection id is being used for import.
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
-    _completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -904,7 +911,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
   auto check_status = collection->CheckBuffersAllocated();
   if (!check_status.ok() || check_status.value().status != ZX_OK) {
-    _completer.ReplyError(ZX_ERR_SHOULD_WAIT);
+    completer.ReplyError(ZX_ERR_SHOULD_WAIT);
     return;
   }
 
@@ -921,36 +928,35 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
     fbl::AllocChecker ac;
     auto image = fbl::AdoptRef(new (&ac) Image(controller_, capture_image, &proxy_->node(), id_));
     if (!ac.check()) {
-      _completer.ReplyError(ZX_ERR_NO_MEMORY);
+      completer.ReplyError(ZX_ERR_NO_MEMORY);
       return;
     }
     image->id = next_capture_image_id++;
-    _completer.ReplySuccess(image->id);
+    completer.ReplySuccess(image->id);
     release_image.cancel();
     capture_images_.insert(std::move(image));
   } else {
-    _completer.ReplyError(status);
+    completer.ReplyError(status);
   }
 }
 
-void Client::StartCapture(StartCaptureRequestView request,
-                          StartCaptureCompleter::Sync& _completer) {
+void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture.
   if (controller_->dc_capture() == nullptr) {
-    _completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
   // Don't start capture if one is in progress
   if (current_capture_image_ != INVALID_ID) {
-    _completer.ReplyError(ZX_ERR_SHOULD_WAIT);
+    completer.ReplyError(ZX_ERR_SHOULD_WAIT);
     return;
   }
 
   // Ensure we have a capture fence for the request signal event.
   auto signal_fence = fences_.GetFence(request->signal_event_id);
   if (signal_fence == nullptr) {
-    _completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -958,7 +964,7 @@ void Client::StartCapture(StartCaptureRequestView request,
   auto image = capture_images_.find(request->image_id);
   if (!image.IsValid()) {
     zxlogf(ERROR, "Invalid Capture Image ID requested for capture");
-    _completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -967,9 +973,9 @@ void Client::StartCapture(StartCaptureRequestView request,
   if (status == ZX_OK) {
     fbl::AutoLock lock(controller_->mtx());
     proxy_->EnableCapture(true);
-    _completer.ReplySuccess();
+    completer.ReplySuccess();
   } else {
-    _completer.ReplyError(status);
+    completer.ReplyError(status);
   }
 
   // keep track of currently active capture image
@@ -977,10 +983,10 @@ void Client::StartCapture(StartCaptureRequestView request,
 }
 
 void Client::ReleaseCapture(ReleaseCaptureRequestView request,
-                            ReleaseCaptureCompleter::Sync& _completer) {
+                            ReleaseCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture
   if (controller_->dc_capture() == nullptr) {
-    _completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
@@ -988,7 +994,7 @@ void Client::ReleaseCapture(ReleaseCaptureRequestView request,
   auto image = capture_images_.find(request->image_id);
   if (!image.IsValid()) {
     zxlogf(ERROR, "Invalid Capture Image ID requested for release");
-    _completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -1001,36 +1007,36 @@ void Client::ReleaseCapture(ReleaseCaptureRequestView request,
     // release image now
     capture_images_.erase(image);
   }
-  _completer.ReplySuccess();
+  completer.ReplySuccess();
 }
 
 void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
-                           SetMinimumRgbCompleter::Sync& _completer) {
+                           SetMinimumRgbCompleter::Sync& completer) {
   if (controller_->dc_clamp_rgb() == nullptr) {
-    _completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   if (!is_owner_) {
-    _completer.ReplyError(ZX_ERR_NOT_CONNECTED);
+    completer.ReplyError(ZX_ERR_NOT_CONNECTED);
     return;
   }
   auto status = controller_->dc_clamp_rgb()->SetMinimumRgb(request->minimum_rgb);
   if (status == ZX_OK) {
     client_minimum_rgb_ = request->minimum_rgb;
-    _completer.ReplySuccess();
+    completer.ReplySuccess();
   } else {
-    _completer.ReplyError(status);
+    completer.ReplyError(status);
   }
 }
 
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
-                             SetDisplayPowerCompleter::Sync& _completer) {
+                             SetDisplayPowerCompleter::Sync& completer) {
   ZX_DEBUG_ASSERT(controller_->dc());
   auto status = controller_->dc()->SetDisplayPower(request->display_id, request->power_on);
   if (status == ZX_OK) {
-    _completer.ReplySuccess();
+    completer.ReplySuccess();
   } else {
-    _completer.ReplyError(status);
+    completer.ReplyError(status);
   }
 }
 
@@ -1521,11 +1527,11 @@ void Client::TearDown() {
     return;
   }
 
-  // make sure we stop vsync messages from this client since server_channel has already
-  // been closed by fidl server
+  // make sure we stop vsync messages from this client since the server end has already been closed
+  // by the fidl server.
   proxy_->EnableVsync(false);
 
-  server_handle_ = ZX_HANDLE_INVALID;
+  running_ = false;
 
   CleanUpImage(nullptr);
   zxlogf(INFO, "Releasing %lu capture images cur=%lu, pending=%lu", capture_images_.size(),
@@ -1546,7 +1552,7 @@ void Client::TearDown() {
   ApplyConfig();
 }
 
-void Client::TearDownTest() { server_handle_ = ZX_HANDLE_INVALID; }
+void Client::TearDownTest() { running_ = false; }
 
 bool Client::CleanUpImage(Image* image) {
   // Clean up any fences associated with the image
@@ -1592,16 +1598,14 @@ void Client::CleanUpCaptureImage(uint64_t id) {
 }
 
 void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
-                              AcknowledgeVsyncCompleter::Sync& _completer) {
+                              AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
   acked_cookie_ = request->cookie;
   zxlogf(TRACE, "Cookie %ld Acked\n", request->cookie);
 }
 
 fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Controller>, zx_status_t>
-Client::Init(zx::channel server_channel) {
-  zx_status_t status;
-
-  server_handle_ = server_channel.get();
+Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end) {
+  running_ = true;
 
   fidl::OnUnboundFn<Client> cb = [](Client* client, fidl::UnbindInfo info,
                                     fidl::ServerEnd<fuchsia_hardware_display::Controller> ch) {
@@ -1613,26 +1617,35 @@ Client::Init(zx::channel server_channel) {
     client->proxy_->OnClientDead();
   };
 
-  auto binding = fidl::BindServer<fuchsia_hardware_display::Controller>(
-      controller_->loop().dispatcher(), std::move(server_channel), this, std::move(cb));
+  auto binding = fidl::BindServer(controller_->loop().dispatcher(), std::move(server_end), this,
+                                  std::move(cb));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
 
-  zx::channel sysmem_allocator_request, sysmem_allocator_client;
-  zx::channel::create(0, &sysmem_allocator_request, &sysmem_allocator_client);
-  status = controller_->dc()->GetSysmemConnection(std::move(sysmem_allocator_request));
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          [&]() {
+            zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+            if (endpoints.is_error()) {
+              return endpoints.error_value();
+            }
+            auto& [sysmem_allocator_client, sysmem_allocator_server] = endpoints.value();
+            if (zx_status_t status =
+                    controller_->dc()->GetSysmemConnection(sysmem_allocator_server.TakeChannel());
+                status != ZX_OK) {
+              return status;
+            }
+            sysmem_allocator_ = fidl::WireSyncClient(std::move(sysmem_allocator_client));
+
+            // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+            std::string debug_name = std::string("display[") + fsl::GetCurrentProcessName() + "]";
+            fidl::OneWayStatus status = sysmem_allocator_->SetDebugClientInfo(
+                fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+            return status.status();
+          }();
+      status != ZX_OK) {
     // Not a fatal error, but BufferCollection functions won't work.
     // TODO(fxbug.dev/33157) TODO: Fail creation once all drivers implement this.
     zxlogf(ERROR, "GetSysmemConnection failed (continuing) - status: %d", status);
-  } else {
-    sysmem_allocator_ =
-        fidl::WireSyncClient<fuchsia_sysmem::Allocator>(std::move(sysmem_allocator_client));
-
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    std::string debug_name = std::string("display[") + fsl::GetCurrentProcessName() + "]";
-    (void)sysmem_allocator_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
-                                                fsl::GetCurrentProcessKoid());
   }
 
   return fpromise::ok(binding);
@@ -1648,17 +1661,17 @@ Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {}
 
 Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-               uint32_t client_id, zx::channel server_channel)
+               uint32_t client_id, fidl::ServerEnd<fhd::Controller> server_end)
     : controller_(controller),
       proxy_(proxy),
       is_vc_(is_vc),
       use_kernel_framebuffer_(use_kernel_framebuffer),
       id_(client_id),
-      server_handle_(server_channel.get()),
+      running_(true),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
-      binding_state_(fidl::ServerEnd<fhd::Controller>(std::move(server_channel))) {}
+      binding_state_(std::move(server_end)) {}
 
-Client::~Client() { ZX_DEBUG_ASSERT(server_handle_ == ZX_HANDLE_INVALID); }
+Client::~Client() { ZX_DEBUG_ASSERT(!running_); }
 
 void ClientProxy::SetOwnership(bool is_owner) {
   fbl::AllocChecker ac;
@@ -1907,7 +1920,8 @@ void ClientProxy::CloseOnControllerLoop() {
   }
 }
 
-zx_status_t ClientProxy::Init(inspect::Node* parent_node, zx::channel server_channel) {
+zx_status_t ClientProxy::Init(inspect::Node* parent_node,
+                              fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end) {
   node_ = parent_node->CreateChild(fbl::StringPrintf("client-%d", handler_.id()).c_str());
   node_.CreateBool("primary", !is_vc_, &static_properties_);
   is_owner_property_ = node_.CreateBool("is_owner", false);
@@ -1915,7 +1929,7 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node, zx::channel server_cha
   mtx_init(&task_mtx_, mtx_plain);
   auto seed = static_cast<uint32_t>(zx::clock::get_monotonic().get());
   initial_cookie_ = rand_r(&seed);
-  auto result = handler_.Init(std::move(server_channel));
+  auto result = handler_.Init(std::move(server_end));
   if (result.is_error()) {
     return result.error();
   }
@@ -1932,11 +1946,11 @@ ClientProxy::ClientProxy(Controller* controller, bool is_vc, bool use_kernel_fra
 }
 
 ClientProxy::ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer,
-                         uint32_t client_id, zx::channel server_channel)
+                         uint32_t client_id, fidl::ServerEnd<fhd::Controller> server_end)
     : controller_(controller),
       is_vc_(is_vc),
       handler_(controller_, this, is_vc_, use_kernel_framebuffer, client_id,
-               std::move(server_channel)) {
+               std::move(server_end)) {
   mtx_init(&mtx_, mtx_plain);
 }
 

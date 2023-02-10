@@ -19,11 +19,15 @@ namespace {
 
 TEST(Intel, IcdList) {
   magma::TestDeviceBase test_device(MAGMA_VENDOR_ID_INTEL);
-  auto rsp =
-      fidl::WireCall<fuchsia_gpu_magma::IcdLoaderDevice>(test_device.channel())->GetIcdList();
-  EXPECT_TRUE(rsp.ok());
-  EXPECT_EQ(rsp.value().icd_list.count(), 3u);
-  auto& icd_item = rsp.value().icd_list[0];
+
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::IcdLoaderDevice> channel{
+      test_device.channel().channel()->borrow()};
+  const fidl::WireResult result = fidl::WireCall(channel)->GetIcdList();
+  EXPECT_TRUE(result.ok()) << result.FormatDescription();
+  const fidl::WireResponse response = result.value();
+  EXPECT_EQ(response.icd_list.count(), 3u);
+  auto& icd_item = response.icd_list[0];
   EXPECT_TRUE(icd_item.has_flags());
   EXPECT_TRUE(icd_item.flags() & fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan);
   std::string res_string(icd_item.component_url().get());

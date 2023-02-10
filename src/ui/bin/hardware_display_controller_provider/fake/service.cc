@@ -69,7 +69,8 @@ void ProviderService::ConnectClient(Request req, const std::shared_ptr<State>& s
   }
 
   zx_status_t status = state->tree->controller()->CreateClient(
-      req.is_virtcon, req.controller_request.TakeChannel(),
+      req.is_virtcon,
+      fidl::ServerEnd<fuchsia_hardware_display::Controller>{req.controller_request.TakeChannel()},
       [weak = std::weak_ptr<State>(state), is_virtcon{req.is_virtcon}]() mutable {
         // Redispatch, in case this callback is invoked on a different thread (this depends
         // on the implementation of MockDisplayDeviceTree, which makes no guarantees).

@@ -4,7 +4,6 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <lib/fdio/directory.h>
 #include <lib/zx/channel.h>
 
 #include <shared_mutex>

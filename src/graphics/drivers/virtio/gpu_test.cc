@@ -62,11 +62,11 @@ class VirtioGpuTest : public zxtest::Test {
     device_ = std::make_unique<virtio::GpuDevice>(nullptr, std::move(bti),
                                                   std::make_unique<FakeGpuBackend>());
 
-    zx::channel server_channel;
-    ASSERT_OK(zx::channel::create(0u, &server_channel, &client_channel_));
+    zx::result server_channel = fidl::CreateEndpoints(&client_channel_);
+    ASSERT_OK(server_channel);
 
-    ASSERT_OK(
-        fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server_channel), &collection_));
+    ASSERT_OK(fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server_channel.value()),
+                                           &collection_));
 
     loop_.StartThread();
   }
@@ -82,7 +82,7 @@ class VirtioGpuTest : public zxtest::Test {
   std::unique_ptr<virtio::GpuDevice> device_;
   StubBufferCollection collection_;
   async::Loop loop_;
-  zx::channel client_channel_;
+  fidl::ClientEnd<fuchsia_sysmem::BufferCollection> client_channel_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
@@ -95,8 +95,8 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   size_t offset;
   uint32_t pixel_size;
   uint32_t row_bytes;
-  EXPECT_OK(device_->GetVmoAndStride(&image, client_channel_.get(), 0, &vmo, &offset, &pixel_size,
-                                     &row_bytes));
+  EXPECT_OK(
+      device_->GetVmoAndStride(&image, client_channel_, 0, &vmo, &offset, &pixel_size, &row_bytes));
   EXPECT_EQ(4, pixel_size);
   EXPECT_EQ(16, row_bytes);
 }
@@ -109,8 +109,8 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   display_controller_impl_protocol_t proto;
   EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
                                     reinterpret_cast<void*>(&proto)));
-  EXPECT_OK(
-      proto.ops->set_buffer_collection_constraints(device_.get(), &image, client_channel_.get()));
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &image,
+                                                         client_channel_.channel().get()));
 }
 
 }  // namespace

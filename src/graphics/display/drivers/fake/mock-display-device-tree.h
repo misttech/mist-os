@@ -35,8 +35,8 @@ class MockDisplayDeviceTree {
 
   const zx_device_t* sysmem_device() { return sysmem_->device(); }
 
-  zx::unowned_channel display_client();
-  fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> sysmem_client();
+  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_client();
+  const fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>& sysmem_client();
 
   void AsyncShutdown();
 
