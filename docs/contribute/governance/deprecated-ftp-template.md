@@ -67,8 +67,8 @@ the concept.
 
 There are potentially several kinds of documentation to address.
 
-How would you write or change a tutorial for this feature, in the style of [the
-various FIDL tutorials][fidl-tutotials]? Imagine explaining your feature to
+How would you write or change a tutorial for this feature, in the style of the
+various FIDL tutorials? Imagine explaining your feature to
 someone new to Fuchsia.
 
 How would you write reference documentation? For example, suppose your proposal
@@ -86,8 +86,8 @@ time, the ability to make backwards-incompatible changes will get harder.
 
 If you are introducing a new data type or language feature, consider what
 changes you would expect users to make to FIDL definitions without breaking
-users of the generated code. If your feature places any new [source
-compatibility][ftp-024.md] restrictions on the generated language bindings, list
+users of the generated code. If your feature places any new source
+compatibility restrictions on the generated language bindings, list
 those here.
 
 ## Performance

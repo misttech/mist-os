@@ -177,9 +177,9 @@ and usable as a [documentation widget][documentation-widgets].
 
 <!-- xrefs -->
 
-[glossary-yaml]: {{fuchsia_editor }}docs/glossary/glossary.yaml
-[glossary-index]: /docs/glossary
-[documentation-widgets]: /docs/reference/documentation/widgets.md
+[glossary-yaml]: /docs/glossary/glossary.yaml
+[glossary-index]: /docs/glossary/README.md
+[documentation-widgets]: /docs/contribute/docs/widgets.md
 
 
 

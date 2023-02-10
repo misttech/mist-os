@@ -378,24 +378,24 @@ To create a debugging profile:
 1. Once you have added the values for your profile, `launch.json` should look
    similar to the following:
 
-   ```json5
-   {
-     "configurations": [
-    {
-      # Specify a meaningful identifier.
-      "name": "Debug examples",
-      # This is a fixed required value.
-      "type": "zxdb",
-      # This is a fixed required value.
-      "request": "launch",
-      # Specify the desired launchcommand.
-      "launchCommand": "tools/ffx component run /core/ffx-laboratory:hello_world fuchsia-pkg://fuchsiasamples.com/hello_world#meta/hello_world.cm --recreate",
-      # Specify the process that you want to debug.
-      "process": "hello_world"
-    }
-    ]
-  }
-  ```
+       ```json5
+       {
+         "configurations": [
+         {
+          # Specify a meaningful identifier.
+          "name": "Debug examples",
+          # This is a fixed required value.
+          "type": "zxdb",
+          # This is a fixed required value.
+          "request": "launch",
+          # Specify the desired launchcommand.
+          "launchCommand": "tools/ffx component run /core/ffx-laboratory:hello_world fuchsia-pkg://fuchsiasamples.com/hello_world#meta/hello_world.cm --recreate",
+          # Specify the process that you want to debug.
+          "process": "hello_world"
+        }
+        ]
+      }
+      ```
 
 1. Save the changes that you made to the `launch.json` file.
 
@@ -432,15 +432,14 @@ Once you have started the debugger:
   breakpoints, logpoints, etc... For more information, see
   [Debug actions][vscode-debug-actions]{: .external}.
 
-[ffx-ref]: https://fuchsia.dev/reference/tools/sdk/ffx
 [fuchsia-dev-ext]: /docs/reference/tools/editors/vscode/fuchsia-ext-install.md
-[get-started-sdk]: /docs/get-started/sdk.md
+[get-started-sdk]: /docs/get-started/sdk/index.md
 [sdk-start-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
 [zx_clock_get_monotonic]: /docs/reference/syscalls/clock_get_monotonic.md
 [add-tags-logging]: /docs/development/languages/rust/logging.md#add_tags
 [log-severity]: /docs/development/diagnostics/logs/severity.md
 [monitor-device-logs]: /docs/development/sdk/ffx/view-device-logs.md#monitor-device-logs
-[zxdb-docs]: /docs/development/debugger.md
+[zxdb-docs]: /docs/development/debugging/debugging.md
 [ffx-run-ref]: https://fuchsia.dev/reference/tools/sdk/ffx#run
 [zxdb-commands-docs]: /docs/development/debugger/commands.md
 [vscode-debug-actions]: https://code.visualstudio.com/docs/editor/debugging#_debug-actions
@@ -448,6 +447,6 @@ Once you have started the debugger:
 [cml-docs]: https://fuchsia.dev/reference/cml
 [vscode-errors]: https://code.visualstudio.com/Docs/editor/editingevolved#_errors-warnings
 [diagnostics-schema]: /docs/reference/platform-spec/diagnostics/schema.md#payload
-[docs-schema-logs]: /docs/reference/platform-spec/diagnostics/schema.md#logs_2
+[docs-schema-logs]: /docs/reference/platform-spec/diagnostics/schema.md#logs
 [docs-debuggging-vscode]: https://code.visualstudio.com/docs/editor/debugging
 [component-moniker]: /docs/reference/components/moniker.md

@@ -134,8 +134,8 @@ We will amend [RFC-0029: Increasing Method Ordinals](/docs/contribute/governance
 `fidlc` to report errors consistently.
 
 Links to other FIDL language elements that have documentation associated
-with them (or _documented entities_) can be made by adding [\`link-target\`].
-For example, [\`fidl.io/NodeInfo\`] links to docs on said library.
+with them (or _documented entities_) can be made by adding \[\`link-target\`\].
+For example, \[\`fidl.io/NodeInfo\`\] links to docs on said library.
 The resolution rules are as follows:
 
 1. First, nested elements will be checked.
