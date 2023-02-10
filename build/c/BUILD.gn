@@ -34,10 +34,6 @@ config("fidl-deprecated-c-bindings") {
 
     #------------------
     #------------------
-    "//zircon/system/ulib/c/sanitizers",
-
-    #------------------
-    #------------------
     "//zircon/system/utest/fidl-utils",
 
     #------------------
