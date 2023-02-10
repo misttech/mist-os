@@ -103,7 +103,8 @@ TEST_F(TiIna231Test, GetPowerWatts) {
 
   EXPECT_OK(dut.DdkAdd("ti-ina231"));
 
-  fidl::WireSyncClient<power_sensor_fidl::Device> client(std::move(ddk.FidlClient()));
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(ddk.FidlClient())}};
 
   {
     fake_i2c().set_power(4792);
@@ -215,7 +216,8 @@ TEST_F(TiIna231Test, GetVoltageVolts) {
 
   EXPECT_OK(dut.DdkAdd("ti-ina231"));
 
-  fidl::WireSyncClient<power_sensor_fidl::Device> client(std::move(ddk.FidlClient()));
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(ddk.FidlClient())}};
 
   {
     fake_i2c().set_bus_voltage(9200);
