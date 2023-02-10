@@ -36,7 +36,10 @@ exports_files(
         "third_party/android/platform/external/avb/test/data/atx_metadata.bin",
     ] +
     # Bootloader images used in partition configs for product bundles.
-    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"]),
+    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"]) +
+
+    # OSPO license verification tool
+    glob(["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"]),
 )
 
 linux_sysroot(
