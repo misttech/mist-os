@@ -11,17 +11,13 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver-integration-test/fixture.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fdio.h>
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
+#include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-#include "fbl/unique_fd.h"
-#include "lib/sys/cpp/service_directory.h"
 #include "src/devices/bin/driver_host/test-metadata.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace {
 
@@ -67,19 +63,21 @@ TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
   // Setup the environment for testing.
   SetupEnvironment(dev, &devmgr, &development_);
 
-  fidl::ClientEnd<TestDevice> chan_driver;
+  uint64_t pid_before;
+  {
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        devmgr.devfs_root().get(), "sys/platform/11:17:0/driver-host-restart-driver");
+    ASSERT_OK(channel.status_value());
+    fidl::ClientEnd<TestDevice> chan_driver{std::move(channel.value())};
+    ASSERT_TRUE(chan_driver.is_valid());
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:17:0/driver-host-restart-driver");
-  ASSERT_OK(channel.status_value());
-  chan_driver = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
-  ASSERT_TRUE(chan_driver.is_valid());
-
-  // Get pid of driver before restarting.
-  auto result_before = fidl::WireCall(chan_driver)->GetPid();
-  ASSERT_OK(result_before.status());
-  ASSERT_FALSE(result_before->is_error(), "GetPid failed: %s",
-               zx_status_get_string(result_before->error_value()));
+    // Get pid of driver before restarting.
+    const fidl::WireResult result = fidl::WireCall(chan_driver)->GetPid();
+    ASSERT_OK(result);
+    const fit::result response = result.value();
+    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+    pid_before = response.value()->pid;
+  }
 
   // Need to create a DirWatcher to wait for the device to close.
   fbl::unique_fd fd(
@@ -97,18 +95,20 @@ TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
   ASSERT_OK(watcher->WaitForRemoval("driver-host-restart-driver", zx::duration::infinite()));
 
   // Get pid of driver after restarting.
-  channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
-                                                 "sys/platform/11:17:0/driver-host-restart-driver");
-  ASSERT_OK(channel.status_value());
-  chan_driver = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
-  ASSERT_TRUE(chan_driver.is_valid());
+  {
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        devmgr.devfs_root().get(), "sys/platform/11:17:0/driver-host-restart-driver");
+    ASSERT_OK(channel.status_value());
+    fidl::ClientEnd<TestDevice> chan_driver{std::move(channel.value())};
+    ASSERT_TRUE(chan_driver.is_valid());
 
-  auto result_after = fidl::WireCall(chan_driver)->GetPid();
-  ASSERT_OK(result_after.status());
-  ASSERT_FALSE(result_after->is_error(), "GetPid failed: %s",
-               zx_status_get_string(result_after->error_value()));
+    const fidl::WireResult result = fidl::WireCall(chan_driver)->GetPid();
+    ASSERT_OK(result);
+    const fit::result response = result.value();
+    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
 
-  ASSERT_NE(result_before->value()->pid, result_after->value()->pid);
+    ASSERT_NE(pid_before, response.value()->pid);
+  }
 }
 
 // Test restarting a driver host containing a parent and child driver by calling restart on

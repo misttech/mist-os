@@ -8,8 +8,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/driver-integration-test/fixture.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
@@ -98,8 +96,8 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindSameDriver) {
     call_status = resp2.value().error_value();
   }
   ASSERT_OK(resp2.status());
-  ASSERT_EQ(call_status, ZX_ERR_ALREADY_BOUND);
-
+  ASSERT_STATUS(ZX_ERR_ALREADY_BOUND, call_status);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -123,7 +121,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindNoChildrenManualBind) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -153,7 +151,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenAutoBind) {
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(channel.status_value());
 
-  auto parent_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+  fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
   // Do not open the child. Otherwise rebind will be stuck.
   zx_status_t call_status = ZX_OK;
@@ -195,7 +193,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenManualBind) {
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(channel.status_value());
-  auto parent_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+  fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
   char libpath[PATH_MAX];
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", "/boot/driver",
@@ -243,7 +241,7 @@ TEST_F(DeviceControllerIntegrationTest, TestUnbindChildrenSuccess) {
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(channel.status_value());
 
-  auto parent_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+  fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall(parent_channel)->UnbindChildren();
@@ -288,8 +286,8 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindDifferentDriver) {
     call_status = resp2.value().error_value();
   }
   ASSERT_OK(resp2.status());
-  ASSERT_EQ(call_status, ZX_ERR_ALREADY_BOUND);
-
+  ASSERT_STATUS(ZX_ERR_ALREADY_BOUND, call_status);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -315,7 +313,7 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBind) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -340,8 +338,8 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBindFail) {
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
-  ASSERT_EQ(call_status, ZX_ERR_BAD_STATE);
-
+  ASSERT_STATUS(ZX_ERR_BAD_STATE, call_status);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -367,7 +365,8 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestEnabledBindFail) {
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
-  ASSERT_EQ(call_status, ZX_ERR_BAD_STATE);
+  ASSERT_STATUS(ZX_ERR_BAD_STATE, call_status);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -392,7 +391,7 @@ TEST_F(DeviceControllerIntegrationTest, DefaultTestsDisabledBind) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
-
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -420,6 +419,7 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestDisabledBind) {
     call_status = resp.value().error_value();
   }
   ASSERT_OK(call_status);
+  // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   ASSERT_OK(fidl::WireCall(fidl::ClientEnd<fuchsia_device_test::Device>{dev_channel.TakeChannel()})
                 ->Destroy());
 }
@@ -447,7 +447,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Success) {
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(channel.status_value());
-  auto parent_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+  fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall(parent_channel)->Rebind(::fidl::StringView(""));
@@ -489,7 +489,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Failure) {
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent");
   ASSERT_OK(channel.status_value());
-  auto parent_channel = fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())};
+  fidl::ClientEnd<fuchsia_device::Controller> parent_channel{std::move(channel.value())};
 
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall(parent_channel)->Rebind(::fidl::StringView(""));
@@ -497,8 +497,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindWithInit_Failure) {
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
   }
-  ASSERT_EQ(call_status, ZX_ERR_IO);
-
+  ASSERT_STATUS(ZX_ERR_IO, call_status);
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
                                                  "sys/platform/11:0e:0/devhost-test-parent")
                 .status_value());
