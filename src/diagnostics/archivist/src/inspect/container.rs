@@ -8,7 +8,6 @@ use crate::{
     identity::ComponentIdentity,
     inspect::collector::{self as collector, InspectData},
 };
-use async_lock::RwLock;
 use diagnostics_data as schema;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
@@ -26,7 +25,7 @@ use std::time::Duration;
 use std::{
     collections::{HashMap, VecDeque},
     convert::{From, Into, TryFrom},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use tracing::warn;
 
@@ -67,7 +66,7 @@ impl From<fio::DirectoryProxy> for InspectHandle {
 pub struct InspectArtifactsContainer {
     /// DirectoryProxy for the out directory that this
     /// data packet is configured for.
-    diagnostics_proxy: RwLock<HashMap<zx::Koid, Arc<InspectHandle>>>,
+    diagnostics_proxy: Mutex<HashMap<zx::Koid, Arc<InspectHandle>>>,
     _on_closed_task: fasync::Task<()>,
 }
 
@@ -88,12 +87,12 @@ impl InspectArtifactsContainer {
             }
             let _ = snd.send(koid);
         });
-        (Self { diagnostics_proxy: RwLock::new(diagnostics_proxy), _on_closed_task }, rcv)
+        (Self { diagnostics_proxy: Mutex::new(diagnostics_proxy), _on_closed_task }, rcv)
     }
 
     /// Remove a handle via its `koid` from the set of proxies managed by `self`.
-    pub async fn remove_handle(&self, koid: zx::Koid) -> usize {
-        let mut lock_guard = self.diagnostics_proxy.write().await;
+    pub fn remove_handle(&self, koid: zx::Koid) -> usize {
+        let mut lock_guard = self.diagnostics_proxy.lock().expect("poisoned mutex");
         lock_guard.remove(&koid);
         lock_guard.len()
     }
@@ -101,12 +100,12 @@ impl InspectArtifactsContainer {
     /// Generate an `UnpopulatedInspectDataContainer` from the proxies managed by `self`.
     ///
     /// Returns `None` if there are no valid proxies.
-    pub async fn create_unpopulated(
+    pub fn create_unpopulated(
         &self,
         identity: &Arc<ComponentIdentity>,
         matcher: Option<Arc<HierarchyMatcher>>,
     ) -> Option<UnpopulatedInspectDataContainer> {
-        let lock_guard = self.diagnostics_proxy.read().await;
+        let lock_guard = self.diagnostics_proxy.lock().expect("poisoned mutex");
         if lock_guard.len() == 0 {
             return None;
         }

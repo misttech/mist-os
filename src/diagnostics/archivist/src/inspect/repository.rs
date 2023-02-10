@@ -65,7 +65,6 @@ impl InspectRepository {
             .read()
             .await
             .fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
-            .await
     }
 
     async fn add_inspect_artifacts(
@@ -89,7 +88,7 @@ impl InspectRepository {
                                 let guard = &mut this.inner.write().await.diagnostics_containers;
 
                                 if let Some((_, container)) = guard.get(&identity.unique_key()) {
-                                    if container.remove_handle(koid_to_remove).await != 0 {
+                                    if container.remove_handle(koid_to_remove) != 0 {
                                         return;
                                     }
                                 }
@@ -194,54 +193,51 @@ impl InspectRepositoryInner {
         }
     }
 
-    async fn fetch_inspect_data(
+    fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
         moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
-        let mut containers = vec![];
-        for (_, diagnostics_artifacts_container_opt) in self.diagnostics_containers.iter() {
-            let (identity, container) = match &diagnostics_artifacts_container_opt {
-                Some((identity, container)) => (identity, container),
-                None => continue,
-            };
+        self.diagnostics_containers
+            .iter()
+            .filter_map(|(_, diagnostics_artifacts_container_opt)| {
+                let (identity, container) = match &diagnostics_artifacts_container_opt {
+                    Some((identity, container)) => (identity, container),
+                    None => return None,
+                };
 
-            let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
-                Some(map) => {
-                    match map.get(&identity.relative_moniker) {
-                        Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
-                        // Return early if there were static selectors, and none were for this
-                        // moniker.
-                        None => continue,
+                let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
+                    Some(map) => {
+                        match map.get(&identity.relative_moniker) {
+                            Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
+                            // Return early if there were static selectors, and none were for this
+                            // moniker.
+                            None => return None,
+                        }
                     }
+                    None => None,
+                };
+
+                // Verify that the dynamic selectors contain an entry that applies to
+                // this moniker as well.
+                if !match component_selectors {
+                    Some(component_selectors) => component_selectors.iter().any(|s| {
+                        selectors::match_component_moniker_against_selector(
+                            &identity.relative_moniker,
+                            s,
+                        )
+                        .ok()
+                        .unwrap_or(false)
+                    }),
+                    None => true,
+                } {
+                    return None;
                 }
-                None => None,
-            };
 
-            // Verify that the dynamic selectors contain an entry that applies to
-            // this moniker as well.
-            if !match component_selectors {
-                Some(component_selectors) => component_selectors.iter().any(|s| {
-                    selectors::match_component_moniker_against_selector(
-                        &identity.relative_moniker,
-                        s,
-                    )
-                    .ok()
-                    .unwrap_or(false)
-                }),
-                None => true,
-            } {
-                continue;
-            }
-
-            // This artifact contains inspect and matches a passed selector.
-            if let Some(unpopulated) =
-                container.create_unpopulated(identity, optional_hierarchy_matcher).await
-            {
-                containers.push(unpopulated);
-            }
-        }
-        containers
+                // This artifact contains inspect and matches a passed selector.
+                container.create_unpopulated(identity, optional_hierarchy_matcher)
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -457,30 +453,21 @@ mod tests {
             })
             .await;
 
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).await.len());
+        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/foo.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(
-            1,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(1, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/f*.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(
-            2,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("foo.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(
-            0,
-            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
-        );
+        assert_eq!(0, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
     }
 }
