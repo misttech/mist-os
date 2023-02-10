@@ -172,11 +172,21 @@ __EXPORT void* usb_desc_iter_get_structure(usb_desc_iter_t* iter, size_t structu
   return (void*)start;
 }
 
-// returns the next interface descriptor, optionally skipping alternate interfaces
-__EXPORT usb_interface_descriptor_t* usb_desc_iter_next_interface(usb_desc_iter_t* iter,
-                                                                  bool skip_alt) {
+// returns the next interface descriptor, optionally skipping alternate interfaces. The last
+// association descriptor pointer is filled in at assoc. If none are seen, assoc does not change.
+__EXPORT usb_interface_descriptor_t* usb_desc_iter_next_interface_with_assoc(
+    usb_desc_iter_t* iter, bool skip_alt, usb_interface_assoc_descriptor_t** assoc) {
   usb_descriptor_header_t* header;
   while ((header = usb_desc_iter_peek(iter)) != NULL) {
+    if (assoc && header->b_descriptor_type == USB_DT_INTERFACE_ASSOCIATION) {
+      usb_interface_assoc_descriptor_t* desc =
+          usb_desc_iter_get_structure(iter, sizeof(usb_interface_assoc_descriptor_t));
+      if (!desc) {
+        return NULL;
+      }
+      *assoc = desc;
+    }
+
     if (header->b_descriptor_type == USB_DT_INTERFACE) {
       usb_interface_descriptor_t* desc =
           usb_desc_iter_get_structure(iter, sizeof(usb_interface_descriptor_t));
@@ -192,6 +202,11 @@ __EXPORT usb_interface_descriptor_t* usb_desc_iter_next_interface(usb_desc_iter_
   }
   // not found
   return NULL;
+}
+
+__EXPORT usb_interface_descriptor_t* usb_desc_iter_next_interface(usb_desc_iter_t* iter,
+                                                                  bool skip_alt) {
+  return usb_desc_iter_next_interface_with_assoc(iter, skip_alt, NULL);
 }
 
 // returns the next endpoint descriptor within the current interface

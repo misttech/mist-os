@@ -27,30 +27,48 @@ zx_status_t InterfaceList::Create(const ddk::UsbProtocolClient& client, bool ski
   return ZX_OK;
 }
 
-InterfaceList::iterator InterfaceList::begin() const {
+InterfaceList::iterator UnownedInterfaceList::begin() const {
   if (!iter_.desc) {
     return end();
   }
   usb_desc_iter_t iter = iter_;
-  const usb_interface_descriptor_t* intf = usb_desc_iter_next_interface(&iter, skip_alt_);
-  return iterator(iter, skip_alt_, intf);
+  usb_interface_assoc_descriptor_t* assoc = nullptr;
+  const usb_interface_descriptor_t* intf =
+      usb_desc_iter_next_interface_with_assoc(&iter, skip_alt_, &assoc);
+  return iterator(iter, skip_alt_, intf, assoc);
 }
 
-InterfaceList::const_iterator InterfaceList::cbegin() const {
-  return static_cast<InterfaceList::const_iterator>(begin());
+UnownedInterfaceList::const_iterator UnownedInterfaceList::cbegin() const {
+  return static_cast<UnownedInterfaceList::const_iterator>(begin());
 }
 
-InterfaceList::iterator InterfaceList::end() const {
+UnownedInterfaceList::iterator UnownedInterfaceList::end() const {
   usb_desc_iter_t init = {};
-  return iterator(init, skip_alt_, nullptr);
+  return iterator(init, skip_alt_, nullptr, nullptr);
 }
 
-InterfaceList::const_iterator InterfaceList::cend() const {
-  return static_cast<InterfaceList::const_iterator>(end());
+UnownedInterfaceList::const_iterator UnownedInterfaceList::cend() const {
+  return static_cast<UnownedInterfaceList::const_iterator>(end());
 }
 
 void Interface::Next(bool skip_alt) {
-  descriptor_ = usb_desc_iter_next_interface(&iter_, skip_alt);
+  usb_interface_assoc_descriptor_t* assoc = nullptr;
+  descriptor_ = usb_desc_iter_next_interface_with_assoc(&iter_, skip_alt, &assoc);
+  if (!descriptor_) {
+    return;
+  }
+  if (assoc) {
+    assoc_.emplace(
+        InterfaceAssociation{.assoc_desc = assoc, .interface_count = assoc->b_interface_count});
+  }
+  if (descriptor_->b_alternate_setting == 0) {
+    if (assoc_ && assoc_->interface_count == 0) {
+      assoc_.reset();
+    }
+    if (assoc_) {
+      assoc_->interface_count--;
+    }
+  }
 }
 
 EndpointList::iterator EndpointList::begin() const {

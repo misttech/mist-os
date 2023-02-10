@@ -38,6 +38,21 @@ struct alt_ss_config {
   usb_interface_descriptor_t alt_interface;
 };
 
+// The interface configuration corresponding to a device with one interface association made up of
+// two interfaces (each with one alt-interface) and an interface not in the interface association.
+struct assoc_config {
+  usb_interface_assoc_descriptor_t association;
+  usb_interface_descriptor_t interface1;
+  usb_endpoint_descriptor_t ep1;
+  usb_endpoint_descriptor_t ep2;
+  usb_hid_descriptor_for_test_t hid_descriptor;
+  usb_interface_descriptor_t alt_interface1;
+  usb_interface_descriptor_t interface2;
+  usb_endpoint_descriptor_t ep3;
+  usb_interface_descriptor_t alt_interface2;
+  usb_interface_descriptor_t interface3;
+};
+
 static void EXPECT_INTERFACE_EQ(usb_interface_descriptor_t a, usb_interface_descriptor_t b) {
   EXPECT_EQ(a.b_length, b.b_length);
   EXPECT_EQ(a.b_descriptor_type, b.b_descriptor_type);
@@ -48,6 +63,18 @@ static void EXPECT_INTERFACE_EQ(usb_interface_descriptor_t a, usb_interface_desc
   EXPECT_EQ(a.b_interface_sub_class, b.b_interface_sub_class);
   EXPECT_EQ(a.b_interface_protocol, b.b_interface_protocol);
   EXPECT_EQ(a.i_interface, b.i_interface);
+}
+
+static void EXPECT_INTERFACE_ASSOCIATION_EQ(usb_interface_assoc_descriptor_t a,
+                                            usb_interface_assoc_descriptor_t b) {
+  EXPECT_EQ(a.b_length, b.b_length);
+  EXPECT_EQ(a.b_descriptor_type, b.b_descriptor_type);
+  EXPECT_EQ(a.b_first_interface, b.b_first_interface);
+  EXPECT_EQ(a.b_interface_count, b.b_interface_count);
+  EXPECT_EQ(a.b_function_class, b.b_function_class);
+  EXPECT_EQ(a.b_function_sub_class, b.b_function_sub_class);
+  EXPECT_EQ(a.b_function_protocol, b.b_function_protocol);
+  EXPECT_EQ(a.i_function, b.i_function);
 }
 
 static void EXPECT_ENDPOINT_EQ(const usb_endpoint_descriptor_t a,
@@ -606,6 +633,218 @@ TEST_F(BinaryHidDescriptorTest, TestBinaryHidDescriptor) {
   EXPECT_EQ(count, 1);
   EXPECT_NOT_NULL(hid_desc);
   EXPECT_NOT_NULL(endpoint_desc);
+}
+
+constexpr assoc_config kTestInterfaceAssociation = {
+    .association =
+        {
+            .b_length = sizeof(usb_interface_assoc_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE_ASSOCIATION,
+            .b_first_interface = 0,
+            .b_interface_count = 2,
+            .b_function_class = 1,
+            .b_function_sub_class = 1,
+            .b_function_protocol = 1,
+            .i_function = 1,
+        },
+    .interface1 =
+        {
+            .b_length = sizeof(usb_interface_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE,
+            .b_interface_number = 0,
+            .b_alternate_setting = 0,
+            .b_num_endpoints = 2,
+            .b_interface_class = 8,
+            .b_interface_sub_class = 6,
+            .b_interface_protocol = 80,
+            .i_interface = 0,
+        },
+    .ep1 =
+        {
+            .b_length = sizeof(usb_endpoint_descriptor_t),
+            .b_descriptor_type = USB_DT_ENDPOINT,
+            .b_endpoint_address = 0x81,
+            .bm_attributes = 2,
+            .w_max_packet_size = 1024,
+            .b_interval = 0,
+        },
+    .ep2 =
+        {
+            .b_length = sizeof(usb_endpoint_descriptor_t),
+            .b_descriptor_type = USB_DT_ENDPOINT,
+            .b_endpoint_address = 2,
+            .bm_attributes = 2,
+            .w_max_packet_size = 1024,
+            .b_interval = 0,
+        },
+    .hid_descriptor =
+        {
+            .bLength = sizeof(usb_hid_descriptor_for_test_t),
+            .bDescriptorType = USB_DT_HID,
+            .bcdHID = 0,
+            .bCountryCode = 0,
+            .bNumDescriptors = 0,
+        },
+    .alt_interface1 =
+        {
+            .b_length = sizeof(usb_interface_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE,
+            .b_interface_number = 0,
+            .b_alternate_setting = 1,
+            .b_num_endpoints = 2,
+            .b_interface_class = 8,
+            .b_interface_sub_class = 6,
+            .b_interface_protocol = 80,
+            .i_interface = 0,
+        },
+    .interface2 =
+        {
+            .b_length = sizeof(usb_interface_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE,
+            .b_interface_number = 1,
+            .b_alternate_setting = 0,
+            .b_num_endpoints = 1,
+            .b_interface_class = 8,
+            .b_interface_sub_class = 6,
+            .b_interface_protocol = 80,
+            .i_interface = 0,
+        },
+    .ep3 =
+        {
+            .b_length = sizeof(usb_endpoint_descriptor_t),
+            .b_descriptor_type = USB_DT_ENDPOINT,
+            .b_endpoint_address = 0x81,
+            .bm_attributes = 2,
+            .w_max_packet_size = 1024,
+            .b_interval = 0,
+        },
+    .alt_interface2 =
+        {
+            .b_length = sizeof(usb_interface_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE,
+            .b_interface_number = 2,
+            .b_alternate_setting = 1,
+            .b_num_endpoints = 0,
+            .b_interface_class = 8,
+            .b_interface_sub_class = 6,
+            .b_interface_protocol = 80,
+            .i_interface = 0,
+        },
+    .interface3 =
+        {
+            .b_length = sizeof(usb_interface_descriptor_t),
+            .b_descriptor_type = USB_DT_INTERFACE,
+            .b_interface_number = 2,
+            .b_alternate_setting = 0,
+            .b_num_endpoints = 0,
+            .b_interface_class = 8,
+            .b_interface_sub_class = 6,
+            .b_interface_protocol = 80,
+            .i_interface = 0,
+        },
+};
+
+// InterfaceAssociationListTest tests an InterfaceAssociation's ability to process descriptors.
+using InterfaceAssociationTest = WrapperTest<&kTestInterfaceAssociation>;
+
+struct expected_interface_values_t {
+  const usb_interface_descriptor_t& interface;
+  size_t length;
+  const usb_interface_assoc_descriptor_t* association;
+};
+
+void VerifyInterface(const Interface& interface, const expected_interface_values_t& expected,
+                     bool skip_alt) {
+  ASSERT_NOT_NULL(interface.descriptor());
+  EXPECT_EQ(interface.length(skip_alt), expected.length);
+  EXPECT_INTERFACE_EQ(*interface.descriptor(), expected.interface);
+
+  ASSERT_EQ(interface.association() != nullptr, expected.association != nullptr);
+  if (interface.association()) {
+    EXPECT_INTERFACE_ASSOCIATION_EQ(*interface.association(), *expected.association);
+  }
+}
+
+TEST_F(InterfaceAssociationTest, TestUnownedInterfaceListSkipAlt) {
+  auto length = usb_.GetDescriptorsLength();
+  uint8_t descriptor[length];
+  size_t actual;
+  usb_.GetDescriptors(descriptor, length, &actual);
+  EXPECT_EQ(actual, length);
+  EXPECT_BYTES_EQ(descriptor, &kTestInterfaceAssociation, length);
+
+  const expected_interface_values_t expected[] = {
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface1,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface2) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface1),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface2,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface3) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface2),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface3,
+          .length = sizeof(kTestInterfaceAssociation.interface3),
+          .association = nullptr,
+      },
+  };
+  UnownedInterfaceList ilist(descriptor, length, true);
+  uint32_t i = 0;
+  for (const auto& interface : ilist) {
+    VerifyInterface(interface, expected[i], true);
+    i++;
+  }
+}
+
+TEST_F(InterfaceAssociationTest, TestUnownedInterfaceList) {
+  auto length = usb_.GetDescriptorsLength();
+  uint8_t descriptor[length];
+  size_t actual;
+  usb_.GetDescriptors(descriptor, length, &actual);
+  EXPECT_EQ(actual, length);
+  EXPECT_BYTES_EQ(descriptor, &kTestInterfaceAssociation, length);
+
+  const expected_interface_values_t expected[] = {
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface1,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.alt_interface1) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface1),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.alt_interface1,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface2) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.alt_interface1),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface2,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.alt_interface2) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface2),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.alt_interface2,
+          .length = reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.interface3) -
+                    reinterpret_cast<uintptr_t>(&kTestInterfaceAssociation.alt_interface2),
+          .association = &kTestInterfaceAssociation.association,
+      },
+      expected_interface_values_t{
+          .interface = kTestInterfaceAssociation.interface3,
+          .length = sizeof(kTestInterfaceAssociation.interface3),
+          .association = nullptr,
+      },
+  };
+  UnownedInterfaceList ilist(descriptor, length, false);
+  uint32_t i = 0;
+  for (const auto& interface : ilist) {
+    VerifyInterface(interface, expected[i], false);
+    i++;
+  }
 }
 
 }  // namespace usb

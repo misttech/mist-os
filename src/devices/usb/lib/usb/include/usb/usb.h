@@ -324,7 +324,10 @@ bool usb_desc_iter_advance(usb_desc_iter_t* iter);
 // NULL would be returned, user is expected to handle the error case.
 void* usb_desc_iter_get_structure(usb_desc_iter_t* iter, size_t structure_size);
 
-// returns the next interface descriptor, optionally skipping alternate interfaces
+// returns the next interface descriptor, optionally skipping alternate interfaces. The last
+// association descriptor pointer is filled in at assoc. If none are seen, assoc does not change.
+usb_interface_descriptor_t* usb_desc_iter_next_interface_with_assoc(
+    usb_desc_iter_t* iter, bool skip_alt, usb_interface_assoc_descriptor_t** assoc);
 usb_interface_descriptor_t* usb_desc_iter_next_interface(usb_desc_iter_t* iter, bool skip_alt);
 
 // returns the next endpoint descriptor within the current interface
@@ -592,31 +595,92 @@ class EndpointList {
 // Interface is accessed by iterating on InterfaceList. It contains a pointer to an interface
 // descriptor. The returned descriptor pointer is valid for the lifetime of the InterfaceList used
 // to create the Interface.
+//
+// If the interface is part of an interface association, it contains an assoc_ member that points to
+// the association descriptor, from which you can find the start of the association. While iterating
+// through interfaces, if an Interface has the assoc_ member, you may start keeping track of members
+// in the association. The assoc_.assoc_desc refers to the association that it is part of. When
+// assoc_.assoc_desc changes, a new association has started. If assoc_ disappears, the interface is
+// not part of the association anymore.
+//
+// Example Usage of association():
+//   std::optional<InterfaceList> interfaces;
+//   status = InterfaceList::Create(my_client, true, &interfaces);
+//   if (status != ZX_OK) {
+//     ...
+//   }
+//
+//   usb_interface_assoc_descriptor_t* prev_assoc = nullptr;
+//   for (const auto& interface : *interfaces) {
+//     if (interface.association()) {
+//       if (prev_assoc != interface.association()->assoc_desc) {
+//         // A new association is found!
+//         prev_assoc = interface.association()->assoc_desc;
+//       }
+//       // I am an interface part of prev_assoc
+//       ...
+//
+//       continue;
+//     }
+//
+//     prev_assoc = nullptr;
+//     // I am an interface not associated with an associations.
+//     ...
+//   }
 class Interface {
+ private:
+  struct InterfaceAssociation;
+
  public:
   DescriptorList GetDescriptorList() const;
   EndpointList GetEndpointList() const;
   const usb_interface_descriptor_t* descriptor() const { return descriptor_; }
+  const usb_interface_assoc_descriptor_t* association() const {
+    return assoc_ ? assoc_->assoc_desc : nullptr;
+  }
+  // Returns length of Interface Descriptor including Association Descriptor before it.
+  size_t length(bool skip_alt) const {
+    usb_desc_iter_t iter = iter_;
+    usb_interface_assoc_descriptor_t* assoc = nullptr;
+    auto* desc = usb_desc_iter_next_interface_with_assoc(&iter, skip_alt, &assoc);
+    uintptr_t next = assoc  ? reinterpret_cast<uintptr_t>(assoc)
+                     : desc ? reinterpret_cast<uintptr_t>(desc)
+                            : reinterpret_cast<uintptr_t>(iter_.desc_end);
+    return next - reinterpret_cast<uintptr_t>(descriptor_);
+  }
 
-  friend class InterfaceList;
+  friend class UnownedInterfaceList;
 
  private:
-  Interface(const usb_desc_iter_t& iter, const usb_interface_descriptor_t* descriptor)
-      : descriptor_(descriptor), iter_(iter) {}
+  struct InterfaceAssociation {
+    const usb_interface_assoc_descriptor_t* assoc_desc;
+    // The number of interfaces left in this association. Used internally to remove association when
+    // all interfaces have been seen.
+    uint8_t interface_count;
+  };
+
+  Interface(const usb_desc_iter_t& iter, const usb_interface_descriptor_t* descriptor,
+            const usb_interface_assoc_descriptor_t* association)
+      : descriptor_(descriptor),
+        iter_(iter),
+        assoc_(
+            (association && association->b_interface_count != 0)
+                ? std::make_optional(InterfaceAssociation{
+                      .assoc_desc = association,
+                      .interface_count = static_cast<uint8_t>(association->b_interface_count - 1)})
+                : std::nullopt) {}
 
   // Advances iter_ to the next usb_interface_descriptor_t.
   void Next(bool skip_alt);
 
   const usb_interface_descriptor_t* descriptor_;
   usb_desc_iter_t iter_;
+  std::optional<InterfaceAssociation> assoc_;
 };
 
-// An InterfaceList can be used for enumerating USB interfaces. It implements a standard C++
-// iterator interface that returns Interface. All descriptors accessed by child classes are valid
-// only for the lifetime of this InterfaceList object.
-//
-// The InterfaceList will skip any alternate interfaces if skip_alt is true (see usb2.0 ch9.6.5).
-class InterfaceList {
+// The Unowned variant of InterfaceList. The user of UnownedInterfaceList must guarantee the
+// lifetime of the descriptors.
+class UnownedInterfaceList {
  private:
   class iterator_impl;
 
@@ -624,24 +688,12 @@ class InterfaceList {
   using iterator = iterator_impl;
   using const_iterator = iterator_impl;
 
-  InterfaceList() = delete;
+  UnownedInterfaceList() = delete;
 
-  InterfaceList(const usb_desc_iter_t& iter, bool skip_alt) : iter_(iter), skip_alt_(skip_alt) {}
-
-  InterfaceList(InterfaceList&&) = delete;
-  InterfaceList& operator=(InterfaceList&&) = delete;
-
-  ~InterfaceList() {
-    if (iter_.desc) {
-      usb_desc_iter_release(&iter_);
-    }
-  }
-
-  static zx_status_t Create(const ddk::UsbProtocolClient& client, bool skip_alt,
-                            std::optional<InterfaceList>* out);
-
-  size_t size() {
-    return reinterpret_cast<size_t>(iter_.desc_end) - reinterpret_cast<size_t>(iter_.desc);
+  UnownedInterfaceList(const usb_desc_iter_t& iter, bool skip_alt)
+      : iter_(iter), skip_alt_(skip_alt) {}
+  UnownedInterfaceList(void* descriptors, size_t length, bool skip_alt) : skip_alt_(skip_alt) {
+    usb_desc_iter_init_unowned(descriptors, length, &iter_);
   }
 
   iterator begin() const;
@@ -649,12 +701,15 @@ class InterfaceList {
   iterator end() const;
   const_iterator cend() const;
 
+  friend class InterfaceList;
+
  private:
   class iterator_impl {
    public:
     iterator_impl(const usb_desc_iter_t& iter, bool skip_alt,
-                  const usb_interface_descriptor_t* descriptor)
-        : skip_alt_(skip_alt), interface_(iter, descriptor) {}
+                  const usb_interface_descriptor_t* descriptor,
+                  const usb_interface_assoc_descriptor_t* association)
+        : skip_alt_(skip_alt), interface_(iter, descriptor, association) {}
 
     bool operator==(const iterator_impl& other) const {
       return interface_.descriptor_ == other.interface_.descriptor_;
@@ -683,6 +738,35 @@ class InterfaceList {
 
   usb_desc_iter_t iter_{};
   bool skip_alt_;
+};
+
+// An InterfaceList can be used for enumerating USB interfaces. It implements a standard C++
+// iterator interface that returns Interface. All descriptors accessed by child classes are valid
+// only for the lifetime of this InterfaceList object.
+//
+// The InterfaceList will skip any alternate interfaces if skip_alt is true (see usb2.0 ch9.6.5).
+class InterfaceList : public UnownedInterfaceList {
+ public:
+  InterfaceList() = delete;
+
+  InterfaceList(const usb_desc_iter_t& iter, bool skip_alt)
+      : UnownedInterfaceList(iter, skip_alt) {}
+
+  InterfaceList(InterfaceList&&) = delete;
+  InterfaceList& operator=(InterfaceList&&) = delete;
+
+  ~InterfaceList() {
+    if (iter_.desc) {
+      usb_desc_iter_release(&iter_);
+    }
+  }
+
+  static zx_status_t Create(const ddk::UsbProtocolClient& client, bool skip_alt,
+                            std::optional<InterfaceList>* out);
+
+  size_t size() {
+    return reinterpret_cast<size_t>(iter_.desc_end) - reinterpret_cast<size_t>(iter_.desc);
+  }
 };
 
 }  // namespace usb
