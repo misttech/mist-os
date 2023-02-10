@@ -10,18 +10,26 @@ import json
 import os
 import sys
 
+# Some boot options have non-primitive types.
+# This map is used to map the type of the boot-option
+# to a string suitable for markdown documentation about the option.
 SPECIAL_TYPES = {
     'SmallString': r'\<string>',
     'RedactedHex': r'\<hexadecimal>',
     'TestOption': 'test',
-    'uart::all::Driver': r'[none | legacy | qemu | \<type>,\<base>,\<irq>]',
+    'uart::all::Driver': r'\[none | legacy | qemu | \<type>,\<base>,\<irq>\]',
 }
 
 
 def generate_doc(option):
+    # Types that are lists are enumerations of valid values for this option.
+    # and are printed as [ <value1> | <value2> |...].
     if isinstance(option['type'], list):
-        option['type'] = '[%s]' % ' | '.join(option['type'])
+        option['type'] = '\[%s\]' % ' | '.join(option['type'])
     else:
+        # Non-list types could be a special type, or default to the
+        # type passed in. This allows SPECIAL_TYPES to handle non-primitive
+        # types and primitive types fall back to themselves as the default.
         option['type'] = SPECIAL_TYPES.get(
             option['type'], r'\<%s>' % option['type'])
     if option['default'] != '':
@@ -30,8 +38,10 @@ def generate_doc(option):
         elif isinstance(option['default'], int):
             option['default'] = '%#x' % option['default']
         option['default'] = '**Default:** `%s`\n' % option['default']
+    # Return the multiline string with the values interpolated.
     return '''
 ### {name}={type}
+
 {default}
 {documentation}
 '''.format(**option)
