@@ -34,10 +34,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/board/drivers/x86/test:x86-board",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }
