@@ -164,6 +164,36 @@
   related_guides: [""]
   area: ["System", "Zircon"]
 
+- term: "Base driver"
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> that is available in the
+  Fuchsia image and not critical for bootstrapping the system. These drivers are loaded from
+  the system's storage, so they need to be loaded after the
+  <a href=\"/docs/glossary#boot-driver\">boot drivers</a> have enabled storage (for example,
+  USB drivers, networking drivers)."
+  full_description: "A <a href=\"/docs/glossary#driver\">driver</a> that is available in the
+  Fuchsia image and not critical for bootstrapping the system. These drivers are loaded from
+  the system's storage, so they need to be loaded after the
+  <a href=\"/docs/glossary#boot-driver\">boot drivers</a> have enabled storage (for example,
+  USB drivers, networking drivers). Base drivers reside in the
+  <a href=\"/docs/concepts/packages/package?hl=en#base-packages\">base packages</a>."
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers"]
+
+- term: "Boot driver"
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> that exists in the
+  <a href=\"/docs/glossary#zircon-boot-image\">Zircon Boot Image (ZBI)</a> and is needed for
+  bootstrapping the system (for example, storage drivers)."
+  full_description: "A <a href=\"/docs/glossary#driver\">driver</a> that exists in the
+  <a href=\"/docs/glossary#zircon-boot-image\">Zircon Boot Image (ZBI)</a> and is needed for
+  bootstrapping the system (for example, storage drivers). The
+  <a href=\"/docs/glossary#zircon-boot-image\">Zircon Boot Image (ZBI)</a>
+  has limited space for such <a href=\"/docs/glossary#driver\">drivers</a>, a constraint that
+  does not generally apply to <a href=\"/docs/glossary#base-driver\">base drivers</a>."
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers"]
+
 - term: "Bringup"
   short_description: "The process of getting Fuchsia to run on a new <a href=\"/docs/glossary#board\">board</a>."
   full_description: "Bringup is the catchall term for all of the engineering work related to
@@ -182,11 +212,12 @@
   area: ["System", "Zircon"]
 
 - term: "Bus driver"
-  short_description: "A driver for a device that has multiple children."
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> for a device that has multiple children."
   full_description: "A  <a href=\"/docs/glossary#driver\">driver</a> for a device that has
   multiple children. For example, hardware interfaces like PCI specify a topology in which a single
   controller is used to interface with multiple devices connected to it. In that situation, the
-  driver for the controller would be a bus driver."
+  driver for the controller would be a bus driver. A bus driver does not necessarily correspond
+  to a physical bus."
   see_also: [""]
   related_guides: [""]
   area: ["System", "Devices", "Drivers"]
@@ -267,6 +298,15 @@
              "<a href=\"https://chrome-infra-packages.appspot.com/\">CIPD web UI</a>"]
   related_guides: [""]
   area: ["General", "Developer"]
+
+- term: "Compat driver"
+  short_description: "A Driver Framework v2 (DFv2)
+  <a href=\"/docs/glossary#driver\">driver</a> that wraps a Driver Framework v1 (DFv1) driver so
+  that the DFv1 driver can run in a DFv2 environment."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Component"
   short_description: "Components are the common abstraction that defines how all software
@@ -653,6 +693,17 @@
   see_also: [""]
   related_guides: [""]
   area: ["Component Framework"]
+
+- term: "Ephemeral driver"
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> that is not
+  included in the <a href=\"/docs/glossary#board\">board</a> configuration. These
+  drivers are loaded from the
+  <a href=\"/docs/concepts/packages/package#universe-packages\">universe package set<\a>
+  at runtime."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers"]
 
 - term: "Escher"
   short_description: "Graphics library for compositing user interface content."
@@ -1717,6 +1768,15 @@
   see_also: [""]
   related_guides: [""]
   area: ["General"]
+
+- term: "Universe driver"
+  short_description: "An <a href=\"/docs/glossary#ephemeral-driver\">ephemeral driver</a>
+  from a specific Fuchsia package set that is registered manually after the system's
+  initial boot."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers"]
 
 - term: "use"
   short_description: "A keyword for a component instance to consume a capability that was offered to it."
