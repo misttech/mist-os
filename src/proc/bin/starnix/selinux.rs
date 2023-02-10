@@ -7,8 +7,8 @@ use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
 use crate::logging::not_implemented;
 use crate::task::*;
-use crate::types::as_any::AsAny;
 use crate::types::*;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use zerocopy::AsBytes;
@@ -29,14 +29,14 @@ impl SeLinuxFs {
     fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, SeLinuxFs);
         StaticDirectoryBuilder::new(&fs)
-            .entry(b"load", SeLinuxNode::new(|| Ok(SeLoad)), mode!(IFREG, 0o600))
-            .entry(b"enforce", SeLinuxNode::new(|| Ok(SeEnforce)), mode!(IFREG, 0o644))
-            .entry(b"checkreqprot", SeLinuxNode::new(|| Ok(SeCheckReqProt)), mode!(IFREG, 0o644))
+            .entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600))
+            .entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644))
+            .entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644))
             .entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666))
             .entry(
                 b"deny_unknown",
                 // Allow all unknown object classes/permissions.
-                ByteVecFile::new_node(b"0:0\n".to_vec()),
+                BytesFile::new_node(b"0:0\n".to_vec()),
                 mode!(IFREG, 0o444),
             )
             .entry(
@@ -52,82 +52,11 @@ impl SeLinuxFs {
                 mode!(IFREG, 0o444),
             )
             .entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777))
-            .entry(b"context", SeLinuxNode::new(|| Ok(SeContext)), mode!(IFREG, 0o644))
+            .entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o644))
             .entry_dev(b"null", DeviceFileNode {}, mode!(IFCHR, 0o666), DeviceType::NULL)
             .build_root();
 
         Ok(fs)
-    }
-}
-
-pub struct SeLinuxNode<F, O>
-where
-    F: Fn() -> Result<O, Errno>,
-    O: FileOps,
-{
-    create_file_ops: F,
-}
-impl<F, O> SeLinuxNode<F, O>
-where
-    F: Fn() -> Result<O, Errno> + Send + Sync,
-    O: FileOps,
-{
-    pub fn new(create_file_ops: F) -> SeLinuxNode<F, O> {
-        Self { create_file_ops }
-    }
-}
-impl<F, O> FsNodeOps for SeLinuxNode<F, O>
-where
-    F: Fn() -> Result<O, Errno> + Send + Sync + 'static,
-    O: FileOps,
-{
-    fn create_file_ops(
-        &self,
-        _node: &FsNode,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new((self.create_file_ops)()?))
-    }
-
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
-        // TODO(tbodt): Is this right? This is the minimum to handle O_TRUNC
-        Ok(())
-    }
-}
-
-trait SeLinuxFile {
-    fn write(&self, current_task: &CurrentTask, data: &mut dyn InputBuffer)
-        -> Result<usize, Errno>;
-    fn read(&self, _current_task: &CurrentTask) -> Result<Vec<u8>, Errno> {
-        error!(ENOSYS)
-    }
-}
-
-impl<T: SeLinuxFile + Send + Sync + AsAny + 'static> FileOps for T {
-    fileops_impl_seekable!();
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        if offset != 0 {
-            return error!(EINVAL);
-        }
-        self.write(current_task, data)
-    }
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        _offset: usize,
-        buffer: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let data = self.read(current_task)?;
-        buffer.write(&data)
     }
 }
 
@@ -150,64 +79,44 @@ struct selinux_status_t {
 }
 
 struct SeLoad;
-impl SeLinuxFile for SeLoad {
-    fn write(
-        &self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let length = data.drain();
-        not_implemented!(current_task, "got selinux policy, length {}, ignoring", length);
-        Ok(length)
+impl BytesFileOps for SeLoad {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        not_implemented!(current_task, "got selinux policy, length {}, ignoring", data.len());
+        Ok(())
     }
 }
 
 struct SeEnforce;
-impl SeLinuxFile for SeEnforce {
-    fn write(
-        &self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        let enforce = parse_int(&bytes)?;
+impl BytesFileOps for SeEnforce {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let enforce = parse_int(&data)?;
         not_implemented!(current_task, "selinux setenforce: {}", enforce);
-        Ok(bytes.len())
+        Ok(())
     }
 
-    fn read(&self, _current_task: &CurrentTask) -> Result<Vec<u8>, Errno> {
-        Ok(b"0\n".to_vec())
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(b"0\n"[..].into())
     }
 }
 
 struct SeCheckReqProt;
-impl SeLinuxFile for SeCheckReqProt {
-    fn write(
-        &self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        let checkreqprot = parse_int(&bytes)?;
+impl BytesFileOps for SeCheckReqProt {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let checkreqprot = parse_int(&data)?;
         not_implemented!(current_task, "selinux checkreqprot: {}", checkreqprot);
-        Ok(bytes.len())
+        Ok(())
     }
 }
 
 struct SeContext;
-impl SeLinuxFile for SeContext {
-    fn write(
-        &self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
+impl BytesFileOps for SeContext {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         not_implemented!(
             current_task,
             "selinux validate context: {}",
-            String::from_utf8_lossy(&bytes)
+            String::from_utf8_lossy(&data)
         );
-        Ok(bytes.len())
+        Ok(())
     }
 }
 
@@ -319,11 +228,11 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
             .or_insert_with(|| {
                 let index = format!("{next_index}\n").into_bytes();
                 StaticDirectoryBuilder::new(&node.fs())
-                    .entry(b"index", ByteVecFile::new_node(index), mode!(IFREG, 0o444))
+                    .entry(b"index", BytesFile::new_node(index), mode!(IFREG, 0o444))
                     .subdir(b"perms", 0o555, |mut perms| {
                         for (i, perm) in SELINUX_PERMS.iter().enumerate() {
                             let node =
-                                ByteVecFile::new_node(format!("{}\n", i + 1).as_bytes().to_vec());
+                                BytesFile::new_node(format!("{}\n", i + 1).as_bytes().to_vec());
                             perms = perms.entry(perm, node, mode!(IFREG, 0o444));
                         }
                         perms

@@ -57,7 +57,7 @@ fn attr_directory(task: &Arc<Task>, fs: &FileSystemHandle) -> Arc<FsNode> {
     StaticDirectoryBuilder::new(fs)
         // The `current` security context is, with selinux disabled, unconfined.
         .entry_creds(task.as_fscred())
-        .entry(b"current", ByteVecFile::new_node(b"unconfined\n".to_vec()), mode!(IFREG, 0o666))
+        .entry(b"current", BytesFile::new_node(b"unconfined\n".to_vec()), mode!(IFREG, 0o666))
         .entry(b"fscreate", SimpleFileNode::new(|| Ok(SeLinuxAttribute)), mode!(IFREG, 0o666))
         .dir_creds(task.as_fscred())
         .build()
@@ -195,7 +195,7 @@ impl FsNodeOps for NsDirectory {
                 // TODO(qsr): For now, returns an empty file. In the future, this should create a
                 // reference to to correct namespace, and ensures it keeps it alive.
                 Ok(node.fs().create_node(
-                    ByteVecFile::new_node(vec![]),
+                    BytesFile::new_node(vec![]),
                     mode!(IFREG, 0o444),
                     self.task.as_fscred(),
                 ))
@@ -266,7 +266,7 @@ impl FsNodeOps for FdInfoDirectory {
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
         Ok(node.fs().create_node(
-            ByteVecFile::new_node(data),
+            BytesFile::new_node(data),
             mode!(IFREG, 0o444),
             self.task.as_fscred(),
         ))
