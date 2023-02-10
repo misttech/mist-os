@@ -20,7 +20,6 @@
 #include "msd_cc.h"
 #include "platform_object.h"
 #include "platform_thread.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_event.h"
 
 namespace magma {
 

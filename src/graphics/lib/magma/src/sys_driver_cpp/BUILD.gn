@@ -56,7 +56,6 @@ source_set("connection") {
     "//sdk/lib/stdcompat",
     "//src/graphics/lib/magma/src/magma_util/platform:object",
     "//src/graphics/lib/magma/src/magma_util/platform:thread",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:event",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
