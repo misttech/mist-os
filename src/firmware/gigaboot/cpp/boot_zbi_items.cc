@@ -240,12 +240,12 @@ bool AddSystemTable(zbi_header_t* image, size_t capacity) {
 
 }  // namespace
 
-bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, AbrSlotIndex slot) {
+bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
   if (!AddMemoryRanges(image, capacity)) {
     return false;
   }
 
-  if (AppendCurrentSlotZbiItem(image, capacity, slot) != ZBI_RESULT_OK) {
+  if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
     return false;
   }
 

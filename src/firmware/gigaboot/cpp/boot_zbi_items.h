@@ -5,10 +5,11 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_BOOT_ZBI_ITEMS_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_BOOT_ZBI_ITEMS_H_
 
+#include <lib/abr/abr.h>
 #include <lib/zbi/zbi.h>
 
 namespace gigaboot {
-bool AddGigabootZbiItems(zbi_header_t *image, size_t capacity, AbrSlotIndex slot);
+bool AddGigabootZbiItems(zbi_header_t *image, size_t capacity, const AbrSlotIndex *slot);
 }  // namespace gigaboot
 
 #endif  // SRC_FIRMWARE_GIGABOOT_CPP_BOOT_ZBI_ITEMS_H_

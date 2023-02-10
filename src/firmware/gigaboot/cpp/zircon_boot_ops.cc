@@ -72,7 +72,7 @@ bool WriteToPartition(ZirconBootOps* ops, const char* part, size_t offset, size_
   return gpt_device.value().WritePartition(MapPartitionName(part), src, offset, size).is_ok();
 }
 
-void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity, AbrSlotIndex slot) {
+void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity) {
   // TODO(https://fxbug.dev/78965): Implement the same relocation logic in zircon_boot
   // library and use it here to validate.
   printf("Booting zircon\n");
@@ -98,7 +98,8 @@ void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity, AbrSlotIndex s
   boot.Boot();
 }
 
-bool AddZbiItems(ZirconBootOps* ops, zbi_header_t* image, size_t capacity, AbrSlotIndex slot) {
+bool AddZbiItems(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
+                 const AbrSlotIndex* slot) {
   // TODO(b/235489025): To implement. Append necessary ZBI items for booting the ZBI image. Refers
   // to the C Gigaboot implementation in function boot_zircon() in
   // `src/firmware/gigaboot/src/zircon.c` for what items are needed.

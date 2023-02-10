@@ -84,8 +84,9 @@ TEST_F(BootZbiItemTest, AddMemoryRanges) {
 
   stub_service().SetMemoryMap(memory_map);
 
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_MEM_CONFIG);
   EXPECT_EQ(items.size(), 1ULL);
@@ -109,9 +110,9 @@ TEST_F(BootZbiItemTest, AppendAbrSlotA) {
   auto cleanup = SetupEfiGlobalState();
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
-
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_CMDLINE);
   EXPECT_EQ(items.size(), 1ULL);
@@ -124,9 +125,9 @@ TEST_F(BootZbiItemTest, AppendAbrSlotB) {
   auto cleanup = SetupEfiGlobalState();
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
-
+  AbrSlotIndex slot = kAbrSlotIndexB;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexB));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_CMDLINE);
   EXPECT_EQ(items.size(), 1ULL);
@@ -140,8 +141,9 @@ TEST_F(BootZbiItemTest, AcpiRsdpTestV2) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_ACPI_RSDP);
   ASSERT_EQ(items.size(), 1ULL);
@@ -155,8 +157,9 @@ TEST_F(BootZbiItemTest, AcpiRsdpV1) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_ACPI_RSDP);
   ASSERT_EQ(items.size(), 1ULL);
@@ -171,8 +174,9 @@ TEST_F(BootZbiItemTest, AcpiRsdpV1CorruptTest) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_FALSE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                   buffer().size(), kAbrSlotIndexA));
+                                   buffer().size(), &slot));
 }
 TEST_F(BootZbiItemTest, AcpiRsdpV2CorruptTest) {
   EfiConfigTable config_table(1);
@@ -180,8 +184,9 @@ TEST_F(BootZbiItemTest, AcpiRsdpV2CorruptTest) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_FALSE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                   buffer().size(), kAbrSlotIndexA));
+                                   buffer().size(), &slot));
 }
 TEST_F(BootZbiItemTest, AcpiRsdpNotFoundTest) {
   EfiConfigTable config_table(1);
@@ -189,8 +194,9 @@ TEST_F(BootZbiItemTest, AcpiRsdpNotFoundTest) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_FALSE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                   buffer().size(), kAbrSlotIndexA));
+                                   buffer().size(), &slot));
 }
 
 TEST_F(BootZbiItemTest, SmbiosTest) {
@@ -198,8 +204,9 @@ TEST_F(BootZbiItemTest, SmbiosTest) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_SMBIOS);
   ASSERT_EQ(items.size(), 1ULL);
@@ -212,8 +219,9 @@ TEST_F(BootZbiItemTest, SmbiosV3Test) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_SMBIOS);
   ASSERT_EQ(items.size(), 1ULL);
@@ -226,8 +234,9 @@ TEST_F(BootZbiItemTest, SmbiosErrorTest) {
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_FALSE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                   buffer().size(), kAbrSlotIndexA));
+                                   buffer().size(), &slot));
 }
 
 struct PixelFormatTestCase {
@@ -261,8 +270,9 @@ TEST_P(PixelFormatTest, TestPixelFormat) {
   };
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_FRAMEBUFFER);
   ASSERT_EQ(items.size(), 1ULL);
@@ -311,8 +321,9 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_F(BootZbiItemTest, SystemTableTest) {
   auto cleanup = SetupEfiGlobalState();
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  AbrSlotIndex slot = kAbrSlotIndexA;
   ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), kAbrSlotIndexA));
+                                  buffer().size(), &slot));
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_EFI_SYSTEM_TABLE);
   ASSERT_EQ(items.size(), 1ULL);

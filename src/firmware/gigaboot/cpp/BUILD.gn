@@ -77,6 +77,7 @@ if (is_efi_toolchain) {
     deps = [
       ":lib",
       "legacy_c_gigaboot",
+      "//src/firmware/lib/zircon_boot:in_tree",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
@@ -138,10 +139,8 @@ template("gigaboot_esp") {
 
     # In esp template, `gigaboot_target` and `gigaboot_bin` is only used when target_cpu is x64.
     if (target_cpu == "x64") {
-      gigaboot_target = ":$_efi_target"
-      gigaboot_bin = get_label_info(
-                         "$gigaboot_target(//zircon/kernel/phys/efi:kernel.efi_$current_cpu)",
-                         "root_out_dir") + "/" +
+      gigaboot_target = ":$_efi_target($efi_toolchain)"
+      gigaboot_bin = get_label_info("$gigaboot_target", "root_out_dir") + "/" +
                      get_label_info(gigaboot_target, "name") + ".efi"
     }
   }

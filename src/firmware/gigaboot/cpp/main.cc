@@ -9,6 +9,7 @@
 #include "backends.h"
 #include "fastboot_tcp.h"
 #include "gigaboot/src/netifc.h"
+#include "lib/zircon_boot/zircon_boot.h"
 #include "utils.h"
 #include "xefi.h"
 #include "zircon_boot_ops.h"
@@ -70,13 +71,14 @@ int main(int argc, char** argv) {
     }
   }
 
-  ForceRecovery force_recovery_option =
-      reboot_mode == gigaboot::RebootMode::kRecovery ? kForceRecoveryOn : kForceRecoveryOff;
+  ZirconBootMode boot_mode = reboot_mode == gigaboot::RebootMode::kRecovery
+                                 ? kZirconBootModeForceRecovery
+                                 : kZirconBootModeAbr;
 
-  // TODO(b/236039205): Implement logic to construct these arguments for the API. This is currently
-  // a placeholder for testing compilation/linking.
+  // TODO(b/236039205): Implement logic to construct these arguments for the API. This
+  // is currently a placeholder for testing compilation/linking.
   ZirconBootOps zircon_boot_ops = gigaboot::GetZirconBootOps();
-  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, force_recovery_option);
+  ZirconBootResult res = LoadAndBoot(&zircon_boot_ops, boot_mode);
   if (res != kBootResultOK) {
     printf("Failed to boot zircon\n");
     return 1;
