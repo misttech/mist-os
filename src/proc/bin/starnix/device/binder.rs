@@ -2589,7 +2589,10 @@ impl BinderDriver {
             return Ok(Box::new(task.clone()));
         }
         Ok(Box::new(Arc::new(LocalBinderTask {
-            task: kernel.pids.read().get_task(binder_process.pid).ok_or_else(|| errno!(EINVAL))?,
+            task: kernel.pids.read().get_task(binder_process.pid).ok_or_else(|| {
+                log_error!("binder: task {:?} does not exist (anymore)", binder_process.pid);
+                errno!(EINVAL)
+            })?,
         })))
     }
 
