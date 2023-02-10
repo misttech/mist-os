@@ -90,7 +90,6 @@ zx_library("fake_ddk") {
     "//src/connectivity/ethernet/drivers/virtio/*",
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
     "//src/devices/power/drivers/ti-ina231/*",
-    "//src/devices/spi/drivers/aml-spi/*",
     "//src/devices/testing/*",
     "//src/devices/testing/fake_ddk/test/*",
     "//src/devices/thermal/drivers/aml-thermistor/test/*",
