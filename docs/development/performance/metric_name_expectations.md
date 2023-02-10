@@ -15,9 +15,6 @@ to match.
 For the tests in fuchsia.git, the expectation files are located in
 [src/tests/end_to_end/perf/expected_metric_names/](/src/tests/end_to_end/perf/expected_metric_names/).
 
-The expectation files are not yet required, so some tests do not have
-them yet.
-
 ## Intended benefits
 
 *   The expectation files are intended to help keep metric naming
