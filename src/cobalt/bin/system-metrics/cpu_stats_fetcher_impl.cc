@@ -5,8 +5,8 @@
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher_impl.h"
 
 #include <fcntl.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fdio.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/resource.h>
@@ -81,23 +81,17 @@ bool CpuStatsFetcherImpl::CalculateCpuPercentage(double *cpu_percentage) {
 // switch to Component Stats / iquery, by creating a new class with the
 // interface CpuStatsFetcher.
 void CpuStatsFetcherImpl::InitializeKernelStats() {
-  zx::channel local, remote;
-  zx_status_t status = zx::channel::create(0, &local, &remote);
-  if (status != ZX_OK) {
-    return;
-  }
-  static const char kKernelStatsSvc[] = "/svc/fuchsia.kernel.Stats";
-  status = fdio_service_connect(kKernelStatsSvc, remote.release());
-  if (status != ZX_OK) {
+  zx::result client_end = component::Connect<fuchsia_kernel::Stats>();
+  if (!client_end.is_ok()) {
     FX_LOGS(ERROR) << "Cobalt SystemMetricsDaemon: Error getting kernel stats. "
-                   << "Cannot open fuchsia.kernel.Stats: " << zx_status_get_string(status);
+                   << "Cannot open fuchsia.kernel.Stats: " << client_end.status_string();
     return;
   }
   cpu_stats_buffer_ =
       std::make_unique<fidl::SyncClientBuffer<fuchsia_kernel::Stats::GetCpuStats>>();
   last_cpu_stats_buffer_ =
       std::make_unique<fidl::SyncClientBuffer<fuchsia_kernel::Stats::GetCpuStats>>();
-  stats_service_ = fidl::WireSyncClient<fuchsia_kernel::Stats>(std::move(local));
+  stats_service_ = fidl::WireSyncClient(std::move(*client_end));
 }
 
 }  // namespace cobalt

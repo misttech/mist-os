@@ -31,6 +31,7 @@ source_set("system_metrics_daemon_lib") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/inspect/contrib/cpp:archive_reader",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/inspect/cpp",
@@ -48,11 +49,6 @@ source_set("system_metrics_daemon_lib") {
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]

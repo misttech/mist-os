@@ -18,7 +18,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
   visibility = [
     #------------------
     #------------------
-    "//src/cobalt/bin/system-metrics:system_metrics_daemon_lib",
 
     #------------------
     #------------------
