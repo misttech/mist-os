@@ -40,6 +40,18 @@ pub struct PlayCommand {
 
     #[argh(option, description = "mute the renderer. Default: false", default = "false")]
     pub mute: bool,
+
+    #[argh(
+        option,
+        description = "explicitly set the renderer's reference clock. By default,\
+        SetReferenceClock is not called, which leads to a flexible clock. \
+        Options include: 'flexible', 'monotonic', and 'custom,<rate adjustment>,<offset>' where \
+        rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
+        in place of rate adjustment.",
+        from_str_fn(str_to_clock),
+        default = "fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(fidl_fuchsia_audio_ffxdaemon::Flexible)"
+    )]
+    pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioRenderUsage, String> {
@@ -51,4 +63,8 @@ fn str_to_usage(src: &str) -> Result<AudioRenderUsage, String> {
         "COMMUNICATION" => Ok(AudioRenderUsage::Communication),
         _ => Err(String::from("Couldn't parse usage.")),
     }
+}
+
+fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {
+    format_utils::str_to_clock(src)
 }

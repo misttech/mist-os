@@ -52,6 +52,7 @@ pub async fn record_capture(
                 Some(RecordLocation::Capturer(CapturerInfo {
                     usage: capturer_usage,
                     buffer_size: record_command.buffer_size,
+                    clock: Some(record_command.clock),
                     ..CapturerInfo::EMPTY
                 }))
             },

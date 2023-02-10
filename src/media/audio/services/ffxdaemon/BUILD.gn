@@ -17,6 +17,7 @@ rustc_library("format-utils") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//third_party/rust_crates:anyhow",

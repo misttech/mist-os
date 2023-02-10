@@ -21,6 +21,7 @@ pub async fn play_cmd(audio_proxy: AudioDaemonProxy, cmd: PlayCommand) -> Result
         location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::Renderer(
             fidl_fuchsia_audio_ffxdaemon::RendererInfo {
                 usage: Some(cmd.usage),
+                clock: Some(cmd.clock),
                 ..fidl_fuchsia_audio_ffxdaemon::RendererInfo::EMPTY
             },
         )),

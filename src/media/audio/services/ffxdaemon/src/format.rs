@@ -266,6 +266,41 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
     }
 }
 
+pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {
+    match src.to_lowercase().as_str() {
+        "flexible" => Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
+            fidl_fuchsia_audio_ffxdaemon::Flexible,
+        )),
+        "monotonic" => Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Monotonic(
+            fidl_fuchsia_audio_ffxdaemon::Monotonic,
+        )),
+        _ => {
+            let splits: Vec<&str> = src.split(",").collect();
+            if splits[0] == "custom" {
+                let rate_adjust = match splits[1].parse::<i32>() {
+                    Ok(rate_adjust) => Some(rate_adjust),
+                    Err(_) => None,
+                };
+
+                let offset = match splits[2].parse::<i32>() {
+                    Ok(offset) => Some(offset),
+                    Err(_) => None,
+                };
+
+                Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(
+                    fidl_fuchsia_audio_ffxdaemon::CustomClockInfo {
+                        rate_adjust,
+                        offset,
+                        ..fidl_fuchsia_audio_ffxdaemon::CustomClockInfo::EMPTY
+                    },
+                ))
+            } else {
+                return Err(format!("Invalid clock argument: {}.", src));
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 #[cfg(test)]

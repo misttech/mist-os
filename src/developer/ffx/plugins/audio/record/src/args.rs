@@ -43,6 +43,18 @@ pub struct RecordCommand {
         Defaults to size to hold 1 second of audio data."
     )]
     pub buffer_size: Option<u64>,
+
+    #[argh(
+        option,
+        description = "explicitly set the capturer's reference clock. By default,\
+        SetReferenceClock is not called, which leads to a flexible clock. \
+        Options include: 'flexible', 'monotonic', and 'custom,<rate adjustment>,<offset>' where \
+        rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
+        in place of rate adjustment.",
+        from_str_fn(str_to_clock),
+        default = "fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(fidl_fuchsia_audio_ffxdaemon::Flexible)"
+    )]
+    pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,4 +86,8 @@ fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
 
 fn parse_duration(value: &str) -> Result<Duration, String> {
     format_utils::parse_duration(value)
+}
+
+fn str_to_clock(value: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {
+    format_utils::str_to_clock(value)
 }

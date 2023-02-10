@@ -25,7 +25,37 @@ type RendererInfo = table {
     /// The usage of the audio stream.
     /// Required.
     1: usage fuchsia.media.AudioRenderUsage;
+
+    /// How to set the reference clock.
+    2: clock ClockType;
 };
+
+/// Reference clock options for AudioRenderer and AudioCapturer.
+type ClockType = flexible union {
+    /// Use a flexible clock.
+    1: flexible struct {};
+
+    /// Use the system monotonic clock.
+    2: monotonic struct {};
+
+    /// Use a monotonic clock with possible rate adjustment and offset relative to the system
+    /// monotonic clock.
+    3: custom CustomClockInfo;
+};
+
+/// Configuration for the custom reference clock passed to AudioRenderer or AudioCapturer.
+type CustomClockInfo = table {
+    /// Frequency rate adjustment to a clone of the system monotonic clock.
+    /// Given in parts per million relative to the system monotonic rate.
+    /// Must fall within [ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST].
+    /// For more info, see `zx_clock_update`.
+    1: rate_adjust int32;
+
+    /// Starting delta between the reference clock passed to AudioRenderer or Capturer
+    /// and the system monotonic clock.
+    2: offset int32;
+};
+
 
 /// Where to capture audio data.
 type RecordLocation = flexible union {
@@ -44,6 +74,9 @@ type CapturerInfo = table {
 
     /// Buffer size in bytes for retrieving audio data.
     2: buffer_size uint64;
+
+    /// How to set the reference clock.
+    3: clock ClockType;
 };
 
 /// Gain settings.

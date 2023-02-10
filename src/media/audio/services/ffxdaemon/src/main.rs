@@ -61,9 +61,11 @@ impl AudioDaemon {
 
         let location = request.location.ok_or(anyhow::anyhow!("Input missing."))?;
 
-        let (capturer_usage, loopback) = match location {
-            RecordLocation::Capturer(capturer_info) => (capturer_info.usage, false),
-            RecordLocation::Loopback(..) => (None, true),
+        let (capturer_usage, loopback, clock) = match location {
+            RecordLocation::Capturer(capturer_info) => {
+                (capturer_info.usage, false, capturer_info.clock)
+            }
+            RecordLocation::Loopback(..) => (None, true, None),
             _ => panic!("Expected Capturer RecordLocation"),
         };
 
@@ -87,11 +89,17 @@ impl AudioDaemon {
 
         let capturer_proxy = client_end.into_proxy()?;
         capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
+
         if !(loopback) {
             match capturer_usage {
                 Some(capturer_usage) => capturer_proxy.set_usage(capturer_usage)?,
                 None => panic!("No usage specified how to capture audio."),
             }
+        }
+
+        if let Some(clock_type) = clock {
+            let reference_clock = Self::setup_reference_clock(clock_type)?;
+            capturer_proxy.set_reference_clock(reference_clock)?;
         }
 
         let num_packets = 4;
@@ -135,6 +143,53 @@ impl AudioDaemon {
         Ok(())
     }
 
+    fn setup_reference_clock(
+        clock_type: fidl_fuchsia_audio_ffxdaemon::ClockType,
+    ) -> Result<Option<zx::Clock>, Error> {
+        match clock_type {
+            fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(_) => Ok(None),
+            fidl_fuchsia_audio_ffxdaemon::ClockType::Monotonic(_) => {
+                let clock =
+                    zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
+                        .expect("Creating reference clock failed");
+                let rights_clock = clock
+                    .replace_handle(zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
+                    .expect("Replace handle for reference clock failed");
+                Ok(Some(rights_clock))
+            }
+            fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(info) => {
+                let rate = info.rate_adjust;
+                let offset = info.offset;
+                let now = zx::Time::get_monotonic();
+                let delta_time = now + zx::Duration::from_nanos(offset.unwrap_or(0).into());
+
+                let update_builder = zx::ClockUpdate::builder()
+                    .rate_adjust(rate.unwrap_or(0))
+                    .absolute_value(now, delta_time);
+
+                let auto_start = if offset.is_some() {
+                    zx::ClockOpts::empty()
+                } else {
+                    zx::ClockOpts::AUTO_START
+                };
+
+                let clock = zx::Clock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
+                    .expect("Creating reference clock failed");
+
+                clock.update(update_builder.build()).expect("Updating reference clock failed");
+
+                Ok(Some(
+                    clock
+                        .replace_handle(
+                            zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER,
+                        )
+                        .expect("Replace handle for reference clock failed"),
+                ))
+            }
+            fidl_fuchsia_audio_ffxdaemon::ClockTypeUnknown!() => Ok(None),
+        }
+    }
+
     fn send_next_packet<'b>(
         payload_offset: u64,
         mut socket: fidl::AsyncSocket,
@@ -151,13 +206,13 @@ impl AudioDaemon {
             if total_bytes_read == 0 {
                 return Ok(());
             }
-            vmo.write(&buf[..total_bytes_read], payload_offset as u64)?;
+            vmo.write(&buf[..total_bytes_read], payload_offset)?;
 
             let packet_fut =
                 audio_renderer_proxy.send_packet(&mut fidl_fuchsia_media::StreamPacket {
                     pts: fidl_fuchsia_media::NO_TIMESTAMP,
                     payload_buffer_id: 0,
-                    payload_offset: payload_offset as u64,
+                    payload_offset: payload_offset,
                     payload_size: total_bytes_read as u64,
                     flags: 0,
                     buffer_config: 0,
@@ -207,8 +262,8 @@ impl AudioDaemon {
 
         let (gain_control_client_end, gain_control_server_end) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media_audio::GainControlMarker>()?;
-        let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
+        let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
         audio_component.create_audio_renderer(server_end)?;
         let audio_renderer_proxy = Rc::new(client_end.into_proxy()?);
 
@@ -232,12 +287,18 @@ impl AudioDaemon {
         let bytes_per_packet = cmp::min(vmo_size_bytes / num_packets as usize, 32000 as usize);
         let location = request.location.ok_or(anyhow::anyhow!("Location missing"))?;
 
-        let usage = match location {
-            PlayLocation::Renderer(renderer_info) => {
-                renderer_info.usage.ok_or(anyhow::anyhow!("No usage provided."))?
-            }
+        let (usage, clock) = match location {
+            PlayLocation::Renderer(renderer_info) => (
+                renderer_info.usage.ok_or(anyhow::anyhow!("No usage provided."))?,
+                renderer_info.clock,
+            ),
             _ => panic!("Expected Renderer PlayLocation"),
         };
+
+        if let Some(clock_type) = clock {
+            let reference_clock = Self::setup_reference_clock(clock_type)?;
+            audio_renderer_proxy.set_reference_clock(reference_clock)?;
+        }
 
         audio_renderer_proxy.set_usage(usage)?;
         audio_renderer_proxy.set_pcm_stream_type(&mut AudioStreamType::from(&format))?;
