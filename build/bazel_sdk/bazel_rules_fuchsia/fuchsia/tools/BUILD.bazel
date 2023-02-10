@@ -139,3 +139,9 @@ py_binary(
     srcs = ["json_comparator.py"],
     python_version = "PY3",
 )
+
+py_binary(
+    name = "create_pave_script",
+    srcs = ["create_pave_script.py"],
+    python_version = "PY3",
+)

@@ -376,7 +376,7 @@ def _fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
     partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
     system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
-    ffx_tool = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].ffx
+    ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
@@ -449,6 +449,11 @@ def _fuchsia_product_bundle_impl(ctx):
     ]
     if ctx.file.repository_keys != None:
         script_lines.append("cp -r $ORIG_DIR/$REPOKEYS $ORIG_DIR/$OUTDIR")
+
+    script_lines.append("cp $ORIG_DIR/$BOOTSERVER $ORIG_DIR/$OUTDIR")
+    env["BOOTSERVER"] = fuchsia_toolchain.bootserver.path
+    inputs.append(fuchsia_toolchain.bootserver)
+
     script = "\n".join(script_lines)
     ctx.actions.run_shell(
         inputs = inputs,
@@ -466,6 +471,23 @@ def _fuchsia_product_bundle_impl(ctx):
     if ctx.attr.recovery_scrutiny_config:
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, True)
+
+    # TODO(fxb/121752): Remove the generation of pave.sh after infra is
+    # ready to use product bundle to flash device.
+    pave_script = ctx.actions.declare_file("pave.sh")
+    ctx.actions.run(
+        outputs = [pave_script],
+        inputs = [pb_out_dir],
+        executable = ctx.executable._create_pave_script,
+        arguments = [
+            "--product-bundle",
+            pb_out_dir.path + "/product_bundle.json",
+            "--pave-script-path",
+            pave_script.path,
+        ],
+    )
+    deps.append(pave_script)
+
     return [DefaultInfo(files = depset(direct = deps)), FuchsiaProductBundleInfo(
         product_bundle = pb_out_dir,
         is_remote = False,
@@ -528,6 +550,11 @@ fuchsia_product_bundle = rule(
         "_sdk_manifest": attr.label(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
+        ),
+        "_create_pave_script": attr.label(
+            default = "//fuchsia/tools:create_pave_script",
+            executable = True,
+            cfg = "exec",
         ),
     },
 )
