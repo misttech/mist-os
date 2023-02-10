@@ -109,6 +109,34 @@ unsafe impl ObjectQuery for SocketInfoQuery {
 }
 
 impl Socket {
+    /// Create a streaming socket, accessed through a pair of endpoints. Data written
+    /// into one may be read from the other.
+    ///
+    /// Wraps
+    /// [zx_socket_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_create.md).
+    ///
+    /// # Panics
+    ///
+    /// If the process' job policy denies socket creation or the kernel reports no memory
+    /// available to create a new socket.
+    pub fn create_stream() -> (Socket, Socket) {
+        Self::create(SocketOpts::STREAM).expect("socket creation can't fail with valid options")
+    }
+
+    /// Create a datagram socket, accessed through a pair of endpoints. Data written
+    /// into one may be read from the other.
+    ///
+    /// Wraps
+    /// [zx_socket_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_create.md).
+    ///
+    /// # Panics
+    ///
+    /// If the process' job policy denies socket creation or the kernel reports no memory
+    /// available to create a new socket.
+    pub fn create_datagram() -> (Socket, Socket) {
+        Self::create(SocketOpts::DATAGRAM).expect("socket creation can't fail with valid options")
+    }
+
     /// Create a socket, accessed through a pair of endpoints. Data written
     /// into one may be read from the other.
     ///

@@ -715,6 +715,16 @@ impl Drop for Socket {
 }
 
 impl Socket {
+    /// Create a streaming socket.
+    pub fn create_stream() -> (Socket, Socket) {
+        Self::create(SocketOpts::STREAM).expect("socket creation can't fail with valid options")
+    }
+
+    /// Create a datagram socket.
+    pub fn create_datagram() -> (Socket, Socket) {
+        Self::create(SocketOpts::DATAGRAM).expect("socket creation can't fail with valid options")
+    }
+
     /// Create a pair of sockets
     pub fn create(sock_opts: SocketOpts) -> Result<(Socket, Socket), zx_status::Status> {
         match sock_opts {
