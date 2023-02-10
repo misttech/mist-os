@@ -188,7 +188,7 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
     explicit last_reference(fdio_t* ptr) : ptr_(ptr, deleter) {}
     ~last_reference() {
       if (ptr_) {
-        ptr_->close(/*should_wait=*/true);
+        ptr_->close(/*should_wait=*/false);
       }
     }
 
@@ -239,7 +239,7 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   virtual ~fdio();
 
   void fbl_recycle() {
-    close(/*should_wait=*/true);
+    close(/*should_wait=*/false);
     delete this;
   }
 
