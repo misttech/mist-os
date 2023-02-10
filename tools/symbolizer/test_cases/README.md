@@ -17,7 +17,7 @@ symbolizer against `cpp_crasher_syslog.in` manually.
 
 ```
 ffx debug symbol-index add prebuilt/test_data/symbolizer/symbols
-fx symbolize < tools/symbolizer/test_cases/cpp_crasher_syslog.in
+ffx debug symbolize < tools/symbolizer/test_cases/cpp_crasher_syslog.in
 ```
 
 ## Upload symbol files for new test cases

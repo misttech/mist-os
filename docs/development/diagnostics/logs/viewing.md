@@ -110,7 +110,7 @@ while others are trimmed down (timestamp, severity).
 Serial output should be piped in from the emulator or from other sources:
 
 ```
-ffx emu start --console | fx symbolize
+ffx emu start --console | ffx debug symbolize
 ```
 
 For example, if the message "something happened" is printed to klog at WARN level by
@@ -152,7 +152,7 @@ Normally this includes the following notable items, all interleaved:
 * kernel log from netsvc (equivalent to `fx klog`)
 * `stdout` and `stderr` of the tests run by testrunner
 
-This aggregate log is run through the equivalent of `fx symbolize` before upload.
+This aggregate log is run through the equivalent of `ffx debug symbolize` before upload.
 
 [monotonic clock]: /docs/reference/syscalls/clock_get_monotonic.md
 [Concepts: Storage]: /docs/concepts/components/diagnostics/logs/README.md#storage

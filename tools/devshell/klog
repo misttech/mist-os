@@ -10,11 +10,6 @@
 ##
 ##    --raw                   do not attempt to symbolize the log
 ##
-##    --remote-symbols|-r     attempt to resolve symbols using predefined remote
-##                            symbol servers for symbols that cannot be resolved
-##                            locally. See `fx help symbolize` for more
-##                            information on remote symbol servers.
-##
 ## This command delegates to the Zircon `loglistener` binary.
 ## It will listen to the device specified with `fx -d DEVICE klog` or
 ## `fx set-device`, otherwise one of the devices on the link-local network.
@@ -26,8 +21,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 fx-config-read
 
 declare is_raw=0
-declare is_remote=0
-declare symbolizer=( "fx-command-run" "symbolize" )
+declare symbolizer=( "fx-command-run" "ffx" "debug" "symbolize" )
 
 while [[ $# -ne 0 ]]; do
   case "$1" in
@@ -39,8 +33,8 @@ while [[ $# -ne 0 ]]; do
     is_raw=1
     ;;
   --remote-symbols|-r)
-    is_remote=1
-    symbolizer+=("-r")
+    fx-error "--remote-symbols|-r is deprecated. Remote symbolization will be tried automatically."
+    exit 1
     ;;
   *)
     fx-error Invalid syntax
@@ -49,12 +43,6 @@ while [[ $# -ne 0 ]]; do
   esac
   shift
 done
-
-if (( is_raw )) && (( is_remote )); then
-  fx-error "Invalid syntax: --raw and -r cannot be used together"
-  fx-command-help
-  exit 1
-fi
 
 device="$(get-device-name)" || exit $?
 if (( is_raw )); then

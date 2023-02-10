@@ -191,7 +191,7 @@ def hijack_stdout(cmd):
 
 
 def get_decode_cmd():
-  decode_cmd = 'fx symbolize'
+  decode_cmd = 'ffx debug symbolize'
   return decode_cmd
 
 

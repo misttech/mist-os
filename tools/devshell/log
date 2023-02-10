@@ -10,11 +10,6 @@
 ##
 ##    --raw                   do not attempt to symbolize the log
 ##
-##    --remote-symbols|-r     attempt to resolve symbols using predefined remote
-##                            symbol servers for symbols that cannot be resolved
-##                            locally. See `fx help symbolize` for more
-##                            information on remote symbol servers.
-##
 ##    --help|-h               show this help and attempt to also show the
 ##                            on-device log_listener help
 ##
@@ -50,8 +45,7 @@ function listen {
 }
 
 declare is_raw=0
-declare is_remote=0
-declare symbolizer=( "fx-command-run" "symbolize" )
+declare symbolizer=( "fx-command-run" "ffx" "debug" "symbolize" )
 
 while [[ $# -ne 0 ]]; do
   case "$1" in
@@ -66,20 +60,14 @@ while [[ $# -ne 0 ]]; do
     is_raw=1
     ;;
   --remote-symbols|-r)
-    is_remote=1
-    symbolizer+=("-r")
+    fx-error "--remote-symbols|-r is deprecated. Remote symbolization will be tried automatically."
+    exit 1
     ;;
   *)
     break
   esac
   shift
 done
-
-if (( is_raw )) && (( is_remote )); then
-  fx-error "Invalid syntax: --raw and -r cannot be used together"
-  fx-command-help
-  exit 1
-fi
 
 if (( is_raw )); then
   listen "$@"
