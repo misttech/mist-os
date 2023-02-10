@@ -97,11 +97,9 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/ram/bin/ram-info",
 
     #------------------
     #------------------
-    "//src/devices/ram/bin/ram-info:ram-info-test-bin",
 
     #------------------
     #------------------
