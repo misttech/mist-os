@@ -9,11 +9,9 @@
 #include <fidl/fuchsia.hardware.usb.peripheral.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/namespace.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
@@ -106,17 +104,19 @@ class BlockDeviceController {
         fidl::VectorView<usb_peripheral::wire::FunctionDescriptor>::FromExternal(function_descs));
     ASSERT_OK(bus_->SetupPeripheralDevice(GetDeviceDescriptor(), std::move(config_descs)));
 
+    fbl::unique_fd fd{openat(bus_->GetRootFd(), "class/usb-cache-test", O_RDONLY)};
+
     fbl::String devpath;
-    while (fdio_watch_directory(openat(bus_->GetRootFd(), "class/usb-cache-test", O_RDONLY),
-                                WaitForAnyFile, ZX_TIME_INFINITE, &devpath) != ZX_ERR_STOP)
-      continue;
+    while (fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath) !=
+           ZX_ERR_STOP) {
+    }
+    fdio_cpp::UnownedFdioCaller caller(fd);
 
-    devpath = fbl::String::Concat({fbl::String("class/usb-cache-test/"), devpath});
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), devpath.c_str(), O_RDWR));
-    zx::channel cache_control;
-    ASSERT_OK(fdio_get_service_handle(fd.release(), cache_control.reset_and_get_address()));
+    zx::result client_end =
+        component::ConnectAt<usb_peripheral_block::Device>(caller.directory(), devpath.c_str());
+    ASSERT_OK(client_end);
 
-    cachecontrol_ = fidl::WireSyncClient<usb_peripheral_block::Device>(std::move(cache_control));
+    cachecontrol_.Bind(std::move(client_end.value()));
   }
 
   void EnableWritebackCache() {
@@ -243,44 +243,49 @@ TEST_F(UmsTest, DISABLED_CachedWriteWithNoFlushShouldBeDiscarded) {
   ASSERT_NO_FATAL_FAILURE(controller.Connect());
   ASSERT_NO_FATAL_FAILURE(controller.SetWritebackCacheReported(true));
   ASSERT_NO_FATAL_FAILURE(controller.EnableWritebackCache());
-  fbl::unique_fd fd(openat(bus_->GetRootFd(), GetTestdevPath().c_str(), O_RDWR));
-  ASSERT_GE(fd.get(), 0);
-  fdio_cpp::UnownedFdioCaller caller(fd);
+  fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
 
   uint32_t blk_size;
+  std::unique_ptr<uint8_t[]> read_buffer;
   {
-    const fidl::WireResult result =
-        fidl::WireCall(caller.borrow_as<fuchsia_hardware_block::Block>())->GetInfo();
-    ASSERT_OK(result.status());
-    const fit::result response = result.value();
-    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-    blk_size = response.value()->info.block_size;
-  }
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
+    ASSERT_OK(client_end);
 
-  std::unique_ptr<uint8_t[]> write_buffer(new uint8_t[blk_size]);
-  std::unique_ptr<uint8_t[]> read_buffer(new uint8_t[blk_size]);
-  ASSERT_EQ(ZX_OK, BRead(caller.borrow_as<fuchsia_hardware_block::Block>(), read_buffer.get(),
-                         blk_size, 0));
-  fd.reset(openat(bus_->GetRootFd(), GetTestdevPath().c_str(), O_RDWR));
-  ASSERT_GE(fd.get(), 0);
-  // Create a pattern to write to the block device
-  for (size_t i = 0; i < blk_size; i++) {
-    write_buffer.get()[i] = static_cast<unsigned char>(i);
+    {
+      const fidl::WireResult result = fidl::WireCall(client_end.value())->GetInfo();
+      ASSERT_OK(result.status());
+      const fit::result response = result.value();
+      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+      blk_size = response.value()->info.block_size;
+    }
+    read_buffer.reset(new uint8_t[blk_size]);
+
+    ASSERT_EQ(ZX_OK, BRead(client_end.value(), read_buffer.get(), blk_size, 0));
   }
-  // Write the data to the block device
-  ASSERT_EQ(ZX_OK, BWrite(caller.borrow_as<fuchsia_hardware_block::Block>(), write_buffer.get(),
-                          blk_size, 0));
-  ASSERT_EQ(-1, fsync(fd.get()));
-  fd.reset();
+  std::unique_ptr<uint8_t[]> write_buffer(new uint8_t[blk_size]);
+  {
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
+    ASSERT_OK(client_end);
+    // Create a pattern to write to the block device
+    for (size_t i = 0; i < blk_size; i++) {
+      write_buffer.get()[i] = static_cast<unsigned char>(i);
+    }
+    // Write the data to the block device
+    ASSERT_EQ(ZX_OK, BWrite(client_end.value(), write_buffer.get(), blk_size, 0));
+  }
   // Disconnect the block device without flushing the cache.
   // This will cause the data that was written to be discarded.
   ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
   ASSERT_NO_FATAL_FAILURE(controller.Connect());
-  fd.reset(openat(bus_->GetRootFd(), GetTestdevPath().c_str(), O_RDWR));
-  ASSERT_GE(fd.get(), 0);
-  ASSERT_EQ(ZX_OK, BRead(caller.borrow_as<fuchsia_hardware_block::Block>(), write_buffer.get(),
-                         blk_size, 0));
-  ASSERT_NE(0, memcmp(read_buffer.get(), write_buffer.get(), blk_size));
+  {
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
+    ASSERT_OK(client_end);
+    ASSERT_EQ(ZX_OK, BRead(client_end.value(), write_buffer.get(), blk_size, 0));
+    ASSERT_NE(0, memcmp(read_buffer.get(), write_buffer.get(), blk_size));
+  }
 }
 
 TEST_F(UmsTest, DISABLED_UncachedWriteShouldBePersistedToBlockDevice) {
@@ -290,41 +295,44 @@ TEST_F(UmsTest, DISABLED_UncachedWriteShouldBePersistedToBlockDevice) {
   ASSERT_NO_FATAL_FAILURE(controller.Connect());
   ASSERT_NO_FATAL_FAILURE(controller.SetWritebackCacheReported(false));
   ASSERT_NO_FATAL_FAILURE(controller.DisableWritebackCache());
-  fbl::unique_fd fd(openat(bus_->GetRootFd(), GetTestdevPath().c_str(), O_RDWR));
-  ASSERT_GE(fd.get(), 0);
-  fdio_cpp::UnownedFdioCaller caller(fd.get());
+  fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
 
   uint32_t blk_size;
+  std::unique_ptr<uint8_t[]> write_buffer;
   {
-    const fidl::WireResult result =
-        fidl::WireCall(caller.borrow_as<fuchsia_hardware_block::Block>())->GetInfo();
-    ASSERT_OK(result.status());
-    const fit::result response = result.value();
-    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-    blk_size = response.value()->info.block_size;
-  }
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
+    ASSERT_OK(client_end);
+    {
+      const fidl::WireResult result = fidl::WireCall(client_end.value())->GetInfo();
+      ASSERT_OK(result.status());
+      const fit::result response = result.value();
+      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+      blk_size = response.value()->info.block_size;
+    }
 
-  // Allocate our buffer
-  std::unique_ptr<uint8_t[]> write_buffer(new uint8_t[blk_size]);
-  // Generate and write a pattern to the block device
-  for (size_t i = 0; i < blk_size; i++) {
-    write_buffer.get()[i] = static_cast<unsigned char>(i);
+    // Allocate our buffer
+    write_buffer.reset(new uint8_t[blk_size]);
+    // Generate and write a pattern to the block device
+    for (size_t i = 0; i < blk_size; i++) {
+      write_buffer.get()[i] = static_cast<unsigned char>(i);
+    }
+    ASSERT_EQ(ZX_OK, BWrite(client_end.value(), write_buffer.get(), blk_size, 0));
+    memset(write_buffer.get(), 0, blk_size);
   }
-  ASSERT_EQ(ZX_OK, BWrite(caller.borrow_as<fuchsia_hardware_block::Block>(), write_buffer.get(),
-                          blk_size, 0));
-  memset(write_buffer.get(), 0, blk_size);
-  fd.reset();
   // Disconnect and re-connect the block device
   ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
   ASSERT_NO_FATAL_FAILURE(controller.Connect());
-  fd.reset(openat(bus_->GetRootFd(), GetTestdevPath().c_str(), O_RDWR));
-  ASSERT_GE(fd.get(), 0);
-  // Read back the pattern, which should match what was written
-  // since writeback caching was disabled.
-  ASSERT_EQ(ZX_OK, BRead(caller.borrow_as<fuchsia_hardware_block::Block>(), write_buffer.get(),
-                         blk_size, 0));
-  for (size_t i = 0; i < blk_size; i++) {
-    ASSERT_EQ(write_buffer.get()[i], static_cast<unsigned char>(i));
+  {
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
+    ASSERT_OK(client_end);
+    // Read back the pattern, which should match what was written
+    // since writeback caching was disabled.
+    ASSERT_EQ(ZX_OK, BRead(client_end.value(), write_buffer.get(), blk_size, 0));
+    for (size_t i = 0; i < blk_size; i++) {
+      ASSERT_EQ(write_buffer.get()[i], static_cast<unsigned char>(i));
+    }
   }
 }
 
