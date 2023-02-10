@@ -7,6 +7,7 @@ use {
     anyhow::{format_err, Context, Result},
     fuchsia_async as fasync,
     fuchsia_lockfile::Lockfile,
+    fuchsia_pkg::PackageManifest,
     fuchsia_repo::{
         package_manifest_watcher::PackageManifestWatcher,
         repo_builder::RepoBuilder,
@@ -18,10 +19,10 @@ use {
     std::{
         collections::BTreeSet,
         fs::File,
-        io::{BufWriter, Write},
+        io::{BufReader, BufWriter, Write},
         path::Path,
     },
-    tracing::{error, warn},
+    tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
 };
 
@@ -50,8 +51,26 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         .watch()?;
 
     while let Some(event) = watcher.next().await {
-        cmd.package_manifests = event.paths.into_iter().collect();
-        repo_publish(cmd).await.unwrap_or_else(|e| warn!("Repo publish error: {:?}", e));
+        cmd.package_manifests.clear();
+
+        // Log which packages we intend to publish.
+        for path in event.paths {
+            let Ok(file) = File::open(&path) else {
+                continue;
+            };
+
+            let Ok(manifest) = PackageManifest::from_reader(&path, BufReader::new(file)) else {
+                continue;
+            };
+
+            info!("publishing {}", manifest.name());
+
+            cmd.package_manifests.push(path);
+        }
+
+        if let Err(err) = repo_publish(cmd).await {
+            warn!("Repo publish failed: {:#}", err);
+        }
     }
     Ok(())
 }
