@@ -235,7 +235,7 @@ impl ServiceConsumerProxyInterface for ServiceConsumer {
 /// Connect two test overnet instances with a stream socket.
 pub fn connect(a: &Arc<Overnet>, b: &Arc<Overnet>) -> Result<(), Error> {
     tracing::info!(a = a.node_id().0, b = b.node_id().0, "Connect nodes");
-    let (sa, sb) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (sa, sb) = fidl::Socket::create_stream();
     a.attach_circuit_socket_link(sa, true)?;
     b.attach_circuit_socket_link(sb, false)?;
     Ok(())

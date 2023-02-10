@@ -41,9 +41,7 @@ use crate::{
 };
 use anyhow::{bail, format_err, Context as _, Error};
 use async_utils::mutex_ticket::MutexTicket;
-use fidl::{
-    endpoints::ClientEnd, AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket, SocketOpts,
-};
+use fidl::{endpoints::ClientEnd, AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket};
 use fidl_fuchsia_overnet::{ConnectionInfo, ServiceProviderMarker, ServiceProviderProxyInterface};
 use fidl_fuchsia_overnet_protocol::{
     ChannelHandle, EventPairHandle, EventPairRights, Implementation, LinkDiagnosticInfo,
@@ -960,15 +958,16 @@ impl Router {
                 .await
             }
             ZirconHandle::Socket(SocketHandle { stream_ref, socket_type, rights }) => {
-                let opts = match socket_type {
-                    SocketType::Stream => SocketOpts::STREAM,
-                    SocketType::Datagram => SocketOpts::DATAGRAM,
-                };
                 self.recv_proxied_handle(
                     conn,
                     stats,
                     stream_ref,
-                    move || Socket::create(opts).map_err(Into::into),
+                    move || {
+                        Ok(match socket_type {
+                            SocketType::Stream => Socket::create_stream(),
+                            SocketType::Datagram => Socket::create_datagram(),
+                        })
+                    },
                     rights,
                 )
                 .await

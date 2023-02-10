@@ -22,7 +22,13 @@ impl SockFixture {
 #[async_trait]
 impl socket::Fixture for SockFixture {
     async fn create_handles(&self, opts: fidl::SocketOpts) -> (fidl::Socket, fidl::Socket) {
-        let (local, remote) = fidl::Socket::create(opts).unwrap();
+        let (local, remote) = match opts {
+            fidl::SocketOpts::STREAM => fidl::Socket::create_stream(),
+            fidl::SocketOpts::DATAGRAM => fidl::Socket::create_datagram(),
+
+            #[cfg(target_os = "fuchsia")]
+            _ => panic!("unsupported socket options"),
+        };
         (local, self.fixture.distribute_handle(remote, Target::B).await)
     }
 }

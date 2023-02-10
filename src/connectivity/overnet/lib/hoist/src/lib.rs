@@ -127,8 +127,8 @@ mod test {
     async fn one_bad_link_doesnt_take_the_rest_down() {
         let hoist = Hoist::new().unwrap();
         let mesh_controller = &hoist.connect_as_mesh_controller().unwrap();
-        let (s1a, s1b) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
-        let (s2a, s2b) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (s1a, s1b) = fidl::Socket::create_stream();
+        let (s2a, s2b) = fidl::Socket::create_stream();
         mesh_controller.attach_socket_link(s1a).unwrap();
         mesh_controller.attach_socket_link(s2a).unwrap();
         let mut s1b = fidl::AsyncSocket::from_socket(s1b).unwrap();

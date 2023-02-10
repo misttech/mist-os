@@ -276,8 +276,8 @@ pub async fn connect_with_mutator(
 ) -> Result<(), Error> {
     let a = a.clone().connect_as_mesh_controller()?;
     let b = b.clone().connect_as_mesh_controller()?;
-    let (a1, a2) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
-    let (b1, b2) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (a1, a2) = fidl::Socket::create_stream();
+    let (b1, b2) = fidl::Socket::create_stream();
     let (arx, atx) = fidl::AsyncSocket::from_socket(a2)?.split();
     let (brx, btx) = fidl::AsyncSocket::from_socket(b1)?.split();
     a.attach_socket_link(a1)?;
@@ -295,7 +295,7 @@ pub fn connect(a: &Arc<Overnet>, b: &Arc<Overnet>) -> Result<(), Error> {
     tracing::info!(a = a.node_id().0, b = b.node_id().0, "Connect nodes");
     let a = a.clone().connect_as_mesh_controller()?;
     let b = b.clone().connect_as_mesh_controller()?;
-    let (sa, sb) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (sa, sb) = fidl::Socket::create_stream();
     a.attach_socket_link(sa)?;
     b.attach_socket_link(sb)?;
     Ok(())

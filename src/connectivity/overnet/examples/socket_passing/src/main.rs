@@ -101,8 +101,7 @@ async fn exec_client(args: Command) -> Result<(), Error> {
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
             let cli = socketpassing::ExampleProxy::new(proxy);
 
-            let (ss, cs) = fidl::Socket::create(fidl::SocketOpts::STREAM)
-                .context("failed to create socket")?;
+            let (ss, cs) = fidl::Socket::create_stream();
             return try_join(run_command(cs, args), cli.pass(ss).map_err(|e| e.into()))
                 .await
                 .map(|_| ());

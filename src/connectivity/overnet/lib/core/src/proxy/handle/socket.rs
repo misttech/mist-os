@@ -154,7 +154,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn stream_socket_partial_write() {
-        let (tx, rx) = fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (tx, rx) = fidl::Socket::create_stream();
         let socket = tx.into_proxied().expect("create proxied socket");
 
         const KERNEL_BUF_SIZE: usize = 257024;

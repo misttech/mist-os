@@ -39,8 +39,7 @@ async fn connect_to_stressor() -> fstress::StressorProxy {
 #[fuchsia::test]
 async fn test_stuff_socket() {
     let proxy = connect_to_stressor().await;
-    let (client_socket, server_socket) =
-        zx::Socket::create(zx::SocketOpts::STREAM).expect("create socket");
+    let (client_socket, server_socket) = zx::Socket::create_stream();
     let bytes_written = proxy.stuff_socket(server_socket).await.expect("stuff socket");
 
     // Full socket shouldn't block other requests.
