@@ -278,7 +278,6 @@ zx::result<> FlashmapPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size)
   // single slot.
   bool needs_full_update = NeedsFullUpdate(cur_gbb, new_gbb);
   if (needs_full_update) {
-    ERROR("Full update is not yet implemented. https://fxbug.dev/81685\n");
     return FullUpdate(new_image);
   }
 
@@ -313,8 +312,8 @@ zx::result<> FlashmapPartitionClient::ABUpdate(fzl::VmoMapper& new_image) {
       source_slot = kFirmwareRwBSection;
       break;
     default:
-      // TODO(fxbug.dev/81685): in this situation, we should update *both* A and B.
-      // This would be the same as "futility update --mode recovery" on CrOS.
+      // In this situation, ideally we would `update *both* A and B.  This would be the same as
+      // "futility update --mode recovery" on CrOS.  For now, return NOT_SUPPORTED.
       ERROR("Cannot do an A/B firmware update from recovery firmware. Bailing out.\n");
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
@@ -356,8 +355,8 @@ zx::result<> FlashmapPartitionClient::ABUpdate(fzl::VmoMapper& new_image) {
     return zx::error(status);
   }
 
-  // TODO(fxbug.dev/81685): don't erase so aggressively. The flashmap component should implement a
-  // "EraseAndWrite" call that will erase only required blocks.
+  // It might be better if we didn't erase so aggressively.  The flashmap component could implement
+  // an "EraseAndWrite" call that will erase only required blocks.
   auto erase_result =
       flashmap_->Erase(fidl::StringView::FromExternal(install_area->name), 0, install_area->size);
   if (!erase_result.ok() || erase_result->is_error()) {
@@ -416,7 +415,8 @@ zx::result<> FlashmapPartitionClient::ABUpdate(fzl::VmoMapper& new_image) {
 }
 
 zx::result<> FlashmapPartitionClient::FullUpdate(fzl::VmoMapper& new_image) {
-  // TODO(fxbug.dev/81685): implement this.
+  ERROR("FullUpdate isn't implemented yet.");
+  // Return ZX_OK to not fail the entire OTA.
   return zx::ok();
 }
 
