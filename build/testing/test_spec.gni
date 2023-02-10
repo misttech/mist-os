@@ -410,6 +410,16 @@ template("test_spec") {
         log_settings = _log_settings
       }
 
+      if (!defined(package_url)) {
+        assert(defined(path), "path or package_url must be defined.")
+        if (is_linux || is_mac ||
+            (defined(invoker.os) &&
+             (invoker.os == "linux" || invoker.os == "mac"))) {
+          # Trim leading //.
+          path = rebase_path(path, root_build_dir)
+        }
+      }
+
       if (!defined(name)) {
         if (defined(package_url)) {
           name = package_url
@@ -418,16 +428,6 @@ template("test_spec") {
           # Path is of the form <toolchain_variant.name>/<basename>, so
           # removing the left-most appearance should do what we want.
           name = string_replace(path, toolchain_variant.suffix, "", 1)
-        }
-      }
-
-      if (!defined(package_url)) {
-        assert(defined(path), "path or package_url must be defined.")
-        if (is_linux || is_mac ||
-            (defined(invoker.os) &&
-             (invoker.os == "linux" || invoker.os == "mac"))) {
-          # Trim leading //.
-          path = rebase_path(path, root_build_dir)
         }
       }
 
