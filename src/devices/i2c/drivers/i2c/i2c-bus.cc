@@ -147,6 +147,20 @@ int I2cBus::I2cThread() {
     mutex_.Release();
   }
 
+  fbl::AutoLock lock(&mutex_);
+
+  I2cTxn* txn;
+
+  // Cancel txns that clients are waiting on, and free all remaining txns.
+  while ((txn = list_remove_head_type(&queued_txns_, I2cTxn, node)) != nullptr) {
+    txn->transact_cb(txn->cookie, ZX_ERR_CANCELED, nullptr, 0);
+    free(txn);
+  }
+
+  while ((txn = list_remove_head_type(&free_txns_, I2cTxn, node)) != nullptr) {
+    free(txn);
+  }
+
   return 0;
 }
 
@@ -199,6 +213,11 @@ void I2cBus::Transact(uint16_t address, const I2cBus::TransactOp* op_list, size_
   }
 
   fbl::AutoLock lock(&mutex_);
+
+  if (shutdown_) {
+    callback(cookie, ZX_ERR_CANCELED, nullptr, 0);
+    return;
+  }
 
   I2cTxn* txn = list_remove_head_type(&free_txns_, I2cTxn, node);
   if (txn && txn->length < req_length) {
