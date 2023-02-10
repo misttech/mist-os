@@ -83,8 +83,9 @@ fn get_config() -> ConfigWrapper {
 
         let pkg_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
             .map(zx::Channel::from_handle);
-        let outgoing_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
-            .map(zx::Channel::from_handle);
+        let outgoing_dir =
+            fruntime::take_startup_handle(kernel_config::GALAXY_OUTGOING_DIR_HANDLE_INFO)
+                .map(zx::Channel::from_handle);
 
         ConfigWrapper {
             config: Config {
