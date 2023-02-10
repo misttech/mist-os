@@ -5,7 +5,6 @@
 #include "fake-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -296,16 +295,17 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayCaptureImplSetDisplayCaptureInterface(
+zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
   fbl::AutoLock lock(&capture_lock_);
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
+  return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayCaptureImplImportImageForCapture(zx_unowned_handle_t collection,
-                                                                 uint32_t index,
-                                                                 uint64_t* out_capture_handle) {
+zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
+                                                                    uint32_t index,
+                                                                    uint64_t* out_capture_handle) {
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
@@ -343,7 +343,7 @@ zx_status_t FakeDisplay::DisplayCaptureImplImportImageForCapture(zx_unowned_hand
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayCaptureImplStartCapture(uint64_t capture_handle) {
+zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
   if (capture_active_id_ != INVALID_ID) {
     return ZX_ERR_SHOULD_WAIT;
@@ -361,7 +361,7 @@ zx_status_t FakeDisplay::DisplayCaptureImplStartCapture(uint64_t capture_handle)
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayCaptureImplReleaseCapture(uint64_t capture_handle) {
+zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
   if (capture_handle == capture_active_id_) {
     return ZX_ERR_SHOULD_WAIT;
@@ -377,7 +377,7 @@ zx_status_t FakeDisplay::DisplayCaptureImplReleaseCapture(uint64_t capture_handl
   return ZX_OK;
 }
 
-bool FakeDisplay::DisplayCaptureImplIsCaptureCompleted() {
+bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_lock_);
   return (capture_active_id_ == INVALID_ID);
 }
@@ -399,9 +399,6 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {
     case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
       proto->ops = &display_controller_impl_protocol_ops_;
-      return ZX_OK;
-    case ZX_PROTOCOL_DISPLAY_CAPTURE_IMPL:
-      proto->ops = &display_capture_impl_protocol_ops_;
       return ZX_OK;
     case ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL:
       proto->ops = &display_clamp_rgb_impl_protocol_ops_;

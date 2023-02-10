@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
@@ -447,12 +446,6 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
     case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
       proto->ops = &display_controller_impl_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_DISPLAY_CAPTURE_IMPL:
-      if (!vout_->supports_capture()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      proto->ops = &display_capture_impl_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL:
       proto->ops = &display_clamp_rgb_impl_protocol_ops_;
       return ZX_OK;
@@ -591,14 +584,18 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
   return vout_->PowerOff().status_value();
 }
 
-void AmlogicDisplay::DisplayCaptureImplSetDisplayCaptureInterface(
+zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
+  if (!vout_->supports_capture()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   fbl::AutoLock lock(&capture_lock_);
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
+  return ZX_OK;
 }
 
-zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
     zx_unowned_handle_t collection_handle, uint32_t index, uint64_t* out_capture_handle) {
   fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{
       zx::unowned_channel(collection_handle)};
@@ -655,7 +652,7 @@ zx_status_t AmlogicDisplay::DisplayCaptureImplImportImageForCapture(
   return ZX_OK;
 }
 
-zx_status_t AmlogicDisplay::DisplayCaptureImplStartCapture(uint64_t capture_handle) {
+zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
   if (!fully_initialized()) {
     DISP_ERROR("Cannot start capture before initializing the display\n");
     return ZX_ERR_SHOULD_WAIT;
@@ -707,7 +704,7 @@ zx_status_t AmlogicDisplay::DisplayCaptureImplStartCapture(uint64_t capture_hand
   return ZX_OK;
 }
 
-zx_status_t AmlogicDisplay::DisplayCaptureImplReleaseCapture(uint64_t capture_handle) {
+zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
   if (capture_handle == capture_active_id_) {
     return ZX_ERR_SHOULD_WAIT;
@@ -723,7 +720,7 @@ zx_status_t AmlogicDisplay::DisplayCaptureImplReleaseCapture(uint64_t capture_ha
   return ZX_OK;
 }
 
-bool AmlogicDisplay::DisplayCaptureImplIsCaptureCompleted() {
+bool AmlogicDisplay::DisplayControllerImplIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_lock_);
   return (capture_active_id_ == INVALID_ID);
 }

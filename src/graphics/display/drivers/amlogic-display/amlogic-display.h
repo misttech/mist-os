@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
@@ -68,7 +67,6 @@ using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable, ddk::Suspen
 class AmlogicDisplay
     : public DeviceType,
       public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol>,
-      public ddk::DisplayCaptureImplProtocol<AmlogicDisplay>,
       public ddk::DisplayClampRgbImplProtocol<AmlogicDisplay>,
       public ddk::I2cImplProtocol<AmlogicDisplay> {
  public:
@@ -101,14 +99,14 @@ class AmlogicDisplay
   }
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
 
-  void DisplayCaptureImplSetDisplayCaptureInterface(
+  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);
-
-  zx_status_t DisplayCaptureImplImportImageForCapture(zx_unowned_handle_t collection,
-                                                      uint32_t index, uint64_t* out_capture_handle);
-  zx_status_t DisplayCaptureImplStartCapture(uint64_t capture_handle);
-  zx_status_t DisplayCaptureImplReleaseCapture(uint64_t capture_handle);
-  bool DisplayCaptureImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
+  zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
+                                                         uint32_t index,
+                                                         uint64_t* out_capture_handle);
+  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle);
+  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle);
+  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
 
   zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
 

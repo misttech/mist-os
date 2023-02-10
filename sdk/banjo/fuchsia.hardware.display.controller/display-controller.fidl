@@ -175,6 +175,12 @@ protocol DisplayControllerInterface {
     });
 };
 
+@transport("Banjo")
+@banjo_layout("ddk-interface")
+protocol DisplayCaptureInterface {
+    OnCaptureComplete() -> ();
+};
+
 type Alpha = strict enum : uint8 {
     DISABLE = 0;
     PREMULTIPLIED = 1;
@@ -393,6 +399,16 @@ protocol DisplayControllerImpl {
         intf client_end:DisplayControllerInterface;
     }) -> ();
 
+    /// Initialize the display capture interface. Must be called only once
+    /// before importing resources for capture and starting display capture.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if display capture is not supported.
+    SetDisplayCaptureInterface(resource struct {
+        intf client_end:DisplayCaptureInterface;
+    }) -> (struct {
+        s zx.status;
+    });
+
     /// Imports an image from a buffer collection into the driver. The driver should set
     /// image->handle.
     ImportImage(struct {
@@ -402,6 +418,22 @@ protocol DisplayControllerImpl {
         index uint32;
     }) -> (struct {
         s zx.status;
+    });
+
+    /// Import BufferCollection backed VMO pointed to by index.
+    /// Importing the VMO usually involves pinning the VMO and updating display
+    /// controller hardware registers with the physical address of the VMO to be
+    /// used for capture. Returns out_capture_handle which maps to the allocated
+    /// resource.
+    ///
+    /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED and
+    /// the value of `capture_handle` will be undefined.
+    ImportImageForCapture(struct {
+        collection ZxUnownedHandle;
+        index uint32;
+    }) -> (struct {
+        s zx.status;
+        capture_handle uint64;
     });
 
     /// Releases any driver state associated with the given image. The client guarantees that
@@ -509,5 +541,39 @@ protocol DisplayControllerImpl {
         power_on bool;
     }) -> (struct {
         s zx.status;
+    });
+
+    /// Starts capture into the resource mapped by capture_handle (non-blocking)
+    /// Only one active capture is allowed at a time.
+    /// A valid image must be displayed during capture. Otherwise unexpected hardware
+    /// behavior might occur.
+    /// Drivers should not leave display hardware in this unexpected state.
+    /// Drivers are expected to stop and/or abort capture if no valid
+    /// image is being displayed.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
+    /// supported.
+    StartCapture(struct {
+        capture_handle uint64;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Releases resources allocated by capture_handle.
+    /// Releasing resources from an active capture is not allowed and will cause
+    /// unexpected behavior.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
+    /// supported.
+    ReleaseCapture(struct {
+        capture_handle uint64;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Returns true if display capture is supported and the previous capture is
+    /// completed. False otherwise.
+    IsCaptureCompleted() -> (struct {
+        b bool;
     });
 };

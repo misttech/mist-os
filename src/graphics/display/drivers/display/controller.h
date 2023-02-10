@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
@@ -99,18 +98,14 @@ class Controller : public ControllerParent,
   bool GetDisplayPhysicalDimensions(uint64_t display_id, uint32_t* horizontal_size_mm,
                                     uint32_t* vertical_size_mm) __TA_REQUIRES(mtx());
   ddk::DisplayControllerImplProtocolClient* dc() { return &dc_; }
-  ddk::DisplayCaptureImplProtocolClient* dc_capture() {
-    if (dc_capture_.is_valid()) {
-      return &dc_capture_;
-    }
-    return nullptr;
-  }
   ddk::DisplayClampRgbImplProtocolClient* dc_clamp_rgb() {
     if (dc_clamp_rgb_.is_valid()) {
       return &dc_clamp_rgb_;
     }
     return nullptr;
   }
+  bool supports_capture() { return supports_capture_; }
+
   async::Loop& loop() { return loop_; }
   bool current_thread_is_loop() { return thrd_current() == loop_thread_; }
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
@@ -159,6 +154,8 @@ class Controller : public ControllerParent,
   uint32_t applied_client_id_ = 0;
   uint64_t pending_capture_image_release_ = 0;
 
+  bool supports_capture_ = false;
+
   uint32_t next_client_id_ __TA_GUARDED(mtx()) = 1;
   ClientProxy* vc_client_ __TA_GUARDED(mtx()) = nullptr;
   bool vc_ready_ __TA_GUARDED(mtx());
@@ -172,7 +169,6 @@ class Controller : public ControllerParent,
   thrd_t loop_thread_;
   async_watchdog::Watchdog watchdog_;
   ddk::DisplayControllerImplProtocolClient dc_;
-  ddk::DisplayCaptureImplProtocolClient dc_capture_;
   ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
   ddk::I2cImplProtocolClient i2c_;
 

@@ -54,8 +54,17 @@ class SimpleDisplay : public DeviceType,
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
+      const display_capture_interface_protocol_t* intf) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
+  zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
+                                                         uint32_t index,
+                                                         uint64_t* out_capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   void DisplayControllerImplReleaseImage(image_t* image);
   uint32_t DisplayControllerImplCheckConfiguration(const display_config_t** display_configs,
                                                    size_t display_count,
@@ -76,6 +85,13 @@ class SimpleDisplay : public DeviceType,
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
  private:
   void OnPeriodicVSync();

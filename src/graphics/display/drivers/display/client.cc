@@ -889,13 +889,13 @@ void Client::SetVirtconMode(SetVirtconModeRequestView request,
 }
 
 void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
-  completer.ReplySuccess(controller_->dc_capture() != nullptr);
+  completer.ReplySuccess(controller_->supports_capture());
 }
 
 void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
                                    ImportImageForCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture.
-  if (controller_->dc_capture() == nullptr) {
+  if (!controller_->supports_capture()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -918,12 +918,11 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   // capture_image will contain a handle that will be used by display driver to trigger
   // capture start/release.
   image_t capture_image = {};
-  zx_status_t status = controller_->dc_capture()->ImportImageForCapture(
+  zx_status_t status = controller_->dc()->ImportImageForCapture(
       collection.client_end().borrow().channel()->get(), request->index, &capture_image.handle);
   if (status == ZX_OK) {
-    auto release_image = fit::defer([this, &capture_image]() {
-      controller_->dc_capture()->ReleaseCapture(capture_image.handle);
-    });
+    auto release_image = fit::defer(
+        [this, &capture_image]() { controller_->dc()->ReleaseCapture(capture_image.handle); });
 
     fbl::AllocChecker ac;
     auto image = fbl::AdoptRef(new (&ac) Image(controller_, capture_image, &proxy_->node(), id_));
@@ -942,7 +941,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
 
 void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture.
-  if (controller_->dc_capture() == nullptr) {
+  if (!controller_->supports_capture()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -969,7 +968,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = request->signal_event_id;
-  auto status = controller_->dc_capture()->StartCapture(image->info().handle);
+  auto status = controller_->dc()->StartCapture(image->info().handle);
   if (status == ZX_OK) {
     fbl::AutoLock lock(controller_->mtx());
     proxy_->EnableCapture(true);
@@ -985,7 +984,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
 void Client::ReleaseCapture(ReleaseCaptureRequestView request,
                             ReleaseCaptureCompleter::Sync& completer) {
   // Ensure display driver supports/implements capture
-  if (controller_->dc_capture() == nullptr) {
+  if (!controller_->supports_capture()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }

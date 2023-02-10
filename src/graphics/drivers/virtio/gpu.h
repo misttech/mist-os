@@ -13,6 +13,7 @@
 #include <semaphore.h>
 #include <stdlib.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 
 #include <memory>
@@ -55,8 +56,19 @@ class GpuDevice : public Device,
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
 
+  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
+      const display_capture_interface_protocol_t* intf) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
+
+  zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
+                                                         uint32_t index,
+                                                         uint64_t* out_capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   void DisplayControllerImplReleaseImage(image_t* image);
 
@@ -76,6 +88,16 @@ class GpuDevice : public Device,
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   zx_unowned_handle_t collection);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
+
+  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
  private:
   // Internal routines

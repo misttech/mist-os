@@ -55,8 +55,6 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
   // Protocols for display controller.
   mock_display->AddProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL, display_->dcimpl_proto()->ops,
                             display_->dcimpl_proto()->ctx);
-  mock_display->AddProtocol(ZX_PROTOCOL_DISPLAY_CAPTURE_IMPL, display_->capture_proto()->ops,
-                            display_->capture_proto()->ctx);
   mock_display->AddProtocol(ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL,
                             display_->clamp_rgbimpl_proto()->ops,
                             display_->clamp_rgbimpl_proto()->ctx);

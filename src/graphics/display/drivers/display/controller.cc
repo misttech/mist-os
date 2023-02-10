@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/drivers/display/controller.h"
 
-#include <fuchsia/hardware/display/capture/c/banjo.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
@@ -618,8 +616,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
 
 void Controller::ReleaseCaptureImage(uint64_t handle) {
-  if (dc_capture_.is_valid() && handle != 0) {
-    if (dc_capture_.ReleaseCapture(handle) == ZX_ERR_SHOULD_WAIT) {
+  if (supports_capture_ && handle != 0) {
+    if (dc_.ReleaseCapture(handle) == ZX_ERR_SHOULD_WAIT) {
       ZX_DEBUG_ASSERT_MSG(pending_capture_image_release_ == 0,
                           "multiple pending releases for capture images");
       // Delay the image release until the hardware is done.
@@ -879,12 +877,6 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // optional display controller capture protocol client
-  dc_capture_ = ddk::DisplayCaptureImplProtocolClient(parent_);
-  if (!dc_capture_.is_valid()) {
-    zxlogf(WARNING, "Display Capture not supported by this platform");
-  }
-
   // optional display controller clamp rgb protocol client
   dc_clamp_rgb_ = ddk::DisplayClampRgbImplProtocolClient(parent_);
 
@@ -928,9 +920,11 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
   [[maybe_unused]] auto ptr = device_ptr->release();
 
   dc_.SetDisplayControllerInterface(this, &display_controller_interface_protocol_ops_);
-  if (dc_capture_.is_valid()) {
-    dc_capture_.SetDisplayCaptureInterface(this, &display_capture_interface_protocol_ops_);
-  }
+
+  status = dc_.SetDisplayCaptureInterface(this, &display_capture_interface_protocol_ops_);
+  supports_capture_ = (status == ZX_OK);
+  zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
+         zx_status_get_string(status));
 
   status = vsync_monitor_.PostDelayed(loop_.dispatcher(), kVsyncMonitorInterval);
   if (status != ZX_OK) {

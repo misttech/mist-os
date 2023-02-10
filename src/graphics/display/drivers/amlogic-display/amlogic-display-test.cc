@@ -213,9 +213,9 @@ TEST(AmlogicDisplay, NoLeakCaptureCanvas) {
   display.SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient(&canvas.get_protocol()));
 
   uint64_t capture_handle;
-  EXPECT_OK(display.DisplayCaptureImplImportImageForCapture(
+  EXPECT_OK(display.DisplayControllerImplImportImageForCapture(
       buffer_collection_endpoints->client.handle()->get(), 0, &capture_handle));
-  EXPECT_OK(display.DisplayCaptureImplReleaseCapture(capture_handle));
+  EXPECT_OK(display.DisplayControllerImplReleaseCapture(capture_handle));
 
   canvas.CheckThatNoEntriesInUse();
 }

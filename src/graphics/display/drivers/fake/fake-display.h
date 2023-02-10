@@ -5,8 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
-#include <fuchsia/hardware/display/capture/c/banjo.h>
-#include <fuchsia/hardware/display/capture/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/c/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -45,13 +43,11 @@ using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable, ddk::ChildPreR
 
 class FakeDisplay : public DeviceType,
                     public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol>,
-                    public ddk::DisplayCaptureImplProtocol<FakeDisplay>,
                     public ddk::DisplayClampRgbImplProtocol<FakeDisplay> {
  public:
   explicit FakeDisplay(zx_device_t* parent)
       : DeviceType(parent),
         dcimpl_proto_({&display_controller_impl_protocol_ops_, this}),
-        capture_proto_({&display_capture_impl_protocol_ops_, this}),
         clamp_rgbimpl_proto_({&display_clamp_rgb_impl_protocol_ops_, this}) {}
 
   // This function is called from the c-bind function upon driver matching.
@@ -83,16 +79,18 @@ class FakeDisplay : public DeviceType,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  void DisplayCaptureImplSetDisplayCaptureInterface(
+  zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);
 
-  zx_status_t DisplayCaptureImplImportImageForCapture(zx_unowned_handle_t collection,
-                                                      uint32_t index, uint64_t* out_capture_handle)
+  zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
+                                                         uint32_t index,
+                                                         uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_lock_);
-  zx_status_t DisplayCaptureImplStartCapture(uint64_t capture_handle) __TA_EXCLUDES(capture_lock_);
-  zx_status_t DisplayCaptureImplReleaseCapture(uint64_t capture_handle)
+  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
       __TA_EXCLUDES(capture_lock_);
-  bool DisplayCaptureImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
+  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle)
+      __TA_EXCLUDES(capture_lock_);
+  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
 
   zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
 
@@ -105,7 +103,6 @@ class FakeDisplay : public DeviceType,
   }
 
   const display_controller_impl_protocol_t* dcimpl_proto() const { return &dcimpl_proto_; }
-  const display_capture_impl_protocol_t* capture_proto() const { return &capture_proto_; }
   const display_clamp_rgb_impl_protocol_t* clamp_rgbimpl_proto() const {
     return &clamp_rgbimpl_proto_;
   }
@@ -128,7 +125,6 @@ class FakeDisplay : public DeviceType,
   void PopulateAddedDisplayArgs(added_display_args_t* args);
 
   display_controller_impl_protocol_t dcimpl_proto_ = {};
-  display_capture_impl_protocol_t capture_proto_ = {};
   display_clamp_rgb_impl_protocol_t clamp_rgbimpl_proto_ = {};
   ddk::PDev pdev_;
   ddk::SysmemProtocolClient sysmem_;
