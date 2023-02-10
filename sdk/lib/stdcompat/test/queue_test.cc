@@ -59,15 +59,13 @@ TEST(DequeTest, EraseVariantsAreAliasForStdWhenAvailable) {
 
   constexpr size_type (*cpp20_erase)(arg&, const value&) =
       &cpp20::erase<int, std::deque<int>::allocator_type, int>;
-  constexpr size_type (*std_erase)(arg&, const value&) =
-      &std::erase<int, std::deque<int>::allocator_type, int>;
+  constexpr size_type (*std_erase)(arg&, const value&) = &std::erase;
   static_assert(cpp20_erase == std_erase, "");
 
   using pred = bool (*)(value);
   constexpr size_type (*cpp20_erase_if)(arg&, pred) =
       &cpp20::erase_if<int, std::deque<int>::allocator_type, pred>;
-  constexpr size_type (*std_erase_if)(arg&, pred) =
-      &std::erase_if<int, std::deque<int>::allocator_type, pred>;
+  constexpr size_type (*std_erase_if)(arg&, pred) = &std::erase_if;
   static_assert(cpp20_erase_if == std_erase_if, "");
 }
 
