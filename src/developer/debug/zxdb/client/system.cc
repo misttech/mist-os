@@ -140,6 +140,25 @@ static const char* kUiTimeoutMsDescription =
   running it in the background and showing the prompt again. Setting this value
   to 0 makes all commands run asynchronously without blocking the input.)";
 
+const char* ClientSettings::System::kContextLinesAfter = "context-lines-after";
+static const char* kContextLinesAfterDescription =
+    R"(  Number of lines of source code to show below the current line when
+  stopping. This setting has priority over "context-lines" and can be
+  set independently.)";
+
+const char* ClientSettings::System::kContextLinesBefore = "context-lines-before";
+static const char* kContextLinesBeforeDescription =
+    R"(  Number of lines of source code to show above the current line when
+  stopping. This setting has priority over "context-lines" and can be
+  set independently.)";
+
+const char* ClientSettings::System::kContextLines = "context-lines";
+static const char* kContextLinesDescription =
+    R"(  Number of lines of source code to show above and below the current
+  line when stopping. In other words, this is a convenience setter that sets
+  both "context-lines-after" and "context-lines-before", overwriting their
+  current values.)";
+
 namespace {
 
 fxl::RefPtr<SettingSchema> CreateSchema() {
@@ -189,6 +208,11 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
 
   // Set the UI timeout default to 1 second.
   schema->AddInt(ClientSettings::System::kUiTimeoutMs, kUiTimeoutMsDescription, 1000);
+
+  // Set the number of source code lines to show when we stop.
+  schema->AddInt(ClientSettings::System::kContextLinesAfter, kContextLinesAfterDescription, 2);
+  schema->AddInt(ClientSettings::System::kContextLinesBefore, kContextLinesBeforeDescription, 2);
+  schema->AddInt(ClientSettings::System::kContextLines, kContextLinesDescription, 2);
 
   return schema;
 }
@@ -343,6 +367,7 @@ System::System(Session* session)
   settings_.AddObserver(ClientSettings::System::kIdsTxts, this);
   settings_.AddObserver(ClientSettings::System::kSymbolServers, this);
   settings_.AddObserver(ClientSettings::System::kSecondChanceExceptions, this);
+  settings_.AddObserver(ClientSettings::System::kContextLines, this);
 }
 
 System::~System() {
@@ -849,7 +874,10 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
             // TODO: handle me.
           }
         });
-
+  } else if (setting_name == ClientSettings::System::kContextLines) {
+    const int64_t lines = store.GetInt(ClientSettings::System::kContextLines);
+    settings().SetInt(ClientSettings::System::kContextLinesAfter, lines);
+    settings().SetInt(ClientSettings::System::kContextLinesBefore, lines);
   } else {
     LOGS(Warn) << "Unhandled setting change: " << setting_name;
   }

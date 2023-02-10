@@ -53,6 +53,11 @@ struct ClientSettings {
     // Console options (having this here in the client is a layering violation but is not
     // worth creating some complicated system for dynamically injecting these to avoid.
     static const char* kUiTimeoutMs;
+
+    // Source code context lines to display around the current line when we stop.
+    static const char* kContextLinesAfter;
+    static const char* kContextLinesBefore;
+    static const char* kContextLines;
   };
 
   struct Target {

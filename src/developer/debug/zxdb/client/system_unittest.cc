@@ -267,4 +267,43 @@ TEST_F(SystemTest, UpdateSecondChanceExceptions) {
   }
 }
 
+TEST_F(SystemTest, UpdateSourceCodeContextLines) {
+  System& system = session().system();
+
+  {
+    // Setting |kContextLines| should overwrite both |kContextLinesBefore| and
+    // |kContextLinesAfter|.
+    system.settings().SetInt(ClientSettings::System::kContextLines, 10);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesBefore),
+              system.settings().GetInt(ClientSettings::System::kContextLines));
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesAfter),
+              system.settings().GetInt(ClientSettings::System::kContextLines));
+  }
+
+  // Setting either |kContextLinesBefore| or |kContextLinesAfter| should leave
+  // the other and |kContextLines| unaffected.
+  {
+    system.settings().SetInt(ClientSettings::System::kContextLinesBefore, 2);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesBefore), 2);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesAfter), 10);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesAfter),
+              system.settings().GetInt(ClientSettings::System::kContextLines));
+  }
+  {
+    system.settings().SetInt(ClientSettings::System::kContextLinesAfter, 5);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesBefore), 2);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesAfter), 5);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLines), 10);
+  }
+
+  // Now setting |kContextLines| again should make everything equal again.
+  {
+    system.settings().SetInt(ClientSettings::System::kContextLines, 15);
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesBefore),
+              system.settings().GetInt(ClientSettings::System::kContextLines));
+    EXPECT_EQ(system.settings().GetInt(ClientSettings::System::kContextLinesAfter),
+              system.settings().GetInt(ClientSettings::System::kContextLines));
+  }
+}
+
 }  // namespace zxdb

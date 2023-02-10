@@ -38,8 +38,15 @@ namespace zxdb {
 
 namespace {
 
+// Lines of source code context to show (before, after) the current line.
+using ContextLines = std::pair<int64_t, int64_t>;
 using LineInfo = std::pair<int, std::string>;  // Line #, Line contents.
 using LineVector = std::vector<LineInfo>;
+
+ContextLines GetContextLinesSettings(const SettingStore& settings) {
+  return std::make_pair(settings.GetInt(ClientSettings::System::kContextLinesBefore),
+                        settings.GetInt(ClientSettings::System::kContextLinesAfter));
+}
 
 OutputBuffer FormatSourceLineNoSyntax(const FormatSourceOpts& opts, bool is_highlight_line,
                                       const std::string& line) {
@@ -268,13 +275,14 @@ void FormatSourceOpts::SetLanguageFromFileName(const std::string& file_name) {
 Err OutputSourceContext(Process* process, std::unique_ptr<SourceFileProvider> file_provider,
                         const Location& location, SourceAffinity source_affinity) {
   if (source_affinity != SourceAffinity::kAssembly && location.file_line().is_valid()) {
+    ContextLines context = GetContextLinesSettings(process->session()->system().settings());
     // Synchronous source output.
     FormatSourceOpts source_opts;
     source_opts.active_line = location.file_line().line();
     source_opts.highlight_line = source_opts.active_line;
     source_opts.highlight_column = location.column();
-    source_opts.first_line = source_opts.active_line - 2;
-    source_opts.last_line = source_opts.active_line + 2;
+    source_opts.first_line = source_opts.active_line - context.first;
+    source_opts.last_line = source_opts.active_line + context.second;
     source_opts.dim_others = true;
     source_opts.module_for_time_warning = GetWeakModuleForLocation(process, location);
 
@@ -570,12 +578,13 @@ Err FormatBreakpointContext(const Location& location, const SourceFileProvider& 
     return Err("No symbols for this location.");
 
   int line = location.file_line().line();
-  constexpr int kBreakpointContext = 1;
+  ContextLines context =
+      GetContextLinesSettings(Console::get()->context().session()->system().settings());
 
   FormatSourceOpts opts;
   opts.SetLanguageFromFileName(location.file_line().file());
-  opts.first_line = line - kBreakpointContext;
-  opts.last_line = line + kBreakpointContext;
+  opts.first_line = line - context.first;
+  opts.last_line = line + context.second;
   opts.highlight_line = line;
   opts.bp_lines[line] = enabled;
   return FormatSourceFileContext(location.file_line(), file_provider, opts, out);
