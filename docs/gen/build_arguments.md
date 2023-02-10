@@ -330,7 +330,7 @@ reserve few blocks required for its operations.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:77
+From //build/images/fvm.gni:75
 
 ### blobfs_board_minimum_data_bytes
 
@@ -429,7 +429,7 @@ From //src/storage/blobfs/BUILD.gn:13
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:78
+From //build/images/fvm.gni:76
 
 ### blobfs_product_minimum_data_bytes
 
@@ -3031,7 +3031,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:103
+From //build/bazel/legacy_ninja_build_outputs.gni:104
 
 ### extra_package_labels
 
@@ -3543,19 +3543,19 @@ Possible values:
 
 **Current value (from the default):** `"default"`
 
-From //build/images/fvm.gni:99
+From //build/images/fvm.gni:95
 
 ### fvm_ftl_nand_block_count
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:92
+From //build/images/fvm.gni:88
 
 ### fvm_ftl_nand_oob_size
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:90
+From //build/images/fvm.gni:86
 
 ### fvm_ftl_nand_page_size
 
@@ -3567,13 +3567,13 @@ room to initialize on boot.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:89
+From //build/images/fvm.gni:85
 
 ### fvm_ftl_nand_pages_per_block
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:91
+From //build/images/fvm.gni:87
 
 ### fvm_max_disk_size
 
@@ -4764,18 +4764,6 @@ users of persistent RAM.  Must be a multiple of 128 bytes.
 
 From //zircon/kernel/lib/crashlog/params.gni:14
 
-### minfs_board_maximum_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:79
-
-### minfs_board_minimum_data_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:66
-
 ### minfs_maximum_runtime_bytes
 
 minfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
@@ -4787,18 +4775,6 @@ Pass the empty string for no limit.
 **Current value (from the default):** `""`
 
 From //src/storage/fshost/generated_fshost_config.gni:22
-
-### minfs_product_maximum_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:80
-
-### minfs_product_minimum_data_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:67
 
 ### mini_chromium_is_chromeos_ash
 
