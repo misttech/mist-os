@@ -232,7 +232,7 @@ int Vim3UsbPhy::IrqThread() {
 
     // Since |SetMode| is asynchronous, we need to block until it completes.
     sync_completion_t set_mode_sync;
-    auto completion = [&](void) { sync_completion_signal(&set_mode_sync); };
+    auto completion = [&]() { sync_completion_signal(&set_mode_sync); };
     // Read current host/device role.
     if (r5.iddig_curr() == 0) {
       zxlogf(INFO, "Entering USB Host Mode");
@@ -247,7 +247,8 @@ int Vim3UsbPhy::IrqThread() {
     auto status = irq_.wait(nullptr);
     if (status == ZX_ERR_CANCELED) {
       return 0;
-    } else if (status != ZX_OK) {
+    }
+    if (status != ZX_OK) {
       zxlogf(ERROR, "%s: irq_.wait failed: %d", __func__, status);
       return -1;
     }
@@ -346,14 +347,14 @@ zx_status_t Vim3UsbPhy::Init() {
     zxlogf(ERROR, "%s: could not get reset_register fragment", __func__);
     return ZX_ERR_NO_RESOURCES;
   }
-  zx::channel register_client_end, register_server_end;
-  if ((status = zx::channel::create(0, &register_client_end, &register_server_end)) != ZX_OK) {
-    zxlogf(ERROR, "%s: could not create channel %d\n", __func__, status);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "%s: could not create channel %s\n", __func__, endpoints.status_string());
     return status;
   }
-  reset_register.Connect(std::move(register_server_end));
-  reset_register_ =
-      fidl::WireSyncClient<fuchsia_hardware_registers::Device>(std::move(register_client_end));
+  auto& [register_client_end, register_server_end] = endpoints.value();
+  reset_register.Connect(register_server_end.TakeChannel());
+  reset_register_.Bind(std::move(register_client_end));
 
   size_t actual;
   status = DdkGetMetadata(DEVICE_METADATA_PRIVATE, pll_settings_, sizeof(pll_settings_), &actual);
@@ -365,7 +366,8 @@ zx_status_t Vim3UsbPhy::Init() {
   if (status == ZX_OK && actual != sizeof(dr_mode_)) {
     zxlogf(ERROR, "Vim3UsbPhy::Init could not get metadata for USB Mode");
     return ZX_ERR_INTERNAL;
-  } else if (status != ZX_OK) {
+  }
+  if (status != ZX_OK) {
     dr_mode_ = USB_MODE_OTG;
   }
 
@@ -402,7 +404,7 @@ zx_status_t Vim3UsbPhy::Init() {
 void Vim3UsbPhy::DdkInit(ddk::InitTxn txn) {
   if (dr_mode_ != USB_MODE_OTG) {
     sync_completion_t set_mode_sync;
-    auto completion = [&](void) { sync_completion_signal(&set_mode_sync); };
+    auto completion = [&]() { sync_completion_signal(&set_mode_sync); };
     fbl::AutoLock lock(&lock_);
     if (dr_mode_ == USB_MODE_PERIPHERAL) {
       zxlogf(INFO, "Entering USB Peripheral Mode");

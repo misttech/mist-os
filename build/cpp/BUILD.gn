@@ -173,34 +173,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/usb/bin/usbctl",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-test-bin",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-v2-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-test-bin",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-v2-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/usb/drivers/vim3-usb-phy:vim3-usb-phy-test-bin",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }
