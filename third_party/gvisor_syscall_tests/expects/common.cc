@@ -159,11 +159,6 @@ void FilterTestsForLoopbackIsolatedTarget(TestMap& tests) {
   SkipTestsRunByLoopbackIsolatedTcpLingerTimeoutTarget(tests);
 }
 
-void FilterTestsForLoopbackIsolatedTcpFinWaitTarget(TestMap& tests) {
-  SkipTestsRunByLoopbackIsolatedTarget(tests);
-  SkipTestsRunByLoopbackIsolatedTcpLingerTimeoutTarget(tests);
-}
-
 void FilterTestsForLoopbackIsolatedTcpLingerTimeoutTarget(TestMap& tests) {
   SkipTestsRunByLoopbackIsolatedTarget(tests);
   SkipTestsRunByLoopbackIsolatedTcpFinWaitTarget(tests);

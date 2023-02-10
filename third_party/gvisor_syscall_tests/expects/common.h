@@ -13,10 +13,6 @@ namespace netstack_syscall_test {
 // source files. This method skips all tests besides that subset.
 void FilterTestsForLoopbackTarget(TestMap& tests);
 
-// The `loopback_isolated_tcp_fin_wait` target runs only a subset of the tests in its
-// included source files. This method skips all tests besides that subset.
-void FilterTestsForLoopbackIsolatedTcpFinWaitTarget(TestMap& tests);
-
 // The `loopback_isolated_tcp_linger_timeout` target runs only a subset of the tests in its
 // included source files. This method skips all tests besides that subset.
 void FilterTestsForLoopbackIsolatedTcpLingerTimeoutTarget(TestMap& tests);
