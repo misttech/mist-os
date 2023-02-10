@@ -22,8 +22,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::lock::{Mutex, RwLock};
 use crate::mutable_state::*;
 use crate::selinux::selinux_fs;
-use crate::task::CurrentTask;
-use crate::task::Task;
+use crate::task::*;
 use crate::types::*;
 
 /// A mount namespace.
@@ -565,6 +564,25 @@ impl FileOps for ProcMountsFile {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
+    }
+
+    fn wait_async(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        _events: FdEvents,
+        _handler: EventHandler,
+    ) -> WaitKey {
+        // Polling this file gives notifications when any change to mounts occurs. This is not
+        // implemented yet, but stubbed for Android init.
+        waiter.fake_wait()
+    }
+
+    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
+
+    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+        FdEvents::empty()
     }
 }
 
