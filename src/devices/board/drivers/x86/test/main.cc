@@ -76,7 +76,7 @@ TEST(X86Board, ListTableEntries) {
   ASSERT_OK(dev.status_value());
 
   fidl::WireResult<Tables::ListTableEntries> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))->ListTableEntries();
+      fidl::WireCall(std::move(dev.value()))->ListTableEntries();
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_ok());
   const auto& response = *result->value();
@@ -101,7 +101,7 @@ TEST(X86Board, ReadNamedTable) {
   // Read the system's DSDT entry. Every system should have one of these.
   auto [vmo, vmo_copy] = CreateVmoPair();
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_ok());
@@ -123,7 +123,7 @@ TEST(X86Board, InvalidTableName) {
   // Read an invalid entry.
   auto [vmo, vmo_copy] = CreateVmoPair();
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("???\n"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -138,7 +138,7 @@ TEST(X86Board, InvalidIndexNumber) {
   // have 1 of them.
   auto [vmo, vmo_copy] = CreateVmoPair();
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 1234, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -152,7 +152,7 @@ TEST(X86Board, VmoTooSmall) {
   // Only allocate a VMO with 3 bytes backing it.
   auto [vmo, vmo_copy] = CreateVmoPair(/*size=*/3);
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -168,7 +168,7 @@ TEST(X86Board, ReadOnlyVmoSent) {
   zx::vmo read_only_vmo;
   ZX_ASSERT(vmo_copy.replace(ZX_RIGHT_NONE, &read_only_vmo) == ZX_OK);
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(read_only_vmo));
   EXPECT_EQ(result.status(), ZX_ERR_ACCESS_DENIED);
 }
@@ -181,7 +181,7 @@ TEST(X86Board, InvalidObject) {
   zx::channel a, b;
   zx::channel::create(/*flags=*/0, &a, &b);
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(std::move(dev.value()))
+      fidl::WireCall(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, zx::vmo(a.release()));
   // FIDL detects that a channel is being sent as a VMO handle.
   ASSERT_FALSE(result.ok());

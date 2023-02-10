@@ -590,11 +590,10 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseDaiChannel) {
   ASSERT_OK(
       client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3->server)));
 
-  auto vmo =
-      fidl::WireCall<fuchsia_hardware_audio::RingBuffer>(endpoints3->client)->GetVmo(8192, 0);
+  auto vmo = fidl::WireCall(endpoints3->client)->GetVmo(8192, 0);
   ASSERT_OK(vmo.status());
 
-  auto start_time = fidl::WireCall<fuchsia_hardware_audio::RingBuffer>(endpoints3->client)->Start();
+  auto start_time = fidl::WireCall(endpoints3->client)->Start();
   ASSERT_OK(start_time.status());
 
   // Close DAI channel.
@@ -640,11 +639,10 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseRingBufferChannel) {
   ASSERT_OK(
       client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3->server)));
 
-  auto vmo =
-      fidl::WireCall<fuchsia_hardware_audio::RingBuffer>(endpoints3->client)->GetVmo(8192, 0);
+  auto vmo = fidl::WireCall(endpoints3->client)->GetVmo(8192, 0);
   ASSERT_OK(vmo.status());
 
-  auto start_time = fidl::WireCall<fuchsia_hardware_audio::RingBuffer>(endpoints3->client)->Start();
+  auto start_time = fidl::WireCall(endpoints3->client)->Start();
   ASSERT_OK(start_time.status());
 
   // Close RingBuffer channel.

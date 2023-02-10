@@ -517,7 +517,7 @@ TEST_F(SimpleAudioTest, CreateRingBuffer1) {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
 
-  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.fifo_depth(), MockSimpleAudio::kTestFifoDepth);
   server->DdkAsyncRemove();
@@ -564,7 +564,7 @@ TEST_F(SimpleAudioTest, CreateRingBuffer2) {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
 
-  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.fifo_depth(), MockSimpleAudio::kTestFifoDepth);
   server->DdkAsyncRemove();
@@ -597,7 +597,7 @@ TEST_F(SimpleAudioTest, SetBadFormat1) {
   auto result1 = stream_client->GetSupportedFormats();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, result1.status());  // With a bad format we get a channel close.
 
-  auto result2 = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result2 = fidl::WireCall(local)->GetProperties();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, result2.status());  // With a bad format we get a channel close.
   server->DdkAsyncRemove();
   EXPECT_TRUE(ddk_.Ok());
@@ -629,7 +629,7 @@ TEST_F(SimpleAudioTest, SetBadFormat2) {
   auto result1 = stream_client->GetSupportedFormats();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, result1.status());  // With a bad format we get a channel close.
 
-  auto result2 = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result2 = fidl::WireCall(local)->GetProperties();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, result2.status());  // With a bad format we get a channel close.
   server->DdkAsyncRemove();
   EXPECT_TRUE(ddk_.Ok());
@@ -933,13 +933,12 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
   // Buffer is set to hold at least 1 second, with kNumberOfPositionNotifications notifications
   // per ring buffer (i.e. per second) we set the time waiting for the watch below to 200ms+.
 
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(MockSimpleAudio::kTestFrameRate,
-                                                                   kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate,
+                                           kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
   constexpr uint64_t kSomeActiveChannelsMask = 0xc3;
-  auto active_channels =
-      fidl::WireCall<audio_fidl::RingBuffer>(local)->SetActiveChannels(kSomeActiveChannelsMask);
+  auto active_channels = fidl::WireCall(local)->SetActiveChannels(kSomeActiveChannelsMask);
   ASSERT_OK(active_channels.status());
   ASSERT_EQ(active_channels->error_value(), ZX_ERR_NOT_SUPPORTED);
 
@@ -957,7 +956,7 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
                       inspect::UintPropertyValue(MockSimpleAudio::kTestFrameRate)));
   }
 
-  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto start = fidl::WireCall(local)->Start();
   ASSERT_OK(start.status());
 
   // Check updated inspect state.
@@ -971,10 +970,10 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
         CheckPropertyNotEqual(simple_audio->node(), "start_time", inspect::IntPropertyValue(0)));
   }
 
-  auto position = fidl::WireCall<audio_fidl::RingBuffer>(local)->WatchClockRecoveryPositionInfo();
+  auto position = fidl::WireCall(local)->WatchClockRecoveryPositionInfo();
   ASSERT_EQ(MockSimpleAudio::kTestPositionNotify, position.value().position_info.position);
 
-  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto stop = fidl::WireCall(local)->Stop();
   ASSERT_OK(stop.status());
   server->DdkAsyncRemove();
   EXPECT_TRUE(ddk_.Ok());
@@ -999,7 +998,7 @@ TEST_F(SimpleAudioTest, RingBufferStartBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Start() before GetVmo() must result in channel closure
-  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto start = fidl::WireCall(local)->Start();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());  // We get a channel close.
 
   server->DdkAsyncRemove();
@@ -1024,15 +1023,14 @@ TEST_F(SimpleAudioTest, RingBufferStartWhileStarted) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo =
-      fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(MockSimpleAudio::kTestFrameRate, 0);
+  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
-  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto start = fidl::WireCall(local)->Start();
   ASSERT_OK(start.status());
 
   // Start() while already started must result in channel closure
-  auto restart = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto restart = fidl::WireCall(local)->Start();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, restart.status());  // We get a channel close.
 
   server->DdkAsyncRemove();
@@ -1058,7 +1056,7 @@ TEST_F(SimpleAudioTest, RingBufferStopBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Stop() before GetVmo() must result in channel closure
-  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto stop = fidl::WireCall(local)->Stop();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, stop.status());  // We get a channel close.
 
   server->DdkAsyncRemove();
@@ -1083,15 +1081,14 @@ TEST_F(SimpleAudioTest, RingBufferStopWhileStopped) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo =
-      fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(MockSimpleAudio::kTestFrameRate, 0);
+  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
   // We are already stopped, but this should be harmless
-  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto stop = fidl::WireCall(local)->Stop();
   ASSERT_OK(stop.status());
   // Another stop immediately afterward should also be harmless
-  auto restop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto restop = fidl::WireCall(local)->Stop();
   ASSERT_OK(restop.status());
 
   server->DdkAsyncRemove();
@@ -1120,18 +1117,18 @@ TEST_F(SimpleAudioTest, WatchPositionAndCloseRingBufferBeforeReply) {
   // Buffer is set to hold at least 1 second, with kNumberOfPositionNotifications notifications
   // per ring buffer (i.e. per second) the time waiting before getting a position reply is 200ms+.
 
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(MockSimpleAudio::kTestFrameRate,
-                                                                   kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate,
+                                           kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
-  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto start = fidl::WireCall(local)->Start();
   ASSERT_OK(start.status());
 
   // Watch position notifications.
   auto f = [](void* arg) -> int {
     auto ch = static_cast<fidl::ClientEnd<audio_fidl::RingBuffer>*>(arg);
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)fidl::WireCall<audio_fidl::RingBuffer>(*ch)->WatchClockRecoveryPositionInfo();
+    (void)fidl::WireCall(*ch)->WatchClockRecoveryPositionInfo();
     return 0;
   };
   thrd_t th;
@@ -1166,7 +1163,7 @@ TEST_F(SimpleAudioTest, WatchDelays) {
 
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
-  auto delay_info = fidl::WireCall<audio_fidl::RingBuffer>(local)->WatchDelayInfo();
+  auto delay_info = fidl::WireCall(local)->WatchDelayInfo();
   ASSERT_OK(delay_info.status());
   // Based on MockSimpleAudio::kTestFifoDepth = 16 and
   // GetDefaultPcmFormat() = frame size of 4 bytes (4 frames per fifo) and frame rate 48'000;

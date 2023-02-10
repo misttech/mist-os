@@ -677,7 +677,7 @@ TEST(UsbAudioTest, DelayInfo) {
   auto result = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(result.status());
 
-  auto delay_info = fidl::WireCall<audio_fidl::RingBuffer>(local)->WatchDelayInfo();
+  auto delay_info = fidl::WireCall(local)->WatchDelayInfo();
   ASSERT_OK(delay_info.status());
   // Internal delay of = 6 (MAX_OUTSTANDING_REQ) x 1 msecs per request.
   ASSERT_EQ(delay_info.value().delay_info.internal_delay(), zx::msec(6).to_nsecs());
@@ -708,7 +708,7 @@ TEST(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported fifo_depth (the minimum required lead time)
@@ -719,16 +719,15 @@ TEST(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
   constexpr uint32_t kMinFrames = 10;
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kMinFrames,
-                                                                   kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall(local)->GetVmo(kMinFrames, kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
+    auto start = fidl::WireCall(ring_buffer)->Start();
     ASSERT_OK(start.status());
-    auto stop = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Stop();
+    auto stop = fidl::WireCall(ring_buffer)->Stop();
     ASSERT_OK(stop.status());
     done.store(true);
   });
@@ -767,7 +766,7 @@ TEST(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Start() before GetVmo() must result in channel closure
-  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
+  auto start = fidl::WireCall(local)->Start();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());  // We get a channel close.
 
   fake_device.DdkAsyncRemove();
@@ -795,17 +794,17 @@ TEST(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kTestFrameRate, 0);
+  auto vmo = fidl::WireCall(local)->GetVmo(kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
+    auto start = fidl::WireCall(ring_buffer)->Start();
     ASSERT_OK(start.status());
-    auto restart = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
+    auto restart = fidl::WireCall(ring_buffer)->Start();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, restart.status());  // We get a channel close.
-    auto stop = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Stop();
+    auto stop = fidl::WireCall(ring_buffer)->Stop();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, stop.status());  // We already got a channel closed.
     done.store(true);
   });
@@ -847,7 +846,7 @@ TEST(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Stop() before GetVmo() must result in channel closure
-  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto stop = fidl::WireCall(local)->Stop();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, stop.status());  // We get a channel close.
 
   fake_device.DdkAsyncRemove();
@@ -874,14 +873,14 @@ TEST(UsbAudioTest, RingBufferStopWhileStopped) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kTestFrameRate, 0);
+  auto vmo = fidl::WireCall(local)->GetVmo(kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
   // We are already stopped, but this should be harmless
-  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto stop = fidl::WireCall(local)->Stop();
   ASSERT_OK(stop.status());
   // Another stop immediately afterward should also be harmless
-  auto restop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
+  auto restop = fidl::WireCall(local)->Stop();
   ASSERT_OK(restop.status());
 
   fake_device.DdkAsyncRemove();
@@ -908,7 +907,7 @@ TEST(UsbAudioTest, Unplug) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto result = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported fifo_depth (the minimum required lead time)
@@ -919,14 +918,13 @@ TEST(UsbAudioTest, Unplug) {
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
   constexpr uint32_t kMinFrames = 10;
-  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kMinFrames,
-                                                                   kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall(local)->GetVmo(kMinFrames, kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
+    auto start = fidl::WireCall(ring_buffer)->Start();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());
     done.store(true);
   });

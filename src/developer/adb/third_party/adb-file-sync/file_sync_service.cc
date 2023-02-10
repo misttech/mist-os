@@ -149,7 +149,7 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
     }
     attr = result.Unwrap()->attributes;
   } else {
-    auto result = fidl::WireCall<fuchsia_io::Node>(endpoints->client)->GetAttr();
+    auto result = fidl::WireCall(endpoints->client)->GetAttr();
     if (!result.ok()) {
       FX_LOGS(ERROR) << "GetAttr failed with " << result.error();
       return false;
@@ -191,7 +191,7 @@ static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::s
       attr = result->attributes;
     }
   } else {
-    auto result = fidl::WireCall<fuchsia_io::Node>(endpoints->client)->GetAttr();
+    auto result = fidl::WireCall(endpoints->client)->GetAttr();
     status = result.status();
     if (result.ok()) {
       attr = result->attributes;

@@ -330,9 +330,8 @@ class WeakEventSenderVeneer final {
 //
 //     // All space used for the |Foo| call is allocated from |buffer|.
 //     fidl::SyncClientBuffer<MyProtocol::Foo> buffer;
-//     fidl::WireUnownedResult result = fidl::WireCall<MyProtocol>(channel)
-//         .buffer(buffer.view())
-//         ->Foo(args);
+//     fidl::WireSyncClient client(...);
+//     client.buffer(buffer.view())->Foo(args);
 //
 template <typename FidlMethod>
 using SyncClientBuffer =

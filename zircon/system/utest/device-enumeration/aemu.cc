@@ -62,7 +62,7 @@ zx_status_t FetchTable(const fidl::ClientEnd<Tables>& channel, const TableInfo& 
 
   // Fetch the data.
   fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
+      fidl::WireCall(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
   if (!result.ok()) {
     return result.status();
   }

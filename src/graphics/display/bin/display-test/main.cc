@@ -634,7 +634,7 @@ Platforms GetPlatform() {
     return UNKNOWN_PLATFORM;
   }
 
-  auto result = fidl::WireCall<sysinfo::SysInfo>(sysinfo.value())->GetBoardName();
+  auto result = fidl::WireCall(sysinfo.value())->GetBoardName();
   if (!result.ok() || result.value().status != ZX_OK) {
     return UNKNOWN_PLATFORM;
   }

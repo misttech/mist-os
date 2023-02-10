@@ -77,7 +77,7 @@ void RuntimeTest::ParentSetTestData(const void* data_to_send, size_t size) {
   memcpy(data.data(), data_to_send, size);
   data.set_count(size);
 
-  auto response = fidl::WireCall<TestDevice>(parent_chan)->SetTestData(std::move(data));
+  auto response = fidl::WireCall(parent_chan)->SetTestData(std::move(data));
   ASSERT_EQ(ZX_OK, response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -88,8 +88,7 @@ void RuntimeTest::ParentSetTestData(const void* data_to_send, size_t size) {
 
 void RuntimeTest::GetParentDataOverRuntimeChannel(bool sync, const void* want_data,
                                                   size_t want_size) {
-  auto response =
-      fidl::WireCall<TestDeviceChild>(child_chan)->GetParentDataOverRuntimeChannel(sync);
+  auto response = fidl::WireCall(child_chan)->GetParentDataOverRuntimeChannel(sync);
   ASSERT_EQ(ZX_OK, response.status());
 
   zx_status_t call_status = ZX_OK;

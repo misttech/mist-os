@@ -131,7 +131,7 @@ struct AudioStreamInTest : public inspect::InspectTestHelper, public zxtest::Tes
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
 
-    auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(frames_req, 0);
+    auto vmo = fidl::WireCall(local)->GetVmo(frames_req, 0);
     ASSERT_OK(vmo.status());
     ASSERT_EQ(vmo->value()->num_frames, frames_expected);
 
@@ -191,7 +191,7 @@ TEST_F(AudioStreamInTest, Inspect) {
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
 
-  auto props = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
+  auto props = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(props.status());
 
   // Check inspect state.

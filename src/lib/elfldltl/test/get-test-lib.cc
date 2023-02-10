@@ -32,8 +32,7 @@ zx::vmo GetTestLibVmo(std::string_view libname) {
   static const auto ldsvc_endpoint = init_ldsvc();
 
   fidl::Arena arena;
-  fidl::WireResult result =
-      fidl::WireCall<fuchsia_ldsvc::Loader>(ldsvc_endpoint)->LoadObject({arena, libname});
+  fidl::WireResult result = fidl::WireCall(ldsvc_endpoint)->LoadObject({arena, libname});
   EXPECT_TRUE(result.ok()) << libname << ": " << zx_status_get_string(result.status());
   if (!result.ok()) {
     return {};

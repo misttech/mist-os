@@ -83,7 +83,7 @@ class File : public zxtest::Test {
     if (client_end.is_error()) {
       return client_end.status_value();
     }
-    fidl::WireResult result = fidl::WireCall<fio::File>(client_end.value())->Describe();
+    fidl::WireResult result = fidl::WireCall(client_end.value())->Describe();
     if (result.status() != ZX_OK) {
       return result.status();
     }

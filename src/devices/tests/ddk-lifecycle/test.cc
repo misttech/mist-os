@@ -239,8 +239,8 @@ TEST_F(LifecycleTest, CloseAllConnectionsOnUnbind) {
 // Tests that the child device is removed if init fails.
 TEST_F(LifecycleTest, FailedInit) {
   uint64_t child_id;
-  auto result = fidl::WireCall<TestDevice>(chan_)->AddChild(true /* complete_init */,
-                                                            ZX_ERR_BAD_STATE /* init_status */);
+  auto result =
+      fidl::WireCall(chan_)->AddChild(true /* complete_init */, ZX_ERR_BAD_STATE /* init_status */);
   ASSERT_OK(result.status());
   ASSERT_FALSE(result->is_error());
   child_id = result->value()->child_id;
@@ -262,8 +262,8 @@ TEST_F(LifecycleTest, RebindNoChildren) {
 
 TEST_F(LifecycleTest, RebindChildren) {
   {
-    fidl::WireResult result = fidl::WireCall<TestDevice>(chan_)->AddChild(true /* complete_init */,
-                                                                          ZX_OK /* init_status */);
+    fidl::WireResult result =
+        fidl::WireCall(chan_)->AddChild(true /* complete_init */, ZX_OK /* init_status */);
     ASSERT_OK(result.status());
     ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
   }
