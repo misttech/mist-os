@@ -5,7 +5,7 @@
 #include <endian.h>
 #include <fuchsia/hardware/block/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/scsi/scsilib.h>
+#include <lib/scsi/disk.h>
 #include <netinet/in.h>
 #include <zircon/process.h>
 

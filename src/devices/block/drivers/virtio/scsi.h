@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
-#include <lib/scsi/scsilib.h>
-#include <lib/scsi/scsilib_controller.h>
+#include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>

@@ -10,7 +10,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/defer.h>
-#include <lib/scsi/scsilib.h>
+#include <lib/scsi/controller.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

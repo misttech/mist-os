@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <lib/scsi/scsilib_controller.h>
+#include <lib/scsi/controller.h>
 #include <zircon/status.h>
 
 namespace scsi {

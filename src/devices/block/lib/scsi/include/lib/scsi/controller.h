@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_CONTROLLER_H_
-#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_CONTROLLER_H_
+#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_
+#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_
 
 #include <lib/ddk/debug.h>
 #include <lib/zx/result.h>
@@ -408,4 +408,4 @@ class Controller {
 
 }  // namespace scsi
 
-#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_CONTROLLER_H_
+#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_H_
-#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_H_
+#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_H_
+#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_H_
 
 #include <fuchsia/hardware/block/c/banjo.h>
 #include <fuchsia/hardware/block/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/scsi/scsilib_controller.h>
+#include <lib/scsi/controller.h>
 #include <stdint.h>
 
 #include <ddktl/device.h>
@@ -94,4 +94,4 @@ class Disk : public DeviceType,
 
 }  // namespace scsi
 
-#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_SCSILIB_H_
+#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_H_

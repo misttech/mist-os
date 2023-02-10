@@ -4,8 +4,8 @@
 
 #include <endian.h>
 #include <lib/fit/function.h>
-#include <lib/scsi/scsilib.h>
-#include <lib/scsi/scsilib_controller.h>
+#include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
 
@@ -72,7 +72,7 @@ class ControllerForTest : public Controller {
     auto* io = reinterpret_cast<struct queued_io*>(new queued_io);
     io->target = target;
     io->lun = lun;
-    // The cbd is allocated on the stack in the scsilib's BlockImplQueue.
+    // The cdb is allocated on the stack in the scsi::Disk's BlockImplQueue.
     // So make a copy of that locally, and point to that instead
     memcpy(reinterpret_cast<void*>(&io->cdbptr), cdb.iov_base, cdb.iov_len);
     io->cdb.iov_base = &io->cdbptr;

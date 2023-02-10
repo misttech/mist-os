@@ -12,12 +12,12 @@ group("tests") {
 zx_library("scsi") {
   sdk = "source"
   sdk_headers = [
-    "lib/scsi/scsilib.h",
-    "lib/scsi/scsilib_controller.h",
+    "lib/scsi/controller.h",
+    "lib/scsi/disk.h",
   ]
   sources = [
-    "scsilib.cc",
-    "scsilib_controller.cc",
+    "controller.cc",
+    "disk.cc",
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",

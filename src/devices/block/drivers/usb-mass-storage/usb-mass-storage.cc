@@ -7,7 +7,7 @@
 #include <endian.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/scsi/scsilib.h>
+#include <lib/scsi/controller.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>
