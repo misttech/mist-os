@@ -441,11 +441,11 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
   }
 
   if (v1.min_coded_width() != 0 || v1.min_coded_height() != 0) {
-    v2b.min_surface_size() = {v1.min_coded_width(), v1.min_coded_height()};
+    v2b.min_size() = {v1.min_coded_width(), v1.min_coded_height()};
   }
 
   if (v1.max_coded_width() != 0 || v1.max_coded_height() != 0) {
-    v2b.max_surface_size() = {v1.max_coded_width(), v1.max_coded_height()};
+    v2b.max_size() = {v1.max_coded_width(), v1.max_coded_height()};
   }
 
   PROCESS_SCALAR_FIELD_V1(min_bytes_per_row);
@@ -465,12 +465,12 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
   }
 
   if (v1.coded_width_divisor() != 0 || v1.coded_height_divisor() != 0) {
-    ZX_DEBUG_ASSERT(!v2b.surface_size_alignment().has_value());
-    v2b.surface_size_alignment() = {1, 1};
-    v2b.surface_size_alignment()->width() =
-        std::max(v2b.surface_size_alignment()->width(), v1.coded_width_divisor());
-    v2b.surface_size_alignment()->height() =
-        std::max(v2b.surface_size_alignment()->height(), v1.coded_height_divisor());
+    ZX_DEBUG_ASSERT(!v2b.size_alignment().has_value());
+    v2b.size_alignment() = {1, 1};
+    v2b.size_alignment()->width() =
+        std::max(v2b.size_alignment()->width(), v1.coded_width_divisor());
+    v2b.size_alignment()->height() =
+        std::max(v2b.size_alignment()->height(), v1.coded_height_divisor());
   }
 
   PROCESS_SCALAR_FIELD_V1(bytes_per_row_divisor);
@@ -491,9 +491,8 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
           "required_min_coded_width and required_min_coded_height must both be set or both be un-set");
       return fpromise::error();
     }
-    ZX_DEBUG_ASSERT(!v2b.required_min_surface_size().has_value());
-    v2b.required_min_surface_size() = {v1.required_min_coded_width(),
-                                       v1.required_min_coded_height()};
+    ZX_DEBUG_ASSERT(!v2b.required_min_size().has_value());
+    v2b.required_min_size() = {v1.required_min_coded_width(), v1.required_min_coded_height()};
   }
 
   if (v1.required_max_coded_width() != 0 || v1.required_max_coded_height() != 0) {
@@ -502,9 +501,8 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
           "required_max_coded_width and required_max_coded_height must both be set or both be un-set");
       return fpromise::error();
     }
-    ZX_DEBUG_ASSERT(!v2b.required_max_surface_size().has_value());
-    v2b.required_max_surface_size() = {v1.required_max_coded_width(),
-                                       v1.required_max_coded_height()};
+    ZX_DEBUG_ASSERT(!v2b.required_max_size().has_value());
+    v2b.required_max_size() = {v1.required_max_coded_width(), v1.required_max_coded_height()};
   }
 
   return fpromise::ok(std::move(v2b));
@@ -648,16 +646,16 @@ fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
 
   // V2 is more expressive in these fields, so the conversion is intentionally
   // asymmetric.
-  v2b.surface_size() = {v1.coded_width(), v1.coded_height()};
+  v2b.size() = {v1.coded_width(), v1.coded_height()};
   PROCESS_SCALAR_FIELD_V1(bytes_per_row);
   v2b.display_size() = {v1.display_width(), v1.display_height()};
 
   // The coded_width and coded_height may or may not actually be the "valid" pixels from a video
   // decoder.  V2 allows us to be more precise here.  Since output from a video decoder will
-  // _typically_ have surface_size == valid_size, and because coded_width,coded_height is documented
+  // _typically_ have size == valid_size, and because coded_width,coded_height is documented
   // to be the valid non-padding actual pixels, which can include some that are outside the
   // display_size, we go ahead and place coded_width,coded_height in valid_size as well as in
-  // surface_size above.  The ability to be more precise here in V2 is one of the reasons to switch
+  // size above.  The ability to be more precise here in V2 is one of the reasons to switch
   // to V2.  V1 lacks any way to specify the UV plane offset separately from the coded_height, so
   // there can be situations in which coded_height is artificially larger than the valid_size.height
   // as the only way to make the UV offset correct, which sacrifices the ability to specify the real
@@ -1078,13 +1076,13 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
     }
   }
 
-  if (v2.min_surface_size().has_value()) {
-    v1.min_coded_width() = v2.min_surface_size()->width();
-    v1.min_coded_height() = v2.min_surface_size()->height();
+  if (v2.min_size().has_value()) {
+    v1.min_coded_width() = v2.min_size()->width();
+    v1.min_coded_height() = v2.min_size()->height();
   }
-  if (v2.max_surface_size().has_value()) {
-    v1.max_coded_width() = v2.max_surface_size()->width();
-    v1.max_coded_height() = v2.max_surface_size()->height();
+  if (v2.max_size().has_value()) {
+    v1.max_coded_width() = v2.max_size()->width();
+    v1.max_coded_height() = v2.max_size()->height();
   }
 
   PROCESS_SCALAR_FIELD_V2(min_bytes_per_row);
@@ -1095,9 +1093,9 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
   }
   v1.layers() = 1;
 
-  if (v2.surface_size_alignment().has_value()) {
-    v1.coded_width_divisor() = v2.surface_size_alignment()->width();
-    v1.coded_height_divisor() = v2.surface_size_alignment()->height();
+  if (v2.size_alignment().has_value()) {
+    v1.coded_width_divisor() = v2.size_alignment()->width();
+    v1.coded_height_divisor() = v2.size_alignment()->height();
   }
 
   PROCESS_SCALAR_FIELD_V2(bytes_per_row_divisor);
@@ -1108,18 +1106,18 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
     v1.display_height_divisor() = v2.display_size_alignment()->height();
   }
 
-  if (v2.required_min_surface_size().has_value()) {
-    v1.required_min_coded_width() = v2.required_min_surface_size()->width();
-    v1.required_min_coded_height() = v2.required_min_surface_size()->height();
+  if (v2.required_min_size().has_value()) {
+    v1.required_min_coded_width() = v2.required_min_size()->width();
+    v1.required_min_coded_height() = v2.required_min_size()->height();
   }
 
-  if (v2.required_max_surface_size().has_value()) {
-    v1.required_max_coded_width() = v2.required_max_surface_size()->width();
-    v1.required_max_coded_height() = v2.required_max_surface_size()->height();
+  if (v2.required_max_size().has_value()) {
+    v1.required_max_coded_width() = v2.required_max_size()->width();
+    v1.required_max_coded_height() = v2.required_max_size()->height();
   }
 
   // V2 doesn't have these fields.  A similar constraint, though not exactly the same, can be
-  // achieved with required_min_surface_size.width, required_max_surface_size.width.
+  // achieved with required_min_size.width, required_max_size.width.
   v1.required_min_bytes_per_row() = 0;
   v1.required_max_bytes_per_row() = 0;
 
@@ -1154,11 +1152,11 @@ fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
   }
 
   // The conversion is intentionally asymmetric, in that conversion from V2 to V1 loses the ability
-  // to have valid_size different from surface_size. The conversion is based mostly on typical usage
+  // to have valid_size different from size. The conversion is based mostly on typical usage
   // of V1 fields, and to a lesser extent, V1 field comments in the V1 FIDL file.
   //
   // Specifically, in typical usage, coded_width and coded_height are actually conveying the
-  // surface_size.width and surface_size.height, not the valid_size.width and valid_size.height,
+  // size.width and size.height, not the valid_size.width and valid_size.height,
   // because in V1, coded_height being larger than the actual valid pixels height is the only way to
   // indicate a UV plane offset that's larger than the minimum required to hold the valid pixels. In
   // contrast to the height situation, re. width, both V1 and V2 have the ability to indicate the
@@ -1170,29 +1168,29 @@ fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
   // coded_height is unnaturally larger than it "should be" per V1 doc comments because it's the
   // only way to indicate UV plane offset, while coded_width is the valid pixels width as it "should
   // be" per V1 doc comments. In V2 the situation is cleaned up by providing a way to specify
-  // valid_size and surface_size separately, both with width and height in pixels, and retain
+  // valid_size and size separately, both with width and height in pixels, and retain
   // bytes_per_row since that's still needed for formats like BGR24 (3 bytes per pixel but fairly
   // often 4 byte aligned row start offsets), where the row start alignment isn't a multiple of the
   // bytes per pixel * width in valid pixels.
   //
-  // In practice, V1 coded_height is surface_size.height, despite the V1 FIDL comments making it
+  // In practice, V1 coded_height is size.height, despite the V1 FIDL comments making it
   // sound like coded_height holds valid_size.height. Essentially, in V1 it's not actually possible
   // to convey the valid_size.height in all situations, as the coded_height is the only way to
   // specify the UV plane offset, so coded_height must be used to define the UV plane offset, not
   // the valid_size.height.
   //
-  // In practice, V1 coded_width can be surface_size.width (typically with little or no padding
+  // In practice, V1 coded_width can be size.width (typically with little or no padding
   // implied by bytes_per_row) or can be valid_size.width (sometimes with a lot more padding implied
-  // by bytes_per_row). In this V2 -> V1 conversion we choose to store V2 surface_size.width in
-  // coded_width, partly for consistency with coded_height being surface_size.height, partly so that
+  // by bytes_per_row). In this V2 -> V1 conversion we choose to store V2 size.width in
+  // coded_width, partly for consistency with coded_height being size.height, partly so that
   // we're eliminating both parts of valid_size instead of trying to keep only one part of it, and
   // partly because the more typical V1 usage is for coded_width and coded_height to store the
-  // surface_size.width and surface_size.height (in contrast to splitting them and "leaning harder"
+  // size.width and size.height (in contrast to splitting them and "leaning harder"
   // on bytes_per_row), so we go with that more typical V1 usage pattern here, despite some
   // unfortunate mismatch with V1 FIDL doc comments stemming from V1 limitations.
-  if (v2.surface_size().has_value()) {
-    v1.coded_width() = v2.surface_size()->width();
-    v1.coded_height() = v2.surface_size()->height();
+  if (v2.size().has_value()) {
+    v1.coded_width() = v2.size()->width();
+    v1.coded_height() = v2.size()->height();
   }
 
   PROCESS_SCALAR_FIELD_V2(bytes_per_row);

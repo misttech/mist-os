@@ -1968,14 +1968,14 @@ bool LogicalBufferCollection::IsMinBufferSizeSpecifiedByAnyParticipant(
     }
     if (constraints.image_format_constraints().has_value()) {
       for (auto& image_format_constraints : constraints.image_format_constraints().value()) {
-        if (image_format_constraints.min_surface_size().has_value() &&
-            image_format_constraints.min_surface_size()->width() > 0 &&
-            image_format_constraints.min_surface_size()->height() > 0) {
+        if (image_format_constraints.min_size().has_value() &&
+            image_format_constraints.min_size()->width() > 0 &&
+            image_format_constraints.min_size()->height() > 0) {
           return true;
         }
-        if (image_format_constraints.required_max_surface_size().has_value() &&
-            image_format_constraints.required_max_surface_size()->width() > 0 &&
-            image_format_constraints.required_max_surface_size()->height() > 0) {
+        if (image_format_constraints.required_max_size().has_value() &&
+            image_format_constraints.required_max_size()->width() > 0 &&
+            image_format_constraints.required_max_size()->height() > 0) {
           return true;
         }
       }
@@ -2479,34 +2479,34 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
 
   FIELD_DEFAULT_SET_VECTOR(constraints, color_spaces, 0);
 
-  if (!constraints.min_surface_size().has_value()) {
-    constraints.min_surface_size() = {0, 0};
+  if (!constraints.min_size().has_value()) {
+    constraints.min_size() = {0, 0};
   }
 
-  if (!constraints.max_surface_size().has_value()) {
-    constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                      std::numeric_limits<uint32_t>::max()};
+  if (!constraints.max_size().has_value()) {
+    constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
+                              std::numeric_limits<uint32_t>::max()};
   }
 
   FIELD_DEFAULT_ZERO(constraints, min_bytes_per_row);
   FIELD_DEFAULT_MAX(constraints, max_bytes_per_row);
   FIELD_DEFAULT_MAX(constraints, max_surface_width_times_surface_height);
 
-  if (!constraints.surface_size_alignment().has_value()) {
-    constraints.surface_size_alignment() = {1, 1};
+  if (!constraints.size_alignment().has_value()) {
+    constraints.size_alignment() = {1, 1};
   }
 
   if (!constraints.display_size_alignment().has_value()) {
     constraints.display_size_alignment() = {1, 1};
   }
 
-  if (!constraints.required_min_surface_size().has_value()) {
-    constraints.required_min_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                               std::numeric_limits<uint32_t>::max()};
+  if (!constraints.required_min_size().has_value()) {
+    constraints.required_min_size() = {std::numeric_limits<uint32_t>::max(),
+                                       std::numeric_limits<uint32_t>::max()};
   }
 
-  if (!constraints.required_max_surface_size().has_value()) {
-    constraints.required_max_surface_size() = {0, 0};
+  if (!constraints.required_max_size().has_value()) {
+    constraints.required_max_size() = {0, 0};
   }
 
   // "Packed" by default (for example, kBgr24 3 bytes per pixel is allowed to have zero padding per
@@ -2535,7 +2535,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     }
     uint32_t min_bytes_per_row_given_min_width =
         ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier) *
-        constraints.min_surface_size()->width();
+        constraints.min_size()->width();
     constraints.min_bytes_per_row() =
         std::max(constraints.min_bytes_per_row().value(), min_bytes_per_row_given_min_width);
   }
@@ -2549,12 +2549,12 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     return false;
   }
 
-  if (constraints.min_surface_size()->width() > constraints.max_surface_size()->width()) {
-    LogError(FROM_HERE, "min_surface_size.width > max_surface_size.width");
+  if (constraints.min_size()->width() > constraints.max_size()->width()) {
+    LogError(FROM_HERE, "min_size.width > max_size.width");
     return false;
   }
-  if (constraints.min_surface_size()->height() > constraints.max_surface_size()->height()) {
-    LogError(FROM_HERE, "min_surface_size.height > max_surface_size.height");
+  if (constraints.min_size()->height() > constraints.max_size()->height()) {
+    LogError(FROM_HERE, "min_size.height > max_size.height");
     return false;
   }
 
@@ -2564,9 +2564,9 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   }
 
   uint32_t min_width_times_min_height;
-  if (!CheckMul(constraints.min_surface_size()->width(), constraints.min_surface_size()->height())
+  if (!CheckMul(constraints.min_size()->width(), constraints.min_size()->height())
            .AssignIfValid(&min_width_times_min_height)) {
-    LogError(FROM_HERE, "min_surface_size.width * min_surface_size.height failed");
+    LogError(FROM_HERE, "min_size.width * min_size.height failed");
     return false;
   }
   if (min_width_times_min_height > constraints.max_surface_width_times_surface_height().value()) {
@@ -2574,12 +2574,12 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     return false;
   }
 
-  if (!IsNonZeroPowerOf2(constraints.surface_size_alignment()->width())) {
-    LogError(FROM_HERE, "non-power-of-2 surface_size_alignment.width not supported");
+  if (!IsNonZeroPowerOf2(constraints.size_alignment()->width())) {
+    LogError(FROM_HERE, "non-power-of-2 size_alignment.width not supported");
     return false;
   }
-  if (!IsNonZeroPowerOf2(constraints.surface_size_alignment()->height())) {
-    LogError(FROM_HERE, "non-power-of-2 surface_size_alignment.height not supported");
+  if (!IsNonZeroPowerOf2(constraints.size_alignment()->height())) {
+    LogError(FROM_HERE, "non-power-of-2 size_alignment.height not supported");
     return false;
   }
 
@@ -2634,32 +2634,30 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     }
   }
 
-  if (constraints.required_min_surface_size()->width() == 0) {
-    LogError(FROM_HERE, "required_min_surface_size.width == 0");
+  if (constraints.required_min_size()->width() == 0) {
+    LogError(FROM_HERE, "required_min_size.width == 0");
     return false;
   }
-  ZX_DEBUG_ASSERT(constraints.required_min_surface_size()->width() != 0);
-  if (constraints.required_min_surface_size()->width() < constraints.min_surface_size()->width()) {
-    LogError(FROM_HERE, "required_min_surface_size.width < min_surface_size.width");
+  ZX_DEBUG_ASSERT(constraints.required_min_size()->width() != 0);
+  if (constraints.required_min_size()->width() < constraints.min_size()->width()) {
+    LogError(FROM_HERE, "required_min_size.width < min_size.width");
     return false;
   }
-  if (constraints.required_max_surface_size()->width() > constraints.max_surface_size()->width()) {
-    LogError(FROM_HERE, "required_max_surface_size.width > max_surface_size.width");
+  if (constraints.required_max_size()->width() > constraints.max_size()->width()) {
+    LogError(FROM_HERE, "required_max_size.width > max_size.width");
     return false;
   }
-  if (constraints.required_min_surface_size()->height() == 0) {
-    LogError(FROM_HERE, "required_min_surface_size.height == 0");
+  if (constraints.required_min_size()->height() == 0) {
+    LogError(FROM_HERE, "required_min_size.height == 0");
     return false;
   }
-  ZX_DEBUG_ASSERT(constraints.required_min_surface_size()->height() != 0);
-  if (constraints.required_min_surface_size()->height() <
-      constraints.min_surface_size()->height()) {
-    LogError(FROM_HERE, "required_min_surface_size.height < min_surface_size.height");
+  ZX_DEBUG_ASSERT(constraints.required_min_size()->height() != 0);
+  if (constraints.required_min_size()->height() < constraints.min_size()->height()) {
+    LogError(FROM_HERE, "required_min_size.height < min_size.height");
     return false;
   }
-  if (constraints.required_max_surface_size()->height() >
-      constraints.max_surface_size()->height()) {
-    LogError(FROM_HERE, "required_max_surface_size.height > max_surface_size.height");
+  if (constraints.required_max_size()->height() > constraints.max_size()->height()) {
+    LogError(FROM_HERE, "required_max_size.height > max_size.height");
     return false;
   }
 
@@ -2945,19 +2943,15 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   // Else AccumulateConstraintColorSpaces() would have returned false.
   ZX_DEBUG_ASSERT(!acc->color_spaces()->empty());
 
-  ZX_DEBUG_ASSERT(acc->min_surface_size().has_value());
-  ZX_DEBUG_ASSERT(c.min_surface_size().has_value());
-  acc->min_surface_size()->width() =
-      std::max(acc->min_surface_size()->width(), c.min_surface_size()->width());
-  acc->min_surface_size()->height() =
-      std::max(acc->min_surface_size()->height(), c.min_surface_size()->height());
+  ZX_DEBUG_ASSERT(acc->min_size().has_value());
+  ZX_DEBUG_ASSERT(c.min_size().has_value());
+  acc->min_size()->width() = std::max(acc->min_size()->width(), c.min_size()->width());
+  acc->min_size()->height() = std::max(acc->min_size()->height(), c.min_size()->height());
 
-  ZX_DEBUG_ASSERT(acc->max_surface_size().has_value());
-  ZX_DEBUG_ASSERT(c.max_surface_size().has_value());
-  acc->max_surface_size()->width() =
-      std::min(acc->max_surface_size()->width(), c.max_surface_size()->width());
-  acc->max_surface_size()->height() =
-      std::min(acc->max_surface_size()->height(), c.max_surface_size()->height());
+  ZX_DEBUG_ASSERT(acc->max_size().has_value());
+  ZX_DEBUG_ASSERT(c.max_size().has_value());
+  acc->max_size()->width() = std::min(acc->max_size()->width(), c.max_size()->width());
+  acc->max_size()->height() = std::min(acc->max_size()->height(), c.max_size()->height());
 
   acc->min_bytes_per_row() = std::max(*acc->min_bytes_per_row(), *c.min_bytes_per_row());
   acc->max_bytes_per_row() = std::min(*acc->max_bytes_per_row(), *c.max_bytes_per_row());
@@ -2969,12 +2963,12 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
 
   // For these, see also the conditional statement below that ensures these are fixed up with any
   // pixel-format-dependent adjustment.
-  ZX_DEBUG_ASSERT(acc->surface_size_alignment().has_value());
-  ZX_DEBUG_ASSERT(c.surface_size_alignment().has_value());
-  acc->surface_size_alignment()->width() =
-      std::max(acc->surface_size_alignment()->width(), c.surface_size_alignment()->width());
-  acc->surface_size_alignment()->height() =
-      std::max(acc->surface_size_alignment()->height(), c.surface_size_alignment()->height());
+  ZX_DEBUG_ASSERT(acc->size_alignment().has_value());
+  ZX_DEBUG_ASSERT(c.size_alignment().has_value());
+  acc->size_alignment()->width() =
+      std::max(acc->size_alignment()->width(), c.size_alignment()->width());
+  acc->size_alignment()->height() =
+      std::max(acc->size_alignment()->height(), c.size_alignment()->height());
 
   acc->bytes_per_row_divisor() =
       std::max(*acc->bytes_per_row_divisor(), *c.bytes_per_row_divisor());
@@ -2994,11 +2988,11 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   bool acc_is_pixel_format_do_not_care = acc_is_pixel_format_do_not_care_result.value();
   if (!acc_is_pixel_format_do_not_care) {
     auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(*acc);
-    acc->surface_size_alignment()->width() =
-        std::max(acc->surface_size_alignment()->width(),
+    acc->size_alignment()->width() =
+        std::max(acc->size_alignment()->width(),
                  ImageFormatSurfaceWidthMinDivisor(acc_pixel_format_and_modifier));
-    acc->surface_size_alignment()->height() =
-        std::max(acc->surface_size_alignment()->height(),
+    acc->size_alignment()->height() =
+        std::max(acc->size_alignment()->height(),
                  ImageFormatSurfaceHeightMinDivisor(acc_pixel_format_and_modifier));
     acc->bytes_per_row_divisor() = std::max(
         *acc->bytes_per_row_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
@@ -3018,25 +3012,25 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   // video decoder to indicate that it's capable of outputting a wide range of
   // output dimensions, but that it has specific current dimensions that are
   // presently required_ (min == max) for decode to proceed.
-  ZX_DEBUG_ASSERT(acc->required_min_surface_size().has_value());
-  ZX_DEBUG_ASSERT(c.required_min_surface_size().has_value());
-  ZX_DEBUG_ASSERT(acc->required_max_surface_size().has_value());
-  ZX_DEBUG_ASSERT(c.required_max_surface_size().has_value());
+  ZX_DEBUG_ASSERT(acc->required_min_size().has_value());
+  ZX_DEBUG_ASSERT(c.required_min_size().has_value());
+  ZX_DEBUG_ASSERT(acc->required_max_size().has_value());
+  ZX_DEBUG_ASSERT(c.required_max_size().has_value());
 
-  ZX_DEBUG_ASSERT(acc->required_min_surface_size()->width() != 0);
-  ZX_DEBUG_ASSERT(c.required_min_surface_size()->width() != 0);
-  ZX_DEBUG_ASSERT(acc->required_min_surface_size()->height() != 0);
-  ZX_DEBUG_ASSERT(c.required_min_surface_size()->height() != 0);
+  ZX_DEBUG_ASSERT(acc->required_min_size()->width() != 0);
+  ZX_DEBUG_ASSERT(c.required_min_size()->width() != 0);
+  ZX_DEBUG_ASSERT(acc->required_min_size()->height() != 0);
+  ZX_DEBUG_ASSERT(c.required_min_size()->height() != 0);
 
-  acc->required_min_surface_size()->width() =
-      std::min(acc->required_min_surface_size()->width(), c.required_min_surface_size()->width());
-  acc->required_max_surface_size()->width() =
-      std::max(acc->required_max_surface_size()->width(), c.required_max_surface_size()->width());
+  acc->required_min_size()->width() =
+      std::min(acc->required_min_size()->width(), c.required_min_size()->width());
+  acc->required_max_size()->width() =
+      std::max(acc->required_max_size()->width(), c.required_max_size()->width());
 
-  acc->required_min_surface_size()->height() =
-      std::min(acc->required_min_surface_size()->height(), c.required_min_surface_size()->height());
-  acc->required_max_surface_size()->height() =
-      std::max(acc->required_max_surface_size()->height(), c.required_max_surface_size()->height());
+  acc->required_min_size()->height() =
+      std::min(acc->required_min_size()->height(), c.required_min_size()->height());
+  acc->required_max_size()->height() =
+      std::max(acc->required_max_size()->height(), c.required_max_size()->height());
 
   return true;
 }
@@ -3328,39 +3322,35 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     min_image.pixel_format() = pixel_format_and_modifier.pixel_format;
     min_image.pixel_format_modifier() = pixel_format_and_modifier.pixel_format_modifier;
 
-    min_image.surface_size().emplace();
+    min_image.size().emplace();
 
-    // We use required_max_surface_size.width because that's the max width that the producer (or
+    // We use required_max_size.width because that's the max width that the producer (or
     // initiator) wants these buffers to be able to hold.
-    min_image.surface_size()->width() =
-        AlignUp(std::max(image_format_constraints.min_surface_size()->width(),
-                         image_format_constraints.required_max_surface_size()->width()),
-                image_format_constraints.surface_size_alignment()->width());
-    if (min_image.surface_size()->width() > image_format_constraints.max_surface_size()->width()) {
-      LogError(FROM_HERE,
-               "surface_size_alignment.width caused surface_size.width > max_surface_size.width");
+    min_image.size()->width() =
+        AlignUp(std::max(image_format_constraints.min_size()->width(),
+                         image_format_constraints.required_max_size()->width()),
+                image_format_constraints.size_alignment()->width());
+    if (min_image.size()->width() > image_format_constraints.max_size()->width()) {
+      LogError(FROM_HERE, "size_alignment.width caused size.width > max_size.width");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
-    // We use required_max_surface_size.height because that's the max height that the producer (or
+    // We use required_max_size.height because that's the max height that the producer (or
     // initiator) needs these buffers to be able to hold.
-    min_image.surface_size()->height() =
-        AlignUp(std::max(image_format_constraints.min_surface_size()->height(),
-                         image_format_constraints.required_max_surface_size()->height()),
-                image_format_constraints.surface_size_alignment()->height());
-    if (min_image.surface_size()->height() >
-        image_format_constraints.max_surface_size()->height()) {
-      LogError(
-          FROM_HERE,
-          "surface_size_alignment.height caused surface_size.height > max_surface_size.height");
+    min_image.size()->height() =
+        AlignUp(std::max(image_format_constraints.min_size()->height(),
+                         image_format_constraints.required_max_size()->height()),
+                image_format_constraints.size_alignment()->height());
+    if (min_image.size()->height() > image_format_constraints.max_size()->height()) {
+      LogError(FROM_HERE, "size_alignment.height caused size.height > max_size.height");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
     uint32_t one_row_non_padding_bytes;
     if (!CheckMul(ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier),
-                  min_image.surface_size()->width())
+                  min_image.size()->width())
              .AssignIfValid(&one_row_non_padding_bytes)) {
-      LogError(FROM_HERE, "stride_bytes_per_width_pixel * surface_size.width failed");
+      LogError(FROM_HERE, "stride_bytes_per_width_pixel * size.width failed");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
     // TODO: Make/use a safemath-y version of AlignUp().
@@ -3375,7 +3365,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     }
 
     uint32_t min_image_width_times_height;
-    if (!CheckMul(min_image.surface_size()->width(), min_image.surface_size()->height())
+    if (!CheckMul(min_image.size()->width(), min_image.size()->height())
              .AssignIfValid(&min_image_width_times_height)) {
       LogError(FROM_HERE, "min_image width*height failed");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
@@ -3496,24 +3486,22 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
       inspect_node_.CreateUint("pixel_format_modifier",
                                *image_format_constraints.pixel_format_modifier(), &vmo_properties_);
     }
-    if (image_format_constraints.min_surface_size()->width() > 0) {
-      inspect_node_.CreateUint("min_surface_size_width",
-                               image_format_constraints.min_surface_size()->width(),
+    if (image_format_constraints.min_size()->width() > 0) {
+      inspect_node_.CreateUint("min_size_width", image_format_constraints.min_size()->width(),
                                &vmo_properties_);
     }
-    if (image_format_constraints.min_surface_size()->height() > 0) {
-      inspect_node_.CreateUint("min_surface_size_height",
-                               image_format_constraints.min_surface_size()->height(),
+    if (image_format_constraints.min_size()->height() > 0) {
+      inspect_node_.CreateUint("min_size_height", image_format_constraints.min_size()->height(),
                                &vmo_properties_);
     }
-    if (image_format_constraints.required_max_surface_size()->width() > 0) {
-      inspect_node_.CreateUint("required_max_surface_size_width",
-                               image_format_constraints.required_max_surface_size()->width(),
+    if (image_format_constraints.required_max_size()->width() > 0) {
+      inspect_node_.CreateUint("required_max_size_width",
+                               image_format_constraints.required_max_size()->width(),
                                &vmo_properties_);
     }
-    if (image_format_constraints.required_max_surface_size()->height() > 0) {
-      inspect_node_.CreateUint("required_max_surface_size_height",
-                               image_format_constraints.required_max_surface_size()->height(),
+    if (image_format_constraints.required_max_size()->height() > 0) {
+      inspect_node_.CreateUint("required_max_size_height",
+                               image_format_constraints.required_max_size()->height(),
                                &vmo_properties_);
     }
   }
@@ -4156,32 +4144,28 @@ void LogicalBufferCollection::LogConstraints(
       LOG_UINT64_FIELD(FROM_HERE, ifc, pixel_format_modifier);
     }
 
-    LogInfo(FROM_HERE, "min_surface_size.width: %u", ifc.min_surface_size()->width());
-    LogInfo(FROM_HERE, "min_surface_size.height: %u", ifc.min_surface_size()->height());
+    LogInfo(FROM_HERE, "min_size.width: %u", ifc.min_size()->width());
+    LogInfo(FROM_HERE, "min_size.height: %u", ifc.min_size()->height());
 
-    LogInfo(FROM_HERE, "max_surface_size.width: %u", ifc.max_surface_size()->width());
-    LogInfo(FROM_HERE, "max_surface_size.height: %u", ifc.max_surface_size()->height());
+    LogInfo(FROM_HERE, "max_size.width: %u", ifc.max_size()->width());
+    LogInfo(FROM_HERE, "max_size.height: %u", ifc.max_size()->height());
 
     LOG_UINT32_FIELD(FROM_HERE, ifc, min_bytes_per_row);
     LOG_UINT32_FIELD(FROM_HERE, ifc, max_bytes_per_row);
 
     LOG_UINT32_FIELD(FROM_HERE, ifc, max_surface_width_times_surface_height);
 
-    LogInfo(FROM_HERE, "surface_size_alignment.width: %u", ifc.surface_size_alignment()->width());
-    LogInfo(FROM_HERE, "surface_size_alignment.height: %u", ifc.surface_size_alignment()->height());
+    LogInfo(FROM_HERE, "size_alignment.width: %u", ifc.size_alignment()->width());
+    LogInfo(FROM_HERE, "size_alignment.height: %u", ifc.size_alignment()->height());
 
     LogInfo(FROM_HERE, "display_size_alignment.width: %u", ifc.display_size_alignment()->width());
     LogInfo(FROM_HERE, "display_size_alignment.height: %u", ifc.display_size_alignment()->height());
 
-    LogInfo(FROM_HERE, "required_min_surface_size.width: %u",
-            ifc.required_min_surface_size()->width());
-    LogInfo(FROM_HERE, "required_min_surface_size.height: %u",
-            ifc.required_min_surface_size()->height());
+    LogInfo(FROM_HERE, "required_min_size.width: %u", ifc.required_min_size()->width());
+    LogInfo(FROM_HERE, "required_min_size.height: %u", ifc.required_min_size()->height());
 
-    LogInfo(FROM_HERE, "required_max_surface_size.width: %u",
-            ifc.required_max_surface_size()->width());
-    LogInfo(FROM_HERE, "required_max_surface_size.height: %u",
-            ifc.required_max_surface_size()->height());
+    LogInfo(FROM_HERE, "required_max_size.width: %u", ifc.required_max_size()->width());
+    LogInfo(FROM_HERE, "required_max_size.height: %u", ifc.required_max_size()->height());
 
     LOG_UINT32_FIELD(FROM_HERE, ifc, bytes_per_row_divisor);
 

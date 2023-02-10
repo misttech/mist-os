@@ -525,15 +525,15 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     PRINT_DIFF(pixel_format);
     PRINT_DIFF(pixel_format_modifier);
     PRINT_DIFF(color_spaces);
-    PRINT_DIFF(min_surface_size);
-    PRINT_DIFF(max_surface_size);
+    PRINT_DIFF(min_size);
+    PRINT_DIFF(max_size);
     PRINT_DIFF(min_bytes_per_row);
     PRINT_DIFF(max_bytes_per_row);
     PRINT_DIFF(max_surface_width_times_surface_height);
-    PRINT_DIFF(surface_size_alignment);
+    PRINT_DIFF(size_alignment);
     PRINT_DIFF(display_size_alignment);
-    PRINT_DIFF(required_min_surface_size);
-    PRINT_DIFF(required_max_surface_size);
+    PRINT_DIFF(required_min_size);
+    PRINT_DIFF(required_max_size);
     PRINT_DIFF(bytes_per_row_divisor);
     PRINT_DIFF(start_offset_divisor);
   }

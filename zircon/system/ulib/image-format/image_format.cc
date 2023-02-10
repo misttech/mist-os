@@ -236,14 +236,12 @@ class IntelTiledFormats : public ImageFormatSet {
     // Caller must set pixel_format.
     ZX_DEBUG_ASSERT(constraints.pixel_format().has_value());
 
-    if (constraints.surface_size_alignment().has_value()) {
-      width = fbl::round_up(width, constraints.surface_size_alignment()->width());
+    if (constraints.size_alignment().has_value()) {
+      width = fbl::round_up(width, constraints.size_alignment()->width());
     }
 
-    if ((constraints.min_surface_size().has_value() &&
-         width < constraints.min_surface_size()->width()) ||
-        (constraints.max_surface_size().has_value() &&
-         width > constraints.max_surface_size()->width())) {
+    if ((constraints.min_size().has_value() && width < constraints.min_size()->width()) ||
+        (constraints.max_size().has_value() && width > constraints.max_size()->width())) {
       return false;
     }
     uint32_t constraints_min_bytes_per_row =
@@ -355,7 +353,7 @@ class IntelTiledFormats : public ImageFormatSet {
         ZX_DEBUG_ASSERT(plane == 0);
 
         *width_out = fbl::round_up(bytes_per_row, bytes_per_row_per_tile) / bytes_per_row_per_tile;
-        *height_out = fbl::round_up(image_format.surface_size()->height(), tile_rows) / tile_rows;
+        *height_out = fbl::round_up(image_format.size()->height(), tile_rows) / tile_rows;
       } break;
       // Since NV12 is a biplanar format we must handle the size for each plane separately. From
       // https://github.com/intel/gmmlib/blob/e1f634c5d5a41ac48756b25697ea499605711747/Source/GmmLib/Texture/GmmTextureAlloc.cpp#L1192:
@@ -366,14 +364,14 @@ class IntelTiledFormats : public ImageFormatSet {
           // Calculate the Y plane size (8 bpp)
           *width_out =
               fbl::round_up(bytes_per_row, bytes_per_row_per_tile) / bytes_per_row_per_tile;
-          *height_out = fbl::round_up(image_format.surface_size()->height(), tile_rows) / tile_rows;
+          *height_out = fbl::round_up(image_format.size()->height(), tile_rows) / tile_rows;
         } else if (plane == 1) {
           // Calculate the UV plane size (4 bpp)
           // We effectively have 1/2 the height of our original image since we are subsampled at
           // 4:2:0. Since width of the Y plane must match the width of the UV plane we divide the
           // height of the Y plane by 2 to calculate the height of the UV plane (aligned on tile
           // height boundaries). Ensure the height is aligned 2 before dividing.
-          uint32_t adjusted_height = fbl::round_up(image_format.surface_size()->height(), 2u) / 2u;
+          uint32_t adjusted_height = fbl::round_up(image_format.size()->height(), 2u) / 2u;
 
           *width_out =
               fbl::round_up(bytes_per_row, bytes_per_row_per_tile) / bytes_per_row_per_tile;
@@ -492,10 +490,10 @@ class AfbcFormats : public ImageFormatSet {
     constexpr uint32_t kBytesPerPixel = 4;
     constexpr uint32_t kBytesPerBlockHeader = 16;
 
-    ZX_DEBUG_ASSERT(image_format.surface_size().has_value());
+    ZX_DEBUG_ASSERT(image_format.size().has_value());
     uint64_t block_count =
-        fbl::round_up(image_format.surface_size()->width(), width_alignment) / block_width *
-        fbl::round_up(image_format.surface_size()->height(), height_alignment) / block_height;
+        fbl::round_up(image_format.size()->width(), width_alignment) / block_width *
+        fbl::round_up(image_format.size()->height(), height_alignment) / block_height;
     return block_count * block_width * block_height * kBytesPerPixel +
            fbl::round_up(block_count * kBytesPerBlockHeader, body_alignment);
   }
@@ -503,8 +501,8 @@ class AfbcFormats : public ImageFormatSet {
   uint64_t ImageFormatImageSize(const ImageFormat& image_format) const override {
     uint64_t size = NonTESize(image_format);
     if (image_format.pixel_format_modifier().value() & fuchsia_images2::kFormatModifierArmTeBit) {
-      size += arm_transaction_elimination_buffer_size(size, image_format.surface_size()->width(),
-                                                      image_format.surface_size()->height());
+      size += arm_transaction_elimination_buffer_size(size, image_format.size()->width(),
+                                                      image_format.size()->height());
     }
 
     return size;
@@ -531,7 +529,7 @@ class AfbcFormats : public ImageFormatSet {
       return true;
     }
     if (plane == kTransactionEliminationPlane) {
-      *row_bytes_out = arm_transaction_elimination_row_size(image_format.surface_size()->width());
+      *row_bytes_out = arm_transaction_elimination_row_size(image_format.size()->width());
       return true;
     }
     return false;
@@ -541,12 +539,10 @@ class AfbcFormats : public ImageFormatSet {
     ZX_DEBUG_ASSERT(IsSupported(PixelFormatAndModifier(
         constraints.pixel_format().value(), constraints.pixel_format_modifier().value())));
 
-    if (constraints.min_surface_size().has_value() &&
-        width < constraints.min_surface_size()->width()) {
+    if (constraints.min_size().has_value() && width < constraints.min_size()->width()) {
       return false;
     }
-    if (constraints.max_surface_size().has_value() &&
-        width > constraints.max_surface_size()->width()) {
+    if (constraints.max_size().has_value() && width > constraints.max_size()->width()) {
       return false;
     }
 
@@ -625,14 +621,12 @@ bool linear_minimum_row_bytes(const fuchsia_sysmem2::ImageFormatConstraints& con
   // Caller must set pixel_format.
   ZX_DEBUG_ASSERT(constraints.pixel_format().has_value());
 
-  if ((constraints.min_surface_size().has_value() &&
-       width < constraints.min_surface_size()->width()) ||
-      (constraints.max_surface_size().has_value() &&
-       width > constraints.max_surface_size()->width())) {
+  if ((constraints.min_size().has_value() && width < constraints.min_size()->width()) ||
+      (constraints.max_size().has_value() && width > constraints.max_size()->width())) {
     return false;
   }
-  if (constraints.surface_size_alignment().has_value() &&
-      width % constraints.surface_size_alignment()->width() != 0) {
+  if (constraints.size_alignment().has_value() &&
+      width % constraints.size_alignment()->width() != 0) {
     return false;
   }
   uint32_t constraints_min_bytes_per_row =
@@ -691,9 +685,9 @@ class LinearFormats : public ImageFormatSet {
     ZX_DEBUG_ASSERT(image_format.pixel_format().has_value());
     auto pixel_format_and_modifier = PixelFormatAndModifierFromImageFormat(image_format);
     ZX_DEBUG_ASSERT(IsSupported(pixel_format_and_modifier));
-    ZX_DEBUG_ASSERT(image_format.surface_size().has_value());
+    ZX_DEBUG_ASSERT(image_format.size().has_value());
     ZX_DEBUG_ASSERT(image_format.bytes_per_row().has_value());
-    uint32_t surface_height = image_format.surface_size()->height();
+    uint32_t surface_height = image_format.size()->height();
     uint32_t bytes_per_row =
         image_format.bytes_per_row().has_value() ? image_format.bytes_per_row().value() : 0;
     return linear_size(surface_height, bytes_per_row, pixel_format_and_modifier.pixel_format);
@@ -710,9 +704,9 @@ class LinearFormats : public ImageFormatSet {
         case PixelFormat::kNv12:
         case PixelFormat::kI420:
         case PixelFormat::kYv12: {
-          *offset_out = CheckMul(image_format.surface_size().value().height(),
-                                 image_format.bytes_per_row().value())
-                            .ValueOrDie();
+          *offset_out =
+              CheckMul(image_format.size().value().height(), image_format.bytes_per_row().value())
+                  .ValueOrDie();
           return true;
         }
         default:
@@ -723,11 +717,10 @@ class LinearFormats : public ImageFormatSet {
       switch (image_format.pixel_format().value()) {
         case PixelFormat::kI420:
         case PixelFormat::kYv12: {
-          auto luma_bytes = CheckMul(image_format.surface_size().value().height(),
-                                     image_format.bytes_per_row().value());
-          auto one_chroma_plane_bytes =
-              CheckMul(CheckDiv(image_format.surface_size().value().height(), 2),
-                       CheckDiv(image_format.bytes_per_row().value(), 2));
+          auto luma_bytes =
+              CheckMul(image_format.size().value().height(), image_format.bytes_per_row().value());
+          auto one_chroma_plane_bytes = CheckMul(CheckDiv(image_format.size().value().height(), 2),
+                                                 CheckDiv(image_format.bytes_per_row().value(), 2));
           auto offset_just_past_luma_and_one_chroma = CheckAdd(luma_bytes, one_chroma_plane_bytes);
           // 2nd chroma plane is just past luma and 1st chroma plane
           *offset_out = offset_just_past_luma_and_one_chroma.ValueOrDie();
@@ -797,10 +790,10 @@ class GoldfishFormats : public ImageFormatSet {
     ZX_DEBUG_ASSERT(image_format.pixel_format().has_value());
     auto pixel_format_and_modifier = PixelFormatAndModifierFromImageFormat(image_format);
     ZX_DEBUG_ASSERT(IsSupported(pixel_format_and_modifier));
-    ZX_DEBUG_ASSERT(image_format.surface_size().has_value());
+    ZX_DEBUG_ASSERT(image_format.size().has_value());
     ZX_DEBUG_ASSERT(image_format.bytes_per_row().has_value());
 
-    uint32_t surface_height = image_format.surface_size()->height();
+    uint32_t surface_height = image_format.size()->height();
     uint32_t bytes_per_row = image_format.bytes_per_row().value();
     return linear_size(surface_height, bytes_per_row, image_format.pixel_format().value());
   }
@@ -866,13 +859,13 @@ class ArmTELinearFormats : public ImageFormatSet {
   uint64_t ImageFormatImageSize(const fuchsia_images2::ImageFormat& image_format) const override {
     auto pixel_format_and_modifier = PixelFormatAndModifierFromImageFormat(image_format);
     ZX_DEBUG_ASSERT(IsSupported(pixel_format_and_modifier));
-    ZX_DEBUG_ASSERT(image_format.surface_size().has_value());
+    ZX_DEBUG_ASSERT(image_format.size().has_value());
     ZX_DEBUG_ASSERT(image_format.bytes_per_row().has_value());
     uint32_t bytes_per_row = image_format.bytes_per_row().value();
-    uint64_t size = linear_size(image_format.surface_size()->height(), bytes_per_row,
+    uint64_t size = linear_size(image_format.size()->height(), bytes_per_row,
                                 pixel_format_and_modifier.pixel_format);
-    uint64_t crc_size = arm_transaction_elimination_buffer_size(
-        size, image_format.surface_size()->width(), image_format.surface_size()->height());
+    uint64_t crc_size = arm_transaction_elimination_buffer_size(size, image_format.size()->width(),
+                                                                image_format.size()->height());
     return size + crc_size;
   }
 
@@ -882,10 +875,10 @@ class ArmTELinearFormats : public ImageFormatSet {
       return kLinearFormats.ImageFormatPlaneByteOffset(image_format, plane, offset_out);
     }
     if (plane == kTransactionEliminationPlane) {
-      ZX_DEBUG_ASSERT(image_format.surface_size().has_value());
+      ZX_DEBUG_ASSERT(image_format.size().has_value());
       ZX_DEBUG_ASSERT(image_format.bytes_per_row().has_value());
       uint32_t bytes_per_row = image_format.bytes_per_row().value();
-      uint64_t size = linear_size(image_format.surface_size()->height(), bytes_per_row,
+      uint64_t size = linear_size(image_format.size()->height(), bytes_per_row,
                                   image_format.pixel_format().value());
       *offset_out = fbl::round_up(size, 64u);
       return true;
@@ -900,10 +893,10 @@ class ArmTELinearFormats : public ImageFormatSet {
       return kLinearFormats.ImageFormatPlaneRowBytes(image_format, plane, row_bytes_out);
     }
     if (plane == kTransactionEliminationPlane) {
-      if (!image_format.surface_size().has_value()) {
+      if (!image_format.size().has_value()) {
         return false;
       }
-      *row_bytes_out = arm_transaction_elimination_row_size(image_format.surface_size()->width());
+      *row_bytes_out = arm_transaction_elimination_row_size(image_format.size()->width());
       return true;
     }
     return false;
@@ -1463,16 +1456,12 @@ bool ImageFormatConvertZxToSysmem(zx_pixel_format_t zx_pixel_format,
 
 fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstraints& constraints,
                                                        uint32_t width, uint32_t height) {
-  if ((constraints.min_surface_size().has_value() &&
-       height < constraints.min_surface_size()->height()) ||
-      (constraints.max_surface_size().has_value() &&
-       height > constraints.max_surface_size()->height())) {
+  if ((constraints.min_size().has_value() && height < constraints.min_size()->height()) ||
+      (constraints.max_size().has_value() && height > constraints.max_size()->height())) {
     return fpromise::error();
   }
-  if ((constraints.min_surface_size().has_value() &&
-       width < constraints.min_surface_size()->width()) ||
-      (constraints.max_surface_size().has_value() &&
-       width > constraints.max_surface_size()->width())) {
+  if ((constraints.min_size().has_value() && width < constraints.min_size()->width()) ||
+      (constraints.max_size().has_value() && width > constraints.max_size()->width())) {
     return fpromise::error();
   }
   ImageFormat result;
@@ -1484,7 +1473,7 @@ fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstrai
   result.bytes_per_row() = minimum_row_bytes;
   result.pixel_format() = constraints.pixel_format().value();
   result.pixel_format_modifier() = constraints.pixel_format_modifier().value();
-  result.surface_size() = {width, height};
+  result.size() = {width, height};
   result.display_size() = {width, height};
   if (constraints.color_spaces().has_value() && !constraints.color_spaces()->empty()) {
     result.color_space() = constraints.color_spaces()->at(0);

@@ -66,11 +66,10 @@ zx_status_t CheckSingleBufferSettings(
 
   if (has_image_format_constraints) {
     const auto& image_constraints = single_buffer_settings.image_format_constraints();
-    if (!image_constraints.has_pixel_format() || !image_constraints.has_min_surface_size()) {
-      zxlogf(ERROR,
-             "[%s][%s] image_constraints missing arguments: pixel_format %d min_surface_size %d",
+    if (!image_constraints.has_pixel_format() || !image_constraints.has_min_size()) {
+      zxlogf(ERROR, "[%s][%s] image_constraints missing arguments: pixel_format %d min_size %d",
              kTag, __func__, image_constraints.has_pixel_format(),
-             image_constraints.has_min_surface_size());
+             image_constraints.has_min_size());
       return ZX_ERR_INVALID_ARGS;
     }
   }
@@ -98,7 +97,7 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
   ZX_DEBUG_ASSERT(buffer_settings.has_image_format_constraints());
   const auto& image_constraints = buffer_settings.image_format_constraints();
 
-  ZX_DEBUG_ASSERT(image_constraints.has_pixel_format() && image_constraints.has_min_surface_size());
+  ZX_DEBUG_ASSERT(image_constraints.has_pixel_format() && image_constraints.has_min_size());
 
   // TODO(fxbug.dev/59804): Support other pixel formats.
   const auto& pixel_format = image_constraints.pixel_format();
@@ -122,20 +121,19 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  uint32_t width = image_constraints.min_surface_size().width;
-  if (image_constraints.has_required_max_surface_size()) {
-    width = std::max(width, image_constraints.required_max_surface_size().width);
+  uint32_t width = image_constraints.min_size().width;
+  if (image_constraints.has_required_max_size()) {
+    width = std::max(width, image_constraints.required_max_size().width);
   }
-  width = fbl::round_up(width, image_constraints.has_surface_size_alignment()
-                                   ? image_constraints.surface_size_alignment().width
-                                   : 1);
+  width = fbl::round_up(
+      width, image_constraints.has_size_alignment() ? image_constraints.size_alignment().width : 1);
 
-  uint32_t height = image_constraints.min_surface_size().height;
-  if (image_constraints.has_required_max_surface_size()) {
-    height = std::max(height, image_constraints.required_max_surface_size().height);
+  uint32_t height = image_constraints.min_size().height;
+  if (image_constraints.has_required_max_size()) {
+    height = std::max(height, image_constraints.required_max_size().height);
   }
-  height = fbl::round_up(height, image_constraints.has_surface_size_alignment()
-                                     ? image_constraints.surface_size_alignment().height
+  height = fbl::round_up(height, image_constraints.has_size_alignment()
+                                     ? image_constraints.size_alignment().height
                                      : 1);
 
   CreateColorBuffer2Params buffer2_params(allocator);
@@ -276,9 +274,9 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
   TRACE_DURATION(
       "gfx", "HostVisibleHeap::CreateResource", "type", is_image ? "image" : "buffer",
       "image:width",
-      is_image ? request->buffer_settings.image_format_constraints().min_surface_size().width : 0,
+      is_image ? request->buffer_settings.image_format_constraints().min_size().width : 0,
       "image:height",
-      is_image ? request->buffer_settings.image_format_constraints().min_surface_size().height : 0,
+      is_image ? request->buffer_settings.image_format_constraints().min_size().height : 0,
       "image:format",
       is_image ? static_cast<uint32_t>(
                      request->buffer_settings.image_format_constraints().pixel_format())

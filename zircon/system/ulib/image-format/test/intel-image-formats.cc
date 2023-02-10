@@ -18,7 +18,7 @@ TEST(ImageFormat, IntelYTiledFormat_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
   constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierIntelI915YTiled;
-  constraints.min_surface_size() = {128u, 32u};
+  constraints.min_size() = {128u, 32u};
 
   auto image_format_result = ImageConstraintsToFormat(constraints, 3440u, 1440u);
   EXPECT_TRUE(image_format_result.is_ok());
@@ -61,7 +61,7 @@ TEST(ImageFormat, IntelYTiledFormat_V2_wire) {
   constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kNv12);
   constraints.set_pixel_format_modifier(allocator,
                                         fuchsia_images2::wire::kFormatModifierIntelI915YTiled);
-  constraints.set_min_surface_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
+  constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
 
   auto image_format_result = ImageConstraintsToFormat(allocator, constraints, 3440u, 1440u);
   EXPECT_TRUE(image_format_result.is_ok());
@@ -209,7 +209,7 @@ TEST(ImageFormat, IntelYTiledFormat_V2BytesPerRowDivisor) {
   constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
   constraints.set_pixel_format_modifier(allocator,
                                         fuchsia_images2::wire::kFormatModifierIntelI915YTiled);
-  constraints.set_min_surface_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
+  constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});
   constraints.set_bytes_per_row_divisor(512u);
 
   constexpr uint32_t kImageWidth = 540u / 4;

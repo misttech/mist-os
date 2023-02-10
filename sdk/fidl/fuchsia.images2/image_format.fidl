@@ -33,19 +33,17 @@ type ImageFormat = table {
     ///
     /// The right and bottom of the image may have some valid pixels which are
     /// not to be displayed.  See `display_size`.
-    //
-    // TODO: Consider renaming this to "image_size" or "size".
-    4: surface_size fuchsia.math.SizeU;
+    4: size fuchsia.math.SizeU;
 
     /// Number of bytes per row. For multi-plane YUV formats, this is the number
     /// of bytes per row in the Y plane.
     ///
     /// When this field is not set, there is no padding at the end of each row
     /// of pixels. In other words, when not set, the stride is equal to the
-    /// "stride bytes per width pixel" times the `surface_size.width`.
+    /// "stride bytes per width pixel" times the `size.width`.
     ///
     /// When set, the value in this field must be >= the "stride bytes per width
-    /// pixel" times the `surface_size.width`. If equal, there is no padding at
+    /// pixel" times the `size.width`. If equal, there is no padding at
     /// the end of each row of pixels. If greater, the difference is how much
     /// padding is at the end of each row of pixels, in bytes.
     ///
@@ -59,12 +57,12 @@ type ImageFormat = table {
     /// not necessarily divisible by the size in bytes of a pixel ("stride bytes
     /// per width pixel"), so we indicate the padding using this field rather
     /// than trying to incorporate the padding as a larger "fake"
-    /// `surface_size.width`.
+    /// `size.width`.
     5: bytes_per_row uint32;
 
     /// The size of a frame for display purposes. This is the size in pixels of
     /// the rectangle of pixels that should be displayed.  This must be <= the
-    /// `surface_size` in both dimensions.
+    /// `size` in both dimensions.
     ///
     /// This field is intentionally limited to only allow cropping on the right
     /// and bottom, not on the top or left. This addresses video codecs, but is
@@ -76,8 +74,8 @@ type ImageFormat = table {
     /// for correct decoder function.  The `display_size` will always be less
     /// than or equal to the corresponding `valid_size` values (in both
     /// dimensions), when `valid_size` is set.  The `display_size` will always
-    /// be less than or equal to the corresponding `surface_size` values. In
-    /// other words, `display_size` <= 'valid_size` <= `surface_size`.
+    /// be less than or equal to the corresponding `size` values. In
+    /// other words, `display_size` <= 'valid_size` <= `size`.
     ///
     /// Downstream texture filtering operations should avoid letting any pixel
     /// outside of display_size influence the visual appearance of any displayed
@@ -86,7 +84,7 @@ type ImageFormat = table {
     /// display.
     ///
     /// Behavior when this field is not set is protocol-specific. In some
-    /// protocols, fallback to `valid_size`, then to `surface_size` may be
+    /// protocols, fallback to `valid_size`, then to `size` may be
     /// implemented. In other protocols, this field must be set or the channel
     /// will close.
     6: display_size fuchsia.math.SizeU;

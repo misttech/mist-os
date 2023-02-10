@@ -495,14 +495,14 @@ bool AttachTokenSucceedsV2(
   image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints_1.min_surface_size() = {256, 256};
-  image_constraints_1.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                            std::numeric_limits<uint32_t>::max()};
+  image_constraints_1.min_size() = {256, 256};
+  image_constraints_1.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                    std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints_1.max_surface_width_times_surface_height() =
       std::numeric_limits<uint32_t>::max();
-  image_constraints_1.surface_size_alignment() = {2, 2};
+  image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
   image_constraints_1.display_size_alignment() = {1, 1};
@@ -511,7 +511,7 @@ bool AttachTokenSucceedsV2(
   // in the constraints struct so a struct copy instead of clone is fine here.
   v2::BufferCollectionConstraints constraints_2(constraints_1);
   // Modify constraints_2 to require double the width and height.
-  constraints_2.image_format_constraints()->at(0).min_surface_size() = {512, 512};
+  constraints_2.image_format_constraints()->at(0).min_size() = {512, 512};
 
   // TODO(fxb/115937): Fix this to work for sysmem2.
 #if SYSMEM_FUZZ_CORPUS
@@ -1218,13 +1218,13 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_surface_size() = {256, 256};
-  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                          std::numeric_limits<uint32_t>::max()};
+  image_constraints.min_size() = {256, 256};
+  image_constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                  std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.surface_size_alignment() = {2, 2};
+  image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
   image_constraints.display_size_alignment() = {1, 1};
@@ -1625,14 +1625,14 @@ TEST(Sysmem, MultipleParticipantsV2) {
   image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints_1.min_surface_size() = {256, 256};
-  image_constraints_1.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                            std::numeric_limits<uint32_t>::max()};
+  image_constraints_1.min_size() = {256, 256};
+  image_constraints_1.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                    std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints_1.max_surface_width_times_surface_height() =
       std::numeric_limits<uint32_t>::max();
-  image_constraints_1.surface_size_alignment() = {2, 2};
+  image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
   image_constraints_1.display_size_alignment() = {1, 1};
@@ -1641,7 +1641,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   // in the constraints struct so a struct copy instead of clone is fine here.
   v2::BufferCollectionConstraints constraints_2 = constraints_1;
   // Modify constraints_2 to require double the width and height.
-  constraints_2.image_format_constraints()->at(0).min_surface_size() = {512, 512};
+  constraints_2.image_format_constraints()->at(0).min_size() = {512, 512};
 
   // TODO(fxb/115937): Make this work for sysmem2.
 #if 0
@@ -1904,9 +1904,7 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
 
   for (uint32_t i = 0; i < constraints_2.image_format_constraints()->size(); ++i) {
     // Modify constraints_2 to require nonzero image dimensions.
-    constraints_2.image_format_constraints()->at(i).required_max_surface_size().emplace();
-    constraints_2.image_format_constraints()->at(i).required_max_surface_size()->width() = 512;
-    constraints_2.image_format_constraints()->at(i).required_max_surface_size()->height() = 512;
+    constraints_2.image_format_constraints()->at(i).required_max_size() = {512, 512};
   }
 
   // TODO(fxb/115937): Make this work for sysmem2.
@@ -2665,17 +2663,17 @@ TEST(Sysmem, RequiredSizeV2) {
   image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
-  image_constraints.min_surface_size() = {256, 256};
-  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                          std::numeric_limits<uint32_t>::max()};
+  image_constraints.min_size() = {256, 256};
+  image_constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                  std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.surface_size_alignment() = {1, 1};
+  image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = 1;
   image_constraints.start_offset_divisor() = 1;
   image_constraints.display_size_alignment() = {1, 1};
-  image_constraints.required_max_surface_size() = {512, 1024};
+  image_constraints.required_max_size() = {512, 1024};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3166,13 +3164,13 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_surface_size() = {kWidth, kHeight};
-  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                          std::numeric_limits<uint32_t>::max()};
+  image_constraints.min_size() = {kWidth, kHeight};
+  image_constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                  std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = kStride;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.surface_size_alignment() = {1, 1};
+  image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = divisor;
   image_constraints.start_offset_divisor() = divisor;
   image_constraints.display_size_alignment() = {1, 1};
@@ -3793,9 +3791,9 @@ TEST(Sysmem, DefaultAttributesV2) {
   image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
   image_constraints.color_spaces().emplace(1);
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
-  image_constraints.required_max_surface_size().emplace();
-  image_constraints.required_max_surface_size()->width() = 512;
-  image_constraints.required_max_surface_size()->height() = 1024;
+  image_constraints.required_max_size().emplace();
+  image_constraints.required_max_size()->width() = 512;
+  image_constraints.required_max_size()->height() = 1024;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3857,9 +3855,9 @@ TEST(Sysmem, TooManyFormatsV2) {
     image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
     image_constraints.color_spaces().emplace(1);
     image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
-    image_constraints.required_max_surface_size().emplace();
-    image_constraints.required_max_surface_size()->width() = 512;
-    image_constraints.required_max_surface_size()->height() = 1024;
+    image_constraints.required_max_size().emplace();
+    image_constraints.required_max_size()->width() = 512;
+    image_constraints.required_max_size()->height() = 1024;
   }
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3935,13 +3933,13 @@ bool BasicAllocationSucceedsV2(
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
   // The min dimensions intentionally imply a min size that's larger than
   // buffer_memory_constraints.min_size_bytes.
-  image_constraints.min_surface_size() = {256, 256};
-  image_constraints.max_surface_size() = {std::numeric_limits<uint32_t>::max(),
-                                          std::numeric_limits<uint32_t>::max()};
+  image_constraints.min_size() = {256, 256};
+  image_constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
+                                  std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
   image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
-  image_constraints.surface_size_alignment() = {2, 2};
+  image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
   image_constraints.display_size_alignment() = {1, 1};
@@ -4024,12 +4022,12 @@ TEST(Sysmem, ZeroRequiredMinCodedWidth_FailsInV2) {
   // interpreted as replace with default.
   EXPECT_FALSE(BasicAllocationSucceedsV2([](v2::BufferCollectionConstraints& to_modify) {
     auto& ifc = to_modify.image_format_constraints()->at(0);
-    if (!ifc.required_min_surface_size().has_value()) {
-      ifc.required_min_surface_size().emplace();
+    if (!ifc.required_min_size().has_value()) {
+      ifc.required_min_size().emplace();
       // not testing height 0, so set height to 1
-      ifc.required_min_surface_size()->height() = 1;
+      ifc.required_min_size()->height() = 1;
     }
-    ifc.required_min_surface_size()->width() = 0;
+    ifc.required_min_size()->width() = 0;
   }));
 }
 
@@ -4038,12 +4036,12 @@ TEST(Sysmem, ZeroRequiredMinCodedHeight_FailsInV2) {
   // interpreted as replace with default.
   EXPECT_FALSE(BasicAllocationSucceedsV2([](v2::BufferCollectionConstraints& to_modify) {
     auto& ifc = to_modify.image_format_constraints()->at(0);
-    if (!ifc.required_min_surface_size().has_value()) {
-      ifc.required_min_surface_size().emplace();
+    if (!ifc.required_min_size().has_value()) {
+      ifc.required_min_size().emplace();
       // not testing width 0, so set width to 1
-      ifc.required_min_surface_size()->width() = 1;
+      ifc.required_min_size()->width() = 1;
     }
-    ifc.required_min_surface_size()->height() = 0;
+    ifc.required_min_size()->height() = 0;
   }));
 }
 
@@ -5180,9 +5178,9 @@ TEST(Sysmem, PixelFormatDoNotCare_SuccessV2) {
   c2.image_format_constraints()->at(0) = {};
   c2.image_format_constraints()->at(0).color_spaces().emplace(1);
   c2.image_format_constraints()->at(0).color_spaces()->at(0) = fuchsia_images2::ColorSpace::kRec709;
-  c2.image_format_constraints()->at(0).min_surface_size().emplace();
-  c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-  c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+  c2.image_format_constraints()->at(0).min_size().emplace();
+  c2.image_format_constraints()->at(0).min_size()->width() = 32;
+  c2.image_format_constraints()->at(0).min_size()->height() = 32;
 
   // clone / copy
   auto c1 = c2;
@@ -5238,9 +5236,9 @@ TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFailsV2) {
     c2.image_format_constraints()->at(0).color_spaces().emplace(1);
     c2.image_format_constraints()->at(0).color_spaces()->at(0) =
         fuchsia_images2::ColorSpace::kRec709;
-    c2.image_format_constraints()->at(0).min_surface_size().emplace();
-    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+    c2.image_format_constraints()->at(0).min_size().emplace();
+    c2.image_format_constraints()->at(0).min_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
@@ -5309,9 +5307,9 @@ TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFailsV2) {
     c2.image_format_constraints()->at(0).color_spaces().emplace(1);
     c2.image_format_constraints()->at(0).color_spaces()->at(0) =
         fuchsia_images2::ColorSpace::kRec709;
-    c2.image_format_constraints()->at(0).min_surface_size().emplace();
-    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+    c2.image_format_constraints()->at(0).min_size().emplace();
+    c2.image_format_constraints()->at(0).min_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
@@ -5370,9 +5368,9 @@ TEST(Sysmem, ColorSpaceDoNotCare_SuccessV2) {
   c2.min_buffer_count_for_camping() = 1;
   c2.image_format_constraints().emplace(1);
   c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
-  c2.image_format_constraints()->at(0).min_surface_size().emplace();
-  c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-  c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+  c2.image_format_constraints()->at(0).min_size().emplace();
+  c2.image_format_constraints()->at(0).min_size()->width() = 32;
+  c2.image_format_constraints()->at(0).min_size()->height() = 32;
 
   // clone / copy
   auto c1 = c2;
@@ -5434,9 +5432,9 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV2) {
     c2.min_buffer_count_for_camping() = 1;
     c2.image_format_constraints().emplace(1);
     c2.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
-    c2.image_format_constraints()->at(0).min_surface_size().emplace();
-    c2.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-    c2.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+    c2.image_format_constraints()->at(0).min_size().emplace();
+    c2.image_format_constraints()->at(0).min_size()->width() = 32;
+    c2.image_format_constraints()->at(0).min_size()->height() = 32;
 
     // clone / copy
     auto c1 = c2;
@@ -5531,9 +5529,9 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormatV2) {
     c1.image_format_constraints()->at(0).pixel_format() = fuchsia_images2::PixelFormat::kNv12;
     // c1 is logically kDoNotCare, via ForceUnsetColorSpaceConstraint() sent below.  This field is
     // copied but then overridden for c2 (pass 0 only).
-    c1.image_format_constraints()->at(0).min_surface_size().emplace();
-    c1.image_format_constraints()->at(0).min_surface_size()->width() = 32;
-    c1.image_format_constraints()->at(0).min_surface_size()->height() = 32;
+    c1.image_format_constraints()->at(0).min_size().emplace();
+    c1.image_format_constraints()->at(0).min_size()->width() = 32;
+    c1.image_format_constraints()->at(0).min_size()->height() = 32;
 
     // clone / copy
     auto c2 = c1;
