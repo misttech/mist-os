@@ -63,13 +63,13 @@ void BuildDiskImage(zx::vmo vmo) {
   // Format the new fvm partition with minfs.
   {
     FX_LOGS(INFO) << "Formatting \"" << zxcrypt.value() << "\" as minfs.";
-    zx::result channel = component::Connect<fuchsia_hardware_block::Block>(zxcrypt.value());
+    zx::result channel = component::Connect<fuchsia_hardware_block_volume::Volume>(zxcrypt.value());
     ASSERT_TRUE(channel.is_ok()) << channel.status_string();
-    std::unique_ptr<block_client::RemoteBlockDevice> minfs_device;
-    ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(channel.value()), &minfs_device),
-              ZX_OK);
-    auto bc = minfs::Bcache::Create(std::move(minfs_device), block_count);
-    ASSERT_EQ(bc.status_value(), ZX_OK);
+    zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+    ASSERT_TRUE(device.is_ok()) << device.status_string();
+    std::unique_ptr<block_client::RemoteBlockDevice> minfs_device = std::move(device.value());
+    zx::result bc = minfs::Bcache::Create(std::move(minfs_device), block_count);
+    ASSERT_TRUE(bc.is_ok()) << bc.status_string();
     ASSERT_EQ(minfs::Mkfs(bc.value().get()).status_value(), ZX_OK);
 
     // Write a simple file hierarchy out to test the copy code.

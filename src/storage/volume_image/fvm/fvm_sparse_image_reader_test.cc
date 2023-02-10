@@ -63,22 +63,21 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
 
   // Open the ram disk
   zx::result channel =
-      component::Connect<fuchsia_hardware_block::Block>(ram_disk_or.value().path());
+      component::Connect<fuchsia_hardware_block_volume::Volume>(ram_disk_or.value().path());
   ASSERT_TRUE(channel.is_ok()) << channel.status_string();
 
-  std::unique_ptr<block_client::RemoteBlockDevice> client;
-  zx_status_t status = block_client::RemoteBlockDevice::Create(std::move(channel.value()), &client);
-  ASSERT_EQ(status, ZX_OK);
+  zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
+  std::unique_ptr<block_client::RemoteBlockDevice> client = std::move(device.value());
 
   constexpr uint64_t kInitialVmoSize = 1048576;
   auto vmo = fzl::ResizeableVmoMapper::Create(kInitialVmoSize, "test");
   ASSERT_TRUE(vmo);
 
   storage::Vmoid vmoid;
-  status = client->BlockAttachVmo(vmo->vmo(), &vmoid);
+  ASSERT_EQ(client->BlockAttachVmo(vmo->vmo(), &vmoid), ZX_OK);
   // This is a test, so we don't need to worry about cleaning it up.
   vmoid_t vmo_id = vmoid.TakeId();
-  ASSERT_EQ(status, ZX_OK);
 
   memset(vmo->start(), 0xaf, kInitialVmoSize);
 
@@ -90,8 +89,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .length =
             static_cast<uint32_t>(std::min(disk_size - offset, kInitialVmoSize) / kDeviceBlockSize),
         .dev_offset = offset / kDeviceBlockSize};
-    status = client->FifoTransaction(&request, 1);
-    ASSERT_EQ(status, ZX_OK);
+    ASSERT_EQ(client->FifoTransaction(&request, 1), ZX_OK);
   }
 
   for (const AddressMap& map : sparse_image_or.value().address().mappings) {
@@ -102,8 +100,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
     EXPECT_TRUE(map.options.empty());
 
     if (vmo->size() < map.count) {
-      status = vmo->Grow(map.count);
-      ASSERT_EQ(status, ZX_OK);
+      ASSERT_EQ(vmo->Grow(map.count), ZX_OK);
     }
     auto result = sparse_image_or.value().reader()->Read(
         map.source, cpp20::span<uint8_t>(reinterpret_cast<uint8_t*>(vmo->start()), map.count));
@@ -115,16 +112,15 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
                                     .length = static_cast<uint32_t>(map.count / kDeviceBlockSize),
                                     .dev_offset = map.target / kDeviceBlockSize};
 
-    status = client->FifoTransaction(&request, 1);
-    ASSERT_EQ(status, ZX_OK) << "length=" << request.length
-                             << ", dev_offset=" << request.dev_offset;
+    ASSERT_EQ(client->FifoTransaction(&request, 1), ZX_OK)
+        << "length=" << request.length << ", dev_offset=" << request.dev_offset;
   }
 
   client.reset();
 
   // Now try and attach FVM.
   auto result = AttachFvm(ram_disk_or.value().path());
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
 
   fs_management::PartitionMatcher matcher{
       .type_guids = {GUID_DATA_VALUE},
@@ -150,7 +146,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
     };
     EXPECT_EQ(fs_management::Fsck(path, fs_management::kDiskFormatMinfs, options,
                                   fs_management::LaunchStdioSync),
-              0);
+              ZX_OK);
   }
 
   // Attempt to fsck blobfs.
@@ -174,7 +170,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
     };
     EXPECT_EQ(fs_management::Fsck(path, fs_management::kDiskFormatBlobfs, options,
                                   fs_management::LaunchStdioSync),
-              0);
+              ZX_OK);
   }
 }
 

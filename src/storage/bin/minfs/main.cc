@@ -198,28 +198,15 @@ int main(int argc, char** argv) {
         // handle. Get it and create the bcache.
         zx::channel device_channel = zx::channel(zx_take_startup_handle(FS_HANDLE_BLOCK_DEVICE_ID));
 
-        std::unique_ptr<block_client::RemoteBlockDevice> device;
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-        zx_status_t status = block_client::RemoteBlockDevice::Create(
-            fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(device_channel)), &device);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Could not access block device";
+        zx::result device = block_client::RemoteBlockDevice::Create(
+            fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(device_channel)));
+        if (device.is_error()) {
+          FX_PLOGS(ERROR, device.status_value()) << "Could not access block device";
           return EXIT_FAILURE;
         }
 
-        if (int ret = CreateBcacheUpdatingOptions(std::move(device), &options, &bc); ret != 0) {
+        if (int ret = CreateBcacheUpdatingOptions(std::move(device.value()), &options, &bc);
+            ret != 0) {
           return ret;
         }
       }

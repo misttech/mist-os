@@ -1043,10 +1043,11 @@ TEST_P(BlobfsIntegrationTest, ReadOnly) {
 
 void OpenBlockDevice(const std::string& path,
                      std::unique_ptr<block_client::RemoteBlockDevice>* block_device) {
-  zx::result channel = component::Connect<fuchsia_hardware_block::Block>(path);
+  zx::result channel = component::Connect<fuchsia_hardware_block_volume::Volume>(path);
   ASSERT_TRUE(channel.is_ok()) << channel.status_string();
-  ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(channel.value()), block_device),
-            ZX_OK);
+  zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
+  *block_device = std::move(device.value());
 }
 
 using SliceRange = fuchsia_hardware_block_volume::wire::VsliceRange;

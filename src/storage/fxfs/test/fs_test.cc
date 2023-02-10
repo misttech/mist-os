@@ -43,7 +43,7 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   const std::string kFilename = GetPath("block_device");
   const off_t kFileSize = 10 * 1024 * 1024;  // 10 megabytes
   CreateFxFile(kFilename, kFileSize);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
   auto& [client, server] = endpoints.value();
 
@@ -57,8 +57,9 @@ TEST_P(DeviceTest, TestWriteThenRead) {
                 .status(),
             ZX_OK);
 
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result result = block_client::RemoteBlockDevice::Create(std::move(client));
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  std::unique_ptr<block_client::RemoteBlockDevice> device = std::move(result.value());
 
   fuchsia_hardware_block::wire::BlockInfo info = {};
   ASSERT_EQ(device->BlockGetInfo(&info), ZX_OK);
@@ -107,7 +108,7 @@ TEST_P(DeviceTest, TestWriteThenRead) {
 TEST_P(DeviceTest, TestGroupWritesThenReads) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
   auto& [client, server] = endpoints.value();
 
@@ -120,8 +121,9 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
                 .status(),
             ZX_OK);
 
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result result = block_client::RemoteBlockDevice::Create(std::move(client));
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  std::unique_ptr<block_client::RemoteBlockDevice> device = std::move(result.value());
 
   const size_t kVmoBlocks = 6;
   zx::vmo vmo;
@@ -191,7 +193,7 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
 TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
   auto& [client, server] = endpoints.value();
 
@@ -204,8 +206,9 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
                 .status(),
             ZX_OK);
 
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result result = block_client::RemoteBlockDevice::Create(std::move(client));
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  std::unique_ptr<block_client::RemoteBlockDevice> device = std::move(result.value());
 
   const size_t kVmoBlocks = 2;
   zx::vmo vmo;
@@ -251,7 +254,7 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
 TEST_P(DeviceTest, TestInvalidGroupRequests) {
   const std::string kFilename = GetPath("block_device");
   CreateFxFile(kFilename);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
   auto& [client, server] = endpoints.value();
 
@@ -264,8 +267,9 @@ TEST_P(DeviceTest, TestInvalidGroupRequests) {
                 .status(),
             ZX_OK);
 
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result result = block_client::RemoteBlockDevice::Create(std::move(client));
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  std::unique_ptr<block_client::RemoteBlockDevice> device = std::move(result.value());
 
   const size_t kVmoBlocks = 5;
   zx::vmo vmo;

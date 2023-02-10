@@ -278,12 +278,13 @@ TEST_F(BlockDeviceManagerIntegration, StartBlobfsComponent) {
     ASSERT_EQ(fvm_partition_or.status_value(), ZX_OK);
 
     // Format the new fvm partition with blobfs.
-    zx::result device = component::Connect<fuchsia_hardware_block::Block>(fvm_partition_or.value());
-    ASSERT_TRUE(device.is_ok()) << device.status_string();
+    zx::result volume =
+        component::Connect<fuchsia_hardware_block_volume::Volume>(fvm_partition_or.value());
+    ASSERT_TRUE(volume.is_ok()) << volume.status_string();
 
-    std::unique_ptr<block_client::RemoteBlockDevice> blobfs_device;
-    ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(device.value()), &blobfs_device),
-              ZX_OK);
+    zx::result device = block_client::RemoteBlockDevice::Create(std::move(volume.value()));
+    ASSERT_TRUE(device.is_ok()) << device.status_string();
+    std::unique_ptr<block_client::RemoteBlockDevice> blobfs_device = std::move(device.value());
     ASSERT_EQ(blobfs::FormatFilesystem(blobfs_device.get(), blobfs::FilesystemOptions{}), ZX_OK);
 
     // Check the newly formatted blobfs for good measure.
