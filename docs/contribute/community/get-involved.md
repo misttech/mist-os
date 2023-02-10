@@ -43,6 +43,12 @@ Google Groups.
 For more information,
 see [Mailing lists](/docs/contribute/community/mailing-lists.md).
 
+## Join our Discord server
+
+Connect and chat with Fuchsia contributors in the Fuchsia Discord community.
+
+Join the [Fuchsia Discord server](https://discord.com/invite/pjfYkmbq69){: .external}.
+
 ## Contribute code
 
 The Fuchsia project encourages well-tested, high-quality contributions from
