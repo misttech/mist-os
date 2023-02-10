@@ -295,7 +295,7 @@ mod tests {
                 .write_stdout(FOO_URL, "stdout")
                 .await
                 .context("failed to write 'stderr' to stderr")?;
-            let (stdout, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stdout, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
@@ -304,7 +304,7 @@ mod tests {
                 .write_stderr(FOO_URL, "stderr")
                 .await
                 .context("failed to write 'stderr' to stderr")?;
-            let (stderr, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stderr, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
@@ -313,7 +313,7 @@ mod tests {
                 .write_syslog(FOO_URL, "syslog")
                 .await
                 .context("failed to write 'syslog' to syslog")?;
-            let (syslog, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (syslog, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
@@ -347,7 +347,7 @@ mod tests {
                 .context("fuchsia.fuzzer.Manager/Connect")?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
-            let (stderr, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stderr, socket) = zx::Socket::create_stream();
             let status =
                 fuzz_manager_foo.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
@@ -374,7 +374,7 @@ mod tests {
                 .context("fuchsia.fuzzer.Manager/Connect")?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
-            let (stderr, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stderr, socket) = zx::Socket::create_stream();
             let status =
                 fuzz_manager_bar.get_output(BAR_URL, fuzz::TestOutput::Stderr, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
@@ -475,15 +475,15 @@ mod tests {
                 .context("fuchsia.fuzzer.Manager/Connect")?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
-            let (stdout, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stdout, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
-            let (stderr, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (stderr, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 
-            let (syslog, socket) = zx::Socket::create(zx::SocketOpts::empty())?;
+            let (syslog, socket) = zx::Socket::create_stream();
             let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
             assert_eq!(status, zx::Status::OK.into_raw());
 

@@ -341,16 +341,14 @@ fn send_default_run_events(
         .send_run_event(url, RunEventPayload::RunStarted(RunStarted {}))
         .context("failed to send RunStarted run event")?;
 
-    let (out_rx, out_tx) =
-        zx::Socket::create(zx::SocketOpts::empty()).context("failed to create socket")?;
+    let (out_rx, out_tx) = zx::Socket::create_stream();
     let stdout = fasync::Socket::from_socket(out_tx).context("failed to create async socket")?;
     fuzzers.put_stdout(&url, stdout);
     fuzzers
         .send_run_event(url, RunEventPayload::Artifact(Artifact::Stdout(out_rx)))
         .context("failed to send Stdout run event")?;
 
-    let (err_rx, err_tx) =
-        zx::Socket::create(zx::SocketOpts::empty()).context("failed to create socket")?;
+    let (err_rx, err_tx) = zx::Socket::create_stream();
     let stderr = fasync::Socket::from_socket(err_tx).context("failed to create async socket")?;
     fuzzers.put_stderr(&url, stderr);
     fuzzers
