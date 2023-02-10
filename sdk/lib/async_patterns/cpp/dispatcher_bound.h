@@ -83,7 +83,7 @@ namespace async_patterns {
 // [synchronized-dispatcher]:
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 template <typename T>
-class DispatcherBound final {
+class DispatcherBound {
  public:
   // Constructs a |DispatcherBound| that does not hold an instance of |T|.
   DispatcherBound() = default;
