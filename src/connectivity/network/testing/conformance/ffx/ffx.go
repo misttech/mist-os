@@ -113,6 +113,30 @@ func NewFfxInstance(
 		return nil, fmt.Errorf("wrapperFfxInstance.SetLogLevel(%q) = %w", ffxutil.Warn, err)
 	}
 
+	hostOutDir, err := util.GetHostOutDirectory()
+	if err != nil {
+		return nil, fmt.Errorf("util.GetHostOutDirectory() = %w", err)
+	}
+	rootBuildDir := filepath.Dir(hostOutDir)
+
+	if err := wrapperFfxInstance.ConfigSet(ctx, "sdk.root", rootBuildDir); err != nil {
+		return nil, fmt.Errorf(
+			"wrapperFfxInstance.ConfigSet(_, %q, %q) = %w",
+			"sdk.root",
+			rootBuildDir,
+			err,
+		)
+	}
+
+	if err := wrapperFfxInstance.ConfigSet(ctx, "sdk.type", "in-tree"); err != nil {
+		return nil, fmt.Errorf(
+			"wrapperFfxInstance.ConfigSet(_, %q, %q) = %w",
+			"sdk.type",
+			"in-tree",
+			err,
+		)
+	}
+
 	fmt.Printf("====== Choosing FFX target: %s ======\n", options.Target)
 	return &wrapperFfxInstance, nil
 }
