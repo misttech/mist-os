@@ -130,6 +130,7 @@ export RBE_log_dir="$reproxy_tmpdir"
 export RBE_proxy_log_dir="$reproxy_tmpdir"
 # rbe_metrics.{pb,txt} appears in -output_dir
 export RBE_output_dir="$reproxy_tmpdir"
+export RBE_server_address=unix://"$reproxy_tmpdir"/reproxy.sock
 # deps cache dir should be somewhere persistent between builds,
 # and thus, not random.  /var/cache can be root-owned and not always writeable.
 if test -n "$HOME"
