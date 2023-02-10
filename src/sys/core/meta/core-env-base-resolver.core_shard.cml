@@ -15,10 +15,6 @@
             extends: "realm",
             runners: [
                 {
-                    runner: "starbionic",
-                    from: "#starnix_manager",
-                },
-                {
                     runner: "stardroid",
                     from: "#starnix_manager",
                 },

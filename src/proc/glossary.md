@@ -57,7 +57,7 @@ futexes.
 ## Galaxy
 
 The term "galaxy" refers to the [Starnix kernel](#starnix-kernel) bundled with a particular
-system image and configuration. For example, the `starbionic` galaxy is a starnix kernel instance
+system image and configuration. For example, the `bionic` galaxy is a starnix kernel instance
 configured to run binaries using an Android system image (Bionic libc).
 
 

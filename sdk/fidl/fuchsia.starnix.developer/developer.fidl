@@ -11,7 +11,7 @@ using zx;
 /// Several `Manager` methods allow clients to choose a "galaxy." A galaxy is a Starnix kernel
 /// instance configured with a particular system image, init task, etc.
 ///
-/// For example, the `starbionic` galaxy runs components in a bionic (Android libc) based
+/// For example, the `bionic` galaxy runs components in a bionic (Android libc) based
 /// environment.
 ///
 /// Some methods allow clients to specify the name of a galaxy explicitly, while others rely on the
@@ -43,8 +43,8 @@ protocol Manager {
     ///
     /// The shell component to launch is optionally specified by `params.url`. The galaxy in which
     /// the shell will run is determined by the `.cml` file of the shell component (i.e., by which
-    /// runner it uses). For example, a shell component with its `runner` set to `starbionic` will
-    /// run in the `starbionic` galaxy.
+    /// runner it uses). For example, a shell component with its `runner` set to `bionic` will
+    /// run in the `bionic` galaxy.
     ///
     /// If no shell component is specified, the `Manager` will choose a default shell component to
     /// launch and connect to.

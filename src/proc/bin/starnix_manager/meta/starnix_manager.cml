@@ -9,8 +9,9 @@
     },
     children: [
         {
-            name: "starbionic",
-            url: "fuchsia-pkg://fuchsia.com/starbionic#meta/starnix_kernel.cm",
+            name: "bionic",
+            url: "fuchsia-pkg://fuchsia.com/starbionic#meta/bionic_galaxy.cm",
+            environment: "#galaxy-env",
         },
         {
             name: "stardroid",
@@ -57,8 +58,9 @@
     use: [
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#starbionic",
-            path: "/starbionic/fuchsia.starnix.galaxy.Controller",
+            from: "#bionic",
+            path: "/bionic/fuchsia.starnix.galaxy.Controller",
+            dependency: "weak",
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
@@ -94,7 +96,6 @@
             from: "parent",
             to: [
                 "#kernels",
-                "#starbionic",
                 "#stardroid",
                 "#starless",
                 "#starmium",
@@ -111,7 +112,6 @@
             from: "parent",
             to: [
                 "#kernels",
-                "#starbionic",
                 "#stardroid",
                 "#starless",
                 "#starmium",
@@ -128,7 +128,6 @@
             from: "parent",
             to: [
                 "#kernels",
-                "#starbionic",
                 "#stardroid",
                 "#starless",
                 "#starmium",
@@ -138,7 +137,6 @@
             directory: "galaxy_config",
             from: "void",
             to: [
-                "#starbionic",
                 "#stardroid",
                 "#starless",
                 "#starmium",
@@ -149,8 +147,8 @@
     expose: [
         {
             runner: "starnix",
-            from: "#starbionic",
-            as: "starbionic",
+            from: "#bionic",
+            as: "starnix_bionic",
         },
         {
             runner: "starnix",
@@ -183,13 +181,13 @@
             runners: [
                 {
                     runner: "starnix",
-                    from: "#starmium",
-                    as: "starmium",
+                    from: "#bionic",
+                    as: "starnix_bionic",
                 },
                 {
                     runner: "starnix",
-                    from: "#starbionic",
-                    as: "starbionic",
+                    from: "#starmium",
+                    as: "starmium",
                 },
                 {
                     runner: "starnix",
@@ -201,6 +199,16 @@
                     from: "#starless",
                     as: "starless",
                 },
+                {
+                    runner: "starnix",
+                    from: "self",
+                },
+            ],
+        },
+        {
+            name: "galaxy-env",
+            extends: "realm",
+            runners: [
                 {
                     runner: "starnix",
                     from: "self",

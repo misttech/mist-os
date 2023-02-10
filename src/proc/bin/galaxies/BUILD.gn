@@ -5,7 +5,7 @@
 group("galaxies") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
-      "starbionic",
+      "bionic",
       "starless",
       "starmium",
     ]
@@ -15,7 +15,7 @@ group("galaxies") {
 group("release") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
-      "starbionic",
+      "bionic",
       "starless",
       "starmium",
     ]

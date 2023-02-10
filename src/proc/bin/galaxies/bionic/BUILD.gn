@@ -1,0 +1,32 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+group("bionic") {
+  deps = [ ":bionic_package" ]
+}
+
+# Mount point for when we need to mount an image with testcases.
+resource("testcases_mount_point") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/testcases/.placeholder" ]
+}
+
+# The system image for the galaxy.
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+fuchsia_package_with_single_component("bionic_package") {
+  manifest = "meta/bionic_galaxy.cml"
+  package_name = "starbionic"
+  component_name = "bionic_galaxy"
+
+  deps = [
+    ":system_image",
+    ":testcases_mount_point",
+  ]
+}
