@@ -218,7 +218,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   size_t GetGammaTableSize() const { return gamma_table_map_.size(); }
 
  private:
-  void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
   void ImportImage2(ImportImage2RequestView request,
                     ImportImage2Completer::Sync& _completer) override;
   void ReleaseImage(ReleaseImageRequestView request,
