@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::storage_info::StorageInfo;
 use fidl_fuchsia_hwinfo::{Architecture, ArchitectureUnknown, BoardInfo, DeviceInfo, ProductInfo};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::collections::HashMap;
@@ -47,22 +48,17 @@ impl Serialize for GumshoeDeviceInfo {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 pub struct DeviceInfoImpl {
     board_info: Option<GumshoeBoardInfo>,
     device_info: Option<GumshoeDeviceInfo>,
     product_info: HashMap<String, Option<String>>,
+    storage_info: Option<StorageInfo>,
 }
 
 /// Store of "stable" Device information, like product name and serial.
 /// Used as a base for data passed to Handlebars template renderer.
 impl DeviceInfoImpl {
-    #[cfg(test)]
-    /// Easy instancing of a DeviceInfoImpl for testing.
-    pub fn stub() -> Self {
-        Self { board_info: None, device_info: None, product_info: HashMap::new() }
-    }
-
     fn build_product_map(product_info: Option<ProductInfo>) -> HashMap<String, Option<String>> {
         let mut product_map = HashMap::new();
         match product_info {
@@ -94,11 +90,13 @@ impl DeviceInfoImpl {
         board_info: Option<BoardInfo>,
         device_info: Option<DeviceInfo>,
         product_info: Option<ProductInfo>,
+        storage_info: Option<StorageInfo>,
     ) -> Self {
         DeviceInfoImpl {
             board_info: board_info.map(|b| GumshoeBoardInfo(b)),
             device_info: device_info.map(|d| GumshoeDeviceInfo(d)),
             product_info: Self::build_product_map(product_info),
+            storage_info,
         }
     }
 }
@@ -108,19 +106,16 @@ mod tests {
     use super::*;
 
     #[test]
-    /// Verifies placeholder implementation of DeviceInfo sets name/serial.
+    /// Verifies placeholder implementation of DeviceInfo contains nothing.
     fn no_product_values_when_not_provided() {
-        let device = DeviceInfoImpl::stub();
+        let device = DeviceInfoImpl::default();
+
         assert_eq!(0, device.product_info.len());
     }
 
     #[test]
     fn product_values_present_when_provided() {
-        let device = DeviceInfoImpl::new(
-            Some(BoardInfo::EMPTY),
-            Some(DeviceInfo::EMPTY),
-            Some(ProductInfo::EMPTY),
-        );
+        let device = DeviceInfoImpl::new(None, None, Some(ProductInfo::EMPTY), None);
 
         // Gumshoe extracts 14 fields from ProductInfo.
         assert_eq!(14, device.product_info.len());

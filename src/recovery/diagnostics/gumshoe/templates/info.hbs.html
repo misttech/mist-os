@@ -26,4 +26,32 @@
 {{/each}}
 </ul>
 
+<h2>Storage Devices</h2>
+{{#if storage_info.devices}}
+<table>
+  <thead>
+    <tr>
+      <th>Logical Path</th>
+      <th>Block Size</th>
+      <th>Block Count</th>
+      <th>Capacity</th>
+      <th>Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each storage_info.devices}}
+    <tr>
+      <td>{{this.logical_path}}</td>
+      <td>{{#if this.block_size}}{{this.block_size}}{{else}}UNDEFINED{{/if}}</td>
+      <td>{{#if this.block_count}}{{this.block_count}}{{else}}UNDEFINED{{/if}}</td>
+      <td>{{#if this.capacity}}{{this.capacity}}{{else}}UNDEFINED{{/if}}</td>
+      <td>{{#if this.name}}"{{this.name}}"{{else}}UNDEFINED{{/if}}</td>
+    </tr>
+  {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>UNAVAILABLE</p>
+{{/if}}
+
 {{/chrome}}

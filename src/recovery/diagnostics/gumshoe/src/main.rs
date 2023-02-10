@@ -5,11 +5,13 @@
 mod device_info;
 mod handlebars_utils;
 mod responder;
+mod storage_info;
 mod webserver;
 
 use crate::device_info::DeviceInfoImpl;
 use crate::handlebars_utils::TemplateEngine;
 use crate::responder::ResponderImpl;
+use crate::storage_info::StorageInfo;
 use crate::webserver::{WebServer, WebServerImpl};
 use anyhow::Error;
 use fidl_fuchsia_hwinfo::BoardInfo;
@@ -29,6 +31,15 @@ const TEMPLATE_GLOB_PATH: Option<&str> = Some("/pkg/templates/*.hbs.html");
 async fn get_product_info() -> Result<ProductInfo, Error> {
     let product = connect_to_protocol::<fidl_fuchsia_hwinfo::ProductMarker>()?;
     Ok(product.get_info().await?)
+}
+
+/// Connects to Partition FIDL at given path.
+fn partition_provider(
+    path: &str,
+) -> Result<fidl_fuchsia_hardware_block_partition::PartitionProxy, Error> {
+    fuchsia_component::client::connect_to_protocol_at_path::<
+        fidl_fuchsia_hardware_block_partition::PartitionMarker,
+    >(path)
 }
 
 /// Retrieve BoardInfo from HWInfo FIDL.
@@ -67,21 +78,28 @@ async fn stakeout(
         )?;
     }
 
-    let maybe_product_info = match get_product_info().await {
-        Ok(product_info) => Some(product_info),
+    let storage_info = match StorageInfo::new(partition_provider).await {
+        Ok(storage_info) => Some(storage_info),
         Err(e) => {
-            eprintln!("Error getting product info: {:?}", e);
+            println!("Error getting storage info: {:?}", e);
             None
         }
     };
-    let maybe_board_info = match get_board_info().await {
+    let product_info = match get_product_info().await {
+        Ok(product_info) => Some(product_info),
+        Err(e) => {
+            println!("Error getting product info: {:?}", e);
+            None
+        }
+    };
+    let board_info = match get_board_info().await {
         Ok(board_info) => Some(board_info),
         Err(e) => {
             eprintln!("Error getting board info: {:?}", e);
             None
         }
     };
-    let maybe_device_info = match get_device_info().await {
+    let device_info = match get_device_info().await {
         Ok(device_info) => Some(device_info),
         Err(e) => {
             eprintln!("Error getting device info: {:?}", e);
@@ -89,7 +107,7 @@ async fn stakeout(
         }
     };
     let boxed_device_info =
-        Box::new(DeviceInfoImpl::new(maybe_board_info, maybe_device_info, maybe_product_info));
+        Box::new(DeviceInfoImpl::new(board_info, device_info, product_info, storage_info));
 
     // Construct a responder for generating HTTP responses from HTTP requests.
     let responder_impl = ResponderImpl::new(template_engine, boxed_device_info);
@@ -105,11 +123,11 @@ async fn main() {
     let template_engine = Box::new(Handlebars::new());
 
     match stakeout(&web_server_impl, template_engine, TEMPLATE_GLOB_PATH).await {
-        Ok(_) => {
-            eprintln!("Stakeout completed");
+        Ok(()) => {
+            println!("Stakeout completed");
         }
         Err(e) => {
-            eprintln!("Stakeout terminated with error: {:?}", e);
+            println!("Stakeout terminated with error: {:?}", e);
         }
     };
 }
