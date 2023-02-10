@@ -114,7 +114,7 @@ class SymbolizingTestRunner extends TestRunner {
       // `fx shell ...`, which leads to "can't find fx" errors (since that's
       // not on the device)
       '-c',
-      [command, ...args, '|', fx, 'symbolize'].join(' ')
+      [command, ...args, '|', fx, 'ffx', 'debug', 'symbolize'].join(' ')
     ]);
   }
 }
