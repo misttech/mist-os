@@ -109,6 +109,7 @@ fuchsia_unittest_package("test_manager_stress_test") {
 }
 
 fuchsia_unittest_package("test_manager_legacy_test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/test_manager_legacy_test.cml"
   deps = [
     ":test_manager_legacy_test_bin",

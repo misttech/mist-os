@@ -49,6 +49,7 @@ fuchsia_component("component") {
 
 # Run with `fx test flutter-runner-launch-smoke-test-unittests`.
 fuchsia_unittest_package("flutter-runner-launch-smoke-test-unittests") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/flutter-runner-launch-smoke-test.cml"
   deps = [
     ":bin_test",

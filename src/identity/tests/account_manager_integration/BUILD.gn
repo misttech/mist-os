@@ -45,6 +45,7 @@ rustc_test("test") {
 }
 
 fuchsia_test_component("account_manager_integration_test_component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/account_manager_integration_test.cml"
   deps = [

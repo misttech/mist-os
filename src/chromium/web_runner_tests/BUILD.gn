@@ -60,6 +60,7 @@ executable("web_runner_integration_tests_bin") {
 }
 
 fuchsia_component("web_runner_integration_tests") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   deps = [ ":web_runner_integration_tests_bin" ]
   manifest = "meta/web_runner_integration_tests.cml"

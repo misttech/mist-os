@@ -580,6 +580,7 @@ fuchsia_test_package("use_mjpeg_decoder_tests_x86") {
 #
 
 fuchsia_component("vp9_conformance_http_test_component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "use_media_decoder/meta/vp9_decoder_conformance_http.cml"
   deps = [

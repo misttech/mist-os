@@ -42,6 +42,7 @@ rustc_test("driver") {
 }
 
 fuchsia_test_component("isolated-ota-integration-test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/isolated-ota-integration-test.cml"
   deps = [ ":driver" ]

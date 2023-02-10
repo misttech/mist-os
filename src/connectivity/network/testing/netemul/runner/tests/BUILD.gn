@@ -43,6 +43,7 @@ rustc_test("netemul_runner_test") {
 }
 
 fuchsia_unittest_package("netemul-runner-tests") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [
     ":netemul_runner_test",
     "test-data",
@@ -64,6 +65,7 @@ rustc_test("netemul_runner_errors_test") {
 }
 
 fuchsia_unittest_package("netemul-runner-errors-tests") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [
     ":netemul_runner_errors_test",
     "test-data",

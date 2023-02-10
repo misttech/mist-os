@@ -274,6 +274,7 @@ rustc_test("basemgr_v1_to_v2_test_realm_bin") {
 }
 
 fuchsia_component("basemgr-v1-to-v2-test-realm") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/basemgr_v1_to_v2_test_realm.cml"
   deps = [ ":basemgr_v1_to_v2_test_realm_bin" ]

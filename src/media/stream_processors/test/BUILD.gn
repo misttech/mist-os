@@ -497,6 +497,7 @@ rustc_test("h265_encoder_test_bin") {
 }
 
 fuchsia_test_component("h265-encoder-test") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/h265_encoder_test.cml"
   deps = [ ":h265_encoder_test_bin" ]
 }
