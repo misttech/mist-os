@@ -71,12 +71,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.element.GraphicalPresenter" ],
-            from: "#session-manager",
-            to: "#test_manager",
-            source_availability: "unknown",
-        },
-        {
             protocol: "fuchsia.factory.WeaveFactoryStoreProvider",
             from: "#factory_store_providers",
             to: "#test_manager",

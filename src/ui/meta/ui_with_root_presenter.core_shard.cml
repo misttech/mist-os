@@ -43,6 +43,12 @@
             availability: "optional",
         },
         {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "void",
+            to: "#test_manager",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.settings.Light" ],
             from: "#setui_service",
             to: "#ui",

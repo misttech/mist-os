@@ -15,6 +15,7 @@ rustc_binary("scene_manager_bin") {
     ":input_config_lib",
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_rust",
     "//sdk/fidl/fuchsia.accessibility.scene:fuchsia.accessibility.scene_rust",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
     "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_rust",
@@ -59,6 +60,7 @@ rustc_binary("scene_manager_bin") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
+    "//src/lib/ui/fuchsia-scenic",
     "//src/ui/lib/scene_management:scene_management_mocks",
     "//third_party/rust_crates:assert_matches",
   ]

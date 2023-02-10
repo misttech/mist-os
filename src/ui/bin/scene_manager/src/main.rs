@@ -15,6 +15,9 @@ use {
         MagnifierMarker,
     },
     fidl_fuchsia_accessibility_scene as a11y_view,
+    fidl_fuchsia_element::{
+        GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
+    },
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
     fidl_fuchsia_input_interaction::NotifierRequestStream,
     fidl_fuchsia_input_interaction_observation::AggregatorRequestStream,
@@ -72,13 +75,14 @@ enum ExposedServices {
     FactoryResetCountdown(FactoryResetCountdownRequestStream),
     FactoryReset(FactoryResetDeviceRequestStream),
     FocusChainProvider(FocusChainProviderRequestStream),
+    GraphicalPresenter(GraphicalPresenterRequestStream),
     InputConfigFeatures(InputConfigFeaturesRequestStream),
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
-    Wayland(KeymapRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
     UserInteractionObservation(AggregatorRequestStream),
     UserInteraction(NotifierRequestStream),
+    Wayland(KeymapRequestStream),
 }
 
 #[fuchsia::main(logging_tags = [ "scene_manager" ])]
@@ -130,6 +134,7 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::FactoryResetCountdown)
         .add_fidl_service(ExposedServices::FactoryReset)
         .add_fidl_service(ExposedServices::FocusChainProvider)
+        .add_fidl_service(ExposedServices::GraphicalPresenter)
         .add_fidl_service(ExposedServices::InputConfigFeatures)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
         .add_fidl_service(ExposedServices::SceneManager)
@@ -501,6 +506,13 @@ async fn inner_main() -> Result<(), Error> {
                 })
                 .detach();
             }
+            ExposedServices::GraphicalPresenter(stream) => {
+                fasync::Task::local(handle_graphical_presenter_request_stream(
+                    stream,
+                    Arc::clone(&scene_manager),
+                ))
+                .detach();
+            }
         }
     }
 
@@ -598,6 +610,65 @@ pub async fn handle_scene_manager_request_stream(
     }
 }
 
+pub async fn handle_graphical_presenter_request_stream(
+    mut request_stream: GraphicalPresenterRequestStream,
+    scene_manager: Arc<Mutex<dyn scene_management::SceneManager>>,
+) {
+    while let Ok(Some(request)) = request_stream.try_next().await {
+        match request {
+            GraphicalPresenterRequest::PresentView { view_spec, responder, .. } => {
+                match view_spec {
+                    ViewSpec {
+                        view_holder_token: Some(view_holder_token),
+                        view_ref,
+                        viewport_creation_token: None,
+                        ..
+                    } => {
+                        info!("Processing fuchsia.element.GraphicalPresenter/PresentView() with GFX view tokens.");
+                        let mut scene_manager = scene_manager.lock().await;
+                        let mut set_root_view_result = scene_manager
+                            .set_root_view(ViewportToken::Gfx(view_holder_token), view_ref)
+                            .await
+                            .map_err(|e| {
+                                error!("Failed to PresentView() - GFX: {}", e);
+                                PresentViewError::InvalidArgs
+                            });
+                        if let Err(e) = responder.send(&mut set_root_view_result) {
+                            error!("Error responding to PresentView(): {}", e);
+                        }
+                    }
+                    ViewSpec {
+                        viewport_creation_token: Some(viewport_creation_token),
+                        view_holder_token: None,
+                        view_ref: None,
+                        ..
+                    } => {
+                        info!("Processing fuchsia.element.GraphicalPresenter/PresentView() with Flatland view tokens.");
+                        let mut scene_manager = scene_manager.lock().await;
+                        let mut set_root_view_result = scene_manager
+                            .set_root_view(ViewportToken::Flatland(viewport_creation_token), None)
+                            .await
+                            .map_err(|e| {
+                                error!("Failed to PresentView() - Flatland: {}", e);
+                                PresentViewError::InvalidArgs
+                            });
+                        if let Err(e) = responder.send(&mut set_root_view_result) {
+                            error!("Error responding to PresentView(): {}", e);
+                        }
+                    }
+                    _ => {
+                        error!("Failed to retrieve valid tokens from ViewSpec");
+                        if let Err(e) = responder.send(&mut Err(PresentViewError::InvalidArgs)) {
+                            error!("Error responding to PresentView(): {}", e);
+                        }
+                    }
+                };
+            }
+        };
+        info!("No longer processing fuchsia.element.GraphicalPresenter request stream.");
+    }
+}
+
 fn register_gfx_as_magnifier(
     scene_manager: Arc<Mutex<dyn SceneManager>>,
 ) -> Result<(), anyhow::Error> {
@@ -610,4 +681,95 @@ fn register_gfx_as_magnifier(
     let magnifier_proxy = connect_to_protocol::<MagnifierMarker>()?;
     magnifier_proxy.register_handler(magnification_handler_client)?;
     Ok(())
+}
+
+#[cfg(test)]
+
+mod tests {
+    use {
+        super::*, fidl::endpoints::create_proxy_and_stream,
+        fidl_fuchsia_element::GraphicalPresenterMarker, fuchsia_scenic as scenic,
+        scene_management_mocks::MockSceneManager,
+    };
+
+    /// Tests that handle_graphical_presenter_request_stream, when receiving a GFX present_view request, passes the view_holder_token and the view_ref to set_root_view().
+    #[fasync::run_singlethreaded(test)]
+    async fn handle_graphical_presenter_request_stream_presents_view_gfx() -> Result<(), Error> {
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
+        let mock_scene_manager = Arc::clone(&scene_manager);
+        fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))
+            .detach();
+
+        let view_token_pair = scenic::ViewTokenPair::new()?;
+        let view_ref_pair = scenic::ViewRefPair::new()?;
+        let expected_view_holder_token_koid = view_token_pair.view_holder_token.value.get_koid();
+        let expected_view_ref_koid = view_ref_pair.view_ref.reference.get_koid();
+        let view_spec = ViewSpec {
+            view_holder_token: Some(view_token_pair.view_holder_token),
+            view_ref: Some(view_ref_pair.view_ref),
+            ..ViewSpec::EMPTY
+        };
+        let _ = proxy
+            .present_view(
+                view_spec, /* annotation controller */ None, /* view controller */ None,
+            )
+            .await;
+
+        let (recorded_viewport_token, recorded_view_ref) =
+            scene_manager.lock().await.get_set_root_view_called_args();
+        if let ViewportToken::Gfx(recorded_view_holder_token) = recorded_viewport_token {
+            assert_eq!(
+                recorded_view_holder_token.value.get_koid(),
+                expected_view_holder_token_koid
+            );
+        } else {
+            panic!("Unexpected ViewportToken recorded");
+        }
+        assert_eq!(
+            recorded_view_ref.expect("Expected ViewRef").reference.get_koid(),
+            expected_view_ref_koid
+        );
+
+        Ok(())
+    }
+
+    /// Tests that handle_graphical_presenter_request_stream, when receiving a Flatland present_view request, passes the viewport_creation_token and None to set_root_view().
+    #[fasync::run_singlethreaded(test)]
+    async fn handle_graphical_presenter_request_stream_presents_view_flatland() -> Result<(), Error>
+    {
+        let (proxy, stream) = create_proxy_and_stream::<GraphicalPresenterMarker>().unwrap();
+        let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
+        let mock_scene_manager = Arc::clone(&scene_manager);
+        fasync::Task::local(handle_graphical_presenter_request_stream(stream, mock_scene_manager))
+            .detach();
+
+        let view_creation_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        let expected_viewport_creation_token_koid =
+            view_creation_token_pair.viewport_creation_token.value.get_koid();
+        let view_spec = ViewSpec {
+            viewport_creation_token: Some(view_creation_token_pair.viewport_creation_token),
+            ..ViewSpec::EMPTY
+        };
+
+        let _ = proxy
+            .present_view(
+                view_spec, /* annotation controller */ None, /* view controller */ None,
+            )
+            .await;
+
+        let (recorded_viewport_token, recorded_view_ref) =
+            scene_manager.lock().await.get_set_root_view_called_args();
+        if let ViewportToken::Flatland(recorded_viewport_creation_token) = recorded_viewport_token {
+            assert_eq!(
+                recorded_viewport_creation_token.value.get_koid(),
+                expected_viewport_creation_token_koid
+            );
+        } else {
+            panic!("Unexpected ViewportToken recorde");
+        }
+        assert_eq!(recorded_view_ref, None);
+
+        Ok(())
+    }
 }

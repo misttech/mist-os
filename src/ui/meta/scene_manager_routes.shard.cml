@@ -74,4 +74,14 @@
             dependency: "weak",
         },
     ],
+    expose: [
+        {
+            // Note: Please check with tq-scenic-team@google.com before
+            // offering this protocol, as it is pending removal.
+            // TODO(fxbug.dev/121453): Remove
+            // fuchsia.element.GraphicalPresenter.
+            protocol: "fuchsia.element.GraphicalPresenter",
+            from: "#scene_manager",
+        },
+    ],
 }

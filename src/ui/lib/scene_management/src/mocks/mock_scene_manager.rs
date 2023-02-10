@@ -6,22 +6,41 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_views as ui_views,
+    fidl_fuchsia_ui_views::ViewRef,
     scene_management::{DisplayMetrics, InjectorViewportSubscriber, SceneManager, ViewportToken},
     std::cell::Cell,
 };
 
 pub struct MockSceneManager {
     was_present_root_view_called: Cell<bool>,
+    was_set_root_view_called: Cell<bool>,
+    set_root_view_viewport_token: Cell<Option<ViewportToken>>,
+    set_root_view_view_ref: Cell<Option<ViewRef>>,
 }
 
 impl MockSceneManager {
     pub fn new() -> Self {
-        MockSceneManager { was_present_root_view_called: Cell::new(false) }
+        MockSceneManager {
+            was_present_root_view_called: Cell::new(false),
+            was_set_root_view_called: Cell::new(false),
+            set_root_view_viewport_token: Cell::new(None),
+            set_root_view_view_ref: Cell::new(None),
+        }
     }
 
     pub fn assert_present_root_view_called(&self) {
         assert!(self.was_present_root_view_called.get() == true);
         self.was_present_root_view_called.set(false);
+    }
+
+    pub fn get_set_root_view_called_args(&self) -> (ViewportToken, Option<ui_views::ViewRef>) {
+        assert!(self.was_set_root_view_called.get() == true);
+        (
+            self.set_root_view_viewport_token
+                .take()
+                .expect("Expected to have a viewport_token from a previous call to set_root_view."),
+            self.set_root_view_view_ref.take(),
+        )
     }
 }
 
@@ -32,15 +51,18 @@ impl SceneManager for MockSceneManager {
         self.was_present_root_view_called.set(true);
     }
 
-    // Leave everything else unimplemented.
-
     async fn set_root_view(
         &mut self,
         viewport_token: ViewportToken,
         view_ref: Option<ui_views::ViewRef>,
     ) -> Result<(), Error> {
-        unimplemented!()
+        self.was_set_root_view_called.set(true);
+        self.set_root_view_viewport_token.set(Some(viewport_token));
+        self.set_root_view_view_ref.set(view_ref);
+        Ok(())
     }
+
+    // Leave everything else unimplemented.
 
     async fn set_root_view_deprecated(
         &mut self,

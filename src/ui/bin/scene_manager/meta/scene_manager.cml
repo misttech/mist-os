@@ -20,6 +20,11 @@
     capabilities: [
         {
             protocol: [
+                // Note: Please check with tq-scenic-team@google.com before
+                // offering this protocol, as it is pending removal.
+                // TODO(fxbug.dev/121453): Remove
+                // fuchsia.element.GraphicalPresenter.
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.accessibility.view.Registry",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
@@ -88,6 +93,11 @@
     expose: [
         {
             protocol: [
+                // Note: Please check with tq-scenic-team@google.com before
+                // offering this protocol, as it is pending removal.
+                // TODO(fxbug.dev/121453): Remove
+                // fuchsia.element.GraphicalPresenter.
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.accessibility.view.Registry",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
