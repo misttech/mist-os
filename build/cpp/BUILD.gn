@@ -58,10 +58,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/i2c/bin:i2cutil",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }

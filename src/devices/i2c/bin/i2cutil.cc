@@ -2,19 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/unsafe.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <stdio.h>
 #include <zircon/status.h>
 
 #include <filesystem>
-
-#include <fbl/unique_fd.h>
 
 // LINT.IfChange
 constexpr char kUsageSummary[] = R"""(
@@ -294,22 +289,13 @@ static int device_cmd(int argc, char** argv, bool print_out) {
     }
   }
 
-  fbl::unique_fd fd(open(path, O_RDWR));
-  if (!fd) {
-    printf("%s: %s\n", argv[2], strerror(errno));
+  zx::result client_end = component::Connect<fuchsia_hardware_i2c::Device>(path);
+  if (client_end.is_error()) {
+    printf("%s: connect failed: %s\n", argv[2], client_end.status_string());
     usage(false);
     return -1;
   }
-
-  zx_handle_t svc;
-  if ((fdio_get_service_handle(fd.release(), &svc) != ZX_OK)) {
-    printf("%s: get service handle failed\n", argv[2]);
-    usage(false);
-    return -1;
-  }
-
-  zx::channel channel(svc);
-  fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client(std::move(channel));
+  fidl::WireSyncClient client{std::move(client_end.value())};
 
   zx_status_t status = ZX_OK;
 
@@ -389,23 +375,15 @@ static int device_cmd(int argc, char** argv, bool print_out) {
 }
 
 static int ping_cmd() {
-  const char* c_dir = "/dev/class/i2c";
-  DIR* dir = opendir(c_dir);
-  if (!dir) {
-    printf("Directory %s not found\n", c_dir);
-    return -1;
-  }
-
-  std::filesystem::path dir_path(c_dir);
-  struct dirent* de;
-  while ((de = readdir(dir))) {
-    std::filesystem::path dev_path = dir_path;
-    dev_path /= std::filesystem::path(de->d_name);
+  constexpr char kDir[] = "/dev/class/i2c";
+  for (auto const& dir_entry : std::filesystem::directory_iterator{kDir}) {
+    const std::filesystem::path& dev_path = dir_entry.path();
     const char* argv[] = {"i2cutil_ping", "r", dev_path.c_str(), "0x00"};
     char** argv_main = (char**)(&argv);
     auto status = device_cmd(std::size(argv), argv_main, false);
     printf("%s: %s\n", dev_path.c_str(), status == ZX_OK ? "OK" : "ERROR");
   }
+
   return 0;
 }
 

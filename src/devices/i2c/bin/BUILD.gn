@@ -25,15 +25,9 @@ executable("i2cutil") {
   sources = [ "i2cutil.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
-    "//sdk/lib/fdio",
-    "//zircon/system/ulib/fbl",
+    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 }
 
 test("i2cutil-test-bin") {
