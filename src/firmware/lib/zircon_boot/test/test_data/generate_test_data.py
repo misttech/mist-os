@@ -27,7 +27,7 @@ KERNEL_IMG_SIZE = 1024
 
 def GetCArrayDeclaration(data: bytes, var_name: str) -> str:
     """Generates a C array declaration for a byte array"""
-    decl = f'const unsigned char {var_name}[] =' + '{ '
+    decl = f'const uint8_t {var_name}[] =' + '{ '
     decl += " ".join([f'0x{b:x},' for b in data])
     decl += "};"
     return decl

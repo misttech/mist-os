@@ -4,11 +4,13 @@
 
 #include <lib/abr/data.h>
 #include <lib/zbi/zbi.h>
+#include <lib/zircon_boot/android_boot_image.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
 #include <lib/zircon_boot/zircon_boot.h>
 #include <zircon/hw/gpt.h>
 
 #include <set>
+#include <span>
 #include <vector>
 
 #include <zxtest/zxtest.h>
@@ -272,8 +274,7 @@ TEST(BootTests, LoadAndBootInvalidZbiHeaderSlotless) {
   dev->RemovePartition(GPT_DURABLE_BOOT_NAME);
 
   // The boot should fail and exit out.
-  ASSERT_EQ(LoadAndBoot(&zircon_boot_ops, kZirconBootModeSlotless),
-            kBootResultErrorZbiHeaderNotFound);
+  ASSERT_EQ(LoadAndBoot(&zircon_boot_ops, kZirconBootModeSlotless), kBootResultErrorInvalidZbi);
   ASSERT_FALSE(dev->GetBootedSlot());
   ASSERT_TRUE(dev->GetBootedImage().empty());
 }
@@ -717,5 +718,235 @@ TEST(BootTests, TestRollbackProtectionSlotless) {
   ASSERT_TRUE(res.is_ok());
   ASSERT_EQ(res.value(), 3);
 }
+
+const cpp20::span<const uint8_t> kRambootZbiOnly(kTestZirconSlotlessImage);
+const cpp20::span<const uint8_t> kRambootVbmeta(kTestVbmetaSlotlessImage);
+
+std::vector<uint8_t> RambootZbiAndVbmeta() {
+  std::vector<uint8_t> image(kRambootZbiOnly.begin(), kRambootZbiOnly.end());
+  image.insert(image.end(), kRambootVbmeta.begin(), kRambootVbmeta.end());
+  return image;
+}
+
+// Wraps the given image in an Android boot image.
+std::vector<uint8_t> AndroidBootImage(uint32_t version, cpp20::span<const uint8_t> image) {
+  // Header versions 3+ fix the page size at 4096.
+  constexpr size_t kAndroidBootImageFixedPageSize = 4096;
+
+  std::vector<uint8_t> result;
+  uint32_t image_size = static_cast<uint32_t>(image.size());
+
+  switch (version) {
+    case 0: {
+      // Pick a value other than kAndroidBootImageFixedPageSize for page size so
+      // we get coverage for different values.
+      zircon_boot_android_image_hdr_v0 header = {.kernel_size = image_size, .page_size = 8192};
+      result.resize(8192);
+      memcpy(result.data(), &header, sizeof(header));
+      break;
+    }
+    case 1: {
+      zircon_boot_android_image_hdr_v1 header = {.kernel_size = image_size, .page_size = 8192};
+      result.resize(8192);
+      memcpy(result.data(), &header, sizeof(header));
+      break;
+    }
+    case 2: {
+      zircon_boot_android_image_hdr_v2 header = {.kernel_size = image_size, .page_size = 8192};
+      result.resize(8192);
+      memcpy(result.data(), &header, sizeof(header));
+      break;
+    }
+    case 3: {
+      zircon_boot_android_image_hdr_v3 header = {.kernel_size = image_size};
+      result.resize(kAndroidBootImageFixedPageSize);
+      memcpy(result.data(), &header, sizeof(header));
+      break;
+    }
+    case 4: {
+      zircon_boot_android_image_hdr_v4 header = {.kernel_size = image_size};
+      result.resize(kAndroidBootImageFixedPageSize);
+      memcpy(result.data(), &header, sizeof(header));
+      break;
+    }
+    default:
+      ADD_FAILURE("Unsupported Android image version: %u", version);
+      return {};
+  }
+
+  // Fill in the common fields here.
+  zircon_boot_android_image_hdr_v0* header =
+      reinterpret_cast<zircon_boot_android_image_hdr_v0*>(result.data());
+  memcpy(&header->magic, ZIRCON_BOOT_ANDROID_IMAGE_MAGIC, ZIRCON_BOOT_ANDROID_IMAGE_MAGIC_SIZE);
+  memcpy(&header->header_version, &version, sizeof(version));
+
+  // Now append the image.
+  result.insert(result.end(), image.begin(), image.end());
+
+  return result;
+}
+
+// Parameterized test fixture to run RAM-boot tests against different image
+// formats:
+//   std::nullopt = raw image
+//   0-4 = Android boot image format
+//
+// Usage:
+//   1. Configure mock_ops_ as needed for the test.
+//   2. Call TestLoadFromRam() to exercise LoadFromRam().
+//   3. Call TestBoot() to exercise booting the RAM-loaded image.
+class RambootTest : public zxtest::TestWithParam<std::optional<uint32_t>> {
+ public:
+  void SetUp() override { ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&mock_ops_)); }
+
+  // Whether to test using mock ops with libavb support or without.
+  enum class OpsMode {
+    kWithAvb,
+    kWithoutAvb,
+  };
+
+  // Tests LoadFromRam() and sets up internal data for TestBoot().
+  //
+  // Args:
+  //   ops_mode: what kind of boot ops to provide.
+  //   image: the RAM image to boot; will be wrapped in the correct format
+  //          according to the test parameter.
+  //
+  // Returns the result of LoadFromRam().
+  ZirconBootResult TestLoadFromRam(OpsMode ops_mode, cpp20::span<const uint8_t> image) {
+    // RAM-boot shouldn't touch any disk data, wipe the partitions to trigger
+    // an error if we try to read/write.
+    mock_ops_->RemoveAllPartitions();
+
+    // Wrap the image in the desired format.
+    auto wrapped = WrapImage(image);
+
+    // Generate the C boot ops struct.
+    if (ops_mode == OpsMode::kWithAvb) {
+      ops_ = mock_ops_->GetZirconBootOpsWithAvb();
+    } else {
+      ops_ = mock_ops_->GetZirconBootOps();
+    }
+
+    return LoadFromRam(&ops_, wrapped.data(), wrapped.size(), &kernel_buffer_, &kernel_capacity_);
+  }
+
+  // Whether the resulting boot image should have ZBI items from the vbmeta image or not.
+  enum class ZbiMode {
+    kWithVbmeta,
+    kWithoutVbmeta,
+  };
+
+  // Tests booting an image previously set up via TestLoadFromRam().
+  //
+  // Args:
+  //   zbi_mode: whether we expect the booted ZBI to have vbmeta items or not.
+  void TestBoot(ZbiMode zbi_mode) {
+    // The buffer returned from LoadFromRam() should be the kernel load buffer.
+    ASSERT_EQ(reinterpret_cast<uint8_t*>(kernel_buffer_), mock_ops_->GetKernelLoadBuffer().data());
+    ASSERT_EQ(kernel_capacity_, mock_ops_->GetKernelLoadBuffer().size());
+
+    // Finish the boot and make sure everything worked as expected.
+    ops_.boot(&ops_, kernel_buffer_, kernel_capacity_);
+
+    // Check that all the expected ZBI items were added.
+    if (zbi_mode == ZbiMode::kWithVbmeta) {
+      ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(mock_ops_.get(), std::nullopt));
+    } else {
+      ASSERT_NO_FATAL_FAILURE(ValidateBootedSlot(mock_ops_.get(), std::nullopt));
+    }
+
+    // RAM-boot should never update antirollbacks.
+    auto res = mock_ops_->ReadRollbackIndex(0);
+    ASSERT_TRUE(res.is_ok());
+    ASSERT_EQ(res.value(), 0);
+  }
+
+ protected:
+  // Returns the image in the format given by the test parameter.
+  std::vector<uint8_t> WrapImage(cpp20::span<const uint8_t> raw) const {
+    std::optional<uint32_t> version = GetParam();
+    if (!version) {
+      return std::vector<uint8_t>(raw.begin(), raw.end());
+    }
+    return AndroidBootImage(*version, raw);
+  }
+
+  // Mock boot ops used in TestLoadFromRam() and TestBoot().
+  std::unique_ptr<MockZirconBootOps> mock_ops_;
+
+  // Filled by TestLoadFromRam().
+  ZirconBootOps ops_ = {};
+  zbi_header_t* kernel_buffer_ = nullptr;
+  size_t kernel_capacity_ = 0;
+};
+
+TEST_P(RambootTest, TestRamBootUnverifiedZbiOnly) {
+  ASSERT_EQ(kBootResultOK, TestLoadFromRam(OpsMode::kWithoutAvb, kRambootZbiOnly));
+  ASSERT_NO_FATAL_FAILURE(TestBoot(ZbiMode::kWithoutVbmeta));
+}
+
+// If the boot ops don't support avb, we should just ignore any vbmeta.
+TEST_P(RambootTest, TestRamBootUnverifiedZbiAndVbmeta) {
+  ASSERT_EQ(kBootResultOK, TestLoadFromRam(OpsMode::kWithoutAvb, RambootZbiAndVbmeta()));
+  ASSERT_NO_FATAL_FAILURE(TestBoot(ZbiMode::kWithoutVbmeta));
+}
+
+// ZBI-only RAM-boot with libavb should fail verification.
+TEST_P(RambootTest, TestRamBootVerifiedZbiOnly) {
+  ASSERT_EQ(kBootResultErrorSlotVerification, TestLoadFromRam(OpsMode::kWithAvb, kRambootZbiOnly));
+}
+
+TEST_P(RambootTest, TestRamBootVerifiedZbiAndVbmeta) {
+  ASSERT_EQ(kBootResultOK, TestLoadFromRam(OpsMode::kWithAvb, RambootZbiAndVbmeta()));
+  ASSERT_NO_FATAL_FAILURE(TestBoot(ZbiMode::kWithVbmeta));
+}
+
+TEST_P(RambootTest, TestRamBootUnlockedZbiOnly) {
+  mock_ops_->SetDeviceLockStatus(MockZirconBootOps::LockStatus::kUnlocked);
+  ASSERT_EQ(kBootResultOK, TestLoadFromRam(OpsMode::kWithAvb, kRambootZbiOnly));
+  ASSERT_NO_FATAL_FAILURE(TestBoot(ZbiMode::kWithoutVbmeta));
+}
+
+TEST_P(RambootTest, TestRamBootUnlockedZbiAndVbmeta) {
+  mock_ops_->SetDeviceLockStatus(MockZirconBootOps::LockStatus::kUnlocked);
+  ASSERT_EQ(kBootResultOK, TestLoadFromRam(OpsMode::kWithAvb, RambootZbiAndVbmeta()));
+  ASSERT_NO_FATAL_FAILURE(TestBoot(ZbiMode::kWithVbmeta));
+}
+
+// No ZBI should give us an "invalid ZBI" error.
+TEST_P(RambootTest, TestRamBootNoZbi) {
+  ASSERT_EQ(kBootResultErrorInvalidZbi, TestLoadFromRam(OpsMode::kWithoutAvb, kRambootVbmeta));
+}
+
+// Modify a ZBI header so it claims to be bigger than the actual data size.
+TEST_P(RambootTest, TestRamBootZbiOverflow) {
+  std::vector<uint8_t> image(kRambootZbiOnly.begin(), kRambootZbiOnly.end());
+  zbi_header_t header;
+  memcpy(&header, image.data(), sizeof(header));
+  header.length = static_cast<uint32_t>(image.size() + 1);
+  memcpy(image.data(), &header, sizeof(header));
+
+  ASSERT_EQ(kBootResultErrorInvalidZbi, TestLoadFromRam(OpsMode::kWithoutAvb, image));
+}
+
+// Antirollback protection must still be enforced for RAM-boot.
+TEST_P(RambootTest, TestRamBootRollbackEnforcement) {
+  // RAM-boot image has RBI[0]=2, it shouldn't be able to boot if device RBI[0]=3.
+  mock_ops_->WriteRollbackIndex(0, 3);
+
+  ASSERT_EQ(kBootResultErrorSlotVerification,
+            TestLoadFromRam(OpsMode::kWithAvb, RambootZbiAndVbmeta()));
+}
+
+INSTANTIATE_TEST_SUITE_P(AllImageFormats, RambootTest,
+                         zxtest::Values<std::optional<uint32_t>>(std::nullopt, 0, 1, 2, 3, 4),
+                         // Give the tests a descriptive tag to make failures easier to identify.
+                         [](const auto& info) -> std::string {
+                           if (!info.param) {
+                             return "Raw";
+                           }
+                           return "AndroidV" + std::to_string(*info.param);
+                         });
 
 }  // namespace

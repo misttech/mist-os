@@ -8,13 +8,17 @@ import("//build/zircon/zx_library.gni")
 common_vars = {
   sdk = "source"
   sdk_headers = [
+    "lib/zircon_boot/android_boot_image.h",
     "lib/zircon_boot/zbi_utils.h",
     "lib/zircon_boot/zircon_boot.h",
   ]
   sources = [
+    "android_boot_image.c",
     "utils.h",
     "zbi_utils.c",
     "zircon_boot.c",
+    "zircon_ramboot.c",
+    "zircon_ramboot.h",
     "zircon_vboot.c",
     "zircon_vboot.h",
   ]

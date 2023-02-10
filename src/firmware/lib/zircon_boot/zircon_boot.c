@@ -15,6 +15,7 @@
 #include <zircon/hw/gpt.h>
 
 #include "utils.h"
+#include "zircon_ramboot.h"
 #include "zircon_vboot.h"
 
 const char* GetSlotPartitionName(const AbrSlotIndex* slot) {
@@ -57,6 +58,35 @@ static bool IsVerifiedBootOpsImplemented(ZirconBootOps* ops) {
          ops->verified_boot_write_rollback_index && ops->verified_boot_read_is_device_locked &&
          ops->verified_boot_read_permanent_attributes &&
          ops->verified_boot_read_permanent_attributes_hash;
+}
+
+size_t ZbiCheckSize(const void* zbi, size_t max_size) {
+  // Copy it locally to avoid any alignment issues.
+  zbi_header_t header;
+  if (max_size && max_size < sizeof(header)) {
+    zircon_boot_dlog("ZBI header exceeds maximum size (%zu)\n", max_size);
+    return 0;
+  }
+  memcpy(&header, zbi, sizeof(header));
+
+  // Check a few of the important fields.
+  if (header.type != ZBI_TYPE_CONTAINER || header.extra != ZBI_CONTAINER_MAGIC ||
+      header.magic != ZBI_ITEM_MAGIC) {
+    zircon_boot_dlog("Image does not look like a ZBI\n");
+    return 0;
+  }
+
+  size_t result = sizeof(header) + header.length;
+  if (result < header.length) {
+    zircon_boot_dlog("ZBI size overflow (%zu)\n", result);
+    return 0;
+  }
+  if (max_size && max_size < result) {
+    zircon_boot_dlog("ZBI exceeds maximum size (%zu > %zu)\n", result, max_size);
+    return 0;
+  }
+
+  return result;
 }
 
 // Verifies a kernel that has already been loaded into memory.
@@ -127,13 +157,12 @@ static ZirconBootResult LoadKernel(ZirconBootOps* ops, const AbrSlotIndex* slot,
     return kBootResultErrorReadHeader;
   }
 
-  if (zbi_hdr.type != ZBI_TYPE_CONTAINER || zbi_hdr.extra != ZBI_CONTAINER_MAGIC ||
-      zbi_hdr.magic != ZBI_ITEM_MAGIC) {
+  size_t image_size = ZbiCheckSize(&zbi_hdr, 0);
+  if (image_size == 0) {
     zircon_boot_dlog("Fail to find ZBI header\n");
-    return kBootResultErrorZbiHeaderNotFound;
+    return kBootResultErrorInvalidZbi;
   }
 
-  size_t image_size = zbi_hdr.length + sizeof(zbi_header_t);
   *load_address_size = image_size;
   *load_address = ops->get_kernel_load_buffer(ops, load_address_size);
   if (*load_address == NULL) {
@@ -287,6 +316,27 @@ ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode) {
   ZIRCON_BOOT_OPS_CALL(ops, boot, load_address, load_address_size);
   zircon_boot_dlog("Should not reach here. Boot handoff failed\n");
   return kBootResultBootReturn;
+}
+
+ZirconBootResult LoadFromRam(ZirconBootOps* ops, const void* image, size_t size, zbi_header_t** zbi,
+                             size_t* zbi_capacity) {
+  RambootContext ramboot_context = {};
+  ZirconBootOps ramboot_ops = {};
+  ZirconBootResult res = SetupRambootOps(ops, image, size, &ramboot_context, &ramboot_ops);
+  if (res != kBootResultOK) {
+    return res;
+  }
+
+  void* load_address = NULL;
+  size_t load_address_size = 0;
+  res = LoadAbr(&ramboot_ops, kZirconBootModeSlotless, &load_address, &load_address_size);
+  if (res != kBootResultOK) {
+    return res;
+  }
+
+  *zbi = (zbi_header_t*)load_address;
+  *zbi_capacity = load_address_size;
+  return kBootResultOK;
 }
 
 AbrSlotIndex GetActiveBootSlot(ZirconBootOps* ops) {

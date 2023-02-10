@@ -35,7 +35,7 @@ typedef enum ZirconBootResult {
   kBootResultErrorInvalidArguments,
   kBootResultErrorMarkUnbootable,
   kBootResultErrorReadHeader,
-  kBootResultErrorZbiHeaderNotFound,
+  kBootResultErrorInvalidZbi,
   kBootResultErrorReadImage,
   kBootResultErrorSlotFail,
   kBootResultErrorNoValidSlot,
@@ -265,6 +265,32 @@ typedef enum ZirconBootMode {
 //
 // The function is not expected to return if boot is successful.
 ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ZirconBootMode boot_mode);
+
+// Loads and verifies kernel image from RAM.
+//
+// The provided image can be any of:
+//   * a ZBI
+//   * a ZBI immediately followed by a vbmeta image
+//   * an Android boot image containing either of the above
+//
+// This function will verify the ZBI image according to the lock state, and
+// on success copy it to the kernel load buffer as in LoadAndBoot(), but will
+// return rather than booting. This is to allow callers to take action based
+// on whether it succeeds or fails (e.g. complete a fastboot message).
+//
+// @ops: Required operations.
+// @image: Image in RAM in one of the supported formats listed above.
+// @size: Image size.
+// @zbi: On success, will be set to the kernel load buffer with the ZBI image.
+//       This is the same buffer provided by the get_kernel_load_buffer() op,
+//       provided here for convenience so the implementation doesn't have to
+//       store the buffer address elsewhere.
+// @zbi_capacity: On success, will be set to the kernel load buffer capacity.
+//
+// Returns the boot result. The caller must only proceed to boot the kernel
+// on kBootResultOK.
+ZirconBootResult LoadFromRam(ZirconBootOps* ops, const void* image, size_t size, zbi_header_t** zbi,
+                             size_t* zbi_capacity);
 
 // Gets the slot that will be selected to boot according to current A/B/R metadata.
 // Specifically, this is the slot that will be booted by LoadAndBoot() with

@@ -24,6 +24,10 @@ class MockZirconBootOps {
     kUnlocked,
   };
 
+  // The amount of extra ZBI space get_kernel_load_buffer() op must be able to
+  // reserve on top of the requested size to account for add_zbi_items() items.
+  static constexpr size_t kExtraZbiItemsCapacity = 0x1000;
+
   MockZirconBootOps() = default;
 
   // Basic ops
@@ -43,6 +47,8 @@ class MockZirconBootOps {
   // further read or write access. Useful to ensure code-under-test never
   // touches the given partition past a certain point.
   void RemovePartition(const char* name);
+  // Removes all partitions, any further disk access will cause test failure.
+  void RemoveAllPartitions();
 
   // Firmware ABR related
   AbrSlotIndex GetFirmwareSlot() { return firmware_slot_; }
@@ -59,8 +65,12 @@ class MockZirconBootOps {
   ZirconBootOps GetZirconBootOps();
   ZirconBootOps GetZirconBootOpsWithAvb();
 
-  uint8_t* GetKernelLoadBuffer(size_t size);
+  // ZirconBootOps callback to provide the kernel load buffer.
+  uint8_t* GetKernelLoadBuffer(size_t* size);
+  // Resizes the kernel load buffer; must be called before loading.
   void SetKernelLoadBufferSize(size_t size);
+  // Returns the kernel load buffer for test examination.
+  const std::vector<uint8_t>& GetKernelLoadBuffer() const { return load_buffer_; }
 
  private:
   std::unordered_map<std::string, std::vector<uint8_t>> partitions_;

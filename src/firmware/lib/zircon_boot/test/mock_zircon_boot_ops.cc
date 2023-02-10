@@ -7,6 +7,8 @@
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
 #include <zircon/hw/gpt.h>
 
+#include <zxtest/zxtest.h>
+
 #include "src/lib/digest/digest.h"
 
 uint32_t AbrCrc32(const void* buf, size_t buf_size) {
@@ -61,8 +63,13 @@ void MockZirconBootOps::AddPartition(const char* name, size_t size) {
 
 void MockZirconBootOps::RemovePartition(const char* name) { partitions_.erase(name); }
 
+void MockZirconBootOps::RemoveAllPartitions() { partitions_.clear(); }
+
 void MockZirconBootOps::Boot(zbi_header_t* image, size_t capacity) {
   const uint8_t* start = reinterpret_cast<const uint8_t*>(image);
+  // We should never boot from anywhere other than the provided kernel buffer.
+  EXPECT_EQ(start, load_buffer_.data());
+  EXPECT_EQ(capacity, load_buffer_.size());
   booted_image_ = std::vector<uint8_t>(start, start + capacity);
 }
 
@@ -74,8 +81,13 @@ void MockZirconBootOps::Reboot(bool force_recovery) {
 
 void MockZirconBootOps::SetKernelLoadBufferSize(size_t size) { load_buffer_.resize(size); }
 
-uint8_t* MockZirconBootOps::GetKernelLoadBuffer(size_t size) {
-  return size <= load_buffer_.size() ? load_buffer_.data() : nullptr;
+uint8_t* MockZirconBootOps::GetKernelLoadBuffer(size_t* size) {
+  // Make sure we have enough room to add some ZBI items.
+  if (*size + kExtraZbiItemsCapacity > load_buffer_.size()) {
+    return nullptr;
+  }
+  *size = load_buffer_.size();
+  return load_buffer_.data();
 }
 
 static bool ReadAbrMetadata(void* context, size_t size, uint8_t* buffer) {
@@ -224,9 +236,7 @@ bool MockZirconBootOps::ReadPermanentAttributesHash(ZirconBootOps* ops,
 
 uint8_t* MockZirconBootOps::GetKernelLoadBuffer(ZirconBootOps* ops, size_t* size) {
   MockZirconBootOps* dev = static_cast<MockZirconBootOps*>(ops->context);
-  // Zbi item margin of safety
-  *size += 0x1000;
-  return dev->GetKernelLoadBuffer(*size);
+  return dev->GetKernelLoadBuffer(size);
 }
 
 ZirconBootOps MockZirconBootOps::GetZirconBootOps() {

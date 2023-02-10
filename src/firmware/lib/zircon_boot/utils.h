@@ -28,6 +28,19 @@ extern "C" {
 
 AbrSlotIndex AbrPeekBootSlot(const AbrOps* abr_ops);
 
+// Returns the size of the ZBI container.
+//
+// This function checks the ZBI header, looks at a few fields to see if it
+// looks correct, and if so returns the full ZBI container size. It only
+// looks at the header so the full ZBI does not yet need to exist.
+//
+// @zbi: buffer containing a ZBI container header; does not need to be aligned.
+// @max_size: maximum ZBI size, or 0 to allow any size.
+//
+// Returns the ZBI size, or 0 if the buffer doesn't look like a ZBI or claims
+// to exceed the maximum possible size.
+size_t ZbiCheckSize(const void* zbi, size_t max_size);
+
 #ifdef __cplusplus
 }
 #endif

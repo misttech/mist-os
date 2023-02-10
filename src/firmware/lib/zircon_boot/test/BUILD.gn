@@ -28,6 +28,7 @@ source_set("mock_zircon_boot_lib") {
     "//src/firmware/lib/zircon_boot:in_tree",
     "//src/lib/digest",
     "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
     "//zircon/third_party/ulib/cksum",
   ]
 }
