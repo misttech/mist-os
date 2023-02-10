@@ -417,7 +417,7 @@ TEST_F(SummaryUnitTest, NameMatch) {
               .vmos =
                   {
                       {.koid = 1, .name = "blob-12a", .committed_bytes = 100},
-                      {.koid = 2, .name = "mrkl-12a", .committed_bytes = 100},
+                      {.koid = 2, .name = "ld.so.1-internal-heap", .committed_bytes = 100},
                       {.koid = 3, .name = "blob-de", .committed_bytes = 100},
                       {.koid = 4, .name = "pthread_t:0x59853000/TLS=0x548", .committed_bytes = 100},
                       {.koid = 5, .name = "thrd_t:0x59853000/TLS=0x548", .committed_bytes = 100},
@@ -428,10 +428,16 @@ TEST_F(SummaryUnitTest, NameMatch) {
                       {.koid = 10, .name = "foo", .committed_bytes = 100},
                       {.koid = 11, .name = "initial-thread", .committed_bytes = 100},
                       {.koid = 12, .name = "libfoo.so.1", .committed_bytes = 100},
+                      {.koid = 13, .name = "stack: msg of 123", .committed_bytes = 100},
+                      {.koid = 14, .name = "inactive-blob-123", .committed_bytes = 100},
+                      {.koid = 15, .name = "bss456:foobar", .committed_bytes = 100},
+                      {.koid = 16, .name = "relro:foobar", .committed_bytes = 100},
                   },
               .processes =
                   {
-                      {.koid = 2, .name = "p1", .vmos = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}},
+                      {.koid = 2,
+                       .name = "p1",
+                       .vmos = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
                   },
           });
   Summary s(c, Summary::kNameMatches);
@@ -443,17 +449,20 @@ TEST_F(SummaryUnitTest, NameMatch) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(1200U, sizes.private_bytes);
+  EXPECT_EQ(1600U, sizes.private_bytes);
 
-  EXPECT_EQ(8U, ps.name_to_sizes().size());
+  EXPECT_EQ(11U, ps.name_to_sizes().size());
   EXPECT_EQ(200U, ps.GetSizes("[blobs]").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[blob-merkles]").private_bytes);
+  EXPECT_EQ(200U, ps.GetSizes("[process-bootstrap]").private_bytes);
   EXPECT_EQ(300U, ps.GetSizes("[stacks]").private_bytes);
   EXPECT_EQ(100U, ps.GetSizes("[data]").private_bytes);
+  EXPECT_EQ(100U, ps.GetSizes("[bss]").private_bytes);
+  EXPECT_EQ(100U, ps.GetSizes("[relro]").private_bytes);
   EXPECT_EQ(100U, ps.GetSizes("[unnamed]").private_bytes);
   EXPECT_EQ(200U, ps.GetSizes("[scudo]").private_bytes);
   EXPECT_EQ(100U, ps.GetSizes("foo").private_bytes);
-  EXPECT_EQ(100U, ps.GetSizes("[libraries]").private_bytes);
+  EXPECT_EQ(100U, ps.GetSizes("[bootfs-libraries]").private_bytes);
+  EXPECT_EQ(100U, ps.GetSizes("[inactive blobs]").private_bytes);
 }
 
 TEST_F(SummaryUnitTest, AllUndigested) {

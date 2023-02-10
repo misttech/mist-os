@@ -11,21 +11,24 @@
 namespace memory {
 
 const std::vector<const NameMatch> Summary::kNameMatches = {
+    // To prevent the [bootfs-libraries] regex from catching ld.so.1-internal-heap,
+    // this regex must be before the [bootfs-libraries] regex.
+    {"ld\\.so\\.1-internal-heap|(^stack: msg of.*)", "[process-bootstrap]"},
     {"blob-[0-9a-f]+", "[blobs]"},
-    {"mrkl-[0-9a-f]+", "[blob-merkles]"},
     {"inactive-blob-[0-9a-f]+", "[inactive blobs]"},
     {"thrd_t:0x.*|initial-thread|pthread_t:0x.*", "[stacks]"},
     {"data[0-9]*:.*", "[data]"},
+    {"bss[0-9]*:.*", "[bss]"},
     {"relro:.*", "[relro]"},
     {"", "[unnamed]"},
     {"scudo:.*", "[scudo]"},
-    {".*\\.so.*", "[libraries]"}};
+    {".*\\.so.*", "[bootfs-libraries]"}};
 
 Namer::Namer(const std::vector<const NameMatch>& name_matches) {
   regex_matches_.reserve(name_matches.size());
-  for (const auto& name_match : name_matches) {
+  for (size_t i = 0; i < name_matches.size(); i++) {
     regex_matches_.push_back(
-        RegexMatch{std::make_unique<re2::RE2>(name_match.regex), name_match.name});
+        RegexMatch{std::make_unique<re2::RE2>(name_matches[i].regex), name_matches[i].name});
   }
 }
 

@@ -50,8 +50,8 @@ class ProcessSummary {
 };
 
 struct NameMatch {
-  const std::string regex;
-  const std::string name;
+  const char* regex = nullptr;
+  const char* name = nullptr;
 };
 
 class Namer {

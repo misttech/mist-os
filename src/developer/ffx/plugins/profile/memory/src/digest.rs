@@ -276,19 +276,20 @@ pub mod processed {
 
     /// Returns the name of a VMO category when the name match on of the rules.
     /// This is used for presentation and aggregation.
-    fn rename(name: &str) -> &str {
+    pub fn rename(name: &str) -> &str {
         lazy_static::lazy_static! {
         /// Default, global regex match.
-        static ref RULES: [(regex::Regex, &'static str); 9] = [
+        static ref RULES: [(regex::Regex, &'static str); 10] = [
+            (regex::Regex::new("ld\\.so\\.1-internal-heap|(^stack: msg of.*)").unwrap(), "[process-bootstrap]"),
             (regex::Regex::new("^blob-[0-9a-f]+$").unwrap(), "[blobs]"),
-            (regex::Regex::new("^mrkl-[0-9a-f]+$").unwrap(), "[blob-merkles]"),
             (regex::Regex::new("^inactive-blob-[0-9a-f]+$").unwrap(), "[inactive blobs]"),
             (regex::Regex::new("^thrd_t:0x.*|initial-thread|pthread_t:0x.*$").unwrap(), "[stacks]"),
             (regex::Regex::new("^data[0-9]*:.*$").unwrap(), "[data]"),
+            (regex::Regex::new("^bss[0-9]*:.*$").unwrap(), "[bss]"),
             (regex::Regex::new("^relro:.*$").unwrap(), "[relro]"),
             (regex::Regex::new("^$").unwrap(), "[unnamed]"),
             (regex::Regex::new("^scudo:.*$").unwrap(), "[scudo]"),
-            (regex::Regex::new("^.*\\.so.*$").unwrap(), "[libraries]"),
+            (regex::Regex::new("^.*\\.so.*$").unwrap(), "[bootfs-libraries]"),
         ];
         }
         RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| rule.1)
@@ -453,6 +454,7 @@ pub mod processed {
 mod tests {
     use super::*;
     use crate::bucket::Bucket;
+    use crate::processed::rename;
     use crate::raw::BucketDefinition;
     use std::collections::{HashMap, HashSet};
 
@@ -891,5 +893,23 @@ mod tests {
             sorted_vmos_by_koid(&expected_vmos),
             sorted_vmos_by_koid(&processed.vmos)
         );
+    }
+
+    #[test]
+    fn rename_test() {
+        pretty_assertions::assert_eq!(rename("ld.so.1-internal-heap"), "[process-bootstrap]");
+        pretty_assertions::assert_eq!(rename("stack: msg of 123"), "[process-bootstrap]");
+        pretty_assertions::assert_eq!(rename("blob-123"), "[blobs]");
+        pretty_assertions::assert_eq!(rename("inactive-blob-123"), "[inactive blobs]");
+        pretty_assertions::assert_eq!(rename("thrd_t:0x123"), "[stacks]");
+        pretty_assertions::assert_eq!(rename("initial-thread"), "[stacks]");
+        pretty_assertions::assert_eq!(rename("pthread_t:0x123"), "[stacks]");
+        pretty_assertions::assert_eq!(rename("data456:"), "[data]");
+        pretty_assertions::assert_eq!(rename("bss456:"), "[bss]");
+        pretty_assertions::assert_eq!(rename("relro:foobar"), "[relro]");
+        pretty_assertions::assert_eq!(rename(""), "[unnamed]");
+        pretty_assertions::assert_eq!(rename("scudo:primary"), "[scudo]");
+        pretty_assertions::assert_eq!(rename("libfoo.so.1"), "[bootfs-libraries]");
+        pretty_assertions::assert_eq!(rename("foobar"), "foobar");
     }
 }
