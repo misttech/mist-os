@@ -4,16 +4,19 @@
 
 #include <fidl/fuchsia.hardware.adc/cpp/wire.h>
 #include <fidl/fuchsia.hardware.temperature/cpp/wire.h>
-#include <lib/fake_ddk/fake_ddk.h>
+#include <lib/async-loop/cpp/loop.h>
 
 #include <cmath>
+#include <memory>
 
+#include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-common/aml-g12-saradc.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
 #include "../thermistor.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -90,8 +93,6 @@ class TestSarAdc : public AmlSaradcDevice {
 
 class ThermistorDeviceTest : public zxtest::Test {
  public:
-  ThermistorDeviceTest() {}
-
   uint32_t CalcSampleValue(NtcInfo info, uint32_t idx, uint32_t pullup) {
     uint32_t ntc_resistance = info.profile[idx].resistance_ohm;
     float ratio = static_cast<float>(ntc_resistance) / static_cast<float>(ntc_resistance + pullup);
@@ -113,14 +114,14 @@ class ThermistorDeviceTest : public zxtest::Test {
     adc_ = fbl::MakeRefCounted<TestSarAdc>(mock0.GetMmioBuffer(), mock1.GetMmioBuffer(),
                                            std::move(irq));
 
-    thermistor_ = std::make_unique<ThermistorChannel>(fake_ddk::kFakeParent, adc_, 0, ntc_info[0],
-                                                      kPullupValue);
+    thermistor_ =
+        std::make_unique<ThermistorChannel>(root_.get(), adc_, 0, ntc_info[0], kPullupValue);
 
-    const auto message_op = [](void* ctx, fidl_incoming_msg_t* msg,
-                               fidl_txn_t* txn) -> zx_status_t {
-      return static_cast<ThermistorChannel*>(ctx)->ddk_device_proto_.message(ctx, msg, txn);
-    };
-    ASSERT_OK(messenger_.SetMessageOp(thermistor_.get(), message_op));
+    loop_.StartThread();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
+    ASSERT_OK(endpoints.status_value());
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), thermistor_.get());
+    client_.Bind(std::move(endpoints->client));
   }
 
  protected:
@@ -128,30 +129,29 @@ class ThermistorDeviceTest : public zxtest::Test {
 
   std::unique_ptr<ThermistorChannel> thermistor_;
   fbl::RefPtr<TestSarAdc> adc_;
-  fake_ddk::FidlMessenger messenger_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  TemperatureClient client_;
 };
 
 TEST_F(ThermistorDeviceTest, GetTemperatureCelsius) {
-  TemperatureClient client(
-      fidl::ClientEnd<fuchsia_hardware_temperature::Device>(std::move(messenger_.local())));
-
   {
     uint32_t ntc_idx = 10;
     adc_->SetReadValue(0, CalcSampleValue(ntc_info[0], ntc_idx, kPullupValue));
-    auto result = client->GetTemperatureCelsius();
+    auto result = client_->GetTemperatureCelsius();
     EXPECT_OK(result.value().status);
     EXPECT_TRUE(FloatNear(result.value().temp, ntc_info[0].profile[ntc_idx].temperature_c));
   }
 
   {  // set read value to 0, which should be out of range of the ntc table
     adc_->SetReadValue(0, 0);
-    auto result = client->GetTemperatureCelsius();
+    auto result = client_->GetTemperatureCelsius();
     EXPECT_NOT_OK(result.value().status);
   }
 
   {  // set read value to max, which should be out of range of ntc table
     adc_->SetReadValue(0, (1 << adc_->Resolution()) - 1);
-    auto result = client->GetTemperatureCelsius();
+    auto result = client_->GetTemperatureCelsius();
     EXPECT_NOT_OK(result.value().status);
   }
 }
