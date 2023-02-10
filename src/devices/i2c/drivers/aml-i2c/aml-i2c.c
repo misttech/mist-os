@@ -103,8 +103,11 @@ static int aml_i2c_irq_thread(void* arg) {
 
   while (1) {
     status = zx_interrupt_wait(dev->irq, NULL);
+    if (status == ZX_ERR_CANCELED) {
+      break;
+    }
     if (status != ZX_OK) {
-      zxlogf(ERROR, "i2c: interrupt error");
+      zxlogf(DEBUG, "i2c: interrupt error");
       continue;
     }
     uint32_t reg = MmioRead32(&dev->virt_regs->control);
@@ -426,7 +429,7 @@ static zx_protocol_device_t i2c_device_proto = {
     .release = aml_i2c_release,
 };
 
-static zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
+zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
   struct aml_i2c_delay_values* clock_delays = NULL;
