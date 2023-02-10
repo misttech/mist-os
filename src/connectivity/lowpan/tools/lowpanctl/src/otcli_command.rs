@@ -68,8 +68,7 @@ impl OtCliCommand {
         }
 
         // Otherwise setup the interactive shell
-        let (client_socket_fidl, server_socket_fidl) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+        let (client_socket_fidl, server_socket_fidl) = fidl::Socket::create_stream();
         device_factory.setup_ot_cli(server_socket_fidl).await.context("Unable to setup ot-ctl")?;
         let mut client_socket = fuchsia_async::Socket::from_socket(client_socket_fidl)?;
         let mut cmd_receiver_stream = OtCliCommand::cmd_stream();

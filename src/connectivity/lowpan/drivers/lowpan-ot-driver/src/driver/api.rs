@@ -522,8 +522,7 @@ where
         let mut cmd = std::string::String::from(command);
         cmd.push('\n');
 
-        let (server_socket_fidl, client_socket_fidl) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+        let (server_socket_fidl, client_socket_fidl) = fidl::Socket::create_stream();
         self.setup_ot_cli(server_socket_fidl).await?;
         let mut client_socket = fuchsia_async::Socket::from_socket(client_socket_fidl)?;
 

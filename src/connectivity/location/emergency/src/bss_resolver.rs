@@ -778,8 +778,7 @@ mod test_doubles {
         type FetchResponseFut = Ready<FetchResponse>;
 
         fn fetch(&self, _request: HttpRequest) -> Self::FetchResponseFut {
-            let (local_socket, remote_socket) =
-                zx::Socket::create(zx::SocketOpts::STREAM).expect("internal error");
+            let (local_socket, remote_socket) = zx::Socket::create_stream();
             local_socket.write(&self.response).expect("internal error");
             ready(Ok(HttpResponse {
                 error: None,
