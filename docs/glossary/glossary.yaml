@@ -175,7 +175,7 @@
   the system's storage, so they need to be loaded after the
   <a href=\"/docs/glossary#boot-driver\">boot drivers</a> have enabled storage (for example,
   USB drivers, networking drivers). Base drivers reside in the
-  <a href=\"/docs/concepts/packages/package?hl=en#base-packages\">base packages</a>."
+  <a href=\"/docs/concepts/packages/package#base-packages\">base packages</a>."
   see_also: [""]
   related_guides: [""]
   area: ["System", "Devices", "Drivers"]
