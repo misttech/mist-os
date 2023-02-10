@@ -75,7 +75,7 @@ pub async fn add_daemon_metrics_event(request_str: &str) {
             Instant::now()
         })
         .await;
-    tracing::info!("analytics time: {}", (analytics_done - analytics_start).as_secs_f32());
+    tracing::debug!("analytics time: {}", (analytics_done - analytics_start).as_secs_f32());
 }
 
 pub async fn add_daemon_launch_event() {

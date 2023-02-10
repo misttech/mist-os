@@ -155,7 +155,7 @@ async fn bind_listener(
 
     let client_routing =
         if client_routing { AscenddClientRouting::Enabled } else { AscenddClientRouting::Disabled };
-    tracing::info!(
+    tracing::debug!(
         node_id = hoist.node().node_id().0,
         "starting ascendd on {}",
         sockpath.display(),
@@ -227,7 +227,7 @@ async fn run_ascendd(
     node.set_implementation(fidl_fuchsia_overnet_protocol::Implementation::Ascendd);
     node.set_client_routing(client_routing);
 
-    tracing::info!("ascendd listening to socket {}", sockpath.display());
+    tracing::debug!("ascendd listening to socket {}", sockpath.display());
 
     let sockpath = &sockpath.to_str().context("Non-unicode in socket path")?.to_owned();
     let hoist = &hoist;
@@ -250,7 +250,13 @@ async fn run_ascendd(
                             )
                             .await
                             {
-                                tracing::warn!("Failed serving socket: {:?}", e);
+                                // A close of the remote side is not an error.
+                                // TODO: Use typed error instead of String
+                                if format!("{e:?}") == "Framer closed during read" {
+                                    tracing::debug!("Completed socket read: {:?}", e);
+                                } else {
+                                    tracing::warn!("Failed serving socket: {:?}", e);
+                                }
                             }
                         }
                         Err(e) => {

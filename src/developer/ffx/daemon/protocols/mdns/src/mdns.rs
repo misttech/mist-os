@@ -178,7 +178,7 @@ pub(crate) async fn discovery_loop(config: DiscoveryConfig) {
                         .map(|id| match make_sender_socket(id, addr, ttl) {
                             Ok(sock) => Some(sock),
                             Err(err) => {
-                                tracing::info!("mdns: failed to bind {}: {}", &addr, err);
+                                tracing::error!("mdns: failed to bind {}: {}", &addr, err);
                                 None
                             }
                         })
@@ -267,7 +267,7 @@ fn make_target<B: ByteSlice + Clone>(
                             port: ssh_port,
                         }));
                     }
-                    tracing::info!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
+                    tracing::debug!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
                 } else {
                     tracing::debug!("no data in txt record {:?}", record.domain);
                 }
@@ -336,7 +336,7 @@ async fn recv_loop(sock: Rc<UdpSocket>, mdns_protocol: Weak<MdnsProtocolInner>) 
                 addr
             }
             Err(err) => {
-                tracing::info!("listen socket recv error: {}, mdns listener closed", err);
+                tracing::error!("listen socket recv error: {}, mdns listener closed", err);
                 return;
             }
         };
@@ -418,7 +418,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration) {
         Ok(SocketAddr::V4(_)) => (MDNS_MCAST_V4, MDNS_PORT).into(),
         Ok(SocketAddr::V6(_)) => (MDNS_MCAST_V6, MDNS_PORT).into(),
         Err(err) => {
-            tracing::info!("resolving local socket addr failed with: {}", err);
+            tracing::error!("resolving local socket addr failed with: {}", err);
             return;
         }
     };
@@ -426,7 +426,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration) {
     loop {
         for query_buf in QUERY_BUF.iter() {
             if let Err(err) = sock.send_to(query_buf, to_addr).await {
-                tracing::info!(
+                tracing::error!(
                     "mdns query failed from {}: {}",
                     sock.local_addr()
                         .map(|a| a.to_string())
@@ -459,7 +459,7 @@ async fn query_recv_loop(
         }
     };
 
-    tracing::info!("mdns: started query socket {}", &addr);
+    tracing::debug!("mdns: started query socket {}", &addr);
 
     futures::select!(
         _ = recv => {},
@@ -472,7 +472,7 @@ async fn query_recv_loop(
     if let Some(a) = tasks.lock().await.remove(&addr.ip()) {
         drop(a)
     }
-    tracing::info!("mdns: shut down query socket {}", &addr);
+    tracing::debug!("mdns: shut down query socket {}", &addr);
 }
 
 // Exclude any mdns packets received where the source address of the packet does not appear in any
@@ -493,7 +493,7 @@ fn contains_source_address<B: zerocopy::ByteSlice + Clone>(
             return true;
         }
     }
-    tracing::info!(
+    tracing::warn!(
         "Dubious mdns from: {:?} does not contain an answer that includes the source address, therefore it is ignored.",
         addr
     );

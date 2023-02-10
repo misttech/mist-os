@@ -122,8 +122,8 @@ impl MetricsService {
                         .body(Body::from(body))?;
                     let res = self.client.request(req).await;
                     match res {
-                        Ok(res) => tracing::info!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::debug!("Error posting analytics: {}", e),
+                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
+                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
                     }
                     Ok(())
                 }
@@ -170,8 +170,8 @@ impl MetricsService {
                         .body(Body::from(body))?;
                     let res = self.client.request(req).await;
                     match res {
-                        Ok(res) => tracing::info!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::debug!("Error posting analytics: {}", e),
+                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
+                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
                     }
                     Ok(())
                 }
@@ -217,8 +217,8 @@ impl MetricsService {
                         .body(Body::from(body))?;
                     let res = self.client.request(req).await;
                     match res {
-                        Ok(res) => tracing::info!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::debug!("Error posting analytics: {}", e),
+                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
+                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
                     }
                     Ok(())
                 }
@@ -245,13 +245,13 @@ impl MetricsService {
             let res = self.client.request(req).await;
             match res {
                 Ok(mut res) => {
-                    tracing::info!("Analytics response: {}", res.status());
+                    tracing::debug!("Analytics response: {}", res.status());
                     while let Some(chunk) = res.body_mut().data().await {
                         tracing::trace!(?chunk);
                     }
                     //let result = String::from_utf8(bytes.into_iter().collect()).expect("");
                 }
-                Err(e) => tracing::debug!("Error posting analytics: {}", e),
+                Err(e) => tracing::warn!("Error posting analytics: {}", e),
             }
             Ok(())
         } else {

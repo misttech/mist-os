@@ -350,7 +350,7 @@ where
             match dispatcher.push(event.clone()).await {
                 Ok(()) => new_handlers.push(dispatcher),
                 Err(e) => {
-                    tracing::info!("dispatcher closed. reason: {:#}", e);
+                    tracing::debug!("dispatcher closed. reason: {:#}", e);
                 }
             }
         }

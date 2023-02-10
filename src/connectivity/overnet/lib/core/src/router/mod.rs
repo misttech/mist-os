@@ -459,7 +459,7 @@ impl Router {
         rtt_observer: Observer<Option<Duration>>,
         connecting_link_token: ConnectingLinkToken,
     ) -> Result<(), Error> {
-        tracing::info!(debug_id = ?routing.debug_id(), "publish link");
+        tracing::debug!(debug_id = ?routing.debug_id(), "publish link");
         self.links.lock().await.insert(routing.id(), Arc::downgrade(&routing));
         let client_type = if routing.is_ascendd_client() {
             routes::ClientType::Ascendd

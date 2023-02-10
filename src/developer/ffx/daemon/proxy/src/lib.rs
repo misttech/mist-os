@@ -249,8 +249,8 @@ async fn init_daemon_proxy(
         .context("Getting hash from daemon")?;
 
     // Check the version against the given comparison scheme.
-    tracing::info!("Checking daemon version: {version_check:?}");
-    tracing::info!("Daemon version info: {daemon_version_info:?}");
+    tracing::debug!("Checking daemon version: {version_check:?}");
+    tracing::debug!("Daemon version info: {daemon_version_info:?}");
     let matched_proxy = match (version_check, daemon_version_info) {
         (DaemonVersionCheck::SameBuildId(ours), VersionInfo { build_id: Some(daemon), .. })
             if ours == daemon =>
@@ -268,7 +268,7 @@ async fn init_daemon_proxy(
     };
 
     if matched_proxy {
-        tracing::info!("Found matching daemon version, using it.");
+        tracing::debug!("Found matching daemon version, using it.");
         link_task.detach();
         return Ok(proxy);
     }

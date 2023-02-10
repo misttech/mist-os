@@ -67,7 +67,7 @@ impl MetricsSession {
         let command_done = Instant::now();
         let command_duration = command_done - self.session_start;
         let analytics_duration = if self.enabled {
-            tracing::info!("Command completed. Success: {}", success);
+            tracing::debug!("Command completed. Success: {}", success);
             let timing_in_millis = command_duration.as_millis().to_string();
             let sanitized_args = sanitized_args.iter().map(AsRef::as_ref).join(" ");
 

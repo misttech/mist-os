@@ -151,9 +151,9 @@ async fn filter_level() -> LevelFilter {
         .ok()
         .map(|str| {
             // Ideally we could log here, but there may be no log sink, so fall back to a default
-            LevelFilter::from_str(&str).unwrap_or(LevelFilter::DEBUG)
+            LevelFilter::from_str(&str).unwrap_or(LevelFilter::INFO)
         })
-        .unwrap_or(LevelFilter::DEBUG)
+        .unwrap_or(LevelFilter::INFO)
 }
 
 pub async fn init(log_to_stdio: bool, log_to_file: bool) -> Result<()> {

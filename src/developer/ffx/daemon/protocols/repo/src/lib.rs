@@ -63,7 +63,7 @@ impl ServerInfo {
         listen_addr: SocketAddr,
         manager: Arc<RepositoryManager>,
     ) -> std::io::Result<Self> {
-        tracing::info!("Starting repository server on {}", listen_addr);
+        tracing::debug!("Starting repository server on {}", listen_addr);
 
         let (server_fut, sink, server) =
             RepositoryServer::builder(listen_addr, Arc::clone(&manager)).start().await?;
@@ -101,13 +101,13 @@ impl ServerState {
             ServerState::Running(server_info) => {
                 *self = ServerState::Stopped;
 
-                tracing::info!("Stopping the repository server");
+                tracing::debug!("Stopping the repository server");
 
                 server_info.server.stop();
 
                 futures::select! {
                     () = server_info.task.fuse() => {
-                        tracing::info!("Stopped the repository server");
+                        tracing::debug!("Stopped the repository server");
                     },
                     () = fasync::Timer::new(SHUTDOWN_TIMEOUT).fuse() => {
                         tracing::error!("Timed out waiting for the repository server to shut down");
@@ -603,13 +603,13 @@ impl RepoInner {
             if let Err(err) =
                 self.start_server(Some(fidl_fuchsia_net_ext::SocketAddress(repo_addr))).await
             {
-                tracing::info!("Failed to start repository server: {:#?}", err);
+                tracing::error!("Failed to start repository server: {:#?}", err);
             }
         }
     }
 
     async fn stop_server(&mut self) -> Result<(), ffx::RepositoryError> {
-        tracing::info!("Stopping repository protocol");
+        tracing::debug!("Stopping repository protocol");
 
         self.server.stop().await?;
 
@@ -1098,7 +1098,7 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
     }
 
     async fn start(&mut self, cx: &Context) -> Result<(), anyhow::Error> {
-        tracing::info!("Starting repository protocol");
+        tracing::debug!("Starting repository protocol");
 
         // Log the server mode to get an understanding of the distribution of users between pm and
         // the ffx repository server.

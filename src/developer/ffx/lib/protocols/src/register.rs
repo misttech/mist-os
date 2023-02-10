@@ -148,7 +148,7 @@ impl ProtocolRegister {
                     // Closes the stream's handle to make sure the task
                     // completes cleanly.
                     let r = handle.shutdown().await;
-                    tracing::info!(
+                    tracing::debug!(
                         "protocol stream for {}-{} finished with result: {:?}",
                         name_copy,
                         task_id,

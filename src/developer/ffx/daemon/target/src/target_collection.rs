@@ -199,7 +199,7 @@ impl TargetCollection {
     #[tracing::instrument(skip(self))]
     pub async fn wait_for_match(&self, matcher: Option<String>) -> Result<Rc<Target>, DaemonError> {
         // If there's nothing to match against, unblock on the first target.
-        tracing::info!("Using matcher: {:?}", matcher);
+        tracing::debug!("Using matcher: {:?}", matcher);
         let target_query = TargetQuery::from(matcher.clone());
 
         // If there is no matcher, and there are already multiple targets in the
@@ -255,7 +255,7 @@ impl TargetCollection {
         TQ: Into<TargetQuery>,
     {
         let target_query: TargetQuery = tq.into();
-        tracing::info!("checking if target is connected with query: {:?}", target_query);
+        tracing::debug!("checking if target is connected with query: {:?}", target_query);
         self.targets
             .borrow()
             .values()

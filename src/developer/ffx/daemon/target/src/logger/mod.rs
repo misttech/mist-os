@@ -375,7 +375,7 @@ impl<'a> Logger<'a> {
     async fn run_logger(&self) -> Result<()> {
         let target = self.target.upgrade().context("lost parent Arc")?;
 
-        tracing::info!("starting logger for {}", target.nodename_str());
+        tracing::debug!("starting logger for {}", target.nodename_str());
         let remote_proxy = target.rcs().context("failed to get RCS")?.proxy;
         let nodename = target.nodename_str();
 

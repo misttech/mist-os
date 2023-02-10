@@ -175,7 +175,7 @@ pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
     match sock {
         Ok(sock) => match sock.peer_addr() {
             Ok(_) => {
-                tracing::info!("found running daemon at {}", socket_path.display());
+                tracing::debug!("found running daemon at {}", socket_path.display());
                 true
             }
             Err(err) => {

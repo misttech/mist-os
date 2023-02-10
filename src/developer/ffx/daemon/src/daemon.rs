@@ -269,7 +269,7 @@ impl DaemonProtocolProvider for Daemon {
 impl EventHandler<DaemonEvent> for DaemonEventHandler {
     #[tracing::instrument(skip(self))]
     async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
-        tracing::info!("! DaemonEvent::{:?}", event);
+        tracing::debug!("! DaemonEvent::{:?}", event);
 
         match event {
             DaemonEvent::WireTraffic(traffic) => match traffic {
@@ -432,7 +432,7 @@ impl Daemon {
     #[tracing::instrument(skip(self))]
     async fn start_ascendd(&mut self, hoist: &Hoist) -> Result<()> {
         // Start the ascendd socket only after we have registered our protocols.
-        tracing::info!("Starting ascendd");
+        tracing::debug!("Starting ascendd");
 
         let client_routing = false; // Don't route between ffx clients
         let ascendd = Ascendd::new(
@@ -501,7 +501,7 @@ impl Daemon {
             .watch(&socket_dir, RecursiveMode::NonRecursive)
             .context("Setting watcher context")?;
 
-        tracing::info!(
+        tracing::debug!(
             "Watching daemon socket file at {socket_path}, will gracefully exit if it's removed.",
             socket_path = self.socket_path.display()
         );
@@ -744,10 +744,10 @@ impl Daemon {
 
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
-        tracing::info!("Starting daemon overnet server");
+        tracing::debug!("Starting daemon overnet server");
         hoist.publish_service(DaemonMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
 
-        tracing::info!("Starting daemon serve loop");
+        tracing::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();
         let mut break_loop_tx = Some(break_loop_tx);
 
@@ -781,7 +781,7 @@ impl Daemon {
                 },
                 _ = quit_rx.next() => {
                     if let Some(break_loop_tx) = break_loop_tx.take() {
-                        tracing::info!("Starting graceful shutdown of daemon socket");
+                        tracing::debug!("Starting graceful shutdown of daemon socket");
 
                         match std::fs::remove_file(self.socket_path.clone()) {
                             Ok(()) => {}
@@ -819,12 +819,12 @@ impl Daemon {
                     }
                 },
                 _ = break_loop_rx => {
-                    tracing::info!("Breaking main daemon socket loop");
+                    tracing::debug!("Breaking main daemon socket loop");
                     break;
                 }
             }
         }
-        tracing::info!("Graceful shutdown of daemon loop completed");
+        tracing::debug!("Graceful shutdown of daemon loop completed");
         ffx_config::logging::disable_stdio_logging();
         Ok(())
     }

@@ -755,13 +755,21 @@ impl Peer {
                 "runner lost route to peer",
             );
         } else if let Err(e) = &result {
-            tracing::warn!(
-                node_id = %get_router_node_id(),
-                conn = ?conn_id,
-                ?endpoint,
-                "runner error: {:?}",
-                e
-            );
+            match e {
+                RunnerError::ConnectionClosed => tracing::debug!(
+                    node_id = %get_router_node_id(),
+                    conn = ?conn_id,
+                    ?endpoint,
+                    "connection closed"
+                ),
+                _ => tracing::warn!(
+                    node_id = %get_router_node_id(),
+                    conn = ?conn_id,
+                    ?endpoint,
+                    "runner error: {:?}",
+                    e
+                ),
+            }
         } else {
             tracing::trace!(
                 node_id = %get_router_node_id(),
