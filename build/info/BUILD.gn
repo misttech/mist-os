@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/board.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/dist/resource.gni")
@@ -24,6 +25,14 @@ if (current_toolchain == default_toolchain) {
     ]
     script = "gen-latest-commit-date.sh"
     args = rebase_path([ "//integration/" ] + outputs, root_build_dir)
+  }
+
+  bazel_input_resource("build_info_version") {
+    sources = [ build_info_files.version ]
+    outputs = [ "build_info_version.txt" ]
+    if (build_info_files.version == build_info_files.latest_commit_date) {
+      deps = [ ":latest-commit-date" ]
+    }
   }
 } else {
   group("latest-commit-date") {
