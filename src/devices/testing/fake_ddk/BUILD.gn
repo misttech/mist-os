@@ -78,7 +78,6 @@ zx_library("fake_ddk") {
   visibility = [
     "//build/*",
     "//src/camera/drivers/controller/test/*",
-    "//src/devices/cpu/drivers/aml-cpu-legacy/*",
     "//src/devices/testing/*",
     "//src/devices/testing/fake_ddk/test/*",
     "//src/graphics/lib/magma/tests/unit_tests/*",

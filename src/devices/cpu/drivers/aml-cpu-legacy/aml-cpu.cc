@@ -241,7 +241,6 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
   }
 
   if (requested_state >= opps.count) {
-    zxlogf(ERROR, "%s: Requested device performance state is out of bounds", __func__);
     return ZX_ERR_OUT_OF_RANGE;
   }
 

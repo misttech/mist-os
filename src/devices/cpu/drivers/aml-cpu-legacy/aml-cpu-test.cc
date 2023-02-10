@@ -7,9 +7,9 @@
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/device-protocol/pdev.h>
-#include <lib/fake_ddk/fake_ddk.h>
-#include <lib/fake_ddk/fidl-helper.h>
 
 #include <algorithm>
 #include <memory>
@@ -24,34 +24,9 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_cpu {
-
-// This subclass of Bind is only used to test the binding of AmlCpu. DeviceAdd is overridden
-// to test expectation on devices that are added.
-class Bind : public fake_ddk::Bind {
- public:
-  Bind() : fake_ddk::Bind() {}
-
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    if (parent != fake_ddk::kFakeParent || !args || args->proto_id != ZX_PROTOCOL_CPU_CTRL ||
-        args->ctx == nullptr) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    devices_.push_back(std::unique_ptr<AmlCpu>(static_cast<AmlCpu*>(args->ctx)));
-    return ZX_OK;
-  }
-
-  const std::vector<std::unique_ptr<AmlCpu>>& get_devices() { return devices_; }
-
-  size_t num_devices_added() const { return devices_.size(); }
-
- private:
-  // The bind function intentionally leaks created devices, so they must be owned here.
-  std::vector<std::unique_ptr<AmlCpu>> devices_;
-};
 
 // Fake MMIO  that exposes CPU version.
 class FakeMmio {
@@ -295,35 +270,26 @@ class AmlCpuBindingTest : public zxtest::Test {
   AmlCpuBindingTest() {
     pdev_.set_mmio(0, mmio_.mmio_info());
 
-    static constexpr size_t kNumBindFragments = 2;
+    root_ = MockDevice::FakeRootParent();
 
-    fbl::Array<fake_ddk::FragmentEntry> fragments(new fake_ddk::FragmentEntry[kNumBindFragments],
-                                                  kNumBindFragments);
-    fragments[0].name = "pdev";
-    fragments[0].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_PDEV, *reinterpret_cast<const fake_ddk::Protocol*>(pdev_.proto())});
-    fragments[1].name = "thermal";
-    fragments[1].protocols.emplace_back(fake_ddk::ProtocolEntry{
-        ZX_PROTOCOL_THERMAL,
-        *reinterpret_cast<const fake_ddk::Protocol*>(thermal_device_.proto())});
-    ddk_.SetFragments(std::move(fragments));
+    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    root_->AddProtocol(ZX_PROTOCOL_THERMAL, thermal_device_.proto()->ops,
+                       thermal_device_.proto()->ctx, "thermal");
 
-    ddk_.SetMetadata(DEVICE_METADATA_CLUSTER_SIZE_LEGACY, &kClusterSizeMetadata,
-                     sizeof(kClusterSizeMetadata));
+    root_->SetMetadata(DEVICE_METADATA_CLUSTER_SIZE_LEGACY, &kClusterSizeMetadata,
+                       sizeof(kClusterSizeMetadata));
   }
 
-  zx_device_t* parent() { return fake_ddk::FakeParent(); }
-
  protected:
-  Bind ddk_;
+  std::shared_ptr<MockDevice> root_;
   fake_pdev::FakePDev pdev_;
   FakeMmio mmio_;
   FakeThermalDevice thermal_device_;
 };
 
 TEST_F(AmlCpuBindingTest, OneDomain) {
-  ASSERT_OK(AmlCpu::Create(nullptr, parent()));
-  ASSERT_EQ(ddk_.num_devices_added(), 1);
+  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_EQ(root_->child_count(), 1);
 }
 
 TEST_F(AmlCpuBindingTest, TwoDomains) {
@@ -344,11 +310,12 @@ TEST_F(AmlCpuBindingTest, TwoDomains) {
     return result;
   }());
 
-  ASSERT_OK(AmlCpu::Create(nullptr, parent()));
-  ASSERT_EQ(ddk_.num_devices_added(), 2);
+  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_EQ(root_->child_count(), 2);
 
-  const auto& devices = ddk_.get_devices();
-  for (const auto& device : devices) {
+  const auto& devices = root_->children();
+  for (const auto& zxdev : devices) {
+    AmlCpu* device = zxdev->GetDeviceContext<AmlCpu>();
     const size_t idx = device->PowerDomainIndex();
 
     // Find the cluster metadata that corresponds to this cluster index.
@@ -366,48 +333,39 @@ class AmlCpuTest : public AmlCpu {
   AmlCpuTest(ThermalSyncClient thermal)
       : AmlCpu(nullptr, std::move(thermal), kBigClusterIdx, kBigClusterCoreCount) {}
 
-  zx_status_t Init();
-  static zx_status_t MessageOp(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn);
-  fidl::ClientEnd<fuchsia_cpuctrl::Device> TakeMessengerChannel() {
-    return fidl::ClientEnd<fuchsia_cpuctrl::Device>{std::move(messenger_.local())};
-  }
-
   zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
-
- private:
-  fake_ddk::FidlMessenger messenger_;
 };
-
-zx_status_t AmlCpuTest::MessageOp(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  return static_cast<AmlCpuTest*>(ctx)->ddk_device_proto_.message(ctx, msg, txn);
-}
-
-zx_status_t AmlCpuTest::Init() { return messenger_.SetMessageOp(this, AmlCpuTest::MessageOp); }
 
 using inspect::InspectTestHelper;
 
 class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
  public:
+  explicit AmlCpuTestFixture() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
   void SetUp() override;
 
  protected:
   FakeAmlThermal thermal_;
 
+  async::Loop loop_;
   std::unique_ptr<AmlCpuTest> dut_;
   CpuCtrlSyncClient cpu_client_;
 };
 
 void AmlCpuTestFixture::SetUp() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_thermal::Device>();
-  ASSERT_OK(endpoints.status_value());
+  auto thermal_eps = fidl::CreateEndpoints<fuchsia_thermal::Device>();
+  ASSERT_OK(thermal_eps.status_value());
 
-  ASSERT_OK(thermal_.Init(std::move(endpoints->server)));
-  ThermalSyncClient thermal_client = fidl::WireSyncClient(std::move(endpoints->client));
+  ASSERT_OK(thermal_.Init(std::move(thermal_eps->server)));
+  ThermalSyncClient thermal_client = fidl::WireSyncClient(std::move(thermal_eps->client));
 
   dut_ = std::make_unique<AmlCpuTest>(std::move(thermal_client));
-  ASSERT_OK(dut_->Init());
 
-  cpu_client_ = CpuCtrlSyncClient(dut_->TakeMessengerChannel());
+  auto cpu_eps = fidl::CreateEndpoints<fuchsia_cpuctrl::Device>();
+  ASSERT_OK(cpu_eps.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(cpu_eps->server), dut_.get());
+  loop_.StartThread("aml-cpu-legacy-test-thread");
+
+  cpu_client_ = CpuCtrlSyncClient(std::move(cpu_eps->client));
 }
 
 TEST_F(AmlCpuTestFixture, TestGetPerformanceStateInfo) {
