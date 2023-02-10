@@ -45,16 +45,16 @@ pub fn dispatch_signal_handler(
     siginfo: SignalInfo,
     action: sigaction_t,
 ) {
-    // TODO implement this on ARM.
+    // TODO(fxbug.dev/121659) implement this on ARM.
 }
 
 pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
-    // TODO implement this on ARM.
+    // TODO(fxbug.dev/121659) implement this on ARM.
     error!(ENOSYS)
 }
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
 /// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Option<sigaction_t>) {
-    // TODO implement this on ARM.
+pub fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Option<sigaction_t>) {
+    // TODO(fxbug.dev/121659) implement this on ARM.
 }

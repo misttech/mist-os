@@ -10,20 +10,102 @@ use paste::paste;
 
 use crate::types::*;
 
-/// Intended to be used with other macros to produce code that needs to handle
-/// each syscall.
-macro_rules! for_each_syscall {
-    {$callback:ident $(,$context:ident)*} => {
+/// Helper for for_each_syscall! that adds any architecture-specific syscalls.
+///
+/// X86_64 has many unique syscalls for legacy reasons. Newer architectures funnel some of these
+/// through some newer and more general variants. The variants used by other platforms are listed in
+/// the comments below.
+#[cfg(target_arch = "x86_64")]
+macro_rules! for_each_arch_syscall {
+    {$callback:ident; $($context:ident;)* ; $($common_name:ident,)*} => {
         $callback!{
             $($context;)*
+            $($common_name,)*
+            access,  // faccessat
+            afs_syscall, // (deprecated)
+            alarm,  // setitimer
+            arch_prctl,  // (unused)
+            chmod,  // fchmodat
+            chown,  // fchownat
+            create_module, // (deprecated)
+            creat,  // openat
+            dup2,  // dup3
+            epoll_create,  // epoll_create1
+            epoll_ctl_old,  // (unused)
+            epoll_wait,  // epoll_pwait
+            epoll_wait_old,  // (unused)
+            eventfd,  // eventfd2
+            fork,  // clone
+            futimesat,  // (deprecated)
+            getdents,  // getdents64
+            get_kernel_syms, // (deprecated)
+            getpgrp,  // getpgid
+            getpmsg, // (unused)
+            get_thread_area,  // (unused)
+            inotify_init,  // inotify_init1
+            ioperm,  // (unused)
+            iopl,  // (deprevated)
+            lchown,  // fchownat
+            link,  // linkat
+            lstat,  // fstatat
+            mkdir,  // mkdirat
+            mknod,  // mknodat
+            modify_ldt,  // (unused)
+            open,  // openat
+            pause,  // sigsuspend
+            pipe,  // pipe2
+            poll,  // ppoll
+            putpmsg, // (unused)
+            query_module, // (deprecated)
+            readlink,  // readlinkat
+            rename,  // renameat
+            rmdir,  // unlinkat
+            security,  // (unused)
+            select,  // pselect
+            set_thread_area, // (unused)
+            signalfd,  // signalfd4
+            stat,  // fstatat
+            symlink,  // symlinkat
+            _sysctl,  // (deprecated)
+            sysfs,  // (deprecated)
+            time,  // gettimeofday
+            tuxcall,  // (unused)
+            unlink,  // unlinkat
+            uselib,  // (deprecated)
+            ustat,  // (deprecated)
+            utimes,  // utimesat
+            utime,  // utimesat
+            vfork,  // clone
+            vserver,  // (unused)
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! for_each_arch_syscall {
+    {$callback:ident; $($context:ident;)* ; $($common_name:ident,)*} => {
+        $callback!{
+            $($context;)*
+            $($common_name,)*
+        }
+    }
+}
+
+/// Intended to be used with other macros to produce code that needs to handle
+/// each syscall.
+///
+/// This list contains all cross-architecture syscalls, and delegates through for_each_arch_syscall!
+/// to add in any architecture-specific ones.
+macro_rules! for_each_syscall {
+    {$callback:ident $(,$context:ident)*} => {
+        for_each_arch_syscall!{
+            $callback;
+            $($context;)*
+            ;
             read,
             write,
-            open,
             close,
-            stat,
             fstat,
-            lstat,
-            poll,
             lseek,
             mmap,
             mprotect,
@@ -37,9 +119,6 @@ macro_rules! for_each_syscall {
             pwrite64,
             readv,
             writev,
-            access,
-            pipe,
-            select,
             sched_yield,
             mremap,
             msync,
@@ -49,11 +128,8 @@ macro_rules! for_each_syscall {
             shmat,
             shmctl,
             dup,
-            dup2,
-            pause,
             nanosleep,
             getitimer,
-            alarm,
             setitimer,
             getpid,
             sendfile,
@@ -73,8 +149,6 @@ macro_rules! for_each_syscall {
             setsockopt,
             getsockopt,
             clone,
-            fork,
-            vfork,
             execve,
             exit,
             wait4,
@@ -94,23 +168,11 @@ macro_rules! for_each_syscall {
             fdatasync,
             truncate,
             ftruncate,
-            getdents,
             getcwd,
             chdir,
             fchdir,
-            rename,
-            mkdir,
-            rmdir,
-            creat,
-            link,
-            unlink,
-            symlink,
-            readlink,
-            chmod,
             fchmod,
-            chown,
             fchown,
-            lchown,
             umask,
             gettimeofday,
             getrlimit,
@@ -127,7 +189,6 @@ macro_rules! for_each_syscall {
             getegid,
             setpgid,
             getppid,
-            getpgrp,
             setsid,
             setreuid,
             setregid,
@@ -148,14 +209,9 @@ macro_rules! for_each_syscall {
             rt_sigqueueinfo,
             rt_sigsuspend,
             sigaltstack,
-            utime,
-            mknod,
-            uselib,
             personality,
-            ustat,
             statfs,
             fstatfs,
-            sysfs,
             getpriority,
             setpriority,
             sched_setparam,
@@ -170,11 +226,8 @@ macro_rules! for_each_syscall {
             mlockall,
             munlockall,
             vhangup,
-            modify_ldt,
             pivot_root,
-            _sysctl,
             prctl,
-            arch_prctl,
             adjtimex,
             setrlimit,
             chroot,
@@ -188,20 +241,10 @@ macro_rules! for_each_syscall {
             reboot,
             sethostname,
             setdomainname,
-            iopl,
-            ioperm,
-            create_module,
             init_module,
             delete_module,
-            get_kernel_syms,
-            query_module,
             quotactl,
             nfsservctl,
-            getpmsg,
-            putpmsg,
-            afs_syscall,
-            tuxcall,
-            security,
             gettid,
             readahead,
             setxattr,
@@ -217,21 +260,15 @@ macro_rules! for_each_syscall {
             lremovexattr,
             fremovexattr,
             tkill,
-            time,
             futex,
             sched_setaffinity,
             sched_getaffinity,
-            set_thread_area,
             io_setup,
             io_destroy,
             io_getevents,
             io_submit,
             io_cancel,
-            get_thread_area,
             lookup_dcookie,
-            epoll_create,
-            epoll_ctl_old,
-            epoll_wait_old,
             remap_file_pages,
             getdents64,
             set_tid_address,
@@ -248,11 +285,8 @@ macro_rules! for_each_syscall {
             clock_getres,
             clock_nanosleep,
             exit_group,
-            epoll_wait,
             epoll_ctl,
             tgkill,
-            utimes,
-            vserver,
             mbind,
             set_mempolicy,
             get_mempolicy,
@@ -269,7 +303,6 @@ macro_rules! for_each_syscall {
             keyctl,
             ioprio_set,
             ioprio_get,
-            inotify_init,
             inotify_add_watch,
             inotify_rm_watch,
             migrate_pages,
@@ -277,7 +310,6 @@ macro_rules! for_each_syscall {
             mkdirat,
             mknodat,
             fchownat,
-            futimesat,
             newfstatat,
             unlinkat,
             renameat,
@@ -298,9 +330,7 @@ macro_rules! for_each_syscall {
             move_pages,
             utimensat,
             epoll_pwait,
-            signalfd,
             timerfd_create,
-            eventfd,
             fallocate,
             timerfd_settime,
             timerfd_gettime,
