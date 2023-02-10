@@ -6,7 +6,6 @@
 #define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_ENDPOINTS_H_
 
 #include <lib/fidl/cpp/wire/internal/transport.h>
-#include <lib/fidl/cpp/wire/soft_migration.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
@@ -37,11 +36,7 @@ class TransportEnd {
   // Creates an |TransportEnd| that wraps the given |handle|.
   // The caller must ensure the |handle| is a server endpoint speaking
   // a protocol compatible with |Protocol|.
-  // TODO(fxbug.dev/65212): Make the conversion explicit as users migrate to
-  // typed handles.
-  // NOLINTNEXTLINE
-  FIDL_CONDITIONALLY_EXPLICIT_CONVERSION TransportEnd(OwnedType handle)
-      : handle_(std::move(handle)) {}
+  explicit TransportEnd(OwnedType handle) : handle_(std::move(handle)) {}
 
   TransportEnd(TransportEnd&& other) noexcept = default;
   TransportEnd& operator=(TransportEnd&& other) noexcept = default;
@@ -83,12 +78,7 @@ class UnownedTransportEnd {
   // type of the underlying protocol.
   // Consider declaring the type of the input variable as a
   // |fidl::UnownedTransportEnd<Protocol, Transport>| instead.
-  //
-  // TODO(fxbug.dev/65212): Make the conversion explicit as users migrate to
-  // typed channels.
-  // NOLINTNEXTLINE
-  FIDL_CONDITIONALLY_EXPLICIT_CONVERSION UnownedTransportEnd(const UnownedType& h)
-      : handle_(h->get()) {}
+  explicit UnownedTransportEnd(const UnownedType& h) : handle_(h->get()) {}
 
   // The unowned transport end is copyable - it simply copies the handle value.
   UnownedTransportEnd(const UnownedTransportEnd& other) = default;

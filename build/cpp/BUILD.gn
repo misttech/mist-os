@@ -2,31 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/69585): Delete this config after all user code
-# migrates to typed channels.
-config("fidl-llcpp-deprecated-raw-channels") {
-  cflags_cc = [ "-DFIDL_LLCPP_ALLOW_DEPRECATED_RAW_CHANNELS" ]
-
-  # Please do not add to this list. Refer to fxbug.dev/69585 to see
-  # how a target could be migrated to use typed channels.
-  #
-  # To regenerate this list, run
-  #
-  #   scripts/gn/trim_visibility.py --target="//build/cpp:fidl-llcpp-deprecated-raw-channels"
-  #
-  # and replace the contents of `visibility` with the script output.
-  visibility = []
-}
-
-# TODO(fxbug.dev/69585): Delete this config after all user code
-# migrates to typed channels.
-# This is used by generated C++ library from fidlgen_cpp, which unfortunately
-# cannot have a definite visibility restriction. Please do not use this config.
-config(
-    "fidl-llcpp-deprecated-raw-channels-reserved-for-llcpp-generated-code-only") {
-  cflags_cc = [ "-DFIDL_LLCPP_ALLOW_DEPRECATED_RAW_CHANNELS" ]
-}
-
 # This allows code call FIDL wire table constructors and setters rather than using builders.
 config("fidl-wire-deprecated-mutable-tables") {
   cflags_cc = [ "-DFIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES" ]

@@ -201,11 +201,6 @@ template("_fidl_cpp_library_impl") {
       "-Wshadow",
     ]
 
-    # TODO(fxbug.dev/69585): We suppress deprecated raw channel usage
-    # in LLCPP generated code itself. Delete this line after everything
-    # migrates to typed channels.
-    configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels-reserved-for-llcpp-generated-code-only" ]
-
     if (defined(invoker.additional_configs)) {
       configs += invoker.additional_configs
     }

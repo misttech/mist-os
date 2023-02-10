@@ -14,7 +14,6 @@
 #ifdef __Fuchsia__
 #include <lib/fidl/cpp/wire/internal/endpoints.h>
 #include <lib/fidl/cpp/wire/message.h>
-#include <lib/fidl/cpp/wire/soft_migration.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 #include <zircon/fidl.h>
 #endif  // __Fuchsia__
