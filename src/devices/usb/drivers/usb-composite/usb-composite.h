@@ -45,6 +45,9 @@ class UsbComposite : public UsbCompositeType {
   }
 
  private:
+  template <auto* descriptors>
+  friend class UsbInterfaceTest;
+
   enum class InterfaceStatus : uint8_t {
     // The interface has not been claimed and no device has been created for it.
     AVAILABLE,

@@ -102,6 +102,9 @@ class UsbInterface : public UsbInterfaceType,
   inline uint8_t usb_protocol() const { return usb_protocol_; }
 
  private:
+  template <auto* descriptors>
+  friend class UsbInterfaceTest;
+
   zx_status_t Init(const void* descriptors, size_t desc_length, uint8_t last_interface_id,
                    uint8_t usb_class, uint8_t usb_subclass, uint8_t usb_protocol);
   zx_status_t ConfigureEndpoints(uint8_t interface_id, uint8_t alt_setting);
