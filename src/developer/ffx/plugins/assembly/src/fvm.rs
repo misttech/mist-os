@@ -10,7 +10,6 @@ use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fvm::{Filesystem, FilesystemAttributes, FvmBuilder, FvmType, NandFvmBuilder};
 use assembly_images_config::{Fvm, FvmFilesystem, FvmOutput, SparseFvm};
 use assembly_manifest::{AssemblyManifest, Image};
-use assembly_minfs::MinFSBuilder;
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
@@ -124,7 +123,6 @@ impl<'a> MultiFvmBuilder<'a> {
     pub fn filesystem(&mut self, filesystem: FvmFilesystem) {
         let name = match &filesystem {
             FvmFilesystem::BlobFS(fs) => &fs.name,
-            FvmFilesystem::MinFS(fs) => &fs.name,
             FvmFilesystem::EmptyData(fs) => &fs.name,
             FvmFilesystem::Reserved(fs) => &fs.name,
         };
@@ -212,25 +210,15 @@ impl<'a> MultiFvmBuilder<'a> {
                     fvm_type,
                 );
 
-                let mut has_data = false;
                 for filesystem_name in &config.filesystems {
                     let fs = self.get_filesystem(tools, filesystem_name)?;
-                    #[allow(clippy::single_match)]
-                    match fs {
-                        Filesystem::MinFS { path: _, attributes: _ } => has_data = true,
-                        _ => {}
-                    }
                     builder.filesystem(fs);
                 }
 
                 builder.build()?;
                 if add_to_manifest {
                     let path_relative = path_relative_from_current_dir(path)?;
-                    if has_data {
-                        self.assembly_manifest.images.push(Image::FVMSparse(path_relative));
-                    } else {
-                        self.assembly_manifest.images.push(Image::FVMSparseBlob(path_relative));
-                    }
+                    self.assembly_manifest.images.push(Image::FVMSparse(path_relative));
                 }
             }
             FvmOutput::Nand(config) => {
@@ -334,23 +322,6 @@ impl<'a> MultiFvmBuilder<'a> {
                     },
                 )
             }
-            FvmFilesystem::MinFS(config) => {
-                let path = self.outdir.join("data.blk");
-                let builder = MinFSBuilder::new(tools.get_tool("minfs")?);
-                builder.build(&path).context("Constructing minfs")?;
-                (
-                    None,
-                    Filesystem::MinFS {
-                        path,
-                        attributes: FilesystemAttributes {
-                            name: config.name.clone(),
-                            minimum_inodes: config.minimum_inodes,
-                            minimum_data_bytes: config.minimum_data_bytes,
-                            maximum_bytes: config.maximum_bytes,
-                        },
-                    },
-                )
-            }
             FvmFilesystem::EmptyData(_config) => (None, Filesystem::EmptyData {}),
             FvmFilesystem::Reserved(config) => {
                 (None, Filesystem::Reserved { slices: config.slices })
@@ -367,8 +338,8 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
     use assembly_images_config::{
-        BlobFS, BlobFSLayout, EmptyData, FvmFilesystem, FvmOutput, MinFS, NandFvm, Reserved,
-        SparseFvm, StandardFvm,
+        BlobFS, BlobFSLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
+        StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -684,18 +655,12 @@ mod tests {
             minimum_inodes: None,
             maximum_contents_size: None,
         }));
-        builder.filesystem(FvmFilesystem::MinFS(MinFS {
-            name: "data".into(),
-            maximum_bytes: None,
-            minimum_data_bytes: None,
-            minimum_inodes: None,
-        }));
         builder.filesystem(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
         builder
             .filesystem(FvmFilesystem::Reserved(Reserved { name: "reserved".into(), slices: 10 }));
         builder.output(FvmOutput::Standard(StandardFvm {
             name: "fvm".into(),
-            filesystems: vec!["blob".into(), "data".into(), "empty-data".into(), "reserved".into()],
+            filesystems: vec!["blob".into(), "empty-data".into(), "reserved".into()],
             compress: false,
             resize_image_file_to_fit: false,
             truncate_to_length: None,
@@ -706,7 +671,6 @@ mod tests {
         let blobfs_path = dir.join("blob.blk");
         let blobs_json_path = dir.join("blobs.json");
         let blob_manifest_path = dir.join("blob.manifest");
-        let minfs_path = dir.join("data.blk");
         let standard_path = dir.join("fvm.blk");
         let expected_log: ToolCommandLog = serde_json::from_value(json!({
             "commands": [
@@ -722,13 +686,6 @@ mod tests {
                 ]
             },
             {
-                "tool": "./host_x64/minfs",
-                "args": [
-                    minfs_path,
-                    "create",
-                ]
-            },
-            {
                 "tool": "./host_x64/fvm",
                 "args": [
                     standard_path,
@@ -737,8 +694,6 @@ mod tests {
                     "0",
                     "--blob",
                     blobfs_path,
-                    "--data",
-                    minfs_path,
                     "--with-empty-minfs",
                     "--reserve-slices",
                     "10",
@@ -815,27 +770,22 @@ mod tests {
             minimum_inodes: None,
             maximum_contents_size: None,
         }));
-        builder.filesystem(FvmFilesystem::MinFS(MinFS {
-            name: "data".into(),
-            maximum_bytes: None,
-            minimum_data_bytes: None,
-            minimum_inodes: None,
-        }));
+        builder.filesystem(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
         builder.output(FvmOutput::Standard(StandardFvm {
             name: "fvm".into(),
-            filesystems: vec!["blob".into(), "data".into()],
+            filesystems: vec!["blob".into(), "empty-data".into()],
             compress: false,
             resize_image_file_to_fit: false,
             truncate_to_length: None,
         }));
         builder.output(FvmOutput::Sparse(SparseFvm {
             name: "fvm.sparse".into(),
-            filesystems: vec!["blob".into(), "data".into()],
+            filesystems: vec!["blob".into(), "empty-data".into()],
             max_disk_size: None,
         }));
         builder.output(FvmOutput::Nand(NandFvm {
             name: "fvm.nand".into(),
-            filesystems: vec!["blob".into(), "data".into()],
+            filesystems: vec!["blob".into(), "empty-data".into()],
             max_disk_size: None,
             compress: false,
             block_count: 1,
@@ -849,7 +799,6 @@ mod tests {
         let blobfs_path = dir.join("blob.blk");
         let blobs_json_path = dir.join("blobs.json");
         let blob_manifest_path = dir.join("blob.manifest");
-        let minfs_path = dir.join("data.blk");
         let standard_path = dir.join("fvm.blk");
         let sparse_path = dir.join("fvm.sparse.blk");
         let nand_tmp_path = dir.join("fvm.nand.tmp.blk");
@@ -868,13 +817,6 @@ mod tests {
                 ]
             },
             {
-                "tool": "./host_x64/minfs",
-                "args": [
-                    minfs_path,
-                    "create",
-                ]
-            },
-            {
                 "tool": "./host_x64/fvm",
                 "args": [
                     standard_path,
@@ -883,8 +825,7 @@ mod tests {
                     "0",
                     "--blob",
                     blobfs_path,
-                    "--data",
-                    minfs_path,
+                    "--with-empty-minfs",
                 ]
             },
             {
@@ -898,8 +839,7 @@ mod tests {
                     "lz4",
                     "--blob",
                     blobfs_path,
-                    "--data",
-                    minfs_path,
+                    "--with-empty-minfs",
                 ]
             },
             {
@@ -913,8 +853,7 @@ mod tests {
                     "lz4",
                     "--blob",
                     blobfs_path,
-                    "--data",
-                    minfs_path,
+                    "--with-empty-minfs",
                 ]
             },
             {

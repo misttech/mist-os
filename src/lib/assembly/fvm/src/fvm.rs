@@ -81,13 +81,6 @@ pub enum Filesystem {
         /// The attributes of the filesystem to create.
         attributes: FilesystemAttributes,
     },
-    /// A minfs filesystem.
-    MinFS {
-        /// The path to the filesystem block file on the host.
-        path: Utf8PathBuf,
-        /// The attributes of the filesystem to create.
-        attributes: FilesystemAttributes,
-    },
     /// An empty data filesystem that will be formatted with fxfs/minfs when Fuchsia boots.
     EmptyData,
     /// Reserved slices for future use.
@@ -203,10 +196,6 @@ impl FvmBuilder {
                 Filesystem::BlobFS { path, attributes } => {
                     append_filesystem(&mut args, path.to_string(), attributes);
                 }
-                Filesystem::MinFS { path, attributes } => {
-                    append_filesystem(&mut args, path.to_string(), attributes);
-                }
-                // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
                 Filesystem::EmptyData => {
                     args.push("--with-empty-minfs".to_string());
                 }

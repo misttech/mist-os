@@ -323,25 +323,10 @@ The images config specifies **which images** to generate and how.
 
 ```json5
 {
-  type: "minfs",
-
-  // The name of the volume in the FVM.
-  name: "data",
-
-  // Reserve |minimum_data_bytes| and |minimum_inodes| in the FVM, and ensure
-  // that the final reserved size does not exceed |maximum_bytes|.
-  maximum_bytes: 0,
-  minimum_data_byts: 0,
-  minimum_inodes: 0,
-}
-```
-
-```json5
-{
   type: "empty-data",
 
   // The name of the volume in the FVM.
-  name: "data_empty",
+  name: "empty-data",
 }
 ```
 
@@ -466,13 +451,6 @@ The images config specifies **which images** to generate and how.
           minimum_data_bytes: 0,
           minimum_inodes: 4096,
         },
-        {
-          type: "minfs",
-          name: "data",
-          maximum_bytes: 65536,
-          minimum_data_bytes: 0,
-          minimum_inodes: 4096,
-        },
       ],
       outputs: [
         {
@@ -480,7 +458,7 @@ The images config specifies **which images** to generate and how.
           name: "fvm",
           filesystems: [
             "blob",
-            "data",
+            "empty-data",
           ],
         },
         {
@@ -488,7 +466,7 @@ The images config specifies **which images** to generate and how.
           name: "fvm.sparse",
           filesystems: [
             "blob",
-            "data",
+            "empty-data",
           ],
           compress: true,
           max_disk_size: 65536,

@@ -15,7 +15,6 @@ if (is_host) {
       "driver_manifest:host_tests",
       "fvm:host_tests",
       "images_config:host_tests",
-      "minfs:host_tests",
       "package_list:host_tests",
       "package_utils:host_tests",
       "partitions_config:host_tests",

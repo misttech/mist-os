@@ -187,10 +187,6 @@ pub enum FvmFilesystem {
     #[serde(rename = "blobfs")]
     BlobFS(BlobFS),
 
-    /// A minfs volume for holding data.
-    #[serde(rename = "minfs")]
-    MinFS(MinFS),
-
     /// An empty data partition.
     /// This reserves the data volume, which will be formatted as fxfs/minfs on boot.
     // TODO(fxbug.dev/85134): Remove empty-minfs alias after updating sdk-integration.
@@ -237,27 +233,6 @@ fn default_blobfs_name() -> String {
 
 fn default_blobfs_layout() -> BlobFSLayout {
     BlobFSLayout::Compact
-}
-
-/// Configuration for building a MinFS volume.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MinFS {
-    /// The name of the volume in the FVM.
-    #[serde(default = "default_data_name")]
-    pub name: String,
-
-    /// Reserve |minimum_data_bytes| and |minimum_inodes| in the FVM, and ensure
-    /// that the final reserved size does not exceed |maximum_bytes|.
-    #[serde(default)]
-    pub maximum_bytes: Option<u64>,
-
-    /// Reserve space for at least this many data bytes.
-    #[serde(default)]
-    pub minimum_data_bytes: Option<u64>,
-
-    /// Reserved space for this many inodes.
-    #[serde(default)]
-    pub minimum_inodes: Option<u64>,
 }
 
 fn default_data_name() -> String {
@@ -538,13 +513,6 @@ mod tests {
                                 minimum_inodes: 0,
                             },
                             {
-                                type: "minfs",
-                                name: "data",
-                                maximum_bytes: 0,
-                                minimum_data_bytes: 0,
-                                minimum_inodes: 0,
-                            },
-                            {
                                 type: "reserved",
                                 name: "internal",
                                 slices: 0,
@@ -651,10 +619,6 @@ mod tests {
                             {
                                 type: "blobfs",
                                 name: "blob",
-                            },
-                            {
-                                type: "minfs",
-                                name: "data",
                             },
                             {
                                 type: "reserved",
