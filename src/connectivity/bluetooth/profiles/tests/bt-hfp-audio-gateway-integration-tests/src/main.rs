@@ -359,13 +359,21 @@ async fn expect_data(channel: &mut Channel, expected: Vec<at::Response>) {
         .flatten()
         .collect();
 
-    let mut actual_bytes = Vec::new();
-    let _read_len = channel
-        .read_datagram(&mut actual_bytes)
-        .on_timeout(CHANNEL_TIMEOUT.after_now(), move || Err(fidl::Status::TIMED_OUT))
-        .await
-        .expect("reading from channel is ok");
-    assert_eq!(actual_bytes, expected_bytes);
+    // `read_datagram` occasionally returns ready with Ok(0) when there are no bytes read from the
+    // socket. Instead of erroring, we retry the read operation until we actually receive a nonzero
+    // amount of data over the channel.
+    loop {
+        let mut actual_bytes = Vec::new();
+        let read_result = channel
+            .read_datagram(&mut actual_bytes)
+            .on_timeout(CHANNEL_TIMEOUT.after_now(), move || Err(fidl::Status::TIMED_OUT))
+            .await
+            .expect("reading from channel is ok");
+        if read_result != 0 {
+            assert_eq!(actual_bytes, expected_bytes);
+            break;
+        }
+    }
 }
 
 /// Serializes and sends the provided AT `command` using the `channel` and then

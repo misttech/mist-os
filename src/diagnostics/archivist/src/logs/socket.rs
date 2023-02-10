@@ -76,17 +76,23 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        match this.socket.poll_datagram(cx, &mut this.buffer) {
-            // If the socket is pending, return Pending.
-            Poll::Pending => Poll::Pending,
-            // If the socket got a PEER_CLOSED then finalize the stream.
-            Poll::Ready(Err(zx::Status::PEER_CLOSED)) => Poll::Ready(None),
-            // If the socket got some other error, return that error.
-            Poll::Ready(Err(status)) => Poll::Ready(Some(Err(status))),
-            // If we got data, then return the data we read.
-            Poll::Ready(Ok(_len)) => {
-                let buf = std::mem::take(&mut this.buffer);
-                Poll::Ready(Some(Ok(E::wrap_bytes(buf, Arc::clone(&this.stats)))))
+        loop {
+            match this.socket.poll_datagram(cx, &mut this.buffer) {
+                // If the socket is pending, return Pending.
+                Poll::Pending => return Poll::Pending,
+                // If the socket got a PEER_CLOSED then finalize the stream.
+                Poll::Ready(Err(zx::Status::PEER_CLOSED)) => return Poll::Ready(None),
+                // If the socket got some other error, return that error.
+                Poll::Ready(Err(status)) => return Poll::Ready(Some(Err(status))),
+                // If the socket read 0 bytes, then retry until we get some data or an error. This
+                // can happen when the zx_object_get_info call returns 0 outstanding read bytes,
+                // but by the time we do zx_socket_read there's data available.
+                Poll::Ready(Ok(0)) => continue,
+                // If we got data, then return the data we read.
+                Poll::Ready(Ok(_len)) => {
+                    let buf = std::mem::take(&mut this.buffer);
+                    return Poll::Ready(Some(Ok(E::wrap_bytes(buf, Arc::clone(&this.stats)))));
+                }
             }
         }
     }

@@ -257,32 +257,42 @@ impl Puppet {
     }
 
     async fn read_record(&self, args: ReadRecordArgs) -> Result<Option<TestRecord>, Error> {
-        let mut buf: Vec<u8> = vec![];
-        let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
-        TestRecord::parse(TestRecordParseArgs {
-            buf: &buf[0..bytes_read],
-            new_file_line_rules: args.new_file_line_rules,
-            ignored_tags: &self.ignored_tags,
-            override_file_line: args.override_file_line,
-        })
+        loop {
+            let mut buf: Vec<u8> = vec![];
+            let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
+            if bytes_read == 0 {
+                continue;
+            }
+            return TestRecord::parse(TestRecordParseArgs {
+                buf: &buf[0..bytes_read],
+                new_file_line_rules: args.new_file_line_rules,
+                ignored_tags: &self.ignored_tags,
+                override_file_line: args.override_file_line,
+            });
+        }
     }
 
     // For the CPP puppet it's necessary to strip out the TID from the comparison
     // as interest events happen outside the main thread due to HLCPP.
     async fn read_record_no_tid(&self, expected_tid: u64) -> Result<Option<TestRecord>, Error> {
-        let mut buf: Vec<u8> = vec![];
-        let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
-        let mut record = TestRecord::parse(TestRecordParseArgs {
-            buf: &buf[0..bytes_read],
-            new_file_line_rules: self.new_file_line_rules,
-            ignored_tags: &self.ignored_tags,
-            override_file_line: true,
-        })?;
-        if let Some(record) = record.as_mut() {
-            record.arguments.remove("tid");
-            record.arguments.insert("tid".to_string(), Value::UnsignedInt(expected_tid));
+        loop {
+            let mut buf: Vec<u8> = vec![];
+            let bytes_read = self.socket.read_datagram(&mut buf).await.unwrap();
+            if bytes_read == 0 {
+                continue;
+            }
+            let mut record = TestRecord::parse(TestRecordParseArgs {
+                buf: &buf[0..bytes_read],
+                new_file_line_rules: self.new_file_line_rules,
+                ignored_tags: &self.ignored_tags,
+                override_file_line: true,
+            })?;
+            if let Some(record) = record.as_mut() {
+                record.arguments.remove("tid");
+                record.arguments.insert("tid".to_string(), Value::UnsignedInt(expected_tid));
+            }
+            return Ok(record);
         }
-        Ok(record)
     }
 
     async fn test(&self) -> Result<(), Error> {
