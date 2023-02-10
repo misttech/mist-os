@@ -88,10 +88,6 @@ struct TopLevel {
     #[argh(option)]
     blob: Option<Utf8PathBuf>,
 
-    /// path to data partition image (not used with ramdisk)
-    #[argh(option)]
-    data: Option<Utf8PathBuf>,
-
     /// if true, use sparse fvm instead of full fvm
     #[argh(switch)]
     use_sparse_fvm: bool,
@@ -422,8 +418,7 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
                 .arg("8388608")
                 .arg("--blob")
                 .arg(args.blob.unwrap())
-                .arg("--data")
-                .arg(args.data.unwrap())
+                .arg("--with-empty-minfs")
                 .env("PATH", &search_path)
                 .status()
                 .context("Failed to run fvm tool")?;
@@ -436,20 +431,14 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
 
 fn check_args(args: &mut TopLevel) -> Result<(), Error> {
     if args.ramdisk_only {
-        if args.blob.is_some()
-            || args.data.is_some()
-            || args.sparse_fvm.is_some()
-            || args.use_sparse_fvm
-        {
+        if args.blob.is_some() || args.sparse_fvm.is_some() || args.use_sparse_fvm {
             bail!(
-                "--ramdisk_only incompatible with --blob, --data, --sparse-fvm and \
+                "--ramdisk_only incompatible with --blob, --sparse-fvm and \
                    --use-sparse-fvm"
             );
         }
-    } else if (args.data.is_some() || args.blob.is_some())
-        && (args.sparse_fvm.is_some() || args.use_sparse_fvm)
-    {
-        bail!("--data|--blob incompatbile with --use-sparse-fvm|--sparse-fvm");
+    } else if (args.blob.is_some()) && (args.sparse_fvm.is_some() || args.use_sparse_fvm) {
+        bail!("--blob incompatbile with --use-sparse-fvm|--sparse-fvm");
     }
 
     if args.sparse_fvm.is_some() {
@@ -504,9 +493,6 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
             } else {
                 if args.blob.is_none() {
                     args.blob = Some(images["blk_blob"].clone())
-                }
-                if args.data.is_none() {
-                    args.data = Some(images["blk_data"].clone())
                 }
             }
         }
@@ -563,8 +549,6 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         } else {
             ensure!(args.blob.is_some(), "Missing --blob");
             dependencies.push(args.blob.as_ref().unwrap());
-            ensure!(args.data.is_some(), "Missing --data");
-            dependencies.push(args.data.as_ref().unwrap());
         }
     }
 

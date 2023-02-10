@@ -48,8 +48,10 @@ template("access_ota_blob_as_executable") {
     #     [...]
     #     46365598 total
     #
-    #   Total: 3063808 + 46365598 = 49429406
-    fvm_truncate_to_length = 49429406
+    #   minfs size: 8388608
+    #
+    #   Total: 3063808 + 46365598 + 8388608 = 57818014
+    fvm_truncate_to_length = 57818014
   }
 
   # System assembly for system version to OTA from package server.

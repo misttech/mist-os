@@ -13,7 +13,6 @@ load(
     "FuchsiaFsBlobFsInfo",
     "FuchsiaFsEmptyAccountInfo",
     "FuchsiaFsEmptyDataInfo",
-    "FuchsiaFsMinFsInfo",
     "FuchsiaFsReservedInfo",
     "FuchsiaVbmetaInfo",
     "FuchsiaZbiInfo",
@@ -42,10 +41,6 @@ def _collect_file_systems(raw_filesystems, filesystems_dict):
             }
             filesystems_dict[raw_fs.empty_data_name] = empty_data
             file_systems.append(raw_fs.empty_data_name)
-        elif FuchsiaFsMinFsInfo in filesystem:
-            raw_fs = filesystem[FuchsiaFsMinFsInfo]
-            filesystems_dict[raw_fs.minfs_name] = raw_fs.minfs_info
-            file_systems.append(raw_fs.minfs_name)
         elif FuchsiaFsReservedInfo in filesystem:
             raw_fs = filesystem[FuchsiaFsReservedInfo]
             filesystems_dict[raw_fs.reserved_name] = raw_fs.reserved_info

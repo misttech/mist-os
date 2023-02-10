@@ -151,14 +151,6 @@ FuchsiaFsBlobFsInfo = provider(
     },
 )
 
-FuchsiaFsMinFsInfo = provider(
-    doc = """A MinFs filesystem.""",
-    fields = {
-        "minfs_name": "Name of filesystem",
-        "minfs_info": "Json of Min FS information",
-    },
-)
-
 FuchsiaFsEmptyDataInfo = provider(
     doc = """An Empty MinFs filesystem.""",
     fields = {

@@ -185,6 +185,7 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
 
   // One-off empty partition with a label of "data". This will later be reformatted.
   // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
+  // TODO(fxbug.dev/121660): Rename this to --with-empty-data.
   if (auto index = FindArgumentByName(arguments, "--with-empty-minfs"); index.has_value()) {
     PartitionParams empty_data_partition;
     empty_data_partition.format = PartitionImageFormat::kEmptyPartition;
@@ -192,8 +193,8 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
     empty_data_partition.type_guid = GUID_DATA_VALUE;
     // Doesn't need to be encrypted, it will be found by GUID and label and reformated.
     empty_data_partition.encrypted = false;
-    // Need 2 slices - one for zxcrypt and one for minfs.
-    empty_data_partition.options.max_bytes = options.slice_size + 1;
+    // Reserve 1 slice for zxcrypt, and 8MiB for data.
+    empty_data_partition.options.max_bytes = options.slice_size + 8388608;
 
     partitions.push_back(empty_data_partition);
   }

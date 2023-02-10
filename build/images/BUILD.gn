@@ -209,7 +209,6 @@ compiled_action("uefi-disk") {
   } else {
     inputs += [
       fvm_tool_path,
-      files.minfs,
 
       # TODO(fxbug.dev/82077): Switch this to the new path the uefi script is
       # switched over to using it (or taking it as an argument).

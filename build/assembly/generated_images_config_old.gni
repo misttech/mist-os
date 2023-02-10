@@ -45,11 +45,6 @@ import("//build/zbi/zbi.gni")
 #   empty_account_partition (optional; default=false)
 #     [bool] Whether to add an empty account partition to each FVM.
 #
-# MinFS parameters:
-#
-#   minfs_minimum_data_bytes, minfs_maximum_bytes (optional)
-#     [int] Size options for minfs to pass to the fvm tool.
-#
 # BlobFS parameters
 #
 #   blobfs_minimum_inodes, blobfs_minimum_data_bytes, blobfs_maximum_bytes (optional)
@@ -102,7 +97,7 @@ template("generated_images_config_old") {
     type = "standard"
     name = "fvm"
     filesystems = [
-      "data",
+      "empty-data",
       "blob",
     ]
 
@@ -115,7 +110,7 @@ template("generated_images_config_old") {
     type = "sparse"
     name = "fvm.sparse"
     filesystems = [
-      "data",
+      "empty-data",
       "blob",
     ]
 
@@ -127,7 +122,10 @@ template("generated_images_config_old") {
   blob_sparse_fvm = {
     type = "sparse"
     name = "fvm.blob.sparse"
-    filesystems = [ "blob" ]
+    filesystems = [
+      "empty-data",
+      "blob",
+    ]
 
     if (fvm_max_disk_size != false) {
       max_disk_size = fvm_max_disk_size
@@ -138,7 +136,7 @@ template("generated_images_config_old") {
     type = "standard"
     name = "fvm.fastboot"
     filesystems = [
-      "data",
+      "empty-data",
       "blob",
     ]
 
@@ -155,7 +153,10 @@ template("generated_images_config_old") {
   nand_fvm = {
     type = "nand"
     name = "fvm.fastboot"
-    filesystems = [ "blob" ]
+    filesystems = [
+      "empty-data",
+      "blob",
+    ]
 
     if (fvm_max_disk_size != false) {
       max_disk_size = fvm_max_disk_size
@@ -204,23 +205,6 @@ template("generated_images_config_old") {
   }
   fvm_filesystems += [ blobfs ]
 
-  minfs = {
-    type = "minfs"
-
-    # The name of the volume in the FVM.
-    name = "data"
-
-    # Reserve |minimum_data_bytes| in the FVM, and ensure
-    # that the final reserved size does not exceed |maximum_bytes|.
-    if (defined(invoker.minfs_maximum_bytes)) {
-      maximum_bytes = invoker.minfs_maximum_bytes
-    }
-    if (defined(invoker.minfs_minimum_data_bytes)) {
-      minimum_data_bytes = invoker.minfs_minimum_data_bytes
-    }
-  }
-  fvm_filesystems += [ minfs ]
-
   # Define an optional empty data partition
   empty_data = {
     type = "empty-data"
@@ -264,12 +248,6 @@ template("generated_images_config_old") {
     emmc_fvm.filesystems += [ "internal" ]
     nand_fvm.filesystems += [ "internal" ]
   }
-
-  # Note that the order of the filesystems must match how the filesystems are
-  # added in ffx assembly image so that we can diff the command logs.
-  # Once ffx assembly image is removed, we can cleanup this file.
-  blob_sparse_fvm.filesystems += [ "empty-data" ]
-  nand_fvm.filesystems += [ "empty-data" ]
 
   # Collect the fvms to generate.
   fvm_outputs = [

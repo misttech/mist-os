@@ -142,7 +142,7 @@ TEST(ArgumentTest, PartitionParamsFromArgsIsok) {
   uint8_t kDataGuid[] = GUID_DATA_VALUE;
   EXPECT_TRUE(memcmp(empty_data_params.type_guid->data(), kDataGuid, kGuidLength) == 0);
   EXPECT_FALSE(empty_data_params.encrypted);
-  EXPECT_EQ(empty_data_params.options.max_bytes.value(), options.slice_size + 1);
+  EXPECT_EQ(empty_data_params.options.max_bytes.value(), options.slice_size + 8388608);
 
   auto empty_account_params = params[6];
   EXPECT_EQ(empty_account_params.label, "account");

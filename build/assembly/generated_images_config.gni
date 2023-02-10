@@ -64,12 +64,6 @@
 #         [bool] Include an empty account partition.
 #
 #     ### Filesystems
-#       minfs
-#         {
-#           minimum_inodes, minimum_data_bytes, maximum_bytes (optional)
-#             [int] Size options for blobfs to pass to the fvm tool.
-#         }
-#
 #       blobfs
 #         {
 #           compress (optional)
@@ -176,20 +170,12 @@ template("generated_images_config") {
         forward_variables_from(invoker_fvm.blobfs, "*")
       }
     }
-    minfs = {
-      type = "minfs"
-      name = "data"
-      if (defined(invoker_fvm.minfs)) {
-        forward_variables_from(invoker_fvm.minfs, "*")
-      }
-    }
     empty_data = {
       type = "empty-data"
       name = "empty-data"
     }
     fvm_filesystems = [
       blobfs,
-      minfs,
       empty_data,
     ]
 
@@ -208,7 +194,7 @@ template("generated_images_config") {
       type = "standard"
       name = "fvm"
       filesystems = [
-        "data",
+        "empty-data",
         "blob",
       ]
       if (defined(reserved)) {
@@ -223,7 +209,7 @@ template("generated_images_config") {
       type = "sparse"
       name = "fvm.sparse"
       filesystems = [
-        "data",
+        "empty-data",
         "blob",
       ]
       if (defined(reserved)) {
@@ -237,11 +223,13 @@ template("generated_images_config") {
     blob_sparse_fvm = {
       type = "sparse"
       name = "fvm.blob.sparse"
-      filesystems = [ "blob" ]
+      filesystems = [
+        "empty-data",
+        "blob",
+      ]
       if (defined(reserved)) {
         filesystems += [ "internal" ]
       }
-      filesystems += [ "empty-data" ]
       if (defined(invoker_fvm.max_disk_size)) {
         max_disk_size = invoker_fvm.max_disk_size
       }
@@ -257,7 +245,7 @@ template("generated_images_config") {
         compress = invoker_emmc.compress
         resize_image_file_to_fit = true
         filesystems = [
-          "data",
+          "empty-data",
           "blob",
         ]
         if (defined(reserved)) {
@@ -289,11 +277,13 @@ template("generated_images_config") {
         oob_size = invoker_nand.oob_size
         page_size = invoker_nand.page_size
         pages_per_block = invoker_nand.pages_per_block
-        filesystems = [ "blob" ]
+        filesystems = [
+          "empty-data",
+          "blob",
+        ]
         if (defined(reserved)) {
           filesystems += [ "internal" ]
         }
-        filesystems += [ "empty-data" ]
         if (defined(invoker_fvm.max_disk_size)) {
           max_disk_size = invoker_fvm.max_disk_size
         }

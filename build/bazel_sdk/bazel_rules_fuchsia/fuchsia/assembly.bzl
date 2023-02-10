@@ -106,10 +106,6 @@ load(
     _fuchsia_filesystem_empty_account = "fuchsia_filesystem_empty_account",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_filesystem_minfs.bzl",
-    _fuchsia_filesystem_minfs = "fuchsia_filesystem_minfs",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_filesystem_empty_data.bzl",
     _fuchsia_filesystem_empty_data = "fuchsia_filesystem_empty_data",
 )
@@ -182,7 +178,6 @@ fuchsia_vbmeta = _fuchsia_vbmeta
 fuchsia_filesystem_blobfs = _fuchsia_filesystem_blobfs
 fuchsia_filesystem_empty_account = _fuchsia_filesystem_empty_account
 fuchsia_filesystem_empty_data = _fuchsia_filesystem_empty_data
-fuchsia_filesystem_minfs = _fuchsia_filesystem_minfs
 fuchsia_filesystem_reserved = _fuchsia_filesystem_reserved
 fuchsia_fvm_nand = _fuchsia_fvm_nand
 fuchsia_fvm_sparse = _fuchsia_fvm_sparse

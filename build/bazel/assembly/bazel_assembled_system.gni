@@ -127,7 +127,6 @@ template("bazel_assembled_system") {
         "base/meta.far",
         "base/package_manifest.json",
         "base/base.merkle",
-        "data.blk",
         "blob.blk",
         "fvm.blk",
         "fvm.sparse.blk",

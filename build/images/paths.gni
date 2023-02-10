@@ -52,7 +52,6 @@ files = {
       get_label_info(labels.zedboot_images, "target_out_dir") + "/zedboot"
 
   if (!use_bringup_assembly) {
-    minfs = "${assembly_outdir}/data.blk"
     blobfs = "${assembly_outdir}/blob.blk"
 
     # TODO(fxbug.dev/82077): Remove this once clients switch to the new path

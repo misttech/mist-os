@@ -55,7 +55,6 @@ if (is_fuchsia) {
     zbi = "${outdir}/fuchsia.zbi"
     zbi_signed = "${outdir}/fuchsia.zbi.signed"
     vbmeta = "${outdir}/fuchsia.vbmeta"
-    minfs = "${outdir}/data.blk"
     blobfs = "${outdir}/blob.blk"
     fvm = "${outdir}/fvm.blk"
     fvm_sparse = "${outdir}/fvm.sparse.blk"
@@ -215,18 +214,6 @@ if (is_fuchsia) {
     ]
     bootfs_labels = [ "//build/input:bootfs" ]
     bootfs_package_labels = product_bootfs_packages
-
-    # minfs arguments
-    if (minfs_product_minimum_data_bytes != false) {
-      minfs_minimum_data_bytes = minfs_product_minimum_data_bytes
-    } else if (minfs_board_minimum_data_bytes != false) {
-      minfs_minimum_data_bytes = minfs_board_minimum_data_bytes
-    }
-    if (minfs_product_maximum_bytes != false) {
-      minfs_maximum_bytes = minfs_product_maximum_bytes
-    } else if (minfs_board_maximum_bytes != false) {
-      minfs_maximum_bytes = minfs_board_maximum_bytes
-    }
 
     # blobfs arguments
     assembly_blob_layout_format = blob_layout_format

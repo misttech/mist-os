@@ -192,11 +192,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   check_production_tag (default: false)
 #      [bool] Whether to check there is no non_production_tag dependencies.
 #
-# Board: MinFS parameters:
-#
-#   minfs_minimum_data_bytes, minfs_maximum_bytes (optional)
-#     [int] Size options for minfs to pass to the fvm tool.
-#
 # Board: BlobFS parameters
 #
 #   blobfs_minimum_inodes, blobfs_minimum_data_bytes, blobfs_maximum_bytes, blobfs_maximum_contents_size (optional)
@@ -421,7 +416,6 @@ template("assembled_system") {
     zbi = "${outdir}/${image_name}.zbi"
     zbi_signed = "${zbi}.signed"
     vbmeta = "${outdir}/${image_name}.vbmeta"
-    minfs = "${outdir}/data.blk"
     blobfs = "${outdir}/blob.blk"
     fvm = "${outdir}/fvm.blk"
     fvm_sparse = "${outdir}/fvm.sparse.blk"
@@ -656,8 +650,6 @@ template("assembled_system") {
                              "visibility",
                              "zbi_signing_script",
                              "zbi_signing_args",
-                             "minfs_maximum_bytes",
-                             "minfs_minimum_data_bytes",
                              "blobfs_maximum_bytes",
                              "blobfs_minimum_data_bytes",
                              "blobfs_maximum_contents_size",
@@ -729,14 +721,6 @@ template("assembled_system") {
         }
 
         # Filesystems
-        minfs = {
-          if (defined(invoker.minfs_minimum_data_bytes)) {
-            minimum_data_bytes = invoker.minfs_minimum_data_bytes
-          }
-          if (defined(invoker.minfs_maximum_bytes)) {
-            maximum_bytes = invoker.minfs_maximum_bytes
-          }
-        }
         blobfs = {
           layout = _blob_layout_format
           if (defined(invoker.blobfs_minimum_inodes)) {
@@ -1068,7 +1052,6 @@ template("assembled_system") {
         files.base_package,
         files.base_package_manifest,
         files.base_package_merkle,
-        files.minfs,
         files.blobfs,
         files.fvm,
         files.fvm_sparse,
@@ -1151,15 +1134,6 @@ template("assembled_system") {
         ]
         if (generate_fvm) {
           images += [
-            # MinFS
-            {
-              label = _label
-              name = "${image_name}.data"
-              path = rebase_path(files.minfs, root_build_dir)
-              type = "blk"
-              forward_variables_from(_image_overrides["minfs"], "*")
-            },
-
             # BlobFS
             {
               label = _label

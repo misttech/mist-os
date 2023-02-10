@@ -8,7 +8,6 @@ load(
     "FuchsiaFsBlobFsInfo",
     "FuchsiaFsEmptyAccountInfo",
     "FuchsiaFsEmptyDataInfo",
-    "FuchsiaFsMinFsInfo",
     "FuchsiaFsReservedInfo",
 )
 
@@ -50,7 +49,6 @@ fuchsia_fvm_nand = rule(
             doc = "Filesystems to use",
             providers = [
                 [FuchsiaFsBlobFsInfo],
-                [FuchsiaFsMinFsInfo],
                 [FuchsiaFsEmptyDataInfo],
                 [FuchsiaFsEmptyAccountInfo],
                 [FuchsiaFsReservedInfo],

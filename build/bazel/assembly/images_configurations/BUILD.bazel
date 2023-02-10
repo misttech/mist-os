@@ -7,7 +7,6 @@ load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_filesystem_blobfs",
     "fuchsia_filesystem_empty_data",
-    "fuchsia_filesystem_minfs",
     "fuchsia_filesystem_reserved",
     "fuchsia_fvm_sparse",
     "fuchsia_fvm_standard",
@@ -76,7 +75,7 @@ fuchsia_vbmeta(
 fuchsia_fvm_standard(
     name = "standard_fvm",
     filesystems = [
-        ":minfs",
+        ":empty_data",
         ":blobfs",
         ":internal_reserved",
     ],
@@ -86,7 +85,7 @@ fuchsia_fvm_standard(
 fuchsia_fvm_sparse(
     name = "sparse_fvm",
     filesystems = [
-        ":minfs",
+        ":empty_data",
         ":blobfs",
         ":internal_reserved",
     ],
@@ -96,9 +95,9 @@ fuchsia_fvm_sparse(
 fuchsia_fvm_sparse(
     name = "blob_sparse_fvm",
     filesystems = [
+        ":empty_data",
         ":blobfs",
         ":internal_reserved",
-        ":empty_data",
     ],
     fvm_sparse_name = "fvm.blob.sparse",
 )
@@ -109,7 +108,7 @@ fuchsia_fvm_standard(
     # can compress here to speed up FVM transmission.
     compress = False,
     filesystems = [
-        ":minfs",
+        ":empty_data",
         ":blobfs",
         ":internal_reserved",
     ],
@@ -129,10 +128,6 @@ fuchsia_fvm_standard(
 fuchsia_filesystem_blobfs(
     name = "blobfs",
     maximum_contents_size = "5216665600",  # 4975 MiB. Leaves 50 MiB for the update package.
-)
-
-fuchsia_filesystem_minfs(
-    name = "minfs",
 )
 
 fuchsia_filesystem_empty_data(

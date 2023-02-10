@@ -20,7 +20,6 @@ files = {
   gendir = "${outdir}/gen"
 
   zbi = "${outdir}/fuchsia.zbi"
-  minfs = "${outdir}/data.blk"
   blobfs = "${outdir}/blob.blk"
   fvm_sparse = "${outdir}/fvm.sparse.blk"
   blobs_json = "${gendir}/blobs.json"
