@@ -72,8 +72,9 @@
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Bind library"
-  short_description: "A bind library is a mechanism used to define node properties.
-  The node properties can be assigned to nodes by their
+  short_description: "A bind library is a mechanism used to define
+  <a href=\"/docs/glossary#node-properties\">node properties</a>. The node properties
+  can be assigned to nodes by their
   <a href=\"/docs/glossary#parent-driver\">parent drivers</a> or
   used in the <a href=\"/docs/glossary#bind-rules\">bind rules</a>.
   Bind libraries are defined through the
@@ -86,8 +87,11 @@
 
 - term: "Bind rules"
   short_description: "Bind rules are a defined set of conditions provided by a
-  <a href=\"/docs/glossary#driver\">driver</a> that must be satisfied in order for the driver to bind
-  to a node. The conditions are evaluated against node properties. Formerly known as a bind program."
+  <a href=\"/docs/glossary#driver\">driver</a> that must be satisfied in order for
+  the driver to <a href=\"/docs/glossary#driver-matching\">match</a>
+  to a <a href=\"/docs/glossary#node\">node</a>. The conditions are evaluated
+  against <a href=\"/docs/glossary#node-properties\">node properties</a>. Formerly
+  known as a bind program."
   full_description: ""
   see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
@@ -1207,6 +1211,25 @@
   of a hardware device."
   full_description: ""
   see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Node properties"
+  short_description: "Node properties are key-value pairs contained in
+  <a href=\"/docs/glossary#node\">nodes</a>. They are used by
+  <a href=\"/docs/glossary#bind-rules\">bind rules</a> to evaluate whether a
+  <a href=\"/docs/glossary#driver\">driver</a> is
+  <a href=\"/docs/glossary#driver-matching\">matched</a> to the node."
+  full_description: "Node properties are key-value pairs contained in
+  <a href=\"/docs/glossary#node\">nodes</a>. They are used by
+  <a href=\"/docs/glossary#bind-rules\">bind rules</a> to evaluate whether a
+  <a href=\"/docs/glossary#driver\">driver</a> is
+  <a href=\"/docs/glossary#driver-matching\">matched</a> to the node.The keys
+  can be of integer or string type. The values can be of integer, string, boolean,
+  or enum type."
+  see_also: [
+    "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>",
+    "<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
