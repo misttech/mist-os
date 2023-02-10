@@ -38,14 +38,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/bus/drivers/platform:platform-bus-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/bus/drivers/platform:platform-bus-unittest",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }
