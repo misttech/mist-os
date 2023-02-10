@@ -655,10 +655,8 @@ mod tests {
     #[::fuchsia::test]
     fn test_multiple_events() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let (client1, server1) =
-            zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
-        let (client2, server2) =
-            zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
+        let (client1, server1) = zx::Socket::create_stream();
+        let (client2, server2) = zx::Socket::create_stream();
         let pipe1 = create_fuchsia_pipe(&current_task, client1, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let pipe2 = create_fuchsia_pipe(&current_task, client2, OpenFlags::RDWR)

@@ -380,7 +380,7 @@ mod tests {
     fn test_vsock_poll() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let (client, server) = zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
+        let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
