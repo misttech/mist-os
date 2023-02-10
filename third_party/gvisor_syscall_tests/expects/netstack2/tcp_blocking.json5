@@ -1,0 +1,28 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // https://fxbug.dev/42692
+                "BlockingTCPSockets/BlockingStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // https://fxbug.dev/46211
+                // Deadlock? Test makes no progress even when run in isolation.
+                "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
+            ],
+        },
+    ],
+}
