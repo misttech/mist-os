@@ -38,9 +38,9 @@ declare_args() {
   # If set to 0, then no reservation partition will be added.
   fvm_reserved_slices = 0
 
-  # The following blobfs_* and minfs_* arguments are used to determine the
-  # initial dimensions of the blobfs and minfs partitions added to an FVM
-  # image. If they are unset, the sizes of the input blobfs/minfs images will
+  # The following blobfs_* arguments are used to determine the
+  # initial dimensions of the blobfs partition added to a FVM
+  # image. If they are unset, the sizes of the input blobfs image will
   # determine the dimensions of the respective partition within FVM.
   #
   # These dimensions cannot make a partition smaller than the image provided
@@ -63,8 +63,6 @@ declare_args() {
   # required for the filesystem.
   blobfs_board_minimum_data_bytes = false
   blobfs_product_minimum_data_bytes = false
-  minfs_board_minimum_data_bytes = false
-  minfs_product_minimum_data_bytes = false
 
   # In addition to reserving space for inodes and data, fs needs additional
   # space for maintaining some internal data structures. So the
@@ -76,10 +74,8 @@ declare_args() {
   # reserve few blocks required for its operations.
   blobfs_board_maximum_bytes = false
   blobfs_product_maximum_bytes = false
-  minfs_board_maximum_bytes = false
-  minfs_product_maximum_bytes = false
 
-  # End of variables for blobfs/minfs dimensions
+  # End of variables for blobfs dimensions
 
   # Specifying these variables will generate a NAND FVM image suitable for
   # directly flashing via fastboot. The NAND characteristics are required
