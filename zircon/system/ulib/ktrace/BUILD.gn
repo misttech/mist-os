@@ -12,7 +12,6 @@ zx_library("ktrace") {
     "//sdk/fidl/fuchsia.tracing.kernel:fuchsia.tracing.kernel_hlcpp",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/async",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]

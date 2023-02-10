@@ -13,7 +13,6 @@
 #include <lib/async-loop/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/fidl-async/bind.h>
 #include <lib/scsi/controller.h>
 #include <lib/sync/completion.h>
 #include <threads.h>

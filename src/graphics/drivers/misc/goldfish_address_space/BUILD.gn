@@ -28,7 +28,6 @@ common_deps = [
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
-  "//zircon/system/ulib/fidl-async",
   "//zircon/system/ulib/svc",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace",

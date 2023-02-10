@@ -14,7 +14,6 @@ zx_library("mock-boot-arguments") {
     "//sdk/lib/fidl",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }

@@ -19,7 +19,6 @@ executable("clkctl") {
     "//sdk/lib/fidl",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/zx",
   ]
 }

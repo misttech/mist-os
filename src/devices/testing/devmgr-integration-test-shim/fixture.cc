@@ -15,7 +15,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/fidl-async/bind.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/vfs/cpp/remote_dir.h>
 #include <stdint.h>

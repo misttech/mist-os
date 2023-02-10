@@ -18,33 +18,10 @@ zx_library("fidl-async") {
   # This library only supports the C bindings.
   # Consider using the new C++ FIDL bindings instead of the C bindings.
   visibility = [
+    ":fidl-async_cc_stub",
     "//build/sdk:sdk_versioned_source_sets",
-    "//sdk/lib/component/tests:*",
-    "//sdk/lib/fdio/tests:*",
-    "//sdk/lib/sys/component/cpp/tests:*",
-    "//sdk/lib/zxio/tests:*",
-    "//src/bringup/bin/console-launcher:*",
-    "//src/devices/bin/driver_host:*",
-    "//src/devices/bin/driver_manager:*",
-    "//src/devices/block/drivers/usb-mass-storage:*",
-    "//src/devices/clock/bin/clock:*",
-    "//src/devices/pwm/bin/pwmctl:*",
-    "//src/devices/serial/drivers/serial-async/tests:*",
-    "//src/devices/testing/devmgr-integration-test-shim:*",
-    "//src/devices/testing/driver-integration-test-shim:*",
-    "//src/devices/testing/fake_ddk:*",
-    "//src/graphics/drivers/misc/goldfish_address_space:*",
-    "//src/lib/fidl/c/walker_tests:*",
-    "//src/power/shutdown-shim:*",
-    "//src/storage/fshost:*",
-    "//zircon/system/ulib/c/test:*",
-    "//zircon/system/ulib/fidl-async:*",
-    "//zircon/system/ulib/fidl-utils:*",
-    "//zircon/system/ulib/kcounter:*",
-    "//zircon/system/ulib/kernel-debug:*",
-    "//zircon/system/ulib/ktrace:*",
-    "//zircon/system/ulib/mock-boot-arguments:*",
-    "//zircon/system/ulib/profile:*",
+    "//src/lib/fidl/c/walker_tests:test_sources",
+    "//zircon/system/ulib/fidl-utils",
   ]
 }
 

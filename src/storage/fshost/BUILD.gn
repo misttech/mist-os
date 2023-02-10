@@ -217,7 +217,6 @@ test("fshost_test") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fit-promise",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/mock-boot-arguments",
   ]
@@ -325,7 +324,6 @@ template("fshost_integration_test") {
       "//src/storage/testing:storage_driver_test_support",
       "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_cpp_wire",
       "//third_party/googletest:gmock",
-      "//zircon/system/ulib/fidl-async",
     ]
     data_deps = [
       "//src/storage/bin/mount",
@@ -451,7 +449,6 @@ test("disk-migration-test") {
     "//src/storage/lib/utils:topological_path",
     "//src/storage/minfs",
     "//src/storage/testing:storage_driver_test_support",
-    "//zircon/system/ulib/fidl-async",
   ]
   defines = [
     "DATA_FILESYSTEM_FORMAT=\"$data_filesystem_format\"",

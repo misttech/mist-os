@@ -17,7 +17,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
-#include <lib/fidl-async/bind.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/coding.h>
 #include <lib/fidl/cpp/wire/arena.h>
