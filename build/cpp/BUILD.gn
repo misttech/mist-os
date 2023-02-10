@@ -97,16 +97,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-
-    #------------------
-    #------------------
-
-    #------------------
-    #------------------
-    "//src/devices/ram/drivers/aml-ram:aml-ram-test-bin",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }
