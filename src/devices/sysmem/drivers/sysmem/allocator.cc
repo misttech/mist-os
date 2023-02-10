@@ -40,9 +40,9 @@ void Allocator::CreateChannelOwnedV2(zx::channel request, Device* device) {
                    std::move(v2_server));
 }
 
-template <typename Completer>
-fit::result<std::monostate, std::pair<zx::channel, zx::channel>>
-Allocator::CommonAllocateNonSharedCollection(Completer& completer) {
+template <typename Completer, typename Protocol>
+fit::result<std::monostate, fidl::Endpoints<Protocol>> Allocator::CommonAllocateNonSharedCollection(
+    Completer& completer) {
   // The AllocateCollection() message skips past the token stage because the
   // client is also the only participant (probably a temp/test client).  Real
   // clients are encouraged to use AllocateSharedCollection() instead, so that
@@ -58,24 +58,22 @@ Allocator::CommonAllocateNonSharedCollection(Completer& completer) {
   // and can share this code instead.
 
   // Create a local token.
-  zx::channel token_client;
-  zx::channel token_server;
-  zx_status_t status = zx::channel::create(0, &token_client, &token_server);
-  if (status != ZX_OK) {
+  zx::result endpoints = fidl::CreateEndpoints<Protocol>();
+  if (endpoints.is_error()) {
     LogError(FROM_HERE,
              "Allocator::AllocateCollection() zx::channel::create() failed "
              "- status: %d",
-             status);
+             endpoints.error_value());
     // ~buffer_collection_request
     //
     // Returning an error here causes the sysmem connection to drop also,
     // which seems like a good idea (more likely to recover overall) given
     // the nature of the error.
-    completer.Close(status);
+    completer.Close(endpoints.error_value());
     return fit::error(std::monostate{});
   }
 
-  return fit::success(std::make_pair(std::move(token_client), std::move(token_server)));
+  return fit::success(std::move(endpoints.value()));
 }
 
 void Allocator::V1::AllocateNonSharedCollection(
@@ -83,19 +81,20 @@ void Allocator::V1::AllocateNonSharedCollection(
     AllocateNonSharedCollectionCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Allocator::AllocateNonSharedCollection");
 
-  auto result = allocator_->CommonAllocateNonSharedCollection(completer);
-  if (!result.is_ok()) {
+  fit::result endpoints = allocator_->CommonAllocateNonSharedCollection<
+      decltype(completer), fuchsia_sysmem::BufferCollectionToken>(completer);
+  if (!endpoints.is_ok()) {
     return;
   }
-  auto endpoints = std::move(result.value());
-  auto& [token_client, token_server] = endpoints;
+  auto& [token_client, token_server] = endpoints.value();
 
   // The server end of the local token goes to Create(), and the client end
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV1(std::move(token_server), allocator_->parent_device_);
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, std::move(token_client), std::move(request.collection_request()),
+      allocator_->parent_device_, token_client.TakeChannel(),
+      std::move(request.collection_request()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
   // Now the client can SetConstraints() on the BufferCollection, etc.  The
@@ -115,19 +114,19 @@ void Allocator::V2::AllocateNonSharedCollection(
     return;
   }
 
-  auto result = allocator_->CommonAllocateNonSharedCollection(completer);
-  if (!result.is_ok()) {
+  fit::result endpoints = allocator_->CommonAllocateNonSharedCollection<
+      decltype(completer), fuchsia_sysmem2::BufferCollectionToken>(completer);
+  if (!endpoints.is_ok()) {
     return;
   }
-  auto endpoints = std::move(result.value());
-  auto [token_client, token_server] = std::move(endpoints);
+  auto& [token_client, token_server] = endpoints.value();
 
   // The server end of the local token goes to Create(), and the client end
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV2(std::move(token_server), allocator_->parent_device_);
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, std::move(token_client),
+      allocator_->parent_device_, token_client.TakeChannel(),
       std::move(request.collection_request().value()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
@@ -152,8 +151,7 @@ void Allocator::V1::AllocateSharedCollection(AllocateSharedCollectionRequest& re
   // go ahead and allocate the LogicalBufferCollection here since the
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
-  LogicalBufferCollection::CreateV1(request.token_request().TakeChannel(),
-                                    allocator_->parent_device_);
+  LogicalBufferCollection::CreateV1(std::move(request.token_request()), allocator_->parent_device_);
 }
 
 void Allocator::V2::AllocateSharedCollection(AllocateSharedCollectionRequest& request,
@@ -177,7 +175,7 @@ void Allocator::V2::AllocateSharedCollection(AllocateSharedCollectionRequest& re
   // go ahead and allocate the LogicalBufferCollection here since the
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
-  LogicalBufferCollection::CreateV2(request.token_request()->TakeChannel(),
+  LogicalBufferCollection::CreateV2(std::move(request.token_request().value()),
                                     allocator_->parent_device_);
 }
 

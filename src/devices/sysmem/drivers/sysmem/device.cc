@@ -86,7 +86,7 @@ fuchsia_sysmem2::HeapProperties BuildHeapPropertiesWithCoherencyDomainSupport(
 
 class SystemRamMemoryAllocator : public MemoryAllocator {
  public:
-  SystemRamMemoryAllocator(Owner* parent_device)
+  explicit SystemRamMemoryAllocator(Owner* parent_device)
       : MemoryAllocator(BuildHeapPropertiesWithCoherencyDomainSupport(
             true /*cpu*/, true /*ram*/, true /*inaccessible*/,
             // Zircon guarantees created VMO are filled with 0; sysmem doesn't
@@ -114,7 +114,7 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
     return ZX_OK;
   }
 
-  virtual void Delete(zx::vmo parent_vmo) override {
+  void Delete(zx::vmo parent_vmo) override {
     // ~parent_vmo
   }
   // Since this allocator only allocates independent VMOs, it's fine to orphan those VMOs from the
@@ -179,9 +179,8 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
     *parent_vmo = std::move(result_parent_vmo);
     return ZX_OK;
   }
-  virtual zx_status_t SetupChildVmo(
-      const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-      fuchsia_sysmem2::SingleBufferSettings buffer_settings) override {
+  zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
+                            fuchsia_sysmem2::SingleBufferSettings buffer_settings) override {
     // nothing to do here
     return ZX_OK;
   }
@@ -264,7 +263,8 @@ zx::result<bool> Device::GetBoolFromCommandLine(const char* name, bool default_v
   std::transform(str.begin(), str.end(), str.begin(), ::tolower);
   if (str == "true" || str == "1") {
     return zx::ok(true);
-  } else if (str == "false" || str == "0") {
+  }
+  if (str == "false" || str == "0") {
     return zx::ok(false);
   }
   return zx::error(ZX_ERR_INVALID_ARGS);
@@ -420,8 +420,7 @@ void Device::SecureMemControl::AddProtectedRange(const protected_ranges::Range& 
   fidl::Arena arena;
   auto wire_secure_heap_and_range = fidl::ToWire(arena, std::move(secure_heap_and_range));
   auto result =
-      fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(parent->secure_mem_->channel()))
-          ->AddSecureHeapPhysicalRange(std::move(wire_secure_heap_and_range));
+      parent->secure_mem_->channel()->AddSecureHeapPhysicalRange(wire_secure_heap_and_range);
   // If we lose the ability to control protected memory ranges ... reboot.
   ZX_ASSERT(result.ok());
   if (result->is_error()) {
@@ -443,8 +442,7 @@ void Device::SecureMemControl::DelProtectedRange(const protected_ranges::Range& 
   fidl::Arena arena;
   auto wire_secure_heap_and_range = fidl::ToWire(arena, std::move(secure_heap_and_range));
   auto result =
-      fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(parent->secure_mem_->channel()))
-          ->DeleteSecureHeapPhysicalRange(std::move(wire_secure_heap_and_range));
+      parent->secure_mem_->channel()->DeleteSecureHeapPhysicalRange(wire_secure_heap_and_range);
   // If we lose the ability to control protected memory ranges ... reboot.
   ZX_ASSERT(result.ok());
   if (result->is_error()) {
@@ -478,9 +476,7 @@ void Device::SecureMemControl::ModProtectedRange(const protected_ranges::Range& 
   modification.new_range().emplace(std::move(range_new));
   fidl::Arena arena;
   auto wire_modification = fidl::ToWire(arena, std::move(modification));
-  auto result =
-      fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(parent->secure_mem_->channel()))
-          ->ModifySecureHeapPhysicalRange(std::move(wire_modification));
+  auto result = parent->secure_mem_->channel()->ModifySecureHeapPhysicalRange(wire_modification);
   // If we lose the ability to control protected memory ranges ... reboot.
   ZX_ASSERT(result.ok());
   if (result->is_error()) {
@@ -502,9 +498,8 @@ void Device::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_expl
   secure_heap_and_range.range().emplace(std::move(secure_heap_range));
   fidl::Arena arena;
   auto wire_secure_heap_and_range = fidl::ToWire(arena, std::move(secure_heap_and_range));
-  auto result =
-      fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(parent->secure_mem_->channel()))
-          ->ZeroSubRange(is_covering_range_explicit, std::move(wire_secure_heap_and_range));
+  auto result = parent->secure_mem_->channel()->ZeroSubRange(is_covering_range_explicit,
+                                                             wire_secure_heap_and_range);
   // If we lose the ability to control protected memory ranges ... reboot.
   ZX_ASSERT(result.ok());
   if (result->is_error()) {
@@ -731,7 +726,8 @@ zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
                          });
 }
 
-zx_status_t Device::CommonSysmemRegisterHeap(uint64_t heap_param, zx::channel heap_connection) {
+zx_status_t Device::CommonSysmemRegisterHeap(
+    uint64_t heap_param, fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_connection) {
   // External heaps should not have bit 63 set but bit 60 must be set.
   if ((heap_param & 0x8000000000000000) || !(heap_param & 0x1000000000000000)) {
     DRIVER_ERROR("Invalid external heap");
@@ -795,7 +791,8 @@ zx_status_t Device::CommonSysmemRegisterHeap(uint64_t heap_param, zx::channel he
                          });
 }
 
-zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connection) {
+zx_status_t Device::CommonSysmemRegisterSecureMem(
+    fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection) {
   LOG(DEBUG, "sysmem RegisterSecureMem begin");
 
   current_close_is_abort_ = std::make_shared<std::atomic_bool>(true);
@@ -810,7 +807,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
         // 2) It modifies member variables like |secure_mem_| and |heaps_| that should only be
         // touched on |loop_|'s thread.
         auto wait_for_close = std::make_unique<async::Wait>(
-            secure_mem_connection.get(), ZX_CHANNEL_PEER_CLOSED, 0,
+            secure_mem_connection.channel().get(), ZX_CHANNEL_PEER_CLOSED, 0,
             async::Wait::Handler([this, close_is_abort](async_dispatcher_t* dispatcher,
                                                         async::Wait* wait, zx_status_t status,
                                                         const zx_packet_signal_t* signal) {
@@ -868,8 +865,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
           fidl::Arena arena;
           auto wire_whole_heap = fidl::ToWire(arena, std::move(whole_heap));
           auto get_properties_result =
-              fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(secure_mem_->channel()))
-                  ->GetPhysicalSecureHeapProperties(std::move(wire_whole_heap));
+              secure_mem_->channel()->GetPhysicalSecureHeapProperties(wire_whole_heap);
           if (!get_properties_result.ok()) {
             ZX_ASSERT(!*close_is_abort);
             return;
@@ -883,7 +879,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
           }
           ZX_ASSERT(get_properties_result->is_ok());
           const fuchsia_sysmem::SecureHeapProperties& properties =
-              fidl::ToNatural(std::move(get_properties_result->value()->properties));
+              fidl::ToNatural(get_properties_result->value()->properties);
           ZX_ASSERT(properties.heap().has_value());
           ZX_ASSERT(properties.heap().value() ==
                     safe_cast<fuchsia_sysmem::HeapType>(sysmem::fidl_underlying_cast(heap_type)));
@@ -898,13 +894,11 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
           control.max_range_count = properties.max_protected_range_count().value();
           control.range_granularity = properties.protected_range_granularity().value();
           control.has_mod_protected_range = properties.is_mod_protected_range_available().value();
-          secure_mem_controls_.emplace(std::make_pair<>(heap_type, std::move(control)));
+          secure_mem_controls_.emplace(heap_type, std::move(control));
         }
 
         // Now we get the secure heaps that are configured via the TEE.
-        auto get_result =
-            fidl::WireCall<fuchsia_sysmem::SecureMem>(zx::unowned_channel(secure_mem_->channel()))
-                ->GetPhysicalSecureHeaps();
+        auto get_result = secure_mem_->channel()->GetPhysicalSecureHeaps();
         if (!get_result.ok()) {
           // For now this is fatal unless explicitly unregistered, since this case is very
           // unexpected, and in this case rebooting is the most plausible way to get back to a
@@ -920,13 +914,10 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
         }
         ZX_ASSERT(get_result->is_ok());
         const fuchsia_sysmem::SecureHeapsAndRanges& tee_configured_heaps =
-            fidl::ToNatural(std::move(get_result->value()->heaps));
+            fidl::ToNatural(get_result->value()->heaps);
         ZX_ASSERT(tee_configured_heaps.heaps().has_value());
         ZX_ASSERT(tee_configured_heaps.heaps()->size() != 0);
-        for (uint32_t heap_index = 0; heap_index < tee_configured_heaps.heaps()->size();
-             ++heap_index) {
-          const fuchsia_sysmem::SecureHeapAndRanges& heap =
-              tee_configured_heaps.heaps()->at(heap_index);
+        for (const auto& heap : *tee_configured_heaps.heaps()) {
           ZX_ASSERT(heap.heap().has_value());
           ZX_ASSERT(heap.ranges().has_value());
           // A tee-configured heap with multiple ranges can be specified by the protocol but is not
@@ -962,7 +953,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connect
           control.max_range_count = 0;
           control.range_granularity = 0;
           control.has_mod_protected_range = false;
-          secure_mem_controls_.emplace(std::make_pair<>(heap_type, std::move(control)));
+          secure_mem_controls_.emplace(heap_type, std::move(control));
 
           ZX_ASSERT(secure_allocators_.find(heap_type) == secure_allocators_.end());
           secure_allocators_[heap_type] = secure_allocator.get();
@@ -1030,12 +1021,14 @@ zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
 
 zx_status_t Device::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
   WarnOfDeprecatedSysmemBanjo(true);
-  return CommonSysmemRegisterHeap(heap, std::move(heap_connection));
+  return CommonSysmemRegisterHeap(
+      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>{std::move(heap_connection)});
 }
 
 zx_status_t Device::SysmemRegisterSecureMem(zx::channel tee_connection) {
   WarnOfDeprecatedSysmemBanjo(true);
-  return CommonSysmemRegisterSecureMem(std::move(tee_connection));
+  return CommonSysmemRegisterSecureMem(
+      fidl::ClientEnd<fuchsia_sysmem::SecureMem>{std::move(tee_connection)});
 }
 
 zx_status_t Device::SysmemUnregisterSecureMem() {
@@ -1139,15 +1132,16 @@ const fuchsia_sysmem2::HeapProperties& Device::GetHeapProperties(
   return allocators_.at(heap)->heap_properties();
 }
 
-Device::SecureMemConnection::SecureMemConnection(zx::channel connection,
+Device::SecureMemConnection::SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
                                                  std::unique_ptr<async::Wait> wait_for_close)
-    : connection_(std::move(connection)), wait_for_close_(std::move(wait_for_close)) {
+    : connection_(std::move(channel)), wait_for_close_(std::move(wait_for_close)) {
   // nothing else to do here
 }
 
-zx_handle_t Device::SecureMemConnection::channel() {
+const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& Device::SecureMemConnection::channel()
+    const {
   ZX_DEBUG_ASSERT(connection_);
-  return connection_.get();
+  return connection_;
 }
 
 FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
@@ -1161,9 +1155,8 @@ FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device
 }
 
 zx_status_t FidlDevice::Bind() {
-  auto status = outgoing_.AddUnmanagedProtocol(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>);
+  auto status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_sysmem::Sysmem>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   if (status.is_error()) {
     zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
            status.status_string());
@@ -1244,7 +1237,7 @@ void FidlDevice::ConnectServerV2(ConnectServerV2Request& request,
 void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
                               RegisterHeapCompleter::Sync& completer) {
   zx_status_t status = sysmem_device_->CommonSysmemRegisterHeap(
-      request.heap(), request.heap_connection().TakeChannel());
+      request.heap(), std::move(request.heap_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
     return;
@@ -1254,7 +1247,7 @@ void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
 void FidlDevice::RegisterSecureMem(RegisterSecureMemRequest& request,
                                    RegisterSecureMemCompleter::Sync& completer) {
   zx_status_t status =
-      sysmem_device_->CommonSysmemRegisterSecureMem(request.secure_mem_connection().TakeChannel());
+      sysmem_device_->CommonSysmemRegisterSecureMem(std::move(request.secure_mem_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
     return;
@@ -1287,12 +1280,14 @@ zx_status_t BanjoDevice::SysmemConnect(zx::channel allocator_request) {
 
 zx_status_t BanjoDevice::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
   WarnOfDeprecatedSysmemBanjo(false);
-  return sysmem_device_->CommonSysmemRegisterHeap(heap, std::move(heap_connection));
+  return sysmem_device_->CommonSysmemRegisterHeap(
+      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>{std::move(heap_connection)});
 }
 
 zx_status_t BanjoDevice::SysmemRegisterSecureMem(zx::channel tee_connection) {
   WarnOfDeprecatedSysmemBanjo(false);
-  return sysmem_device_->CommonSysmemRegisterSecureMem(std::move(tee_connection));
+  return sysmem_device_->CommonSysmemRegisterSecureMem(
+      fidl::ClientEnd<fuchsia_sysmem::SecureMem>{std::move(tee_connection)});
 }
 
 zx_status_t BanjoDevice::SysmemUnregisterSecureMem() {

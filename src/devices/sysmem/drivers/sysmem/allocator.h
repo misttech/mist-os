@@ -69,9 +69,9 @@ class Allocator : public LoggingMixin {
 
   Allocator(Device* parent_device);
 
-  template <typename Completer>
-  fit::result<std::monostate, std::pair<zx::channel, zx::channel>>
-  CommonAllocateNonSharedCollection(Completer& completer);
+  template <typename Completer, typename Protocol>
+  fit::result<std::monostate, fidl::Endpoints<Protocol>> CommonAllocateNonSharedCollection(
+      Completer& completer);
 
   Device* parent_device_ = nullptr;
 

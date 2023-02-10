@@ -11,6 +11,6 @@ void LogError(const char* format, ...);
 
 void FlushLog(bool error);
 
-int MemoryPressureCommand(fxl::CommandLine command_line, bool sleep);
+int MemoryPressureCommand(const fxl::CommandLine& command_line, bool sleep);
 
 #endif  // SRC_DEVICES_SYSMEM_TOOLS_MEMORY_PRESSURE_H_

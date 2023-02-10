@@ -87,8 +87,10 @@ class Device final : public DdkDeviceType,
 
   [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
   [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(zx::channel tee_connection);
+  [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(
+      uint64_t heap, fidl::ClientEnd<fuchsia_sysmem2::Heap> heap_connection);
+  [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(
+      fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
   [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
 
   // SysmemProtocol "direct == true" Banjo implementation. This will be removed soon in favor of
@@ -195,11 +197,12 @@ class Device final : public DdkDeviceType,
  private:
   class SecureMemConnection {
    public:
-    SecureMemConnection(zx::channel connection, std::unique_ptr<async::Wait> wait_for_close);
-    zx_handle_t channel();
+    SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
+                        std::unique_ptr<async::Wait> wait_for_close);
+    const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& channel() const;
 
    private:
-    zx::channel connection_;
+    fidl::WireSyncClient<fuchsia_sysmem::SecureMem> connection_;
     std::unique_ptr<async::Wait> wait_for_close_;
   };
 

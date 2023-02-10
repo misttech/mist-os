@@ -203,7 +203,7 @@ class FakeDdkSysmem : public zxtest::Test {
     ddk::UnbindTxn txn{sysmem_->zxdev()};
     sysmem_->DdkUnbind(std::move(txn));
     EXPECT_OK(sysmem_->zxdev()->WaitUntilUnbindReplyCalled());
-    sysmem_.release();
+    std::ignore = sysmem_.release();
     loop_.Shutdown();
   }
 
@@ -257,15 +257,16 @@ TEST_F(FakeDdkSysmem, TearDownLoop) {
 
 // Test that creating and tearing down a SecureMem connection works correctly.
 TEST_F(FakeDdkSysmem, DummySecureMem) {
-  zx::channel securemem_server, securemem_client;
-  ASSERT_OK(zx::channel::create(0u, &securemem_server, &securemem_client));
-  EXPECT_EQ(ZX_OK, sysmem_->CommonSysmemRegisterSecureMem(std::move(securemem_server)));
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
+  ASSERT_OK(endpoints);
+  auto& [client, server] = endpoints.value();
+  ASSERT_OK(sysmem_->CommonSysmemRegisterSecureMem(std::move(client)));
 
   // This shouldn't deadlock waiting for a message on the channel.
-  EXPECT_EQ(ZX_OK, sysmem_->CommonSysmemUnregisterSecureMem());
+  EXPECT_OK(sysmem_->CommonSysmemUnregisterSecureMem());
 
   // This shouldn't cause a panic due to receiving peer closed.
-  securemem_client.reset();
+  client.reset();
 }
 
 TEST_F(FakeDdkSysmem, NamedToken) {

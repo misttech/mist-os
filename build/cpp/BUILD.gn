@@ -129,18 +129,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/sysmem/drivers/sysmem:sysmem-unittest-bin",
-
-    #------------------
-    #------------------
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
-
-    #------------------
-    #------------------
-    "//src/devices/sysmem/tools:common_srcs",
-
-    #------------------
-    #------------------
     "//src/devices/temperature/drivers/tmp112:tmp112-test-bin",
 
     #------------------

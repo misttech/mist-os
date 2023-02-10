@@ -425,7 +425,7 @@ fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(Devic
 }
 
 // static
-void LogicalBufferCollection::CreateV1(zx::channel buffer_collection_token_request,
+void LogicalBufferCollection::CreateV1(TokenServerEndV1 buffer_collection_token_request,
                                        Device* parent_device) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
       LogicalBufferCollection::CommonCreate(parent_device);
@@ -435,7 +435,7 @@ void LogicalBufferCollection::CreateV1(zx::channel buffer_collection_token_reque
 }
 
 // static
-void LogicalBufferCollection::CreateV2(zx::channel buffer_collection_token_request,
+void LogicalBufferCollection::CreateV2(TokenServerEndV2 buffer_collection_token_request,
                                        Device* parent_device) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
       LogicalBufferCollection::CommonCreate(parent_device);

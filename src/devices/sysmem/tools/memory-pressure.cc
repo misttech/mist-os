@@ -5,7 +5,7 @@
 #include "memory-pressure.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -30,7 +30,7 @@ void PrintHelp() {
   Log(" size_bytes       The size of the memory in bytes.\n");
 }
 
-int MemoryPressureCommand(fxl::CommandLine command_line, bool sleep) {
+int MemoryPressureCommand(const fxl::CommandLine& command_line, bool sleep) {
   if (command_line.HasOption("help")) {
     PrintHelp();
     return 0;
@@ -89,34 +89,55 @@ int MemoryPressureCommand(fxl::CommandLine command_line, bool sleep) {
   mem_constraints.inaccessible_domain_supported = true;
   mem_constraints.heap_permitted_count = 1;
   mem_constraints.heap_permitted[0] = heap;
-  zx::channel local_endpoint, server_endpoint;
-  zx::channel::create(0u, &local_endpoint, &server_endpoint);
-  fdio_service_connect("/svc/fuchsia.sysmem.Allocator", server_endpoint.release());
-  fidl::WireSyncClient<sysmem::Allocator> sysmem_allocator(std::move(local_endpoint));
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)sysmem_allocator->SetDebugClientInfo(
-      fidl::StringView::FromExternal(fsl::GetCurrentProcessName()), fsl::GetCurrentProcessKoid());
-
-  zx::channel client_collection_channel, server_collection;
-  zx::channel::create(0u, &client_collection_channel, &server_collection);
-
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)sysmem_allocator->AllocateNonSharedCollection(std::move(server_collection));
-  fidl::WireSyncClient<sysmem::BufferCollection> collection(std::move(client_collection_channel));
-
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)collection->SetName(1000000, "sysmem-memory-pressure");
-
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)collection->SetConstraints(true, std::move(constraints));
-
-  auto res = collection->WaitForBuffersAllocated();
-  if (!res.ok()) {
-    LogError("Lost connection to sysmem services, error %d\n", res.status());
+  zx::result client_end = component::Connect<sysmem::Allocator>();
+  if (client_end.is_error()) {
+    LogError("Failed to connect to sysmem services, error %d\n", client_end.status_value());
     return 1;
   }
-  if (res.value().status != ZX_OK) {
-    LogError("Allocation error %d\n", res.value().status);
+  fidl::WireSyncClient sysmem_allocator{std::move(client_end.value())};
+  if (const fidl::OneWayStatus status = sysmem_allocator->SetDebugClientInfo(
+          fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),
+          fsl::GetCurrentProcessKoid());
+      !status.ok()) {
+    LogError("Failed to set debug client info, error %d\n", status.status());
+    return 1;
+  };
+
+  zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
+  if (endpoints.is_error()) {
+    LogError("Failed to create buffer collection endpoints, error %d\n", endpoints.status_value());
+    return 1;
+  }
+  auto& [client_collection_channel, server_collection] = endpoints.value();
+
+  if (const fidl::OneWayStatus status =
+          sysmem_allocator->AllocateNonSharedCollection(std::move(server_collection));
+      !status.ok()) {
+    LogError("Failed to allocate collection, error %d\n", status.status());
+    return 1;
+  }
+  fidl::WireSyncClient collection(std::move(client_collection_channel));
+
+  if (const fidl::OneWayStatus status = collection->SetName(1000000, "sysmem-memory-pressure");
+      !status.ok()) {
+    LogError("Failed to set collection name, error %d\n", status.status());
+    return 1;
+  }
+
+  if (const fidl::OneWayStatus status = collection->SetConstraints(true, constraints);
+      !status.ok()) {
+    LogError("Failed to set collection constraints, error %d\n", status.status());
+    return 1;
+  }
+
+  const fidl::WireResult result = collection->WaitForBuffersAllocated();
+  if (!result.ok()) {
+    LogError("Lost connection to sysmem services, error %d\n", result.status());
+    return 1;
+  }
+  auto const& response = result.value();
+  if (response.status != ZX_OK) {
+    LogError("Allocation error %d\n", response.status);
     return 1;
   }
   Log("Allocated %ld bytes. Sleeping forever\n", size);

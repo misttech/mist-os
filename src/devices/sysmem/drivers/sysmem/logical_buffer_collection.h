@@ -54,8 +54,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   ~LogicalBufferCollection();
 
-  static void CreateV1(zx::channel buffer_collection_token_request, Device* parent_device);
-  static void CreateV2(zx::channel buffer_collection_token_request, Device* parent_device);
+  static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Device* parent_device);
+  static void CreateV2(TokenServerEndV2 buffer_collection_token_request, Device* parent_device);
 
   // |parent_device| the Device* that the calling allocator is part of.  The
   // tokens_by_koid_ for each Device is separate.  If somehow two clients were
@@ -198,7 +198,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     std::string name;
   };
 
-  LogicalBufferCollection(Device* parent_device);
+  explicit LogicalBufferCollection(Device* parent_device);
 
   // Will log an error, and then FailRoot().
   void LogAndFailRootNode(Location location, zx_status_t epitaph, const char* format, ...)
@@ -243,7 +243,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   void ResetGroupChildSelection(std::vector<NodeProperties*>& groups_by_priority);
   void InitGroupChildSelection(std::vector<NodeProperties*>& groups_by_priority);
   void NextGroupChildSelection(std::vector<NodeProperties*> groups_by_priority);
-  bool DoneWithGroupChildSelections(const std::vector<NodeProperties*> groups_by_priority);
+  bool DoneWithGroupChildSelections(std::vector<NodeProperties*> groups_by_priority);
 
   // The caller must keep "this" alive.  We require this of the caller since the caller is fairly
   // likely to want to keep "this" alive longer than MaybeAllocate() could anyway.
