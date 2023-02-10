@@ -19,10 +19,7 @@ var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{3, 4}:  Pass,
 	{3, 5}:  Pass,
 	// TODO(https://fxbug.dev/104720): Investigate flake.
-	// TODO(https://fxbug.dev/120281): Run the IGMPv3 suite instead.
-	// Note that if https://fxbug.dev/104720 recurs in the v3 suite, it
-	// should be marked Flaky, otherwise marked Pass.
-	{3, 6}: Fail,
+	{3, 6}: Flaky,
 	{3, 7}: Pass,
 	{5, 1}: Pass,
 	{5, 2}: Pass,
