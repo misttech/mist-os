@@ -62,7 +62,7 @@ typedef volatile struct {
   uint32_t token_rdata_1;
 } __PACKED aml_i2c_regs_t;
 
-typedef enum {
+typedef enum : uint64_t {
   TOKEN_END,
   TOKEN_START,
   TOKEN_SLAVE_ADDR_WR,
@@ -99,11 +99,11 @@ static zx_status_t aml_i2c_set_slave_addr(aml_i2c_dev_t* dev, uint16_t addr) {
 }
 
 static int aml_i2c_irq_thread(void* arg) {
-  aml_i2c_dev_t* dev = arg;
+  auto* dev = reinterpret_cast<aml_i2c_dev_t*>(arg);
   zx_status_t status;
 
   while (1) {
-    status = zx_interrupt_wait(dev->irq, NULL);
+    status = zx_interrupt_wait(dev->irq, nullptr);
     if (status == ZX_ERR_CANCELED) {
       break;
     }
@@ -175,18 +175,18 @@ static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32
   uint32_t token_num = 0;
   uint64_t token_reg = 0;
 
-  token_reg |= (uint64_t)TOKEN_START << (4 * (token_num++));
-  token_reg |= (uint64_t)TOKEN_SLAVE_ADDR_WR << (4 * (token_num++));
+  token_reg |= TOKEN_START << (4 * (token_num++));
+  token_reg |= TOKEN_SLAVE_ADDR_WR << (4 * (token_num++));
 
   while (len > 0) {
     bool is_last_iter = len <= 8;
     uint32_t tx_size = is_last_iter ? len : 8;
     for (uint32_t i = 0; i < tx_size; i++) {
-      token_reg |= (uint64_t)TOKEN_DATA << (4 * (token_num++));
+      token_reg |= TOKEN_DATA << (4 * (token_num++));
     }
 
     if (is_last_iter && stop) {
-      token_reg |= (uint64_t)TOKEN_STOP << (4 * (token_num++));
+      token_reg |= TOKEN_STOP << (4 * (token_num++));
     }
 
     MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_0);
@@ -195,7 +195,7 @@ static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32
 
     uint64_t wdata = 0;
     for (uint32_t i = 0; i < tx_size; i++) {
-      wdata |= (uint64_t)buff[i] << (8 * i);
+      wdata |= static_cast<uint64_t>(buff[i]) << (8 * i);
     }
 
     MmioWrite32(wdata & 0xffffffff, &dev->virt_regs->token_wdata_0);
@@ -223,23 +223,23 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
   uint32_t token_num = 0;
   uint64_t token_reg = 0;
 
-  token_reg |= (uint64_t)TOKEN_START << (4 * (token_num++));
-  token_reg |= (uint64_t)TOKEN_SLAVE_ADDR_RD << (4 * (token_num++));
+  token_reg |= TOKEN_START << (4 * (token_num++));
+  token_reg |= TOKEN_SLAVE_ADDR_RD << (4 * (token_num++));
 
   while (len > 0) {
     bool is_last_iter = len <= 8;
     uint32_t rx_size = is_last_iter ? len : 8;
 
     for (uint32_t i = 0; i < (rx_size - 1); i++) {
-      token_reg |= (uint64_t)TOKEN_DATA << (4 * (token_num++));
+      token_reg |= TOKEN_DATA << (4 * (token_num++));
     }
     if (is_last_iter) {
-      token_reg |= (uint64_t)TOKEN_DATA_LAST << (4 * (token_num++));
+      token_reg |= TOKEN_DATA_LAST << (4 * (token_num++));
       if (stop) {
-        token_reg |= (uint64_t)TOKEN_STOP << (4 * (token_num++));
+        token_reg |= TOKEN_STOP << (4 * (token_num++));
       }
     } else {
-      token_reg |= (uint64_t)TOKEN_DATA << (4 * (token_num++));
+      token_reg |= TOKEN_DATA << (4 * (token_num++));
     }
 
     MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_0);
@@ -261,10 +261,10 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
 
     uint64_t rdata;
     rdata = MmioRead32(&dev->virt_regs->token_rdata_0);
-    rdata |= ((uint64_t)MmioRead32(&dev->virt_regs->token_rdata_1)) << 32;
+    rdata |= static_cast<uint64_t>(MmioRead32(&dev->virt_regs->token_rdata_1)) << 32;
 
     for (uint32_t i = 0; i < len; i++, rdata >>= 8) {
-      buff[i] = (uint8_t)(rdata & 0xff);
+      buff[i] = rdata & 0xff;
     }
 
     len -= rx_size;
@@ -279,8 +279,7 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
 /* create instance of aml_i2c_t and do basic initialization.  There will
 be one of these instances for each of the soc i2c ports.
 */
-static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index,
-                                    struct aml_i2c_delay_values delay) {
+static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index, aml_i2c_delay_values delay) {
   aml_i2c_dev_t* device = &i2c->i2c_devs[index];
 
   device->timeout = ZX_SEC(1);
@@ -294,7 +293,7 @@ static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index,
     return status;
   }
 
-  device->virt_regs = (MMIO_PTR aml_i2c_regs_t*)device->regs_iobuff.vaddr;
+  device->virt_regs = reinterpret_cast<MMIO_PTR aml_i2c_regs_t*>(device->regs_iobuff.vaddr);
 
   if (delay.quarter_clock_delay > AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX ||
       delay.clock_low_delay > AML_I2C_SLAVE_ADDR_REG_SCL_LOW_DELAY_MAX) {
@@ -353,7 +352,7 @@ static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index,
 }
 
 static uint32_t aml_i2c_get_bus_count(void* ctx) {
-  aml_i2c_t* i2c = ctx;
+  auto* i2c = reinterpret_cast<aml_i2c_t*>(ctx);
 
   return i2c->dev_count;
 }
@@ -379,7 +378,7 @@ static zx_status_t aml_i2c_transact(void* ctx, uint32_t bus_id, const i2c_impl_o
       return ZX_ERR_OUT_OF_RANGE;
     }
   }
-  aml_i2c_t* i2c = ctx;
+  auto* i2c = reinterpret_cast<aml_i2c_t*>(ctx);
   if (bus_id >= i2c->dev_count) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -392,9 +391,11 @@ static zx_status_t aml_i2c_transact(void* ctx, uint32_t bus_id, const i2c_impl_o
       return status;
     }
     if (rws[i].is_read) {
-      status = aml_i2c_read(dev, rws[i].data_buffer, (uint32_t)rws[i].data_size, rws[i].stop);
+      status = aml_i2c_read(dev, rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size),
+                            rws[i].stop);
     } else {
-      status = aml_i2c_write(dev, rws[i].data_buffer, (uint32_t)rws[i].data_size, rws[i].stop);
+      status = aml_i2c_write(dev, rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size),
+                             rws[i].stop);
     }
     if (status != ZX_OK) {
       return status;  // TODO(andresoportus) release the bus
@@ -413,7 +414,7 @@ static i2c_impl_protocol_ops_t i2c_ops = {
 };
 
 static void aml_i2c_release(void* ctx) {
-  aml_i2c_t* i2c = ctx;
+  auto* i2c = reinterpret_cast<aml_i2c_t*>(ctx);
   for (unsigned i = 0; i < i2c->dev_count; i++) {
     aml_i2c_dev_t* device = &i2c->i2c_devs[i];
 
@@ -438,9 +439,9 @@ static zx_protocol_device_t i2c_device_proto = {
 zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
-  struct aml_i2c_delay_values* clock_delays = NULL;
+  aml_i2c_delay_values* clock_delays = nullptr;
 
-  aml_i2c_t* i2c = calloc(1, sizeof(aml_i2c_t));
+  auto* i2c = reinterpret_cast<aml_i2c_t*>(calloc(1, sizeof(aml_i2c_t)));
   if (!i2c) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -477,14 +478,15 @@ zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
     goto fail;
   }
 
-  i2c->i2c_devs = calloc(info.mmio_count, sizeof(aml_i2c_dev_t));
+  i2c->i2c_devs = reinterpret_cast<aml_i2c_dev_t*>(calloc(info.mmio_count, sizeof(aml_i2c_dev_t)));
   if (!i2c->i2c_devs) {
     goto fail;
   }
-  i2c->dev_count = (uint32_t)info.mmio_count;
+  i2c->dev_count = info.mmio_count;
 
   if (metadata_size > 0) {
-    clock_delays = calloc(info.mmio_count, sizeof(clock_delays[0]));
+    clock_delays =
+        reinterpret_cast<aml_i2c_delay_values*>(calloc(info.mmio_count, sizeof(clock_delays[0])));
     if (!clock_delays) {
       status = ZX_ERR_NO_MEMORY;
       goto fail;
@@ -505,8 +507,8 @@ zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
   }
 
   for (unsigned i = 0; i < i2c->dev_count; i++) {
-    zx_status_t status = aml_i2c_dev_init(
-        i2c, i, metadata_size > 0 ? clock_delays[i] : (struct aml_i2c_delay_values){0, 0});
+    zx_status_t status =
+        aml_i2c_dev_init(i2c, i, metadata_size > 0 ? clock_delays[i] : aml_i2c_delay_values{0, 0});
     if (status != ZX_OK) {
       zxlogf(ERROR, "aml_i2c_bind: aml_i2c_dev_init failed: %d", status);
       goto fail;
@@ -514,9 +516,10 @@ zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
   }
 
   free(clock_delays);
-  clock_delays = NULL;
+  clock_delays = nullptr;
 
-  device_add_args_t args = {
+  device_add_args_t args;
+  args = {
       .version = DEVICE_ADD_ARGS_VERSION,
       .name = "aml-i2c",
       .ctx = i2c,

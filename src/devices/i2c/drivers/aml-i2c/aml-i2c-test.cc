@@ -23,9 +23,7 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
-extern "C" {
 zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent);
-}
 
 namespace aml_i2c {
 
