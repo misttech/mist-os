@@ -22,7 +22,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl-async/cpp/bind.h>
 #endif  // __Fuchsia__
 
 #include <fbl/unique_fd.h>

@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>

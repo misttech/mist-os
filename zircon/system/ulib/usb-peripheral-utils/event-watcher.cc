@@ -10,6 +10,13 @@
 
 namespace usb_peripheral_utils {
 
+EventWatcher::EventWatcher(async::Loop* loop,
+                           fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Events> svc,
+                           size_t functions)
+    : loop_(loop), functions_(functions) {
+  fidl::BindSingleInFlightOnly(loop->dispatcher(), std::move(svc), this);
+}
+
 void EventWatcher::FunctionRegistered(FunctionRegisteredCompleter::Sync& completer) {
   functions_registered_++;
   if (all_functions_registered()) {

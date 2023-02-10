@@ -12,7 +12,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fastboot/fastboot.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/status.h>
 
 #include <optional>

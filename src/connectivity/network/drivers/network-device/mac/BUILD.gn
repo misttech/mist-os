@@ -19,7 +19,6 @@ ddk_source_split("mac") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 

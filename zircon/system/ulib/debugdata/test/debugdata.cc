@@ -10,7 +10,6 @@
 #include <lib/debugdata/debugdata.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>

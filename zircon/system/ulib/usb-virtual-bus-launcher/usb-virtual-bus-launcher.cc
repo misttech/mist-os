@@ -12,7 +12,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/watcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/usb-peripheral-utils/event-watcher.h>
 #include <lib/usb-virtual-bus-launcher-helper/usb-virtual-bus-launcher-helper.h>
 #include <lib/zx/channel.h>

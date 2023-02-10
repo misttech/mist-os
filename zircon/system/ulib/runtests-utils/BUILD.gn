@@ -49,7 +49,6 @@ zx_library("runtests-utils") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

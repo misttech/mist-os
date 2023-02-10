@@ -7,7 +7,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/ddk/device.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <set>
 

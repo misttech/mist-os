@@ -6,7 +6,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>

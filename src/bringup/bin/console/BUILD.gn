@@ -44,7 +44,6 @@ source_set("common") {
     "//src/lib/fxl",
     "//zircon/system/ulib/cmdline",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 
@@ -56,7 +55,6 @@ executable("console") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 

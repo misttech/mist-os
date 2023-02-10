@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>

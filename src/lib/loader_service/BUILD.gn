@@ -24,7 +24,6 @@ source_set("loader_service") {
     "//sdk/lib/fidl",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 

@@ -47,7 +47,6 @@ ddk_source_split("device") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/backtrace-request",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",

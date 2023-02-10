@@ -4,7 +4,6 @@
 
 #include "system_state_manager.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/status.h>
 
 #include "coordinator.h"

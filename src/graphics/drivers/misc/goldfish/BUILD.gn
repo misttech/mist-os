@@ -49,7 +49,8 @@ fuchsia_driver("goldfish_driver-driver") {
     "pipe_device.h",
   ]
 
-  deps = common_deps
+  deps = common_deps + [ "//zircon/system/ulib/fidl-async:fidl-async-cpp" ]
+
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   configs += [ "//build/config:all_source" ]

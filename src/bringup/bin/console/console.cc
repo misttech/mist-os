@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/vfs.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
 #include <stdlib.h>

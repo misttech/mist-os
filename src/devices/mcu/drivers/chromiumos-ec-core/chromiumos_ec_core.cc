@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.google.ec/cpp/wire_types.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/ddk/debug.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <zircon/errors.h>
 

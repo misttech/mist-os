@@ -42,7 +42,6 @@ source_set("common_srcs") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mipi-dsi",
     "//zircon/system/ulib/sync",
@@ -70,7 +69,6 @@ test("dsi-dw-test") {
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

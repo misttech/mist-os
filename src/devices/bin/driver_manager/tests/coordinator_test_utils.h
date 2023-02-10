@@ -12,7 +12,6 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/coding.h>
 #include <lib/fidl/cpp/message.h>
 #include <lib/fidl/cpp/wire/string_view.h>

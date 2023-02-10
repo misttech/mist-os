@@ -7,13 +7,12 @@
 #include "src/sys/appmgr/startup_service.h"
 
 #include <fuchsia/appmgr/cpp/fidl.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/binding_set.h>
 
 #include "src/sys/appmgr/appmgr.h"
 
 zx_status_t StartupServiceImpl::Bind(async_dispatcher_t* dispatcher,
-                                       fidl::InterfaceRequest<fuchsia::appmgr::Startup> req) {
+                                     fidl::InterfaceRequest<fuchsia::appmgr::Startup> req) {
   bindings_.AddBinding(this, std::move(req), dispatcher, nullptr);
   return ZX_OK;
 }

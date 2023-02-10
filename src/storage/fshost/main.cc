@@ -14,7 +14,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fdio/watcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>

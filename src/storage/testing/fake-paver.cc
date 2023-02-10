@@ -4,6 +4,7 @@
 
 #include "fake-paver.h"
 
+#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fzl/vmo-mapper.h>
 
 namespace paver_test {

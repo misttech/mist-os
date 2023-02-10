@@ -12,7 +12,6 @@
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <threads.h>

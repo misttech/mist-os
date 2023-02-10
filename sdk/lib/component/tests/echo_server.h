@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef LIB_COMPONENT_TESTS_ECHO_SERVER_H_
+#define LIB_COMPONENT_TESTS_ECHO_SERVER_H_
+
 #include <fidl/fidl.service.test/cpp/wire.h>
 #include <fidl/fidl.service.test/cpp/wire_test_base.h>
+#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 using Echo = fidl_service_test::Echo;
@@ -11,7 +15,7 @@ using EchoService = fidl_service_test::EchoService;
 
 class EchoCommon : public fidl::WireServer<Echo> {
  public:
-  EchoCommon(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  explicit EchoCommon(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   explicit EchoCommon(const char* prefix, async_dispatcher_t* dispatcher)
       : prefix_(prefix), dispatcher_(dispatcher) {}
@@ -21,8 +25,7 @@ class EchoCommon : public fidl::WireServer<Echo> {
   }
 
   void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
-    zx_status_t status = fidl::BindSingleInFlightOnly(
-        dispatcher_, fidl::ServerEnd<Echo>(request->request.TakeChannel()), this);
+    zx_status_t status = Connect(fidl::ServerEnd<Echo>(request->request.TakeChannel()));
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to bind request: %s", zx_status_get_string(status));
   }
 
@@ -44,3 +47,5 @@ class EchoCommon : public fidl::WireServer<Echo> {
   async_dispatcher_t* dispatcher_;
   fidl::ServerBindingGroup<Echo> bindings_;
 };
+
+#endif  // LIB_COMPONENT_TESTS_ECHO_SERVER_H_

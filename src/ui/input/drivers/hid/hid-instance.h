@@ -13,7 +13,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <array>
 #include <list>

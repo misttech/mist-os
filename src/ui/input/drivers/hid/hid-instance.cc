@@ -10,6 +10,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fidl-async/cpp/bind.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/assert.h>

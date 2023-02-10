@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <threads.h>

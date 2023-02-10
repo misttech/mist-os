@@ -8,7 +8,6 @@
 // clang-format off
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/trace/event.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>

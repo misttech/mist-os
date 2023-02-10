@@ -7,19 +7,14 @@
 
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/types.h>
 
 namespace usb_peripheral_utils {
 
 class __EXPORT EventWatcher : public fidl::WireServer<fuchsia_hardware_usb_peripheral::Events> {
  public:
-  explicit EventWatcher(async::Loop* loop,
-                        fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Events> svc,
-                        size_t functions)
-      : loop_(loop), functions_(functions) {
-    fidl::BindSingleInFlightOnly(loop->dispatcher(), std::move(svc), this);
-  }
+  EventWatcher(async::Loop* loop, fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Events> svc,
+               size_t functions);
 
   void FunctionRegistered(FunctionRegisteredCompleter::Sync& completer) override;
   void FunctionsCleared(FunctionsClearedCompleter::Sync& completer) override;

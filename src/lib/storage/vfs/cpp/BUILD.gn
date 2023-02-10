@@ -97,7 +97,6 @@ static_library("cpp") {
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
       "//sdk/lib/file-lock:cpp",
       "//zircon/system/ulib/async",
-      "//zircon/system/ulib/fidl-async:fidl-async-cpp",
 
       # <fs/tracked_remote_dir.h> has #include <lib/async/cpp/wait.h>.
       "//zircon/system/ulib/async:async-cpp",

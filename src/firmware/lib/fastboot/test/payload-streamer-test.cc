@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <zxtest/zxtest.h>
 
