@@ -9,7 +9,11 @@ use ffx_fidl::DaemonError;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use selectors::{self, VerboseError};
-use std::{future::Future, pin::Pin, rc::Rc, sync::Arc, time::Duration};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::time::Duration;
+use std::{rc::Rc, sync::Arc};
 
 use crate::FhoEnvironment;
 
@@ -21,6 +25,12 @@ pub trait TryFromEnv: Sized {
 #[async_trait(?Send)]
 pub trait CheckEnv {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()>;
+}
+
+#[async_trait(?Send)]
+pub trait TryFromEnvWith: 'static {
+    type Output: 'static;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output>;
 }
 
 #[async_trait(?Send)]
@@ -86,6 +96,9 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
 /// until you need it (if at all) or apply additional combinators on it (like
 /// custom timeout logic or anything like that).
 ///
+/// If you need to defer something that requires a decorator, use the
+/// [`deferred`] decorator around it.
+///
 /// Example:
 /// ```rust
 /// #[derive(FfxTool)]
@@ -112,6 +125,36 @@ where
     }
 }
 
+/// The implementation of the decorator returned by [`deferred`]
+pub struct WithDeferred<T>(T);
+#[async_trait(?Send)]
+impl<T> TryFromEnvWith for WithDeferred<T>
+where
+    T: TryFromEnvWith + 'static,
+{
+    type Output = Deferred<T::Output>;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
+        let env = env.clone();
+        Ok(Deferred(Box::pin(async move { self.0.try_from_env_with(&env).await })))
+    }
+}
+
+/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
+/// specify the selector string for the proxy you're loading.
+///
+/// Example:
+///
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     #[with(fho::deferred(fho::selector("core/selector/thing")))]
+///     foo_proxy: fho::Deferred<FooProxy>,
+/// }
+/// ```
+pub fn deferred<T: TryFromEnvWith>(inner: T) -> WithDeferred<T> {
+    WithDeferred(inner)
+}
+
 impl<T> Future for Deferred<T> {
     type Output = Result<T>;
     fn poll(
@@ -130,57 +173,23 @@ impl TryFromEnv for ffx_config::Sdk {
     }
 }
 
-/// A trait for looking up a Fuchsia component when using the Protocol struct.
-///
-/// Example usage;
-/// ```rust
-/// struct FooSelector;
-/// impl FuchsiaComponentSelector for FooSelector {
-///     const SELECTOR: &'static str = "core/selector/thing";
-/// }
-///
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     foo_proxy: Protocol<FooProxy, FooSelector>,
-/// }
-/// ```
-pub trait FuchsiaComponentSelector {
-    const SELECTOR: &'static str;
-}
-
-/// A wrapper type used to look up protocols on a Fuchsia target. Whatever has been set as the
-/// default target in the environment will be where the proxy is connected.
-#[derive(Debug, Clone)]
-pub struct Protocol<P: Clone, S, const TIMEOUT: u64 = 15> {
-    proxy: P,
-    _s: std::marker::PhantomData<fn(S) -> ()>,
-}
-
-impl<P: Clone, S, const TIMEOUT: u64> Protocol<P, S, TIMEOUT> {
-    pub fn new(proxy: P) -> Self {
-        Self { proxy, _s: Default::default() }
-    }
-}
-
-impl<P: Clone, S, const TIMEOUT: u64> std::ops::Deref for Protocol<P, S, TIMEOUT> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        &self.proxy
-    }
+/// The implementation of the decorator returned by [`selector`] and [`selector_timeout`]
+pub struct WithSelector<P> {
+    selector: String,
+    timeout: Duration,
+    _p: PhantomData<fn() -> P>,
 }
 
 #[async_trait(?Send)]
-impl<P: Proxy + Clone, S: FuchsiaComponentSelector, const TIMEOUT: u64> TryFromEnv
-    for Protocol<P, S, TIMEOUT>
-where
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+impl<P: Proxy + 'static> TryFromEnvWith for WithSelector<P> {
+    type Output = P;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
-            .with_user_message(|| format!("Failed creating proxy for selector {}", S::SELECTOR))?;
-        let _ = selectors::parse_selector::<VerboseError>(S::SELECTOR)
-            .with_bug_context(|| format!("Parsing selector {}", S::SELECTOR))?;
+            .with_user_message(|| {
+                format!("Failed creating proxy for selector {}", self.selector)
+            })?;
+        let _ = selectors::parse_selector::<VerboseError>(&self.selector)
+            .with_bug_context(|| format!("Parsing selector {}", self.selector))?;
         let retry_count = 1;
         let mut tries = 0;
         // TODO(fxbug.dev/113143): Remove explicit retries/timeouts here so they can be
@@ -193,13 +202,39 @@ where
             }
         }?;
         rcs::connect_with_timeout(
-            Duration::from_secs(TIMEOUT),
-            S::SELECTOR,
+            self.timeout,
+            &self.selector,
             &rcs_instance,
             server_end.into_channel(),
         )
         .await?;
-        Ok(Protocol::new(proxy))
+        Ok(proxy)
+    }
+}
+
+/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
+/// specify the selector string for the proxy you're loading.
+///
+/// Example:
+///
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     #[with(fho::selector("core/selector/thing"))]
+///     foo_proxy: FooProxy,
+/// }
+/// ```
+pub fn selector<P: Proxy>(selector: impl AsRef<str>) -> WithSelector<P> {
+    selector_timeout(selector, 15)
+}
+
+/// Like [`selector`], but lets you also specify an override for the default
+/// timeout.
+pub fn selector_timeout<P: Proxy>(selector: impl AsRef<str>, timeout_secs: u64) -> WithSelector<P> {
+    WithSelector {
+        selector: selector.as_ref().to_owned(),
+        timeout: Duration::from_secs(timeout_secs),
+        _p: Default::default(),
     }
 }
 

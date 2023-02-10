@@ -56,17 +56,32 @@ impl ToTokens for StructDecl<'_> {
 }
 
 /// Creates a TryFromEnv invocation for the given type.
-struct TryFromEnvInvocation<'a>(&'a syn::Type);
+enum TryFromEnvInvocation<'a> {
+    Normal(&'a syn::Type),
+    Decorated(ExprCall),
+}
 
 impl ToTokens for TryFromEnvInvocation<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ty = self.0;
-        let ty_span = ty.span();
-        tokens.extend(quote_spanned! {ty_span=>
-            // _env comes from the from_env function as part of the TryFromEnv
-            // trait.
-            <#ty as fho::TryFromEnv>::try_from_env(&_env)
-        });
+        use TryFromEnvInvocation::*;
+        match self {
+            Normal(ty) => {
+                let ty_span = ty.span();
+                tokens.extend(quote_spanned! {ty_span=>
+                    // _env comes from the from_env function as part of the TryFromEnv
+                    // trait.
+                    <#ty as fho::TryFromEnv>::try_from_env(&_env)
+                });
+            }
+            Decorated(expr) => {
+                let expr_span = expr.span();
+                tokens.extend(quote_spanned! {expr_span=>
+                    // _env comes from the from_env function as part of the TryFromEnv
+                    // trait.
+                    fho::TryFromEnvWith::try_from_env_with(#expr, &_env)
+                });
+            }
+        }
     }
 }
 
@@ -130,17 +145,29 @@ impl<'a> VariableCreationCollection<'a> {
         Self::default()
     }
 
-    /// Will panic if being given a `#[command]` field.
-    fn add_field(&mut self, field: NamedFieldTy<'a>) {
+    fn add_field(&mut self, field: NamedFieldTy<'a>) -> Result<(), ParseError> {
+        use NamedFieldTy::*;
         match field {
-            NamedFieldTy::Blank(field) => {
-                self.try_from_env_invocations.push(TryFromEnvInvocation(field.field_ty));
+            Blank(field) => {
+                self.try_from_env_invocations.push(TryFromEnvInvocation::Normal(field.field_ty));
                 self.join_results_names.push(field.field_name);
                 let id = self.try_from_env_type_assertions.len() + 1;
                 self.try_from_env_type_assertions.push(TryFromEnvTypeAssertion { id, field });
             }
-            _ => panic!("unexpected non-blank field type"),
+            With(expr, field) => {
+                self.try_from_env_invocations.push(TryFromEnvInvocation::Decorated(expr));
+                self.join_results_names.push(field.field_name);
+                // since output types don't necessarily match for decorated try_from_envs we
+                // won't emit a type assertion here.
+            }
+            Command(field) => {
+                return Err(ParseError::UnexpectedAttr(
+                    "command".to_owned(),
+                    field.field_ty.span(),
+                ));
+            }
         }
+        Ok(())
     }
 }
 
@@ -208,7 +235,7 @@ impl<'a> NamedFieldStruct<'a> {
         let checks = CheckCollection(attrs.checks);
         let mut vcc = VariableCreationCollection::new();
         for field in fields.into_iter() {
-            vcc.add_field(field);
+            vcc.add_field(field)?;
         }
         Ok(Self { forces_stdout_logs, command_field_decl, struct_decl, checks, vcc })
     }
@@ -286,11 +313,9 @@ mod tests {
             .collect::<Result<Vec<_>, ParseError>>()
             .unwrap();
         let mut vcc = VariableCreationCollection::new();
-        vcc.add_field(fields.remove(0));
-        // An unfortunate side effect of translating to tokens is that every individual token is
-        // separated by a space.
+        vcc.add_field(fields.remove(0)).expect("correct kind of field");
         assert_eq!(
-            "let bar = < u32 as fho :: TryFromEnv > :: try_from_env (& _env) . await ? ;",
+            quote! { let bar = <u32 as fho::TryFromEnv>::try_from_env(&_env).await?; }.to_string(),
             vcc.into_token_stream().to_string(),
         );
     }
@@ -315,10 +340,37 @@ mod tests {
             .collect::<Result<Vec<_>, ParseError>>()
             .unwrap();
         let mut vcc = VariableCreationCollection::new();
-        vcc.add_field(fields.remove(0));
-        vcc.add_field(fields.remove(0));
+        vcc.add_field(fields.remove(0)).expect("correct kind of field");
+        vcc.add_field(fields.remove(0)).expect("correct kind of field");
         assert_eq!(
-            "let (bar , baz) = fho :: macro_deps :: futures :: try_join ! (< u32 as fho :: TryFromEnv > :: try_from_env (& _env) , < u8 as fho :: TryFromEnv > :: try_from_env (& _env)) ? ;",
+            quote! { let (bar, baz) = fho::macro_deps::futures::try_join!(<u32 as fho::TryFromEnv>::try_from_env(&_env) , <u8 as fho::TryFromEnv>::try_from_env(&_env)) ? ; }.to_string(),
+            vcc.into_token_stream().to_string(),
+        );
+    }
+
+    #[test]
+    fn test_vcc_with() {
+        let ast = parse_macro_derive(
+            r#"
+            #[derive(FfxTool)]
+            struct Foo {
+                #[with(something("stuff"))]
+                bar: u32,
+            }
+            "#,
+        );
+        let ds = crate::extract_struct_info(&ast).unwrap();
+        let syn::Fields::Named(fields) = &ds.fields else { unreachable!() };
+        let mut fields = fields
+            .named
+            .iter()
+            .map(NamedFieldTy::parse)
+            .collect::<Result<Vec<_>, ParseError>>()
+            .unwrap();
+        let mut vcc = VariableCreationCollection::new();
+        vcc.add_field(fields.remove(0)).expect("correct kind of field");
+        assert_eq!(
+            quote! { let bar = fho::TryFromEnvWith::try_from_env_with(something("stuff"), &_env).await ? ; }.to_string(),
             vcc.into_token_stream().to_string(),
         );
     }

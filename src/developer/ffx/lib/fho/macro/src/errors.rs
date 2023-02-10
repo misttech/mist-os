@@ -14,6 +14,9 @@ pub enum ParseError {
     OnlyStructsSupported(Span),
     OnlyNamedFieldStructsSupported(Span),
     InvalidCheckAttr(Span),
+    InvalidWithAttr(Span),
+    InvalidAttr(Span),
+    UnexpectedAttr(String, Span),
 }
 
 impl ToTokens for ParseError {
@@ -54,6 +57,21 @@ impl ToTokens for ParseError {
                     std::compile_error!("`#[check()]` attribute contents must be a call expression");
                 }
             ),
+            ParseError::InvalidWithAttr(span) => tokens.extend(
+                quote_spanned! {*span=>
+                    std::compile_error!("`#[with()]` attribute contents must be a call expression");
+                }
+            ),
+            ParseError::UnexpectedAttr(name, span) => tokens.extend(
+                quote_spanned! {*span=>
+                    std::compile_error!("`#[{}]` unexpected here", #name);
+                }
+            ),
+            ParseError::InvalidAttr(span) => tokens.extend(
+                quote_spanned! {*span=>
+                    std::compile_error!("Invalid or unknown attribute for FfxTool");
+                }
+            )
         }
     }
 }

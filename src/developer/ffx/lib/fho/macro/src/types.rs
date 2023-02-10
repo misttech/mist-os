@@ -7,20 +7,12 @@ use std::collections::HashSet;
 use crate::errors::ParseError;
 use syn::{spanned::Spanned, ExprCall, NestedMeta};
 
-fn is_matching_attr(name: &str, attr: &syn::Attribute) -> bool {
-    attr.path.segments.len() == 1 && attr.path.segments[0].ident == name
-}
-
-fn is_command_attr(attr: &syn::Attribute) -> bool {
-    is_matching_attr("command", attr)
-}
-
-fn is_ffx_attr(attr: &syn::Attribute) -> bool {
-    is_matching_attr("ffx", attr)
-}
-
-fn is_check_attr(attr: &syn::Attribute) -> bool {
-    is_matching_attr("check", attr)
+fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
+    if attr.path.segments.len() == 1 {
+        Ok(attr.path.segments[0].ident.to_string())
+    } else {
+        Err(ParseError::InvalidAttr(attr.span()))
+    }
 }
 
 fn is_forces_stdout_logs_path(path: &syn::Path) -> bool {
@@ -40,6 +32,8 @@ pub enum NamedFieldTy<'a> {
     Blank(NamedField<'a>),
     // Is denoted as #[command].
     Command(NamedField<'a>),
+    // Uses a decorator for adding context to the tryfrom
+    With(ExprCall, NamedField<'a>),
 }
 
 impl<'a> NamedFieldTy<'a> {
@@ -48,11 +42,25 @@ impl<'a> NamedFieldTy<'a> {
         let field_name = field.ident.as_ref().expect("field missing ident in struct");
         let field_ty = &field.ty;
         for attr in &field.attrs {
-            if is_command_attr(attr) {
-                if res.is_some() {
-                    return Err(ParseError::DuplicateAttr(attr.span()));
+            match attr_name(attr)?.as_str() {
+                "command" => {
+                    if res.is_some() {
+                        return Err(ParseError::DuplicateAttr(attr.span()));
+                    }
+                    res.replace(Self::Command(NamedField { field_ty, field_name }));
                 }
-                res.replace(Self::Command(NamedField { field_ty, field_name }));
+                "with" => {
+                    if res.is_some() {
+                        return Err(ParseError::DuplicateAttr(attr.span()));
+                    }
+                    let expr =
+                        attr.parse_args().map_err(|_| ParseError::InvalidWithAttr(attr.span()))?;
+                    res.replace(Self::With(expr, NamedField { field_ty, field_name }));
+                }
+                name @ ("ffx" | "check") => {
+                    return Err(ParseError::UnexpectedAttr(name.to_owned(), attr.span()));
+                }
+                _ => {} // ignore unknown attributes (like derive)
             }
         }
         Ok(res.unwrap_or(Self::Blank(NamedField { field_ty, field_name })))
@@ -95,23 +103,29 @@ impl FromEnvAttributes {
         let mut flags = HashSet::new();
         let mut checks = Vec::new();
         for attr in attrs.iter() {
-            if is_ffx_attr(attr) {
-                let meta_list = match attr
-                    .parse_meta()
-                    .map_err(|_| ParseError::MalformedFfxAttr(attr.span()))?
-                {
-                    syn::Meta::List(list) => Ok(list),
-                    meta => Err(ParseError::MalformedFfxAttr(meta.span())),
-                }?;
-                for item in &meta_list.nested {
-                    let flag = item.try_into()?;
-                    if !flags.insert(flag) {
-                        return Err(ParseError::DuplicateFfxAttr(item.span()));
+            match attr_name(attr)?.as_str() {
+                "ffx" => {
+                    let meta_list = match attr
+                        .parse_meta()
+                        .map_err(|_| ParseError::MalformedFfxAttr(attr.span()))?
+                    {
+                        syn::Meta::List(list) => Ok(list),
+                        meta => Err(ParseError::MalformedFfxAttr(meta.span())),
+                    }?;
+                    for item in &meta_list.nested {
+                        let flag = item.try_into()?;
+                        if !flags.insert(flag) {
+                            return Err(ParseError::DuplicateFfxAttr(item.span()));
+                        }
                     }
                 }
-            } else if is_check_attr(attr) {
-                checks
-                    .push(attr.parse_args().map_err(|_| ParseError::InvalidCheckAttr(attr.span()))?)
+                "check" => checks.push(
+                    attr.parse_args().map_err(|_| ParseError::InvalidCheckAttr(attr.span()))?,
+                ),
+                name @ ("with" | "command") => {
+                    return Err(ParseError::UnexpectedAttr(name.to_owned(), attr.span()));
+                }
+                _ => {} // ignore unknown attributes
             }
         }
         Ok(Self { flags, checks })
@@ -233,6 +247,24 @@ mod tests {
             matches!(
                 FromEnvAttributes::from_attrs(&ast.attrs),
                 Err(ParseError::InvalidCheckAttr(_))
+            ),
+            "Expected error parsing invalid check"
+        );
+    }
+
+    #[test]
+    fn test_parse_ffx_attr_with_invalid_place() {
+        let ast = parse_macro_derive(
+            r#"
+            #[derive(FfxTool)]
+            #[with(something("with-a-string"))]
+            struct Foo {}
+            "#,
+        );
+        assert!(
+            matches!(
+                FromEnvAttributes::from_attrs(&ast.attrs),
+                Err(ParseError::UnexpectedAttr(attr, _)) if attr == "with",
             ),
             "Expected error parsing invalid check"
         );
