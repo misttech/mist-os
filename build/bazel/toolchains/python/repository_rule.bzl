@@ -42,7 +42,7 @@ def _compact_python_runtime_impl(repo_ctx):
         # On Linux, this is slightly slower than using the host zip command
         # (i.e. 0.77s vs 0.483s).
         zip_directory_script = repo_ctx.path(project_root + "build/bazel/scripts/zip-directory.py")
-        repo_ctx.execute(
+        ret = repo_ctx.execute(
             [
                 str(zip_directory_script),
                 str(repo_ctx.path(lib_python_zip)),
@@ -50,6 +50,8 @@ def _compact_python_runtime_impl(repo_ctx):
             ],
             quiet = False,  # False for debugging!
         )
+        if ret.return_code != 0:
+            fail("Could not create python library zip archive!: %s" % ret.stderr)
     else:
         fail("One of lib_python_zip or lib_python_path must be defined.")
 
