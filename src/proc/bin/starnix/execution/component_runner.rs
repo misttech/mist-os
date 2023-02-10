@@ -102,16 +102,22 @@ pub async fn start_component(
 
     let binary_path = get_program_string(&start_info, "binary")
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
-    // If the binary path is relative, treat it as a path into the component's package
-    // directory.
-    let binary_in_package = &binary_path[..1] != "/";
-    let binary_path = CString::new(if binary_in_package {
-        pkg_directory + "/" + binary_path
-    } else {
-        binary_path.to_owned()
-    })?;
+    let binary_path = CString::new(binary_path.to_owned())?;
 
     let mut current_task = galaxy.create_process(&binary_path)?;
+
+    let cwd = current_task
+        .lookup_path(
+            &mut LookupContext::default(),
+            current_task.fs().root(),
+            pkg_directory.as_bytes(),
+        )
+        .map_err(|e| anyhow!("Could not find package directory: {:?}", e))?;
+    current_task
+        .fs()
+        .chdir(&current_task, cwd)
+        .map_err(|e| anyhow!("Failed to set cwd to package directory: {:?}", e))?;
+
     let user_passwd = get_program_string(&start_info, "user").unwrap_or("fuchsia:x:42:42");
     let credentials = Credentials::from_passwd(user_passwd)?;
     current_task.set_creds(credentials);
