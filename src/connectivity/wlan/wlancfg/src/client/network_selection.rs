@@ -63,7 +63,7 @@ const SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED: i16 = 30;
 /// attempts to a BSS.
 const SCORE_PENALTY_FOR_SHORT_CONNECTION: i16 = 20;
 // Threshold for what we consider a short time to be connected
-const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
+pub const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
 
 const INSPECT_EVENT_LIMIT_FOR_NETWORK_SELECTIONS: usize = 10;
 

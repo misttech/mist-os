@@ -6,7 +6,7 @@ use fasync::TimeoutExt;
 
 use {
     crate::{
-        client::{bss_selection, types},
+        client::{bss_selection, network_selection, types},
         config_management::{PastConnectionData, SavedNetworksManagerApi},
         mode_management::{Defect, IfaceFailure},
         telemetry::{DisconnectInfo, TelemetryEvent, TelemetrySender},
@@ -643,23 +643,30 @@ async fn connected_state(
                     };
 
                     if is_sme_idle {
-                        // Retry the previously established connection
-                        let next_connecting_options = ConnectingOptions {
-                            connect_selection: types::ConnectSelection {
-                                reason: types::ConnectReason::RetryAfterDisconnectDetected,
-                                ..options.currently_fulfilled_connection.clone()
-                            },
-                            attempt_counter: 0,
+                        // Retry the previously established connection, but fall back to network
+                        // selection if the connection was short to avoid continuously reconnecting
+                        // to a flaky AP.
+                        let next_connecting_options = if fasync::Time::now() - connect_start_time > network_selection::SHORT_CONNECT_DURATION {
+                            info!("Detected disconnection from network, will attempt reconnection");
+                            Some(ConnectingOptions {
+                                connect_selection: types::ConnectSelection {
+                                    reason: types::ConnectReason::RetryAfterDisconnectDetected,
+                                    ..options.currently_fulfilled_connection.clone()
+                                },
+                                attempt_counter: 0,
+                            })
+                        } else {
+                            info!("Detected disconnection from network shortly after connecting, will not attempt reconnection");
+                            None
                         };
 
                         let options = DisconnectingOptions {
                             disconnect_responder: None,
                             previous_network: Some((options.currently_fulfilled_connection.target.network.clone(), types::DisconnectStatus::ConnectionFailed)),
-                            next_network: Some(next_connecting_options),
+                            next_network: next_connecting_options,
                             reason: types::DisconnectReason::DisconnectDetectedFromSme,
                         };
                         common_options.telemetry_sender.send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-                        info!("Detected disconnection from network, will attempt reconnection");
                         return Ok(disconnecting_state(common_options, options).into_state());
                     }
                 }
@@ -2703,21 +2710,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn connected_state_notified_of_network_disconnect_no_sme_reconnect() {
-        let mut exec = fasync::TestExecutor::new();
-        // Do test set up manually to get stash server
-        let (_client_req_sender, client_req_stream) = mpsc::channel(1);
-        let (update_sender, mut update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        let saved_networks_manager = Arc::new(saved_networks);
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (stats_sender, _stats_receiver) = mpsc::unbounded();
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+    fn connected_state_notified_of_network_disconnect_no_sme_reconnect_retry_connection() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let mut test_values = test_setup();
+
         let network_ssid = types::Ssid::try_from("foo").unwrap();
         let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
         let connect_selection = types::ConnectSelection {
@@ -2736,26 +2732,10 @@ mod tests {
             reason: types::ConnectReason::RegulatoryChangeReconnect,
         };
 
-        // Store the network in the saved_networks_manager, so we can record connection success
-        let save_fut = saved_networks_manager.store(
-            connect_selection.target.network.clone(),
-            connect_selection.target.credential.clone(),
-        );
-        pin_mut!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        // Set fake time at beginning of connection for the uptime tracked by connected_state
+        let start_time = fasync::Time::now();
+        exec.set_fake_time(start_time);
 
-        let common_options = CommonStateOptions {
-            proxy: sme_proxy,
-            req_stream: client_req_stream.fuse(),
-            update_sender: update_sender,
-            saved_networks_manager: saved_networks_manager.clone(),
-            telemetry_sender,
-            iface_id: 1,
-            stats_sender,
-            defect_sender,
-        };
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
@@ -2768,14 +2748,17 @@ mod tests {
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
         };
-        let initial_state = connected_state(common_options, options);
+        let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
-        let sme_fut = sme_req_stream.into_future();
+        let sme_fut = test_values.sme_req_stream.into_future();
         pin_mut!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Set time to indicate a decent uptime before the disconnect so the AP is retried
+        exec.set_fake_time(start_time + fasync::Duration::from_hours(24));
 
         // SME notifies Policy of disconnection.
         let is_sme_reconnecting = false;
@@ -2810,7 +2793,7 @@ mod tests {
             }],
         };
         assert_variant!(
-            update_receiver.try_next(),
+            test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
@@ -2846,10 +2829,75 @@ mod tests {
             }],
         };
         assert_variant!(
-            update_receiver.try_next(),
+            test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
+    }
+
+    #[fuchsia::test]
+    fn connected_state_notified_of_network_disconnect_no_sme_reconnect_short_uptime_no_retry() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let test_values = test_setup();
+
+        let network_ssid = types::Ssid::try_from("foo").unwrap();
+        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
+        let connect_selection = types::ConnectSelection {
+            target: types::ScannedCandidate {
+                network: types::NetworkIdentifier {
+                    ssid: network_ssid.clone(),
+                    security_type: types::SecurityType::Wpa2,
+                },
+                credential: TEST_PASSWORD.clone(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
+                observation: types::ScanObservation::Passive,
+                has_multiple_bss_candidates: true,
+                authenticator: generate_random_authenticator(),
+            },
+            reason: types::ConnectReason::RegulatoryChangeReconnect,
+        };
+
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let options = ConnectedOptions {
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(bss_description.clone().into()),
+            multiple_bss_candidates: true,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+        let fut = run_state_machine(initial_state);
+        pin_mut!(fut);
+        let sme_fut = test_values.sme_req_stream.into_future();
+        pin_mut!(sme_fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // SME notifies Policy of disconnection.
+        let is_sme_reconnecting = false;
+        connect_txn_handle
+            .send_on_disconnect(&mut generate_disconnect_info(is_sme_reconnecting))
+            .expect("failed to send disconnection event");
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Check for a disconnect request to SME
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
+                responder.send().expect("could not send sme response");
+            }
+        );
+
+        // The state machine should exit since there is no attempt to reconnect.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
@@ -2918,12 +2966,8 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_notified_of_network_disconnect_sme_reconnect_unsuccessfully() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = test_setup();
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        let saved_networks_manager = Arc::new(saved_networks);
-        test_values.common_options.saved_networks_manager = saved_networks_manager.clone();
 
         let network_ssid = types::Ssid::try_from("foo").unwrap();
         let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
@@ -2943,15 +2987,9 @@ mod tests {
             reason: types::ConnectReason::IdleInterfaceAutoconnect,
         };
 
-        // Store the network in the saved_networks_manager, so we can record connection success
-        let save_fut = saved_networks_manager.store(
-            connect_selection.target.network.clone(),
-            connect_selection.target.credential.clone(),
-        );
-        pin_mut!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
+        // Set the start time of the connection
+        let start_time = fasync::Time::now();
+        exec.set_fake_time(start_time);
 
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
@@ -2973,6 +3011,9 @@ mod tests {
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Set time to indicate a decent uptime before the disconnect so the AP is retried
+        exec.set_fake_time(start_time + fasync::Duration::from_hours(24));
 
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;
