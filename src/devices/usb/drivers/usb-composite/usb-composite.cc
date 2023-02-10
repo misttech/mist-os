@@ -131,147 +131,78 @@ zx_status_t UsbComposite::AddInterfaces() {
     return ZX_ERR_INTERNAL;
   }
   auto* config = reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_.data());
-  usb_desc_iter_t header_iter;
-  auto status = usb_desc_iter_init_unowned(config, le16toh(config->w_total_length), &header_iter);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not init iterator %d", status);
-    return status;
-  }
-  if (!usb_desc_iter_advance(&header_iter)) {
-    zxlogf(ERROR, "Could not advance iterator");
-    return ZX_ERR_INTERNAL;
-  }
-  usb_descriptor_header_t* header;
+  const usb::UnownedInterfaceList interface_list(config, le16toh(config->w_total_length), true);
+  zx_status_t assoc_status = ZX_OK;
+  struct assoc_iterator_t {
+    const usb_interface_assoc_descriptor_t* desc_;
+    size_t length_;
+    UsbComposite* dev_ptr_;
+    zx_status_t* status_;
 
-  zx_status_t result = ZX_OK;
-  while ((header = usb_desc_iter_peek(&header_iter)) != nullptr) {
-    if (header->b_descriptor_type == USB_DT_INTERFACE_ASSOCIATION) {
-      const auto* assoc_desc = reinterpret_cast<const usb_interface_assoc_descriptor_t*>(
-          usb_desc_iter_get_structure(&header_iter, sizeof(usb_interface_assoc_descriptor_t)));
-      if (!assoc_desc) {
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
+    assoc_iterator_t(const usb_interface_assoc_descriptor_t* desc, size_t length,
+                     UsbComposite* dev_ptr, zx_status_t* status)
+        : desc_(desc), length_(length), dev_ptr_(dev_ptr), status_(status) {}
+
+    ~assoc_iterator_t() {
+      auto status = dev_ptr_->AddInterfaceAssoc(desc_, length_);
+      if (status_ && *status_ != ZX_OK) {
+        *status_ = status;
       }
-      int interface_count = assoc_desc->b_interface_count;
+    }
+  };
+  std::optional<assoc_iterator_t> assoc = std::nullopt;
+  for (const auto& interface : interface_list) {
+    if (!interface.descriptor()) {
+      zxlogf(ERROR, "Malformed USB descriptor detected!");
+      return ZX_ERR_INTERNAL;
+    }
 
-      // find end of this interface association
-      usb_desc_iter_t next_iter = header_iter;
-      if (!usb_desc_iter_advance(&next_iter)) {
-        // This should not happen
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
-      }
-      usb_descriptor_header_t* next;
-      while ((next = usb_desc_iter_peek(&next_iter)) != nullptr) {
-        if (next->b_descriptor_type == USB_DT_INTERFACE_ASSOCIATION) {
-          break;
-        } else if (next->b_descriptor_type == USB_DT_INTERFACE) {
-          const auto* test_intf = reinterpret_cast<const usb_interface_descriptor_t*>(
-              usb_desc_iter_get_structure(&next_iter, sizeof(usb_interface_descriptor_t)));
-          if (!test_intf) {
-            zxlogf(ERROR, "Malformed USB descriptor detected!");
-            return ZX_ERR_INTERNAL;
-          }
-
-          if (test_intf->b_alternate_setting == 0) {
-            if (interface_count == 0) {
-              break;
-            }
-            interface_count--;
-          }
-        }
-        if (!usb_desc_iter_advance(&next_iter)) {
-          // This should not happen
-          zxlogf(ERROR, "Malformed USB descriptor detected!");
-          return ZX_ERR_INTERNAL;
-        }
+    if (interface.association()) {
+      if (!assoc || interface.association() != assoc->desc_) {
+        assoc.emplace(interface.association(), sizeof(*interface.association()), this,
+                      &assoc_status);
       }
 
-      size_t length =
-          reinterpret_cast<uintptr_t>(next_iter.current) - reinterpret_cast<uintptr_t>(assoc_desc);
-      status = AddInterfaceAssoc(assoc_desc, length);
+      assoc->length_ += interface.length(true);
+      continue;
+    }
+
+    assoc.reset();
+    if (assoc_status != ZX_OK) {
+      return assoc_status;
+    }
+
+    auto intf_num = interface.descriptor()->b_interface_number;
+    InterfaceStatus intf_status;
+    {
+      fbl::AutoLock lock(&lock_);
+
+      // Only create a child device if no child interface has claimed this interface.
+      intf_status = interface_statuses_[intf_num];
+    }
+
+    if (intf_status == InterfaceStatus::AVAILABLE) {
+      auto status = AddInterface(interface.descriptor(), interface.length(true));
       if (status != ZX_OK) {
         return status;
       }
 
-      header_iter = next_iter;
-    } else if (header->b_descriptor_type == USB_DT_INTERFACE) {
-      const auto* intf_desc = reinterpret_cast<const usb_interface_descriptor_t*>(
-          usb_desc_iter_get_structure(&header_iter, sizeof(usb_interface_descriptor_t)));
-      if (!intf_desc) {
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
-      }
-      // find end of current interface descriptor
-      usb_desc_iter_t next_iter = header_iter;
-      if (!usb_desc_iter_advance(&next_iter)) {
-        // This should not happen
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
-      }
-      usb_descriptor_header_t* next;
-      while ((next = usb_desc_iter_peek(&next_iter)) != nullptr) {
-        if (next->b_descriptor_type == USB_DT_INTERFACE) {
-          const auto* test_intf = reinterpret_cast<const usb_interface_descriptor_t*>(
-              usb_desc_iter_get_structure(&next_iter, sizeof(usb_interface_descriptor_t)));
-          if (!test_intf) {
-            zxlogf(ERROR, "Malformed USB descriptor detected!");
-            return ZX_ERR_INTERNAL;
-          }
-          // Iterate until we find the next top-level interface
-          // Include alternate interfaces in the current interface
-          if (test_intf->b_alternate_setting == 0) {
-            break;
-          }
+      fbl::AutoLock lock(&lock_);
+
+      // The interface may have been claimed in the meanwhile, so we need to
+      // check the interface status again.
+      if (interface_statuses_[intf_num] == InterfaceStatus::CLAIMED) {
+        bool removed = RemoveInterfaceById(intf_num);
+        if (!removed) {
+          return ZX_ERR_BAD_STATE;
         }
-        if (!usb_desc_iter_advance(&next_iter)) {
-          // This should not happen
-          zxlogf(ERROR, "Malformed USB descriptor detected!");
-          return ZX_ERR_INTERNAL;
-        }
-      }
-
-      auto intf_num = intf_desc->b_interface_number;
-      InterfaceStatus intf_status;
-      {
-        fbl::AutoLock lock(&lock_);
-
-        // Only create a child device if no child interface has claimed this interface.
-        intf_status = interface_statuses_[intf_num];
-      }
-
-      size_t length =
-          reinterpret_cast<uintptr_t>(next_iter.current) - reinterpret_cast<uintptr_t>(intf_desc);
-      if (intf_status == InterfaceStatus::AVAILABLE) {
-        auto status = AddInterface(intf_desc, length);
-        if (status != ZX_OK) {
-          return status;
-        }
-
-        fbl::AutoLock lock(&lock_);
-
-        // The interface may have been claimed in the meanwhile, so we need to
-        // check the interface status again.
-        if (interface_statuses_[intf_num] == InterfaceStatus::CLAIMED) {
-          bool removed = RemoveInterfaceById(intf_num);
-          if (!removed) {
-            return ZX_ERR_BAD_STATE;
-          }
-        } else {
-          interface_statuses_[intf_num] = InterfaceStatus::CHILD_DEVICE;
-        }
-      }
-      header_iter = next_iter;
-    } else {
-      if (!usb_desc_iter_advance(&header_iter)) {
-        // This should not happen
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
+      } else {
+        interface_statuses_[intf_num] = InterfaceStatus::CHILD_DEVICE;
       }
     }
   }
 
-  return result;
+  return assoc_status;
 }
 
 fbl::RefPtr<UsbInterface> UsbComposite::GetInterfaceById(uint8_t interface_id) {
@@ -325,51 +256,25 @@ zx_status_t UsbComposite::GetAdditionalDescriptorList(uint8_t last_interface_id,
     return ZX_ERR_INTERNAL;
   }
   auto* config = reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_.data());
-  usb_desc_iter_t header_iter;
-  auto status = usb_desc_iter_init_unowned(config, le16toh(config->w_total_length), &header_iter);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not init iterator %d", status);
-    return status;
-  }
-  if (!usb_desc_iter_advance(&header_iter)) {
-    zxlogf(ERROR, "Could not advance iterator");
-    return ZX_ERR_INTERNAL;
-  }
-
-  usb_interface_descriptor_t* result = NULL;
-  const usb_descriptor_header_t* header;
-  while ((header = usb_desc_iter_peek(&header_iter)) != nullptr) {
-    if (header->b_descriptor_type == USB_DT_INTERFACE) {
-      auto* test_intf = reinterpret_cast<usb_interface_descriptor_t*>(
-          usb_desc_iter_get_structure(&header_iter, sizeof(usb_interface_descriptor_t)));
-      if (!test_intf) {
-        zxlogf(ERROR, "Malformed USB descriptor detected!");
-        return ZX_ERR_INTERNAL;
-      }
-      // We are only interested in descriptors past the last stored descriptor
-      // for the current interface.
-      if (test_intf->b_alternate_setting == 0 &&
-          test_intf->b_interface_number > last_interface_id) {
-        result = test_intf;
-        break;
-      }
-    }
-    if (!usb_desc_iter_advance(&header_iter)) {
-      // This should not happen
+  usb::UnownedInterfaceList intf_list(config, le16toh(config->w_total_length), true);
+  for (const auto& intf : intf_list) {
+    if (!intf.descriptor()) {
       zxlogf(ERROR, "Malformed USB descriptor detected!");
       return ZX_ERR_INTERNAL;
     }
+    // We are only interested in descriptors past the last stored descriptor
+    // for the current interface.
+    if (intf.descriptor()->b_interface_number > last_interface_id) {
+      size_t length = config->w_total_length - (reinterpret_cast<uintptr_t>(intf.descriptor()) -
+                                                reinterpret_cast<uintptr_t>(config));
+      if (length > desc_count) {
+        return ZX_ERR_BUFFER_TOO_SMALL;
+      }
+      memcpy(out_desc_list, intf.descriptor(), length);
+      *out_desc_actual = length;
+      return ZX_OK;
+    }
   }
-  if (!result) {
-    return ZX_OK;
-  }
-  size_t length =
-      reinterpret_cast<uintptr_t>(header_iter.desc_end) - reinterpret_cast<uintptr_t>(result);
-  if (length > desc_count) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-  memcpy(out_desc_list, result, length);
-  *out_desc_actual = length;
   return ZX_OK;
 }
 
