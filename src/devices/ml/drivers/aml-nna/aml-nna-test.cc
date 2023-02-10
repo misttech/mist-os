@@ -41,9 +41,10 @@ class MockRegisters {
 
   // The caller should set the mock expectations before calling this.
   void CreateDeviceAndVerify(AmlNnaDevice::NnaBlock nna_block) {
-    zx::channel client_end, server_end;
-    EXPECT_OK(zx::channel::create(0, &client_end, &server_end));
-    reset_mock_->RegistersConnect(std::move(server_end));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    reset_mock_->RegistersConnect(server_end.TakeChannel());
 
     ddk::PDev pdev;
     zx::resource smc_monitor;

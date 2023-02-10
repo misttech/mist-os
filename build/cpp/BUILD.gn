@@ -77,22 +77,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/ml/drivers/aml-nna:aml-nna-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/ml/drivers/aml-nna:aml-nna-test-bin",
-
-    #------------------
-    #------------------
-    "//src/devices/ml/drivers/as370-nna:as370-nna-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/ml/drivers/as370-nna:as370-nna-test-bin",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }

@@ -119,12 +119,13 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     zxlogf(ERROR, "Could not get reset_register fragment");
     return ZX_ERR_NO_RESOURCES;
   }
-  zx::channel client_end, server_end;
-  if ((status = zx::channel::create(0, &client_end, &server_end)) != ZX_OK) {
-    zxlogf(ERROR, "Could not create channel %d\n", status);
-    return status;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Could not create channel %d\n", endpoints.status_value());
+    return endpoints.status_value();
   }
-  reset.Connect(std::move(server_end));
+  auto& [client_end, server_end] = endpoints.value();
+  reset.Connect(server_end.TakeChannel());
 
   std::optional<fdf::MmioBuffer> hiu_mmio;
   status = pdev.MapMmio(kHiu, &hiu_mmio);

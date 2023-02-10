@@ -62,7 +62,8 @@ class AmlNnaDevice : public AmlNnaDeviceType, public ddk::EmptyProtocol<ZX_PROTO
   };
 
   explicit AmlNnaDevice(zx_device_t* parent, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer power_mmio,
-                        fdf::MmioBuffer memory_pd_mmio, zx::channel reset, ddk::PDev pdev,
+                        fdf::MmioBuffer memory_pd_mmio,
+                        fidl::ClientEnd<fuchsia_hardware_registers::Device> reset, ddk::PDev pdev,
                         NnaBlock nna_block, zx::resource smc_monitor)
       : AmlNnaDeviceType(parent),
         pdev_(std::move(pdev)),
