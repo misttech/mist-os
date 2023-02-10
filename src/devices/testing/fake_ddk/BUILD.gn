@@ -80,7 +80,6 @@ zx_library("fake_ddk") {
   visibility = [
     "//build/*",
     "//src/camera/drivers/controller/test/*",
-    "//src/connectivity/ethernet/drivers/virtio/*",
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
     "//src/devices/power/drivers/ti-ina231/*",
     "//src/devices/testing/*",
