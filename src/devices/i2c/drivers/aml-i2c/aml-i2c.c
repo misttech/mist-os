@@ -78,6 +78,7 @@ typedef struct {
   mmio_buffer_t regs_iobuff;
   MMIO_PTR aml_i2c_regs_t* virt_regs;
   zx_duration_t timeout;
+  thrd_t irqthrd;
 } aml_i2c_dev_t;
 
 typedef struct {
@@ -262,8 +263,8 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
     rdata = MmioRead32(&dev->virt_regs->token_rdata_0);
     rdata |= ((uint64_t)MmioRead32(&dev->virt_regs->token_rdata_1)) << 32;
 
-    for (uint32_t i = 0; i < sizeof(rdata); i++) {
-      buff[i] = (uint8_t)((rdata >> (8 * i) & 0xff));
+    for (uint32_t i = 0; i < len; i++, rdata >>= 8) {
+      buff[i] = (uint8_t)(rdata & 0xff);
     }
 
     len -= rx_size;
@@ -324,8 +325,7 @@ static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index,
     return status;
   }
 
-  thrd_t irqthrd;
-  thrd_create_with_name(&irqthrd, aml_i2c_irq_thread, device, "i2c_irq_thread");
+  thrd_create_with_name(&device->irqthrd, aml_i2c_irq_thread, device, "i2c_irq_thread");
 
   // Set profile for IRQ thread.
   // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
@@ -341,7 +341,7 @@ static zx_status_t aml_i2c_dev_init(aml_i2c_t* i2c, unsigned index,
     zxlogf(WARNING, "aml_i2c_dev_init: Failed to get deadline profile: %s",
            zx_status_get_string(status));
   } else {
-    status = zx_object_set_profile(thrd_get_zx_handle(irqthrd), irq_profile, 0);
+    status = zx_object_set_profile(thrd_get_zx_handle(device->irqthrd), irq_profile, 0);
     if (status != ZX_OK) {
       zxlogf(WARNING, "aml_i2c_dev_init: Failed to apply deadline profile to IRQ thread: %s",
              zx_status_get_string(status));
@@ -416,6 +416,12 @@ static void aml_i2c_release(void* ctx) {
   aml_i2c_t* i2c = ctx;
   for (unsigned i = 0; i < i2c->dev_count; i++) {
     aml_i2c_dev_t* device = &i2c->i2c_devs[i];
+
+    zx_interrupt_destroy(device->irq);
+    if (device->irqthrd) {
+      thrd_join(device->irqthrd, NULL);
+    }
+
     mmio_buffer_release(&device->regs_iobuff);
     zx_handle_close(device->event);
     zx_handle_close(device->irq);

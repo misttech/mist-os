@@ -11,6 +11,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
+#include <threads.h>
 
 #include <array>
 #include <atomic>
@@ -58,6 +59,7 @@ class AmlI2cTest : public zxtest::Test {
     mmio_buffer_t regs_iobuff;
     void* virt_regs;
     zx_duration_t timeout;
+    thrd_t irqthrd;
   };
 
   struct AmlI2c {
@@ -165,8 +167,7 @@ class AmlI2cTest : public zxtest::Test {
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
-// TODO(fxbug.dev/120969): Re-enable after the driver bugs have been fixed.
-TEST_F(AmlI2cTest, DISABLED_SmallWrite) {
+TEST_F(AmlI2cTest, SmallWrite) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t write_buffer[] = {0x45, 0xd9, 0x65, 0xbc, 0x31, 0x26, 0xd7, 0xe5};
@@ -198,7 +199,7 @@ TEST_F(AmlI2cTest, DISABLED_SmallWrite) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_BigWrite) {
+TEST_F(AmlI2cTest, BigWrite) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t write_buffer[] = {0xb9, 0x17, 0x32, 0xba, 0x8e, 0xf7, 0x19, 0xf2, 0x78, 0xbf,
@@ -225,7 +226,7 @@ TEST_F(AmlI2cTest, DISABLED_BigWrite) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_SmallRead) {
+TEST_F(AmlI2cTest, SmallRead) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   const std::vector<uint8_t> kExpectedReadData{0xf0, 0xdb, 0xdf, 0x6b, 0xb9, 0x3e, 0xa6, 0xfa};
@@ -263,7 +264,7 @@ TEST_F(AmlI2cTest, DISABLED_SmallRead) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_BigRead) {
+TEST_F(AmlI2cTest, BigRead) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   const std::vector<uint8_t> kExpectedReadData{0xd8, 0xfa, 0x51, 0xc7, 0x8c, 0xd9, 0x32, 0x92};
@@ -293,7 +294,7 @@ TEST_F(AmlI2cTest, DISABLED_BigRead) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_NoStopFlag) {
+TEST_F(AmlI2cTest, NoStopFlag) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t buffer[4];
@@ -317,7 +318,7 @@ TEST_F(AmlI2cTest, DISABLED_NoStopFlag) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_StartTransferFlag) {
+TEST_F(AmlI2cTest, StartTransferFlag) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t buffer[4];
@@ -335,7 +336,7 @@ TEST_F(AmlI2cTest, DISABLED_StartTransferFlag) {
   EXPECT_EQ(mmio()[kControlReg], 1);
 }
 
-TEST_F(AmlI2cTest, DISABLED_TransferError) {
+TEST_F(AmlI2cTest, TransferError) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t buffer[4];
@@ -351,8 +352,7 @@ TEST_F(AmlI2cTest, DISABLED_TransferError) {
   EXPECT_NOT_OK(Transact(0, &op, 1));
 }
 
-// TODO(fxbug.dev/120969): Re-enable after the bug has been fixed.
-TEST_F(AmlI2cTest, DISABLED_ManyTransactions) {
+TEST_F(AmlI2cTest, ManyTransactions) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   const std::vector<uint8_t> kExpectedReadData{0x41, 0x6a, 0x51, 0x4f, 0xca, 0xd3, 0x5b, 0xe5};
@@ -414,7 +414,7 @@ TEST_F(AmlI2cTest, DISABLED_ManyTransactions) {
   });
 }
 
-TEST_F(AmlI2cTest, DISABLED_MultipleControllers) {
+TEST_F(AmlI2cTest, MultipleControllers) {
   EXPECT_NO_FATAL_FAILURE(Init(4));
 
   uint8_t write_buffer[] = {0x45};
@@ -450,7 +450,7 @@ TEST_F(AmlI2cTest, DISABLED_MultipleControllers) {
   EXPECT_NOT_OK(i2c.Transact(4, &op, 1));
 }
 
-TEST_F(AmlI2cTest, DISABLED_TransactionTooBig) {
+TEST_F(AmlI2cTest, TransactionTooBig) {
   EXPECT_NO_FATAL_FAILURE(Init(1));
 
   uint8_t buffer[513];
@@ -465,7 +465,7 @@ TEST_F(AmlI2cTest, DISABLED_TransactionTooBig) {
   EXPECT_NOT_OK(Transact(0, &op, 1));
 }
 
-TEST_F(AmlI2cTest, DISABLED_Metadata) {
+TEST_F(AmlI2cTest, Metadata) {
   aml_i2c_delay_values metadata[]{
       {
           .quarter_clock_delay = 0,
@@ -489,7 +489,7 @@ TEST_F(AmlI2cTest, DISABLED_Metadata) {
   EXPECT_EQ(mmio()[kTargetAddrReg], (0xf12 << 16) | (1 << 28));
 }
 
-TEST_F(AmlI2cTest, DISABLED_NoMetadata) {
+TEST_F(AmlI2cTest, NoMetadata) {
   EXPECT_NO_FATAL_FAILURE(Init(3));
 
   EXPECT_EQ(mmio()[kControlReg], 0);
@@ -542,7 +542,7 @@ TEST_F(AmlI2cTest, MetadataTooSmall) {
   EXPECT_NOT_OK(aml_i2c_bind(nullptr, root_.get()));
 }
 
-TEST_F(AmlI2cTest, DISABLED_CanUsePDevFragment) {
+TEST_F(AmlI2cTest, CanUsePDevFragment) {
   root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
   EXPECT_OK(zx::vmo::create(kMmioSize, 0, &mmio_));
 
