@@ -30,6 +30,21 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
     }
 }
 
+/// An extension trait adding functionality to [`Poll`].
+pub trait PollExt<T> {
+    /// Like [`Poll::is_ready`], but the caller must provide the inner type.
+    ///
+    /// This allows both the authors and the reviewers to check if information
+    /// is being discarded unnoticed.
+    fn is_ready_checked<TT: sealed::EqType<T>>(&self) -> bool;
+}
+
+impl<T> PollExt<T> for core::task::Poll<T> {
+    fn is_ready_checked<TT: sealed::EqType<T>>(&self) -> bool {
+        core::task::Poll::is_ready(self)
+    }
+}
+
 mod sealed {
     /// `EqType<T>` indicates that the implementer is equal to `T`.
     ///
