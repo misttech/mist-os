@@ -59,6 +59,8 @@ group("allow_non_hermetic_packages") {
     "//src/virtualization/bin/vmm/device/virtio_magma:*",
     "//src/virtualization/lib/guest_interaction:*",
     "//src/virtualization/tests:*",
+    "//vendor/google/bin/*",
+    "//vendor/google/media/*",
   ]
 }
 
