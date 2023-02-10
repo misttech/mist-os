@@ -5,8 +5,9 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_I2C_I2C_BUS_H_
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_BUS_H_
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/ddk/driver.h>
+#include <lib/async/dispatcher.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 
@@ -29,15 +30,22 @@ class I2cBus : public fbl::RefCounted<I2cBus> {
   using TransactCallback = void (*)(void* ctx, zx_status_t status, const TransactOp* op_list,
                                     size_t op_count);
 
-  explicit I2cBus(zx_device_t* parent, ddk::I2cImplProtocolClient i2c, uint32_t bus_id);
-  virtual ~I2cBus() = default;
-  zx_status_t Start();
+  static zx_status_t CreateAndAddChildren(
+      zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
+      const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels,
+      async_dispatcher_t* dispatcher);
+
+  explicit I2cBus(zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
+                  uint64_t max_transfer_size);
+  virtual ~I2cBus() {
+    AsyncStop();
+    WaitForStop();
+  }
+  zx_status_t Start(zx_device_t* parent);
   void AsyncStop();
   void WaitForStop();
   virtual void Transact(uint16_t address, const TransactOp* op_list, size_t op_count,
                         TransactCallback callback, void* cookie);
-
-  size_t max_transfer() const { return max_transfer_; }
 
  private:
   // struct representing an I2C transaction.
@@ -54,9 +62,9 @@ class I2cBus : public fbl::RefCounted<I2cBus> {
   int I2cThread();
 
   zx_device_t* parent_;
-  ddk::I2cImplProtocolClient i2c_;
+  const ddk::I2cImplProtocolClient i2c_;
   const uint32_t bus_id_;
-  size_t max_transfer_;
+  const uint64_t max_transfer_;
 
   list_node_t queued_txns_ __TA_GUARDED(mutex_);
   list_node_t free_txns_ __TA_GUARDED(mutex_);

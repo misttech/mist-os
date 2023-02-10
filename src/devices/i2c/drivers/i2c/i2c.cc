@@ -4,134 +4,92 @@
 
 #include "i2c.h"
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fdf/dispatcher.h>
-#include <lib/sync/completion.h>
-#include <threads.h>
-#include <zircon/types.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
 #include <memory>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/mutex.h>
 
-#include "i2c-child.h"
-#include "lib/fdf/cpp/dispatcher.h"
+#include "i2c-bus.h"
 #include "src/devices/i2c/drivers/i2c/i2c_bind.h"
 
 namespace i2c {
-
-void I2cDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  for (auto& bus : i2c_buses_) {
-    bus->AsyncStop();
-  }
-
-  txn.Reply();
-}
-
-void I2cDevice::DdkRelease() {
-  for (auto& bus : i2c_buses_) {
-    bus->WaitForStop();
-  }
-  delete this;
-}
 
 zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
   return Create(ctx, parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
 }
 
 zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher) {
-  i2c_impl_protocol_t i2c;
-  auto status = device_get_protocol(parent, ZX_PROTOCOL_I2C_IMPL, &i2c);
-  if (status != ZX_OK) {
-    return status;
+  ddk::I2cImplProtocolClient i2c(parent);
+  if (!i2c.is_valid()) {
+    zxlogf(ERROR, "Failed to get i2cimpl client");
+    return ZX_ERR_NO_RESOURCES;
   }
 
-  fbl::AllocChecker ac;
-  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, &i2c));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  const uint32_t bus_base = i2c.GetBusBase();
 
-  status = device->Init(&i2c);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = device->DdkAdd(ddk::DeviceAddArgs("i2c").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  device->AddChildren(dispatcher);
-
-  [[maybe_unused]] auto* dummy = device.release();
-
-  return ZX_OK;
-}
-
-zx_status_t I2cDevice::Init(ddk::I2cImplProtocolClient i2c) {
-  first_bus_id_ = i2c.GetBusBase();
-  uint32_t bus_count = i2c.GetBusCount();
+  const uint32_t bus_count = i2c.GetBusCount();
   if (!bus_count) {
+    zxlogf(ERROR, "i2cimpl driver has no buses");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
+      parent, DEVICE_METADATA_I2C_CHANNELS);
+  if (!decoded.is_ok()) {
+    zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+    return decoded.error_value();
+  }
+
+  if (!decoded.value()->has_channels()) {
+    zxlogf(ERROR, "No channels supplied");
+    return ZX_ERR_NO_RESOURCES;
+  }
+
+  const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels =
+      decoded.value()->channels();
+
+  for (auto& channel : channels) {
+    const uint32_t bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
+    if (bus_id < bus_base || (bus_id - bus_base) >= bus_count) {
+      zxlogf(ERROR, "Bus ID %u out of range", bus_id);
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
   fbl::AllocChecker ac;
-  i2c_buses_.reserve(bus_count, &ac);
+  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, std::move(decoded.value())));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  for (uint32_t i = first_bus_id_; i < first_bus_id_ + bus_count; i++) {
-    auto i2c_bus = fbl::MakeRefCountedChecked<I2cBus>(&ac, this->zxdev_, i2c, i);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("i2c").set_flags(DEVICE_ADD_NON_BINDABLE));
+  if (status != ZX_OK) {
+    return status;
+  }
 
-    auto status = i2c_bus->Start();
+  status = device->Init(i2c, bus_base, bus_count, dispatcher);
+
+  [[maybe_unused]] auto* unused = device.release();
+
+  return status;
+}
+
+zx_status_t I2cDevice::Init(const ddk::I2cImplProtocolClient& i2c, const uint32_t bus_base,
+                            const uint32_t bus_count, async_dispatcher_t* const dispatcher) {
+  zxlogf(DEBUG, "%zu channels supplied.", metadata_->channels().count());
+
+  for (uint32_t i = 0; i < bus_count; i++) {
+    zx_status_t status =
+        I2cBus::CreateAndAddChildren(zxdev(), i2c, i + bus_base, metadata_->channels(), dispatcher);
     if (status != ZX_OK) {
       return status;
     }
-
-    i2c_buses_.push_back(std::move(i2c_bus));
   }
 
   return ZX_OK;
-}
-
-void I2cDevice::AddChildren(async_dispatcher_t* dispatcher) {
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-      parent(), DEVICE_METADATA_I2C_CHANNELS);
-  if (!decoded.is_ok()) {
-    return;
-  }
-
-  fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata& metadata = *decoded.value();
-  if (!metadata.has_channels()) {
-    zxlogf(INFO, "%s: no channels supplied.", __func__);
-    return;
-  }
-
-  zxlogf(INFO, "%s: %zu channels supplied.", __func__, metadata.channels().count());
-
-  for (auto& channel : metadata.channels()) {
-    const uint32_t bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
-    if (bus_id < first_bus_id_ || (bus_id - first_bus_id_) >= i2c_buses_.size()) {
-      zxlogf(ERROR, "%s: bus_id %u out of range", __func__, bus_id);
-      return;
-    }
-
-    const uint32_t bus_index = bus_id - first_bus_id_;
-    zx_status_t status =
-        I2cChild::CreateAndAddDevice(zxdev(), channel, i2c_buses_[bus_index], dispatcher);
-    if (status != ZX_OK) {
-      return;
-    }
-  }
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

@@ -5,14 +5,10 @@
 #include "i2c-child.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/sync/completion.h>
-#include <threads.h>
-#include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/mutex.h>
 
 #include "src/devices/i2c/drivers/i2c/i2c_bind.h"
 

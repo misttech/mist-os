@@ -5,40 +5,34 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_I2C_I2C_H_
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_H_
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
+#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/vector.h>
-
-#include "i2c-bus.h"
 
 namespace i2c {
 
 class I2cDevice;
-using I2cDeviceType = ddk::Device<I2cDevice, ddk::Unbindable>;
+using I2cDeviceType = ddk::Device<I2cDevice>;
 
 class I2cDevice : public I2cDeviceType {
  public:
-  I2cDevice(zx_device_t* parent, const i2c_impl_protocol_t* i2c)
-      : I2cDeviceType(parent), i2c_(i2c) {}
+  I2cDevice(zx_device_t* parent,
+            ddk::DecodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata> metadata)
+      : I2cDeviceType(parent), metadata_(std::move(metadata)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
   static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
 
-  void DdkRelease();
-  void DdkUnbind(ddk::UnbindTxn txn);
+  void DdkRelease() { delete this; }
 
  private:
-  zx_status_t Init(ddk::I2cImplProtocolClient i2c);
-  void AddChildren(async_dispatcher_t* dispatcher);
+  zx_status_t Init(const ddk::I2cImplProtocolClient& i2c, uint32_t bus_base, uint32_t bus_count,
+                   async_dispatcher_t* dispatcher);
 
-  const ddk::I2cImplProtocolClient i2c_;
-  uint32_t first_bus_id_;
-  // List of I2C buses.
-  fbl::Vector<fbl::RefPtr<I2cBus>> i2c_buses_;
+  // Retain ownership of the metadata so we can pass references to children.
+  ddk::DecodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata> metadata_;
 };
 
 }  // namespace i2c

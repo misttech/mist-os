@@ -9,35 +9,54 @@
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
-#include <stdlib.h>
-#include <string.h>
-#include <threads.h>
-#include <zircon/assert.h>
-#include <zircon/status.h>
-#include <zircon/syscalls.h>
 #include <zircon/threads.h>
-
-#include <mutex>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
+#include <fbl/ref_ptr.h>
+
+#include "i2c-child.h"
 
 namespace i2c {
 
-I2cBus::I2cBus(zx_device_t* parent, ddk::I2cImplProtocolClient i2c, uint32_t bus_id)
-    : parent_(parent), i2c_(i2c), bus_id_(bus_id) {
+zx_status_t I2cBus::CreateAndAddChildren(
+    zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, const uint32_t bus_id,
+    const fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel>& channels,
+    async_dispatcher_t* const dispatcher) {
+  uint64_t max_transfer_size = 0;
+  if (zx_status_t status = i2c.GetMaxTransferSize(bus_id, &max_transfer_size); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get max transfer size: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  auto bus = fbl::MakeRefCounted<I2cBus>(parent, i2c, bus_id, max_transfer_size);
+  if (zx_status_t status = bus->Start(parent); status != ZX_OK) {
+    return status;
+  }
+
+  for (const auto& channel : channels) {
+    const uint32_t child_bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
+    if (bus_id == child_bus_id) {
+      zx_status_t status = I2cChild::CreateAndAddDevice(parent, channel, bus, dispatcher);
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
+  }
+
+  return ZX_OK;
+}
+
+I2cBus::I2cBus(zx_device_t* parent, const ddk::I2cImplProtocolClient& i2c, uint32_t bus_id,
+               uint64_t max_transfer_size)
+    : parent_(parent), i2c_(i2c), bus_id_(bus_id), max_transfer_(max_transfer_size) {
   list_initialize(&queued_txns_);
   list_initialize(&free_txns_);
   sync_completion_reset(&txn_signal_);
 }
 
-zx_status_t I2cBus::Start() {
-  auto status = i2c_.GetMaxTransferSize(bus_id_, &max_transfer_);
-  if (status != ZX_OK) {
-    return status;
-  }
-
+zx_status_t I2cBus::Start(zx_device_t* parent) {
   char name[32];
   snprintf(name, sizeof(name), "I2cBus[%u]", bus_id_);
   auto thunk = [](void* arg) -> int { return static_cast<I2cBus*>(arg)->I2cThread(); };
@@ -52,8 +71,9 @@ zx_status_t I2cBus::Start() {
     const zx::duration period = deadline;
 
     zx::profile bus_profile;
-    status = device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(),
-                                         name, bus_profile.reset_and_get_address());
+    zx_status_t status =
+        device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(), name,
+                                    bus_profile.reset_and_get_address());
     if (status != ZX_OK) {
       zxlogf(WARNING, "I2cBus::Start: Failed to get deadline profile: %s",
              zx_status_get_string(status));
