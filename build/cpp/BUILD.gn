@@ -46,18 +46,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/cpu/drivers/aml-cpu:aml-cpu-test-bin",
-
-    #------------------
-    #------------------
-    "//src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-test-bin",
-
-    #------------------
-    #------------------
     "//src/lib/fidl/c/walker_tests:test_sources",
   ]
 }

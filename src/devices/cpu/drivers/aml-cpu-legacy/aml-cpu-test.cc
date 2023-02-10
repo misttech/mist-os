@@ -368,7 +368,9 @@ class AmlCpuTest : public AmlCpu {
 
   zx_status_t Init();
   static zx_status_t MessageOp(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn);
-  zx::channel& GetMessengerChannel() { return messenger_.local(); }
+  fidl::ClientEnd<fuchsia_cpuctrl::Device> TakeMessengerChannel() {
+    return fidl::ClientEnd<fuchsia_cpuctrl::Device>{std::move(messenger_.local())};
+  }
 
   zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
 
@@ -405,7 +407,7 @@ void AmlCpuTestFixture::SetUp() {
   dut_ = std::make_unique<AmlCpuTest>(std::move(thermal_client));
   ASSERT_OK(dut_->Init());
 
-  cpu_client_ = CpuCtrlSyncClient(std::move(dut_->GetMessengerChannel()));
+  cpu_client_ = CpuCtrlSyncClient(dut_->TakeMessengerChannel());
 }
 
 TEST_F(AmlCpuTestFixture, TestGetPerformanceStateInfo) {

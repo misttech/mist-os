@@ -43,22 +43,23 @@ fidl::WireSyncClient<amlogic_cpu::fuchsia_thermal::Device> CreateFidlClient(
     const ddk::ThermalProtocolClient& protocol_client, zx_status_t* status) {
   // This channel pair will be used to talk to the Thermal Device's FIDL
   // interface.
-  zx::channel channel_local, channel_remote;
-  *status = zx::channel::create(0, &channel_local, &channel_remote);
+  zx::result endpoints = fidl::CreateEndpoints<amlogic_cpu::fuchsia_thermal::Device>();
+  *status = endpoints.status_value();
   if (*status != ZX_OK) {
     zxlogf(ERROR, "aml-cpu: Failed to create channel pair, st = %d\n", *status);
     return {};
   }
+  auto& [channel_local, channel_remote] = endpoints.value();
 
   // Pass one end of the channel to the Thermal driver. The thermal driver will
   // serve its FIDL interface over this channel.
-  *status = protocol_client.Connect(std::move(channel_remote));
+  *status = protocol_client.Connect(channel_remote.TakeChannel());
   if (*status != ZX_OK) {
     zxlogf(ERROR, "aml-cpu: failed to connect to thermal driver, st = %d\n", *status);
     return {};
   }
 
-  return fidl::WireSyncClient<amlogic_cpu::fuchsia_thermal::Device>(std::move(channel_local));
+  return fidl::WireSyncClient{std::move(channel_local)};
 }
 
 zx_status_t GetDeviceName(bool big_little, PowerDomain power_domain, char const** name) {
