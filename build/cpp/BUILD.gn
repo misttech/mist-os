@@ -15,11 +15,7 @@ config("fidl-llcpp-deprecated-raw-channels") {
   #   scripts/gn/trim_visibility.py --target="//build/cpp:fidl-llcpp-deprecated-raw-channels"
   #
   # and replace the contents of `visibility` with the script output.
-  visibility = [
-    #------------------
-    #------------------
-    "//src/devices/bin/acpidump:src",
-  ]
+  visibility = []
 }
 
 # TODO(fxbug.dev/69585): Delete this config after all user code

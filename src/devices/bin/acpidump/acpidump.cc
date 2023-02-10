@@ -4,11 +4,9 @@
 
 #include "acpidump.h"
 
-#include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <lib/cmdline/args_parser.h>
-#include <lib/fdio/cpp/caller.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
@@ -26,7 +24,6 @@
 
 #include <fbl/array.h>
 #include <fbl/string_printf.h>
-#include <fbl/unique_fd.h>
 
 namespace acpidump {
 
@@ -79,7 +76,7 @@ bool ParseArgs(cpp20::span<const char* const> args, Args* result) {
   }
 
   // Ensure no additional args were given.
-  if (params.size() > 0) {
+  if (!params.empty()) {
     fprintf(stderr, "Unknown argument: '%s'\n", params[0].c_str());
     return false;
   }
@@ -119,7 +116,7 @@ void PrintTableNames(const fidl::VectorView<TableInfo>& entries) {
 }
 
 // Fetch raw data for a table.
-zx_status_t FetchTable(const zx::channel& channel, const TableInfo& table,
+zx_status_t FetchTable(const fidl::WireSyncClient<Tables>& client, const TableInfo& table,
                        fbl::Array<uint8_t>* data) {
   // Allocate a VMO for the read.
   zx::vmo vmo;
@@ -134,14 +131,17 @@ zx_status_t FetchTable(const zx::channel& channel, const TableInfo& table,
   }
 
   // Fetch the data.
-  fidl::WireResult<Tables::ReadNamedTable> result =
-      fidl::WireCall<Tables>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
+  const fidl::WireResult result = client->ReadNamedTable(table.name, 0, std::move(vmo_copy));
   if (!result.ok()) {
     return result.status();
   }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
 
   // Copy the data into memory.
-  uint32_t size = result.value().value()->size;
+  uint32_t size = response.value()->size;
   auto table_data = fbl::Array<uint8_t>(new uint8_t[size], size);
   if (zx_status_t status = vmo.read(table_data.data(), 0, size); status != ZX_OK) {
     return status;
@@ -194,64 +194,31 @@ void PrintHex(const char* name, const fbl::Array<uint8_t>& data) {
   putchar('\n');
 }
 
-// Open the ACPI device, waiting until it appears if necessary (e.g., if we run shortly
-// after system boot).
-static fbl::unique_fd OpenAcpiDevice() {
-  zx::duration poll_delay = zx::msec(1);
-  bool first_poll = true;
-
-  while (true) {
-    // Attempt to open the device.
-    fbl::unique_fd fd{open(kAcpiDevicePath, O_RDONLY)};
-    if (fd.is_valid()) {
-      return fd;
-    }
-
-    // If we have an error (other than "file not found") print an error and return.
-    if (errno != ENOENT) {
-      fprintf(stderr, "Failed to open '%s': %s\n", kAcpiDevicePath, strerror(errno));
-      return fbl::unique_fd();
-    }
-
-    // If we couldn't open it because it doesn't exist, it might just be that
-    // ACPI hasn't been enumerated yet. Poll the file every so often.
-    //
-    // TODO(dgreenaway): Instead of polling, using the Watch API.
-    if (first_poll) {
-      fprintf(stderr, "ACPI device '%s' not found. Waiting for it to appear...\n", kAcpiDevicePath);
-      first_poll = false;
-    }
-
-    // Poll with exponential backoff, up to a 1 second polling interval.
-    zx::nanosleep(zx::deadline_after(poll_delay));
-    poll_delay = std::min(poll_delay * 2, zx::sec(1));
-  }
-}
-
 zx_status_t AcpiDump(const Args& args) {
-  // Open up channel to ACPI device.
-  fbl::unique_fd fd = OpenAcpiDevice();
-  if (!fd.is_valid()) {
-    return ZX_ERR_UNAVAILABLE;
+  zx::result acpi_device = device_watcher::RecursiveWaitForFile(kAcpiDevicePath);
+  if (acpi_device.is_error()) {
+    fprintf(stderr, "Failed to open '%s': %s\n", kAcpiDevicePath, acpi_device.status_string());
+    return acpi_device.status_value();
   }
-  fdio_cpp::FdioCaller dev(std::move(fd));
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<fuchsia_acpi_tables::Tables>{std::move(acpi_device.value())}};
 
   // List ACPI entries.
-  fidl::WireResult<Tables::ListTableEntries> result =
-      fidl::WireCall<Tables>(dev.channel())->ListTableEntries();
+  const fidl::WireResult result = client->ListTableEntries();
   if (!result.ok()) {
     fprintf(stderr, "Could not list ACPI table entries: %s.\n",
             zx_status_get_string(result.status()));
     return result.status();
   }
-  if (result.value().is_error()) {
+  const fit::result response = result.value();
+  if (response.is_error()) {
     fprintf(stderr, "Call to list ACPI table entries failed: %s.\n",
-            zx_status_get_string(result.value().error_value()));
-    return result.value().error_value();
+            zx_status_get_string(response.error_value()));
+    return response.error_value();
   }
 
   // Print summary if requested.
-  auto& entries = result.value().value()->entries;
+  auto& entries = response.value()->entries;
   if (args.table_names_only) {
     PrintTableNames(entries);
     return 0;
@@ -262,15 +229,15 @@ zx_status_t AcpiDump(const Args& args) {
   for (auto table : entries) {
     // Skip over tables we should ignore.
     if (args.table.has_value() &&
-        std::string_view(reinterpret_cast<const char*>(table.name.begin()), table.name.size()) !=
-            args.table.value()) {
+        args.table.value() !=
+            std::string_view(reinterpret_cast<const char*>(table.name.data()), table.name.size())) {
       continue;
     }
     found_table = true;
 
     // Fetch table.
     fbl::Array<uint8_t> table_data;
-    if (zx_status_t status = FetchTable(*dev.channel(), table, &table_data); status != ZX_OK) {
+    if (zx_status_t status = FetchTable(client, table, &table_data); status != ZX_OK) {
       fprintf(stderr, "Failed to read table '%s': %s\n", SignatureToString(table.name).c_str(),
               zx_status_get_string(status));
       return 1;

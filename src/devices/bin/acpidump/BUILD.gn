@@ -12,18 +12,12 @@ source_set("src") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp",
-    "//sdk/lib/fdio",
+    "//sdk/lib/device-watcher/cpp",
     "//zircon/system/ulib/cmdline",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
   ]
   visibility = [ ":*" ]
-
-  # TODO(fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
-  # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
 }
 
 executable("acpidump") {
