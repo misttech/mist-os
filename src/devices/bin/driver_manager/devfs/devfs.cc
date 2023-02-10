@@ -184,49 +184,6 @@ bool Devnode::VnodeImpl::IsService() const {
       target_);
 }
 
-zx_status_t Devnode::VnodeImpl::OpenNode(ValidatedOptions options,
-                                         fbl::RefPtr<Vnode>* out_redirect) {
-  if (options->flags.directory) {
-    return ZX_OK;
-  }
-  if (IsDirectory()) {
-    return ZX_OK;
-  }
-  if (IsService()) {
-    return ZX_OK;
-  }
-  *out_redirect = remote_;
-  return ZX_OK;
-}
-
-fs::VnodeProtocolSet Devnode::VnodeImpl::RemoteNode::GetProtocols() const {
-  return parent_.GetProtocols();
-}
-
-zx_status_t Devnode::VnodeImpl::RemoteNode::GetNodeInfoForProtocol(fs::VnodeProtocol protocol,
-                                                                   fs::Rights rights,
-                                                                   fs::VnodeRepresentation* info) {
-  return parent_.GetNodeInfoForProtocol(protocol, rights, info);
-}
-
-bool Devnode::VnodeImpl::RemoteNode::IsRemote() const { return true; }
-
-zx_status_t Devnode::VnodeImpl::RemoteNode::OpenRemote(fio::OpenFlags flags, fio::ModeType mode,
-                                                       fidl::StringView path,
-                                                       fidl::ServerEnd<fio::Node> object) const {
-  ZX_ASSERT_MSG(path.get() == ".", "unexpected path to remote '%.*s'",
-                static_cast<int>(path.size()), path.data());
-  return std::visit(
-      overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
-                 [&](const Connector& connector) {
-                   return connector.connector->Connect(object.TakeChannel()).status();
-                 },
-                 [&](const Remote& remote) {
-                   return remote.connector->ConnectMultiplexed(object.TakeChannel()).status();
-                 }},
-      parent_.target_);
-}
-
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
   return children().GetAttributes(a);
 }

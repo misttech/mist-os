@@ -101,7 +101,6 @@ class Devnode {
                                        fs::VnodeRepresentation* info) final;
     zx_status_t ConnectService(zx::channel channel) final;
     bool IsService() const final;
-    zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
 
     PseudoDir& children() const { return *children_; }
 
@@ -115,25 +114,7 @@ class Devnode {
 
     bool IsDirectory() const;
 
-    class RemoteNode : public fs::Vnode {
-     private:
-      friend fbl::internal::MakeRefCountedHelper<RemoteNode>;
-
-      explicit RemoteNode(VnodeImpl& parent) : parent_(parent) {}
-
-      fs::VnodeProtocolSet GetProtocols() const final;
-      zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                         fs::VnodeRepresentation* info) final;
-
-      bool IsRemote() const final;
-      zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
-                             fidl::ServerEnd<fuchsia_io::Node>) const final;
-
-      VnodeImpl& parent_;
-    };
-
     fbl::RefPtr<PseudoDir> children_ = fbl::MakeRefCounted<PseudoDir>();
-    fbl::RefPtr<RemoteNode> remote_ = fbl::MakeRefCounted<RemoteNode>(*this);
   };
 
  private:
