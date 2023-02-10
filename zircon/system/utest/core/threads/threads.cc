@@ -77,7 +77,7 @@ static void resume_thread_synchronous(zx_handle_t thread, zx_handle_t suspend_to
 static void advance_over_breakpoint(zx_handle_t thread) {
 #if defined(__aarch64__)
   // Advance 4 bytes to the next instruction after the debug break.
-  zx_thread_state_general_regs regs;
+  zx_thread_state_general_regs_t regs;
   ASSERT_EQ(zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)), ZX_OK);
   regs.pc += 4;
   ASSERT_EQ(zx_thread_write_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)),
@@ -892,7 +892,7 @@ TEST(Threads, StartSuspendedAndResumedThread) {
 }
 
 static void jump_to_thread_exit(zx_handle_t thread) {
-  zx_thread_state_general_regs regs;
+  zx_thread_state_general_regs_t regs;
   ASSERT_EQ(zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)), ZX_OK);
 #if defined(__aarch64__)
   regs.pc = reinterpret_cast<uint64_t>(&zx_thread_exit);

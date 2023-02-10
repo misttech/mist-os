@@ -29,8 +29,8 @@ class FuchsiaMemory : public Memory {
   zx_handle_t process_;
 };
 
-// Convert zx_thread_state_general_regs to Registers.
-Registers FromFuchsiaRegisters(const zx_thread_state_general_regs& regs);
+// Convert zx_thread_state_general_regs_t to Registers.
+Registers FromFuchsiaRegisters(const zx_thread_state_general_regs_t& regs);
 
 }  // namespace unwinder
 

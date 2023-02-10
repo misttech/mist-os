@@ -17,17 +17,17 @@ struct Thread;
 
 // The caller is responsible for making sure the thread is in an exception
 // or is suspended, and stays so.
-zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs* out);
-zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_regs* in);
+zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t* out);
+zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_regs_t* in);
 
-zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs* out);
-zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs* in);
+zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out);
+zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in);
 
-zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs* out);
-zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs* in);
+zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* out);
+zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs_t* in);
 
-zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs* out);
-zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs* in);
+zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* out);
+zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs_t* in);
 
 zx_status_t arch_get_single_step(Thread* thread, zx_thread_state_single_step_t* out);
 zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_step_t* in);

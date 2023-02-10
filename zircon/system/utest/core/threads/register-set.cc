@@ -64,8 +64,8 @@ void general_regs_fill_test_values(zx_thread_state_general_regs_t* regs) {
 #endif
 }
 
-void fp_regs_fill_test_values(zx_thread_state_fp_regs* regs) {
-  memset(regs, 0, sizeof(zx_thread_state_fp_regs));
+void fp_regs_fill_test_values(zx_thread_state_fp_regs_t* regs) {
+  memset(regs, 0, sizeof(zx_thread_state_fp_regs_t));
 #if defined(__x86_64__)
   for (size_t i = 0; i < 7; i++)
     regs->st[i].low = i;
@@ -79,8 +79,8 @@ void fp_regs_fill_test_values(zx_thread_state_fp_regs* regs) {
 #endif
 }
 
-void vector_regs_fill_test_values(zx_thread_state_vector_regs* regs) {
-  memset(regs, 0, sizeof(zx_thread_state_vector_regs));
+void vector_regs_fill_test_values(zx_thread_state_vector_regs_t* regs) {
+  memset(regs, 0, sizeof(zx_thread_state_vector_regs_t));
 #if defined(__x86_64__)
   for (uint64_t i = 0; i < 16; i++) {
     // Only sets the XMM registers (first two) since that's all that's guaranteed.
@@ -626,7 +626,7 @@ __asm__(
 
 // save_fp_regs_and_exit_thread() function.
 #if defined(__x86_64__)
-static_assert(offsetof(zx_thread_state_fp_regs, st) == 32, "");
+static_assert(offsetof(zx_thread_state_fp_regs_t, st) == 32, "");
 __asm__(
     ".pushsection .text,\"ax\", @progbits\n"
     ".global save_fp_regs_and_exit_thread\n"
@@ -664,7 +664,7 @@ __asm__(
 
 // save_vector_regs_and_exit_thread() function.
 #if defined(__x86_64__)
-static_assert(offsetof(zx_thread_state_vector_regs, zmm) == 0, "");
+static_assert(offsetof(zx_thread_state_vector_regs_t, zmm) == 0, "");
 __asm__(
     ".pushsection .text,\"ax\", @progbits\n"
     ".global save_vector_regs_and_exit_thread\n"

@@ -53,7 +53,7 @@ uint32_t GetHardwareBreakpointCount();
 uint32_t GetHardwareWatchpointCount();
 
 // Converts the given register structure to a vector of debug_ipc registers.
-void SaveGeneralRegs(const zx_thread_state_general_regs& input,
+void SaveGeneralRegs(const zx_thread_state_general_regs_t& input,
                      std::vector<debug::RegisterValue>& out);
 
 // The registers in the given category are appended to the given output vector.

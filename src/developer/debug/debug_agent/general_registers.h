@@ -20,7 +20,7 @@ namespace debug_agent {
 class GeneralRegisters {
  public:
   GeneralRegisters() : regs_() {}
-  explicit GeneralRegisters(const zx_thread_state_general_regs& r) : regs_(r) {}
+  explicit GeneralRegisters(const zx_thread_state_general_regs_t& r) : regs_(r) {}
 
 #if defined(__x86_64__)
   // Instruction pointer.
@@ -42,8 +42,8 @@ class GeneralRegisters {
   // Appends the current general registers to the given high-level register record.
   void CopyTo(std::vector<debug::RegisterValue>& dest) const;
 
-  zx_thread_state_general_regs& GetNativeRegisters() { return regs_; }
-  const zx_thread_state_general_regs& GetNativeRegisters() const { return regs_; }
+  zx_thread_state_general_regs_t& GetNativeRegisters() { return regs_; }
+  const zx_thread_state_general_regs_t& GetNativeRegisters() const { return regs_; }
 
   // TODO: Maintain a better id <-> platform register mapping and use here and in the arch files to
   // avoid this unnecessary std::vector creation and unify with the arch::SaveGeneralRegisters()
@@ -51,7 +51,7 @@ class GeneralRegisters {
   std::optional<uint64_t> GetRegister(debug::RegisterID reg_id) const;
 
  private:
-  zx_thread_state_general_regs regs_;
+  zx_thread_state_general_regs_t regs_;
 };
 
 }  // namespace debug_agent

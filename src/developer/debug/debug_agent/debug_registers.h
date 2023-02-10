@@ -20,7 +20,7 @@ namespace debug_agent {
 class DebugRegisters {
  public:
   DebugRegisters() : regs_() {}
-  explicit DebugRegisters(const zx_thread_state_debug_regs& r) : regs_(r) {}
+  explicit DebugRegisters(const zx_thread_state_debug_regs_t& r) : regs_(r) {}
 
   // Fills the given state the debug registers to what it should be if we added an execution HW
   // breakpoint for |address|. Return false if there are no registers left.
@@ -62,11 +62,11 @@ class DebugRegisters {
 
   std::string ToString() const;
 
-  zx_thread_state_debug_regs& GetNativeRegisters() { return regs_; }
-  const zx_thread_state_debug_regs& GetNativeRegisters() const { return regs_; }
+  zx_thread_state_debug_regs_t& GetNativeRegisters() { return regs_; }
+  const zx_thread_state_debug_regs_t& GetNativeRegisters() const { return regs_; }
 
  private:
-  zx_thread_state_debug_regs regs_;
+  zx_thread_state_debug_regs_t regs_;
 };
 
 }  // namespace debug_agent

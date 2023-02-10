@@ -249,7 +249,7 @@ void ThreadInterrupter::ThreadInterrupt() {
 }
 
 bool ThreadInterrupter::GrabRegisters(zx_handle_t thread, InterruptedThreadState* state) {
-  zx_thread_state_general_regs regs;
+  zx_thread_state_general_regs_t regs;
   zx_status_t status =
       zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs));
   if (status != ZX_OK) {

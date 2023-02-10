@@ -110,7 +110,7 @@ static inline bool mxcsr_is_valid(uint32_t mxcsr, uint32_t mxcsr_mask) {
 
 // Backend for arch_get_vector_regs and arch_set_vector_regs. This does a read or write of the
 // thread to or from the regs structure.
-zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs* regs,
+zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* regs,
                                     RegAccess access) {
   // Function to copy memory in the correct direction. Write the code using this function as if it
   // was "memcpy" in "get" mode, and it will be reversed in "set" mode.
@@ -122,7 +122,7 @@ zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs*
 
   if (access == RegAccess::kGet) {
     // Not all parts will be filled in in all cases so zero out first.
-    memset(regs, 0, sizeof(zx_thread_state_vector_regs));
+    memset(regs, 0, sizeof(zx_thread_state_vector_regs_t));
   }
 
   // Whether to force the components to be marked present in the xsave area.
@@ -307,9 +307,9 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
   return ZX_OK;
 }
 
-zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs* out) {
+zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out) {
   // Don't leak any reserved fields.
-  memset(out, 0, sizeof(zx_thread_state_fp_regs));
+  memset(out, 0, sizeof(zx_thread_state_fp_regs_t));
 
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
@@ -318,8 +318,7 @@ zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs* out) {
   uint32_t comp_size = 0;
   const x86_xsave_legacy_area* save =
       static_cast<const x86_xsave_legacy_area*>(x86_get_extended_register_state_component(
-          thread->arch().extended_register_buffer, X86_XSAVE_STATE_INDEX_X87,
-          false, &comp_size));
+          thread->arch().extended_register_buffer, X86_XSAVE_STATE_INDEX_X87, false, &comp_size));
   DEBUG_ASSERT(save);  // Legacy getter should always succeed.
 
   out->fcw = save->fcw;
@@ -333,7 +332,7 @@ zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs* out) {
   return ZX_OK;
 }
 
-zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs* in) {
+zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
@@ -355,18 +354,18 @@ zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs* in) 
   return ZX_OK;
 }
 
-zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs* out) {
+zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* out) {
   // The get_set function promises to not modify the thread state in get mode.
   return x86_get_set_vector_regs(thread, out, RegAccess::kGet);
 }
 
-zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs* in) {
+zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs_t* in) {
   // The get_set function won't write in "kSet" mode so the const_cast is safe.
-  return x86_get_set_vector_regs(thread, const_cast<zx_thread_state_vector_regs*>(in),
+  return x86_get_set_vector_regs(thread, const_cast<zx_thread_state_vector_regs_t*>(in),
                                  RegAccess::kSet);
 }
 
-zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs* out) {
+zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* out) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
@@ -384,7 +383,7 @@ zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs* out)
   return ZX_OK;
 }
 
-zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs* in) {
+zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs_t* in) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());

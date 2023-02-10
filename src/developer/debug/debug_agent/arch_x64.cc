@@ -80,7 +80,7 @@ using debug::RegisterID;
     break;
 
 zx_status_t ReadGeneralRegs(const zx::thread& thread, std::vector<debug::RegisterValue>& out) {
-  zx_thread_state_general_regs gen_regs;
+  zx_thread_state_general_regs_t gen_regs;
   zx_status_t status = thread.read_state(ZX_THREAD_STATE_GENERAL_REGS, &gen_regs, sizeof(gen_regs));
   if (status != ZX_OK)
     return status;
@@ -90,7 +90,7 @@ zx_status_t ReadGeneralRegs(const zx::thread& thread, std::vector<debug::Registe
 }
 
 zx_status_t ReadFPRegs(const zx::thread& thread, std::vector<debug::RegisterValue>& out) {
-  zx_thread_state_fp_regs fp_regs;
+  zx_thread_state_fp_regs_t fp_regs;
   zx_status_t status = thread.read_state(ZX_THREAD_STATE_FP_REGS, &fp_regs, sizeof(fp_regs));
   if (status != ZX_OK)
     return status;
@@ -116,7 +116,7 @@ zx_status_t ReadFPRegs(const zx::thread& thread, std::vector<debug::RegisterValu
 }
 
 zx_status_t ReadVectorRegs(const zx::thread& thread, std::vector<debug::RegisterValue>& out) {
-  zx_thread_state_vector_regs vec_regs;
+  zx_thread_state_vector_regs_t vec_regs;
   zx_status_t status = thread.read_state(ZX_THREAD_STATE_VECTOR_REGS, &vec_regs, sizeof(vec_regs));
   if (status != ZX_OK)
     return status;
@@ -187,7 +187,7 @@ const int64_t kExceptionOffsetForSoftwareBreakpoint = 1;
 
 ::debug::Arch GetCurrentArch() { return ::debug::Arch::kX64; }
 
-void SaveGeneralRegs(const zx_thread_state_general_regs& input,
+void SaveGeneralRegs(const zx_thread_state_general_regs_t& input,
                      std::vector<debug::RegisterValue>& out) {
   out.emplace_back(RegisterID::kX64_rax, input.rax);
   out.emplace_back(RegisterID::kX64_rbx, input.rbx);
@@ -302,8 +302,8 @@ zx_status_t WriteGeneralRegisters(const std::vector<debug::RegisterValue>& updat
     if (reg.data.size() != 8)
       return ZX_ERR_INVALID_ARGS;
 
-    // zx_thread_state_general_regs has the same layout as the RegisterID enum for x64 general
-    // registers.
+    // zx_thread_state_general_regs_t has the same layout as the RegisterID
+    // enum for x64 general registers.
     uint32_t id = static_cast<uint32_t>(reg.id);
     if (id < begin || id > last)
       return ZX_ERR_INVALID_ARGS;

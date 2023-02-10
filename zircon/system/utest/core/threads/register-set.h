@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef ZIRCON_SYSTEM_UTEST_CORE_THREADS_REGISTER_SET_H_
+#define ZIRCON_SYSTEM_UTEST_CORE_THREADS_REGISTER_SET_H_
 
 #include <zircon/compiler.h>
 #include <zircon/syscalls/debug.h>
@@ -33,8 +34,8 @@ struct thread_local_regs {
 
 // Initializes the register set with known test data.
 void general_regs_fill_test_values(zx_thread_state_general_regs_t* regs);
-void fp_regs_fill_test_values(zx_thread_state_fp_regs* regs);
-void vector_regs_fill_test_values(zx_thread_state_vector_regs* regs);
+void fp_regs_fill_test_values(zx_thread_state_fp_regs_t* regs);
+void vector_regs_fill_test_values(zx_thread_state_vector_regs_t* regs);
 void debug_regs_fill_test_values(zx_thread_state_debug_regs_t* to_write,
                                  zx_thread_state_debug_regs_t* expected);
 
@@ -70,3 +71,5 @@ void save_vector_regs_and_exit_thread();
 void save_thread_local_regs_and_exit_thread();
 
 __END_CDECLS
+
+#endif  // ZIRCON_SYSTEM_UTEST_CORE_THREADS_REGISTER_SET_H_

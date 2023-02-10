@@ -122,17 +122,17 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
   return ZX_OK;
 }
 
-zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs* out) {
+zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out) {
   // There are no ARM fp regs.
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs* in) {
+zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in) {
   // There are no ARM fp regs.
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs* out) {
+zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* out) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
@@ -148,7 +148,7 @@ zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs* ou
   return ZX_OK;
 }
 
-zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs* in) {
+zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs_t* in) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
@@ -164,7 +164,7 @@ zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_re
   return ZX_OK;
 }
 
-zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs* out) {
+zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* out) {
   *out = {};
   out->hw_bps_count = arm64_hw_breakpoint_count();
   out->hw_wps_count = arm64_hw_watchpoint_count();
@@ -194,7 +194,7 @@ zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs* out)
   return ZX_OK;
 }
 
-zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs* in) {
+zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs_t* in) {
   arm64_debug_state_t state = {};
 
   // We copy over the state from the input.

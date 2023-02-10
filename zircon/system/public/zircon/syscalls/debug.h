@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_DEBUG_
-#define SYSROOT_ZIRCON_SYSCALLS_DEBUG_
+#ifndef SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_
+#define SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
 
-#if defined(__x86_64__)
-
 // Value for ZX_THREAD_STATE_GENERAL_REGS on x86-64 platforms.
-typedef struct zx_thread_state_general_regs {
+typedef struct zx_x86_64_thread_state_general_regs {
   uint64_t rax;
   uint64_t rbx;
   uint64_t rcx;
@@ -34,10 +32,10 @@ typedef struct zx_thread_state_general_regs {
   uint64_t rflags;
   uint64_t fs_base;
   uint64_t gs_base;
-} zx_thread_state_general_regs_t;
+} zx_x86_64_thread_state_general_regs_t;
 
 // Value for ZX_THREAD_STATE_FP_REGS on x64. Holds x87 and MMX state.
-typedef struct zx_thread_state_fp_regs {
+typedef struct zx_x86_64_thread_state_fp_regs {
   uint16_t fcw;  // Control word.
   uint16_t fsw;  // Status word.
   uint8_t ftw;   // Tag word.
@@ -55,13 +53,13 @@ typedef struct zx_thread_state_fp_regs {
     uint64_t low;
     uint64_t high;
   } st[8];
-} zx_thread_state_fp_regs_t;
+} zx_x86_64_thread_state_fp_regs_t;
 
 // Value for ZX_THREAD_STATE_VECTOR_REGS on x64. Holds SSE and AVX registers.
 //
 // Setting vector registers will only work for threads that have previously executed an
 // instruction using the corresponding register class.
-typedef struct zx_thread_state_vector_regs {
+typedef struct zx_x86_64_thread_state_vector_regs {
   // When only 16 registers are supported (pre-AVX-512), zmm[16-31] will be 0.
   // YMM registers (256 bits) are v[0-4], XMM registers (128 bits) are v[0-2].
   struct {
@@ -75,44 +73,42 @@ typedef struct zx_thread_state_vector_regs {
   uint32_t mxcsr;
 
   uint8_t padding1[4];
-} zx_thread_state_vector_regs_t;
+} zx_x86_64_thread_state_vector_regs_t;
 
 // Value for ZX_THREAD_STATE_DEBUG_REGS on x64 platforms.
-typedef struct zx_thread_state_debug_regs {
+typedef struct zx_x86_64_thread_state_debug_regs {
   uint64_t dr[4];
   // DR4 and D5 are not used.
   uint64_t dr6;  // Status register.
   uint64_t dr7;  // Control register.
-} zx_thread_state_debug_regs_t;
-
-#elif defined(__aarch64__)
+} zx_x86_64_thread_state_debug_regs_t;
 
 // Value for ZX_THREAD_STATE_GENERAL_REGS on ARM64 platforms.
-typedef struct zx_thread_state_general_regs {
+typedef struct zx_arm64_thread_state_general_regs {
   uint64_t r[30];
   uint64_t lr;
   uint64_t sp;
   uint64_t pc;
   uint64_t cpsr;
   uint64_t tpidr;
-} zx_thread_state_general_regs_t;
+} zx_arm64_thread_state_general_regs_t;
 
 // Value for ZX_THREAD_STATE_FP_REGS on ARM64 platforms.
 // This is unused because vector state is used for all floating point on ARM64.
-typedef struct zx_thread_state_fp_regs {
+typedef struct zx_arm64_thread_state_fp_regs {
   // Avoids sizing differences for empty structs between C and C++.
   uint32_t unused;
-} zx_thread_state_fp_regs_t;
+} zx_arm64_thread_state_fp_regs_t;
 
 // Value for ZX_THREAD_STATE_VECTOR_REGS on ARM64 platforms.
-typedef struct zx_thread_state_vector_regs {
+typedef struct zx_arm64_thread_state_vector_regs {
   uint32_t fpcr;
   uint32_t fpsr;
   struct {
     uint64_t low;
     uint64_t high;
   } v[32];
-} zx_thread_state_vector_regs_t;
+} zx_arm64_thread_state_vector_regs_t;
 
 // ARMv8-A provides 2 to 16 hardware breakpoint registers.
 // The number is obtained by the BRPs field in the EDDFR register.
@@ -122,7 +118,7 @@ typedef struct zx_thread_state_vector_regs {
 #define AARCH64_MAX_HW_WATCHPOINTS 16
 
 // Value for ZX_THREAD_STATE_DEBUG_REGS for ARM64 platforms.
-typedef struct zx_thread_state_debug_regs {
+typedef struct zx_arm64_thread_state_debug_regs {
   struct {
     uint32_t dbgbcr;  //  HW Breakpoint Control register.
     uint8_t padding1[4];
@@ -152,7 +148,21 @@ typedef struct zx_thread_state_debug_regs {
 
   uint8_t padding1[2];
 
-} zx_thread_state_debug_regs_t;
+} zx_arm64_thread_state_debug_regs_t;
+
+#if defined(__x86_64__)
+
+typedef zx_x86_64_thread_state_general_regs_t zx_thread_state_general_regs_t;
+typedef zx_x86_64_thread_state_fp_regs_t zx_thread_state_fp_regs_t;
+typedef zx_x86_64_thread_state_vector_regs_t zx_thread_state_vector_regs_t;
+typedef zx_x86_64_thread_state_debug_regs_t zx_thread_state_debug_regs_t;
+
+#elif defined(__aarch64__)
+
+typedef zx_arm64_thread_state_general_regs_t zx_thread_state_general_regs_t;
+typedef zx_arm64_thread_state_fp_regs_t zx_thread_state_fp_regs_t;
+typedef zx_arm64_thread_state_vector_regs_t zx_thread_state_vector_regs_t;
+typedef zx_arm64_thread_state_debug_regs_t zx_thread_state_debug_regs_t;
 
 #endif
 
@@ -170,4 +180,4 @@ typedef uint32_t zx_thread_state_topic_t;
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_DEBUG_
+#endif  // SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_

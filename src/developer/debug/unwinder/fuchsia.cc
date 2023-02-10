@@ -20,7 +20,7 @@ Error FuchsiaMemory::ReadBytes(uint64_t addr, uint64_t size, void* dst) {
   return Success();
 }
 
-unwinder::Registers FromFuchsiaRegisters(const zx_thread_state_general_regs& regs) {
+unwinder::Registers FromFuchsiaRegisters(const zx_thread_state_general_regs_t& regs) {
 #if defined(__x86_64__)
   unwinder::Registers res(unwinder::Registers::Arch::kX64);
   // The first 4 registers are out-of-order.

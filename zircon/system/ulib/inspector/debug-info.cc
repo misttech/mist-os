@@ -109,7 +109,7 @@ typedef struct decoded_registers_t {
   zx_vaddr_t fp = 0;
 } decoded_registers;
 
-decoded_registers_t decode_registers(const zx_thread_state_general_regs* regs) {
+decoded_registers_t decode_registers(const zx_thread_state_general_regs_t* regs) {
   decoded_registers decoded;
 #if defined(__x86_64__)
   decoded.pc = regs->rip;
@@ -148,7 +148,7 @@ static void get_name(zx_handle_t handle, char* buf, size_t size) {
 }
 
 static void print_exception_report(FILE* out, const zx_exception_report_t& report,
-                                   const zx_thread_state_general_regs* regs,
+                                   const zx_thread_state_general_regs_t* regs,
                                    const inspector_excp_data_t* excp_data) {
   inspector::decoded_registers decoded = inspector::decode_registers(regs);
 

@@ -151,7 +151,7 @@ debug_ipc::ThreadRecord ZirconThreadHandle::GetThreadRecord(zx_koid_t process_ko
 }
 
 std::optional<GeneralRegisters> ZirconThreadHandle::GetGeneralRegisters() const {
-  zx_thread_state_general_regs r;
+  zx_thread_state_general_regs_t r;
   if (thread_.read_state(ZX_THREAD_STATE_GENERAL_REGS, &r, sizeof(r)) == ZX_OK)
     return GeneralRegisters(r);
   return std::nullopt;
@@ -159,11 +159,11 @@ std::optional<GeneralRegisters> ZirconThreadHandle::GetGeneralRegisters() const 
 
 void ZirconThreadHandle::SetGeneralRegisters(const GeneralRegisters& regs) {
   thread_.write_state(ZX_THREAD_STATE_GENERAL_REGS, &regs.GetNativeRegisters(),
-                      sizeof(zx_thread_state_general_regs));
+                      sizeof(zx_thread_state_general_regs_t));
 }
 
 std::optional<DebugRegisters> ZirconThreadHandle::GetDebugRegisters() const {
-  zx_thread_state_debug_regs regs;
+  zx_thread_state_debug_regs_t regs;
   if (thread_.read_state(ZX_THREAD_STATE_DEBUG_REGS, &regs, sizeof(regs)) == ZX_OK)
     return DebugRegisters(regs);
   return std::nullopt;
@@ -171,7 +171,7 @@ std::optional<DebugRegisters> ZirconThreadHandle::GetDebugRegisters() const {
 
 bool ZirconThreadHandle::SetDebugRegisters(const DebugRegisters& regs) {
   return thread_.write_state(ZX_THREAD_STATE_DEBUG_REGS, &regs.GetNativeRegisters(),
-                             sizeof(zx_thread_state_debug_regs)) == ZX_OK;
+                             sizeof(zx_thread_state_debug_regs_t)) == ZX_OK;
 }
 
 void ZirconThreadHandle::SetSingleStep(bool single_step) {

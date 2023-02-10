@@ -14,7 +14,8 @@ namespace unwinder {
 
 // The DWARF ID for each register.
 enum class RegisterID : uint8_t {
-  // x86_64. Please note the order is not RAX, RBX, RCX, RDX as in zx_thread_state_general_regs.
+  // x86_64. Please note the order is not RAX, RBX, RCX, RDX as in
+  // zx_thread_state_general_regs_t.
   kX64_rax = 0,
   kX64_rdx = 1,
   kX64_rcx = 2,

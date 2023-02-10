@@ -25,7 +25,7 @@ RegsFuchsia::~RegsFuchsia() = default;
 
 ArchEnum RegsFuchsia::Arch() { return ARCH_X86_64; }
 
-void RegsFuchsia::Set(const zx_thread_state_general_regs& input) {
+void RegsFuchsia::Set(const zx_thread_state_general_regs_t& input) {
   regs_.resize(kUnwindStackRegCount);
 
   regs_[X86_64_REG_RAX] = input.rax;
@@ -48,7 +48,7 @@ void RegsFuchsia::Set(const zx_thread_state_general_regs& input) {
 }
 
 zx_status_t RegsFuchsia::Read(zx_handle_t thread) {
-  zx_thread_state_general_regs thread_regs;
+  zx_thread_state_general_regs_t thread_regs;
   zx_status_t status =
       zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &thread_regs, sizeof(thread_regs));
   if (status != ZX_OK)
