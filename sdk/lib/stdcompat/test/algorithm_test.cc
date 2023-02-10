@@ -187,7 +187,7 @@ TEST(RemoveTest, IsAliasWhenStdIsAvailable) {
 
 TEST(RemoveTest, WithSelfMoveAvoided) {
   std::deque<std::string> container = {"value 1", "value 2"};
-  cpp20::remove(container.begin(), container.end(), "value 2");
+  std::ignore = cpp20::remove(container.begin(), container.end(), "value 2");
 
   ASSERT_EQ(container.size(), 2u);
   ASSERT_EQ(container.front(), "value 1");
