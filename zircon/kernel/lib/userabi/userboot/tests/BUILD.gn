@@ -16,7 +16,6 @@ group("boot_tests") {
 
 if (is_fuchsia) {
   source_set("helper") {
-    configs += [ "//build/c:fidl-deprecated-c-bindings" ]
     testonly = true
     visibility = [ ":*" ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
@@ -24,9 +23,6 @@ if (is_fuchsia) {
     sources = [ "helper.cc" ]
     public = [ "helper.h" ]
     deps = [
-      "//sdk/fidl/fuchsia.boot:fuchsia.boot_c",
-      "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_c",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_c",
       "//sdk/lib/fit",
       "//src/zircon/testing/standalone-test:headers",
       "//zircon/system/ulib/zx",
@@ -36,7 +32,6 @@ if (is_fuchsia) {
 
   # Verify that the '/svc' and svc stash handle work correctly.
   zbi_test_executable("early-boot-single-process-test-bin") {
-    configs += [ "//build/c:fidl-deprecated-c-bindings" ]
     sources = [ "svc-test.cc" ]
     deps = [
       ":helper",
@@ -51,13 +46,9 @@ if (is_fuchsia) {
 
   # Verify that the '/svc' and svc stash handle work correctly.
   zbi_test_executable("early-boot-multiple-process-test-bin") {
-    configs += [ "//build/c:fidl-deprecated-c-bindings" ]
     sources = [ "multiple-svc-test.cc" ]
     deps = [
       ":helper",
-      "//sdk/fidl/fuchsia.boot:fuchsia.boot_c",
-      "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_c",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_c",
       "//src/zircon/testing/standalone-test",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zxtest",

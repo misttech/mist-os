@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <fuchsia/boot/c/fidl.h>
 #include <lib/elfldltl/machine.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/processargs/processargs.h>
@@ -50,6 +49,17 @@
 #include "zbi.h"
 
 namespace {
+
+// TODO(fxbug.dev/121753): Replace copy & pasted FIDL C bindings with new C++ bindings when that's
+// allowed.
+
+struct fuchsia_boot_SvcStashStoreRequestMessage {
+  FIDL_ALIGNDECL
+  fidl_message_header_t hdr;
+  zx_handle_t svc_endpoint;
+};
+
+constexpr uint64_t fuchsia_boot_SvcStashStoreOrdinal = 0xC2648E356CA2870;
 
 constexpr const char kStackVmoName[] = "userboot-child-initial-stack";
 

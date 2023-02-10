@@ -4,11 +4,10 @@
 
 #include "helper.h"
 
-#include <fuchsia/boot/c/fidl.h>
-#include <fuchsia/debugdata/c/fidl.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/fidl.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/types.h>
@@ -19,8 +18,11 @@
 
 #include <zxtest/zxtest.h>
 
-// TODO(fxbug.dev/82681): Clean up manual FIDL definitions once there exists a stable way of doing
-// this.
+namespace {
+
+// TODO(https://fxbug.dev/121753): Replace copy & pasted FIDL C bindings with new C++ bindings when
+// that's allowed.
+
 struct fuchsia_io_DirectoryOpenRequest {
   FIDL_ALIGNDECL
   fidl_message_header_t hdr;
@@ -29,6 +31,24 @@ struct fuchsia_io_DirectoryOpenRequest {
   fidl_string_t path;
   zx_handle_t object;
 };
+
+struct fuchsia_debugdata_PublisherPublishRequestMessage {
+  FIDL_ALIGNDECL
+  fidl_message_header_t hdr;
+  fidl_string_t data_sink;
+  zx_handle_t data;
+  zx_handle_t vmo_token;
+};
+
+struct fuchsia_boot_SvcStashStoreRequestMessage {
+  FIDL_ALIGNDECL
+  fidl_message_header_t hdr;
+  zx_handle_t svc_endpoint;
+};
+
+constexpr uint64_t fuchsia_boot_SvcStashStoreOrdinal = 0xC2648E356CA2870;
+
+}  // namespace
 
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
