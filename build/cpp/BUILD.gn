@@ -121,14 +121,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/securemem/drivers/aml-securemem:aml-securemem-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/securemem/drivers/aml-securemem:aml-securemem-test-bin",
-
-    #------------------
-    #------------------
     "//src/devices/temperature/drivers/tmp112:tmp112-test-bin",
 
     #------------------

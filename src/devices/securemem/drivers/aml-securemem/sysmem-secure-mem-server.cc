@@ -18,7 +18,6 @@
 #include <fbl/algorithm.h>
 #include <safemath/safe_math.h>
 
-#include "lib/async/cpp/task.h"
 #include "log.h"
 
 namespace {
@@ -211,9 +210,9 @@ SysmemSecureMemServer::~SysmemSecureMemServer() {
   }
 }
 
-zx_status_t SysmemSecureMemServer::BindAsync(zx::channel sysmem_secure_mem_server,
-                                             thrd_t* sysmem_secure_mem_server_thread,
-                                             SecureMemServerDone secure_mem_server_done) {
+zx_status_t SysmemSecureMemServer::BindAsync(
+    fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
+    thrd_t* sysmem_secure_mem_server_thread, SecureMemServerDone secure_mem_server_done) {
   ZX_DEBUG_ASSERT(sysmem_secure_mem_server);
   ZX_DEBUG_ASSERT(sysmem_secure_mem_server_thread);
   ZX_DEBUG_ASSERT(secure_mem_server_done);
@@ -278,7 +277,7 @@ void SysmemSecureMemServer::GetPhysicalSecureHeaps(
     completer.ReplyError(status);
     return;
   }
-  completer.ReplySuccess(std::move(heaps));
+  completer.ReplySuccess(heaps);
 }
 
 void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
@@ -295,7 +294,7 @@ void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
     completer.ReplyError(status);
     return;
   }
-  completer.ReplySuccess(std::move(properties));
+  completer.ReplySuccess(properties);
 }
 
 void SysmemSecureMemServer::AddSecureHeapPhysicalRange(

@@ -190,13 +190,12 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
     return status;
   }
   sysmem_secure_mem_server_.emplace(fdf_dispatcher_, std::move(tee_device_client));
-  zx::channel sysmem_secure_mem_client;
-  zx::channel sysmem_secure_mem_server;
-  status = zx::channel::create(0, &sysmem_secure_mem_client, &sysmem_secure_mem_server);
-  if (status != ZX_OK) {
-    LOG(ERROR, "failed to create sysmem tee channels - status: %d", status);
-    return status;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
+  if (endpoints.is_error()) {
+    LOG(ERROR, "failed to create sysmem tee channels - status: %d", endpoints.status_value());
+    return endpoints.status_value();
   }
+  auto& [sysmem_secure_mem_client, sysmem_secure_mem_server] = endpoints.value();
   status = sysmem_secure_mem_server_->BindAsync(
       std::move(sysmem_secure_mem_server), &sysmem_secure_mem_server_thread_,
       [this](bool is_success) {
@@ -258,7 +257,7 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   // Tell sysmem about the fidl::sysmem::Tee channel that sysmem will use (async) to configure
   // secure memory ranges.  Sysmem won't fidl call back during this banjo call.
   LOG(DEBUG, "calling sysmem_proto_client_.RegisterSecureMem()...");
-  status = sysmem_proto_client_.RegisterSecureMem(std::move(sysmem_secure_mem_client));
+  status = sysmem_proto_client_.RegisterSecureMem(sysmem_secure_mem_client.TakeChannel());
   if (status != ZX_OK) {
     // In this case sysmem_secure_mem_server_ will get cleaned up when the channel close is noticed
     // soon.

@@ -36,7 +36,7 @@ using AmlogicSecureMemDeviceBase =
 class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
                                public ddk::EmptyProtocol<ZX_PROTOCOL_SECURE_MEM> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* device);
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   zx_status_t Bind();
 

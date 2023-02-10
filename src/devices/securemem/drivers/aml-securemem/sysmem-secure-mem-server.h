@@ -24,10 +24,10 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
  public:
   using SecureMemServerDone = fit::callback<void(bool is_success)>;
 
-  SysmemSecureMemServer(const fdf_dispatcher_t* fdf_dispatcher, zx::channel loopback_tee_client);
+  SysmemSecureMemServer(const fdf_dispatcher_t* fdf_dispatcher, zx::channel tee_client_channel);
   ~SysmemSecureMemServer() override;
 
-  zx_status_t BindAsync(zx::channel sysmem_secure_mem_server,
+  zx_status_t BindAsync(fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
                         thrd_t* sysmem_secure_mem_server_thread,
                         SecureMemServerDone secure_mem_server_done);
   void StopAsync();
@@ -79,7 +79,8 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
       if (left.begin() < right.begin()) {
         // <
         return true;
-      } else if (left.begin() > right.begin()) {
+      }
+      if (left.begin() > right.begin()) {
         // >
         return false;
       }
@@ -87,7 +88,8 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
       if (left.end() < right.end()) {
         // <
         return true;
-      } else if (left.end() > right.end()) {
+      }
+      if (left.end() > right.end()) {
         // >
         return false;
       }
