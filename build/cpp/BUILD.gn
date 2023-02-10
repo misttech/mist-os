@@ -22,11 +22,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
 
     #------------------
     #------------------
-    "//src/devices/block/drivers/sdmmc:sdmmc-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/block/drivers/sdmmc:sdmmc-test-bin",
 
     #------------------
     #------------------
