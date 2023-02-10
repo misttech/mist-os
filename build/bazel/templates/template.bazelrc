@@ -8,6 +8,28 @@
 # of relying on --crosstool_top / --cpu / --compiler/
 build --incompatible_enable_cc_toolchain_resolution
 
+# Ensure that the same build configuration and output directory will be used
+# when there are two different transition paths to the same configured
+# target. For example, let's assume the following:
+#
+#  - transition_A sets the '//:foo' boolean build flag.
+#  - transition B sets the '//:bar' boolean build flag.
+#
+#  - the same `//:final` target is a transitive dependency of two different
+#    top-level ones using different transition paths, as in:
+#
+#       //:toplevel1 ---transition_A---> //:intermediate1 ---transition_B---> //:final
+#       //:toplevel2 ---transition_B---> //:intermediate2 ---transition_A---> //:final
+#
+# Without the flag below, the //:final target will be built twice, because by default the
+# transition path is part of the final build configuration due to a Bazel implementation
+# detail (search for 'affected_by' in the Bazel source tree).
+#
+# By using 'diff_against_baseline', Bazel will ignore the transition path, and recognize
+# that //:final only needs to be built once, at a single common location.
+#
+common --experimental_output_directory_naming_scheme=diff_against_baseline
+
 # Setup the default platform.
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`
