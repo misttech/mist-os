@@ -50,6 +50,10 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         .package_lists(cmd.package_list_manifests.iter().cloned())
         .watch()?;
 
+    // Clear out the package list manifests, since the package watcher will tell us which packages
+    // from these lists have changed.
+    cmd.package_list_manifests = vec![];
+
     while let Some(event) = watcher.next().await {
         cmd.package_manifests.clear();
 
