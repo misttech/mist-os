@@ -62,11 +62,30 @@ TEST(FakePDev, SetInterrupts) {
   }
 
   for (uint32_t i = 0; i < 10; i++) {
-    fake.set_interrupt(i, zx::interrupt());
+    EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    EXPECT_TRUE(irq.is_valid());
+    fake.set_interrupt(i, std::move(irq));
   }
 
   for (uint32_t i = 0; i < 10; i++) {
     ASSERT_OK(pdev.GetInterrupt(i, 0, &irq));
+    EXPECT_TRUE(irq.is_valid());
+  }
+}
+
+TEST(FakePDev, CreateInterrupts) {
+  fake_pdev::FakePDev fake;
+  ddk::PDevProtocolClient pdev(fake.proto());
+
+  for (uint32_t i = 0; i < 10; i++) {
+    zx::unowned_interrupt unowned_irq = fake.CreateVirtualInterrupt(i);
+    EXPECT_TRUE(unowned_irq->is_valid());
+  }
+
+  for (uint32_t i = 0; i < 10; i++) {
+    zx::interrupt irq;
+    EXPECT_OK(pdev.GetInterrupt(i, 0, &irq));
+    EXPECT_TRUE(irq.is_valid());
   }
 }
 

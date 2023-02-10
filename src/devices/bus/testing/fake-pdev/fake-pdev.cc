@@ -15,7 +15,7 @@ zx::unowned_interrupt FakePDev::CreateVirtualInterrupt(uint32_t idx) {
   auto status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
   ZX_ASSERT(status == ZX_OK);
   zx::unowned_interrupt ret(irq);
-  irqs_[0] = std::move(irq);
+  irqs_[idx] = std::move(irq);
   return ret;
 }
 
