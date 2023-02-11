@@ -12,7 +12,6 @@
 #include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 
@@ -21,37 +20,7 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-namespace {
-
-using Echo = fidl_service_test::Echo;
-using EchoService = fidl_service_test::EchoService;
-
-class EchoCommon : public fidl::WireServer<Echo> {
- public:
-  explicit EchoCommon(const char* prefix, async_dispatcher_t* dispatcher)
-      : prefix_(prefix), dispatcher_(dispatcher) {}
-
-  zx_status_t Connect(async_dispatcher_t* dispatcher, fidl::ServerEnd<Echo> request) {
-    return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
-  }
-
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
-    zx_status_t status = fidl::BindSingleInFlightOnly(
-        dispatcher_, fidl::ServerEnd<Echo>(request->request.TakeChannel()), this);
-    ASSERT_OK(status);
-  }
-
-  void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
-    std::string reply = prefix_ + ": " + std::string(request->value.data(), request->value.size());
-    completer.Reply(fidl::StringView::FromExternal(reply));
-  }
-
- private:
-  std::string prefix_;
-  async_dispatcher_t* dispatcher_;
-};
-
-}  // namespace
+#include "echo_server.h"
 
 class ServerTest : public zxtest::Test {
  protected:
