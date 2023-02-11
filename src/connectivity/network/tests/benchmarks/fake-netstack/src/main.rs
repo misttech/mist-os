@@ -139,10 +139,11 @@ async fn handle_provider_request(
                 fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
                     .context("create request stream")?;
             responder.send(&mut Ok(client_end)).context("send StreamSocket response")?;
-            let socket = Rc::new(RefCell::new(
-                StreamSocket::new(proto, domain, request_stream.control_handle())
-                    .context("create socket")?,
-            ));
+            let socket = Rc::new(RefCell::new(StreamSocket::new(
+                proto,
+                domain,
+                request_stream.control_handle(),
+            )));
             info!("opened new stream socket");
             stream_requests.push(request_stream.tagged(socket));
         }
@@ -249,10 +250,9 @@ impl StreamSocket {
         protocol: fposix_socket::StreamSocketProtocol,
         domain: fposix_socket::Domain,
         control_handle: fposix_socket::StreamSocketControlHandle,
-    ) -> Result<Self, anyhow::Error> {
-        let (local_socket, peer_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).context("create socket")?;
-        Ok(Self {
+    ) -> Self {
+        let (local_socket, peer_socket) = zx::Socket::create_stream();
+        Self {
             domain,
             protocol,
             control_handle,
@@ -261,7 +261,7 @@ impl StreamSocket {
             send_buffer_size: DEFAULT_BUFFER_SIZE,
             local_socket: Some(local_socket),
             peer_socket,
-        })
+        }
     }
 
     fn bind(
@@ -342,11 +342,7 @@ impl StreamSocket {
                 .expect("create request stream");
         // Create the new connected socket.
         let mut other_connected =
-            StreamSocket::new(this.protocol, this.domain, request_stream.control_handle())
-                .map_err(|e| {
-                    error!("failed to create connected socket {:?}", e);
-                    fposix::Errno::Eio
-                })?;
+            StreamSocket::new(this.protocol, this.domain, request_stream.control_handle());
 
         accept_queue.push_back((local_addr.clone(), client_end));
 

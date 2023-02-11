@@ -176,8 +176,7 @@ impl tcp::socket::NonSyncContext for crate::bindings::BindingsNonSyncCtxImpl {
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
     ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {
-        let (local, peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create sockets");
+        let (local, peer) = zx::Socket::create_stream();
         let socket = Arc::new(local);
         let notifier = NeedsDataNotifier::default();
         let watcher = notifier.watcher();
@@ -425,13 +424,11 @@ pub(super) async fn spawn_worker(
     proto: fposix_socket::StreamSocketProtocol,
     ctx: crate::bindings::NetstackContext,
     request_stream: fposix_socket::StreamSocketRequestStream,
-) -> Result<(), fposix::Errno>
-where
+) where
     DeviceId<StackTime>: TryFromFidlWithContext<Never, Error = DeviceNotFoundError>
         + TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
-    let (local, peer) = zx::Socket::create(zx::SocketOpts::STREAM)
-        .map_err(|_: zx::Status| fposix::Errno::Enobufs)?;
+    let (local, peer) = zx::Socket::create_stream();
     let socket = Arc::new(local);
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
@@ -444,7 +441,7 @@ where
                 )
             };
             let worker = SocketWorker::<Ipv4>::new(id, ctx.clone(), peer);
-            Ok(worker.spawn(request_stream))
+            worker.spawn(request_stream);
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
             let id = {
@@ -456,7 +453,7 @@ where
                 )
             };
             let worker = SocketWorker::<Ipv6>::new(id, ctx.clone(), peer);
-            Ok(worker.spawn(request_stream))
+            worker.spawn(request_stream);
         }
     }
 }
@@ -1425,8 +1422,7 @@ mod tests {
 
     #[test]
     fn receive_buffer() {
-        let (local, peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let (local, peer) = zx::Socket::create_stream();
         let mut rbuf = ReceiveBufferWithZirconSocket::new(Arc::new(local));
         assert_eq!(rbuf.write_at(0, &TEST_BYTES), TEST_BYTES.len());
         assert_eq!(rbuf.write_at(TEST_BYTES.len() * 2, &TEST_BYTES), TEST_BYTES.len());
@@ -1440,8 +1436,7 @@ mod tests {
 
     #[test]
     fn send_buffer() {
-        let (local, peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let (local, peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let mut sbuf =
             SendBufferWithZirconSocket::new(Arc::new(local), notifier, u16::MAX as usize);
@@ -1463,8 +1458,7 @@ mod tests {
     #[test_case(1 << 16, 1 << 16; "in range")]
     #[test_case(1 << 32, SendBufferWithZirconSocket::MAX_CAPACITY; "above max")]
     fn send_buffer_limits(target: usize, expected: usize) {
-        let (local, _peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let (local, _peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
         let ring_buffer_capacity = sbuf.cap() - sbuf.socket.info().unwrap().rx_buf_max;
@@ -1473,8 +1467,7 @@ mod tests {
 
     #[test]
     fn send_buffer_peek_past_ring_buffer() {
-        let (local, peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let (local, peer) = zx::Socket::create_stream();
         let mut sbuf = SendBufferWithZirconSocket::new(
             Arc::new(local),
             NeedsDataNotifier::default(),
@@ -1502,8 +1495,7 @@ mod tests {
     #[test]
     fn send_buffer_resize_empties_zircon_socket() {
         // Regression test for https://fxbug.dev/119242.
-        let (local, peer) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let (local, peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let mut sbuf = SendBufferWithZirconSocket::new(
             Arc::new(local),

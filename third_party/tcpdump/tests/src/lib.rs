@@ -78,10 +78,8 @@ fn start_tcpdump(
     args: impl IntoIterator<Item = &'static str>,
     mut spawn_actions: Vec<SpawnAction<'_>>,
 ) -> (zx::Process, zx::Socket, zx::Socket) {
-    let (stdout_reader, stdout_writer) =
-        zx::Socket::create(zx::SocketOpts::STREAM).expect("create stdout socket");
-    let (stderr_reader, stderr_writer) =
-        zx::Socket::create(zx::SocketOpts::STREAM).expect("create stderr socket");
+    let (stdout_reader, stdout_writer) = zx::Socket::create_stream();
+    let (stderr_reader, stderr_writer) = zx::Socket::create_stream();
 
     // The reader-ends should not write.
     let () = stdout_writer.half_close().expect("stdout_reader.half_close");

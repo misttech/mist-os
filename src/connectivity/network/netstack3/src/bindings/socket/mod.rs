@@ -85,17 +85,8 @@ pub(crate) async fn serve(
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     match fidl::endpoints::create_request_stream() {
                         Ok((client, request_stream)) => {
-                            responder_send!(
-                                responder,
-                                &mut stream::spawn_worker(
-                                    domain,
-                                    proto,
-                                    ctx.clone(),
-                                    request_stream
-                                )
-                                .await
-                                .map(|()| client)
-                            );
+                            stream::spawn_worker(domain, proto, ctx.clone(), request_stream).await;
+                            responder_send!(responder, &mut Ok(client));
                         }
                         Err(_) => responder_send!(responder, &mut Err(Errno::Enobufs)),
                     }

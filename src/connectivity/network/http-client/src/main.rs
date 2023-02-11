@@ -78,7 +78,7 @@ async fn to_success_response(
     current_url: &hyper::Uri,
     current_method: &hyper::Method,
     mut hyper_response: hyper::Response<hyper::Body>,
-) -> Result<net_http::Response, zx::Status> {
+) -> net_http::Response {
     let redirect_info = redirect_info(current_url, current_method, &hyper_response);
     let headers = hyper_response
         .headers()
@@ -89,7 +89,7 @@ async fn to_success_response(
         })
         .collect();
 
-    let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+    let (tx, rx) = zx::Socket::create_stream();
     let response = net_http::Response {
         error: None,
         body: Some(rx),
@@ -146,7 +146,7 @@ async fn to_success_response(
         }
     }).detach();
 
-    Ok(response)
+    response
 }
 
 fn to_fidl_error(error: &hyper::Error) -> net_http::Error {
@@ -268,8 +268,7 @@ impl Loader {
                                 self.url
                             );
                             let response =
-                                to_success_response(&self.url, &self.method, hyper_response)
-                                    .await?;
+                                to_success_response(&self.url, &self.method, hyper_response).await;
                             match loader_client.on_response(response).await {
                                 Ok(()) => {}
                                 Err(e) => {
@@ -282,7 +281,7 @@ impl Loader {
                         }
                     }
                     let response =
-                        to_success_response(&self.url, &self.method, hyper_response).await?;
+                        to_success_response(&self.url, &self.method, hyper_response).await;
                     // We don't care if on_response returns an error since this is the last
                     // callback.
                     let _: Result<_, _> = loader_client.on_response(response).await;
@@ -376,7 +375,7 @@ fn spawn_server(stream: net_http::LoaderRequestStream) {
                             responder.send(match result {
                                 Ok((hyper_response, final_url, final_method)) => {
                                     to_success_response(&final_url, &final_method, hyper_response)
-                                        .await?
+                                        .await
                                 }
                                 Err(error) => to_error_response(error),
                             })?;
