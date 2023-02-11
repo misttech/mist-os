@@ -29,11 +29,11 @@ source_set("lib") {
   ]
 
   public_deps = [
-    ":fuchsia.factory.camera",
-    "//sdk/fidl/fuchsia.camera3",
-    "//sdk/fidl/fuchsia.ui.app",
-    "//sdk/fidl/fuchsia.ui.scenic",
-    "//sdk/fidl/fuchsia.ui.views",
+    ":fuchsia.factory.camera_hlcpp",
+    "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
+    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
@@ -56,9 +56,17 @@ executable("camera_factory_bin") {
 fidl("fuchsia.factory.camera") {
   sdk_category = "internal"
 
+  # TODO(fxbug.dev/35879): Remove lint exclusions by fixing known FIDL lint violations in this target
+  excluded_checks = [
+    "string-bounds-not-specified",
+    "invalid-case-for-decl-name",
+  ]
+
   sources = [ "factory.test.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.images" ]
+
+  enable_hlcpp = true
 }
 
 fuchsia_package_with_single_component("camera_factory") {

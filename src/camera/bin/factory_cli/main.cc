@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fuchsia/factory/camera/cpp/fidl.h>
 #include <fuchsia/images/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -10,11 +11,11 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <filesystem>
 #include <iostream>
 
 #include <fbl/unique_fd.h>
 
-#include "fuchsia/factory/camera/cpp/fidl.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 
@@ -38,7 +39,7 @@ enum Command {
   SET_BYPASS_MODE,
 };
 
-constexpr std::string_view kDevicePath = "/dev/class/isp/000";
+constexpr std::string_view kDeviceDir = "/dev/class/isp";
 constexpr std::string_view kFlag = "command";
 
 // Controller Commands
@@ -245,26 +246,15 @@ int main(int argc, char* argv[]) {
   }
 
   // Connect to the ISP.
-  int result = open(kDevicePath.data(), O_RDONLY);
-  if (result < 0) {
-    FX_LOGS(ERROR) << "Error opening device at " << kDevicePath;
-    return EXIT_FAILURE;
-  }
-  fbl::unique_fd fd;
-  fd.reset(result);
-
-  zx::channel channel;
-  status = fdio_get_service_handle(fd.get(), channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to get handle for device at " << kDevicePath;
-    return EXIT_FAILURE;
-  }
-
   fuchsia::factory::camera::IspPtr isp;
-  status = isp.Bind(std::move(channel), loop.dispatcher());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to get camera-factory Controller pointer.";
-    return EXIT_FAILURE;
+  for (auto const& dir_entry : std::filesystem::directory_iterator{kDeviceDir}) {
+    const char* path = dir_entry.path().c_str();
+    status = fdio_service_connect(path, isp.NewRequest(loop.dispatcher()).TakeChannel().release());
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to get handle for device at " << path;
+      return EXIT_FAILURE;
+    }
+    break;
   }
 
   // Error handling

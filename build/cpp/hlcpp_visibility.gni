@@ -6,6 +6,11 @@ hlcpp_visibility = [
   # Dependencies between SDK FIDL libraries.
   "//sdk/fidl/*",
 
+  # Unusually located FIDL libraries.
+  "//src/camera/bin/factory:fuchsia.factory.camera_cpp_hlcpp_conversion",
+  "//src/camera/bin/factory:fuchsia.factory.camera_hlcpp",
+  "//src/camera/bin/factory:fuchsia.factory.camera_libfuzzer",
+
   # FIDL implementation, tests, examples.
   "//examples/fidl/fuchsia.examples:*",
   "//examples/fidl/hlcpp/*",
@@ -78,6 +83,8 @@ hlcpp_visibility = [
   "//src/camera/bin/camera-gym/*",
   "//src/camera/bin/device/*",
   "//src/camera/bin/device_watcher:*",
+  "//src/camera/bin/factory:lib",
+  "//src/camera/bin/factory_cli:camera_factory_cli_bin",
   "//src/camera/bin/sensor_cli:*",
   "//src/camera/bin/usb_device:*",
   "//src/camera/bin/virtual_camera:*",

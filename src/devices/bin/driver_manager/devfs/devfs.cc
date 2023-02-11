@@ -478,9 +478,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       "goldfish-control",
       "goldfish-pipe",
 
-      // TODO(https://fxbug.dev/113833): Remove.
-      "isp",
-
       // TODO(https://fxbug.dev/113834): Remove.
       "light",
 

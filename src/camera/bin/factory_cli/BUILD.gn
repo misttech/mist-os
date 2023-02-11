@@ -11,10 +11,10 @@ group("factory_cli") {
 executable("camera_factory_cli_bin") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.camera3",
+    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/camera/bin/factory:fuchsia.factory.camera",
+    "//src/camera/bin/factory:fuchsia.factory.camera_hlcpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
