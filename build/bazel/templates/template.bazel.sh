@@ -53,6 +53,29 @@ logrotate3 () {{
 mkdir -p "${{_LOG_DIR}}"
 logrotate3 "${{_LOG_DIR}}/workspace-events.log"
 
+# For infra builds, connections to various remote services are tunneled
+# through local socket relays, launched by [infra/infra]/cmd/buildproxywrap/main.go.
+# Detect manually provided config options that involve the proxies.
+# TODO: This method doesn't work if the same configs are indirectly enabled.
+proxy_overrides=()
+for arg in "$@"
+do
+  case "$arg" in
+    --config=sponge) # Sponge build event service
+      test -z "$BAZEL_sponge_socket_path" ||
+        proxy_overrides+=( "--bes_proxy=unix://$BAZEL_sponge_socket_path" )
+      ;;
+    --config=resultstore) # Resultstore build event service
+      test -z "$BAZEL_resultstore_socket_path" ||
+        proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
+      ;;
+    --config=remote) # Remote build execution service
+      test -z "$BAZEL_rbe_socket_path" ||
+        proxy_overrides+=( "--remote_proxy=unix://$BAZEL_rbe_socket_path" )
+      ;;
+  esac
+done
+
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/112206#c9.
 #
@@ -64,4 +87,5 @@ cd "${{_WORKSPACE_DIR}}" && USER=unused-bazel-build-user {bazel_bin_path} \
       --nohome_rc \
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
-      "$@"
+      "$@" \
+      "${{proxy_overrides[@]}}"
