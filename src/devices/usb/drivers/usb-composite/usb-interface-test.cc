@@ -4,51 +4,14 @@
 
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"
 
-#include <fuchsia/hardware/usb/cpp/banjo-mock.h>
-
 #include <queue>
 
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-
-// Some test utilities in "fuchsia/hardware/usb/function/cpp/banjo-mock.h" expect the following
-// operators to be implemented.
-bool operator==(const usb_request_complete_callback_t& lhs,
-                const usb_request_complete_callback_t& rhs) {
-  // Comparison of these struct is not useful. Return true always.
-  return true;
-}
-
-bool operator==(const usb_ss_ep_comp_descriptor_t& lhs, const usb_ss_ep_comp_descriptor_t& rhs) {
-  // Comparison of these struct is not useful. Return true always.
-  return true;
-}
-
-bool operator==(const usb_endpoint_descriptor_t& lhs, const usb_endpoint_descriptor_t& rhs) {
-  // Comparison of these struct is not useful. Return true always.
-  return true;
-}
-
-bool operator==(const usb_request_t& lhs, const usb_request_t& rhs) {
-  // Only comparing endpoint address. Use ExpectCallWithMatcher for more specific
-  // comparisons.
-  return lhs.header.ep_address == rhs.header.ep_address;
-}
+#include "src/devices/usb/drivers/usb-composite/test-helper.h"
 
 namespace usb_composite {
-
-class MockUsb : public ddk::MockUsb {
- public:
-  zx_status_t UsbEnableEndpoint(const usb_endpoint_descriptor_t* ep_desc,
-                                const usb_ss_ep_comp_descriptor_t* ss_com_desc,
-                                bool enable) override {
-    std::tuple<zx_status_t> ret = mock_enable_endpoint_.Call(
-        ep_desc ? *ep_desc : usb_endpoint_descriptor_t{},
-        ss_com_desc ? *ss_com_desc : usb_ss_ep_comp_descriptor_t{}, enable);
-    return std::get<0>(ret);
-  }
-};
 
 void UsbComposite::DdkInit(ddk::InitTxn txn) { txn.Reply(ZX_OK); }
 void UsbComposite::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
@@ -130,7 +93,7 @@ class UsbInterfaceTest : public zxtest::Test {
  protected:
   MockUsb usb_;
 
-  fbl::RefPtr<usb_composite::UsbInterface> dut_;
+  usb_composite::UsbInterface* dut_;
   ddk::UsbProtocolClient usb_client_;
   UsbComposite* composite_;
   ddk::UsbCompositeProtocolClient composite_client_;
@@ -138,14 +101,16 @@ class UsbInterfaceTest : public zxtest::Test {
  private:
   template <typename T>
   void SetUpInterface(const T* descriptor, size_t desc_length) {
+    std::unique_ptr<UsbInterface> ifc;
     EXPECT_OK(UsbInterface::Create(fake_parent_.get(), composite_,
                                    ddk::UsbProtocolClient(fake_parent_.get()), descriptor,
-                                   desc_length, &dut_));
-    ASSERT_NOT_NULL(dut_);
+                                   desc_length, &ifc));
+    ASSERT_NOT_NULL(ifc);
 
-    EXPECT_OK(dut_->DdkAdd("test-interface", DEVICE_ADD_NON_BINDABLE));
-    dut_->AddRef();
+    EXPECT_OK(ifc->DdkAdd("test-interface", DEVICE_ADD_NON_BINDABLE));
+    ifc.release();
     auto* child = composite_dev_->GetLatestChild();
+    dut_ = child->GetDeviceContext<UsbInterface>();
 
     usb_client_ = ddk::UsbProtocolClient(child);
     ASSERT_TRUE(usb_client_.is_valid());

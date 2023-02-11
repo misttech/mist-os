@@ -11,8 +11,6 @@
 #include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/usb-composite/usb-composite.h"
@@ -26,8 +24,7 @@ using UsbInterfaceType = ddk::Device<UsbInterface, ddk::GetProtocolable>;
 // This class represents a USB interface in a composite device.
 class UsbInterface : public UsbInterfaceType,
                      public ddk::UsbProtocol<UsbInterface, ddk::base_protocol>,
-                     public ddk::UsbCompositeProtocol<UsbInterface>,
-                     public fbl::RefCounted<UsbInterface> {
+                     public ddk::UsbCompositeProtocol<UsbInterface> {
  public:
   UsbInterface(zx_device_t* parent, UsbComposite* composite, const ddk::UsbProtocolClient& usb)
       : UsbInterfaceType(parent), composite_(composite), usb_(usb) {}
@@ -35,11 +32,11 @@ class UsbInterface : public UsbInterfaceType,
   static zx_status_t Create(zx_device_t* parent, UsbComposite* composite,
                             const ddk::UsbProtocolClient& usb,
                             const usb_interface_descriptor_t* interface_desc, size_t desc_length,
-                            fbl::RefPtr<UsbInterface>* out_interface);
+                            std::unique_ptr<UsbInterface>* out_interface);
   static zx_status_t Create(zx_device_t* parent, UsbComposite* composite,
                             const ddk::UsbProtocolClient& usb,
                             const usb_interface_assoc_descriptor_t* assoc_desc, size_t desc_length,
-                            fbl::RefPtr<UsbInterface>* out_interface);
+                            std::unique_ptr<UsbInterface>* out_interface);
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);

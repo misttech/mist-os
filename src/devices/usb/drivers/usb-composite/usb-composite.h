@@ -11,7 +11,6 @@
 #include <ddktl/init-txn.h>
 #include <fbl/array.h>
 #include <fbl/mutex.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <usb/usb.h>
 
@@ -47,6 +46,8 @@ class UsbComposite : public UsbCompositeType {
  private:
   template <auto* descriptors>
   friend class UsbInterfaceTest;
+  template <auto* descriptors>
+  friend class UsbCompositeTest;
 
   enum class InterfaceStatus : uint8_t {
     // The interface has not been claimed and no device has been created for it.
@@ -62,13 +63,13 @@ class UsbComposite : public UsbCompositeType {
   zx_status_t AddInterface(const usb_interface_descriptor_t* interface_desc, size_t length);
   zx_status_t AddInterfaceAssoc(const usb_interface_assoc_descriptor_t* assoc_desc, size_t length);
   zx_status_t AddInterfaces();
-  fbl::RefPtr<UsbInterface> GetInterfaceById(uint8_t interface_id) __TA_REQUIRES(lock_);
+  UsbInterface* GetInterfaceById(uint8_t interface_id) __TA_REQUIRES(lock_);
   bool RemoveInterfaceById(uint8_t interface_id) __TA_REQUIRES(lock_);
 
   // Our parent's USB protocol.
   const ddk::UsbProtocolClient usb_;
   // Array of all our USB interfaces.
-  fbl::Vector<fbl::RefPtr<UsbInterface>> interfaces_ __TA_GUARDED(lock_);
+  fbl::Vector<UsbInterface*> interfaces_ __TA_GUARDED(lock_);
 
   InterfaceStatus interface_statuses_[UINT8_MAX] __TA_GUARDED(lock_) = {};
 

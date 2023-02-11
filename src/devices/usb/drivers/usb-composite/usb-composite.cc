@@ -49,7 +49,7 @@ bool UsbComposite::RemoveInterfaceById(uint8_t interface_id) {
 
 zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interface_desc,
                                        size_t length) {
-  fbl::RefPtr<UsbInterface> interface;
+  std::unique_ptr<UsbInterface> interface;
   auto status = UsbInterface::Create(zxdev(), this, usb_, interface_desc, length, &interface);
   if (status != ZX_OK) {
     return status;
@@ -58,7 +58,7 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
   {
     fbl::AutoLock lock(&lock_);
     // We need to do this first before calling DdkAdd().
-    interfaces_.push_back(interface);
+    interfaces_.push_back(interface.get());
   }
 
   char name[20];
@@ -77,7 +77,7 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
   status = interface->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
-    interface->AddRef();
+    interface.release();
   } else {
     fbl::AutoLock lock(&lock_);
     interfaces_.pop_back();
@@ -88,7 +88,7 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
 
 zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor_t* assoc_desc,
                                             size_t length) {
-  fbl::RefPtr<UsbInterface> interface;
+  std::unique_ptr<UsbInterface> interface;
   auto status = UsbInterface::Create(zxdev(), this, usb_, assoc_desc, length, &interface);
   if (status != ZX_OK) {
     return status;
@@ -97,7 +97,7 @@ zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor
   {
     fbl::AutoLock lock(&lock_);
     // We need to do this first before calling DdkAdd().
-    interfaces_.push_back(interface);
+    interfaces_.push_back(interface.get());
   }
 
   char name[20];
@@ -116,7 +116,7 @@ zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor
   status = interface->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
-    interface->AddRef();
+    interface.release();
   } else {
     fbl::AutoLock lock(&lock_);
     interfaces_.pop_back();
@@ -205,7 +205,7 @@ zx_status_t UsbComposite::AddInterfaces() {
   return assoc_status;
 }
 
-fbl::RefPtr<UsbInterface> UsbComposite::GetInterfaceById(uint8_t interface_id) {
+UsbInterface* UsbComposite::GetInterfaceById(uint8_t interface_id) {
   for (auto intf : interfaces_) {
     if (intf->ContainsInterface(interface_id)) {
       return intf;

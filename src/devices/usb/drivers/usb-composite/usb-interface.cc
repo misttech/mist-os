@@ -20,11 +20,10 @@ namespace usb_composite {
 zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
                                  const ddk::UsbProtocolClient& usb,
                                  const usb_interface_descriptor_t* interface_desc,
-                                 size_t desc_length, fbl::RefPtr<UsbInterface>* out_interface) {
+                                 size_t desc_length, std::unique_ptr<UsbInterface>* out_interface) {
   fbl::AllocChecker ac;
-  auto interface =
-      fbl::MakeRefCountedChecked<UsbInterface>(&ac, composite->zxdev(), composite, usb);
-  if (!ac.check()) {
+  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb);
+  if (!interface) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -53,18 +52,17 @@ zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
     return status;
   }
 
-  *out_interface = interface;
+  *out_interface = std::move(interface);
   return ZX_OK;
 }
 
 zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
                                  const ddk::UsbProtocolClient& usb,
                                  const usb_interface_assoc_descriptor_t* assoc_desc,
-                                 size_t desc_length, fbl::RefPtr<UsbInterface>* out_interface) {
+                                 size_t desc_length, std::unique_ptr<UsbInterface>* out_interface) {
   fbl::AllocChecker ac;
-  auto interface =
-      fbl::MakeRefCountedChecked<UsbInterface>(&ac, composite->zxdev(), composite, usb);
-  if (!ac.check()) {
+  auto interface = std::make_unique<UsbInterface>(composite->zxdev(), composite, usb);
+  if (!interface) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -106,7 +104,7 @@ zx_status_t UsbInterface::Create(zx_device_t* parent, UsbComposite* composite,
     }
   }
 
-  *out_interface = interface;
+  *out_interface = std::move(interface);
   return ZX_OK;
 }
 
@@ -147,10 +145,7 @@ zx_status_t UsbInterface::DdkGetProtocol(uint32_t proto_id, void* protocol) {
   }
 }
 
-void UsbInterface::DdkRelease() {
-  // Release the reference now that devmgr no longer has a pointer to this object.
-  [[maybe_unused]] bool dummy = Release();
-}
+void UsbInterface::DdkRelease() { delete this; }
 
 // for determining index into active_endpoints[]
 // b_endpoint_address has 4 lower order bits, plus high bit to signify direction
