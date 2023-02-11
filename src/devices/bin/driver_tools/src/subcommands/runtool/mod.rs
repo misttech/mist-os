@@ -21,12 +21,9 @@ pub async fn run_tool(
     tool_runner_proxy: fdp::ToolRunnerProxy,
 ) -> Result<()> {
     let (controller_proxy, controller_server_end) = create_proxy::<fdp::CloseControllerMarker>()?;
-    let (sin, cin) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create stdin socket")?;
-    let (sout, cout) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create stdout socket")?;
-    let (serr, cerr) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create stderr socket")?;
+    let (sin, cin) = fidl::Socket::create_stream();
+    let (sout, cout) = fidl::Socket::create_stream();
+    let (serr, cerr) = fidl::Socket::create_stream();
 
     let mut stdin = fidl::AsyncSocket::from_socket(cin)?;
     let mut stdout = Unblock::new(std::io::stdout());
