@@ -15,9 +15,10 @@ import sys
 import logging
 from typing import Dict, List, Set, Tuple
 
-from assembly import AssemblyInputBundle, AIBCreator, FileEntry, FilePath, ImageAssemblyConfig
+from assembly import AssemblyInputBundle, AIBCreator, FileEntry, FilePath, ImageAssemblyConfig, PackageManifest
 from assembly.assembly_input_bundle import DuplicatePackageException, PackageManifestParsingException
 from depfile import DepFile
+from serialization import json_load
 
 logger = logging.getLogger()
 
@@ -139,13 +140,13 @@ def main():
             manifest_path, package_name = package["manifest_path"], package[
                 "package_name"]
             with open(manifest_path, "r") as fname:
-                package_aib = json.load(fname)
+                package_aib = json_load(PackageManifest, fname)
                 shell_deps.add(manifest_path)
                 shell_commands[package_name].update(
                     {
-                        blob["path"]
-                        for blob in package_aib["blobs"]
-                        if blob['path'].startswith("bin/")
+                        blob.path
+                        for blob in package_aib.blobs
+                        if blob.path.startswith("bin/")
                     })
 
     core_realm_shards: Set[FilePath] = set()
