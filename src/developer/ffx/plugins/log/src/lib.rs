@@ -540,7 +540,7 @@ This likely means that your logs will not be symbolized."
 #[ffx_plugin(
     "proactive_log.enabled",
     DiagnosticsProxy = "daemon::protocol",
-    LogSettingsProxy = "bootstrap:expose:fuchsia.diagnostics.LogSettings"
+    LogSettingsProxy = "bootstrap/archivist:expose:fuchsia.diagnostics.LogSettings"
 )]
 pub async fn log(
     diagnostics_proxy: DiagnosticsProxy,
