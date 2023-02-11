@@ -190,13 +190,8 @@ rustc_binary("fxfs") {
   ]
   sources = [ "src/main.rs" ]
 
-  configs += [
-    # Optimize for size
-    "//build/config/rust:bootfs",
-
-    # Optimize for speed (Fxfs is split into several crates; apply optimizations across them).
-    "//build/config/rust:lto_thin",
-  ]
+  # Optimize for size
+  configs += [ "//build/config/rust:bootfs" ]
   features = [ "tracing" ]
 }
 
