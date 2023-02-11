@@ -649,8 +649,7 @@ mod tests {
             ServerEnd::new(dir_server_end.into_channel()),
         );
 
-        let (send_socket, _keep_socket) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (send_socket, _keep_socket) = fidl::Socket::create_stream();
 
         assert_matches!(
             dir_proxy
