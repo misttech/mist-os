@@ -11,10 +11,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
@@ -25,20 +21,11 @@
 
 #include "src/camera/bin/usb_device/device_impl.h"
 
-zx::result<fuchsia::camera::ControlSyncPtr> OpenCamera(zx::channel camera_channel) {
-  int fd;
-  zx_status_t status = fdio_fd_create(camera_channel.get(), &fd);
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to create fd from channel";
-    return zx::error(status);
-  }
-
-  fbl::unique_fd camera_device_fd(fd);
+zx::result<fuchsia::camera::ControlSyncPtr> OpenCamera(
+    fidl::ClientEnd<fuchsia_hardware_camera::Device> client_end) {
   fuchsia::camera::ControlSyncPtr ctrl;
-  fdio_cpp::UnownedFdioCaller caller(fd);
-  status = fidl::WireCall(caller.borrow_as<fuchsia_hardware_camera::Device>())
-           ->GetChannel(ctrl.NewRequest().TakeChannel())
-           .status();
+  zx_status_t status =
+      fidl::WireCall(client_end)->GetChannel(ctrl.NewRequest().TakeChannel()).status();
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Call to GetChannel failed";
     return zx::error(status);
@@ -76,7 +63,8 @@ int main(int argc, char* argv[]) {
   }
 
   // Connect to USB camera device.
-  zx::result<fuchsia::camera::ControlSyncPtr> status_or = OpenCamera(std::move(camera_channel));
+  zx::result status_or =
+      OpenCamera(fidl::ClientEnd<fuchsia_hardware_camera::Device>{std::move(camera_channel)});
   if (status_or.is_error()) {
     FX_PLOGS(FATAL, status_or.error_value())
         << "Failed to request camera device: error: " << status_or.error_value();
