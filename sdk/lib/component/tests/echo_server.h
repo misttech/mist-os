@@ -7,7 +7,6 @@
 
 #include <fidl/fidl.service.test/cpp/wire.h>
 #include <fidl/fidl.service.test/cpp/wire_test_base.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 using Echo = fidl_service_test::Echo;
@@ -20,13 +19,12 @@ class EchoCommon : public fidl::WireServer<Echo> {
   explicit EchoCommon(const char* prefix, async_dispatcher_t* dispatcher)
       : prefix_(prefix), dispatcher_(dispatcher) {}
 
-  zx_status_t Connect(fidl::ServerEnd<Echo> request) {
-    return fidl::BindSingleInFlightOnly(dispatcher_, std::move(request), this);
+  void Connect(fidl::ServerEnd<Echo> request) {
+    bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
   }
 
   void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
-    zx_status_t status = Connect(fidl::ServerEnd<Echo>(request->request.TakeChannel()));
-    ZX_ASSERT_MSG(status == ZX_OK, "Failed to bind request: %s", zx_status_get_string(status));
+    Connect(fidl::ServerEnd<Echo>(request->request.TakeChannel()));
   }
 
   void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {

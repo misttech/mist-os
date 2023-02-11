@@ -33,7 +33,6 @@ zx_library("fidl-async-cpp") {
   visibility = [
     ":fidl-async-cpp_cc_stub",
     "test:fidl-async-test",
-    "//sdk/lib/component/tests:*",
     "//sdk/lib/fdio/tests:*",
     "//sdk/lib/zxio/tests:*",
     "//src/bringup/bin/device-name-provider:*",
