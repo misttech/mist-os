@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/status.h>
 
+#include "src/devices/bin/driver_manager/bind_driver_manager.h"
 #include "src/devices/bin/driver_manager/binding.h"
 #include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
@@ -91,7 +92,7 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
                                  uint32_t fragments_count, uint32_t primary_fragment_index,
                                  std::optional<bool> legacy_colocate_flag,
                                  fbl::Array<std::unique_ptr<Metadata>> metadata,
-                                 bool from_composite_node_spec)
+                                 Coordinator& coordinator, bool from_composite_node_spec)
     : name_(std::move(name)),
       properties_(std::move(properties)),
       str_properties_(std::move(str_properties)),
@@ -99,12 +100,14 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
       primary_fragment_index_(primary_fragment_index),
       legacy_colocate_flag_(legacy_colocate_flag),
       metadata_(std::move(metadata)),
-      from_composite_node_spec_(from_composite_node_spec) {}
+      from_composite_node_spec_(from_composite_node_spec),
+      coordinator_(coordinator) {}
 
 CompositeDevice::~CompositeDevice() = default;
 
 zx_status_t CompositeDevice::Create(std::string_view name,
                                     fdm::wire::CompositeDeviceDescriptor comp_desc,
+                                    Coordinator& coordinator,
                                     std::unique_ptr<CompositeDevice>* out) {
   fbl::String name_obj(name);
   fbl::Array<zx_device_prop_t> properties(new zx_device_prop_t[comp_desc.props.count() + 1],
@@ -137,7 +140,7 @@ zx_status_t CompositeDevice::Create(std::string_view name,
   auto dev = std::make_unique<CompositeDevice>(
       std::move(name), std::move(properties), std::move(str_properties),
       comp_desc.fragments.count(), comp_desc.primary_fragment_index, comp_desc.spawn_colocated,
-      std::move(metadata), false);
+      std::move(metadata), coordinator, false);
   for (uint32_t i = 0; i < comp_desc.fragments.count(); ++i) {
     const auto& fidl_fragment = comp_desc.fragments[i];
     size_t parts_count = fidl_fragment.parts.count();
@@ -166,13 +169,14 @@ zx_status_t CompositeDevice::Create(std::string_view name,
 }
 
 std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromSpec(
-    CompositeNodeSpecInfo composite_info, fbl::Array<std::unique_ptr<Metadata>> metadata) {
+    CompositeNodeSpecInfo composite_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
+    Coordinator& coordinator) {
   uint32_t num_parents = static_cast<uint32_t>(composite_info.parent_names.size());
 
   auto dev = std::make_unique<CompositeDevice>(
       fbl::String(composite_info.composite_name), fbl::Array<const zx_device_prop_t>(),
       fbl::Array<const StrProperty>(), num_parents, composite_info.primary_index, std::nullopt,
-      std::move(metadata), true);
+      std::move(metadata), coordinator, true);
 
   for (uint32_t i = 0; i < num_parents; ++i) {
     std::string name = composite_info.parent_names[i];
@@ -221,7 +225,36 @@ bool CompositeDevice::IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* in
   return false;
 }
 
+zx::result<> CompositeDevice::MatchDriverToComposite() {
+  ZX_ASSERT(!driver_.has_value());
+  ZX_ASSERT(!from_composite_node_spec_);
+
+  auto match_result = coordinator_.bind_driver_manager().MatchCompositeDevice(
+      *this, DriverLoader::MatchDeviceConfig{});
+  if (match_result.is_error()) {
+    if (match_result.status_value() != ZX_ERR_NOT_FOUND) {
+      LOGF(ERROR, "Failed to match driver to composite: %s",
+           zx_status_get_string(match_result.status_value()));
+    }
+    return match_result.take_error();
+  }
+
+  driver_.emplace(match_result.value());
+  return zx::ok();
+}
+
 zx_status_t CompositeDevice::TryMatchBindFragments(const fbl::RefPtr<Device>& dev) {
+  if (from_composite_node_spec_) {
+    return ZX_OK;
+  }
+
+  if (!driver_.has_value()) {
+    auto result = MatchDriverToComposite();
+    if (result.is_error()) {
+      return result.status_value() == ZX_ERR_NOT_FOUND ? ZX_OK : result.status_value();
+    }
+  }
+
   size_t index;
   if (!IsFragmentMatch(dev, &index)) {
     return ZX_OK;
@@ -315,8 +348,7 @@ zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
   }
 
   // Create a new driver host and return it.
-  auto coordinator = GetPrimaryFragment()->bound_device()->coordinator;
-  auto status = coordinator->NewDriverHost("driver_host", &driver_host_);
+  auto status = coordinator_.NewDriverHost("driver_host", &driver_host_);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -328,24 +360,10 @@ zx_status_t CompositeDevice::TryAssemble() {
 
   // If unavailable, search for a driver that binds to the composite.
   if (!driver_.has_value()) {
-    if (!GetPrimaryFragment() || !GetPrimaryFragment()->bound_device()) {
-      return ZX_ERR_SHOULD_WAIT;
+    auto result = MatchDriverToComposite();
+    if (result.is_error()) {
+      return result.status_value() == ZX_ERR_NOT_FOUND ? ZX_OK : ZX_ERR_SHOULD_WAIT;
     }
-
-    auto coordinator = GetPrimaryFragment()->bound_device()->coordinator;
-    auto match_result = coordinator->bind_driver_manager().MatchCompositeDevice(
-        *this, DriverLoader::MatchDeviceConfig{});
-    if (match_result.is_error()) {
-      if (match_result.status_value() == ZX_ERR_NOT_FOUND) {
-        return ZX_ERR_SHOULD_WAIT;
-      }
-
-      LOGF(ERROR, "Failed to match driver to composite: %s",
-           zx_status_get_string(match_result.status_value()));
-      return match_result.status_value();
-    }
-
-    driver_.emplace(match_result.value());
   }
 
   for (auto& fragment : fragments_) {
@@ -381,14 +399,13 @@ zx_status_t CompositeDevice::TryAssemble() {
   }
 
   fbl::RefPtr<Device> new_device;
-  Coordinator* coordinator = GetPrimaryFragment()->bound_device()->coordinator;
   auto status = Device::CreateComposite(
-      coordinator, driver_host.value(), *this, std::move(coordinator_endpoints->server),
+      &coordinator_, driver_host.value(), *this, std::move(coordinator_endpoints->server),
       std::move(device_controller_endpoints->client), &new_device);
   if (status != ZX_OK) {
     return status;
   }
-  coordinator->device_manager()->AddToDevices(new_device);
+  coordinator_.device_manager()->AddToDevices(new_device);
 
   // Create the composite device in the driver_host
   fdm::wire::CompositeDevice composite{fragments, fidl::StringView::FromExternal(name())};
@@ -417,7 +434,7 @@ zx_status_t CompositeDevice::TryAssemble() {
   for (size_t i = 0; i < metadata_.size(); i++) {
     // Making a copy of metadata, instead of transfering ownership, so that
     // metadata can be added again if device is recreated
-    status = coordinator->AddMetadata(device_, metadata_[i]->type, metadata_[i]->Data(),
+    status = coordinator_.AddMetadata(device_, metadata_[i]->type, metadata_[i]->Data(),
                                       metadata_[i]->length);
     if (status != ZX_OK) {
       LOGF(ERROR, "Failed to add metadata to device %p '%s': %s", device_.get(),
@@ -427,7 +444,7 @@ zx_status_t CompositeDevice::TryAssemble() {
   }
 
   // Bind |driver_| to |device_|.
-  status = coordinator->AttemptBind(driver_.value(), device_);
+  status = coordinator_.AttemptBind(driver_.value(), device_);
   if (status != ZX_OK) {
     LOGF(ERROR, "%s: Failed to bind driver '%s' to device '%s': %s", __func__,
          driver_.value().name(), device_->name().data(), zx_status_get_string(status));
@@ -437,10 +454,9 @@ zx_status_t CompositeDevice::TryAssemble() {
   return ZX_OK;
 }
 
-void CompositeDevice::SetDriverAndAssemble(MatchedDriverInfo driver) {
+void CompositeDevice::SetMatchedDriver(MatchedDriverInfo driver) {
   ZX_ASSERT(!driver_.has_value());
   driver_.emplace(driver);
-  TryAssemble();
 }
 
 void CompositeDevice::UnbindFragment(CompositeDeviceFragment* fragment) {

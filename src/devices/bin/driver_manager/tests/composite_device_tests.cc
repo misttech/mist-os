@@ -548,9 +548,11 @@ TEST_F(CompositeTestCase, AddCompositeWithoutMatchingDriver) {
 
   AddCompositeFragmentDevices(protocol_id, std::size(protocol_id), device_indexes);
 
-  size_t fragment_device_indexes[std::size(device_indexes)];
-  CheckCompositeFragments(kCompositeDevName, device_indexes, std::size(device_indexes),
-                          fragment_device_indexes);
+  // Check each composite fragment to ensure that they're unbound.
+  for (auto& device_idx : device_indexes) {
+    auto device_state = device(device_idx);
+    ASSERT_FALSE(device_state->HasPendingMessages());
+  }
 
   // Check that the composite device doesn't exist. The driver host should not receive a
   // message to add a device.
@@ -561,6 +563,13 @@ TEST_F(CompositeTestCase, AddCompositeWithoutMatchingDriver) {
   driver_index_->set_match_callback(
       [&](auto args) -> zx::result<FakeDriverIndex::MatchResult> { return MatchFakeDriver(args); });
   coordinator().bind_driver_manager().BindAllDevices(DriverLoader::MatchDeviceConfig{});
+
+  coordinator_loop()->RunUntilIdle();
+
+  // Fragments should be bound.
+  size_t fragment_device_indexes[std::size(device_indexes)];
+  CheckCompositeFragments(kCompositeDevName, device_indexes, std::size(device_indexes),
+                          fragment_device_indexes);
 
   // Make sure that the composite comes up.
   DeviceState composite;

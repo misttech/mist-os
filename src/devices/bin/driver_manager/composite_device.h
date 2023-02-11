@@ -52,7 +52,8 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   CompositeDevice(fbl::String name, fbl::Array<const zx_device_prop_t> properties,
                   fbl::Array<const StrProperty> str_properties, uint32_t fragments_count,
                   uint32_t primary_fragment_index, std::optional<bool> legacy_colocate_flag,
-                  fbl::Array<std::unique_ptr<Metadata>> metadata, bool from_driver_index);
+                  fbl::Array<std::unique_ptr<Metadata>> metadata, Coordinator& coordinator,
+                  bool from_driver_index);
 
   CompositeDevice(CompositeDevice&&) = delete;
   CompositeDevice& operator=(CompositeDevice&&) = delete;
@@ -64,10 +65,11 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   static zx_status_t Create(std::string_view name,
                             fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_desc,
-                            std::unique_ptr<CompositeDevice>* out);
+                            Coordinator& coordinator, std::unique_ptr<CompositeDevice>* out);
 
   static std::unique_ptr<CompositeDevice> CreateFromSpec(
-      CompositeNodeSpecInfo driver_info, fbl::Array<std::unique_ptr<Metadata>> metadata);
+      CompositeNodeSpecInfo driver_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
+      Coordinator& coordinator);
 
   // Attempt to match and bind any of the unbound fragments against |dev|.
   zx_status_t TryMatchBindFragments(const fbl::RefPtr<Device>& dev);
@@ -77,7 +79,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   // Should only be called if |driver_| is nullopt. Sets |driver_| and tries
   // to assemble the composite device.
-  void SetDriverAndAssemble(MatchedDriverInfo driver);
+  void SetMatchedDriver(MatchedDriverInfo driver);
 
   // Mark the given fragment as unbound.  Note that since we don't expose
   // this device's fragments in the API, this method can only be invoked by
@@ -129,6 +131,10 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // matching fragment.
   bool IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* index_out) const;
 
+  // Finds a matching driver for the CompositeDevice. If it finds one, set |driver_|
+  // to it. Otherwise, return ZX_ERR_NOT_FOUND. Should only be called if |driver_| is nullopt.
+  zx::result<> MatchDriverToComposite();
+
   const fbl::String name_;
   const fbl::Array<const zx_device_prop_t> properties_;
   const fbl::Array<const StrProperty> str_properties_;
@@ -146,7 +152,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   const bool from_composite_node_spec_;
 
   // The driver that binds to actual device created by CompositeDevice. Only set by
-  // CreateFromSpec(), SetDriver(), or TryAssemble().
+  // CreateFromSpec(), SetDriver(), or MatchDriverToComposite().
   std::optional<const MatchedDriverInfo> driver_;
 
   FragmentList fragments_;
@@ -158,6 +164,9 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // Once the composite has been assembled, this refers to the constructed
   // device.
   fbl::RefPtr<Device> device_;
+
+  // Must outlive CompositeDevice.
+  Coordinator& coordinator_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_H_

@@ -171,7 +171,8 @@ zx_status_t DeviceManager::AddDevice(
 zx_status_t DeviceManager::AddCompositeDevice(const fbl::RefPtr<Device>& dev, std::string_view name,
                                               fdm::wire::CompositeDeviceDescriptor comp_desc) {
   std::unique_ptr<CompositeDevice> new_device;
-  zx_status_t status = CompositeDevice::Create(name, std::move(comp_desc), &new_device);
+  zx_status_t status =
+      CompositeDevice::Create(name, std::move(comp_desc), *coordinator_, &new_device);
   if (status != ZX_OK) {
     return status;
   }
@@ -193,7 +194,7 @@ void DeviceManager::AddCompositeDeviceFromSpec(CompositeNodeSpecInfo info,
                                                fbl::Array<std::unique_ptr<Metadata>> metadata) {
   ZX_ASSERT(composites_from_specs_.count(info.spec_name) == 0);
   std::unique_ptr<CompositeDevice> new_device =
-      CompositeDevice::CreateFromSpec(info, std::move(metadata));
+      CompositeDevice::CreateFromSpec(info, std::move(metadata), *coordinator_);
   composites_from_specs_[info.spec_name] = std::move(new_device);
 }
 

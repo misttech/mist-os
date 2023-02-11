@@ -54,7 +54,7 @@ zx_status_t BindDriverManager::BindDevice(const fbl::RefPtr<Device>& dev) {
   }
 
   // This is a general request, so skip devices that don't allow autobind.
-  if (dev->flags & DEV_CTX_SKIP_AUTOBIND) {
+  if (dev->should_skip_autobind()) {
     return ZX_OK;
   }
 
@@ -165,7 +165,16 @@ zx::result<> BindDriverManager::MatchAndBindCompositeDevice(
     return match_result.take_error();
   }
 
-  composite.SetDriverAndAssemble(match_result.value());
+  // If a matching driver is find, set it in the composite device and then
+  // try to match and bind its fragments.
+  composite.SetMatchedDriver(match_result.value());
+  for (auto& dev : coordinator_->device_manager()->devices()) {
+    if (dev.IsAlreadyBound() || dev.should_skip_autobind() || dev.flags & DEV_CTX_PROXY) {
+      continue;
+    }
+    composite.TryMatchBindFragments(fbl::RefPtr(&dev));
+  }
+
   return zx::ok();
 }
 
