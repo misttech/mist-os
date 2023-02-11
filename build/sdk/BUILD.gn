@@ -71,7 +71,6 @@ _sdk_versioned_source_sets_list = [
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async:async-cpp",
   "//zircon/system/ulib/ddk-platform-defs",
-  "//zircon/system/ulib/fidl-async",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/mmio-ptr",
   "//zircon/system/ulib/trace",

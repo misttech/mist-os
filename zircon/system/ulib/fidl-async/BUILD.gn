@@ -4,27 +4,6 @@
 
 import("//build/zircon/zx_library.gni")
 
-zx_library("fidl-async") {
-  sdk = "source"
-  sdk_publishable = true
-  sdk_headers = [ "lib/fidl-async/bind.h" ]
-  sources = [ "bind.c" ]
-  deps = [
-    "//sdk/lib/fidl",
-    "//zircon/system/ulib/async",
-  ]
-
-  # TODO(https://fxbug.dev/116293): This library is deprecated.
-  # This library only supports the C bindings.
-  # Consider using the new C++ FIDL bindings instead of the C bindings.
-  visibility = [
-    ":fidl-async_cc_stub",
-    "//build/sdk:sdk_versioned_source_sets",
-    "//src/lib/fidl/c/walker_tests:test_sources",
-    "//zircon/system/ulib/fidl-utils",
-  ]
-}
-
 zx_library("fidl-async-cpp") {
   sdk = "source"
   sdk_headers = [
