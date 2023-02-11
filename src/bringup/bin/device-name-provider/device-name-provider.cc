@@ -7,9 +7,9 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fidl-async/cpp/bind.h>
-#include <lib/svc/outgoing.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdio/namespace.h>
+#include <lib/fit/defer.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,7 +21,6 @@
 #include "args.h"
 #include "name_tokens.h"
 #include "src/bringup/bin/netsvc/netifc-discover.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 
 // Copies a word from the wordlist starting at |dest| and then adds |sep| at the end.
 // Returns a pointer to the character after the separator.
@@ -94,12 +93,28 @@ class DeviceNameProviderServer final : public fidl::WireServer<fuchsia_device::N
 };
 
 int main(int argc, char** argv) {
-  fbl::unique_fd svc_root(open("/svc", O_RDWR | O_DIRECTORY));
-  fdio_cpp::UnownedFdioCaller caller(svc_root.get());
+  fdio_flat_namespace_t* ns;
+  if (zx_status_t status = fdio_ns_export_root(&ns); status != ZX_OK) {
+    printf("device-name-provider: FATAL: fdio_ns_export_root() = %s\n",
+           zx_status_get_string(status));
+    return -1;
+  }
+  auto free = fit::defer([ns]() { fdio_ns_free_flat_ns(ns); });
+  fidl::ClientEnd<fuchsia_io::Directory> svc_root;
+  for (size_t i = 0; i < ns->count; ++i) {
+    if (std::string_view{ns->path[i]} == "/svc") {
+      svc_root = decltype(svc_root){zx::channel{std::exchange(ns->handle[i], ZX_HANDLE_INVALID)}};
+      break;
+    }
+  }
+  if (!svc_root.is_valid()) {
+    printf("device-name-provider: FATAL: did not find /svc in namespace\n");
+    return -1;
+  }
 
   DeviceNameProviderArgs args;
   const char* errmsg = nullptr;
-  int err = ParseArgs(argc, argv, caller.borrow_as<fuchsia_io::Directory>(), &errmsg, &args);
+  int err = ParseArgs(argc, argv, svc_root, &errmsg, &args);
   if (err) {
     printf("device-name-provider: FATAL: ParseArgs(_) = %d; %s\n", err, errmsg);
     return err;
@@ -129,30 +144,26 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  svc::Outgoing outgoing(dispatcher);
-  zx_status_t status = outgoing.ServeFromStartupInfo();
-  if (status != ZX_OK) {
+  component::OutgoingDirectory outgoing(dispatcher);
+  if (zx::result result = outgoing.ServeFromStartupInfo(); result.is_error()) {
     printf("device-name-provider: FATAL: outgoing.ServeFromStartupInfo() = %s\n",
-           zx_status_get_string(status));
+           result.status_string());
     return -1;
   }
 
   DeviceNameProviderServer server(device_name, strnlen(device_name, sizeof(device_name)));
 
-  outgoing.svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_device::NameProvider>,
-      fbl::MakeRefCounted<fs::Service>(
+  if (zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_device::NameProvider>(
           [dispatcher, server](fidl::ServerEnd<fuchsia_device::NameProvider> server_end) mutable {
-            zx_status_t status =
-                fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), &server);
-            if (status != ZX_OK) {
-              printf("device-name-provider: fidl::BindSingleInFlightOnly(_) = %s\n",
-                     zx_status_get_string(status));
-            }
-            return status;
-          }));
+            fidl::BindServer(dispatcher, std::move(server_end), &server);
+          });
+      result.is_error()) {
+    printf("device-name-provider: FATAL: outgoing.AddUnmanagedProtocol = %s\n",
+           result.status_string());
+    return -1;
+  }
 
-  status = loop.Run();
+  zx_status_t status = loop.Run();
   printf("device-name-provider: loop.Run() = %s\n", zx_status_get_string(status));
   return status;
 }
