@@ -148,4 +148,7 @@ void waitForChildSucceeds(unsigned int waitFlag, int cloneFlags, int (*childRunF
 
 void waitForChildFails(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
                        int (*parentRunFunction)(void *));
+
+std::string get_tmp_path();
+
 #endif  // SRC_PROC_TESTS_CHROMIUMOS_SYSCALLS_TEST_HELPER_H_

@@ -117,6 +117,12 @@ impl SeqFileBuf {
     pub fn write(&mut self, data: &[u8]) {
         self.0.extend_from_slice(data);
     }
+    pub fn write_iter<I>(&mut self, data: I)
+    where
+        I: IntoIterator<Item = u8>,
+    {
+        self.0.extend(data);
+    }
     pub fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> Result<usize, Errno> {
         let start_size = self.0.len();
         std::io::Write::write_fmt(&mut self.0, args).map_err(|_| errno!(EINVAL))?;

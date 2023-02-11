@@ -16,6 +16,22 @@ group("tests") {
   }
 }
 
+source_set("test_utils") {
+  testonly = true
+
+  sources = [
+    "proc_test.h",
+    "syscall_matchers.h",
+    "task_test.h",
+    "test_helper.cc",
+    "test_helper.h",
+  ]
+  public_deps = [
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 test("syscalls_test_bin") {
   exclude_toolchain_tags = [ "asan" ]
   sources = [
@@ -35,8 +51,6 @@ test("syscalls_test_bin") {
     "sw_breakpoint_test.cc",
     "task_test.cc",
     "terminal_test.cc",
-    "test_helper.cc",
-    "test_helper.h",
     "test_helper_test.cc",
     "timerfd_test.cc",
     "trivial_test.cc",
@@ -44,6 +58,8 @@ test("syscalls_test_bin") {
     "waitpid_flags_test.cc",
   ]
   deps = [
+    ":test_utils",
+    "//sdk/lib/stdcompat",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
@@ -73,11 +89,13 @@ test("crash") {
 # toolchain so we need that also.
 if (is_linux) {
   executable("syscall_test_exec_child") {
+    testonly = true
     sources = [ "syscall_test_exec_child.cc" ]
     exclude_toolchain_tags = [
       "asan",
       "coverage",
     ]
+    deps = [ ":test_utils" ]
   }
   resource("syscall_test_exec_child_resource") {
     testonly = true

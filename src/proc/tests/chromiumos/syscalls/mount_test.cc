@@ -13,6 +13,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/proc/tests/chromiumos/syscalls/proc_test.h"
+#include "src/proc/tests/chromiumos/syscalls/syscall_matchers.h"
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 namespace {
@@ -50,13 +52,6 @@ void RecursiveUnmount(const char *path) {
 
 static bool skip_mount_tests = false;
 
-const char *get_tmp_path() {
-  const char *tmp = getenv("TEST_TMPDIR");
-  if (tmp == nullptr)
-    tmp = "/tmp";
-  return tmp;
-}
-
 class MountTest : public ::testing::Test {
  public:
   static void SetUpTestSuite() {
@@ -74,8 +69,7 @@ class MountTest : public ::testing::Test {
     if (skip_mount_tests) {
       GTEST_SKIP() << "Permission denied for unshare(CLONE_NEWNS), skipping suite.";
     }
-    const char *tmp = get_tmp_path();
-    tmp_ = std::string(tmp) + "/mounttest";
+    tmp_ = get_tmp_path() + "/mounttest";
     mkdir(tmp_.c_str(), 0777);
     RecursiveUnmount(tmp_.c_str());
     ASSERT_THAT(mount(nullptr, tmp_.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
@@ -256,7 +250,7 @@ TEST_F(MountTest, LotsOfShadowing) {
 // TODO(tbodt): write more tests:
 // - A and B are shared, make B downstream, make A private, should now both be private
 
-class ProcMountsTest : public ::testing::Test {
+class ProcMountsTest : public ProcTest {
   // Note that these tests can be affected by those in other suites e.g. a
   // MountTest above that doesn't clean up its mounts may change the value of
   // /proc/mounts observed by these tests. Ideally, we'd run a each suite in a
@@ -264,29 +258,10 @@ class ProcMountsTest : public ::testing::Test {
   // the blast radius.
 
  public:
-  void SetUp() override {
-    // TODO Ideally the test galaxy should just have /proc mounted by default
-    // but first the mount point needs to exist in the image
-    // (prebuilt/starnix/chromiumos-image-amd64/system.img).
-    std::stringstream ss;
-    ss << tmp_ << "/proc";
-    proc_ = ss.str();
-    ASSERT_THAT(mkdir(proc_.c_str(), 0777), SyscallSucceeds());
-    ASSERT_THAT(mount(nullptr, proc_.c_str(), "proc", 0, nullptr), SyscallSucceeds());
-
-    ss << "/mounts";
-    proc_mounts_ = ss.str();
-  }
-
-  void TearDown() override {
-    ASSERT_THAT(umount(proc_.c_str()), SyscallSucceeds());
-    ASSERT_THAT(rmdir(proc_.c_str()), SyscallSucceeds());
-  }
-
   std::vector<std::string> read_mounts() {
     std::vector<std::string> ret;
 
-    std::ifstream ifs(proc_mounts_);
+    std::ifstream ifs(proc_path() + "/mounts");
     std::string s;
     while (getline(ifs, s)) {
       ret.push_back(s);
@@ -296,8 +271,6 @@ class ProcMountsTest : public ::testing::Test {
 
  protected:
   const std::string tmp_ = get_tmp_path();
-  std::string proc_;
-  std::string proc_mounts_;
 };
 
 TEST_F(ProcMountsTest, Basic) {
@@ -311,17 +284,13 @@ TEST_F(ProcMountsTest, Basic) {
 TEST_F(ProcMountsTest, MountAdded) {
   auto before_mounts = read_mounts();
 
-  // TODO Can we just include absl::StrCat?
-  std::stringstream ss;
-  ss << tmp_ << "/foo";
-  std::string mp = ss.str();
+  std::string mp = tmp_ + "/foo";
   ASSERT_THAT(mkdir(mp.c_str(), 0777), SyscallSucceeds());
   ASSERT_THAT(mount(nullptr, mp.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
 
   auto expected_mounts = before_mounts;
-  ss.str(std::string());
-  ss << " " << mp << " TODO TODO 0 0";
-  expected_mounts.push_back(ss.str());
+  std::string mount = " " + mp + " TODO TODO 0 0";
+  expected_mounts.push_back(mount);
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(expected_mounts));
 
   // Clean-up.

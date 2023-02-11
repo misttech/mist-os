@@ -142,3 +142,13 @@ void waitForChildFails(unsigned int waitFlag, int cloneFlags, int (*childRunFunc
   EXPECT_EQ(errno, ECHILD);
   errno = 0;
 }
+
+std::string get_tmp_path() {
+  static std::string tmp_path = [] {
+    const char *tmp = getenv("TEST_TMPDIR");
+    if (tmp == nullptr)
+      tmp = "/tmp";
+    return tmp;
+  }();
+  return tmp_path;
+}

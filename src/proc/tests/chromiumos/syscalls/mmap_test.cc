@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <lib/stdcompat/string_view.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -12,6 +14,9 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/fxl/strings/string_printf.h"
+#include "src/proc/tests/chromiumos/syscalls/proc_test.h"
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 constexpr size_t MMAP_FILE_SIZE = 64;
@@ -130,6 +135,76 @@ TEST(MMapTest, MapFileThenGrow) {
   // file is closed and unmapped.
 
   SAFE_SYSCALL(munmap(mapping_addr, mapping_len));
+
+  close(fd);
+  unlink(path.c_str());
+}
+
+class MMapProcTest : public ProcTest {};
+
+TEST_F(MMapProcTest, MapFileWithNewlineInName) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/mmap\nnewline";
+  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
+  ASSERT_GE(fd, 0);
+  SAFE_SYSCALL(ftruncate(fd, page_size));
+  void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd, 0);
+  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+  std::vector<std::string_view> lines =
+      fxl::SplitString(maps, "\n", fxl::kKeepWhitespace, fxl::kSplitWantNonEmpty);
+  bool found_entry = false;
+  for (auto line : lines) {
+    if (cpp20::starts_with(line, address_formatted)) {
+      std::vector<std::string_view> parts =
+          fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+      ASSERT_FALSE(parts.empty()) << line;
+      EXPECT_EQ(parts.back(), dir + "/mmap\\012newline");
+      found_entry = true;
+    }
+  }
+  EXPECT_TRUE(found_entry);
+  close(fd);
+  unlink(path.c_str());
+}
+
+TEST_F(MMapProcTest, AdjacentFileMappings) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/mmap_test";
+  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
+  ASSERT_GE(fd, 0);
+  SAFE_SYSCALL(ftruncate(fd, page_size * 2));
+
+  // Find two adjacent available pages in memory.
+  void* p = mmap(nullptr, page_size * 2, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(MAP_FAILED, p);
+  SAFE_SYSCALL(munmap(p, page_size * 2));
+
+  // Map the first page of the file into the first page of our available space.
+  ASSERT_NE(MAP_FAILED, mmap(p, page_size, PROT_READ, MAP_SHARED | MAP_FIXED, fd, 0));
+  // Map the second page of the file into the second page of our available space.
+  ASSERT_NE(MAP_FAILED, mmap((void*)((intptr_t)p + page_size), page_size, PROT_READ,
+                             MAP_SHARED | MAP_FIXED, fd, page_size));
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+
+  // Expect one line for this file covering 2 pages
+
+  std::vector<std::string_view> lines =
+      fxl::SplitString(maps, "\n", fxl::kKeepWhitespace, fxl::kSplitWantNonEmpty);
+  bool found_entry = false;
+  for (auto line : lines) {
+    if (cpp20::ends_with(line, path)) {
+      EXPECT_FALSE(found_entry) << "extra entry found: " << line;
+      found_entry = true;
+    }
+  }
 
   close(fd);
   unlink(path.c_str());

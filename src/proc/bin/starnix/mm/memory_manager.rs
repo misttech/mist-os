@@ -1583,7 +1583,23 @@ impl FileOps for ProcMapsFile {
                     for _ in line_length..73 {
                         sink.write(b" ");
                     }
-                    sink.write(&filename.path());
+                    // File names can have newlines that need to be escaped before printing.
+                    // According to https://man7.org/linux/man-pages/man5/proc.5.html the only
+                    // escaping applied to paths is replacing newlines with an octal sequence.
+                    let path = filename.path();
+                    sink.write_iter(
+                        path.iter()
+                            .flat_map(
+                                |b| {
+                                    if *b == b'\n' {
+                                        b"\\012"
+                                    } else {
+                                        std::slice::from_ref(b)
+                                    }
+                                },
+                            )
+                            .copied(),
+                    );
                 }
                 sink.write(b"\n");
                 return Ok(Some(range.end));

@@ -17,5 +17,12 @@
                 "MapGrowsdownTest.Syscall*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/121778)
+                "MMapProcTest.AdjacentFileMappings",
+            ],
+        },
     ],
 }
