@@ -7,7 +7,7 @@ group("galaxies") {
     deps = [
       "bionic",
       "chromiumos",
-      "starless",
+      "empty_galaxy",
     ]
   }
 }
@@ -17,13 +17,13 @@ group("release") {
     deps = [
       "bionic",
       "chromiumos",
-      "starless",
+      "empty_galaxy",
     ]
   }
 }
 
 group("tests") {
   if (target_cpu == "x64" && !is_asan) {
-    deps = [ "starless" ]
+    deps = [ "empty_galaxy" ]
   }
 }

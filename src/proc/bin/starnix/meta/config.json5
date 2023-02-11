@@ -7,6 +7,6 @@
     mounts: [
         "/:remotefs",
     ],
-    name: "starless",
+    name: "empty_galaxy",
     startup_file_path: "",
 }

@@ -1,0 +1,46 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    program: {
+        runner: "starnix",
+        apex_hack: [],
+        features: [],
+        init: [],
+        init_user: "root:x:0:0",
+        kernel_cmdline: "",
+        mounts: [ "/:remotefs" ],
+        name: "empty_galaxy",
+        startup_file_path: "",
+    },
+    capabilities: [
+        {
+            runner: "starnix",
+            path: "/svc/fuchsia.component.runner.ComponentRunner",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.binder.DevBinder",
+                "fuchsia.starnix.galaxy.Controller",
+            ],
+        },
+    ],
+    expose: [
+        {
+            runner: "starnix",
+            from: "self",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.galaxy.Controller",
+            ],
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
+    ],
+}

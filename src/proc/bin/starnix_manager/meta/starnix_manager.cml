@@ -23,8 +23,9 @@
             environment: "#galaxy-env",
         },
         {
-            name: "starless",
-            url: "fuchsia-pkg://fuchsia.com/starless#meta/starnix_kernel.cm",
+            name: "empty_galaxy",
+            url: "fuchsia-pkg://fuchsia.com/starless#meta/empty_galaxy.cm",
+            environment: "#galaxy-env",
         },
     ],
     collections: [
@@ -76,8 +77,9 @@
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#starless",
-            path: "/starless/fuchsia.starnix.galaxy.Controller",
+            from: "#empty_galaxy",
+            path: "/empty_galaxy/fuchsia.starnix.galaxy.Controller",
+            dependency: "weak",
         },
         {
             protocol: "fuchsia.component.Realm",
@@ -97,9 +99,9 @@
             ],
             from: "parent",
             to: [
+                "#empty_galaxy",
                 "#kernels",
                 "#stardroid",
-                "#starless",
             ],
         },
         {
@@ -114,7 +116,6 @@
             to: [
                 "#kernels",
                 "#stardroid",
-                "#starless",
             ],
             availability: "optional",
         },
@@ -129,16 +130,12 @@
             to: [
                 "#kernels",
                 "#stardroid",
-                "#starless",
             ],
         },
         {
             directory: "galaxy_config",
             from: "void",
-            to: [
-                "#stardroid",
-                "#starless",
-            ],
+            to: [ "#stardroid" ],
             availability: "optional",
         },
     ],
@@ -160,8 +157,8 @@
         },
         {
             runner: "starnix",
-            from: "#starless",
-            as: "starless",
+            from: "#empty_galaxy",
+            as: "starnix_empty",
         },
         {
             runner: "starnix",
@@ -194,8 +191,8 @@
                 },
                 {
                     runner: "starnix",
-                    from: "#starless",
-                    as: "starless",
+                    from: "#empty_galaxy",
+                    as: "starnix_empty",
                 },
                 {
                     runner: "starnix",

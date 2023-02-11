@@ -341,7 +341,7 @@ fuchsia_component("starnix_kernel") {
 
 fuchsia_structured_config_values("kernel_config") {
   cm_label = ":starnix_kernel_manifest"
-  values_source = "//src/proc/bin/galaxies/starless/config.json5"
+  values_source = "//src/proc/bin/starnix/meta/config.json5"
 }
 
 fuchsia_package("starnix_kernel_package") {

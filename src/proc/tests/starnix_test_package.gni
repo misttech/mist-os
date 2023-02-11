@@ -58,14 +58,3 @@ template("starnix_test_package_with_expectations") {
     }
   }
 }
-
-# Define a test package for a linux test running in a starless galaxy.
-#
-# The parameters are the same as fuchsia_test_package
-template("starless_test_package") {
-  starnix_test_package(target_name) {
-    forward_variables_from(invoker, "*")
-
-    galaxy = "//src/proc/bin/galaxies/starless"
-  }
-}
