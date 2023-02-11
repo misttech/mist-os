@@ -5,19 +5,16 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <fuchsia/camera/cpp/fidl.h>
-#include <fuchsia/hardware/camera/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/watcher.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zircon-internal/align.h>
+
+#include <filesystem>
 
 using CamControl = fuchsia::camera::ControlSyncPtr;
 using Buffer = fuchsia::sysmem::BufferCollectionInfo;
@@ -69,33 +66,35 @@ std::string FormatToString(Format f) {
   return ConvertPixelFormatToString(f.format.pixel_format) + buffer;
 }
 
-zx::result<CamControl> OpenCamera(const std::string& path) {
-  fbl::unique_fd fd(open(path.c_str(), O_RDWR));
-  if (fd.get() < 0) {
-    FX_PLOGS(ERROR, fd.get()) << "Failed to open sensor at " << path;
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  FX_LOGS(INFO) << "opened " << path;
+zx::result<CamControl> OpenCamera() {
+  for (auto const& dir_entry : std::filesystem::directory_iterator{"/dev/class/camera"}) {
+    const char* path = dir_entry.path().c_str();
+    zx::result client_end = component::Connect<fuchsia_hardware_camera::Device>(path);
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value()) << "Failed to open sensor at " << path;
+      return client_end.take_error();
+    }
+    FX_LOGS(INFO) << "opened " << path;
 
-  fuchsia::camera::ControlSyncPtr ctrl;
-  fdio_cpp::UnownedFdioCaller caller(fd);
-  auto status = fidl::WireCall(caller.borrow_as<fuchsia_hardware_camera::Device>())
-                    ->GetChannel(ctrl.NewRequest().TakeChannel())
-                    .status();
-  if (status != ZX_OK) {
-    FX_PLOGS(INFO, status) << "Couldn't GetChannel from " << path;
-    return zx::error(status);
-  }
+    fuchsia::camera::ControlSyncPtr ctrl;
+    const fidl::OneWayStatus status =
+        fidl::WireCall(client_end.value())->GetChannel(ctrl.NewRequest().TakeChannel());
+    if (!status.ok()) {
+      FX_PLOGS(INFO, status.status()) << "Couldn't GetChannel from " << path;
+      return zx::error(status.status());
+    }
 
-  fuchsia::camera::DeviceInfo info_return;
-  status = ctrl->GetDeviceInfo(&info_return);
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Could not get Device Info";
-    return zx::error(status);
+    fuchsia::camera::DeviceInfo info_return;
+    if (zx_status_t status = ctrl->GetDeviceInfo(&info_return); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Could not get Device Info";
+      return zx::error(status);
+    }
+    FX_LOGS(INFO) << "Got Device Info:\n"
+                  << "  Vendor: " << info_return.vendor_name << " (" << info_return.vendor_id
+                  << ")";
+    return zx::ok(std::move(ctrl));
   }
-  FX_LOGS(INFO) << "Got Device Info:\n"
-                << "  Vendor: " << info_return.vendor_name << " (" << info_return.vendor_id << ")";
-  return zx::ok(std::move(ctrl));
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<std::vector<fuchsia::camera::VideoFormat>> GetFormats(CamControl& ctrl) {
@@ -220,7 +219,7 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
 
-  auto result = OpenCamera("/dev/class/camera/000");
+  auto result = OpenCamera();
   if (result.is_error()) {
     FX_PLOGS(ERROR, result.error_value()) << "Unable to open camera.";
     return -1;

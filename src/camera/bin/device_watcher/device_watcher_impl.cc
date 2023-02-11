@@ -294,11 +294,9 @@ void DeviceWatcherImpl::ConnectDynamicChild(
       [exposed_dir = std::move(exposed_dir), request = std::move(request)](
           fuchsia::component::Realm_OpenExposedDir_Result result) mutable {
         if (result.is_err()) {
-          FX_LOGS(ERROR) << "Failed to connect to exposed directory. Result: "
-                         << static_cast<long>(result.err());
-
           // TODO(b/241604541) - Need a more graceful recovery here.
-          ZX_ASSERT(false);
+          FX_LOGS(FATAL) << "Failed to connect to exposed directory. Result: "
+                         << static_cast<uint32_t>(result.err());
         }
         std::shared_ptr<sys::ServiceDirectory> svc_dir =
             std::make_shared<sys::ServiceDirectory>(sys::ServiceDirectory(std::move(exposed_dir)));

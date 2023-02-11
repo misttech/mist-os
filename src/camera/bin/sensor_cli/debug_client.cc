@@ -12,6 +12,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include <filesystem>
+
 namespace camera {
 
 DebugClient::DebugClient(async::Loop& loop)
@@ -24,18 +26,26 @@ void DebugClient::Start(uint32_t mode) {
 
 bool DebugClient::ConnectToServer() {
   fuchsia::hardware::camera::DeviceHandle device_handle;
-  zx_status_t status = fdio_service_connect("/dev/class/camera/000",
-                                            device_handle.NewRequest().TakeChannel().release());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to connect to controller device";
+  for (auto const& dir_entry : std::filesystem::directory_iterator{"/dev/class/camera"}) {
+    if (zx_status_t status = fdio_service_connect(
+            dir_entry.path().c_str(), device_handle.NewRequest().TakeChannel().release());
+        status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to connect to controller device";
+      Quit();
+    }
+    break;
+  }
+  if (!device_handle.is_valid()) {
+    FX_LOGS(ERROR) << "Failed to discover controller device";
     Quit();
   }
 
   fuchsia::hardware::camera::DeviceSyncPtr device_sync_ptr;
   device_sync_ptr.Bind(std::move(device_handle));
 
-  status = device_sync_ptr->GetDebugChannel(debug_ptr_.NewRequest(loop_.dispatcher()));
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          device_sync_ptr->GetDebugChannel(debug_ptr_.NewRequest(loop_.dispatcher()));
+      status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to access Debug API";
     Quit();
   }

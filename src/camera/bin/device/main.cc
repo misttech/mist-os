@@ -15,7 +15,9 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
+#include <lib/zx/result.h>
 
+#include <filesystem>
 #include <string>
 
 #include "src/camera/bin/device/device_impl.h"
@@ -27,19 +29,14 @@ constexpr auto kCameraPath = "/dev/class/camera";
 
 using DeviceHandle = fuchsia::hardware::camera::DeviceHandle;
 
-static std::string GetCameraFullPath(const std::string& path) {
-  return std::string(kCameraPath) + "/" + path;
-}
-
-static fpromise::result<DeviceHandle, zx_status_t> GetCameraHandle(const std::string& full_path) {
-  DeviceHandle camera;
-  zx_status_t status =
-      fdio_service_connect(full_path.c_str(), camera.NewRequest().TakeChannel().release());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status);
-    return fpromise::error(status);
+static zx::result<DeviceHandle> GetCameraHandle() {
+  for (auto const& dir_entry : std::filesystem::directory_iterator{kCameraPath}) {
+    DeviceHandle camera;
+    zx_status_t status =
+        fdio_service_connect(dir_entry.path().c_str(), camera.NewRequest().TakeChannel().release());
+    return zx::make_result(status, std::move(camera));
   }
-  return fpromise::ok(std::move(camera));
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace camera
@@ -60,14 +57,13 @@ int main(int argc, char* argv[]) {
   // instead of hardcoding it here.
   fuchsia::camera2::hal::ControllerSyncPtr controller;
   {
-    auto full_path = camera::GetCameraFullPath("000");
-    auto result = camera::GetCameraHandle(full_path);
+    zx::result result = camera::GetCameraHandle();
     if (result.is_error()) {
-      FX_PLOGS(INFO, result.error()) << "Couldn't get camera from " << full_path
-                                     << ". This device will not be exposed to clients.";
+      FX_PLOGS(INFO, result.status_value())
+          << "Couldn't get camera from. This device will not be exposed to clients.";
       return EXIT_FAILURE;
     }
-    camera::DeviceHandle device_handle = result.take_value();
+    camera::DeviceHandle& device_handle = result.value();
     fuchsia::hardware::camera::DeviceSyncPtr device;
     device.Bind(std::move(device_handle));
 

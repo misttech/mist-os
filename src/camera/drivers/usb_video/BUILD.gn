@@ -9,7 +9,10 @@ import("//src/camera/debug.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":usb_video_bind_test" ]
+  deps = [
+    ":usb_video_bind_test",
+    "uvc-tester",
+  ]
 }
 
 driver_bind_rules("usb_video_bind") {

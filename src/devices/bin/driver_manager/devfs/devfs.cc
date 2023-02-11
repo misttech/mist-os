@@ -467,9 +467,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113719): Remove.
       "bt-hci",
 
-      // TODO(https://fxbug.dev/113720): Remove.
-      "camera",
-
       // TODO(https://fxbug.dev/113828): Remove.
       "cpu-ctrl",
 
