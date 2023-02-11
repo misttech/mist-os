@@ -6,7 +6,6 @@
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/zx/time.h>
 #include <lib/zxio/watcher.h>
 #include <lib/zxio/zxio.h>
@@ -59,7 +58,7 @@ TEST(WatcherTest, WatchInvalidCallback) {
                    fidl::WireServer<fuchsia_io::Directory>::WatchCompleter::Sync& completer) {});
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server));
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   zxio_storage_t storage;
@@ -103,7 +102,7 @@ TEST(WatcherTest, Smoke) {
         0, bytes, static_cast<uint32_t>(std::distance(std::begin(bytes), it)), nullptr, 0));
   });
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server));
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   zxio_storage_t storage;

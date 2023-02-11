@@ -6,7 +6,6 @@
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/sync/completion.h>
 #include <lib/zxio/zxio.h>
 
@@ -70,11 +69,7 @@ class Remote : public zxtest::Test {
       return nullptr;
     }
 
-    EXPECT_OK(fidl::BindSingleInFlightOnly(loop_->dispatcher(), std::move(control_server_),
-                                           server_.get()));
-    if (status != ZX_OK) {
-      return nullptr;
-    }
+    fidl::BindServer(loop_->dispatcher(), std::move(control_server_), server_.get());
     return static_cast<ServerImpl*>(server_.get());
   }
 

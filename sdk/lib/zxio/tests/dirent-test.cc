@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/zxio/ops.h>
 #include <lib/zxio/types.h>
@@ -95,8 +94,7 @@ class DirentTest : public zxtest::Test {
     server_ = std::make_unique<TestServer>();
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_OK(loop_->StartThread("fake-filesystem"));
-    ASSERT_OK(
-        fidl::BindSingleInFlightOnly(loop_->dispatcher(), std::move(server_end), server_.get()));
+    fidl::BindServer(loop_->dispatcher(), std::move(server_end), server_.get());
   }
 
   void TearDown() final {
