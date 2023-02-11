@@ -42,7 +42,7 @@ Now that you've been warned, here's how this is supposed to work:
     Note that this does not support `--config=fuchsia_x64` and
     `--config=fuchsia_arm64` are per the Fuchsia Bazel SDK. Also note that
     the user's own bazel configuration file (e.g. `$HOME/.bazelrc`) will
-    always be ignored.
+    always be ignored.  See [Configurations](#configurations) for more details.
 
   - Symlinks to all top-level entries in the Fuchsia source tree, except for
     `out`. This way, any source or configuration file will appear at the same
@@ -256,6 +256,28 @@ external repository, which defines a C++ toolchain that generates Fuchsia
 binaries (while `@prebuilt_clang` is used to generate host binaries and
 experiment with build variants and PIE-optimized executables, without
 conflicts).
+
+# CONFIGURATIONS
+
+Bazel command-line configurations are defined in
+`//build/bazel/templates/template.bazelrc`,
+which produces `${BAZEL_TOPDIR}/.bazelrc`.
+Configurations are invoked as `--config=NAME`.
+
+## Publish Build and Test Results
+
+Sharing build results can be helpful for triaging and reproducing issues.
+Use one of:
+
+- `--config=sponge` streams build event data to the Sponge service.
+- `--config=resultstore` streams build event data to the ResultStore service.
+
+## Remote Building
+
+Remote building can speed up builds by 1) offloading work remotely and 2)
+caching.
+
+- `--config=remote` enables remote build for many actions using RBE.
 
 # TESTING
 
