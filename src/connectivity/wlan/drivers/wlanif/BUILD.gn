@@ -26,8 +26,6 @@ all_deps = [
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
-  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_c_client",
-  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_c_server",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
   "//src/connectivity/wlan/drivers/lib/log/cpp",
   "//src/connectivity/wlan/lib/common/cpp:common",

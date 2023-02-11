@@ -7,6 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.input") {
   sources = [ "input.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
+
   enable_hlcpp = true
 }

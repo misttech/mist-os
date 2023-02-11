@@ -67,7 +67,6 @@ source_set("source") {
 
     # The LLCPP bindings for fuchsia.hardware.camera is used by controller_device.h
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",

@@ -12,6 +12,6 @@ fidl("fuchsia.logger") {
     "//sdk/fidl/fuchsia.diagnostics",
     "//zircon/vdso/zx",
   ]
-  enable_c = true
+
   enable_hlcpp = true
 }

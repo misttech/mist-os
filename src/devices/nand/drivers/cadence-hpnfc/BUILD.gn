@@ -25,7 +25,6 @@ fuchsia_driver("cadence-hpnfc-driver") {
   deps = [
     ":cadence-hpnfc-bind",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -65,7 +64,6 @@ test("cadence-hpnfc-test-bin") {
   deps = [
     ":cadence-hpnfc-bind",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-ddk",

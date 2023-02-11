@@ -37,7 +37,6 @@ source_set("common") {
   ]
   deps = [
     ":skip-block-bind",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
@@ -64,7 +63,6 @@ test("skip-block-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/fdio",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

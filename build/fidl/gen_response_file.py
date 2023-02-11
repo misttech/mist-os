@@ -41,15 +41,6 @@ def main():
     parser.add_argument(
         "--tables", help="The path for the tables file to generate, if any")
     parser.add_argument(
-        "--deprecated-fuchsia-only-c-client",
-        help="The path for the C simple client file to generate, if any")
-    parser.add_argument(
-        "--deprecated-fuchsia-only-c-header",
-        help="The path for the C header file to generate, if any")
-    parser.add_argument(
-        "--deprecated-fuchsia-only-c-server",
-        help="The path for the C simple server file to generate, if any")
-    parser.add_argument(
         "--target-api-level",
         help="Only compile APIs available at this Fuchsia API level",
         default="HEAD")
@@ -88,21 +79,6 @@ def main():
 
     if args.tables:
         response_file.append("--tables %s" % args.tables)
-
-    if args.deprecated_fuchsia_only_c_client:
-        response_file.append(
-            "--deprecated-fuchsia-only-c-client %s" %
-            args.deprecated_fuchsia_only_c_client)
-
-    if args.deprecated_fuchsia_only_c_header:
-        response_file.append(
-            "--deprecated-fuchsia-only-c-header %s" %
-            args.deprecated_fuchsia_only_c_header)
-
-    if args.deprecated_fuchsia_only_c_server:
-        response_file.append(
-            "--deprecated-fuchsia-only-c-server %s" %
-            args.deprecated_fuchsia_only_c_server)
 
     if args.name:
         response_file.append("--name %s" % args.name)

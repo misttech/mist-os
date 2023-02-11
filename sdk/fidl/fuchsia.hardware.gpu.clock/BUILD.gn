@@ -7,5 +7,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.gpu.clock") {
   sources = [ "clock.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
 }

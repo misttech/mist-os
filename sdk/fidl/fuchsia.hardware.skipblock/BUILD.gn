@@ -7,5 +7,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.skipblock") {
   sources = [ "skip-block.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
 }

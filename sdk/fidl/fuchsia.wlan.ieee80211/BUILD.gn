@@ -15,6 +15,6 @@ fidl("fuchsia.wlan.ieee80211") {
     "status_code.fidl",
   ]
   enable_banjo = true
-  enable_c = true
+
   enable_hlcpp = true
 }

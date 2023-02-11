@@ -79,7 +79,6 @@ executable("killall") {
 executable("vmaps") {
   sources = [ "vmaps.c" ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_c",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/task-utils",
@@ -147,7 +146,6 @@ executable("kstats") {
 executable("threads") {
   sources = [ "threads.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_c",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

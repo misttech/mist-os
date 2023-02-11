@@ -5,7 +5,6 @@
 executable("nand-loader") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/fdio",
     "//src/lib/storage/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",

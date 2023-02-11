@@ -10,5 +10,4 @@ fidl("fuchsia.hardware.intel.hda") {
     "controller.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
 }

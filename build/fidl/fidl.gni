@@ -101,9 +101,6 @@ if (support_rust) {
 #   enable_hlcpp (optional flag, default to false)
 #     Set to true to enable legacy HLCPP bindings for this library
 #
-#   enable_c (optional flag, default to false)
-#     Set to true to enable C bindings for this library
-#
 #   enable_banjo (optional flag, default to false)
 #     Set to true to enable Banjo bindings for this library.
 #
@@ -138,13 +135,11 @@ template("fidl") {
   }
 
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
-  enable_c = defined(invoker.enable_c) && invoker.enable_c
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
 
   not_needed([
                "enable_banjo",
-               "enable_c",
                "enable_hlcpp",
                "enable_zither",
              ])
@@ -301,25 +296,6 @@ template("fidl") {
                                "visibility",
                              ])
       forward_variables_from(extra_parameters, [ "fidl_target" ])
-    }
-
-    # The C client/server are only provided on Fuchsia, not host.
-    if (is_fuchsia && enable_c) {
-      fidl_c("${target_name}_c") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visibility",
-                                 "public_deps",
-                               ])
-        forward_variables_from(extra_parameters,
-                               [
-                                 "library_name",
-                                 "fidl_target",
-                                 "fidl_gen_dir",
-                               ])
-        fidl_gen_dir += "/c"
-      }
     }
   } else {
     not_needed(invoker, non_dart_go_only + [ "sources" ])

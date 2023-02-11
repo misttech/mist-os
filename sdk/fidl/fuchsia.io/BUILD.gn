@@ -26,6 +26,6 @@ fidl("fuchsia.io") {
     "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
-  enable_c = true
+
   enable_hlcpp = true
 }

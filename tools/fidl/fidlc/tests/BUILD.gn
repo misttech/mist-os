@@ -501,7 +501,6 @@ test("fidlc-test") {
     "attributes_tests.cc",
     "availability_interleaving_tests.cc",
     "bits_tests.cc",
-    "c_generator_tests.cc",
     "canonical_names_tests.cc",
     "coded_types_generator_tests.cc",
     "compiled_transformer_tests.cc",

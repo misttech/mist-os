@@ -21,7 +21,6 @@
 #include <utility>
 #include <vector>
 
-#include "tools/fidl/fidlc/include/fidl/c_generator.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
@@ -254,9 +253,6 @@ class ArgvArguments : public Arguments {
 };
 
 enum struct Behavior {
-  kCHeader,
-  kCClient,
-  kCServer,
   kTables,
   kJSON,
   kIndex,
@@ -389,21 +385,6 @@ int compile(fidl::Reporter* reporter, const std::string& library_name,
     auto& file_path = output.second;
 
     switch (behavior) {
-      case Behavior::kCHeader: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceHeader(), file_path);
-        break;
-      }
-      case Behavior::kCClient: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceClient(), file_path);
-        break;
-      }
-      case Behavior::kCServer: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceServer(), file_path);
-        break;
-      }
       case Behavior::kTables: {
         fidl::TablesGenerator generator(compilation.get());
         Write(generator.Produce(), file_path);
@@ -467,15 +448,6 @@ int main(int argc, char* argv[]) {
         FailWithUsage("Unknown value `%s` for flag `format`\n", format_value.data());
       }
       format = format_value;
-    } else if (behavior_argument == "--deprecated-fuchsia-only-c-header") {
-      std::string path = args->Claim();
-      outputs.emplace_back(Behavior::kCHeader, path);
-    } else if (behavior_argument == "--deprecated-fuchsia-only-c-client") {
-      std::string path = args->Claim();
-      outputs.emplace_back(Behavior::kCClient, path);
-    } else if (behavior_argument == "--deprecated-fuchsia-only-c-server") {
-      std::string path = args->Claim();
-      outputs.emplace_back(Behavior::kCServer, path);
     } else if (behavior_argument == "--tables") {
       std::string path = args->Claim();
       outputs.emplace_back(Behavior::kTables, path);

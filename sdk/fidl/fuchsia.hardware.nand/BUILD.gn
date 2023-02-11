@@ -10,5 +10,4 @@ fidl("fuchsia.hardware.nand") {
     "ram-nand.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
 }

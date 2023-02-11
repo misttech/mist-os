@@ -9,7 +9,6 @@ test("task-utils") {
   output_name = "task-utils-test"
   sources = [ "walker.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_c",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/task-utils",
     "//zircon/system/ulib/zxtest",

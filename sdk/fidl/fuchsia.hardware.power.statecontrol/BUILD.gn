@@ -16,6 +16,6 @@ fidl("fuchsia.hardware.power.statecontrol") {
   ]
 
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
+
   enable_hlcpp = true
 }

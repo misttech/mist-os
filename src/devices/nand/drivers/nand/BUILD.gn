@@ -27,7 +27,6 @@ source_set("common") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/sys/inspect/cpp",
     "//src/devices/lib/dev-operation",
     "//src/lib/ddk",

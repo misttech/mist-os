@@ -9,38 +9,3 @@ config("banjo_gen_config") {
       get_label_info("//bogus($banjo_toolchain)", "root_gen_dir")
   include_dirs = [ banjo_root_gen_dir ]
 }
-
-# TODO(fxbug.dev/95833): Delete this config after all user code
-# migrates off of the C bindings.
-config("fidl-deprecated-c-bindings") {
-  cflags = [ "-DFIDL_ALLOW_DEPRECATED_C_BINDINGS" ]
-
-  # Please do not add to this list. Refer to fxbug.dev/95833 to see
-  # how a target could be migrated off the C FIDL bindings.
-  #
-  # To regenerate this list, run
-  #
-  #   scripts/gn/trim_visibility.py --target="//build/c:fidl-deprecated-c-bindings"
-  #
-  # and replace the contents of `visibility` with the script output.
-  visibility = [
-    #------------------
-    #------------------
-    "//src/lib/fidl/c/simple_tests:bin",
-
-    #------------------
-    #------------------
-    "//zircon/system/utest/fidl-utils",
-
-    #------------------
-    #------------------
-  ]
-}
-
-# TODO(fxbug.dev/95833): Delete this config after all user code
-# migrates off of the C bindings.
-# This is used by generated C bindings library from fidlc, which unfortunately
-# cannot have a definite visibility restriction. Please do not use this config.
-config("fidl-deprecated-c-bindings-reserved-for-fidlc-generated-code-only") {
-  cflags = [ "-DFIDL_ALLOW_DEPRECATED_C_BINDINGS" ]
-}

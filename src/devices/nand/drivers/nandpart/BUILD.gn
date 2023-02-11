@@ -32,7 +32,6 @@ fuchsia_driver("nandpart-driver") {
     ":nandpart-bind",
     "//sdk/banjo/fuchsia.hardware.badblock:fuchsia.hardware.badblock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/stdcompat",
     "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
@@ -67,7 +66,6 @@ test("nandpart-test-bin") {
   include_dirs = [ "." ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_c",
     "//sdk/lib/fdio",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",

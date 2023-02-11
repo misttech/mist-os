@@ -10,6 +10,6 @@ fidl("fuchsia.unknown") {
   sources = [ "unknown.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
+
   enable_hlcpp = true
 }

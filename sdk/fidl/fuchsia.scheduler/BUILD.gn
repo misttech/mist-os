@@ -7,6 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.scheduler") {
   sources = [ "profile.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_c = true
+
   enable_hlcpp = true
 }

@@ -20,7 +20,6 @@ group("tests") {
     "dlopen-indirect-deps:tests",
     "errno:tests",
     "exit:tests",
-    "fidl-utils:tests",
     "fpu:tests",
     "getentropy:tests",
     "inspector:tests",

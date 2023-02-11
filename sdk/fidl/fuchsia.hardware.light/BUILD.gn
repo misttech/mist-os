@@ -8,6 +8,6 @@ fidl("fuchsia.hardware.light") {
   sdk_category = "partner"
 
   sources = [ "light.fidl" ]
-  enable_c = true
+
   enable_hlcpp = true
 }

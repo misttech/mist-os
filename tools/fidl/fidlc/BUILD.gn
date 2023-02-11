@@ -6,16 +6,8 @@ import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/golden_files.gni")
 import("//tools/fidl/fidlc/testdata/info.gni")
 
-config("fidlc_config") {
-  defines = []
-  if (defined(fidlc_deprecate_c_unions) && fidlc_deprecate_c_unions) {
-    defines += [ "FIDLC_DEPRECATE_C_UNIONS" ]
-  }
-}
-
 source_set("fidl") {
   sources = [
-    "lib/c_generator.cc",
     "lib/check.cc",
     "lib/coded_types_generator.cc",
     "lib/compiled_transformer.cc",
@@ -79,8 +71,6 @@ source_set("fidl") {
   ]
   deps = [ ":json_schema" ]
   deps += [ "//third_party/boringssl" ]
-
-  configs += [ ":fidlc_config" ]
 
   visibility = [
     ":fidl-fix",
