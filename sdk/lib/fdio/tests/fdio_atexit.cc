@@ -6,7 +6,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/spawn.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/process.h>
 #include <zircon/processargs.h>
@@ -73,7 +72,7 @@ TEST(AtExit, ExitInAccept) {
 
   Server server(server_handle, std::move(server_socket));
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server));
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   ASSERT_OK(loop.StartThread("fake-socket-server"));
 
   const char* argv[] = {"/pkg/bin/accept-child", nullptr};

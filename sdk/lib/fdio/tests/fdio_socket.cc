@@ -9,7 +9,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/unsafe.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -122,8 +121,7 @@ class BaseTest : public zxtest::Test {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_posix_socket::StreamSocket>();
     ASSERT_OK(endpoints.status_value());
 
-    ASSERT_OK(fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(endpoints->server),
-                                           &server_.value()));
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &server_.value());
     ASSERT_OK(loop_.StartThread("fake-socket-server"));
     ASSERT_OK(
         fdio_fd_create(endpoints->client.channel().release(), client_fd_.reset_and_get_address()));

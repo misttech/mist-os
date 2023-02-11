@@ -7,7 +7,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
@@ -186,8 +185,8 @@ TEST(GetVMOTest, Remote) {
   create_context_vmo(zx_system_get_page_size(), &context.vmo);
   ASSERT_OK(context.vmo.write("abcd", 0, 4));
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher, std::move(endpoints->server),
-                                         std::make_unique<TestServer>(&context)));
+  fidl::BindServer(dispatcher, std::move(endpoints->server),
+                   std::make_unique<TestServer>(&context));
 
   int raw_fd = -1;
   ASSERT_OK(fdio_fd_create(endpoints->client.channel().release(), &raw_fd));
@@ -261,8 +260,8 @@ TEST(MmapFileTest, ProtExecWorks) {
   create_context_vmo(zx_system_get_page_size(), &context.vmo);
   ASSERT_OK(context.vmo.write("abcd", 0, 4));
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher, std::move(endpoints->server),
-                                         std::make_unique<TestServer>(&context)));
+  fidl::BindServer(dispatcher, std::move(endpoints->server),
+                   std::make_unique<TestServer>(&context));
 
   int raw_fd = -1;
   ASSERT_OK(fdio_fd_create(endpoints->client.channel().release(), &raw_fd));

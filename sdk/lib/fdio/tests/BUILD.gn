@@ -119,7 +119,6 @@ test("fdio-test") {
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",
-      "//zircon/system/ulib/fidl-async:fidl-async-cpp",
       "//zircon/system/ulib/sync",
       "//zircon/system/ulib/test-utils",
       "//zircon/system/ulib/zx",

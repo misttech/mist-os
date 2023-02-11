@@ -8,7 +8,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/watcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/zx/time.h>
 
 #include <vector>
@@ -59,7 +58,7 @@ TEST(WatcherTest, WatchInvalidCallback) {
                    fidl::WireServer<fuchsia_io::Directory>::WatchCompleter::Sync& completer) {});
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server));
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   fbl::unique_fd directory;
@@ -104,7 +103,7 @@ TEST(WatcherTest, Smoke) {
         0, bytes, static_cast<uint32_t>(std::distance(std::begin(bytes), it)), nullptr, 0));
   });
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server));
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   fbl::unique_fd directory;
