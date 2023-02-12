@@ -49,6 +49,7 @@
             ],
             create_raw_processes: [
                 "/core/starnix_manager/kernels:**",
+                "/core/starnix_manager/stardroid",
                 "/core/test_manager/elf_test_create_raw_processes_runner",
                 "/core/test_manager/starnix_test_runners/starnix_unit_test_runner",
                 "/core/test_manager/starnix-tests:**",
@@ -256,6 +257,7 @@
                     "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/chrome",
                     "/core/termina-guest-manager/vmm",
                     "/core/starnix_manager/kernels:**",
+                    "/core/starnix_manager/stardroid",
                     "/core/test_manager/starnix_test_runners/starnix_unit_test_runner",
                     "/core/test_manager/starnix-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -647,6 +649,7 @@
                     "/core/lowpan-ot-driver",
                     "/core/starnix_manager",
                     "/core/starnix_manager/kernels:**",
+                    "/core/starnix_manager/stardroid",
                     "/core/test_manager",
                     "/core/test_manager/starnix-tests:**",
                 ],
