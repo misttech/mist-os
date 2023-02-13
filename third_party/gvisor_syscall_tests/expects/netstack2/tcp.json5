@@ -69,50 +69,32 @@
                 // https://fxbug.dev/20628
                 "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
 
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.BasicSendmmsg/*",
+                // TODO(https://fxbug.dev/45262): support sendmmsg
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/*",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
 
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.BasicRecvmmsg/*",
+                // TODO(https://fxbug.dev/45260): support recvmmsg
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/*",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/*",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
 
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/*",
+                // Fuchsia does not implement recvmsg correctly for TCP.
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
 
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvWaitAll/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvWaitAllDontWait/*",
-
-                // Fuchsia does not support Unix sockets.
-                "AllUnixDomainSockets/AllSocketPairTest.RecvTimeoutWaitAll/*",
+                // Fuchsia does not implement MSG_WAITALL for TCP.
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/*",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/*",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/*",
 
                 // https://fxbug.dev/74836
-                "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
+                "AllTCPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
 
                 // https://fxbug.dev/74639
-                "AllUnixDomainSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
+                "AllTCPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
 
                 // https://fxbug.dev/20628
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
