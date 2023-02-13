@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{binder::create_binders, wayland::serve_wayland};
+use crate::device::{binder::create_binders, starnix::StarnixDevice, wayland::serve_wayland};
 use crate::fs::{devtmpfs::dev_tmp_fs, SpecialNode};
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
@@ -31,6 +31,13 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                     .register_chrdev_major(framebuffer.clone(), FB_MAJOR)?;
             }
             "magma" => {
+                // Add the starnix device group.
+                current_task
+                    .kernel()
+                    .device_registry
+                    .write()
+                    .register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
+
                 dev_tmp_fs(current_task).root().add_node_ops_dev(
                     b"magma0",
                     mode!(IFCHR, 0o600),

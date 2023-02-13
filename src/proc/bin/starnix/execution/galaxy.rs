@@ -22,7 +22,7 @@ use std::ffi::CString;
 use std::sync::Arc;
 
 use crate::auth::Credentials;
-use crate::device::{run_features, starnix::StarnixDevice};
+use crate::device::run_features;
 use crate::execution::*;
 use crate::fs::layeredfs::LayeredFs;
 use crate::fs::tmpfs::TmpFs;
@@ -201,13 +201,6 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
     // Hack to allow mounting apexes before apexd is working.
     // TODO(tbodt): Remove once apexd works.
     mount_apexes(&system_task, &config)?;
-
-    // Add the starnix device group.
-    system_task
-        .kernel()
-        .device_registry
-        .write()
-        .register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
 
     // Run all common features that were specified in the .cml.
     run_features(&config.features, &system_task)
