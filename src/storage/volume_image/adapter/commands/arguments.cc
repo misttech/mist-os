@@ -185,8 +185,7 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
 
   // One-off empty partition with a label of "data". This will later be reformatted.
   // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
-  // TODO(fxbug.dev/121660): Rename this to --with-empty-data.
-  if (auto index = FindArgumentByName(arguments, "--with-empty-minfs"); index.has_value()) {
+  if (auto index = FindArgumentByName(arguments, "--with-empty-data"); index.has_value()) {
     PartitionParams empty_data_partition;
     empty_data_partition.format = PartitionImageFormat::kEmptyPartition;
     empty_data_partition.label = "data";

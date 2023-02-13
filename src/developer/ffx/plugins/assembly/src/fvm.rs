@@ -694,7 +694,7 @@ mod tests {
                     "0",
                     "--blob",
                     blobfs_path,
-                    "--with-empty-minfs",
+                    "--with-empty-data",
                     "--reserve-slices",
                     "10",
                     "--with-empty-account-partition",
@@ -825,7 +825,7 @@ mod tests {
                     "0",
                     "--blob",
                     blobfs_path,
-                    "--with-empty-minfs",
+                    "--with-empty-data",
                 ]
             },
             {
@@ -839,7 +839,7 @@ mod tests {
                     "lz4",
                     "--blob",
                     blobfs_path,
-                    "--with-empty-minfs",
+                    "--with-empty-data",
                 ]
             },
             {
@@ -853,7 +853,7 @@ mod tests {
                     "lz4",
                     "--blob",
                     blobfs_path,
-                    "--with-empty-minfs",
+                    "--with-empty-data",
                 ]
             },
             {

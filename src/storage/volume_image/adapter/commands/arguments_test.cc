@@ -47,7 +47,7 @@ TEST(ArgumentTest, PartitionParamsFromArgsIsok) {
       "1K",
       "--maximum-bytes",
       "11M",
-      "--with-empty-minfs",
+      "--with-empty-data",
       "--with-empty-account-partition",
       "--data-unsafe",
       "path3",

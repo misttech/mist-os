@@ -52,7 +52,7 @@ template("generate_fvm") {
     }
     if (defined(invoker.with_empty_data) && invoker.with_empty_data) {
       # TODO(fxbug.dev/85165): Remove this flag and pass in an empty file instead.
-      args += [ "--with-empty-minfs" ]
+      args += [ "--with-empty-data" ]
     }
     if (fvm_reserved_slices > 0) {
       args += [

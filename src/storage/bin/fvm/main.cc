@@ -148,7 +148,7 @@ int usage(void) {
           "                         Returns an error if more space is necessary to\n"
           "                         create the requested filesystem.\n");
   fprintf(stderr,
-          " --with-empty-minfs    - Adds a placeholder partition that will be formatted on boot,\n"
+          " --with-empty-data    - Adds a placeholder partition that will be formatted on boot,\n"
           "                         to minfs. The partition will be the 'data' partition.\n");
   fprintf(stderr,
           " --with-empty-account-partition - Adds a placeholder partition with a label of \n"
