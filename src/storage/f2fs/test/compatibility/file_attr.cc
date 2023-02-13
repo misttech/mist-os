@@ -9,16 +9,6 @@ namespace {
 
 using FileAttrCompatibilityTest = F2fsGuestTest;
 
-void CompareStat(const struct stat &a, const struct stat &b) {
-  EXPECT_EQ(a.st_ino, b.st_ino);
-  EXPECT_EQ(a.st_mode, b.st_mode);
-  EXPECT_EQ(a.st_nlink, b.st_nlink);
-  EXPECT_EQ(a.st_size, b.st_size);
-  EXPECT_EQ(a.st_ctime, b.st_ctime);
-  EXPECT_EQ(a.st_mtime, b.st_mtime);
-  ASSERT_EQ(a.st_blocks, b.st_blocks);
-}
-
 TEST_F(FileAttrCompatibilityTest, VerifyAttributesLinuxToFuchsia) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
@@ -242,7 +232,7 @@ TEST_F(FileAttrCompatibilityTest, FileRenameTestFuchsiaToLinux) {
 }
 
 TEST_F(FileAttrCompatibilityTest, FallocateLinuxToFuchsia) {
-  constexpr uint32_t kVerifyPatternSize = 1024 * 1024 * 10;  // 10MB
+  constexpr uint32_t kVerifyPatternSize = 64 * 1024;  // 64 KB
   constexpr off_t kOffset = 5000;
   constexpr uint32_t num_blocks = kVerifyPatternSize / kBlockSize;
   const std::string filename = "alpha";
@@ -278,7 +268,7 @@ TEST_F(FileAttrCompatibilityTest, FallocateLinuxToFuchsia) {
     ASSERT_EQ(test_file->Fstat(target_stat), 0);
     CompareStat(target_stat, host_stat);
 
-    test_file->WritePattern(num_blocks);
+    test_file->WritePattern(num_blocks, 1);
   }
 
   // Verify on Linux
@@ -291,7 +281,7 @@ TEST_F(FileAttrCompatibilityTest, FallocateLinuxToFuchsia) {
     auto testfile = GetEnclosedGuest().GetLinuxOperator().Open(
         std::string(kLinuxPathPrefix) + filename, O_RDWR, 0644);
     ASSERT_TRUE(testfile->IsValid());
-    testfile->VerifyPattern(num_blocks);
+    testfile->VerifyPattern(num_blocks, 1);
   }
 }
 
@@ -369,7 +359,7 @@ TEST_F(FileAttrCompatibilityTest, VerifyXattrsLinuxToFuchsia) {
 
     auto test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filename, O_RDWR, 0644);
     ASSERT_TRUE(test_file->IsValid());
-    test_file->WritePattern(num_blocks);
+    test_file->WritePattern(num_blocks, 1);
   }
 
   // Verify on Linux
@@ -382,7 +372,7 @@ TEST_F(FileAttrCompatibilityTest, VerifyXattrsLinuxToFuchsia) {
     auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
         std::string(kLinuxPathPrefix) + filename, O_RDWR, 0644);
     ASSERT_TRUE(test_file->IsValid());
-    test_file->VerifyPattern(num_blocks);
+    test_file->VerifyPattern(num_blocks, 1);
 
     auto file_path =
         GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) + filename);

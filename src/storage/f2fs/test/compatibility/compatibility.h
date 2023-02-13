@@ -47,8 +47,8 @@ class TestFile {
   virtual int Ftruncate(off_t len) = 0;
   virtual int Fallocate(int mode, off_t offset, off_t len) = 0;
 
-  virtual void WritePattern(size_t block_count) = 0;
-  virtual void VerifyPattern(size_t block_count) = 0;
+  virtual void WritePattern(size_t block_count, size_t interval) = 0;
+  virtual void VerifyPattern(size_t block_count, size_t interval) = 0;
 };
 
 class LinuxTestFile : public TestFile {
@@ -65,8 +65,8 @@ class LinuxTestFile : public TestFile {
   int Ftruncate(off_t len) final;
   int Fallocate(int mode, off_t offset, off_t len) final;
 
-  void WritePattern(size_t block_count) final;
-  void VerifyPattern(size_t block_count) final;
+  void WritePattern(size_t block_count, size_t interval) final;
+  void VerifyPattern(size_t block_count, size_t interval) final;
 
  private:
   std::string filename_;
@@ -91,8 +91,8 @@ class FuchsiaTestFile : public TestFile {
   int Ftruncate(off_t len) final;
   int Fallocate(int mode, off_t offset, off_t len) final { return -1; }
 
-  void WritePattern(size_t block_count) final;
-  void VerifyPattern(size_t block_count) final;
+  void WritePattern(size_t block_count, size_t interval) final;
+  void VerifyPattern(size_t block_count, size_t interval) final;
 
   VnodeF2fs* GetRawVnodePtr() { return vnode_.get(); }
 
@@ -279,6 +279,7 @@ class F2fsGuestTest : public GuestTest<F2fsDebianGuest> {
 };
 
 fs::VnodeConnectionOptions ConvertFlag(int flags);
+void CompareStat(const struct stat& a, const struct stat& b);
 
 }  // namespace f2fs
 

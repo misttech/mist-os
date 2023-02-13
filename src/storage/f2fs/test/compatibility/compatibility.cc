@@ -124,19 +124,19 @@ int LinuxTestFile::Fallocate(int mode, off_t offset, off_t len) {
   return 0;
 }
 
-void LinuxTestFile::WritePattern(size_t block_count) {
-  char buffer[kBlockSize];
-  for (uint32_t i = 0; i < block_count; ++i) {
-    memset(buffer, 0, sizeof(buffer));
+void LinuxTestFile::WritePattern(size_t block_count, size_t interval) {
+  for (uint32_t i = 0; i < block_count; i += interval) {
     std::string pattern = std::to_string(i);
-    pattern.copy(buffer, pattern.length());
 
-    ASSERT_EQ(Write(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
+    ASSERT_EQ(Write(pattern.c_str(), pattern.length()), static_cast<ssize_t>(pattern.length()));
+
+    off_t next_size = std::min(i + interval, block_count) * kBlockSize;
+    ASSERT_EQ(Ftruncate(next_size), 0);
   }
 }
 
-void LinuxTestFile::VerifyPattern(size_t block_count) {
-  for (uint32_t i = 0; i < block_count; ++i) {
+void LinuxTestFile::VerifyPattern(size_t block_count, size_t interval) {
+  for (uint32_t i = 0; i < block_count; i += interval) {
     std::string result;
     linux_operator_->ExecuteWithAssert(
         {"od -An -j", std::to_string(i * kBlockSize), "-N",
@@ -213,20 +213,28 @@ int FuchsiaTestFile::Ftruncate(off_t len) {
   return 0;
 }
 
-void FuchsiaTestFile::WritePattern(size_t block_count) {
+void FuchsiaTestFile::WritePattern(size_t block_count, size_t interval) {
   char buffer[kBlockSize];
   for (uint32_t i = 0; i < block_count; ++i) {
     std::memset(buffer, 0, kBlockSize);
-    strcpy(buffer, std::to_string(i).c_str());
+    if (i % interval == 0) {
+      strcpy(buffer, std::to_string(i).c_str());
+    }
     ASSERT_EQ(Write(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
   }
 }
 
-void FuchsiaTestFile::VerifyPattern(size_t block_count) {
+void FuchsiaTestFile::VerifyPattern(size_t block_count, size_t interval) {
   char buffer[kBlockSize];
+  char zero_buffer[kBlockSize];
+  std::memset(zero_buffer, 0, kBlockSize);
   for (uint32_t i = 0; i < block_count; ++i) {
     ASSERT_EQ(Read(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
-    ASSERT_EQ(std::string(buffer), std::to_string(i));
+    if (i % interval == 0) {
+      ASSERT_EQ(std::string(buffer), std::to_string(i));
+    } else {
+      ASSERT_EQ(memcmp(buffer, zero_buffer, kBlockSize), 0);
+    }
   }
 }
 
@@ -478,6 +486,16 @@ fs::VnodeConnectionOptions ConvertFlag(int flags) {
   }
 
   return options;
+}
+
+void CompareStat(const struct stat& a, const struct stat& b) {
+  EXPECT_EQ(a.st_ino, b.st_ino);
+  EXPECT_EQ(a.st_mode, b.st_mode);
+  EXPECT_EQ(a.st_nlink, b.st_nlink);
+  EXPECT_EQ(a.st_size, b.st_size);
+  EXPECT_EQ(a.st_ctime, b.st_ctime);
+  EXPECT_EQ(a.st_mtime, b.st_mtime);
+  ASSERT_EQ(a.st_blocks, b.st_blocks);
 }
 
 }  // namespace f2fs

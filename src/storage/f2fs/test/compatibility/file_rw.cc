@@ -10,7 +10,6 @@ namespace {
 using FileRWCompatibilityTest = F2fsGuestTest;
 
 TEST_F(FileRWCompatibilityTest, WriteVerifyLinuxToFuchsia) {
-  // TODO(fxbug.dev/115142): larger filesize for slow test
   constexpr uint32_t kVerifyPatternSize = 64 * 1024;  // 64 KB
   constexpr uint32_t num_blocks = kVerifyPatternSize / kBlockSize;
   const std::string filename = "alpha";
@@ -34,7 +33,7 @@ TEST_F(FileRWCompatibilityTest, WriteVerifyLinuxToFuchsia) {
       auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
           std::string(kLinuxPathPrefix) + filename, O_CREAT | O_RDWR, 0644);
       ASSERT_TRUE(test_file->IsValid());
-      test_file->WritePattern(num_blocks);
+      test_file->WritePattern(num_blocks, 1);
     }
 
     // Verify on Fuchsia
@@ -46,13 +45,12 @@ TEST_F(FileRWCompatibilityTest, WriteVerifyLinuxToFuchsia) {
 
       auto test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filename, O_RDWR, 0644);
       ASSERT_TRUE(test_file->IsValid());
-      test_file->VerifyPattern(num_blocks);
+      test_file->VerifyPattern(num_blocks, 1);
     }
   }
 }
 
 TEST_F(FileRWCompatibilityTest, WriteVerifyFuchsiaToLinux) {
-  // TODO(fxbug.dev/115142): larger filesize for slow test
   constexpr uint32_t kVerifyPatternSize = 64 * 1024;  // 64 KB
   constexpr uint32_t num_blocks = kVerifyPatternSize / kBlockSize;
   const std::string filename = "alpha";
@@ -66,7 +64,7 @@ TEST_F(FileRWCompatibilityTest, WriteVerifyFuchsiaToLinux) {
 
     auto test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filename, O_CREAT | O_RDWR, 0644);
     ASSERT_TRUE(test_file->IsValid());
-    test_file->WritePattern(num_blocks);
+    test_file->WritePattern(num_blocks, 1);
   }
 
   // Verify on Linux
@@ -79,7 +77,7 @@ TEST_F(FileRWCompatibilityTest, WriteVerifyFuchsiaToLinux) {
     auto testfile = GetEnclosedGuest().GetLinuxOperator().Open(
         std::string(kLinuxPathPrefix) + filename, O_RDWR, 0644);
     ASSERT_TRUE(testfile->IsValid());
-    testfile->VerifyPattern(num_blocks);
+    testfile->VerifyPattern(num_blocks, 1);
   }
 }
 
@@ -106,7 +104,7 @@ TEST_F(FileRWCompatibilityTest, TruncateLinuxToFuchsia) {
     auto shrink_file = GetEnclosedGuest().GetLinuxOperator().Open(
         std::string(kLinuxPathPrefix) + shrink_filename, O_RDWR | O_CREAT, 0755);
     ASSERT_TRUE(shrink_file->IsValid());
-    shrink_file->WritePattern(num_blocks);
+    shrink_file->WritePattern(num_blocks, 1);
 
     ASSERT_EQ(shrink_file->Ftruncate(kTruncateSize), 0);
   }
@@ -142,7 +140,7 @@ TEST_F(FileRWCompatibilityTest, TruncateLinuxToFuchsia) {
     ASSERT_EQ(shrink_file->Fstat(shrink_file_stat), 0);
     ASSERT_EQ(shrink_file_stat.st_size, kTruncateSize);
 
-    shrink_file->VerifyPattern(num_blocks_truncated);
+    shrink_file->VerifyPattern(num_blocks_truncated, 1);
   }
 }
 
@@ -169,7 +167,7 @@ TEST_F(FileRWCompatibilityTest, TruncateFuchsiaToLinux) {
     auto shrink_file =
         GetEnclosedGuest().GetFuchsiaOperator().Open(shrink_filename, O_RDWR | O_CREAT, 0755);
     ASSERT_TRUE(shrink_file->IsValid());
-    shrink_file->WritePattern(num_blocks);
+    shrink_file->WritePattern(num_blocks, 1);
 
     ASSERT_EQ(shrink_file->Ftruncate(kTruncateSize), 0);
   }
@@ -202,7 +200,7 @@ TEST_F(FileRWCompatibilityTest, TruncateFuchsiaToLinux) {
     auto shrink_file = GetEnclosedGuest().GetLinuxOperator().Open(
         std::string(kLinuxPathPrefix) + shrink_filename, O_RDWR, 0755);
     ASSERT_TRUE(shrink_file->IsValid());
-    shrink_file->VerifyPattern(num_blocks_truncated);
+    shrink_file->VerifyPattern(num_blocks_truncated, 1);
   }
 }
 
