@@ -219,6 +219,24 @@ pub enum IpAddressState {
     Tentative,
 }
 
+/// The reason an address was removed.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum RemovedReason {
+    /// The address was removed in response to external action.
+    Manual,
+    /// The address was removed because it was detected as a duplicate via DAD.
+    DadFailed,
+}
+
+impl From<DelIpv6AddrReason> for RemovedReason {
+    fn from(reason: DelIpv6AddrReason) -> Self {
+        match reason {
+            DelIpv6AddrReason::ManualAction => Self::Manual,
+            DelIpv6AddrReason::DadFailed => Self::DadFailed,
+        }
+    }
+}
+
 #[derive(Debug, Eq, Hash, PartialEq)]
 /// Events emitted from IP devices.
 pub enum IpDeviceEvent<DeviceId, I: Ip> {
@@ -237,6 +255,8 @@ pub enum IpDeviceEvent<DeviceId, I: Ip> {
         device: DeviceId,
         /// The removed address.
         addr: SpecifiedAddr<I::Addr>,
+        /// The reason the address was removed.
+        reason: RemovedReason,
     },
     /// Address state changed.
     AddressStateChanged {
@@ -463,17 +483,20 @@ pub(crate) trait Ipv6DeviceHandler<C>: IpDeviceHandler<Ipv6, C> {
         retrans_timer: NonZeroDuration,
     );
 
-    /// Removes a tentative address as a result of duplicate address detection.
+    /// Handles a received neighbor advertisement.
     ///
-    /// Returns whether or not the address was removed. That is, this method
-    /// returns `Ok(true)` when the address was tentatively assigned and
-    /// `Ok(false)` if the address is fully assigned.
+    /// Takes action in response to a received neighbor advertisement for the
+    /// specified address. Returns the assignment state of the address on the
+    /// given interface, if there was one before any action was taken. That is,
+    /// this method returns `Some(Tentative {..})` when the address was
+    /// tentatively assigned (and now removed), `Some(Assigned)` if the address
+    /// was assigned (and so not removed), otherwise `None`.
     fn remove_duplicate_tentative_address(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
-    ) -> Result<bool, NotFoundError>;
+    ) -> Option<AddressState>;
 
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
@@ -507,23 +530,16 @@ impl<
         ctx: &mut C,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
-    ) -> Result<bool, NotFoundError> {
+    ) -> Option<AddressState> {
         let address_state = self.with_ip_device_state(device_id, |state| {
-            state
-                .ip_state
-                .iter_addrs()
-                .find_map(
-                    |Ipv6AddressEntry {
-                         addr_sub,
-                         state: address_state,
-                         config: _,
-                         deprecated: _,
-                     }| { (addr_sub.addr() == addr).then(|| *address_state) },
-                )
-                .ok_or(NotFoundError)
+            state.ip_state.iter_addrs().find_map(
+                |Ipv6AddressEntry { addr_sub, state: address_state, config: _, deprecated: _ }| {
+                    (addr_sub.addr() == addr).then(|| *address_state)
+                },
+            )
         })?;
 
-        Ok(match address_state {
+        match address_state {
             AddressState::Tentative { dad_transmits_remaining: _ } => {
                 del_ipv6_addr_with_reason(
                     self,
@@ -533,10 +549,10 @@ impl<
                     DelIpv6AddrReason::DadFailed,
                 )
                 .unwrap();
-                true
             }
-            AddressState::Assigned => false,
-        })
+            AddressState::Assigned => (),
+        }
+        Some(address_state)
     }
 
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
@@ -1100,6 +1116,7 @@ pub(crate) fn del_ipv4_addr<
             ctx.on_event(IpDeviceEvent::AddressRemoved {
                 device: device_id.clone(),
                 addr: addr.addr(),
+                reason: RemovedReason::Manual,
             })
         })
     })
@@ -1113,6 +1130,7 @@ fn del_ipv6_addr<
     ctx: &mut C,
     device_id: &SC::DeviceId,
     addr: &SpecifiedAddr<Ipv6Addr>,
+    reason: RemovedReason,
 ) -> Result<Ipv6AddressEntry<C::Instant>, NotFoundError> {
     let entry =
         sync_ctx.with_ip_device_state_mut(device_id, |state| state.ip_state.remove_addr(&addr))?;
@@ -1123,6 +1141,7 @@ fn del_ipv6_addr<
     ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),
         addr: addr.into_specified(),
+        reason,
     });
 
     Ok(entry)
@@ -1139,12 +1158,12 @@ pub(crate) fn del_ipv6_addr_with_reason<
     addr: &SpecifiedAddr<Ipv6Addr>,
     reason: DelIpv6AddrReason,
 ) -> Result<(), NotFoundError> {
-    del_ipv6_addr(sync_ctx, ctx, device_id, addr).map(
+    del_ipv6_addr(sync_ctx, ctx, device_id, addr, reason.into()).map(
         |Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| match config {
             AddrConfig::Slaac(s) => {
                 SlaacHandler::on_address_removed(sync_ctx, ctx, device_id, addr_sub, s, reason)
             }
-            AddrConfig::Manual => {}
+            AddrConfig::Manual => (),
         },
     )
 }
@@ -1434,10 +1453,12 @@ mod tests {
     use alloc::vec;
     use fakealloc::collections::HashSet;
 
-    use net_types::ip::Ipv6;
+    use net_declare::net_ip_v6;
+    use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
-        device::ethernet,
+        context::testutil::FakeInstant,
+        device::{ethernet, DeviceId},
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
             assert_empty, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _,
@@ -1549,6 +1570,30 @@ mod tests {
         assert_eq!(non_sync_ctx.take_events()[..], []);
     }
 
+    fn enable_ipv6_device(
+        sync_ctx: &mut &FakeSyncCtx,
+        non_sync_ctx: &mut FakeNonSyncCtx,
+        device_id: &DeviceId<FakeInstant>,
+        ll_addr: AddrSubnet<Ipv6Addr, LinkLocalAddr<UnicastAddr<Ipv6Addr>>>,
+    ) {
+        update_ipv6_configuration(sync_ctx, non_sync_ctx, device_id, |config| {
+            config.ip_config.ip_enabled = true;
+        });
+        assert_eq!(
+            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(sync_ctx, device_id, |state| {
+                state
+                    .ip_state
+                    .iter_addrs()
+                    .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                        addr_sub.ipv6_unicast_addr()
+                    })
+                    .collect::<HashSet<_>>()
+            }),
+            HashSet::from([ll_addr.ipv6_unicast_addr()]),
+            "enabled device expected to generate link-local address"
+        );
+    }
+
     #[test]
     fn enable_disable_ipv6() {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
@@ -1558,6 +1603,7 @@ mod tests {
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
         let device_id =
             sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let ll_addr = local_mac.to_ipv6_link_local();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.gmp_enabled = true;
 
@@ -1569,41 +1615,11 @@ mod tests {
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
-        let ll_addr = local_mac.to_ipv6_link_local();
-
         // Enable the device and observe an auto-generated link-local address,
         // router solicitation and DAD for the auto-generated address.
         let test_enable_device =
-            |sync_ctx: &mut &FakeSyncCtx,
-             non_sync_ctx: &mut FakeNonSyncCtx,
-             extra_group: Option<MulticastAddr<Ipv6Addr>>| {
-                update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
-                    config.ip_config.ip_enabled = true;
-                });
-                assert_eq!(
-                    IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                        sync_ctx,
-                        &device_id,
-                        |state| {
-                            state
-                                .ip_state
-                                .iter_addrs()
-                                .map(
-                                    |Ipv6AddressEntry {
-                                         addr_sub,
-                                         state: _,
-                                         config: _,
-                                         deprecated: _,
-                                     }| {
-                                        addr_sub.ipv6_unicast_addr()
-                                    },
-                                )
-                                .collect::<HashSet<_>>()
-                        }
-                    ),
-                    HashSet::from([ll_addr.ipv6_unicast_addr()]),
-                    "enabled device expected to generate link-local address"
-                );
+            |sync_ctx: &mut &FakeSyncCtx, non_sync_ctx: &mut FakeNonSyncCtx, extra_group| {
+                enable_ipv6_device(sync_ctx, non_sync_ctx, &device_id, ll_addr);
                 let mut timers = vec![
                     (
                         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(RsTimerId {
@@ -1622,10 +1638,7 @@ mod tests {
                         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
                             MldDelayedReportTimerId(GmpDelayedReportTimerId {
                                 device: device_id.clone(),
-                                group_addr: local_mac
-                                    .to_ipv6_link_local()
-                                    .addr()
-                                    .to_solicited_node_address(),
+                                group_addr: ll_addr.addr().to_solicited_node_address(),
                             })
                             .into(),
                         ))),
@@ -1676,6 +1689,7 @@ mod tests {
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                     device: device_id.clone(),
                     addr: ll_addr.addr().into(),
+                    reason: RemovedReason::Manual,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                     device: device_id.clone(),
@@ -1811,5 +1825,98 @@ mod tests {
         // Verify that a redundant "enable" does not generate any events.
         test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None);
         assert_eq!(non_sync_ctx.take_events()[..], []);
+    }
+
+    #[test]
+    fn notify_on_dad_failure_ipv6() {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(StackStateBuilder::default());
+        let mut sync_ctx = &sync_ctx;
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let device_id =
+            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
+            config.dad_transmits = NonZeroU8::new(1);
+
+            config.ip_config.gmp_enabled = true;
+            config.max_router_solicitations = NonZeroU8::new(1);
+        });
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let ll_addr = local_mac.to_ipv6_link_local();
+
+        enable_ipv6_device(&mut sync_ctx, &mut non_sync_ctx, &device_id, ll_addr);
+        assert_eq!(
+            non_sync_ctx.take_events()[..],
+            [
+                DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+                    device: device_id.clone(),
+                    addr: ll_addr.to_witness(),
+                    state: IpAddressState::Tentative
+                }),
+                DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+                    device: device_id.clone(),
+                    ip_enabled: true,
+                }),
+            ]
+        );
+
+        let assigned_addr = AddrSubnet::new(net_ip_v6!("fe80::1"), 64).unwrap();
+        add_ipv6_addr_subnet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            assigned_addr,
+            AddrConfig::Manual,
+        )
+        .expect("add succeeds");
+
+        assert_eq!(
+            non_sync_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+                device: device_id.clone(),
+                addr: assigned_addr.to_witness(),
+                state: IpAddressState::Tentative
+            })]
+        );
+
+        // When DAD fails, an event should be emitted and the address should be
+        // removed.
+        assert_eq!(
+            Ipv6DeviceHandler::remove_duplicate_tentative_address(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &device_id,
+                assigned_addr.ipv6_unicast_addr()
+            ),
+            Some(AddressState::Tentative { dad_transmits_remaining: None })
+        );
+
+        assert_eq!(
+            non_sync_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
+                device: device_id.clone(),
+                addr: assigned_addr.addr(),
+                reason: RemovedReason::DadFailed,
+            }),]
+        );
+
+        assert_eq!(
+            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+                &mut sync_ctx,
+                &device_id,
+                |state| {
+                    state
+                        .ip_state
+                        .iter_addrs()
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                            addr_sub.ipv6_unicast_addr()
+                        })
+                        .collect::<HashSet<_>>()
+                }
+            ),
+            HashSet::from([ll_addr.ipv6_unicast_addr()]),
+            "manual addresses should be removed on DAD failure"
+        );
     }
 }

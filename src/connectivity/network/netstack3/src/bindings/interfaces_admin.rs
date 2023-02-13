@@ -1099,12 +1099,12 @@ async fn address_state_provider_main_loop(
     };
 
     match cancelation_reason {
-        Some(fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
+        Some(fnet_interfaces_admin::AddressRemovalReason::DadFailed)
+        | Some(fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
             return AddressNeedsExplicitRemovalFromCore::No
         }
         Some(fnet_interfaces_admin::AddressRemovalReason::Invalid)
         | Some(fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned)
-        | Some(fnet_interfaces_admin::AddressRemovalReason::DadFailed)
         | Some(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
         | None => AddressNeedsExplicitRemovalFromCore::Yes,
     }

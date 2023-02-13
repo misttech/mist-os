@@ -48,12 +48,12 @@ use crate::{
         id_map::IdMap, id_map_collection::IdMapCollectionKey, token_bucket::TokenBucket,
     },
     device::{FrameDestination, Mtu},
-    error::NotFoundError,
     ip::{
         device::{
             nud::NudIpHandler,
             route_discovery::{Ipv6DiscoveredRoute, RouteDiscoveryHandler},
             slaac::SlaacHandler,
+            state::AddressState,
             IpDeviceHandler, Ipv6DeviceHandler,
         },
         gmp::mld::MldPacketHandler,
@@ -1238,25 +1238,24 @@ fn receive_ndp_packet<
                         &device_id,
                         target_address,
                     ) {
-                        Ok(tentative) => {
-                            if !tentative {
-                                // Address is assigned to us to we let the
-                                // remote node performing DAD that we own the
-                                // address.
-                                send_neighbor_advertisement(
-                                    sync_ctx,
-                                    ctx,
-                                    &device_id,
-                                    false,
-                                    target_address,
-                                    Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified(),
-                                );
-                            }
-
+                        Some(AddressState::Assigned) => {
+                            // Address is assigned to us to we let the
+                            // remote node performing DAD that we own the
+                            // address.
+                            send_neighbor_advertisement(
+                                sync_ctx,
+                                ctx,
+                                &device_id,
+                                false,
+                                target_address,
+                                Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified(),
+                            );
+                        }
+                        Some(AddressState::Tentative { dad_transmits_remaining: _ }) => {
                             // Nothing further to do in response to DAD
                             // messages.
                         }
-                        Err(NotFoundError) => {
+                        None => {
                             // Nothing further to do for unassigned target
                             // addresses.
                         }
@@ -1332,36 +1331,39 @@ fn receive_ndp_packet<
                 &device_id,
                 target_address,
             ) {
-                Ok(tentative) => {
-                    if !tentative {
-                        // A neighbor is advertising that it owns an address
-                        // that we also have assigned. This is out of scope
-                        // for DAD.
-                        //
-                        // As per RFC 4862 section 5.4.4,
-                        //
-                        //   2.  If the target address matches a unicast address
-                        //       assigned to the receiving interface, it would
-                        //       possibly indicate that the address is a
-                        //       duplicate but it has not been detected by the
-                        //       Duplicate Address Detection procedure (recall
-                        //       that Duplicate Address Detection is not
-                        //       completely reliable). How to handle such a case
-                        //       is beyond the scope of this document.
-                        //
-                        // TODO(https://fxbug.dev/36238): Signal to bindings
-                        // that a duplicate address is detected.
-                        error!(
+                Some(status) => {
+                    match status {
+                        AddressState::Assigned => {
+                            // A neighbor is advertising that it owns an address
+                            // that we also have assigned. This is out of scope
+                            // for DAD.
+                            //
+                            // As per RFC 4862 section 5.4.4,
+                            //
+                            //   2.  If the target address matches a unicast address
+                            //       assigned to the receiving interface, it would
+                            //       possibly indicate that the address is a
+                            //       duplicate but it has not been detected by the
+                            //       Duplicate Address Detection procedure (recall
+                            //       that Duplicate Address Detection is not
+                            //       completely reliable). How to handle such a case
+                            //       is beyond the scope of this document.
+                            //
+                            // TODO(https://fxbug.dev/36238): Signal to bindings
+                            // that a duplicate address is detected.
+                            error!(
                             "NA from {} with target address {} that is also assigned on device {}",
                             src_ip, target_address, device_id
                         );
+                        }
+                        AddressState::Tentative { dad_transmits_remaining: _ } => (),
                     }
 
                     // Nothing further to do for an NA from a neighbor that
                     // targets an address we also have assigned.
                     return;
                 }
-                Err(NotFoundError) => {
+                None => {
                     // Address not targeting us so we know its for a neighbor.
                     //
                     // TODO(https://fxbug.dev/99830): Move NUD to IP.
@@ -4182,7 +4184,7 @@ mod tests {
             _ctx: &mut Fakev6NonSyncCtx,
             _device_id: &Self::DeviceId,
             _addr: UnicastAddr<Ipv6Addr>,
-        ) -> Result<bool, NotFoundError> {
+        ) -> Option<AddressState> {
             unimplemented!()
         }
 

@@ -33,6 +33,7 @@ const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_nonzero_sec
 /// packets.
 const DEFAULT_HOP_LIMIT: NonZeroU8 = nonzero!(64u8);
 
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum DelIpv6AddrReason {
     ManualAction,
     DadFailed,

@@ -6,6 +6,7 @@
 
 use core::{num::NonZeroU8, time::Duration};
 
+use log::debug;
 use net_types::{
     ip::{Ipv6, Ipv6Addr},
     MulticastAddr, UnicastAddr, Witness as _,
@@ -168,7 +169,11 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
                         addr,
                         device_id
                     );
-
+                    debug!(
+                        "performing DAD for {}; {} tries left",
+                        addr.get(),
+                        remaining.map_or(0, NonZeroU8::get)
+                    );
                     true
                 }
             }

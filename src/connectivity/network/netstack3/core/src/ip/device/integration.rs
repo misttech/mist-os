@@ -40,7 +40,7 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddressEntry,
                 Ipv6DeviceConfiguration, Ipv6DeviceState, SlaacConfig,
             },
-            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateAccessor,
+            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateAccessor, RemovedReason,
         },
         gmp::{
             igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata},
@@ -158,7 +158,7 @@ impl<
     ) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<C::Instant>), NotFoundError>
     {
         let SlaacAddrs { sync_ctx, device_id, _marker } = self;
-        del_ipv6_addr(*sync_ctx, ctx, device_id, &addr.into_specified()).map(
+        del_ipv6_addr(*sync_ctx, ctx, device_id, &addr.into_specified(), RemovedReason::Manual).map(
             |Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| {
                 assert_eq!(&addr_sub.addr(), addr);
                 match config {

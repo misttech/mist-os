@@ -69,7 +69,7 @@ use netstack3_core::{
                 SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
             },
             state::{IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6DeviceConfiguration},
-            IpDeviceEvent,
+            IpDeviceEvent, RemovedReason,
         },
         icmp, IpExt,
     },
@@ -403,10 +403,16 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<StackTime>, I>> for BindingsNonS
                 );
                 self.notify_address_update(&device, addr.addr().into(), state);
             }
-            IpDeviceEvent::AddressRemoved { device, addr } => self.notify_interface_update(
-                &device,
-                InterfaceUpdate::AddressRemoved(addr.to_ip_addr()),
-            ),
+            IpDeviceEvent::AddressRemoved { device, addr, reason } => {
+                self.notify_interface_update(
+                    &device,
+                    InterfaceUpdate::AddressRemoved(addr.to_ip_addr()),
+                );
+                match reason {
+                    RemovedReason::Manual => (),
+                    RemovedReason::DadFailed => self.notify_dad_failed(&device, addr.into()),
+                }
+            }
             IpDeviceEvent::AddressStateChanged { device, addr, state } => {
                 self.notify_interface_update(
                     &device,
@@ -514,6 +520,26 @@ impl BindingsNonSyncCtxImpl {
                 .assignment_state_sender
                 .unbounded_send(state.into_fidl())
                 .expect("assignment state receiver unexpectedly disconnected");
+        }
+    }
+
+    fn notify_dad_failed(&mut self, device: &DeviceId<StackTime>, address: SpecifiedAddr<IpAddr>) {
+        if let Some(address_info) = self
+            .devices
+            .get_core_device_mut(device)
+            .expect("device not present")
+            .info_mut()
+            .common_info_mut()
+            .addresses
+            .get_mut(&address)
+        {
+            let devices::FidlWorkerInfo { worker: _, cancelation_sender } =
+                &mut address_info.address_state_provider;
+            if let Some(sender) = cancelation_sender.take() {
+                sender
+                    .send(fnet_interfaces_admin::AddressRemovalReason::DadFailed)
+                    .expect("assignment state receiver unexpectedly disconnected");
+            }
         }
     }
 }
