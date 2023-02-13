@@ -8,6 +8,7 @@ load(
     "FuchsiaAssemblyConfigInfo",
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
+    "FuchsiaRepositoryKeys",
     "FuchsiaScrutinyConfigInfo",
     "FuchsiaVirtualDeviceInfo",
 )
@@ -425,7 +426,7 @@ def _fuchsia_product_bundle_impl(ctx):
 
     # If update info is supplied, add it to the product bundle.
     if ctx.file.update_version_file != None:
-        if ctx.file.repository_keys == None:
+        if ctx.attr.repository_keys == None:
             fail("Repository keys must be supplied in order to build an update package")
         ffx_invocation.extend([
             "--update-package-version-file $ORIG_DIR/$UPDATE_VERSION_FILE",
@@ -436,10 +437,10 @@ def _fuchsia_product_bundle_impl(ctx):
         inputs.append(ctx.file.update_version_file)
 
     # If a repository is supplied, add it to the product bundle.
-    if ctx.file.repository_keys != None:
+    if ctx.attr.repository_keys != None:
         ffx_invocation.append("--tuf-keys $ORIG_DIR/$REPOKEYS")
-        env["REPOKEYS"] = ctx.file.repository_keys.path
-        inputs.append(ctx.file.repository_keys)
+        env["REPOKEYS"] = ctx.attr.repository_keys[FuchsiaRepositoryKeys].dir
+        inputs += ctx.files.repository_keys
     script_lines = [
         "set -e",
         "ORIG_DIR=$(pwd)",
@@ -447,7 +448,7 @@ def _fuchsia_product_bundle_impl(ctx):
         "mkdir -p $FFX_ISOLATE_DIR",
         " ".join(ffx_invocation),
     ]
-    if ctx.file.repository_keys != None:
+    if ctx.attr.repository_keys != None:
         script_lines.append("cp -r $ORIG_DIR/$REPOKEYS $ORIG_DIR/$OUTDIR")
 
     script_lines.append("cp $ORIG_DIR/$BOOTSERVER $ORIG_DIR/$OUTDIR")
@@ -516,8 +517,8 @@ fuchsia_product_bundle = rule(
             default = ".",
         ),
         "repository_keys": attr.label(
-            doc = "Directory of repository keys",
-            allow_single_file = True,
+            doc = "A fuchsia_repository_keys target, must be specified when update_version_file is specified",
+            providers = [FuchsiaRepositoryKeys],
             default = None,
         ),
         "update_version_file": attr.label(

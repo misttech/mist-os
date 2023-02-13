@@ -230,3 +230,8 @@ FuchsiaScrutinyConfigInfo = provider(
         "structured_config_policy": "File describing the policy of structured config",
     },
 )
+
+FuchsiaRepositoryKeys = provider(
+    doc = "A directory containing Fuchsia TUF repository keys.",
+    fields = {"dir": "Path to the directory"},
+)
