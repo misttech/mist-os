@@ -685,11 +685,12 @@ impl<'a> BinderProcessGuard<'a> {
         &mut self,
         binder_thread: &Arc<BinderThread>,
         local: LocalBinderObject,
+        flags: u32,
     ) -> Arc<BinderObject> {
         if let Some(object) = self.find_object(&local) {
             object
         } else {
-            let object = BinderObject::new(self.base, local);
+            let object = BinderObject::new(self.base, local, flags);
             self.objects.insert(object.local.weak_ref_addr, object.clone());
 
             // Tell the owning process that a remote process now has a strong reference to
@@ -763,9 +764,35 @@ struct SharedMemory {
     allocations: BTreeMap<usize, usize>,
 }
 
-/// Contains (data buffer, offsets buffer, scatter gather buffer).
-type SharedMemoryAllocation<'a> =
-    (SharedBuffer<'a, u8>, SharedBuffer<'a, binder_uintptr_t>, SharedBuffer<'a, u8>);
+/// The user buffers containing the data to send to the recipient of a binder transaction.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct TransactionBuffers {
+    /// The buffer containing the data of the transaction.
+    data: UserBuffer,
+    /// The buffer containing the offsets of objects inside the `data` buffer.
+    offsets: UserBuffer,
+    /// An optional buffer pointing to the security context of the client of the transaction.
+    security_context: Option<UserBuffer>,
+}
+
+/// Contains the allocations for a transaction.
+#[derive(Debug)]
+struct SharedMemoryAllocation<'a> {
+    data_buffer: SharedBuffer<'a, u8>,
+    offsets_buffer: SharedBuffer<'a, binder_uintptr_t>,
+    scather_gather_buffer: SharedBuffer<'a, u8>,
+    security_context_buffer: Option<SharedBuffer<'a, u8>>,
+}
+
+impl From<SharedMemoryAllocation<'_>> for TransactionBuffers {
+    fn from(value: SharedMemoryAllocation<'_>) -> Self {
+        Self {
+            data: value.data_buffer.user_buffer(),
+            offsets: value.offsets_buffer.user_buffer(),
+            security_context: value.security_context_buffer.map(|x| x.user_buffer()),
+        }
+    }
+}
 
 impl Drop for SharedMemory {
     fn drop(&mut self) {
@@ -843,6 +870,7 @@ impl SharedMemory {
         data_length: usize,
         offsets_length: usize,
         sg_buffers_length: usize,
+        security_context_buffer_length: usize,
     ) -> Result<SharedMemoryAllocation<'_>, TransactionError> {
         // Round `data_length` up to the nearest multiple of 8, so that the offsets buffer is
         // aligned when we pack it next to the data buffer.
@@ -854,27 +882,40 @@ impl SharedMemory {
         // Ensure that the offsets and buffers lengths are valid.
         if offsets_length % std::mem::size_of::<binder_uintptr_t>() != 0
             || sg_buffers_length % std::mem::size_of::<binder_uintptr_t>() != 0
+            || security_context_buffer_length % std::mem::size_of::<binder_uintptr_t>() != 0
         {
             return Err(TransactionError::Malformed(errno!(EINVAL)));
         }
         let total_length = data_cap
             .checked_add(offsets_length)
             .and_then(|v| v.checked_add(sg_buffers_length))
+            .and_then(|v| v.checked_add(security_context_buffer_length))
             .ok_or_else(|| errno!(EINVAL))?;
         let base_offset = self.allocate(total_length)?;
 
         // SAFETY: The offsets and lengths have been bounds-checked above. Constructing a
         // `SharedBuffer` should be safe.
         unsafe {
-            Ok((
-                SharedBuffer::new_unchecked(self, base_offset, data_length),
-                SharedBuffer::new_unchecked(self, base_offset + data_cap, offsets_length),
-                SharedBuffer::new_unchecked(
+            Ok(SharedMemoryAllocation {
+                data_buffer: SharedBuffer::new_unchecked(self, base_offset, data_length),
+                offsets_buffer: SharedBuffer::new_unchecked(
+                    self,
+                    base_offset + data_cap,
+                    offsets_length,
+                ),
+                scather_gather_buffer: SharedBuffer::new_unchecked(
                     self,
                     base_offset + data_cap + offsets_length,
                     sg_buffers_length,
                 ),
-            ))
+                security_context_buffer: (security_context_buffer_length > 0).then(|| {
+                    SharedBuffer::new_unchecked(
+                        self,
+                        base_offset + data_cap + offsets_length + sg_buffers_length,
+                        security_context_buffer_length,
+                    )
+                }),
+            })
         }
     }
 
@@ -1503,8 +1544,12 @@ impl Command {
             Self::IncRef(..) => binder_driver_return_protocol_BR_INCREFS,
             Self::DecRef(..) => binder_driver_return_protocol_BR_DECREFS,
             Self::Error(..) => binder_driver_return_protocol_BR_ERROR,
-            Self::OnewayTransaction(..) | Self::Transaction { .. } => {
-                binder_driver_return_protocol_BR_TRANSACTION
+            Self::OnewayTransaction(data) | Self::Transaction { data, .. } => {
+                if data.buffers.security_context.is_none() {
+                    binder_driver_return_protocol_BR_TRANSACTION
+                } else {
+                    binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX
+                }
             }
             Self::Reply(..) => binder_driver_return_protocol_BR_REPLY,
             Self::TransactionComplete | Self::OnewayTransactionComplete => {
@@ -1563,19 +1608,45 @@ impl Command {
                 )
             }
             Self::OnewayTransaction(data) | Self::Transaction { data, .. } | Self::Reply(data) => {
-                #[repr(C, packed)]
-                #[derive(AsBytes)]
-                struct TransactionData {
-                    command: binder_driver_return_protocol,
-                    data: [u8; std::mem::size_of::<binder_transaction_data>()],
+                if let Some(security_context_buffer) = data.buffers.security_context.as_ref() {
+                    #[repr(C, packed)]
+                    #[derive(AsBytes)]
+                    struct TransactionData {
+                        command: binder_driver_return_protocol,
+                        data: [u8; std::mem::size_of::<binder_transaction_data>()],
+                        secctx: binder_uintptr_t,
+                    }
+
+                    if buffer.length < std::mem::size_of::<TransactionData>() {
+                        return error!(ENOMEM);
+                    }
+                    current_task.write_object(
+                        UserRef::new(buffer.address),
+                        &TransactionData {
+                            command: self.driver_return_code(),
+                            data: data.as_bytes(),
+                            secctx: security_context_buffer.address.ptr() as binder_uintptr_t,
+                        },
+                    )
+                } else {
+                    #[repr(C, packed)]
+                    #[derive(AsBytes)]
+                    struct TransactionData {
+                        command: binder_driver_return_protocol,
+                        data: [u8; std::mem::size_of::<binder_transaction_data>()],
+                    }
+
+                    if buffer.length < std::mem::size_of::<TransactionData>() {
+                        return error!(ENOMEM);
+                    }
+                    current_task.write_object(
+                        UserRef::new(buffer.address),
+                        &TransactionData {
+                            command: self.driver_return_code(),
+                            data: data.as_bytes(),
+                        },
+                    )
                 }
-                if buffer.length < std::mem::size_of::<TransactionData>() {
-                    return error!(ENOMEM);
-                }
-                current_task.write_object(
-                    UserRef::new(buffer.address),
-                    &TransactionData { command: self.driver_return_code(), data: data.as_bytes() },
-                )
             }
             Self::TransactionComplete
             | Self::OnewayTransactionComplete
@@ -1602,30 +1673,6 @@ impl Command {
                     &DeadBinderData { command: self.driver_return_code(), cookie: *cookie },
                 )
             }
-        }
-    }
-}
-
-/// A binder object, which is owned by a process. Process-local unique memory addresses identify it
-/// to the owner.
-#[derive(Debug)]
-struct BinderObject {
-    /// The owner of the binder object. If the owner cannot be promoted to a strong reference,
-    /// the object is dead.
-    owner: Weak<BinderProcess>,
-    /// The addresses to the binder (weak and strong) in the owner's address space. These are
-    /// treated as opaque identifiers in the driver, and only have meaning to the owning process.
-    local: LocalBinderObject,
-    /// Mutable state for the binder object, protected behind a mutex.
-    state: Mutex<BinderObjectMutableState>,
-}
-
-/// Assert that a dropped object from a live process has no reference.
-#[cfg(any(test, debug_assertions))]
-impl Drop for BinderObject {
-    fn drop(&mut self) {
-        if self.owner.upgrade().is_some() {
-            assert!(!self.has_ref(), "self: {self:?}");
         }
     }
 }
@@ -1677,13 +1724,42 @@ struct BinderObjectMutableState {
     strong_client_state: ClientRefState,
 }
 
+/// A binder object, which is owned by a process. Process-local unique memory addresses identify it
+/// to the owner.
+#[derive(Debug)]
+struct BinderObject {
+    /// The owner of the binder object. If the owner cannot be promoted to a strong reference,
+    /// the object is dead.
+    owner: Weak<BinderProcess>,
+    /// The addresses to the binder (weak and strong) in the owner's address space. These are
+    /// treated as opaque identifiers in the driver, and only have meaning to the owning process.
+    local: LocalBinderObject,
+    /// The flags for the binder object.
+    ///
+    ///The only flag currently implemented is FLAT_BINDER_FLAG_TXN_SECURITY_CTX.
+    flags: u32,
+    /// Mutable state for the binder object, protected behind a mutex.
+    state: Mutex<BinderObjectMutableState>,
+}
+
+/// Assert that a dropped object from a live process has no reference.
+#[cfg(any(test, debug_assertions))]
+impl Drop for BinderObject {
+    fn drop(&mut self) {
+        if self.owner.upgrade().is_some() {
+            assert!(!self.has_ref());
+        }
+    }
+}
+
 impl BinderObject {
     /// Creates a new BinderObject. It is the responsibility of the caller to sent a `BR_ACQUIRE`
     /// to the owning process.
-    fn new(owner: &Arc<BinderProcess>, local: LocalBinderObject) -> Arc<Self> {
+    fn new(owner: &Arc<BinderProcess>, local: LocalBinderObject, flags: u32) -> Arc<Self> {
         Arc::new(Self {
             owner: Arc::downgrade(owner),
             local,
+            flags,
             state: Mutex::new(BinderObjectMutableState {
                 strong_client_state: ClientRefState::WaitingAck,
                 ..Default::default()
@@ -1691,10 +1767,11 @@ impl BinderObject {
         })
     }
 
-    fn new_context_manager_marker(context_manager: &Arc<BinderProcess>) -> Arc<Self> {
+    fn new_context_manager_marker(context_manager: &Arc<BinderProcess>, flags: u32) -> Arc<Self> {
         Arc::new(Self {
             owner: Arc::downgrade(context_manager),
             local: Default::default(),
+            flags,
             state: Default::default(),
         })
     }
@@ -1864,8 +1941,7 @@ struct TransactionData {
     code: u32,
     flags: u32,
 
-    data_buffer: UserBuffer,
-    offsets_buffer: UserBuffer,
+    buffers: TransactionBuffers,
 }
 
 impl TransactionData {
@@ -1879,12 +1955,12 @@ impl TransactionData {
                     flags: self.flags,
                     sender_pid: self.peer_pid,
                     sender_euid: self.peer_euid,
-                    data_size: self.data_buffer.length as u64,
-                    offsets_size: self.offsets_buffer.length as u64,
+                    data_size: self.buffers.data.length as u64,
+                    offsets_size: self.buffers.offsets.length as u64,
                     data.ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: self.data_buffer.address.ptr() as u64,
-                        offsets: self.offsets_buffer.address.ptr() as u64,
-                    },
+                         buffer: self.buffers.data.address.ptr() as u64,
+                         offsets: self.buffers.offsets.address.ptr() as u64,
+                     },
                 })
             }
             FlatBinderObject::Local { ref object } => {
@@ -1895,12 +1971,12 @@ impl TransactionData {
                     flags: self.flags,
                     sender_pid: self.peer_pid,
                     sender_euid: self.peer_euid,
-                    data_size: self.data_buffer.length as u64,
-                    offsets_size: self.offsets_buffer.length as u64,
+                    data_size: self.buffers.data.length as u64,
+                    offsets_size: self.buffers.offsets.length as u64,
                     data.ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: self.data_buffer.address.ptr() as u64,
-                        offsets: self.offsets_buffer.address.ptr() as u64,
-                    },
+                         buffer: self.buffers.data.address.ptr() as u64,
+                         offsets: self.buffers.offsets.address.ptr() as u64,
+                     },
                 })
             }
         }
@@ -2367,10 +2443,17 @@ impl BinderDriver {
                     return error!(EINVAL);
                 }
 
-                // TODO: Read the flat_binder_object when ioctl is uapi::BINDER_SET_CONTEXT_MGR_EXT.
+                let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
+                    let user_ref = UserRef::<flat_binder_object>::new(user_arg);
+                    let flat_binder_object = current_task.read_object(user_ref)?;
+                    flat_binder_object.flags
+                } else {
+                    0
+                };
 
                 let mut state = self.context_manager_and_queue.lock();
-                state.context_manager = Some(BinderObject::new_context_manager_marker(binder_proc));
+                state.context_manager =
+                    Some(BinderObject::new_context_manager_marker(binder_proc, flags));
                 state.wait_queue.notify_all();
                 Ok(SUCCESS)
             }
@@ -2618,15 +2701,25 @@ impl BinderDriver {
         };
 
         let target_task = self.get_binder_task(current_task.kernel(), &target_proc)?;
+        let security_context: Option<&[u8]> = if object.flags
+            & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
+            == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
+        {
+            // TODO(fxb/108648): Compute the correct security context.
+            Some(b"unconfined:role:type:level\0")
+        } else {
+            None
+        };
 
         // Copy the transaction data to the target process.
-        let (data_buffer, offsets_buffer, transaction_state) = self.copy_transaction_buffers(
+        let (buffers, transaction_state) = self.copy_transaction_buffers(
             current_task,
             binder_proc,
             binder_thread,
             target_task.as_ref().as_ref(),
             &target_proc,
             &data,
+            security_context,
         )?;
 
         let transaction = TransactionData {
@@ -2645,8 +2738,7 @@ impl BinderDriver {
             code: data.transaction_data.code,
             flags: data.transaction_data.flags,
 
-            data_buffer,
-            offsets_buffer,
+            buffers: buffers.clone(),
         };
 
         let caller_thread = match match binder_thread.read().transactions.last() {
@@ -2663,7 +2755,7 @@ impl BinderDriver {
 
             // Register the transaction buffer.
             target_proc.lock().active_transactions.insert(
-                data_buffer.address,
+                buffers.data.address,
                 ActiveTransaction {
                     request_type: RequestType::Oneway { object: Arc::downgrade(&object) },
                     _state: transaction_state.into(),
@@ -2697,7 +2789,7 @@ impl BinderDriver {
 
             // Register the transaction buffer.
             target_proc.lock().active_transactions.insert(
-                data_buffer.address,
+                buffers.data.address,
                 ActiveTransaction {
                     request_type: RequestType::RequestResponse,
                     _state: transaction_state.into(),
@@ -2733,18 +2825,19 @@ impl BinderDriver {
         let target_task = self.get_binder_task(current_task.kernel(), &target_proc)?;
 
         // Copy the transaction data to the target process.
-        let (data_buffer, offsets_buffer, transaction_state) = self.copy_transaction_buffers(
+        let (buffers, transaction_state) = self.copy_transaction_buffers(
             current_task,
             binder_proc,
             binder_thread,
             target_task.as_ref().as_ref(),
             &target_proc,
             &data,
+            None,
         )?;
 
         // Register the transaction buffer.
         target_proc.lock().active_transactions.insert(
-            data_buffer.address,
+            buffers.data.address,
             ActiveTransaction {
                 request_type: RequestType::RequestResponse,
                 _state: transaction_state.into(),
@@ -2761,8 +2854,7 @@ impl BinderDriver {
             code: data.transaction_data.code,
             flags: data.transaction_data.flags,
 
-            data_buffer,
-            offsets_buffer,
+            buffers,
         }));
 
         // Schedule the transaction complete command on the caller's command queue.
@@ -2858,8 +2950,9 @@ impl BinderDriver {
 
     /// Copies transaction buffers from the source process' address space to a new buffer in the
     /// target process' shared binder VMO.
-    /// Returns a pair of addresses, the first the address to the transaction data, the second the
-    /// address to the offset buffer.
+    /// Returns the transaction buffers in the target process, as well as the transaction state.
+    ///
+    /// If `security_context` is present, it musts be null terminated.
     fn copy_transaction_buffers<'a>(
         &self,
         source_task: &dyn RunningBinderTask,
@@ -2868,28 +2961,41 @@ impl BinderDriver {
         target_task: &'a dyn BinderTask,
         target_proc: &Arc<BinderProcess>,
         data: &binder_transaction_data_sg,
-    ) -> Result<(UserBuffer, UserBuffer, TransientTransactionState<'a>), TransactionError> {
+        security_context: Option<&[u8]>,
+    ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError> {
         // Get the shared memory of the target process.
         let mut shared_memory_lock = target_proc.shared_memory.lock();
         let shared_memory = shared_memory_lock.as_mut().ok_or_else(|| errno!(ENOMEM))?;
 
         // Allocate a buffer from the target process' shared memory.
-        let (mut data_buffer, mut offsets_buffer, mut sg_buffer) = shared_memory.allocate_buffers(
+        let mut allocations = shared_memory.allocate_buffers(
             data.transaction_data.data_size as usize,
             data.transaction_data.offsets_size as usize,
             data.buffers_size as usize,
+            round_up_to_increment(
+                security_context.map(|s| s.len()).unwrap_or(0),
+                std::mem::size_of::<binder_uintptr_t>(),
+            )?,
         )?;
+
+        // Copy the security context content.
+        if let Some(data) = security_context {
+            let security_buffer = allocations.security_context_buffer.as_mut().unwrap();
+            security_buffer.as_mut_bytes()[..data.len()].copy_from_slice(data);
+        }
 
         // SAFETY: `binder_transaction_data` was read from a userspace VMO, which means that all
         // bytes are defined, making union access safe (even if the value is garbage).
         let userspace_addrs = unsafe { data.transaction_data.data.ptr };
 
         // Copy the data straight into the target's buffer.
-        source_task
-            .read_memory(UserAddress::from(userspace_addrs.buffer), data_buffer.as_mut_bytes())?;
+        source_task.read_memory(
+            UserAddress::from(userspace_addrs.buffer),
+            allocations.data_buffer.as_mut_bytes(),
+        )?;
         source_task.read_objects(
             UserRef::new(UserAddress::from(userspace_addrs.offsets)),
-            offsets_buffer.as_mut_bytes(),
+            allocations.offsets_buffer.as_mut_bytes(),
         )?;
 
         // Translate any handles/fds from the source process' handle table to the target process'
@@ -2900,12 +3006,12 @@ impl BinderDriver {
             source_thread,
             target_task,
             target_proc,
-            offsets_buffer.as_bytes(),
-            data_buffer.as_mut_bytes(),
-            &mut sg_buffer,
+            allocations.offsets_buffer.as_bytes(),
+            allocations.data_buffer.as_mut_bytes(),
+            &mut allocations.scather_gather_buffer,
         )?;
 
-        Ok((data_buffer.user_buffer(), offsets_buffer.user_buffer(), transient_transaction_state))
+        Ok((allocations.into(), transient_transaction_state))
     }
 
     /// Translates binder object handles/FDs from the sending process to the receiver process,
@@ -2981,7 +3087,8 @@ impl BinderDriver {
                     // to translate this address to some handle.
 
                     // Register this binder object if it hasn't already been registered.
-                    let object = source_proc.lock().find_or_register_object(source_thread, local);
+                    let object =
+                        source_proc.lock().find_or_register_object(source_thread, local, flags);
 
                     // Create a handle in the receiving process that references the binder object
                     // in the sender's process.
@@ -3566,9 +3673,10 @@ mod tests {
         let mut addresses = vec![];
         for _ in 0..n {
             let address = {
-                let (buffer, _, _) = shared_memory
-                    .allocate_buffers(VMO_LENGTH / n, 0, 0)
-                    .unwrap_or_else(|_| panic!("allocate {n:?}-th buffer"));
+                let buffer = shared_memory
+                    .allocate_buffers(VMO_LENGTH / n, 0, 0, 0)
+                    .unwrap_or_else(|_| panic!("allocate {n:?}-th buffer"))
+                    .data_buffer;
                 buffer.memory.user_address + buffer.offset
             };
             addresses.push(address);
@@ -3600,7 +3708,8 @@ mod tests {
         weak_ref_addr: UserAddress,
         strong_ref_addr: UserAddress,
     ) -> Arc<BinderObject> {
-        let object = BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr });
+        let object =
+            BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr }, 0);
         owner.lock().objects.insert(weak_ref_addr, object.clone());
         object
     }
@@ -3637,7 +3746,7 @@ mod tests {
         let driver = BinderDriver::new();
         let (_kernel, current_task) = create_kernel_and_task();
         let context_manager_proc = driver.create_process(1);
-        let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
+        let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc, 0);
         driver.context_manager_and_queue.lock().context_manager = Some(context_manager.clone());
         let (object, owner) = driver
             .get_context_manager(&CurrentBinderTask { task: &current_task })
@@ -3665,6 +3774,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
                 strong_ref_addr: UserAddress::from(0x1111111111111111),
             },
+            0,
         );
 
         // Insert the transaction once.
@@ -3701,6 +3811,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
                 strong_ref_addr: UserAddress::from(0x1111111111111111),
             },
+            0,
         );
         scopeguard::defer! {
              transaction_ref.ack_acquire().expect("ack_acquire");
@@ -3734,6 +3845,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
                 strong_ref_addr: UserAddress::from(0x1111111111111111),
             },
+            0,
         );
 
         // Simulate another process keeping a strong reference.
@@ -3782,11 +3894,14 @@ mod tests {
         let mut shared_memory =
             SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         shared_memory
-            .allocate_buffers(3, 1, 0)
+            .allocate_buffers(3, 1, 0, 0)
             .expect_err("offsets_length should be multiple of 8");
         shared_memory
-            .allocate_buffers(3, 8, 1)
+            .allocate_buffers(3, 8, 1, 0)
             .expect_err("buffers_length should be multiple of 8");
+        shared_memory
+            .allocate_buffers(3, 8, 0, 1)
+            .expect_err("security_context_buffer_length should be multiple of 8");
     }
 
     #[fuchsia::test]
@@ -3799,21 +3914,41 @@ mod tests {
         const OFFSETS_COUNT: usize = 1;
         const OFFSETS_LEN: usize = std::mem::size_of::<binder_uintptr_t>() * OFFSETS_COUNT;
         const BUFFERS_LEN: usize = 8;
-        let (data_buf, offsets_buf, buffers_buf) = shared_memory
-            .allocate_buffers(DATA_LEN, OFFSETS_LEN, BUFFERS_LEN)
+        const SECURITY_CONTEXT_BUFFER_LEN: usize = 24;
+        let allocations = shared_memory
+            .allocate_buffers(DATA_LEN, OFFSETS_LEN, BUFFERS_LEN, SECURITY_CONTEXT_BUFFER_LEN)
             .expect("allocate buffer");
-        assert_eq!(data_buf.user_buffer(), UserBuffer { address: BASE_ADDR, length: DATA_LEN });
         assert_eq!(
-            offsets_buf.user_buffer(),
+            allocations.data_buffer.user_buffer(),
+            UserBuffer { address: BASE_ADDR, length: DATA_LEN }
+        );
+        assert_eq!(
+            allocations.offsets_buffer.user_buffer(),
             UserBuffer { address: BASE_ADDR + 8usize, length: OFFSETS_LEN }
         );
         assert_eq!(
-            buffers_buf.user_buffer(),
+            allocations.scather_gather_buffer.user_buffer(),
             UserBuffer { address: BASE_ADDR + 8usize + OFFSETS_LEN, length: BUFFERS_LEN }
         );
-        assert_eq!(data_buf.as_bytes().len(), DATA_LEN);
-        assert_eq!(offsets_buf.as_bytes().len(), OFFSETS_COUNT);
-        assert_eq!(buffers_buf.as_bytes().len(), BUFFERS_LEN);
+        assert_eq!(
+            allocations.security_context_buffer.as_ref().expect("security_context").user_buffer(),
+            UserBuffer {
+                address: BASE_ADDR + 8usize + OFFSETS_LEN + BUFFERS_LEN,
+                length: SECURITY_CONTEXT_BUFFER_LEN
+            }
+        );
+        assert_eq!(allocations.data_buffer.as_bytes().len(), DATA_LEN);
+        assert_eq!(allocations.offsets_buffer.as_bytes().len(), OFFSETS_COUNT);
+        assert_eq!(allocations.scather_gather_buffer.as_bytes().len(), BUFFERS_LEN);
+        assert_eq!(
+            allocations
+                .security_context_buffer
+                .as_ref()
+                .expect("security_context")
+                .as_bytes()
+                .len(),
+            SECURITY_CONTEXT_BUFFER_LEN
+        );
     }
 
     #[fuchsia::test]
@@ -3825,15 +3960,15 @@ mod tests {
         const DATA_LEN: usize = 256;
         const OFFSETS_COUNT: usize = 4;
         const OFFSETS_LEN: usize = std::mem::size_of::<binder_uintptr_t>() * OFFSETS_COUNT;
-        let (mut data_buf, mut offsets_buf, _) =
-            shared_memory.allocate_buffers(DATA_LEN, OFFSETS_LEN, 0).expect("allocate buffer");
+        let mut allocations =
+            shared_memory.allocate_buffers(DATA_LEN, OFFSETS_LEN, 0, 0).expect("allocate buffer");
 
         // Write data to the allocated buffers.
         const DATA_FILL: u8 = 0xff;
-        data_buf.as_mut_bytes().fill(0xff);
+        allocations.data_buffer.as_mut_bytes().fill(0xff);
 
         const OFFSETS_FILL: binder_uintptr_t = 0xDEADBEEFDEADBEEF;
-        offsets_buf.as_mut_bytes().fill(OFFSETS_FILL);
+        allocations.offsets_buffer.as_mut_bytes().fill(OFFSETS_FILL);
 
         // Check that the correct bit patterns were written through to the underlying VMO.
         let mut data = [0u8; DATA_LEN];
@@ -3855,45 +3990,69 @@ mod tests {
         const BUF1_DATA_LEN: usize = 64;
         const BUF1_OFFSETS_LEN: usize = 8;
         const BUF1_BUFFERS_LEN: usize = 8;
-        let (data_buf, offsets_buf, buffers_buf) = shared_memory
-            .allocate_buffers(BUF1_DATA_LEN, BUF1_OFFSETS_LEN, BUF1_BUFFERS_LEN)
+        const BUF1_SECURITY_CONTEXT_BUFFER_LEN: usize = 8;
+        let allocations = shared_memory
+            .allocate_buffers(
+                BUF1_DATA_LEN,
+                BUF1_OFFSETS_LEN,
+                BUF1_BUFFERS_LEN,
+                BUF1_SECURITY_CONTEXT_BUFFER_LEN,
+            )
             .expect("allocate buffer 1");
         assert_eq!(
-            data_buf.user_buffer(),
+            allocations.data_buffer.user_buffer(),
             UserBuffer { address: BASE_ADDR, length: BUF1_DATA_LEN }
         );
         assert_eq!(
-            offsets_buf.user_buffer(),
+            allocations.offsets_buffer.user_buffer(),
             UserBuffer { address: BASE_ADDR + BUF1_DATA_LEN, length: BUF1_OFFSETS_LEN }
         );
         assert_eq!(
-            buffers_buf.user_buffer(),
+            allocations.scather_gather_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN,
                 length: BUF1_BUFFERS_LEN
+            }
+        );
+        assert_eq!(
+            allocations.security_context_buffer.expect("security_context").user_buffer(),
+            UserBuffer {
+                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN + BUF1_BUFFERS_LEN,
+                length: BUF1_SECURITY_CONTEXT_BUFFER_LEN
             }
         );
 
         const BUF2_DATA_LEN: usize = 32;
         const BUF2_OFFSETS_LEN: usize = 0;
         const BUF2_BUFFERS_LEN: usize = 0;
-        let (data_buf, offsets_buf, _) = shared_memory
-            .allocate_buffers(BUF2_DATA_LEN, BUF2_OFFSETS_LEN, BUF2_BUFFERS_LEN)
+        const BUF2_SECURITY_CONTEXT_BUFFER_LEN: usize = 0;
+        let allocations = shared_memory
+            .allocate_buffers(
+                BUF2_DATA_LEN,
+                BUF2_OFFSETS_LEN,
+                BUF2_BUFFERS_LEN,
+                BUF2_SECURITY_CONTEXT_BUFFER_LEN,
+            )
             .expect("allocate buffer 2");
         assert_eq!(
-            data_buf.user_buffer(),
-            UserBuffer {
-                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN + BUF1_BUFFERS_LEN,
-                length: BUF2_DATA_LEN
-            }
-        );
-        assert_eq!(
-            offsets_buf.user_buffer(),
+            allocations.data_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR
                     + BUF1_DATA_LEN
                     + BUF1_OFFSETS_LEN
                     + BUF1_BUFFERS_LEN
+                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN,
+                length: BUF2_DATA_LEN
+            }
+        );
+        assert_eq!(
+            allocations.offsets_buffer.user_buffer(),
+            UserBuffer {
+                address: BASE_ADDR
+                    + BUF1_DATA_LEN
+                    + BUF1_OFFSETS_LEN
+                    + BUF1_BUFFERS_LEN
+                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN
                     + BUF2_DATA_LEN,
                 length: BUF2_OFFSETS_LEN
             }
@@ -3906,14 +4065,18 @@ mod tests {
         let mut shared_memory =
             SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
-        shared_memory.allocate_buffers(VMO_LENGTH + 1, 0, 0).expect_err("out-of-bounds allocation");
-        shared_memory.allocate_buffers(VMO_LENGTH, 8, 0).expect_err("out-of-bounds allocation");
-        shared_memory.allocate_buffers(VMO_LENGTH - 8, 8, 8).expect_err("out-of-bounds allocation");
+        shared_memory
+            .allocate_buffers(VMO_LENGTH + 1, 0, 0, 0)
+            .expect_err("out-of-bounds allocation");
+        shared_memory.allocate_buffers(VMO_LENGTH, 8, 0, 0).expect_err("out-of-bounds allocation");
+        shared_memory
+            .allocate_buffers(VMO_LENGTH - 8, 8, 8, 0)
+            .expect_err("out-of-bounds allocation");
 
-        shared_memory.allocate_buffers(VMO_LENGTH, 0, 0).expect("allocate buffer");
+        shared_memory.allocate_buffers(VMO_LENGTH, 0, 0, 0).expect("allocate buffer");
 
         // Now that the previous buffer allocation succeeded, there should be no more room.
-        shared_memory.allocate_buffers(1, 0, 0).expect_err("out-of-bounds allocation");
+        shared_memory.allocate_buffers(1, 0, 0, 0).expect_err("out-of-bounds allocation");
     }
 
     #[fuchsia::test]
@@ -3925,12 +4088,12 @@ mod tests {
 
         for buffer in fill_with_buffers(&mut shared_memory, n) {
             shared_memory
-                .allocate_buffers(VMO_LENGTH / n, 0, 0)
+                .allocate_buffers(VMO_LENGTH / n, 0, 0, 0)
                 .expect_err(&format!("allocated buffer when shared memory was full {n:?}"));
 
             shared_memory.free_buffer(buffer).expect("didn't free buffer");
 
-            shared_memory.allocate_buffers(VMO_LENGTH / n, 0, 0).unwrap_or_else(|_| {
+            shared_memory.allocate_buffers(VMO_LENGTH / n, 0, 0, 0).unwrap_or_else(|_| {
                 panic!("couldn't allocate new buffer even after {n:?}-th was released")
             });
         }
@@ -3945,11 +4108,11 @@ mod tests {
         let buffers = fill_with_buffers(&mut shared_memory, n);
 
         shared_memory
-            .allocate_buffers(VMO_LENGTH / n, 0, 0)
+            .allocate_buffers(VMO_LENGTH / n, 0, 0, 0)
             .expect_err("could allocate when buffer was full");
         shared_memory.free_buffer(buffers[0]).expect("didn't free buffer");
         shared_memory
-            .allocate_buffers(VMO_LENGTH / n, 0, 0)
+            .allocate_buffers(VMO_LENGTH / n, 0, 0, 0)
             .expect("couldn't allocate even after first slot opened up");
     }
 
@@ -3965,10 +4128,10 @@ mod tests {
         // Free all the buffers in reverse order, and verify that the new buffer isn't allocated
         // until the first buffer is freed.
         shared_memory
-            .allocate_buffers(VMO_LENGTH / n, 0, 0)
+            .allocate_buffers(VMO_LENGTH / n, 0, 0, 0)
             .expect_err("cannot allocate when full");
         shared_memory.free_buffer(buffers[1]).expect("didn't free buffer");
-        shared_memory.allocate_buffers(VMO_LENGTH / n, 0, 0).expect("can allocate in hole");
+        shared_memory.allocate_buffers(VMO_LENGTH / n, 0, 0, 0).expect("can allocate in hole");
     }
 
     #[fuchsia::test]
@@ -3983,11 +4146,11 @@ mod tests {
         shared_memory.free_buffer(buffers[0]).expect("didn't free buffer");
         // Allocate slightly more than what can fit at the start (after freeing the first 1/4th).
         shared_memory
-            .allocate_buffers((VMO_LENGTH / n) + 1, 0, 0)
+            .allocate_buffers((VMO_LENGTH / n) + 1, 0, 0, 0)
             .expect_err("allocated over existing buffer");
         shared_memory.free_buffer(buffers[1]).expect("didn't free buffer");
         shared_memory
-            .allocate_buffers((VMO_LENGTH / n) + 1, 0, 0)
+            .allocate_buffers((VMO_LENGTH / n) + 1, 0, 0, 0)
             .expect("couldn't allocate when there was enough space");
     }
 
@@ -4000,24 +4163,24 @@ mod tests {
         // Test that a buffer can still be allocated even if it can't fit at the end, but can fit
         // at the start by first allocating 3/4 of the vmo.
         let buffer_1 = {
-            let (shared_mem, _, _) =
-                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0).expect("couldn't allocate");
-            shared_mem.memory.user_address + shared_mem.offset
+            let allocations =
+                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
+            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
         };
         let buffer_2 = {
-            let (shared_mem, _, _) =
-                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0).expect("couldn't allocate");
-            shared_mem.memory.user_address + shared_mem.offset
+            let allocations =
+                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
+            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
         };
         let buffer_3 = {
-            let (shared_mem, _, _) =
-                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0).expect("couldn't allocate");
-            shared_mem.memory.user_address + shared_mem.offset
+            let allocations =
+                shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
+            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
         };
 
         // Attempt to allocate a buffer at the end that is larger than 1/4th.
         shared_memory
-            .allocate_buffers(VMO_LENGTH / 3, 0, 0)
+            .allocate_buffers(VMO_LENGTH / 3, 0, 0, 0)
             .expect_err("allocated over existing buffer");
         // Now free all the buffers at the start.
         shared_memory.free_buffer(buffer_1).expect("didn't free buffer");
@@ -4026,7 +4189,7 @@ mod tests {
 
         // Try the allocation again.
         shared_memory
-            .allocate_buffers(VMO_LENGTH / 3, 0, 0)
+            .allocate_buffers(VMO_LENGTH / 3, 0, 0, 0)
             .expect("failed even though there was room at start");
     }
 
@@ -4040,7 +4203,7 @@ mod tests {
             strong_ref_addr: UserAddress::from(0x0000000000000100),
         };
 
-        let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT);
+        let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT, 0);
 
         let commands = object.ack_acquire().expect("ack_acquire");
         for command in commands {
@@ -4064,6 +4227,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000010),
                 strong_ref_addr: UserAddress::from(0x0000000000000100),
             },
+            0,
         );
         // Simulate another process keeping a strong reference.
         object.inc_strong().expect("inc_strong");
@@ -4417,7 +4581,8 @@ mod tests {
 
         // Copy the data from process 1 to process 2
         let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
-        let (data_buffer, offsets_buffer, _transaction_state) = test
+        const kSecContext: &[u8] = b"hello\0";
+        let (buffers, _transaction_state) = test
             .driver
             .copy_transaction_buffers(
                 &CurrentBinderTask { task: &test.sender_task },
@@ -4426,14 +4591,20 @@ mod tests {
                 &target_binder_task,
                 &test.receiver_proc,
                 &transaction,
+                Some(kSecContext),
             )
             .expect("copy data");
+        let data_buffer = buffers.data;
+        let offsets_buffer = buffers.offsets;
+        let security_context_buffer = buffers.security_context.expect("security_context");
 
         // Check that the returned buffers are in-bounds of process 2's shared memory.
         assert!(data_buffer.address >= BASE_ADDR);
         assert!(data_buffer.address < BASE_ADDR + VMO_LENGTH);
         assert!(offsets_buffer.address >= BASE_ADDR);
         assert!(offsets_buffer.address < BASE_ADDR + VMO_LENGTH);
+        assert!(security_context_buffer.address >= BASE_ADDR);
+        assert!(security_context_buffer.address < BASE_ADDR + VMO_LENGTH);
 
         // Verify the contents of the copied data in process 2's shared memory VMO.
         let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
@@ -4445,14 +4616,18 @@ mod tests {
         vmo.read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read offsets");
         assert_eq!(&buffer[..], offsets_data.as_bytes());
+        let mut buffer = [0u8; kSecContext.len()];
+        vmo.read(&mut buffer, (security_context_buffer.address - BASE_ADDR) as u64)
+            .expect("failed to read security_context");
+        assert_eq!(&buffer[..], kSecContext);
     }
 
     #[fuchsia::test]
     fn transaction_translate_binder_leaving_process() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -4484,7 +4659,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4525,14 +4700,14 @@ mod tests {
     fn transaction_translate_binder_handle_entering_owning_process() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let local_binder_object = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
             strong_ref_addr: UserAddress::from(0x0000000000000100),
         };
-        let binder_object = BinderObject::new(&test.receiver_proc, local_binder_object);
+        let binder_object = BinderObject::new(&test.receiver_proc, local_binder_object, 0);
         scopeguard::defer! {
             binder_object.ack_acquire().expect("ack_acquire");
         }
@@ -4566,7 +4741,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4587,8 +4762,8 @@ mod tests {
         let test = TranslateHandlesTestFixture::new();
         let owner_proc = test.driver.create_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let binder_object = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -4603,15 +4778,16 @@ mod tests {
             .sender_proc
             .lock()
             .handles
-            .insert_for_transaction(BinderObject::new(&owner_proc, binder_object));
+            .insert_for_transaction(BinderObject::new(&owner_proc, binder_object, 0));
         assert_eq!(SENDING_HANDLE, handle);
 
         // Give the receiver another handle so that the input handle number and output handle
         // number aren't the same.
-        test.receiver_proc
-            .lock()
-            .handles
-            .insert_for_transaction(BinderObject::new(&owner_proc, LocalBinderObject::default()));
+        test.receiver_proc.lock().handles.insert_for_transaction(BinderObject::new(
+            &owner_proc,
+            LocalBinderObject::default(),
+            0,
+        ));
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
@@ -4636,7 +4812,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4671,8 +4847,8 @@ mod tests {
         let test = TranslateHandlesTestFixture::new();
         let other_proc = test.driver.create_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let binder_object_addr = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -4685,8 +4861,8 @@ mod tests {
         const RECEIVING_HANDLE_OTHER: Handle = Handle::from_raw(3);
 
         // Add both objects (sender owned and other owned) to sender handle table.
-        let sender_object = BinderObject::new(&test.sender_proc, binder_object_addr);
-        let other_object = BinderObject::new(&other_proc, binder_object_addr);
+        let sender_object = BinderObject::new(&test.sender_proc, binder_object_addr, 0);
+        let other_object = BinderObject::new(&other_proc, binder_object_addr, 0);
         assert_eq!(
             test.sender_proc.lock().handles.insert_for_transaction(sender_object).1,
             SENDING_HANDLE_SENDER
@@ -4698,7 +4874,7 @@ mod tests {
 
         // Give the receiver another handle so that the input handle numbers and output handle
         // numbers aren't the same.
-        let obj = BinderObject::new(&other_proc, LocalBinderObject::default());
+        let obj = BinderObject::new(&other_proc, LocalBinderObject::default(), 0);
         test.receiver_proc.lock().handles.insert_for_transaction(obj);
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
@@ -4732,7 +4908,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4860,7 +5036,7 @@ mod tests {
         };
 
         // Perform the translation and copying.
-        let (data_buffer, _, _) = test
+        let (buffers, _) = test
             .driver
             .copy_transaction_buffers(
                 &CurrentBinderTask { task: &test.sender_task },
@@ -4869,8 +5045,10 @@ mod tests {
                 &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
                 &test.receiver_proc,
                 &input,
+                None,
             )
             .expect("copy_transaction_buffers");
+        let data_buffer = buffers.data;
 
         // Read back the translated objects from the receiver's memory.
         let mut translated_objects = [binder_buffer_object::default(); 2];
@@ -4970,6 +5148,7 @@ mod tests {
                 &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
                 &test.receiver_proc,
                 &input,
+                None,
             )
             .expect_err("copy_transaction_buffers should fail");
     }
@@ -5047,6 +5226,7 @@ mod tests {
                 &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
                 &test.receiver_proc,
                 &input,
+                None,
             )
             .expect_err("copy_transaction_buffers should fail");
     }
@@ -5162,7 +5342,7 @@ mod tests {
 
         // Perform the translation and copying.
         let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
-        let (data_buffer, _, transient_transaction_state) = test
+        let (buffers, transient_transaction_state) = test
             .driver
             .copy_transaction_buffers(
                 &CurrentBinderTask { task: &test.sender_task },
@@ -5171,8 +5351,10 @@ mod tests {
                 &target_binder_task,
                 &test.receiver_proc,
                 &input,
+                None,
             )
             .expect("copy_transaction_buffers");
+        let data_buffer = buffers.data;
 
         // Simulate a successful transaction by converting the transient state.
         let _transaction_state: TransactionState = transient_transaction_state.into();
@@ -5223,8 +5405,8 @@ mod tests {
     fn transaction_translation_fails_on_invalid_handle() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let mut transaction_data = Vec::new();
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
@@ -5244,7 +5426,7 @@ mod tests {
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5255,8 +5437,8 @@ mod tests {
     fn transaction_translation_fails_on_invalid_object_type() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let mut transaction_data = Vec::new();
         transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
@@ -5276,7 +5458,7 @@ mod tests {
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5287,8 +5469,8 @@ mod tests {
     fn transaction_drop_references_on_failed_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         let binder_object = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -5321,7 +5503,7 @@ mod tests {
                     std::mem::size_of::<flat_binder_object>() as binder_uintptr_t,
                 ],
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5368,6 +5550,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
+            0,
         );
 
         // Keep a weak reference to the object.
@@ -5428,6 +5611,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
+            0,
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
@@ -5479,6 +5663,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
+            0,
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
@@ -5524,6 +5709,7 @@ mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
+            0,
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
@@ -5573,8 +5759,8 @@ mod tests {
     fn send_fd_in_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         // Open a file in the sender process.
         let file = PanickingFile::new_file(&test.sender_task);
@@ -5605,7 +5791,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -5650,8 +5836,8 @@ mod tests {
     fn cleanup_fd_in_failed_transaction() {
         let test = TranslateHandlesTestFixture::new();
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
-        let (_, _, mut sg_buffer) =
-            receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         // Open a file in the sender process.
         let sender_fd = test
@@ -5680,7 +5866,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut sg_buffer,
+                &mut allocations.scather_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -5798,9 +5984,9 @@ mod tests {
         {
             Command::OnewayTransaction(TransactionData {
                 code: FIRST_TRANSACTION_CODE,
-                data_buffer,
+                buffers: TransactionBuffers { data, .. },
                 ..
-            }) => data_buffer.address,
+            }) => data.address,
             _ => panic!("unexpected command in process queue"),
         };
 
@@ -5824,9 +6010,9 @@ mod tests {
         {
             Command::OnewayTransaction(TransactionData {
                 code: SECOND_TRANSACTION_CODE,
-                data_buffer,
+                buffers: TransactionBuffers { data, .. },
                 ..
-            }) => data_buffer.address,
+            }) => data.address,
             _ => panic!("unexpected command in process queue"),
         };
 
@@ -6233,7 +6419,8 @@ mod tests {
             // Set the context manager, as external ioctl will wait for it to be set before
             // executing.
             let context_manager_proc = driver.create_process(1);
-            let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
+            let context_manager =
+                BinderObject::new_context_manager_marker(&context_manager_proc, 0);
             driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
             driver.open_external(&kernel, process_accessor_client_end, binder_server_end).await;
         });
