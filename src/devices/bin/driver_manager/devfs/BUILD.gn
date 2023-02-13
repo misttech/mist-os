@@ -4,6 +4,8 @@
 
 source_set("devfs") {
   sources = [
+    "allowlist.cc",
+    "allowlist.h",
     "builtin_devices.cc",
     "builtin_devices.h",
     "devfs.cc",

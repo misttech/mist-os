@@ -52,7 +52,8 @@ void BindReply(const fbl::RefPtr<zx_device_t>& dev,
 void DeviceControllerConnection::ConnectMultiplexed(ConnectMultiplexedRequestView request,
                                                     ConnectMultiplexedCompleter::Sync& completer) {
   if (std::optional<devfs_fidl::DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
-    vnode.value().ServeMultiplexed(std::move(request->server));
+    vnode.value().ServeMultiplexed(std::move(request->server), request->include_node,
+                                   request->include_controller);
   }
 }
 

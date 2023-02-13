@@ -25,6 +25,7 @@
 
 #include <fbl/ref_ptr.h>
 
+#include "src/devices/bin/driver_manager/devfs/allowlist.h"
 #include "src/devices/bin/driver_manager/devfs/builtin_devices.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/split_string.h"
@@ -158,21 +159,23 @@ zx_status_t Devnode::VnodeImpl::GetNodeInfoForProtocol(fs::VnodeProtocol protoco
 }
 
 zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
-  return std::visit(
-      overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
-                 [&](const Connector& connector) {
-                   if (!connector.connector.is_valid()) {
-                     return ZX_ERR_NOT_SUPPORTED;
-                   }
-                   return connector.connector->Connect(std::move(channel)).status();
-                 },
-                 [&](const Remote& remote) {
-                   if (remote.connector.is_valid()) {
-                     return remote.connector->ConnectMultiplexed(std::move(channel)).status();
-                   }
-                   return ZX_ERR_NOT_SUPPORTED;
-                 }},
-      target_);
+  return std::visit(overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
+                               [&](const Connector& connector) {
+                                 if (!connector.connector.is_valid()) {
+                                   return ZX_ERR_NOT_SUPPORTED;
+                                 }
+                                 return connector.connector->Connect(std::move(channel)).status();
+                               },
+                               [&](const Remote& remote) {
+                                 if (!remote.connector.is_valid()) {
+                                   return ZX_ERR_NOT_SUPPORTED;
+                                 }
+                                 return remote.connector
+                                     ->ConnectMultiplexed(std::move(channel), remote.multiplex_node,
+                                                          remote.multiplex_controller)
+                                     .status();
+                               }},
+                    target_);
 }
 
 bool Devnode::VnodeImpl::IsService() const {
@@ -398,6 +401,10 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
       zx::result target_clone = clone_target(target);
       if (target_clone.is_error()) {
         return target_clone.error_value();
+      }
+      if (Devnode::Remote* remote = std::get_if<Devnode::Remote>(&target_clone.value()); remote) {
+        remote->multiplex_node = AllowMultiplexingNode(class_name.value());
+        remote->multiplex_controller = AllowMultiplexingController(class_name.value());
       }
       out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(),
                                         std::move(target_clone.value()), instance_name);

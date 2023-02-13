@@ -37,10 +37,14 @@ class Devnode {
     }
   };
   struct Remote {
+    bool multiplex_node = true;
+    bool multiplex_controller = true;
     fidl::WireSharedClient<fuchsia_device_manager::DeviceController> connector;
 
     Remote Clone() {
       return Remote{
+          .multiplex_node = multiplex_node,
+          .multiplex_controller = multiplex_controller,
           .connector = connector.Clone(),
       };
     }

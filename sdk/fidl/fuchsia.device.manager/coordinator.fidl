@@ -132,11 +132,14 @@ type CompositeNodeSpecDescriptor = struct {
 
 /// Protocol for controlling devices in a devhost process from the devcoordinator
 protocol DeviceController {
-    /// Connect to the device's partial fuchsia.io/Node, its
-    /// fuchsia.device/Controller, and its native FIDL API. These protocols are
-    /// multiplexed on the provided channel.
+    /// Connect to the device's FIDL, but also include other FIDLs multiplexed on the same channel.
+    ///
+    /// + request `include_node` if this is true then include fuchsia.io/Node on the channel.
+    /// + request `include_controller` if this is true then include fuchsia.device/Controller on the channel.
     ConnectMultiplexed(resource struct {
         server zx.handle:CHANNEL;
+        include_node bool;
+        include_controller bool;
     });
 
     /// Connect to the device's fuchsia.device/Controller API.

@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+import("//build/test.gni")
+
 source_set("fidl") {
   sources = [
     "transaction.cc",
@@ -22,6 +25,24 @@ source_set("devfs_fidl") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fidl/cpp/wire",
   ]
+}
+
+test("test") {
+  output_name = "devfs-fidl-test"
+  sources = [ "test.cc" ]
+  deps = [
+    ":devfs_fidl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("tests") {
+  package_name = "devfs-fidl-test"
+  deps = [ ":test" ]
 }

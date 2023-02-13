@@ -14,16 +14,29 @@
 namespace devfs_fidl {
 
 DeviceServer::DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher)
-    : dev_(device), dispatcher_(dispatcher) {}
+    : controller_(device), dispatcher_(dispatcher) {}
 
 void DeviceServer::ConnectToController(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  Serve(server_end.TakeChannel(), &dev_);
+  Serve(server_end.TakeChannel(), &controller_);
 }
 
 void DeviceServer::ConnectToDeviceFidl(zx::channel channel) { Serve(std::move(channel), &device_); }
 
-void DeviceServer::ServeMultiplexed(zx::channel channel) {
-  Serve(std::move(channel), &multiplexed_);
+void DeviceServer::ServeMultiplexed(zx::channel channel, bool include_node,
+                                    bool include_controller) {
+  MessageDispatcher* message_dispatcher = [this, include_node, include_controller]() {
+    if (include_node) {
+      if (include_controller) {
+        return &device_and_node_and_controller_;
+      }
+      return &device_and_node_;
+    }
+    if (include_controller) {
+      return &device_and_controller_;
+    }
+    return &device_;
+  }();
+  Serve(std::move(channel), message_dispatcher);
 }
 
 void DeviceServer::CloseAllConnections(fit::callback<void()> callback) {
@@ -71,7 +84,7 @@ DeviceServer::Node::Node(DeviceServer& parent) : parent_(parent) {}
 
 void DeviceServer::Node::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {
   std::string error = "Unsupported call to " + name;
-  parent_.dev_.LogError(error.c_str());
+  parent_.controller_.LogError(error.c_str());
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -91,15 +104,18 @@ void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& c
   if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
     std::string error =
         "Unsupported clone flags=0x" + std::to_string(static_cast<uint32_t>(request->flags));
-    parent_.dev_.LogError(error.c_str());
+    parent_.controller_.LogError(error.c_str());
     request->object.Close(ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  parent_.ServeMultiplexed(request->object.TakeChannel());
+  parent_.ServeMultiplexed(request->object.TakeChannel(), true, true);
 }
 
-DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplexing)
-    : parent_(parent), multiplexing_(multiplexing) {}
+DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_node,
+                                                   bool multiplex_controller)
+    : parent_(parent),
+      multiplex_node_(multiplex_node),
+      multiplex_controller_(multiplex_controller) {}
 
 namespace {
 
@@ -118,24 +134,35 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
     fidl::internal::MessageStorageViewBase* storage_view) {
   // If the device is unbound it shouldn't receive messages so close the channel.
-  if (parent_.dev_.IsUnbound()) {
+  if (parent_.controller_.IsUnbound()) {
     txn->Close(ZX_ERR_IO_NOT_PRESENT);
     return;
   }
 
-  if (multiplexing_) {
+  if (multiplex_node_) {
     if (TryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
-    if (TryDispatch(&parent_.dev_, msg, txn) == fidl::DispatchResult::kFound) {
+  }
+
+  if (multiplex_controller_) {
+    if (TryDispatch(&parent_.controller_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
   }
 
   fidl_incoming_msg_t c_msg = std::move(msg).ReleaseToEncodedCMessage();
   auto ddk_txn = MakeDdkInternalTransaction(txn);
-  zx_status_t status = parent_.dev_.MessageOp(&c_msg, ddk_txn.Txn());
+  zx_status_t status = parent_.controller_.MessageOp(&c_msg, ddk_txn.Txn());
   if (status != ZX_OK && status != ZX_ERR_ASYNC) {
+    if (status == ZX_ERR_NOT_SUPPORTED) {
+      constexpr char kNotSupportedErrorMessage[] =
+          "Failed to send message to device: ZX_ERR_NOT_SUPPORTED\n"
+          "It is possible that this message relied on deprecated FIDL multiplexing.\n"
+          "For more information see https://fxbug.dev/112484.\n";
+      parent_.controller_.LogError(kNotSupportedErrorMessage);
+    }
+
     // Close the connection on any error
     txn->Close(status);
   }
