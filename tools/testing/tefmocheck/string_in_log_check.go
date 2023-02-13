@@ -495,6 +495,10 @@ func infraToolLogChecks() []FailureModeCheck {
 		&stringInLogCheck{
 			String: ffxutilconstants.TimeoutReachingTargetMsg,
 			Type:   swarmingOutputType,
+			// ffx might return this error and then succeed connecting to the target
+			// on a retry, so we should only check for this failure if ffx fails to
+			// connect after all retries and returns a fatal error.
+			SkipPassedTask: true,
 		},
 		// For fxbug.dev/56651.
 		// This error usually happens due to an SSH failure, so that error should take precedence.
