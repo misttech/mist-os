@@ -240,10 +240,7 @@ template("fs_test_suite") {
       ":${suite_name}-filename-tests",
       ":${suite_name}-full-tests",
       ":${suite_name}-inspect-tests",
-
-      # TODO(https://fxbug.dev/121751): Disabled due to failures
-      # on infra.
-      #":${suite_name}-link-tests",
+      ":${suite_name}-link-tests",
       ":${suite_name}-lseek-tests",
       ":${suite_name}-mmap-tests",
       ":${suite_name}-open-tests",
