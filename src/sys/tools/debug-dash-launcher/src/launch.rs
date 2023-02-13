@@ -6,9 +6,10 @@ use crate::layout;
 use crate::socket;
 use crate::trampoline;
 use fidl::{
-    endpoints::{ClientEnd, Proxy},
+    endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
     HandleBased,
 };
+use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_dash as fdash;
 use fidl_fuchsia_dash::LauncherError;
 use fidl_fuchsia_hardware_pty as pty;
@@ -19,6 +20,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
 use fuchsia_zircon as zx;
 use moniker::{RelativeMoniker, RelativeMonikerBase};
+use tracing::warn;
 
 // -s: force input from stdin
 // -i: force interactive
@@ -61,18 +63,14 @@ pub async fn launch_with_handles(
     // Get all directories needed to launch dash successfully.
     let query =
         connect_to_protocol::<fsys::RealmQueryMarker>().map_err(|_| LauncherError::RealmQuery)?;
-    let resolved_dirs = get_resolved_directories(&query, moniker).await?;
 
-    let (out_dir, runtime_dir) = if let Some(execution_dirs) = resolved_dirs.execution_dirs {
-        let out_dir = execution_dirs.out_dir.map(|d| d.into_proxy().unwrap());
-        let runtime_dir = execution_dirs.runtime_dir.map(|d| d.into_proxy().unwrap());
-        (out_dir, runtime_dir)
-    } else {
-        (None, None)
-    };
+    let moniker = RelativeMoniker::parse_str(moniker).map_err(|_| LauncherError::BadMoniker)?;
+    let moniker = moniker.to_string();
 
-    let ns_entries = resolved_dirs.ns_entries;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
+    let out_dir = open_outgoing_dir(&query, &moniker).await?;
+    let runtime_dir = open_runtime_dir(&query, &moniker).await?;
+    let exposed_dir = open_exposed_dir(&query, &moniker).await?;
+    let ns_entries = construct_namespace(&query, &moniker).await?;
 
     // In addition to tools binaries requested by the user, add the built-in binaries of the
     // debug-dash-launcher package, creating `#!resolve` trampolines for all.
@@ -172,26 +170,127 @@ fn split_pty_into_handles(
     Ok((stdin, stdout, stderr))
 }
 
-async fn get_resolved_directories(
+async fn open_outgoing_dir(
     query: &fsys::RealmQueryProxy,
     moniker: &str,
-) -> Result<Box<fsys::ResolvedDirectories>, LauncherError> {
-    let moniker = RelativeMoniker::parse_str(moniker).map_err(|_| LauncherError::BadMoniker)?;
-    let moniker = moniker.to_string();
-
-    let resolved_dirs = query
-        .get_instance_directories(&moniker)
+) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    let result = query
+        .open(
+            &moniker,
+            fsys::OpenDirType::OutgoingDir,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
         .await
-        .map_err(|_| LauncherError::RealmQuery)?
-        .map_err(|e| {
-            if e == fsys::RealmQueryError::InstanceNotFound {
-                LauncherError::InstanceNotFound
-            } else {
-                LauncherError::RealmQuery
-            }
+        .map_err(|error| {
+            warn!(%moniker, %error, "FIDL call failed to open outgoing dir");
+            LauncherError::RealmQuery
         })?;
+    match result {
+        Ok(()) => Ok(Some(dir)),
+        Err(fsys::OpenError::InstanceNotRunning) | Err(fsys::OpenError::NoSuchDir) => Ok(None),
+        Err(fsys::OpenError::BadMoniker) => Err(LauncherError::BadMoniker),
+        Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
+        Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
+        Err(error) => {
+            warn!(%moniker, ?error, "RealmQuery returned error opening outgoing dir");
+            Err(LauncherError::RealmQuery)
+        }
+    }
+}
 
-    resolved_dirs.ok_or(LauncherError::InstanceNotResolved)
+async fn open_runtime_dir(
+    query: &fsys::RealmQueryProxy,
+    moniker: &str,
+) -> Result<Option<fio::DirectoryProxy>, LauncherError> {
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    let result = query
+        .open(
+            &moniker,
+            fsys::OpenDirType::RuntimeDir,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .map_err(|error| {
+            warn!(%moniker, %error, "FIDL call failed to open runtime dir");
+            LauncherError::RealmQuery
+        })?;
+    match result {
+        Ok(()) => Ok(Some(dir)),
+        Err(fsys::OpenError::InstanceNotRunning) | Err(fsys::OpenError::NoSuchDir) => Ok(None),
+        Err(fsys::OpenError::BadMoniker) => Err(LauncherError::BadMoniker),
+        Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
+        Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
+        Err(error) => {
+            warn!(%moniker, ?error, "RealmQuery returned error opening runtime dir");
+            Err(LauncherError::RealmQuery)
+        }
+    }
+}
+
+async fn open_exposed_dir(
+    query: &fsys::RealmQueryProxy,
+    moniker: &str,
+) -> Result<fio::DirectoryProxy, LauncherError> {
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = ServerEnd::new(server_end.into_channel());
+    let result = query
+        .open(
+            &moniker,
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .map_err(|error| {
+            warn!(%moniker, %error, "FIDL call failed to open exposed dir");
+            LauncherError::RealmQuery
+        })?;
+    match result {
+        Ok(()) => Ok(dir),
+        Err(fsys::OpenError::BadMoniker) => Err(LauncherError::BadMoniker),
+        Err(fsys::OpenError::InstanceNotResolved) => Err(LauncherError::InstanceNotResolved),
+        Err(fsys::OpenError::InstanceNotFound) => Err(LauncherError::InstanceNotFound),
+        Err(error) => {
+            warn!(%moniker, ?error, "RealmQuery returned error opening exposed dir");
+            Err(LauncherError::RealmQuery)
+        }
+    }
+}
+
+async fn construct_namespace(
+    query: &fsys::RealmQueryProxy,
+    relative_moniker: &str,
+) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, LauncherError> {
+    let result = query
+        .construct_namespace(&relative_moniker)
+        .await
+        .map_err(|_| LauncherError::RealmQuery)?;
+    match result {
+        Ok(ns_entries) => Ok(ns_entries),
+        Err(fsys::ConstructNamespaceError::BadMoniker) => Err(LauncherError::BadMoniker),
+        Err(fsys::ConstructNamespaceError::InstanceNotResolved) => {
+            Err(LauncherError::InstanceNotResolved)
+        }
+        Err(fsys::ConstructNamespaceError::InstanceNotFound) => {
+            Err(LauncherError::InstanceNotFound)
+        }
+        Err(_) => Err(LauncherError::RealmQuery),
+    }
 }
 
 fn create_handle_infos(
@@ -270,18 +369,14 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::StreamExt;
 
-    fn serve_realm_query(
-        mut result: fsys::RealmQueryGetInstanceDirectoriesResult,
-    ) -> fsys::RealmQueryProxy {
+    fn serve_realm_query(mut result: fsys::RealmQueryOpenResult) -> fsys::RealmQueryProxy {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
         fasync::Task::spawn(async move {
             let mut stream = server_end.into_stream().unwrap();
             let request = stream.next().await.unwrap().unwrap();
             let (moniker, responder) = match request {
-                fsys::RealmQueryRequest::GetInstanceDirectories { moniker, responder } => {
-                    (moniker, responder)
-                }
+                fsys::RealmQueryRequest::Open { moniker, responder, .. } => (moniker, responder),
                 _ => panic!("Unexpected RealmQueryRequest"),
             };
             assert_eq!(moniker, ".");
@@ -292,16 +387,34 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn open_success() {
+        let query = serve_realm_query(Ok(()));
+        open_exposed_dir(&query, ".").await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn instance_not_running() {
+        let query = serve_realm_query(Err(fsys::OpenError::InstanceNotRunning));
+        assert!(open_outgoing_dir(&query, ".").await.unwrap().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn no_such_dir() {
+        let query = serve_realm_query(Err(fsys::OpenError::NoSuchDir));
+        assert!(open_runtime_dir(&query, ".").await.unwrap().is_none());
+    }
+
+    #[fuchsia::test]
     async fn error_instance_unresolved() {
-        let query = serve_realm_query(Ok(None));
-        let error = get_resolved_directories(&query, ".").await.unwrap_err();
+        let query = serve_realm_query(Err(fsys::OpenError::InstanceNotResolved));
+        let error = open_exposed_dir(&query, ".").await.unwrap_err();
         assert_eq!(error, LauncherError::InstanceNotResolved);
     }
 
     #[fuchsia::test]
     async fn error_instance_not_found() {
-        let query = serve_realm_query(Err(fsys::RealmQueryError::InstanceNotFound));
-        let error = get_resolved_directories(&query, ".").await.unwrap_err();
+        let query = serve_realm_query(Err(fsys::OpenError::InstanceNotFound));
+        let error = open_exposed_dir(&query, ".").await.unwrap_err();
         assert_eq!(error, LauncherError::InstanceNotFound);
     }
 }

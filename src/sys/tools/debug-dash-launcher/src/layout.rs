@@ -32,6 +32,7 @@ pub fn nest_all_instance_dirs(
     tools_pkg_dir: Option<fio::DirectoryProxy>,
 ) -> Vec<fproc::NameInfo> {
     let mut name_infos = vec![];
+
     name_infos.push(to_name_info("/exposed", exposed_dir));
     name_infos.push(to_name_info("/svc", svc_dir));
 
