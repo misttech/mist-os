@@ -289,7 +289,6 @@ mod tests {
     use crate::fs::fuchsia::create_fuchsia_pipe;
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
-    use fidl::SocketOpts as ZirconSocketOpts;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
     use syncio::Zxio;
@@ -297,7 +296,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_vsock_socket() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let (fs1, fs2) = fidl::Socket::create(ZirconSocketOpts::STREAM).unwrap();
+        let (fs1, fs2) = fidl::Socket::create_stream();
         const VSOCK_PORT: u32 = 5555;
 
         let listen_socket =
@@ -346,7 +345,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_vsock_write_while_read() {
         let (kernel, current_task) = create_kernel_and_task();
-        let (fs1, fs2) = fidl::Socket::create(ZirconSocketOpts::STREAM).unwrap();
+        let (fs1, fs2) = fidl::Socket::create_stream();
         let socket =
             Socket::new(SocketDomain::Vsock, SocketType::Stream, SocketProtocol::default())
                 .expect("Failed to create socket.");

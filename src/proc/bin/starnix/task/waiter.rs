@@ -519,7 +519,7 @@ mod tests {
         static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
 
         let (_kernel, current_task) = create_kernel_and_task();
-        let (local_socket, remote_socket) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (local_socket, remote_socket) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, remote_socket, OpenFlags::RDWR).unwrap();
 
         const MEM_SIZE: usize = 1024;
