@@ -4,7 +4,6 @@
 
 #include "devfs.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device.fs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/cpp/wait.h>

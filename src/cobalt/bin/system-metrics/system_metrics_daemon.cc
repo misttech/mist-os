@@ -6,7 +6,6 @@
 // on a regular basis.
 #include "src/cobalt/bin/system-metrics/system_metrics_daemon.h"
 
-#include <fcntl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/sys/inspect/cpp/component.h>

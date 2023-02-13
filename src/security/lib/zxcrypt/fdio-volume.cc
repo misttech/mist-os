@@ -5,7 +5,6 @@
 #include "src/security/lib/zxcrypt/fdio-volume.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block.encrypted/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>

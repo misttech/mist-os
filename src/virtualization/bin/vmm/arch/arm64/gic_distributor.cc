@@ -5,7 +5,6 @@
 #include "src/virtualization/bin/vmm/arch/arm64/gic_distributor.h"
 
 #include <endian.h>
-#include <fcntl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>

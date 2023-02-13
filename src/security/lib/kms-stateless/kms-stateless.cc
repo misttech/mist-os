@@ -4,7 +4,6 @@
 
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 
-#include <fcntl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/watcher.h>

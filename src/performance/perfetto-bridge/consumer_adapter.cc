@@ -4,7 +4,6 @@
 
 #include "src/performance/perfetto-bridge/consumer_adapter.h"
 
-#include <fcntl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fit/function.h>

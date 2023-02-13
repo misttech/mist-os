@@ -4,7 +4,6 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
-#include <fcntl.h>
 #include <lib/zx/channel.h>
 #include <poll.h>
 

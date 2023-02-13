@@ -4,7 +4,6 @@
 
 #include "src/storage/minfs/lazy_reader.h"
 
-#include <fcntl.h>
 #include <lib/fit/defer.h>
 
 #include <gtest/gtest.h>

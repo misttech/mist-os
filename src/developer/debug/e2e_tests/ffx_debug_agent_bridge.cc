@@ -4,7 +4,6 @@
 
 #include "src/developer/debug/e2e_tests/ffx_debug_agent_bridge.h"
 
-#include <fcntl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
 #include <string.h>

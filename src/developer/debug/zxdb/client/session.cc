@@ -5,7 +5,6 @@
 #include "src/developer/debug/zxdb/client/session.h"
 
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <ifaddrs.h>
 #include <inttypes.h>
 #include <netdb.h>

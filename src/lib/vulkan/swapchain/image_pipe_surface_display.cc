@@ -6,7 +6,6 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>

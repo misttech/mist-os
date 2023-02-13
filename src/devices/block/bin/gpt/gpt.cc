@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <ctype.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <getopt.h>

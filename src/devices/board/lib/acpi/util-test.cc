@@ -4,7 +4,6 @@
 
 #include "src/devices/board/lib/acpi/util.h"
 
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -4,7 +4,6 @@
 
 #include "osboot.h"
 
-#include <fcntl.h>
 #include <lib/efi/testing/mock_simple_text_input.h>
 #include <lib/efi/testing/stub_boot_services.h>
 #include <lib/efi/testing/stub_runtime_services.h>

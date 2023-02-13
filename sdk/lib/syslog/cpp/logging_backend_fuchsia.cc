@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fcntl.h>
 #include <fuchsia/diagnostics/stream/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>

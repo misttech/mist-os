@@ -4,7 +4,6 @@
 
 #include <ctype.h>
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/fit/defer.h>
 #include <stdio.h>

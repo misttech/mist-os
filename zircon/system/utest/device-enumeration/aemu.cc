@@ -5,7 +5,6 @@
 #include "zircon/system/utest/device-enumeration/aemu.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>

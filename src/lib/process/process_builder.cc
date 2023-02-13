@@ -4,7 +4,6 @@
 
 #include "src/lib/process/process_builder.h"
 
-#include <fcntl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>

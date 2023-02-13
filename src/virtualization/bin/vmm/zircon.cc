@@ -4,7 +4,6 @@
 
 #include "src/virtualization/bin/vmm/zircon.h"
 
-#include <fcntl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <lib/fdio/fd.h>
 #include <lib/stdcompat/span.h>

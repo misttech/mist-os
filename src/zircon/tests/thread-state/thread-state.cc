@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

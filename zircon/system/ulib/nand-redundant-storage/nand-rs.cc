@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <lib/cksum.h>
 #include <lib/mtd/nand-interface.h>
 #include <lib/nand-redundant-storage/nand-redundant-storage-header.h>

@@ -5,7 +5,6 @@
 #include "sata.h"
 
 #include <byteswap.h>
-#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

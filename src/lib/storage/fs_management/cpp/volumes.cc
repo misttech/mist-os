@@ -4,7 +4,6 @@
 
 #include "src/lib/storage/fs_management/cpp/volumes.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/markers.h>

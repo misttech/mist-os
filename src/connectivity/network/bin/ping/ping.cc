@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <lib/fit/defer.h>
 #include <netdb.h>
 #include <netinet/icmp6.h>

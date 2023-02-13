@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/component/incoming/cpp/protocol.h>

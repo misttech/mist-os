@@ -4,7 +4,6 @@
 
 #include "src/sys/appmgr/namespace_builder.h"
 
-#include <fcntl.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

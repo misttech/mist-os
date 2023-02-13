@@ -4,7 +4,6 @@
 
 #include "src/storage/fshost/fxfs.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.component/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire_types.h>

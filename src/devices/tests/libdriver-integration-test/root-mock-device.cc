@@ -4,7 +4,6 @@
 
 #include "root-mock-device.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fuchsia/device/cpp/fidl.h>
 #include <fuchsia/device/test/cpp/fidl.h>

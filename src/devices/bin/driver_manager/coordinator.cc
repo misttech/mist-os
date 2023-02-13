@@ -6,7 +6,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>

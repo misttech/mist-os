@@ -5,7 +5,6 @@
 #include "zircon_device.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.intel.hda/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/client.h>

@@ -4,7 +4,6 @@
 
 #include "zbi-test-entry.h"
 
-#include <fcntl.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/items/bootfs.h>

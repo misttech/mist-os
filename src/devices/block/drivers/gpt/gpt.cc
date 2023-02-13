@@ -5,7 +5,6 @@
 #include "gpt.h"
 
 #include <assert.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/cksum.h>

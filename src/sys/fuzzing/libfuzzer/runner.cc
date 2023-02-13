@@ -4,7 +4,6 @@
 
 #include "src/sys/fuzzing/libfuzzer/runner.h"
 
-#include <fcntl.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
 #include <lib/fpromise/single_threaded_executor.h>

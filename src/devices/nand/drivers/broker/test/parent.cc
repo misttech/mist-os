@@ -4,7 +4,6 @@
 
 #include "parent.h"
 
-#include <fcntl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <string.h>

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fidl.service.test/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <fuchsia/camera/cpp/fidl.h>
 #include <fuchsia/hardware/camera/cpp/fidl.h>

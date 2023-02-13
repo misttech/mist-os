@@ -5,7 +5,6 @@
 // General fdio_spawn tests
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

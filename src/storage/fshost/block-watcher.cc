@@ -4,7 +4,6 @@
 
 #include "block-watcher.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <inttypes.h>

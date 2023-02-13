@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fcntl.h>
 #include <getopt.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

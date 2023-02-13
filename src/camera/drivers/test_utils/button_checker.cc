@@ -4,7 +4,6 @@
 
 #include "button_checker.h"
 
-#include <fcntl.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>

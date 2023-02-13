@@ -4,7 +4,6 @@
 
 #include "src/proc/tests/chromiumos/syscalls/task_test.h"
 
-#include <fcntl.h>
 #include <sched.h>
 #include <strings.h>
 #include <sys/mman.h>

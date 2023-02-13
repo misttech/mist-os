@@ -4,7 +4,6 @@
 
 #include "network_device_client.h"
 
-#include <fcntl.h>
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fpromise/bridge.h>

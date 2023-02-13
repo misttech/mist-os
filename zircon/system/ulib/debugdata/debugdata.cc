@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/debugdata/debugdata.h>
 #include <lib/fdio/io.h>

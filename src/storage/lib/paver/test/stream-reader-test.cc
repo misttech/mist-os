@@ -4,7 +4,6 @@
 
 #include "src/storage/lib/paver/stream-reader.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>

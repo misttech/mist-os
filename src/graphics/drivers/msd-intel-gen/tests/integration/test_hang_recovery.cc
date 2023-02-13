@@ -4,7 +4,6 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
-#include <fcntl.h>
 #include <lib/fdio/directory.h>
 #include <lib/zx/channel.h>
 

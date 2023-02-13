@@ -4,7 +4,6 @@
 
 #include "src/virtualization/bin/termina_guest_manager/block_devices.h"
 
-#include <fcntl.h>
 #include <fuchsia/hardware/block/partition/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>

@@ -4,7 +4,6 @@
 
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher_impl.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>

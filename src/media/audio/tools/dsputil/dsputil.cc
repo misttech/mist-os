@@ -4,7 +4,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <getopt.h>
 #include <lib/component/incoming/cpp/protocol.h>

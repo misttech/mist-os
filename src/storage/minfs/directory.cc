@@ -4,7 +4,6 @@
 
 #include "src/storage/minfs/directory.h"
 
-#include <fcntl.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdio.h>

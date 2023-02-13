@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fcntl.h>
 #include <lib/stdcompat/variant.h>
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/syslog/structured_backend/fuchsia_syslog.h>

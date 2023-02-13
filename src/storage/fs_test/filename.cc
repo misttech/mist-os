@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>

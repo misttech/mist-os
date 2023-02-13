@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <ctype.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/cksum.h>
 #include <lib/component/incoming/cpp/protocol.h>

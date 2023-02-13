@@ -5,7 +5,6 @@
 #include "src/lib/storage/fs_management/cpp/mount.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.component/cpp/wire.h>
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>

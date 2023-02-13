@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <glob.h>
 #include <inttypes.h>
 #include <lib/fit/defer.h>

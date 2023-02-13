@@ -4,7 +4,6 @@
 
 #include <endian.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>

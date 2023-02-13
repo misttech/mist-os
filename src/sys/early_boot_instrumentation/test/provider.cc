@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/markers.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.debugdata/cpp/wire.h>

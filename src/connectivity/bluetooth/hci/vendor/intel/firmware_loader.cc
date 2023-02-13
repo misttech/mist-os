@@ -5,7 +5,6 @@
 #include "firmware_loader.h"
 
 #include <endian.h>
-#include <fcntl.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>

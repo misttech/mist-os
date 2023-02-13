@@ -6,7 +6,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>

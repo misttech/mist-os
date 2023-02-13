@@ -4,7 +4,6 @@
 
 #include "src/sys/sysmgr/package_updating_loader.h"
 
-#include <fcntl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>

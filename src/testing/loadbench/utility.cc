@@ -4,7 +4,6 @@
 
 #include "utility.h"
 
-#include <fcntl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/profile.h>

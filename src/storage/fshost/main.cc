@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <getopt.h>

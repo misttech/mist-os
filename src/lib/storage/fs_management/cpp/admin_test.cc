@@ -4,7 +4,6 @@
 
 #include "src/lib/storage/fs_management/cpp/admin.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/directory.h>
 #include <lib/zx/channel.h>

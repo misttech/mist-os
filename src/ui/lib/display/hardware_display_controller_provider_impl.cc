@@ -4,7 +4,6 @@
 
 #include "src/ui/lib/display/hardware_display_controller_provider_impl.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>

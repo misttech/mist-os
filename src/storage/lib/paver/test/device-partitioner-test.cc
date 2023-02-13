@@ -5,7 +5,6 @@
 #include "src/storage/lib/paver/device-partitioner.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/abr/util.h>

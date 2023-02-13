@@ -5,7 +5,6 @@
 #include "blktest.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>

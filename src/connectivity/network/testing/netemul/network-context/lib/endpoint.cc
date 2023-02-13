@@ -4,7 +4,6 @@
 
 #include "endpoint.h"
 
-#include <fcntl.h>
 #include <fuchsia/netemul/internal/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

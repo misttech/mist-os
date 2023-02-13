@@ -4,7 +4,6 @@
 
 #include "src/sys/appmgr/realm.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>

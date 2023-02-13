@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/defer.h>

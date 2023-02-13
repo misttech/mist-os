@@ -5,7 +5,6 @@
 #include "radar-proxy.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 #include <lib/fdio/cpp/caller.h>

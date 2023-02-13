@@ -4,7 +4,6 @@
 
 #include "disk_inspector/inspector_transaction_handler.h"
 
-#include <fcntl.h>
 #include <lib/fdio/fdio.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>

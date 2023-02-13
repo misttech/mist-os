@@ -5,7 +5,6 @@
 #include "src/developer/memory/monitor/monitor.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/default.h>

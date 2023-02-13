@@ -5,7 +5,6 @@
 #include "resources.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>

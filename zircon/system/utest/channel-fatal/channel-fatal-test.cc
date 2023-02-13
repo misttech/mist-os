@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/process.h>

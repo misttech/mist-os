@@ -4,7 +4,6 @@
 
 #include "src/security/lib/zxcrypt/volume.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <inttypes.h>

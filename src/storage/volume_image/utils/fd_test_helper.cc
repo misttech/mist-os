@@ -4,7 +4,6 @@
 
 #include "src/storage/volume_image/utils/fd_test_helper.h"
 
-#include <fcntl.h>
 #include <lib/fpromise/result.h>
 #include <unistd.h>
 

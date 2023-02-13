@@ -5,7 +5,6 @@
 #include "surface/surface_fuchsia_fb.h"
 
 #include <fbl/unique_fd.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>

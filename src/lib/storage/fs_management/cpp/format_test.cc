@@ -4,7 +4,6 @@
 
 #include "src/lib/storage/fs_management/cpp/format.h"
 
-#include <fcntl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/vmo.h>
 

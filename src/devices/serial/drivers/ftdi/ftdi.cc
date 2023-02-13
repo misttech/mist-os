@@ -4,7 +4,6 @@
 
 #include "ftdi.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fuchsia/hardware/serialimpl/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>

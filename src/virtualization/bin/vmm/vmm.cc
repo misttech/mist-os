@@ -5,7 +5,6 @@
 #include "src/virtualization/bin/vmm/vmm.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/async/cpp/task.h>

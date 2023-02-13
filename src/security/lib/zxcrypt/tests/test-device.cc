@@ -6,7 +6,6 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/fdio/cpp/caller.h>

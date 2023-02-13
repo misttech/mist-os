@@ -4,7 +4,6 @@
 
 #include "factory_reset.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fuchsia/fshost/cpp/fidl_test_base.h>

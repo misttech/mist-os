@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/usb-virtual-bus/host.h"
 
-#include <fcntl.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>

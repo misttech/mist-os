@@ -4,7 +4,6 @@
 
 #include "src/virtualization/bin/vmm/guest.h"
 
-#include <fcntl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>

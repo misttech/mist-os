@@ -4,7 +4,6 @@
 
 #include "fs-manager.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.feedback/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>

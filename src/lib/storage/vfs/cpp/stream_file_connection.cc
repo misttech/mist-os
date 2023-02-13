@@ -4,7 +4,6 @@
 
 #include "src/lib/storage/vfs/cpp/stream_file_connection.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/vfs.h>

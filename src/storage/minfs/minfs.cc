@@ -4,7 +4,6 @@
 
 #include "src/storage/minfs/minfs.h"
 
-#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <lib/stdcompat/span.h>

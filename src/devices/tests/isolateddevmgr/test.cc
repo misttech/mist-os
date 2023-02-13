@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device.manager.test/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>

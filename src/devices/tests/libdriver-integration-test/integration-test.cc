@@ -4,7 +4,6 @@
 
 #include "integration-test.h"
 
-#include <fcntl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fdio/directory.h>

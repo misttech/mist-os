@@ -4,7 +4,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/spi/spi.h>
 #include <stdio.h>

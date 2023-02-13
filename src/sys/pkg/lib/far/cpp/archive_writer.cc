@@ -4,7 +4,6 @@
 
 #include "src/sys/pkg/lib/far/cpp/archive_writer.h"
 
-#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

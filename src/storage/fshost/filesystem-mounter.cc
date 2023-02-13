@@ -5,7 +5,6 @@
 #include "filesystem-mounter.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire_types.h>

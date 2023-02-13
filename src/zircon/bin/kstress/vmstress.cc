@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <lib/fit/defer.h>

@@ -4,7 +4,6 @@
 
 #include "wav-source.h"
 
-#include <fcntl.h>
 #include <lib/fdio/io.h>
 #include <lib/fit/defer.h>
 #include <stdio.h>

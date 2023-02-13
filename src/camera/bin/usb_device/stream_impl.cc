@@ -4,7 +4,6 @@
 
 #include "src/camera/bin/usb_device/stream_impl.h"
 
-#include <fcntl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
