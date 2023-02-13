@@ -4,10 +4,10 @@
 {
     actions: [
         {
-            include: "./loopback_isolated_tcp_fin_wait_skip.json5",
+            include: "./loopback_isolated_skip.json5",
         },
         {
-            include: "./loopback_isolated_tcp_linger_timeout_skip.json5",
+            include: "./loopback_isolated_tcp_fin_wait_skip.json5",
         },
     ],
 }

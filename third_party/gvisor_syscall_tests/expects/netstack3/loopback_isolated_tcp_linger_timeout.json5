@@ -1,0 +1,23 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            include: "../loopback_isolated_tcp_linger_timeout_filter.json5",
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Currently NS3 can't run the Linger2Timeout suite.
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
+            ],
+        },
+    ],
+}

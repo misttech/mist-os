@@ -159,9 +159,4 @@ void FilterTestsForLoopbackIsolatedTarget(TestMap& tests) {
   SkipTestsRunByLoopbackIsolatedTcpLingerTimeoutTarget(tests);
 }
 
-void FilterTestsForLoopbackIsolatedTcpLingerTimeoutTarget(TestMap& tests) {
-  SkipTestsRunByLoopbackIsolatedTarget(tests);
-  SkipTestsRunByLoopbackIsolatedTcpFinWaitTarget(tests);
-}
-
 }  // namespace netstack_syscall_test
