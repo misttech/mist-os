@@ -53,9 +53,6 @@ class IsolatedDevmgr {
   // may be used with openat() and fdio_watch_directory().
   const fbl::unique_fd& devfs_root() const { return devfs_root_; }
 
-  // Expose devfs in component outgoing directory.
-  zx_status_t AddDevfsToOutgoingDir(vfs::PseudoDir* outgoing_root_dir);
-
  private:
   std::unique_ptr<component_testing::RealmRoot> realm_;
 

@@ -39,19 +39,6 @@ std::string PathToUrl(std::string_view path) {
 }  // namespace
 
 __EXPORT
-zx_status_t IsolatedDevmgr::AddDevfsToOutgoingDir(vfs::PseudoDir* outgoing_root_dir) {
-  zx::channel client;
-  if (zx_status_t status = fdio_fd_clone(devfs_root_.get(), client.reset_and_get_address());
-      status != ZX_OK) {
-    return status;
-  }
-  // Add devfs to out directory.
-  auto devfs_out = std::make_unique<vfs::RemoteDir>(std::move(client));
-  outgoing_root_dir->AddEntry("dev", std::move(devfs_out));
-  return ZX_OK;
-}
-
-__EXPORT
 devmgr_launcher::Args IsolatedDevmgr::DefaultArgs() {
   devmgr_launcher::Args args;
   args.root_device_driver = "/boot/driver/sysdev.so";
