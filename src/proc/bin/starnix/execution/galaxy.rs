@@ -147,7 +147,7 @@ pub struct Galaxy {
     pub root_fs: Arc<FsContext>,
 
     /// The system task to execute action as the system.
-    pub system_task: CurrentTask,
+    pub system_task: Arc<CurrentTask>,
 
     /// Inspect node holding information about the state of the galaxy.
     _node: inspect::Node,
@@ -193,7 +193,8 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
     let mut init_task = create_init_task(&kernel, &config)?;
     let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
     init_task.set_fs(fs_context.clone());
-    let system_task = create_task(&kernel, Some(fs_context), "kthread", Credentials::root())?;
+    let system_task =
+        Arc::new(create_task(&kernel, Some(fs_context), "kthread", Credentials::root())?);
 
     mount_filesystems(&system_task, &config, &pkg_dir_proxy)?;
 

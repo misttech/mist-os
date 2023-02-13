@@ -8,7 +8,6 @@ use std::cmp;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::auth::*;
@@ -49,14 +48,10 @@ pub struct CurrentTask {
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
     pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
-
-    /// Exists only to prevent Sync from being implemented, since CurrentTask should only be used
-    /// on the thread that runs the task. impl !Sync is a compiler error, the message is confusing
-    /// but I think it might be nightly only.
-    _not_sync: std::marker::PhantomData<std::cell::UnsafeCell<()>>,
 }
 
-type SyscallRestartFunc = dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send;
+type SyscallRestartFunc =
+    dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
 impl std::ops::Drop for CurrentTask {
     fn drop(&mut self) {
@@ -714,7 +709,6 @@ impl CurrentTask {
             dt_debug_address: None,
             registers: RegisterState::default(),
             syscall_restart_func: None,
-            _not_sync: PhantomData,
         }
     }
 
@@ -728,7 +722,7 @@ impl CurrentTask {
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
         &mut self,
-        f: impl FnOnce(&mut CurrentTask) -> Result<R, Errno> + Send + 'static,
+        f: impl FnOnce(&mut CurrentTask) -> Result<R, Errno> + Send + Sync + 'static,
     ) {
         self.syscall_restart_func = Some(Box::new(|current_task| Ok(f(current_task)?.into())));
     }
