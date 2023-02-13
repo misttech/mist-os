@@ -2647,7 +2647,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:128
+From //zircon/kernel/params.gni:138
 
 ### enable_mdns_trace
 
@@ -3693,7 +3693,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5487,6 +5487,19 @@ From //products/common/bringup.gni:39
 **Overridden from the default:** `[]`
 
 From //build/packages/prebuilt_package_with_flavors.gni:29
+
+### page_compression_enabled
+
+TODO(fxbug.dev/60238): For use while the related RFC is in iterate and can
+be removed once the RFC is finalized.
+Controls kernel page compression and the linking and instantiation of its
+dependencies.
+Defaults to true only when the kernel_debug_level is high enough to enable
+in testing but disable for production.
+
+**Current value (from the default):** `true`
+
+From //zircon/kernel/params.gni:130
 
 ### partitions_config_contents
 
@@ -7854,7 +7867,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
