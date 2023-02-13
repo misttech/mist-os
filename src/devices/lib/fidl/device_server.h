@@ -39,19 +39,6 @@ class DeviceServer {
  private:
   void Serve(zx::channel channel, fidl::internal::IncomingMessageDispatcher* impl);
 
-  class Node : public fidl::testing::WireTestBase<fuchsia_io::Node> {
-   public:
-    explicit Node(DeviceServer& parent);
-
-   private:
-    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override;
-    void Close(CloseCompleter::Sync& completer) override;
-    void Query(QueryCompleter::Sync& completer) override;
-    void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override;
-
-    DeviceServer& parent_;
-  };
-
   class MessageDispatcher : public fidl::internal::IncomingMessageDispatcher {
    public:
     MessageDispatcher(DeviceServer& parent, bool multiplex_node, bool multiplex_controller);
@@ -60,6 +47,20 @@ class DeviceServer {
     void dispatch_message(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
                           fidl::internal::MessageStorageViewBase* storage_view) override;
 
+    class Node : public fidl::testing::WireTestBase<fuchsia_io::Node> {
+     public:
+      explicit Node(MessageDispatcher& parent);
+
+     private:
+      void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override;
+      void Close(CloseCompleter::Sync& completer) override;
+      void Query(QueryCompleter::Sync& completer) override;
+      void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override;
+
+      MessageDispatcher& parent_;
+    };
+
+    Node node_{*this};
     DeviceServer& parent_;
     const bool multiplex_node_;
     const bool multiplex_controller_;
@@ -68,7 +69,6 @@ class DeviceServer {
   DeviceInterface& controller_;
   async_dispatcher_t* const dispatcher_;
 
-  Node node_{*this};
   MessageDispatcher device_{*this, false, false};
   MessageDispatcher device_and_node_{*this, true, false};
   MessageDispatcher device_and_controller_{*this, false, true};

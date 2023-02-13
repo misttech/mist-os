@@ -80,35 +80,38 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
   });
 }
 
-DeviceServer::Node::Node(DeviceServer& parent) : parent_(parent) {}
+DeviceServer::MessageDispatcher::Node::Node(MessageDispatcher& parent) : parent_(parent) {}
 
-void DeviceServer::Node::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {
+void DeviceServer::MessageDispatcher::Node::NotImplemented_(const std::string& name,
+                                                            fidl::CompleterBase& completer) {
   std::string error = "Unsupported call to " + name;
-  parent_.controller_.LogError(error.c_str());
+  parent_.parent_.controller_.LogError(error.c_str());
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void DeviceServer::Node::Close(CloseCompleter::Sync& completer) {
+void DeviceServer::MessageDispatcher::Node::Close(CloseCompleter::Sync& completer) {
   completer.ReplySuccess();
   completer.Close(ZX_OK);
 }
 
-void DeviceServer::Node::Query(QueryCompleter::Sync& completer) {
+void DeviceServer::MessageDispatcher::Node::Query(QueryCompleter::Sync& completer) {
   const std::string_view kProtocol = fuchsia_io::wire::kNodeProtocolName;
   // TODO(https://fxbug.dev/101890): avoid the const cast.
   uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
 }
 
-void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
+void DeviceServer::MessageDispatcher::Node::Clone(CloneRequestView request,
+                                                  CloneCompleter::Sync& completer) {
   if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
     std::string error =
         "Unsupported clone flags=0x" + std::to_string(static_cast<uint32_t>(request->flags));
-    parent_.controller_.LogError(error.c_str());
+    parent_.parent_.controller_.LogError(error.c_str());
     request->object.Close(ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  parent_.ServeMultiplexed(request->object.TakeChannel(), true, true);
+  parent_.parent_.ServeMultiplexed(request->object.TakeChannel(), parent_.multiplex_node_,
+                                   parent_.multiplex_controller_);
 }
 
 DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_node,
@@ -140,7 +143,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
   }
 
   if (multiplex_node_) {
-    if (TryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
+    if (TryDispatch(&node_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
   }
