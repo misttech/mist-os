@@ -25,7 +25,7 @@ pub async fn explore_cmd(
     // LifecycleController expects relative monikers only.
     let relative_moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
 
-    let (client, server) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+    let (client, server) = fidl::Socket::create_stream();
 
     let stdout = if command.is_some() { Stdout::buffered() } else { Stdout::raw()? };
 

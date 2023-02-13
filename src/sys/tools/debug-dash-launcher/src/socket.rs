@@ -124,7 +124,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn pty_forwarder() {
-        let (stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (stdio, stdio_server) = zx::Socket::create_stream();
 
         let pty = spawn_pty_forwarder(stdio_server).await.unwrap();
         let pty = pty.into_proxy().unwrap();

@@ -132,8 +132,7 @@ async fn child_args() {
             environment: None,
             ..fdecl::Child::EMPTY
         };
-        let (_, socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("Couldn't create socket");
+        let (_, socket) = zx::Socket::create_stream();
         let numbered_handles = vec![fprocess::HandleInfo { handle: socket.into_handle(), id: 0 }];
         let child_args = fcomponent::CreateChildArgs {
             numbered_handles: Some(numbered_handles),
@@ -156,8 +155,7 @@ async fn child_args() {
             environment: None,
             ..fdecl::Child::EMPTY
         };
-        let (their_socket, our_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("Couldn't create socket");
+        let (their_socket, our_socket) = zx::Socket::create_stream();
         let numbered_handles = vec![fprocess::HandleInfo {
             handle: their_socket.into_handle(),
             // Must correspond to the same Handle Id in write_startup_socket.rs.
@@ -201,8 +199,7 @@ async fn child_args() {
             environment: None,
             ..fdecl::Child::EMPTY
         };
-        let (their_socket, our_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("Couldn't create socket");
+        let (their_socket, our_socket) = zx::Socket::create_stream();
         let job =
             fuchsia_runtime::job_default().create_child_job().expect("fail to create_child_job");
         job.set_name(&CString::new("new-job-new-name").unwrap()).expect("fail to set_name");

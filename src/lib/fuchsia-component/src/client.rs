@@ -21,7 +21,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_runtime::HandleType,
-    fuchsia_zircon::{self as zx, Socket, SocketOpts},
+    fuchsia_zircon::{self as zx, Socket},
     futures::{
         future::{self, FutureExt, TryFutureExt},
         stream::{StreamExt, TryStreamExt},
@@ -779,7 +779,7 @@ impl Stdio {
         match self {
             Stdio::Inherit => Ok((None, None)),
             Stdio::MakePipe => {
-                let (local, remote) = Socket::create(SocketOpts::STREAM)?;
+                let (local, remote) = Socket::create_stream();
                 // local end is read-only
                 remote.half_close()?;
 

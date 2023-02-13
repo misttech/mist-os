@@ -100,10 +100,7 @@ fn forward_socket_to_syslog(
 }
 
 fn new_socket_bound_to_fd(fd: i32) -> (zx::Socket, fproc::HandleInfo) {
-    // TODO(fxbug.dev/118832): Socket creation can only fail if bad arguments have
-    // been provided or the system is out of memory. For now, we unwrap and assume
-    // this function is infallible.
-    let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (tx, rx) = zx::Socket::create_stream();
 
     (
         rx,
@@ -371,7 +368,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn drain_lines_splits_into_max_size_chunks() -> Result<(), Error> {
-        let (tx, rx) = create_sockets()?;
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut sender, recv) = create_mock_logger();
         let msg = get_random_string(MAX_MESSAGE_SIZE * 4);
 
@@ -394,7 +391,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn drain_lines_splits_at_newline() -> Result<(), Error> {
-        let (tx, rx) = create_sockets()?;
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut sender, recv) = create_mock_logger();
         let msg = std::iter::repeat_with(|| {
             Alphanumeric.sample_string(&mut thread_rng(), MAX_MESSAGE_SIZE - 1)
@@ -415,7 +412,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn drain_lines_writes_when_message_is_received() -> Result<(), Error> {
-        let (tx, rx) = create_sockets()?;
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut sender, mut recv) = create_mock_logger();
         let messages: Vec<String> = vec!["Hello!\n".to_owned(), "World!\n".to_owned()];
 
@@ -437,7 +434,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn drain_lines_waits_for_entire_lines() -> Result<(), Error> {
-        let (tx, rx) = create_sockets()?;
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut sender, mut recv) = create_mock_logger();
 
         let ((), ()) = try_join!(async move { drain_lines(rx, &mut sender).await }, async move {
@@ -461,7 +458,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn drain_lines_collapses_repeated_newlines() {
-        let (tx, rx) = create_sockets().unwrap();
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut sender, mut recv) = create_mock_logger();
 
         let drainer = Task::spawn(async move { drain_lines(rx, &mut sender).await });
@@ -533,10 +530,6 @@ mod tests {
 
     fn create_mock_logger() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
         mpsc::channel::<String>(20)
-    }
-
-    fn create_sockets() -> Result<(zx::Socket, zx::Socket), Error> {
-        zx::Socket::create(zx::SocketOpts::STREAM).context("Failed to create socket")
     }
 
     fn get_random_string(size: usize) -> String {

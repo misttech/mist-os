@@ -8,7 +8,7 @@ use fuchsia_zircon as zx;
 
 #[fuchsia::test]
 pub async fn unknown_tools_package() {
-    let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (_stdio, stdio_server) = zx::Socket::create_stream();
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
@@ -31,7 +31,7 @@ pub async fn unknown_tools_package() {
 
 #[fuchsia::test]
 pub async fn bad_moniker() {
-    let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (_stdio, stdio_server) = zx::Socket::create_stream();
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
@@ -52,7 +52,7 @@ pub async fn bad_moniker() {
 
 #[fuchsia::test]
 pub async fn instance_not_found() {
-    let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (_stdio, stdio_server) = zx::Socket::create_stream();
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
@@ -73,7 +73,7 @@ pub async fn instance_not_found() {
 
 #[fuchsia::test]
 pub async fn bad_url() {
-    let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (_stdio, stdio_server) = zx::Socket::create_stream();
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
