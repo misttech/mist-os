@@ -180,7 +180,7 @@ impl PagedObjectHandle {
         self.store()
             .filesystem()
             .new_transaction(
-                &[],
+                &[LockKey::object(self.handle.store().store_object_id(), self.handle.object_id())],
                 Options {
                     skip_journal_checks: false,
                     borrow_metadata_space: reservation.is_none(),

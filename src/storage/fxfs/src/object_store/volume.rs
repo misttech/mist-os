@@ -8,10 +8,10 @@ use {
         filesystem::Filesystem,
         object_store::{
             allocator::Allocator, directory::Directory, load_store_info, transaction::Options,
-            NewChildStoreOptions, ObjectDescriptor, ObjectStore,
+            LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
     },
-    anyhow::{anyhow, bail, Context, Error},
+    anyhow::{anyhow, bail, ensure, Context, Error},
     fxfs_crypto::Crypt,
     std::sync::Arc,
 };
@@ -45,9 +45,22 @@ impl RootVolume {
     ) -> Result<Arc<ObjectStore>, Error> {
         let root_store = self.filesystem.root_store();
         let store;
-        let mut transaction =
-            self.filesystem.clone().new_transaction(&[], Options::default()).await?;
+        let mut transaction = self
+            .filesystem
+            .clone()
+            .new_transaction(
+                &[LockKey::object(
+                    root_store.store_object_id(),
+                    self.volume_directory().object_id(),
+                )],
+                Options::default(),
+            )
+            .await?;
 
+        ensure!(
+            matches!(self.volume_directory().lookup(volume_name).await?, None),
+            FxfsError::AlreadyExists
+        );
         store = root_store
             .new_child_store(&mut transaction, NewChildStoreOptions { crypt, ..Default::default() })
             .await?;
@@ -180,6 +193,7 @@ mod tests {
                 allocator::Allocator,
                 directory::Directory,
                 transaction::{Options, TransactionHandler},
+                LockKey,
             },
         },
         fxfs_insecure_crypto::InsecureCrypt,
@@ -213,7 +227,10 @@ mod tests {
                 .expect("new_volume failed");
             let mut transaction = filesystem
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new transaction failed");
             let root_directory = Directory::open(&store, store.root_directory_object_id())
@@ -256,14 +273,17 @@ mod tests {
                 .await
                 .expect("new_volume failed");
             store_object_id = store.store_object_id();
+            let mut transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(store_object_id, store.root_directory_object_id())],
+                    Options::default(),
+                )
+                .await
+                .expect("new transaction failed");
             let root_directory = Directory::open(&store, store.root_directory_object_id())
                 .await
                 .expect("open failed");
-            let mut transaction = filesystem
-                .clone()
-                .new_transaction(&[], Options::default())
-                .await
-                .expect("new transaction failed");
             let handle = root_directory
                 .create_child_file(&mut transaction, "foo")
                 .await

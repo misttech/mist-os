@@ -15,7 +15,7 @@ use {
                 ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
                 Timestamp,
             },
-            transaction::{Mutation, Transaction},
+            transaction::{LockKey, Mutation, Options, Transaction},
             HandleOptions, HandleOwner, ObjectStore, ObjectStoreMutation, StoreObjectHandle,
         },
         trace_duration,
@@ -100,6 +100,56 @@ impl<S: HandleOwner> Directory<S> {
             } => Ok(Directory::new(owner.clone(), object_id)),
             ObjectItem { value: ObjectValue::None, .. } => bail!(FxfsError::NotFound),
             _ => bail!(FxfsError::NotDir),
+        }
+    }
+
+    /// Acquires a transaction with the appropriate locks to unlink |name|. Returns the transaction,
+    /// as well as the ID and type of the child.
+    ///
+    /// We need to lock |self|, but also the child when it is a directory to prevent entries being
+    /// added at the same time, while a file needs to be able to decrement the reference count.
+    pub async fn acquire_transaction_for_unlink<'a>(
+        &self,
+        extra_keys: &[LockKey],
+        name: &str,
+        borrow_metadata_space: bool,
+    ) -> Result<(Transaction<'a>, u64, ObjectDescriptor), Error> {
+        // Since we don't know the child object ID until we've looked up the child, we need to loop
+        // until we have acquired a lock on a child whose ID is the same as it was in the last
+        // iteration.
+        //
+        // Note that the returned transaction may lock more objects than is necessary (for example,
+        // if the child "foo" was first a directory, then was renamed to "bar" and a file "foo" was
+        // created, we might acquire a lock on both the parent and "bar").
+        let store = self.store();
+        let (mut child_object_id, _) = self.lookup(name).await?.ok_or(FxfsError::NotFound)?;
+        loop {
+            let mut lock_keys = vec![
+                LockKey::object(store.store_object_id(), self.object_id),
+                LockKey::object(store.store_object_id(), child_object_id),
+            ];
+            lock_keys.extend_from_slice(extra_keys);
+            let fs = store.filesystem().clone();
+            let transaction = fs
+                .new_transaction(
+                    &lock_keys,
+                    Options { borrow_metadata_space, ..Default::default() },
+                )
+                .await?;
+
+            let (object_id, object_descriptor) =
+                self.lookup(name).await?.ok_or(FxfsError::NotFound)?;
+            match object_descriptor {
+                ObjectDescriptor::File
+                | ObjectDescriptor::Directory
+                | ObjectDescriptor::Symlink => {
+                    if object_id == child_object_id {
+                        return Ok((transaction, object_id, object_descriptor));
+                    }
+                    child_object_id = object_id
+                }
+                _ => bail!(FxfsError::Inconsistent),
+            }
         }
     }
 
@@ -598,7 +648,7 @@ mod tests {
                 directory::{replace_child, Directory, ReplacedChild},
                 object_record::Timestamp,
                 transaction::{Options, TransactionHandler},
-                HandleOptions, ObjectDescriptor, ObjectStore,
+                HandleOptions, LockKey, ObjectDescriptor, ObjectStore,
             },
         },
         assert_matches::assert_matches,
@@ -689,20 +739,23 @@ mod tests {
     async fn test_delete_child() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -721,22 +774,26 @@ mod tests {
     async fn test_delete_child_with_children_fails() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let child;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
-        let child =
+        child =
             dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
         child.create_child_file(&mut transaction, "bar").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_eq!(
@@ -748,9 +805,12 @@ mod tests {
             FxfsError::NotEmpty
         );
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), child.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -761,9 +821,15 @@ mod tests {
         );
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -782,20 +848,23 @@ mod tests {
     async fn test_delete_and_reinsert_child() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -806,9 +875,12 @@ mod tests {
         );
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
@@ -823,21 +895,25 @@ mod tests {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let object_id = {
+            let dir;
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())
                 .await
                 .expect("new_transaction failed");
-            let dir =
+            dir =
                 Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
             dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
             dir.lookup("foo").await.expect("lookup failed");
 
-            let mut transaction = fs
+            transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             assert_matches!(
@@ -865,17 +941,19 @@ mod tests {
     async fn test_replace_child() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let child_dir1;
+        let child_dir2;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
-        let child_dir1 =
+        child_dir1 =
             dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        let child_dir2 =
+        child_dir2 =
             dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
         child_dir1
             .create_child_file(&mut transaction, "foo")
@@ -883,9 +961,15 @@ mod tests {
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -905,17 +989,19 @@ mod tests {
     async fn test_replace_child_overwrites_dst() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let child_dir1;
+        let child_dir2;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
-        let child_dir1 =
+        child_dir1 =
             dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        let child_dir2 =
+        child_dir2 =
             dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
         let foo = child_dir1
             .create_child_file(&mut transaction, "foo")
@@ -937,9 +1023,15 @@ mod tests {
         std::mem::drop(bar);
         std::mem::drop(foo);
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -969,17 +1061,19 @@ mod tests {
     async fn test_replace_child_fails_if_would_overwrite_nonempty_dir() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let child_dir1;
+        let child_dir2;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
-        let child_dir1 =
+        child_dir1 =
             dir.create_child_dir(&mut transaction, "dir1").await.expect("create_child_dir failed");
-        let child_dir2 =
+        child_dir2 =
             dir.create_child_dir(&mut transaction, "dir2").await.expect("create_child_dir failed");
         child_dir1
             .create_child_file(&mut transaction, "foo")
@@ -995,9 +1089,15 @@ mod tests {
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_eq!(
@@ -1015,19 +1115,22 @@ mod tests {
     async fn test_replace_child_within_dir() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
         dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(
@@ -1047,13 +1150,13 @@ mod tests {
     async fn test_iterate() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
         let _cat =
             dir.create_child_file(&mut transaction, "cat").await.expect("create_child_file failed");
         let _ball = dir
@@ -1067,9 +1170,12 @@ mod tests {
         let _dog =
             dir.create_child_file(&mut transaction, "dog").await.expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, None, (&dir, "apple"))
@@ -1092,22 +1198,26 @@ mod tests {
     async fn test_sub_dir_count() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let child_dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
-        let child_dir =
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        child_dir =
             dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
         assert_eq!(dir.get_properties().await.expect("get_properties failed").sub_dirs, 1);
 
         // Moving within the same directory should not change the sub_dir count.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, Some((&dir, "foo")), (&dir, "bar"))
@@ -1119,12 +1229,15 @@ mod tests {
         assert_eq!(child_dir.get_properties().await.expect("get_properties failed").sub_dirs, 0);
 
         // Moving between two different directories should update source and destination.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), child_dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
-        let _second_child = child_dir
+        let second_child = child_dir
             .create_child_dir(&mut transaction, "baz")
             .await
             .expect("create_child_dir failed");
@@ -1132,9 +1245,15 @@ mod tests {
 
         assert_eq!(child_dir.get_properties().await.expect("get_properties failed").sub_dirs, 1);
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, Some((&child_dir, "baz")), (&dir, "foo"))
@@ -1146,9 +1265,15 @@ mod tests {
         assert_eq!(child_dir.get_properties().await.expect("get_properties failed").sub_dirs, 0);
 
         // Moving over a directory.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), second_child.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, Some((&dir, "bar")), (&dir, "foo"))
@@ -1159,9 +1284,15 @@ mod tests {
         assert_eq!(dir.get_properties().await.expect("get_properties failed").sub_dirs, 1);
 
         // Unlinking a directory.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, None, (&dir, "foo")).await.expect("replace_child failed");
@@ -1175,14 +1306,15 @@ mod tests {
     async fn test_deleted_dir() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
-        dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        let child =
+            dir.create_child_dir(&mut transaction, "foo").await.expect("create_child_dir failed");
         dir.create_child_dir(&mut transaction, "bar").await.expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
 
@@ -1190,9 +1322,15 @@ mod tests {
         dir.store().flush().await.expect("flush failed");
 
         // Unlink the child directory.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[
+                    LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
+                    LockKey::object(fs.root_store().store_object_id(), child.object_id()),
+                ],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         replace_child(&mut transaction, None, (&dir, "foo")).await.expect("replace_child failed");
@@ -1205,9 +1343,12 @@ mod tests {
         assert!(dir.lookup("bar").await.expect("lookup failed").is_some());
 
         // Remove dir now.
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         remove(&mut transaction, dir.store(), dir.object_id());
@@ -1220,7 +1361,7 @@ mod tests {
         assert_eq!(dir.lookup("bar").await.expect("lookup failed"), None);
         assert!(!dir.has_children().await.expect("has_children failed"));
 
-        let mut transaction = fs
+        transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
@@ -1317,22 +1458,25 @@ mod tests {
     async fn test_unlink_symlink() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
         let mut transaction = fs
             .clone()
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
         let symlink_id = dir
             .create_symlink(&mut transaction, "link", "foo")
             .await
             .expect("create_symlink failed");
         transaction.commit().await.expect("commit failed");
-        let mut transaction = fs
+        transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_matches!(

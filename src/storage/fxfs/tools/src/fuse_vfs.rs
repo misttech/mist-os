@@ -23,7 +23,7 @@ use {
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
-            transaction::{Options, TransactionHandler},
+            transaction::{LockKey, Options, TransactionHandler},
             ObjectDescriptor, Timestamp,
         },
     },
@@ -68,7 +68,14 @@ impl FuseFs {
         let dir = self.open_dir(parent).await?;
 
         if dir.lookup(name.osstr_to_str()?).await?.is_none() {
-            let mut transaction = self.fs.clone().new_transaction(&[], Options::default()).await?;
+            let mut transaction = self
+                .fs
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                    Options::default(),
+                )
+                .await?;
 
             let child_dir = dir.create_child_dir(&mut transaction, name.osstr_to_str()?).await?;
             transaction.commit().await?;
@@ -93,10 +100,10 @@ impl FuseFs {
     async fn unlink_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        if let Some((_, object_descriptor)) = dir.lookup(name.osstr_to_str()?).await? {
-            if object_descriptor == ObjectDescriptor::File {
-                let mut transaction =
-                    self.fs.clone().new_transaction(&[], Options::default()).await?;
+        let (mut transaction, _, object_descriptor) =
+            dir.acquire_transaction_for_unlink(&[], name.osstr_to_str()?, true).await?;
+        match object_descriptor {
+            ObjectDescriptor::File => {
                 let replaced_child =
                     replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
                 transaction.commit().await?;
@@ -111,18 +118,13 @@ impl FuseFs {
                 }
 
                 Ok(())
-            } else if object_descriptor == ObjectDescriptor::Symlink {
-                let mut transaction =
-                    self.fs.clone().new_transaction(&[], Options::default()).await?;
+            }
+            ObjectDescriptor::Symlink => {
                 replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
-
                 transaction.commit().await?;
                 Ok(())
-            } else {
-                Err(FxfsError::NotFile.into())
             }
-        } else {
-            Err(FxfsError::NotFound.into())
+            _ => Err(FxfsError::NotFile.into()),
         }
     }
 
@@ -134,19 +136,15 @@ impl FuseFs {
     async fn rmdir_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        if let Some((_, object_descriptor)) = dir.lookup(name.osstr_to_str()?).await? {
-            if object_descriptor == ObjectDescriptor::Directory {
-                let mut transaction =
-                    self.fs.clone().new_transaction(&[], Options::default()).await?;
+        let (mut transaction, _, object_descriptor) =
+            dir.acquire_transaction_for_unlink(&[], name.osstr_to_str()?, true).await?;
+        match object_descriptor {
+            ObjectDescriptor::Directory => {
                 replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
-
                 transaction.commit().await?;
                 Ok(())
-            } else {
-                Err(FxfsError::NotDir.into())
             }
-        } else {
-            Err(FxfsError::NotFound.into())
+            _ => Err(FxfsError::NotDir.into()),
         }
     }
 
@@ -165,9 +163,39 @@ impl FuseFs {
     ) -> FxfsResult<()> {
         let old_dir = self.open_dir(parent).await?;
         let new_dir = self.open_dir(new_parent).await?;
+        let mut transaction = match new_dir
+            .acquire_transaction_for_unlink(
+                &[LockKey::object(self.default_store.store_object_id(), old_dir.object_id())],
+                new_name.osstr_to_str()?,
+                true,
+            )
+            .await
+        {
+            Ok((transaction, _, _)) => Ok(transaction),
+            Err(e) => match e.downcast_ref::<FxfsError>() {
+                Some(FxfsError::NotFound) => {
+                    self.fs
+                        .clone()
+                        .new_transaction(
+                            &[
+                                LockKey::object(
+                                    self.default_store.store_object_id(),
+                                    new_dir.object_id(),
+                                ),
+                                LockKey::object(
+                                    self.default_store.store_object_id(),
+                                    old_dir.object_id(),
+                                ),
+                            ],
+                            Options::default(),
+                        )
+                        .await
+                }
+                _ => Err(e),
+            },
+        }?;
 
         if old_dir.lookup(name.osstr_to_str()?).await?.is_some() {
-            let mut transaction = self.fs.clone().new_transaction(&[], Options::default()).await?;
             let replaced_child = replace_child(
                 &mut transaction,
                 Some((&old_dir, name.osstr_to_str()?)),
@@ -307,8 +335,17 @@ impl FuseFs {
 
             if object_type == ObjectDescriptor::File {
                 let handle = self.get_object_handle(inode).await?;
-                let mut transaction =
-                    self.fs.clone().new_transaction(&[], Options::default()).await?;
+                let mut transaction = self
+                    .fs
+                    .clone()
+                    .new_transaction(
+                        &[LockKey::object(
+                            self.default_store.store_object_id(),
+                            handle.object_id(),
+                        )],
+                        Options::default(),
+                    )
+                    .await?;
                 handle.write_timestamps(&mut transaction, ctime, mtime).await?;
                 transaction.commit().await?;
 
@@ -318,9 +355,15 @@ impl FuseFs {
                     handle.flush().await?;
                 }
             } else if object_type == ObjectDescriptor::Directory {
+                let mut transaction = self
+                    .fs
+                    .clone()
+                    .new_transaction(
+                        &[LockKey::object(self.default_store.store_object_id(), inode)],
+                        Options::default(),
+                    )
+                    .await?;
                 let dir = self.open_dir(inode).await?;
-                let mut transaction =
-                    self.fs.clone().new_transaction(&[], Options::default()).await?;
                 dir.update_attributes(&mut transaction, ctime, mtime, |_| {}).await?;
                 transaction.commit().await?;
             }
@@ -355,7 +398,14 @@ impl FuseFs {
     async fn create_fxfs(&self, parent: u64, name: &OsStr, flags: u32) -> FxfsResult<ReplyCreated> {
         let dir = self.open_dir(parent).await?;
         if dir.lookup(name.osstr_to_str()?).await?.is_none() {
-            let mut transaction = self.fs.clone().new_transaction(&[], Options::default()).await?;
+            let mut transaction = self
+                .fs
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                    Options::default(),
+                )
+                .await?;
 
             let child_file = dir.create_child_file(&mut transaction, name.osstr_to_str()?).await?;
             transaction.commit().await?;
@@ -643,7 +693,14 @@ impl FuseFs {
         link: &OsStr,
     ) -> FxfsResult<ReplyEntry> {
         let dir = self.open_dir(parent).await?;
-        let mut transaction = self.fs.clone().new_transaction(&[], Options::default()).await?;
+        let mut transaction = self
+            .fs
+            .clone()
+            .new_transaction(
+                &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                Options::default(),
+            )
+            .await?;
 
         let symlink_id = dir
             .create_symlink(&mut transaction, link.osstr_to_str()?, name.osstr_to_str()?)
@@ -673,10 +730,18 @@ impl FuseFs {
             if object_type == ObjectDescriptor::File {
                 let dir = self.open_dir(new_parent).await?;
 
+                let mut transaction = self
+                    .fs
+                    .clone()
+                    .new_transaction(
+                        &[
+                            LockKey::object(self.default_store.store_object_id(), dir.object_id()),
+                            LockKey::object(self.default_store.store_object_id(), inode),
+                        ],
+                        Options::default(),
+                    )
+                    .await?;
                 if dir.lookup(new_name.osstr_to_str()?).await?.is_none() {
-                    let mut transaction =
-                        self.fs.clone().new_transaction(&[], Options::default()).await?;
-
                     dir.insert_child(
                         &mut transaction,
                         new_name.osstr_to_str()?,

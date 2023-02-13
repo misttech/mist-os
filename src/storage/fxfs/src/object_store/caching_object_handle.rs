@@ -184,7 +184,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[],
+                    &[LockKey::object(store_id, self.handle.object_id)],
                     Options {
                         borrow_metadata_space: true,
                         skip_journal_checks: self.handle.options.skip_journal_checks,
@@ -211,7 +211,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[],
+                &[LockKey::object(store_id, self.handle.object_id)],
                 Options {
                     // If there is no data then the reservation won't have any space for the
                     // transaction. Since it should only be for file size or metadata changes,
@@ -457,7 +457,8 @@ mod tests {
                 directory::Directory,
                 object_record::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp},
                 transaction::{Options, TransactionHandler},
-                CachingObjectHandle, HandleOptions, ObjectStore, TRANSACTION_MUTATION_THRESHOLD,
+                CachingObjectHandle, HandleOptions, LockKey, ObjectStore,
+                TRANSACTION_MUTATION_THRESHOLD,
             },
         },
         fuchsia_async as fasync,
@@ -698,7 +699,10 @@ mod tests {
         let (fs, object) = test_filesystem_and_object().await;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(object.store().store_object_id(), object.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let store = object.owner();
@@ -715,7 +719,10 @@ mod tests {
         let allocated_before = allocator.get_allocated_bytes();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(object.store().store_object_id(), object.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         assert_eq!(
@@ -1049,7 +1056,10 @@ mod tests {
         let object;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         object = root_directory

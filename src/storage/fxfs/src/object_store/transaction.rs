@@ -32,6 +32,7 @@ use {
         convert::{From, Into},
         fmt,
         marker::PhantomPinned,
+        mem,
         ops::{Deref, DerefMut, Range},
         sync::{Arc, Mutex},
         task::{Poll, Waker},
@@ -515,8 +516,8 @@ pub enum MetadataReservation {
 pub struct Transaction<'a> {
     handler: Arc<dyn TransactionHandler>,
 
-    /// The mutations that make up this transaction.
-    pub mutations: BTreeSet<TxnMutation<'a>>,
+    // The mutations that make up this transaction.
+    mutations: BTreeSet<TxnMutation<'a>>,
 
     // The locks that this transaction currently holds.
     txn_locks: Vec<LockKey>,
@@ -555,6 +556,14 @@ impl<'a> Transaction<'a> {
             allocator_reservation: None,
             metadata_reservation,
         }
+    }
+
+    pub fn mutations(&self) -> &BTreeSet<TxnMutation<'a>> {
+        &self.mutations
+    }
+
+    pub fn take_mutations(&mut self) -> BTreeSet<TxnMutation<'a>> {
+        mem::take(&mut self.mutations)
     }
 
     /// Adds a mutation to this transaction.  If the mutation already exists, it is replaced and the

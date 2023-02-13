@@ -1280,7 +1280,7 @@ impl Journal {
             checkpoint_before = {
                 let mut inner = self.inner.lock().unwrap();
                 let checkpoint = inner.writer.journal_file_checkpoint();
-                for TxnMutation { object_id, mutation, .. } in &transaction.mutations {
+                for TxnMutation { object_id, mutation, .. } in transaction.mutations() {
                     self.objects.write_mutation(
                         *object_id,
                         mutation,
@@ -1500,7 +1500,7 @@ mod tests {
             object_store::{
                 directory::Directory,
                 transaction::{Options, TransactionHandler},
-                HandleOptions, ObjectStore,
+                HandleOptions, LockKey, ObjectStore,
             },
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -1524,7 +1524,13 @@ mod tests {
                     .expect("open failed");
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(
+                        root_store.store_object_id(),
+                        root_store.root_directory_object_id(),
+                    )],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
@@ -1580,7 +1586,13 @@ mod tests {
                     .expect("open failed");
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(
+                        root_store.store_object_id(),
+                        root_store.root_directory_object_id(),
+                    )],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
@@ -1599,7 +1611,13 @@ mod tests {
             for i in 0..1000 {
                 let mut transaction = fs
                     .clone()
-                    .new_transaction(&[], Options::default())
+                    .new_transaction(
+                        &[LockKey::object(
+                            root_store.store_object_id(),
+                            root_store.root_directory_object_id(),
+                        )],
+                        Options::default(),
+                    )
                     .await
                     .expect("new_transaction failed");
                 let handle = root_directory
@@ -1645,7 +1663,13 @@ mod tests {
                     .expect("open failed");
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(
+                        root_store.store_object_id(),
+                        root_store.root_directory_object_id(),
+                    )],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory

@@ -446,7 +446,7 @@ impl ObjectManager {
         let old_required = self.inner.read().unwrap().required_reservation();
 
         debug!(checkpoint = checkpoint.file_offset, "BEGIN TXN");
-        let mutations = std::mem::take(&mut transaction.mutations);
+        let mutations = transaction.take_mutations();
         let context =
             ApplyContext { mode: ApplyMode::Live(transaction), checkpoint: checkpoint.clone() };
         for TxnMutation { object_id, mutation, associated_object } in mutations {
@@ -558,7 +558,7 @@ impl ObjectManager {
     /// back.  For each mutation, drop_mutation is called to allow for roll back (e.g. the allocator
     /// will unreserve allocations).
     pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
-        for TxnMutation { object_id, mutation, .. } in std::mem::take(&mut transaction.mutations) {
+        for TxnMutation { object_id, mutation, .. } in transaction.take_mutations() {
             self.object(object_id).map(|o| o.drop_mutation(mutation, transaction));
         }
     }

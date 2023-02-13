@@ -366,7 +366,7 @@ mod tests {
         crate::fuse_fs::FuseFs,
         fxfs::{
             object_handle::ObjectHandle,
-            object_store::transaction::{Options, TransactionHandler},
+            object_store::transaction::{LockKey, Options, TransactionHandler},
         },
     };
 
@@ -379,7 +379,10 @@ mod tests {
         let mut transaction = fs
             .fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(fs.default_store.store_object_id(), dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let file =

@@ -20,7 +20,7 @@ use {
         errors::FxfsError,
         filesystem::SyncOptions,
         log::*,
-        object_handle::{ObjectProperties, INVALID_OBJECT_ID},
+        object_handle::ObjectProperties,
         object_store::{
             self,
             directory::{self, ObjectDescriptor, ReplacedChild},
@@ -86,62 +86,6 @@ impl FxDirectory {
     pub fn set_deleted(&self) {
         self.directory.set_deleted();
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::deleted());
-    }
-
-    /// Acquires a transaction with the appropriate locks to unlink |name|. Returns the transaction,
-    /// as well as the ID and type of the child.
-    ///
-    /// We always need to lock |self|, but we only need to lock the child if it's a directory,
-    /// to prevent entries being added to the directory.
-    pub(super) async fn acquire_transaction_for_unlink<'a>(
-        self: &Arc<Self>,
-        extra_keys: &[LockKey],
-        name: &str,
-        borrow_metadata_space: bool,
-    ) -> Result<(Transaction<'a>, u64, ObjectDescriptor), Error> {
-        // Since we don't know the child object ID until we've looked up the child, we need to loop
-        // until we have acquired a lock on a child whose ID is the same as it was in the last
-        // iteration (or the child is a file, at which point it doesn't matter).
-        //
-        // Note that the returned transaction may lock more objects than is necessary (for example,
-        // if the child "foo" was first a directory, then was renamed to "bar" and a file "foo" was
-        // created, we might acquire a lock on both the parent and "bar").
-        let store = self.store();
-        let mut child_object_id = INVALID_OBJECT_ID;
-        loop {
-            let mut lock_keys = if child_object_id == INVALID_OBJECT_ID {
-                vec![LockKey::object(store.store_object_id(), self.object_id())]
-            } else {
-                vec![
-                    LockKey::object(store.store_object_id(), self.object_id()),
-                    LockKey::object(store.store_object_id(), child_object_id),
-                ]
-            };
-            lock_keys.extend_from_slice(extra_keys);
-            let fs = store.filesystem().clone();
-            let transaction = fs
-                .new_transaction(
-                    &lock_keys,
-                    Options { borrow_metadata_space, ..Default::default() },
-                )
-                .await?;
-
-            let (object_id, object_descriptor) =
-                self.directory.lookup(name).await?.ok_or(FxfsError::NotFound)?;
-            match object_descriptor {
-                ObjectDescriptor::File => {
-                    return Ok((transaction, object_id, object_descriptor));
-                }
-                ObjectDescriptor::Directory => {
-                    if object_id == child_object_id {
-                        return Ok((transaction, object_id, object_descriptor));
-                    }
-                    child_object_id = object_id;
-                }
-                ObjectDescriptor::Volume => bail!(FxfsError::Inconsistent),
-                ObjectDescriptor::Symlink => bail!(FxfsError::Inconsistent),
-            }
-        }
     }
 
     async fn lookup(
@@ -307,18 +251,6 @@ impl MutableDirectory for FxDirectory {
         let source_dir = source_dir.downcast::<Self>().unwrap();
         let store = self.store();
         let fs = store.filesystem().clone();
-        // new_transaction will dedupe the locks if necessary.  In theory we only need a read lock
-        // for the source directory, but we can leave that optimisation for now.
-        let mut transaction = fs
-            .new_transaction(
-                &[
-                    LockKey::object(store.store_object_id(), self.object_id()),
-                    LockKey::object(store.store_object_id(), source_dir.object_id()),
-                ],
-                Options::default(),
-            )
-            .await
-            .map_err(map_to_status)?;
         if self.is_deleted() {
             return Err(Status::ACCESS_DENIED);
         }
@@ -328,6 +260,26 @@ impl MutableDirectory for FxDirectory {
                 None => return Err(Status::NOT_FOUND),
                 _ => return Err(Status::NOT_SUPPORTED),
             };
+        // We don't need a lock on the source directory, as it will be unchanged (unless it is the
+        // same as the destination directory). We just need a lock on the source object to ensure
+        // that it hasn't been simultaneously unlinked. We need that lock anyway to update the ref
+        // count.
+        let mut transaction = fs
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), self.object_id()),
+                    LockKey::object(store.store_object_id(), source_id),
+                ],
+                Options::default(),
+            )
+            .await
+            .map_err(map_to_status)?;
+        // Ensure under lock that the file still exists there.
+        match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
+            Some((_, ObjectDescriptor::File)) => {}
+            None => return Err(Status::NOT_FOUND),
+            _ => return Err(Status::NOT_SUPPORTED),
+        };
         if self.directory.lookup(&name).await.map_err(map_to_status)?.is_some() {
             return Err(Status::ALREADY_EXISTS);
         }
@@ -341,8 +293,11 @@ impl MutableDirectory for FxDirectory {
     }
 
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
-        let (mut transaction, _object_id, object_descriptor) =
-            self.acquire_transaction_for_unlink(&[], name, true).await.map_err(map_to_status)?;
+        let (mut transaction, _object_id, object_descriptor) = self
+            .directory
+            .acquire_transaction_for_unlink(&[], name, true)
+            .await
+            .map_err(map_to_status)?;
         if let ObjectDescriptor::Directory = object_descriptor {
         } else if must_be_directory {
             return Err(Status::NOT_DIR);
@@ -441,6 +396,7 @@ impl MutableDirectory for FxDirectory {
         let store = self.store();
         let fs = store.filesystem();
         let (mut transaction, dst_id_and_descriptor) = match self
+            .directory
             .acquire_transaction_for_unlink(
                 &[LockKey::object(store.store_object_id(), src_dir.object_id())],
                 dst,

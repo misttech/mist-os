@@ -17,7 +17,7 @@ use {
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
-            transaction::{self, ObjectStoreMutation, Options},
+            transaction::{self, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
             AttributeKey, EncryptionKeys, ExtentValue, HandleOptions, Mutation, ObjectAttributes,
             ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue,
@@ -572,7 +572,10 @@ async fn test_volume_allocation_mismatch() {
 
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(volume.store_object_id(), root_directory.object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
@@ -582,7 +585,10 @@ async fn test_volume_allocation_mismatch() {
             transaction.commit().await.expect("commit failed");
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(volume.store_object_id(), handle.object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let buf = device.allocate_buffer(1);
@@ -693,7 +699,10 @@ async fn test_too_many_object_refs() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let child_file = root_directory
@@ -924,7 +933,10 @@ async fn test_link_to_root_directory() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         root_directory
@@ -957,7 +969,10 @@ async fn test_multiple_links_to_directory() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         root_directory
@@ -994,7 +1009,10 @@ async fn test_conflicting_link_types() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         root_directory
@@ -1029,7 +1047,10 @@ async fn test_volume_in_child_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         root_directory
@@ -1060,7 +1081,10 @@ async fn test_children_on_file() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let object_id = root_directory
@@ -1222,7 +1246,10 @@ async fn test_invalid_child_in_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         root_directory
@@ -1252,7 +1279,10 @@ async fn test_link_cycle() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let parent = root_directory
@@ -1304,7 +1334,10 @@ async fn test_file_length_mismatch() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let buf = device.allocate_buffer(1);
@@ -1313,7 +1346,10 @@ async fn test_file_length_mismatch() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -1414,7 +1450,10 @@ async fn test_missing_encryption_key() {
         let handle;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         handle = root_directory
@@ -1425,7 +1464,7 @@ async fn test_missing_encryption_key() {
         handle.txn_write(&mut transaction, 1_048_576, buf.as_ref()).await.expect("write failed");
 
         let txn_mutation = transaction
-            .mutations
+            .mutations()
             .iter()
             .find(|m| {
                 matches!(
@@ -1521,7 +1560,10 @@ async fn test_missing_encryption_keys() {
         let handle;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         handle = root_directory
@@ -1530,7 +1572,7 @@ async fn test_missing_encryption_keys() {
             .expect("create_child_file failed");
 
         let txn_mutation = transaction
-            .mutations
+            .mutations()
             .iter()
             .find(|m| {
                 matches!(
@@ -1574,7 +1616,10 @@ async fn test_duplicate_key() {
         let handle;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         handle = root_directory
@@ -1583,7 +1628,7 @@ async fn test_duplicate_key() {
             .expect("create_child_file failed");
 
         let txn_mutation = transaction
-            .mutations
+            .mutations()
             .iter()
             .find(|m| {
                 matches!(

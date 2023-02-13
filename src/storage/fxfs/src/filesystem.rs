@@ -613,6 +613,7 @@ impl TransactionHandler for FxFilesystem {
         let mut transaction =
             Transaction::new(self.clone(), metadata_reservation, &[LockKey::Filesystem], locks)
                 .await;
+
         ScopeGuard::into_inner(guard);
         hold.map(|h| h.forget()); // Transaction takes ownership from here on.
         transaction.allocator_reservation = allocator_reservation;
@@ -762,7 +763,7 @@ mod tests {
                 directory::replace_child,
                 directory::Directory,
                 journal::JournalOptions,
-                transaction::{Options, TransactionHandler},
+                transaction::{LockKey, Options, TransactionHandler},
             },
         },
         fuchsia_async as fasync,
@@ -791,7 +792,10 @@ mod tests {
         for i in 0..2 {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
@@ -882,7 +886,10 @@ mod tests {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let object = root_directory
@@ -904,7 +911,10 @@ mod tests {
         // Delete the object.
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
 

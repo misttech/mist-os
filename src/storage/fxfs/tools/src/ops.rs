@@ -11,7 +11,7 @@ use {
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
-            transaction::{Options, TransactionHandler},
+            transaction::{LockKey, Options, TransactionHandler},
             volume::root_volume,
             Directory, HandleOptions, ObjectDescriptor, ObjectStore,
         },
@@ -113,7 +113,10 @@ pub async fn unlink(
     path: &Path,
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
-    let mut transaction = (*fs).clone().new_transaction(&[], Options::default()).await?;
+    // Not worried about the race between lookup and lock, this is a single-threaded mode.
+    let (mut transaction, _, _) = dir
+        .acquire_transaction_for_unlink(&[], path.file_name().unwrap().to_str().unwrap(), true)
+        .await?;
     let replaced_child =
         replace_child(&mut transaction, None, (&dir, path.file_name().unwrap().to_str().unwrap()))
             .await?;
@@ -178,7 +181,13 @@ pub async fn put(
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, dst.parent().unwrap()).await?;
     let filename = dst.file_name().unwrap().to_str().unwrap();
-    let mut transaction = (*fs).clone().new_transaction(&[], Options::default()).await?;
+    let mut transaction = (*fs)
+        .clone()
+        .new_transaction(
+            &[LockKey::object(vol.store_object_id(), dir.object_id())],
+            Options::default(),
+        )
+        .await?;
     if let Some(_) = dir.lookup(filename).await? {
         bail!("{} already exists", filename);
     }
@@ -198,7 +207,13 @@ pub async fn mkdir(
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
     let filename = path.file_name().unwrap().to_str().unwrap();
-    let mut transaction = (*fs).clone().new_transaction(&[], Options::default()).await?;
+    let mut transaction = (*fs)
+        .clone()
+        .new_transaction(
+            &[LockKey::object(vol.store_object_id(), dir.object_id())],
+            Options::default(),
+        )
+        .await?;
     if let Some(_) = dir.lookup(filename).await? {
         bail!("{} already exists", filename);
     }

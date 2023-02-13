@@ -179,7 +179,16 @@ impl ObjectStore {
         let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
 
         let reservation_update: ReservationUpdate; // Must live longer than end_transaction.
-        let mut end_transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+        let mut end_transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[LockKey::object(
+                    self.parent_store.as_ref().unwrap().store_object_id(),
+                    self.store_info_handle_object_id().unwrap(),
+                )],
+                txn_options,
+            )
+            .await?;
 
         // Create and write a new layer, compacting existing layers.
         let parent_store = self.parent_store.as_ref().unwrap();
@@ -304,7 +313,7 @@ impl ObjectStore {
 
         let reservation_update: ReservationUpdate; // Must live longer than end_transaction.
         let handle; // Must live longer than end_transaction.
-        let mut end_transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+        let mut end_transaction;
 
         // We need to either write our encrypted mutations to a new file, or append them to an
         // existing one.
@@ -318,11 +327,40 @@ impl ObjectStore {
             )
             .await?;
             let oid = handle.object_id();
+            end_transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[
+                        LockKey::object(parent_store.store_object_id(), oid),
+                        LockKey::object(
+                            parent_store.store_object_id(),
+                            self.store_info_handle_object_id().unwrap(),
+                        ),
+                    ],
+                    txn_options,
+                )
+                .await?;
             new_store_info.encrypted_mutations_object_id = oid;
             parent_store.add_to_graveyard(&mut transaction, oid);
             parent_store.remove_from_graveyard(&mut end_transaction, oid);
             handle
         } else {
+            end_transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[
+                        LockKey::object(
+                            parent_store.store_object_id(),
+                            new_store_info.encrypted_mutations_object_id,
+                        ),
+                        LockKey::object(
+                            parent_store.store_object_id(),
+                            self.store_info_handle_object_id().unwrap(),
+                        ),
+                    ],
+                    txn_options,
+                )
+                .await?;
             ObjectStore::open_object(
                 parent_store,
                 new_store_info.encrypted_mutations_object_id,
@@ -396,7 +434,7 @@ mod tests {
                 directory::Directory,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
-                HandleOptions, ObjectStore,
+                HandleOptions, LockKey, ObjectStore,
             },
         },
         fxfs_insecure_crypto::InsecureCrypt,
@@ -445,7 +483,10 @@ mod tests {
             loop {
                 let mut transaction = fs
                     .clone()
-                    .new_transaction(&[], Options::default())
+                    .new_transaction(
+                        &[LockKey::object(store_id, root_dir.object_id())],
+                        Options::default(),
+                    )
                     .await
                     .expect("new_transaction failed");
                 root_dir
@@ -469,7 +510,10 @@ mod tests {
             // Write one more file to ensure the cipher has a non-zero offset.
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(
+                    &[LockKey::object(store_id, root_dir.object_id())],
+                    Options::default(),
+                )
                 .await
                 .expect("new_transaction failed");
             let last_filename = format!("{:<200}", i);
@@ -550,7 +594,10 @@ mod tests {
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let foo = root_dir
@@ -566,7 +613,10 @@ mod tests {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_dir.object_id())],
+                Options::default(),
+            )
             .await
             .expect("new_transaction failed");
         let bar = root_dir

@@ -19,7 +19,7 @@ use {
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectTree, FsInspectVolume},
     fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef, Status},
+    fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{stream::FuturesUnordered, StreamExt, TryStreamExt},
     fxfs::{
         errors::FxfsError,
@@ -130,18 +130,6 @@ impl VolumesDirectory {
         name: &str,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let store = self.root_volume.volume_directory().store();
-        let fs = store.filesystem();
-        let _write_guard = fs
-            .write_lock(&[LockKey::object(
-                store.store_object_id(),
-                self.root_volume.volume_directory().object_id(),
-            )])
-            .await;
-        ensure!(
-            matches!(self.directory_node.get_entry(name), Err(Status::NOT_FOUND)),
-            FxfsError::AlreadyExists
-        );
         let volume = self
             .mount_store(
                 name,

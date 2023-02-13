@@ -89,7 +89,7 @@ impl TransactionHandler for FakeObject {
         transaction: &mut Transaction<'_>,
         callback: &mut (dyn FnMut(u64) + Send),
     ) -> Result<u64, Error> {
-        std::mem::take(&mut transaction.mutations);
+        transaction.take_mutations();
         callback(0);
         Ok(0)
     }

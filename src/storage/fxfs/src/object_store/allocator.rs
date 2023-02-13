@@ -1529,14 +1529,22 @@ impl JournalingObject for SimpleAllocator {
                 .await?;
         }
 
+        // Both of these forward-declared variables need to outlive the transaction.
+        let object_handle;
+        let reservation_update;
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[LockKey::object(root_store.store_object_id(), self.object_id())],
+                txn_options,
+            )
+            .await?;
+        let mut serialized_info = Vec::new();
+
         debug!(oid = object_id, "new allocator layer file");
-        let object_handle =
+        object_handle =
             ObjectStore::open_object(&root_store, self.object_id(), HandleOptions::default(), None)
                 .await?;
-
-        let reservation_update;
-        let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
-        let mut serialized_info = Vec::new();
 
         // We must be careful to take a copy AllocatorInfo here rather than manipulate the
         // live one. If we remove marked_for_deletion entries prematurely, we may fail any
