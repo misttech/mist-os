@@ -450,7 +450,7 @@ mod tests {
     /// Emit one argument of each type and read it back out.
     #[test]
     fn sanity() {
-        let (h1, _h2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (h1, _h2) = zx::Socket::create_stream();
 
         let mut message = Message::new();
         assert!(message.write_arg(Arg::Uint(UINT_VALUE)).is_ok());

@@ -272,7 +272,7 @@ mod test {
 
     #[test]
     fn test_serialize_handle() {
-        let (s1, _s2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (s1, _s2) = zx::Socket::create_stream();
         let (bytes, handles) = TestInterfaceEvent::Handle { arg: s1.into_handle() }
             .into_message(SENDER_ID)
             .unwrap()
@@ -284,7 +284,7 @@ mod test {
 
     #[test]
     fn test_deserialize_handle() {
-        let (s1, _s2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (s1, _s2) = zx::Socket::create_stream();
         let request = TestInterfaceRequest::from_args(
             7, /* opcode */
             vec![Arg::Handle(s1.into_handle())],
@@ -317,7 +317,7 @@ mod test {
 
     #[test]
     fn test_deserialize_complex() {
-        let (s1, s2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (s1, s2) = zx::Socket::create_stream();
         let request = TestInterfaceRequest::from_args(
             8, /* opcode */
             vec![
@@ -356,7 +356,7 @@ mod test {
 
     #[test]
     fn test_serialize_complex() {
-        let (s1, s2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (s1, s2) = zx::Socket::create_stream();
         let event = TestInterfaceEvent::Complex {
             uint_arg: UINT_VALUE,
             int_arg: INT_VALUE,
