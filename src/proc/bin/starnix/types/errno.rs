@@ -7,6 +7,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use crate::types::uapi;
+use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 
 /// Represents the location at which an error was generated.
@@ -67,9 +68,42 @@ impl PartialEq<ErrnoCode> for Errno {
 impl Eq for Errno {}
 
 impl From<Errno> for anyhow::Error {
-    fn from(e: Errno) -> anyhow::Error {
+    fn from(e: Errno) -> Self {
         let code = e.code;
         e.anyhow.unwrap_or_else(|| anyhow::format_err!("errno {} from unknown location", code))
+    }
+}
+
+impl From<Errno> for zx::Status {
+    fn from(e: Errno) -> Self {
+        match e.code.error_code() {
+            uapi::ENOENT => zx::Status::NOT_FOUND,
+            uapi::ENOMEM => zx::Status::NO_MEMORY,
+            uapi::EINVAL => zx::Status::INVALID_ARGS,
+            uapi::ETIMEDOUT => zx::Status::TIMED_OUT,
+            uapi::EBUSY => zx::Status::UNAVAILABLE,
+            uapi::EEXIST => zx::Status::ALREADY_EXISTS,
+            uapi::EPIPE => zx::Status::PEER_CLOSED,
+            uapi::ENAMETOOLONG => zx::Status::BAD_PATH,
+            uapi::EIO => zx::Status::IO,
+            uapi::EISDIR => zx::Status::NOT_FILE,
+            uapi::ENOTDIR => zx::Status::NOT_DIR,
+            uapi::EOPNOTSUPP => zx::Status::NOT_SUPPORTED,
+            uapi::EBADF => zx::Status::BAD_HANDLE,
+            uapi::EACCES => zx::Status::ACCESS_DENIED,
+            uapi::EAGAIN => zx::Status::SHOULD_WAIT,
+            uapi::EFBIG => zx::Status::FILE_BIG,
+            uapi::ENOSPC => zx::Status::NO_SPACE,
+            uapi::ENOTEMPTY => zx::Status::NOT_EMPTY,
+            uapi::EPROTONOSUPPORT => zx::Status::PROTOCOL_NOT_SUPPORTED,
+            uapi::ENETUNREACH => zx::Status::ADDRESS_UNREACHABLE,
+            uapi::EADDRINUSE => zx::Status::ADDRESS_IN_USE,
+            uapi::ENOTCONN => zx::Status::NOT_CONNECTED,
+            uapi::ECONNREFUSED => zx::Status::CONNECTION_REFUSED,
+            uapi::ECONNRESET => zx::Status::CONNECTION_RESET,
+            uapi::ECONNABORTED => zx::Status::CONNECTION_ABORTED,
+            _ => zx::Status::NOT_SUPPORTED,
+        }
     }
 }
 
