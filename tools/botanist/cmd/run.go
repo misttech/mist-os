@@ -89,6 +89,7 @@ type RunCommand struct {
 	// 1 or greater: ffx target flash, ffx bootloader boot
 	// 2 or greater: ffx test, ffx target snapshot, keeps ffx output dir for debugging
 	// 3: enables parallel test execution
+	// 4: enables CSO
 	ffxExperimentLevel int
 
 	// Any image overrides for boot.
@@ -266,6 +267,11 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		// that it is off during target setup as well.
 		if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
 			return err
+		}
+		if r.ffxExperimentLevel == 4 {
+			if err := ffx.Run(ctx, "config", "set", "overnet.cso", "enabled"); err != nil {
+				return err
+			}
 		}
 	}
 
