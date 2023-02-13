@@ -23,8 +23,10 @@ fuchsia_driver("imx8mmevk-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "imx8mmevk-emmc.cc",
     "imx8mmevk-gpio.cc",
     "imx8mmevk-i2c.cc",
+    "imx8mmevk-sd.cc",
     "imx8mmevk.cc",
   ]
   deps = [
@@ -33,6 +35,7 @@ fuchsia_driver("imx8mmevk-driver") {
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
@@ -45,6 +48,7 @@ fuchsia_driver("imx8mmevk-driver") {
     "//src/devices/lib/metadata:llcpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/nxp",
+    "//src/devices/lib/nxp:fuchsia.nxp.sdmmc_cpp_wire",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",

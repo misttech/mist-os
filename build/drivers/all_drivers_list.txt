@@ -82,6 +82,7 @@
 //src/devices/block/drivers/core:core-driver
 //src/devices/block/drivers/ftl:ftl-driver
 //src/devices/block/drivers/gpt:gpt-driver
+//src/devices/block/drivers/imx8m-sdmmc:imx8m-sdmmc-driver
 //src/devices/block/drivers/mbr:mbr-driver
 //src/devices/block/drivers/nvme:nvme-driver
 //src/devices/block/drivers/pci-sdhci:pci-sdhci-driver

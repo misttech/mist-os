@@ -13,6 +13,12 @@
 
 namespace imx8mm_evk {
 
+// BTI IDs
+enum {
+  BTI_EMMC,
+  BTI_SD,
+};
+
 class Imx8mmEvk : public ddk::Device<Imx8mmEvk> {
  public:
   Imx8mmEvk(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
@@ -31,6 +37,8 @@ class Imx8mmEvk : public ddk::Device<Imx8mmEvk> {
 
   zx_status_t GpioInit();
   zx_status_t I2cInit();
+  zx_status_t EmmcInit();
+  zx_status_t SdInit();
 
   const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   const fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info_;

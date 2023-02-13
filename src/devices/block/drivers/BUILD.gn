@@ -15,6 +15,7 @@ group("tests") {
     "core:tests",
     "ftl:tests",
     "gpt:tests",
+    "imx8m-sdmmc:tests",
     "mbr:tests",
     "nvme:tests",
     "pci-sdhci:tests",

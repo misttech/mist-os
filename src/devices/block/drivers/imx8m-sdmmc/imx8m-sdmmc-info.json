@@ -1,0 +1,10 @@
+{
+    "short_description": "NXP imx8m SDMMC block driver",
+    "manufacturer": "NXP",
+    "families": [],
+    "models": [],
+    "areas": [
+        "Block",
+        "Storage"
+    ]
+}

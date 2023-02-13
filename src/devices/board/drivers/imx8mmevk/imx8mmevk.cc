@@ -87,6 +87,18 @@ int Imx8mmEvk::Thread() {
     return thrd_error;
   }
 
+  status = EmmcInit();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "EmmcInit() failed: %s", zx_status_get_string(status));
+    return thrd_error;
+  }
+
+  status = SdInit();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SdInit() failed: %s", zx_status_get_string(status));
+    return thrd_error;
+  }
+
   return status;
 }
 }  // namespace imx8mm_evk

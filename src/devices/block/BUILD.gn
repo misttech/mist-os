@@ -13,6 +13,7 @@ group("drivers") {
     "drivers/core",
     "drivers/ftl",
     "drivers/gpt",
+    "drivers/imx8m-sdmmc",
     "drivers/mbr",
     "drivers/nvme",
     "drivers/pci-sdhci",
