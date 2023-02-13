@@ -76,7 +76,6 @@ group("tests") {
     "async-utils:tests",
     "async-watchdog:tests",
     "backoff:tests",
-    "by_addr:tests",
     "callback:tests",
     "chunked-compression:tests",
     "cmx:tests",
