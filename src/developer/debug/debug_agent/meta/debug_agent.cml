@@ -26,7 +26,6 @@
 
                 // To launch v2 components.
                 "fuchsia.sys2.LifecycleController.root",
-                "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
 
                 // To launch v2 tests.

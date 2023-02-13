@@ -196,21 +196,18 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
   event_stream_binding_.Bind(handle.TakeChannel());
   GetNextComponentEvent();
 
-  // 2. List existing components via fuchsia.sys2.RealmExplorer and fuchsia.sys2.RealmQuery.
-  fuchsia::sys2::RealmExplorerSyncPtr realm_explorer;
+  // 2. List existing components via fuchsia.sys2.RealmQuery.
   fuchsia::sys2::RealmQuerySyncPtr realm_query;
-  services_->Connect(realm_explorer.NewRequest(), "fuchsia.sys2.RealmExplorer.root");
   services_->Connect(realm_query.NewRequest(), "fuchsia.sys2.RealmQuery.root");
 
-  fuchsia::sys2::RealmExplorer_GetAllInstanceInfos_Result all_instance_infos_res;
-  realm_explorer->GetAllInstanceInfos(&all_instance_infos_res);
-  if (all_instance_infos_res.is_err()) {
-    LOGS(Error) << "Failed to GetAllInstanceInfos: "
-                << static_cast<uint32_t>(all_instance_infos_res.err());
+  fuchsia::sys2::RealmQuery_GetAllInstances_Result all_instances_res;
+  realm_query->GetAllInstances(&all_instances_res);
+  if (all_instances_res.is_err()) {
+    LOGS(Error) << "Failed to GetAllInstances: " << static_cast<uint32_t>(all_instances_res.err());
     return;
   }
-  fuchsia::sys2::InstanceInfoIteratorSyncPtr instance_it =
-      all_instance_infos_res.response().iterator.BindSync();
+  fuchsia::sys2::InstanceIteratorSyncPtr instance_it =
+      all_instances_res.response().iterator.BindSync();
 
   auto deferred_ready =
       std::make_shared<fit::deferred_callback>([weak_this = weak_factory_.GetWeakPtr()] {
@@ -218,33 +215,42 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
           weak_this->ready_callback_();
       });
   while (true) {
-    std::vector<fuchsia::sys2::InstanceInfo> infos;
-    instance_it->Next(&infos);
-    if (infos.empty()) {
+    std::vector<fuchsia::sys2::Instance> instances;
+    instance_it->Next(&instances);
+    if (instances.empty()) {
       break;
     }
-    for (auto& info : infos) {
-      if (info.state != fuchsia::sys2::InstanceState::STARTED || info.moniker.empty()) {
+    for (auto& instance : instances) {
+      if (!instance.has_moniker() || instance.moniker().empty()) {
         continue;
       }
-      fuchsia::sys2::RealmQuery_GetInstanceDirectories_Result instance_dirs_res;
-      realm_query->GetInstanceDirectories(info.moniker, &instance_dirs_res);
-      if (!instance_dirs_res.is_response() || !instance_dirs_res.response().resolved_dirs ||
-          !instance_dirs_res.response().resolved_dirs->execution_dirs ||
-          !instance_dirs_res.response().resolved_dirs->execution_dirs->runtime_dir) {
+      if (!instance.has_url() || instance.url().empty()) {
+        continue;
+      }
+      if (!instance.has_resolved_info() || !instance.resolved_info().has_execution_info()) {
+        continue;
+      }
+      fuchsia::sys2::RealmQuery_Open_Result open_res;
+
+      fuchsia::io::DirectoryHandle runtime_dir_handle;
+      realm_query->Open(
+          instance.moniker(), fuchsia::sys2::OpenDirType::RUNTIME_DIR,
+          fuchsia::io::OpenFlags::RIGHT_READABLE, {}, ".",
+          fidl::InterfaceRequest<fuchsia::io::Node>(runtime_dir_handle.NewRequest().TakeChannel()),
+          &open_res);
+      if (!open_res.is_response()) {
         continue;
       }
       // Remove the "." at the beginning of the moniker. It's safe because moniker is not empty.
-      std::string moniker = info.moniker.substr(1);
-      ReadElfJobId(
-          std::move(instance_dirs_res.response().resolved_dirs->execution_dirs->runtime_dir),
-          moniker,
-          [weak_this = weak_factory_.GetWeakPtr(), moniker, url = std::move(info.url),
-           deferred_ready](zx_koid_t job_id) {
-            if (weak_this && job_id != ZX_KOID_INVALID) {
-              weak_this->running_component_info_[job_id] = {.moniker = moniker, .url = url};
-            }
-          });
+      std::string moniker = instance.moniker().substr(1);
+      ReadElfJobId(std::move(runtime_dir_handle), moniker,
+                   [weak_this = weak_factory_.GetWeakPtr(), moniker, url = instance.url(),
+                    deferred_ready](zx_koid_t job_id) {
+                     if (weak_this && job_id != ZX_KOID_INVALID) {
+                       weak_this->running_component_info_[job_id] = {.moniker = moniker,
+                                                                     .url = url};
+                     }
+                   });
     }
   }
 }
