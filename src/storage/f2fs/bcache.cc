@@ -54,15 +54,15 @@ zx::result<std::unique_ptr<Bcache>> CreateBcache(std::unique_ptr<block_client::B
 
 zx::result<std::unique_ptr<Bcache>> CreateBcache(
     fidl::ClientEnd<fuchsia_hardware_block::Block> device_channel, bool* out_readonly) {
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  zx_status_t status = block_client::RemoteBlockDevice::Create(std::move(device_channel), &device);
-  if (status != ZX_OK) {
+  auto device_or = block_client::RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{device_channel.TakeChannel()});
+  if (device_or.is_error()) {
     FX_LOGS(ERROR) << "could not initialize block device";
-    return zx::error(status);
+    return device_or.take_error();
   }
 
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcache(std::move(*device_or), &readonly_device);
   if (bc_or.is_error()) {
     FX_LOGS(ERROR) << "could not create block cache";
     return bc_or.take_error();
