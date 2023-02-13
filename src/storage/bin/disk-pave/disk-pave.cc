@@ -445,11 +445,8 @@ zx_status_t RealMain(Flags flags) {
       return ZX_OK;
     }
     case Command::kBootloader: {
-      // WriteBootloader() has been replaced by WriteFirmware() with an empty
-      // firmware type, but keep this function around for backwards-compatibility.
-      auto result =
-          data_sink->WriteFirmware(fuchsia_paver::wire::Configuration::kA, "", std::move(payload));
-      status = result.ok() ? result.value().result.status() : result.status();
+      auto result = data_sink->WriteBootloader(std::move(payload));
+      status = result.ok() ? result.value().status : result.status();
       if (status != ZX_OK) {
         ERROR("Installing bootloader partition failed: %s\n", zx_status_get_string(status));
         return status;

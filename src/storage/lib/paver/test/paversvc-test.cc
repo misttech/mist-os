@@ -1685,10 +1685,9 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloader) {
   CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
-  auto result =
-      data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kA, "", std::move(payload));
+  auto result = data_sink_->WriteBootloader(std::move(payload));
   ASSERT_OK(result.status());
-  ASSERT_OK(result.value().result.status());
+  ASSERT_OK(result.value().status);
   ValidateWritten(4, 4);
 }
 
@@ -1705,10 +1704,9 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloaderNotAligned) {
   WriteData(8 * kPagesPerBlock - 1, 1, 0xff);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
-  auto result =
-      data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kA, "", std::move(payload));
+  auto result = data_sink_->WriteBootloader(std::move(payload));
   ASSERT_OK(result.status());
-  ASSERT_OK(result.value().result.status());
+  ASSERT_OK(result.value().status);
   ValidateWrittenPages(4 * kPagesPerBlock, static_cast<size_t>(4) * kPagesPerBlock - 1);
   ValidateUnwrittenPages(8 * kPagesPerBlock - 1, 1);
 }
