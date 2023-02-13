@@ -376,6 +376,7 @@ var _ inspectInner = (*fidlStatsInspectImpl)(nil)
 type fidlStatsInspectImpl struct {
 	name                      string
 	fidlInterfaceWatcherStats *fidlInterfaceWatcherStats
+	fidlRoutesWatcherMetrics  *fidlRoutesWatcherMetrics
 }
 
 func (impl *fidlStatsInspectImpl) ReadData() inspect.Object {
@@ -385,6 +386,14 @@ func (impl *fidlStatsInspectImpl) ReadData() inspect.Object {
 			{
 				Key:   "InterfaceWatcherCount",
 				Value: inspect.MetricValueWithIntValue(impl.fidlInterfaceWatcherStats.count.Load()),
+			},
+			{
+				Key:   "RoutesWatcherV4Count",
+				Value: inspect.MetricValueWithIntValue(impl.fidlRoutesWatcherMetrics.count_v4.Load()),
+			},
+			{
+				Key:   "RoutesWatcherV6Count",
+				Value: inspect.MetricValueWithIntValue(impl.fidlRoutesWatcherMetrics.count_v6.Load()),
 			},
 		},
 	}

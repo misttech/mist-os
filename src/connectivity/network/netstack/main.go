@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/filter"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/pprof"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	tracingprovider "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/provider"
 
@@ -36,7 +37,7 @@ import (
 	"fidl/fuchsia/net/interfaces"
 	"fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/neighbor"
-	"fidl/fuchsia/net/routes"
+	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 	"fidl/fuchsia/netstack"
 	"fidl/fuchsia/posix/socket"
@@ -403,11 +404,18 @@ func Main() {
 	f := filter.New(stk)
 
 	interfaceEventChan := make(chan interfaceEvent)
-	watcherChan := make(chan interfaceWatcherRequest)
+	interfacesWatcherChan := make(chan interfaceWatcherRequest)
 	fidlInterfaceWatcherStats := &fidlInterfaceWatcherStats{}
-	go interfaceWatcherEventLoop(ctx, interfaceEventChan, watcherChan, fidlInterfaceWatcherStats)
+	go interfaceWatcherEventLoop(ctx, interfaceEventChan, interfacesWatcherChan, fidlInterfaceWatcherStats)
+
+	routingChangesChan := make(chan routes.RoutingTableChange, maxPendingChanges)
+	routesWatcherChan := make(chan routesGetWatcherRequest)
+	fidlRoutesWatcherMetrics := &fidlRoutesWatcherMetrics{}
+	go routesWatcherEventLoop(ctx, routesWatcherChan, routingChangesChan, fidlRoutesWatcherMetrics)
+
 	ns := &Netstack{
 		interfaceEventChan: interfaceEventChan,
+		routeTable:         routes.NewRouteTableWithChangesChan(routingChangesChan),
 		dnsConfig:          dns.MakeServersConfig(stk.Clock()),
 		stack:              stk,
 		stats:              stats{Stats: stk.Stats()},
@@ -483,6 +491,7 @@ func Main() {
 				inner: &fidlStatsInspectImpl{
 					name:                      "Networking FIDL Protocol Stats",
 					fidlInterfaceWatcherStats: fidlInterfaceWatcherStats,
+					fidlRoutesWatcherMetrics:  fidlRoutesWatcherMetrics,
 				},
 			}).asService,
 		},
@@ -644,22 +653,56 @@ func Main() {
 	}
 
 	{
-		stub := routes.StateWithCtxStub{Impl: &routesImpl{stack: ns.stack}}
+		resolveImpl := resolveImpl{
+			stack: ns.stack,
+		}
+
+		stub := fnetRoutes.StateWithCtxStub{Impl: &resolveImpl}
 		componentCtx.OutgoingService.AddService(
-			routes.StateName,
+			fnetRoutes.StateName,
 			func(ctx context.Context, c zx.Channel) error {
 				go component.Serve(ctx, &stub, c, component.ServeOptions{
 					OnError: func(err error) {
-						_ = syslog.WarnTf(routes.StateName, "%s", err)
+						_ = syslog.WarnTf(fnetRoutes.StateName, "%s", err)
 					},
 				})
 				return nil
 			},
 		)
+		getWatcherImpl := getWatcherImpl{
+			watcherChan: routesWatcherChan,
+		}
+
+		stub_v4 := fnetRoutes.StateV4WithCtxStub{Impl: &getWatcherImpl}
+		componentCtx.OutgoingService.AddService(
+			fnetRoutes.StateV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub_v4, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(fnetRoutes.StateV4Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+
+		stub_v6 := fnetRoutes.StateV6WithCtxStub{Impl: &getWatcherImpl}
+		componentCtx.OutgoingService.AddService(
+			fnetRoutes.StateV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub_v6, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(fnetRoutes.StateV6Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+
 	}
 
 	{
-		stub := interfaces.StateWithCtxStub{Impl: &interfaceStateImpl{watcherChan: watcherChan}}
+		stub := interfaces.StateWithCtxStub{Impl: &interfaceStateImpl{watcherChan: interfacesWatcherChan}}
 		componentCtx.OutgoingService.AddService(
 			interfaces.StateName,
 			func(ctx context.Context, c zx.Channel) error {

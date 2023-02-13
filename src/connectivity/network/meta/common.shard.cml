@@ -187,6 +187,8 @@
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
                 "fuchsia.net.routes.State",
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",

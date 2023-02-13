@@ -170,6 +170,7 @@ go_library("lib") {
     "fuchsia_net_neighbor.go",
     "fuchsia_net_neighbor_test.go",
     "fuchsia_net_routes.go",
+    "fuchsia_net_routes_test.go",
     "fuchsia_net_stack.go",
     "fuchsia_net_stack_test.go",
     "fuchsia_posix_socket.go",

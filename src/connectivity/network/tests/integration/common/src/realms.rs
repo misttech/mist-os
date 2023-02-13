@@ -86,6 +86,8 @@ impl NetstackVersion {
                 fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ViewMarker::PROTOCOL_NAME,
                 fnet_routes::StateMarker::PROTOCOL_NAME,
+                fnet_routes::StateV4Marker::PROTOCOL_NAME,
+                fnet_routes::StateV6Marker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
                 fnetstack::NetstackMarker::PROTOCOL_NAME,
             ),

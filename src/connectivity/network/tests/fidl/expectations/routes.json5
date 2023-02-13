@@ -15,10 +15,6 @@
                 // TODO(https://fxbug.dev/120099): Support fuchsia.net.routes
                 // Watcher protocols in Netstack3.
                 "watcher*ns3*",
-
-                // TODO(https://fxbug.dev/115871): Support fuchsia.net.routes
-                // Watcher protocols in Netstack2.
-                "watcher*ns2*",
             ],
         },
     ],

@@ -99,6 +99,20 @@ type ExtendedRoute struct {
 	Enabled bool
 }
 
+type RoutingChangeTag uint32
+
+const (
+	_ RoutingChangeTag = iota
+	RouteAdded
+	RouteRemoved
+)
+
+// A union type abstracting over the possible changes to the routing table.
+type RoutingTableChange struct {
+	Change RoutingChangeTag
+	Route  ExtendedRoute
+}
+
 // Match matches the given address against this route.
 func (er *ExtendedRoute) Match(addr tcpip.Address) bool {
 	return er.Route.Destination.Contains(addr)
@@ -133,11 +147,51 @@ func (rt ExtendedRouteTable) String() string {
 	return out.String()
 }
 
+// RoutingChangeSender queues up pending changes to the RouteTable, and
+// sends these changes to clients of the `fuchsia.net.routes.Watcher` protocols
+// once the events changes are committed into gVisor.
+type routingChangeSender struct {
+	// A buffer containing accumulated changes to the routing table that have
+	// not yet been sent into `RoutingChangesChan`.
+	pendingChanges []RoutingTableChange
+	// A channel to forward changes in routing state to the clients of
+	// fuchsia.net.routes Watcher protocols.
+	routingChangesChan chan<- RoutingTableChange
+}
+
+// queueChange queues a RoutingTableChange in the RoutingChangeSender.
+func (s *routingChangeSender) queueChange(c RoutingTableChange) {
+	if s.routingChangesChan != nil {
+		s.pendingChanges = append(s.pendingChanges, c)
+	}
+}
+
+// flushChanges drains the pendingChanges by sending each RoutingTableChange
+// into the RoutingChangesChan.
+func (s *routingChangeSender) flushChanges() {
+	if s.routingChangesChan == nil {
+		return
+	}
+	for _, c := range s.pendingChanges {
+		s.routingChangesChan <- c
+	}
+	s.pendingChanges = nil
+}
+
 // RouteTable implements a sorted list of extended routes that is used to build
 // the Netstack lib route table.
 type RouteTable struct {
 	sync.Mutex
 	routes ExtendedRouteTable
+	sender routingChangeSender
+}
+
+func NewRouteTableWithChangesChan(c chan<- RoutingTableChange) RouteTable {
+	return RouteTable{
+		sender: routingChangeSender{
+			routingChangesChan: c,
+		},
+	}
 }
 
 // For debugging.
@@ -178,6 +232,10 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 	for i, er := range rt.routes {
 		if er.Route == route {
 			rt.routes = append(rt.routes[:i], rt.routes[i+1:]...)
+			rt.sender.queueChange(RoutingTableChange{
+				Change: RouteRemoved,
+				Route:  er,
+			})
 			break
 		}
 	}
@@ -205,6 +263,11 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 	}
 
 	rt.dumpLocked()
+
+	rt.sender.queueChange(RoutingTableChange{
+		Change: RouteAdded,
+		Route:  newEr,
+	})
 }
 
 // AddRoute inserts the given route to the table in a sorted fashion. If the
@@ -250,6 +313,14 @@ func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []ExtendedRoute {
 	}
 
 	rt.dumpLocked()
+
+	for _, er := range routesDeleted {
+		rt.sender.queueChange(RoutingTableChange{
+			Change: RouteRemoved,
+			Route:  er,
+		})
+	}
+
 	return routesDeleted
 }
 
@@ -280,6 +351,8 @@ func (rt *RouteTable) UpdateStackLocked(stack *stack.Stack, onUpdateSucceeded fu
 		}
 	}
 	stack.SetRouteTable(t)
+	// Notify clients of `fuchsia.net.routes/Watcher` of the changes.
+	rt.sender.flushChanges()
 
 	_ = syslog.VLogTf(syslog.DebugVerbosity, tag, "UpdateStack route table: %+v", t)
 	onUpdateSucceeded()
@@ -325,9 +398,17 @@ func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action Ac
 		if er.Route.NIC == nicid {
 			switch action {
 			case ActionDeleteAll:
+				rt.sender.queueChange(RoutingTableChange{
+					Change: RouteRemoved,
+					Route:  er,
+				})
 				continue // delete
 			case ActionDeleteDynamic:
 				if er.Dynamic {
+					rt.sender.queueChange(RoutingTableChange{
+						Change: RouteRemoved,
+						Route:  er,
+					})
 					continue // delete
 				}
 			case ActionDisableStatic:

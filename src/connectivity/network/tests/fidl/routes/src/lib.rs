@@ -291,7 +291,13 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
     subnet: net_types::ip::Subnet<I::Addr>,
     interface: u64,
     metric: u32,
+    metric_is_inherited: bool,
 ) -> fnet_routes_ext::InstalledRoute<I> {
+    let specified_metric = if metric_is_inherited {
+        fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty)
+    } else {
+        fnet_routes::SpecifiedMetric::ExplicitMetric(metric)
+    };
     fnet_routes_ext::InstalledRoute {
         route: fnet_routes_ext::Route {
             destination: subnet,
@@ -301,7 +307,7 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
             }),
             properties: fnet_routes_ext::RouteProperties {
                 specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
-                    metric: fnet_routes::SpecifiedMetric::ExplicitMetric(metric),
+                    metric: specified_metric,
                 },
             },
         },
@@ -356,11 +362,13 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
                     net_subnet_v4!("127.0.0.0/8"),
                     loopback_id,
                     DEFAULT_INTERFACE_METRIC,
+                    true,
                 ),
                 new_installed_route(
                     net_subnet_v4!("255.255.255.255/32"),
                     loopback_id,
                     DEFAULT_LOW_PRIORITY_METRIC,
+                    false,
                 ),
             ])
         },
@@ -370,11 +378,17 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
                     net_subnet_v6!("::1/128"),
                     loopback_id,
                     DEFAULT_INTERFACE_METRIC,
+                    true,
                 ),
                 // TODO(https://fxbug.dev/120250): Once IPv6 link-local subnet
                 // routes have the correct metric, switch this to
                 // `DEFAULT_INTERFACE_METRIC`.
-                new_installed_route(net_subnet_v6!("fe80::/64"), loopback_id, DEFAULT_UNSET_METRIC),
+                new_installed_route(
+                    net_subnet_v6!("fe80::/64"),
+                    loopback_id,
+                    DEFAULT_UNSET_METRIC,
+                    true,
+                ),
             ])
         },
     );
@@ -440,7 +454,8 @@ async fn watcher_add_before_watch<
     let existing = fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream)
         .await
         .expect("failed to collect existing routes");
-    let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+    let expected_route =
+        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
     assert!(
         existing.contains(&expected_route),
         "route: {:?}, existing: {:?}",
@@ -483,7 +498,8 @@ async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext:
         event_stream.next().await,
         Some(Ok(fnet_routes_ext::Event::<I>::Added(route))) => route
     );
-    let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+    let expected_route =
+        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
     assert_eq!(added_route, expected_route);
 
     // Remove the test route.
@@ -516,7 +532,7 @@ async fn watcher_already_pending<
     // Call `Watch` in a loop until the idle event is observed.
     while fnet_routes_ext::watch::<I>(&watcher_proxy)
         .map(|event_batch| {
-            event_batch.expect("error while calling watch").into_iter().any(|event| {
+            event_batch.expect("error while calling watch").into_iter().all(|event| {
                 use fnet_routes_ext::Event::*;
                 match event.try_into().expect("failed to process event") {
                     Existing(_) => true,
@@ -643,7 +659,8 @@ async fn watcher_multiple_instances<
             },
         );
         interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
-        let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+        let expected_route =
+            new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
         expected_existing_routes.push(expected_route);
 
         // Observe an `added` event on all connected watchers.
