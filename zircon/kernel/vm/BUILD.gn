@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/zircon/migrated_targets.gni")
+import("//zircon/kernel/params.gni")
 
 zx_library("vm") {
   sources = [
@@ -18,6 +19,7 @@ zx_library("vm") {
     "evictor.cc",
     "kstack.cc",
     "loan_sweeper.cc",
+    "lz4_compressor.cc",
     "page.cc",
     "page_queues.cc",
     "page_source.cc",
@@ -62,6 +64,17 @@ zx_library("vm") {
     # TODO: testonly
     ":tests",
   ]
+
+  # TODO(fxbug.dev/60238): Inclusion of the lz4 library is guarded while the RFC
+  # is in iterate.
+  if (page_compression_enabled) {
+    deps += [ "//zircon/third_party/ulib/lz4" ]
+    defines = [
+      "LZ4_STATIC_LINKING_ONLY",
+      "LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION",
+    ]
+  }
+
   public_deps = [
     # <vm/vm_page_list.h> has #include <ktl/unique_ptr.h>.
     "//zircon/kernel/lib/ktl:headers",
@@ -99,11 +112,15 @@ config("suppress-nonheap-warning") {
 source_set("tests") {
   sources = [
     "unittests/aspace_unittest.cc",
+    "unittests/compression_unittest.cc",
     "unittests/evictor_unittest.cc",
     "unittests/pmm_unittest.cc",
     "unittests/test_helper.cc",
     "unittests/vmo_unittest.cc",
     "unittests/vmpl_unittest.cc",
   ]
-  deps = [ "//zircon/kernel/lib/unittest" ]
+  deps = [
+    "//zircon/kernel/lib/unittest",
+    "//zircon/third_party/ulib/lz4",
+  ]
 }
