@@ -228,7 +228,8 @@ impl Partition {
             }
             PartitionPaveType::Bootloader => {
                 let mut fidl_buf = self.read_data().await?;
-                data_sink.write_bootloader(&mut fidl_buf).await?;
+                // Currently we only store the bootloader in slot A, we don't use an A/B/R scheme.
+                data_sink.write_firmware(Configuration::A, "", &mut fidl_buf).await?;
             }
             PartitionPaveType::Volume => {
                 let pauser = BlockWatcherPauser::new().await.context("Pausing block watcher")?;

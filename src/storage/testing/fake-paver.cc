@@ -262,14 +262,6 @@ void FakePaver::WriteVolumes(WriteVolumesRequestView request,
   completer.Reply(status);
 }
 
-void FakePaver::WriteBootloader(WriteBootloaderRequestView request,
-                                WriteBootloaderCompleter::Sync& completer) {
-  fbl::AutoLock al(&lock_);
-  AppendCommand(Command::kWriteBootloader);
-  auto status = request->payload.size == expected_payload_size_ ? ZX_OK : ZX_ERR_INVALID_ARGS;
-  completer.Reply(status);
-}
-
 void FakePaver::WipeVolume(WipeVolumeCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kWipeVolume);
