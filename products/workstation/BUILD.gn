@@ -37,12 +37,6 @@ product_assembly_configuration("workstation") {
   product = workstation_product_config
 }
 
-bazel_input_resource("workstation_product_config") {
-  sources = [ "${target_out_dir}/workstation/product_assembly_config.json" ]
-  outputs = [ "products/workstation/workstation/product_assembly_config.json" ]
-  deps = [ ":workstation" ]
-}
-
 # TODO(https://fxbug.dev/107089) remove this product once workstation_eng can start paused
 product_assembly_configuration("workstation_paused") {
   platform = workstation_platform_config
