@@ -864,7 +864,7 @@ group("sha2") {
 
 if (!(current_os == "fuchsia")) {
   group("shared_child") {
-    public_deps = [ ":shared_child-v0_3_5" ]
+    public_deps = [ ":shared_child-v1_0_0" ]
   }
 }
 
@@ -10217,10 +10217,10 @@ rust_library("sharded-slab-v0_1_4") {
   visibility = [ ":*" ]
 }
 
-rust_library("shared_child-v0_3_5") {
+rust_library("shared_child-v1_0_0") {
   crate_name = "shared_child"
-  crate_root = "//third_party/rust_crates/vendor/shared_child-0.3.5/src/lib.rs"
-  output_name = "shared_child-ea65da9e08c8af24"
+  crate_root = "//third_party/rust_crates/vendor/shared_child-1.0.0/src/lib.rs"
+  output_name = "shared_child-343c2e19f8d8c087"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10236,8 +10236,8 @@ rust_library("shared_child-v0_3_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ea65da9e08c8af24",
-    "-Cextra-filename=-ea65da9e08c8af24",
+    "-Cmetadata=343c2e19f8d8c087",
+    "-Cextra-filename=-343c2e19f8d8c087",
   ]
 
   visibility = [ ":*" ]

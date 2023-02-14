@@ -307,7 +307,7 @@ rustfix = "0.6.1"
 rustls-native-certs = "0.5.0"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
-shared_child = "0.3.5"
+shared_child = "1.0.0"
 signal-hook = "0.3.8"
 simplelog = "0.10.2"
 syn = { version = "1.0.98", features = ["full", "visit", "visit-mut", "extra-traits"] }
