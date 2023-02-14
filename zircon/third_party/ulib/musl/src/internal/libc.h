@@ -122,6 +122,22 @@ extern char** __environ;
 #define NO_ASAN
 #endif
 
+// Indicate the given function should not use LLVM's stack hardening features,
+// but instead put all local variables on the standard stack. Additionally, the
+// function should not be sanitized with HWASan. This particular combination is
+// significant because libc currently does checks via calls into the hwasan
+// runtime which is instrumented with these stack features. Making a runtime
+// call in a libc function invoked after the shadow call stack is deallocated
+// can result in a fault, so those functions which would be marked with
+// NO_SAFESTACK should also take care not to make a libcall into the hwasan
+// runtime.
+#ifdef __clang__
+#define LIBC_NO_SAFESTACK \
+  __attribute__((no_sanitize("safe-stack", "shadow-call-stack", "hwaddress")))
+#else
+#define LIBC_NO_SAFESTACK
+#endif
+
 #define STRICT_BYTE_ACCESS \
   (!__has_feature(address_sanitizer) && !__has_feature(hwaddress_sanitizer))
 

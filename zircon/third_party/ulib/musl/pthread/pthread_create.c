@@ -15,7 +15,7 @@
 #include "threads_impl.h"
 #include "zircon_impl.h"
 
-__NO_SAFESTACK NO_ASAN static pthread_t prestart(void* arg, void* caller) {
+LIBC_NO_SAFESTACK NO_ASAN static pthread_t prestart(void* arg, void* caller) {
   pthread_t self = arg;
 
 #ifdef __aarch64__
@@ -38,28 +38,28 @@ __NO_SAFESTACK NO_ASAN static pthread_t prestart(void* arg, void* caller) {
 // pthread. This argument gets passed immediately to the thread entry and it's up to the user to
 // keep track of it. This is meaningful to a tool like LSan which could hide an actual leak if the
 // pthread contained a reference to an unhandled allocation.
-__NO_SAFESTACK NO_ASAN static void* get_and_reset_start_arg(pthread_t self) {
+LIBC_NO_SAFESTACK NO_ASAN static void* get_and_reset_start_arg(pthread_t self) {
   void* start_arg = self->start_arg_or_result;
   self->start_arg_or_result = NULL;
   return start_arg;
 }
 
-__NO_RETURN __NO_SAFESTACK NO_ASAN static void start_pthread(void* arg) {
+__NO_RETURN LIBC_NO_SAFESTACK NO_ASAN static void start_pthread(void* arg) {
   pthread_t self = prestart(arg, __builtin_return_address(0));
   __pthread_exit(self->start(get_and_reset_start_arg(self)));
 }
 
-__NO_RETURN __NO_SAFESTACK NO_ASAN static void start_c11(void* arg) {
+__NO_RETURN LIBC_NO_SAFESTACK NO_ASAN static void start_c11(void* arg) {
   pthread_t self = prestart(arg, __builtin_return_address(0));
   int (*start)(void*) = (int (*)(void*))(uintptr_t)self->start;
   __pthread_exit((void*)(intptr_t)start(get_and_reset_start_arg(self)));
 }
 
-__NO_SAFESTACK static void deallocate_region(const struct iovec* region) {
+LIBC_NO_SAFESTACK static void deallocate_region(const struct iovec* region) {
   _zx_vmar_unmap(_zx_vmar_root_self(), (uintptr_t)region->iov_base, region->iov_len);
 }
 
-__NO_SAFESTACK static void deallocate_stack(struct iovec* stack, const struct iovec* region) {
+LIBC_NO_SAFESTACK static void deallocate_stack(struct iovec* stack, const struct iovec* region) {
   // Clear the pointers in the TCB before actually unmapping.  In case we get
   // suspended by __sanitizer_memory_snapshot, the TCB is always expected to
   // contain valid pointers.
@@ -139,7 +139,7 @@ fail_after_alloc:
 
 static _Noreturn void final_exit(pthread_t self) __asm__("final_exit") __attribute__((used));
 
-static __NO_SAFESTACK NO_ASAN void final_exit(pthread_t self) {
+static LIBC_NO_SAFESTACK NO_ASAN void final_exit(pthread_t self) {
   deallocate_stack(&self->safe_stack, &self->safe_stack_region);
   deallocate_stack(&self->unsafe_stack, &self->unsafe_stack_region);
 #if HAVE_SHADOW_CALL_STACK

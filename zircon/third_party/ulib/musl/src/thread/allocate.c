@@ -19,31 +19,31 @@ __asan_weak_ref("memset")
 
 #ifdef __aarch64__
 // Clang's <arm_acle.h> has __yield() but GCC doesn't (nor the intrinsic).
-__NO_SAFESTACK static inline void relax(void) { __asm__("yield"); }
+LIBC_NO_SAFESTACK static inline void relax(void) { __asm__("yield"); }
 #elif defined(__x86_64__)
 // GCC's <x86intrin.h> has __pause() but not Clang though it has the intrinsic.
-__NO_SAFESTACK static inline void relax(void) { __builtin_ia32_pause(); }
+LIBC_NO_SAFESTACK static inline void relax(void) { __builtin_ia32_pause(); }
 #else
-__NO_SAFESTACK static inline void relax(void) {}
+LIBC_NO_SAFESTACK static inline void relax(void) {}
 #endif
 
 static struct pthread* all_threads;
 static atomic_flag all_threads_lock = ATOMIC_FLAG_INIT;
 
-__NO_SAFESTACK struct pthread** __thread_list_acquire(void) {
+LIBC_NO_SAFESTACK struct pthread** __thread_list_acquire(void) {
   while (atomic_flag_test_and_set_explicit(&all_threads_lock, memory_order_acquire)) {
     relax();
   }
   return &all_threads;
 }
 
-__NO_SAFESTACK void __thread_list_release(void) {
+LIBC_NO_SAFESTACK void __thread_list_release(void) {
   atomic_flag_clear_explicit(&all_threads_lock, memory_order_release);
 }
 
 // A detached thread has to remove itself from the list.
 // Joinable threads get removed only in pthread_join.
-__NO_SAFESTACK void __thread_list_erase(void* arg) {
+LIBC_NO_SAFESTACK void __thread_list_erase(void* arg) {
   struct pthread* t = arg;
   __thread_list_acquire();
   *t->prevp = t->next;
@@ -64,11 +64,11 @@ void __thread_allocation_inhibit(void) { pthread_rwlock_wrlock(&allocation_lock)
 
 void __thread_allocation_release(void) { pthread_rwlock_unlock(&allocation_lock); }
 
-__NO_SAFESTACK static inline size_t round_up_to_page(size_t sz) {
+LIBC_NO_SAFESTACK static inline size_t round_up_to_page(size_t sz) {
   return (sz + PAGE_SIZE - 1) & -PAGE_SIZE;
 }
 
-__NO_SAFESTACK static ptrdiff_t offset_for_module(const struct tls_module* module) {
+LIBC_NO_SAFESTACK static ptrdiff_t offset_for_module(const struct tls_module* module) {
 #ifdef TLS_ABOVE_TP
   return module->offset;
 #else
@@ -76,7 +76,7 @@ __NO_SAFESTACK static ptrdiff_t offset_for_module(const struct tls_module* modul
 #endif
 }
 
-__NO_SAFESTACK static thrd_t copy_tls(unsigned char* mem, size_t alloc) {
+LIBC_NO_SAFESTACK static thrd_t copy_tls(unsigned char* mem, size_t alloc) {
   thrd_t td;
   struct tls_module* p;
   size_t i;
@@ -142,9 +142,9 @@ __NO_SAFESTACK static thrd_t copy_tls(unsigned char* mem, size_t alloc) {
 HWASAN_STUBS
 #endif  // __has_feature(hwaddress_sanitizer)
 
-__NO_SAFESTACK static bool map_block(zx_handle_t parent_vmar, zx_handle_t vmo, size_t vmo_offset,
-                                     size_t size, size_t before, size_t after,
-                                     struct iovec* mapping, struct iovec* region) {
+LIBC_NO_SAFESTACK static bool map_block(zx_handle_t parent_vmar, zx_handle_t vmo, size_t vmo_offset,
+                                        size_t size, size_t before, size_t after,
+                                        struct iovec* mapping, struct iovec* region) {
   region->iov_len = before + size + after;
   zx_handle_t vmar;
   uintptr_t addr;
@@ -229,8 +229,9 @@ __NO_SAFESTACK static bool map_block(zx_handle_t parent_vmar, zx_handle_t vmo, s
 // the ShadowCallStack ABI.
 __asan_weak_ref("memcpy")
 
-__NO_SAFESTACK thrd_t __allocate_thread(size_t requested_guard_size, size_t requested_stack_size,
-                                        const char* thread_name, char vmo_name[ZX_MAX_NAME_LEN]) {
+    LIBC_NO_SAFESTACK thrd_t
+    __allocate_thread(size_t requested_guard_size, size_t requested_stack_size,
+                      const char* thread_name, char vmo_name[ZX_MAX_NAME_LEN]) {
   // In the initial thread, we're allocating the stacks and TCB for the running
   // thread itself.  So we can't make calls that rely on safe-stack or
   // shadow-call-stack setup.  Rather than annotating everything in the call
@@ -280,7 +281,7 @@ __NO_SAFESTACK thrd_t __allocate_thread(size_t requested_guard_size, size_t requ
   }
 
   // For the initial thread, it's too early to call snprintf because
-  // it's not __NO_SAFESTACK.
+  // it's not LIBC_NO_SAFESTACK.
   if (!initial_thread) {
     // For other threads, try to give the VMO a name that includes
     // the thrd_t value (and the TLS size if that fits too), but

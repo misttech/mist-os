@@ -4,8 +4,8 @@
 
 #include "dynlink.h"
 
-__NO_SAFESTACK NO_ASAN static inline void apply_relr(ElfW(Addr) base, const ElfW(Addr) * relr,
-                                                     size_t relrsz) {
+LIBC_NO_SAFESTACK NO_ASAN static inline void apply_relr(ElfW(Addr) base, const ElfW(Addr) * relr,
+                                                        size_t relrsz) {
   const size_t nrelr = relrsz / sizeof(relr[0]);
   size_t i = 0;
   while (i < nrelr) {

@@ -189,7 +189,7 @@ union arg {
   void* p;
 };
 
-__NO_SAFESTACK static void pop_arg(union arg* arg, int type, va_list* ap) {
+LIBC_NO_SAFESTACK static void pop_arg(union arg* arg, int type, va_list* ap) {
   /* Give the compiler a hint for optimizing the switch. */
   if ((unsigned)type > MAXSTATE)
     return;
@@ -254,12 +254,12 @@ __NO_SAFESTACK static void pop_arg(union arg* arg, int type, va_list* ap) {
   }
 }
 
-__NO_SAFESTACK static void out(FILE* f, const char* s, size_t l) {
+LIBC_NO_SAFESTACK static void out(FILE* f, const char* s, size_t l) {
   if (!(f->flags & F_ERR))
     __fwritex((void*)s, l, f);
 }
 
-__NO_SAFESTACK static void pad(FILE* f, char c, int w, int l, int fl) {
+LIBC_NO_SAFESTACK static void pad(FILE* f, char c, int w, int l, int fl) {
   char pad[256];
   if (fl & (LEFT_ADJ | ZERO_PAD) || l >= w)
     return;
@@ -272,19 +272,19 @@ __NO_SAFESTACK static void pad(FILE* f, char c, int w, int l, int fl) {
 
 static const char xdigits[16] = {"0123456789ABCDEF"};
 
-__NO_SAFESTACK static char* fmt_x(uintmax_t x, char* s, int lower) {
+LIBC_NO_SAFESTACK static char* fmt_x(uintmax_t x, char* s, int lower) {
   for (; x; x >>= 4)
     *--s = xdigits[(x & 15)] | lower;
   return s;
 }
 
-__NO_SAFESTACK static char* fmt_o(uintmax_t x, char* s) {
+LIBC_NO_SAFESTACK static char* fmt_o(uintmax_t x, char* s) {
   for (; x; x >>= 3)
     *--s = '0' + (x & 7);
   return s;
 }
 
-__NO_SAFESTACK static char* fmt_u(uintmax_t x, char* s) {
+LIBC_NO_SAFESTACK static char* fmt_u(uintmax_t x, char* s) {
   unsigned long y;
   for (; x > ULONG_MAX; x /= 10)
     *--s = '0' + x % 10;
@@ -579,15 +579,15 @@ static int fmt_fp(FILE* f, long double y, int w, int p, int fl, int t) {
   return MAX(w, pl + l);
 }
 
-__NO_SAFESTACK static int getint(char** s) {
+LIBC_NO_SAFESTACK static int getint(char** s) {
   int i;
   for (i = 0; isdigit(**s); (*s)++)
     i = 10 * i + (**s - '0');
   return i;
 }
 
-__NO_SAFESTACK static int printf_core(FILE* f, const char* fmt, va_list* ap, union arg* nl_arg,
-                                      int* nl_type) {
+LIBC_NO_SAFESTACK static int printf_core(FILE* f, const char* fmt, va_list* ap, union arg* nl_arg,
+                                         int* nl_type) {
   char *a, *z, *s = (char*)fmt;
   unsigned l10n = 0, fl;
   int w, p;
@@ -835,7 +835,7 @@ __NO_SAFESTACK static int printf_core(FILE* f, const char* fmt, va_list* ap, uni
   return 1;
 }
 
-__NO_SAFESTACK int vfprintf(FILE* restrict f, const char* restrict fmt, va_list ap) {
+LIBC_NO_SAFESTACK int vfprintf(FILE* restrict f, const char* restrict fmt, va_list ap) {
   va_list ap2;
   int nl_type[NL_ARGMAX + 1] = {};
   union arg nl_arg[NL_ARGMAX + 1];

@@ -165,7 +165,7 @@ void _dl_rdlock(void) { pthread_rwlock_rdlock(&lock); }
 void _dl_unlock(void) { pthread_rwlock_unlock(&lock); }
 static void _dl_wrlock(void) { pthread_rwlock_wrlock(&lock); }
 
-NO_ASAN __NO_SAFESTACK static int dl_strcmp(const char* l, const char* r) {
+NO_ASAN LIBC_NO_SAFESTACK static int dl_strcmp(const char* l, const char* r) {
   for (; *l == *r && *l; l++, r++)
     ;
   return *(unsigned char*)l - *(unsigned char*)r;
@@ -209,7 +209,7 @@ __asm__(
 
 #endif
 
-__NO_SAFESTACK static bool should_break_on_load(void) {
+LIBC_NO_SAFESTACK static bool should_break_on_load(void) {
   intptr_t dyn_break_on_load = 0;
   zx_status_t status = _zx_object_get_property(__zircon_process_self, ZX_PROP_PROCESS_BREAK_ON_LOAD,
                                                &dyn_break_on_load, sizeof(dyn_break_on_load));
@@ -242,7 +242,7 @@ union allocated_types {
 
 static uintptr_t alloc_base, alloc_limit, alloc_ptr;
 
-__NO_SAFESTACK NO_ASAN __attribute__((malloc)) static void* dl_alloc(size_t size) {
+LIBC_NO_SAFESTACK NO_ASAN __attribute__((malloc)) static void* dl_alloc(size_t size) {
   // Round the size up so the allocation pointer always stays aligned.
   size = (size + DL_ALLOC_ALIGN - 1) & -DL_ALLOC_ALIGN;
 
@@ -276,13 +276,13 @@ struct dl_alloc_checkpoint {
   uintptr_t ptr, base;
 };
 
-__NO_SAFESTACK
+LIBC_NO_SAFESTACK
 static void dl_alloc_checkpoint(struct dl_alloc_checkpoint* state) {
   state->ptr = alloc_ptr;
   state->base = alloc_base;
 }
 
-__NO_SAFESTACK
+LIBC_NO_SAFESTACK
 static void dl_alloc_rollback(const struct dl_alloc_checkpoint* state) {
   uintptr_t frontier = alloc_ptr;
   // If we're still using the same contiguous chunk as the checkpoint
@@ -295,32 +295,32 @@ static void dl_alloc_rollback(const struct dl_alloc_checkpoint* state) {
 }
 
 /* Compute load address for a virtual address in a given dso. */
-__NO_SAFESTACK NO_ASAN static inline size_t saddr(struct dso* p, size_t v) {
+LIBC_NO_SAFESTACK NO_ASAN static inline size_t saddr(struct dso* p, size_t v) {
   return p->l_map.l_addr + v;
 }
 
-__NO_SAFESTACK NO_ASAN static inline void* laddr(struct dso* p, size_t v) {
+LIBC_NO_SAFESTACK NO_ASAN static inline void* laddr(struct dso* p, size_t v) {
   return (void*)saddr(p, v);
 }
 
-__NO_SAFESTACK NO_ASAN static inline void (*fpaddr(struct dso* p, size_t v))(void) {
+LIBC_NO_SAFESTACK NO_ASAN static inline void (*fpaddr(struct dso* p, size_t v))(void) {
   return (void (*)(void))saddr(p, v);
 }
 
 // Accessors for dso previous and next pointers.
-__NO_SAFESTACK NO_ASAN static inline struct dso* dso_next(struct dso* p) {
+LIBC_NO_SAFESTACK NO_ASAN static inline struct dso* dso_next(struct dso* p) {
   return (struct dso*)p->l_map.l_next;
 }
 
-__NO_SAFESTACK NO_ASAN static inline struct dso* dso_prev(struct dso* p) {
+LIBC_NO_SAFESTACK NO_ASAN static inline struct dso* dso_prev(struct dso* p) {
   return (struct dso*)p->l_map.l_prev;
 }
 
-__NO_SAFESTACK NO_ASAN static inline void dso_set_next(struct dso* p, struct dso* next) {
+LIBC_NO_SAFESTACK NO_ASAN static inline void dso_set_next(struct dso* p, struct dso* next) {
   p->l_map.l_next = next ? &next->l_map : NULL;
 }
 
-__NO_SAFESTACK NO_ASAN static inline void dso_set_prev(struct dso* p, struct dso* prev) {
+LIBC_NO_SAFESTACK NO_ASAN static inline void dso_set_prev(struct dso* p, struct dso* prev) {
   p->l_map.l_prev = prev ? &prev->l_map : NULL;
 }
 
@@ -358,7 +358,7 @@ __asm__(".weakref memcpy,__libc_memcpy");
 __asm__(".weakref memset,__libc_memset");
 __asan_weak_ref("memcpy") __asan_weak_ref("memset")
 
-    __NO_SAFESTACK NO_ASAN static void decode_vec(ElfW(Dyn) * v, size_t* a, size_t cnt) {
+    LIBC_NO_SAFESTACK NO_ASAN static void decode_vec(ElfW(Dyn) * v, size_t* a, size_t cnt) {
   size_t i;
   for (i = 0; i < cnt; i++)
     a[i] = 0;
@@ -369,7 +369,7 @@ __asan_weak_ref("memcpy") __asan_weak_ref("memset")
     }
 }
 
-__NO_SAFESTACK NO_ASAN static int search_vec(ElfW(Dyn) * v, size_t* r, size_t key) {
+LIBC_NO_SAFESTACK NO_ASAN static int search_vec(ElfW(Dyn) * v, size_t* r, size_t key) {
   for (; v->d_tag != key; v++)
     if (!v->d_tag)
       return 0;
@@ -377,7 +377,7 @@ __NO_SAFESTACK NO_ASAN static int search_vec(ElfW(Dyn) * v, size_t* r, size_t ke
   return 1;
 }
 
-__NO_SAFESTACK NO_ASAN static uint32_t sysv_hash(const char* s0) {
+LIBC_NO_SAFESTACK NO_ASAN static uint32_t sysv_hash(const char* s0) {
   const unsigned char* s = (void*)s0;
   uint_fast32_t h = 0;
   while (*s) {
@@ -387,7 +387,7 @@ __NO_SAFESTACK NO_ASAN static uint32_t sysv_hash(const char* s0) {
   return h & 0xfffffff;
 }
 
-__NO_SAFESTACK NO_ASAN static uint32_t gnu_hash(const char* s0) {
+LIBC_NO_SAFESTACK NO_ASAN static uint32_t gnu_hash(const char* s0) {
   const unsigned char* s = (void*)s0;
   uint_fast32_t h = 5381;
   for (; *s; s++)
@@ -395,7 +395,7 @@ __NO_SAFESTACK NO_ASAN static uint32_t gnu_hash(const char* s0) {
   return h;
 }
 
-__NO_SAFESTACK NO_ASAN static Sym* sysv_lookup(const char* s, uint32_t h, struct dso* dso) {
+LIBC_NO_SAFESTACK NO_ASAN static Sym* sysv_lookup(const char* s, uint32_t h, struct dso* dso) {
   size_t i;
   Sym* syms = dso->syms;
   uint32_t* hashtab = dso->hashtab;
@@ -407,8 +407,8 @@ __NO_SAFESTACK NO_ASAN static Sym* sysv_lookup(const char* s, uint32_t h, struct
   return 0;
 }
 
-__NO_SAFESTACK NO_ASAN static Sym* gnu_lookup(uint32_t h1, uint32_t* hashtab, struct dso* dso,
-                                              const char* s) {
+LIBC_NO_SAFESTACK NO_ASAN static Sym* gnu_lookup(uint32_t h1, uint32_t* hashtab, struct dso* dso,
+                                                 const char* s) {
   uint32_t nbuckets = hashtab[0];
   uint32_t* buckets = hashtab + 4 + hashtab[2] * (sizeof(size_t) / 4);
   uint32_t i = buckets[h1 % nbuckets];
@@ -430,9 +430,9 @@ __NO_SAFESTACK NO_ASAN static Sym* gnu_lookup(uint32_t h1, uint32_t* hashtab, st
   return 0;
 }
 
-__NO_SAFESTACK NO_ASAN static Sym* gnu_lookup_filtered(uint32_t h1, uint32_t* hashtab,
-                                                       struct dso* dso, const char* s,
-                                                       uint32_t fofs, size_t fmask) {
+LIBC_NO_SAFESTACK NO_ASAN static Sym* gnu_lookup_filtered(uint32_t h1, uint32_t* hashtab,
+                                                          struct dso* dso, const char* s,
+                                                          uint32_t fofs, size_t fmask) {
   const size_t* bloomwords = (const void*)(hashtab + 4);
   size_t f = bloomwords[fofs & (hashtab[2] - 1)];
   if (!(f & fmask))
@@ -449,7 +449,8 @@ __NO_SAFESTACK NO_ASAN static Sym* gnu_lookup_filtered(uint32_t h1, uint32_t* ha
   (1 << STT_NOTYPE | 1 << STT_OBJECT | 1 << STT_FUNC | 1 << STT_COMMON | 1 << STT_TLS)
 #define OK_BINDS (1 << STB_GLOBAL | 1 << STB_WEAK | 1 << STB_GNU_UNIQUE)
 
-__NO_SAFESTACK NO_ASAN static struct symdef find_sym(struct dso* dso, const char* s, int need_def) {
+LIBC_NO_SAFESTACK NO_ASAN static struct symdef find_sym(struct dso* dso, const char* s,
+                                                        int need_def) {
   uint32_t h = 0, gh = 0, gho = 0, *ght;
   size_t ghm = 0;
   struct symdef def = {};
@@ -495,8 +496,8 @@ __NO_SAFESTACK NO_ASAN static struct symdef find_sym(struct dso* dso, const char
 
 __attribute__((__visibility__("hidden"))) ptrdiff_t __tlsdesc_static(void), __tlsdesc_dynamic(void);
 
-__NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, size_t rel_size,
-                                             size_t stride) {
+LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, size_t rel_size,
+                                                size_t stride) {
   ElfW(Addr) base = dso->l_map.l_addr;
   Sym* syms = dso->syms;
   char* strings = dso->strings;
@@ -642,7 +643,7 @@ __NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, size_
   }
 }
 
-__NO_SAFESTACK static void unmap_library(struct dso* dso) {
+LIBC_NO_SAFESTACK static void unmap_library(struct dso* dso) {
   if (dso->map && dso->map_len) {
     munmap(dso->map, dso->map_len);
   }
@@ -654,14 +655,14 @@ __NO_SAFESTACK static void unmap_library(struct dso* dso) {
 }
 
 // app.module_id is always zero, so assignments start with 1.
-__NO_SAFESTACK NO_ASAN static void assign_module_id(struct dso* dso) {
+LIBC_NO_SAFESTACK NO_ASAN static void assign_module_id(struct dso* dso) {
   static unsigned int last_module_id;
   dso->module_id = ++last_module_id;
 }
 
 // Locate the build ID note just after mapping the segments in.
 // This is called from dls2, so it cannot use any non-static functions.
-__NO_SAFESTACK NO_ASAN static bool find_buildid_note(struct dso* dso, const Phdr* seg) {
+LIBC_NO_SAFESTACK NO_ASAN static bool find_buildid_note(struct dso* dso, const Phdr* seg) {
   const char* end = laddr(dso, seg->p_vaddr + seg->p_filesz);
   for (const struct gnu_note* n = laddr(dso, seg->p_vaddr); (const char*)n < end;
        n = (const void*)((const char*)&n->name + ((n->nhdr.n_namesz + 3) & -4) +
@@ -678,14 +679,15 @@ __NO_SAFESTACK NO_ASAN static bool find_buildid_note(struct dso* dso, const Phdr
 // Format the markup elements by hand to avoid using large and complex code
 // like the printf engine.
 
-__NO_SAFESTACK static char* format_string(char* p, const char* string, size_t len) {
+LIBC_NO_SAFESTACK static char* format_string(char* p, const char* string, size_t len) {
   return memcpy(p, string, len) + len;
 }
 
 #define FORMAT_HEX_VALUE_SIZE (2 + (sizeof(uint64_t) * 2))
 #define HEXDIGITS "0123456789abcdef"
 
-__NO_SAFESTACK static char* format_hex_value(char buffer[FORMAT_HEX_VALUE_SIZE], uint64_t value) {
+LIBC_NO_SAFESTACK static char* format_hex_value(char buffer[FORMAT_HEX_VALUE_SIZE],
+                                                uint64_t value) {
   char* p = buffer;
   if (value == 0) {
     // No "0x" prefix on zero.
@@ -706,7 +708,7 @@ __NO_SAFESTACK static char* format_hex_value(char buffer[FORMAT_HEX_VALUE_SIZE],
   return p;
 }
 
-__NO_SAFESTACK static char* format_hex_string(char* p, const uint8_t* string, size_t len) {
+LIBC_NO_SAFESTACK static char* format_hex_string(char* p, const uint8_t* string, size_t len) {
   for (size_t i = 0; i < len; ++i) {
     uint8_t byte = string[i];
     *p++ = HEXDIGITS[byte >> 4];
@@ -732,7 +734,7 @@ __NO_SAFESTACK static char* format_hex_string(char* p, const uint8_t* string, si
    sizeof(MODULE_ELEMENT_BUILD_ID_BEGIN) - 1 + (MAX_BUILD_ID_SIZE * 2) + 1 +         \
    sizeof(MODULE_ELEMENT_END))
 
-__NO_SAFESTACK static void log_module_element(struct dso* dso) {
+LIBC_NO_SAFESTACK static void log_module_element(struct dso* dso) {
   char buffer[MODULE_ELEMENT_SIZE];
   char* p = format_string(buffer, MODULE_ELEMENT_BEGIN, sizeof(MODULE_ELEMENT_BEGIN) - 1);
   p = format_hex_value(p, dso->module_id);
@@ -762,7 +764,7 @@ __NO_SAFESTACK static void log_module_element(struct dso* dso) {
    sizeof(MMAP_ELEMENT_LOAD_BEGIN) - 1 + FORMAT_HEX_VALUE_SIZE + 1 + 3 + 1 +                \
    FORMAT_HEX_VALUE_SIZE)
 
-__NO_SAFESTACK static void log_mmap_element(struct dso* dso, const Phdr* ph) {
+LIBC_NO_SAFESTACK static void log_mmap_element(struct dso* dso, const Phdr* ph) {
   size_t start = ph->p_vaddr & -PAGE_SIZE;
   size_t end = (ph->p_vaddr + ph->p_memsz + PAGE_SIZE - 1) & -PAGE_SIZE;
   char buffer[MMAP_ELEMENT_SIZE];
@@ -791,7 +793,7 @@ __NO_SAFESTACK static void log_mmap_element(struct dso* dso, const Phdr* ph) {
 // No newline because it's immediately followed by a {{{module:...}}}.
 #define RESET_ELEMENT "{{{reset}}}"
 
-__NO_SAFESTACK static void log_dso(struct dso* dso) {
+LIBC_NO_SAFESTACK static void log_dso(struct dso* dso) {
   if (dso == head) {
     // Write the reset element before the first thing listed.
     _dl_log_write(RESET_ELEMENT, sizeof(RESET_ELEMENT) - 1);
@@ -806,7 +808,7 @@ __NO_SAFESTACK static void log_dso(struct dso* dso) {
   }
 }
 
-__NO_SAFESTACK void _dl_log_unlogged(void) {
+LIBC_NO_SAFESTACK void _dl_log_unlogged(void) {
   // The first thread to successfully swap in 0 and get an old value
   // for unlogged_tail is responsible for logging all the unlogged
   // DSOs up through that pointer.  If dlopen calls move the tail
@@ -829,7 +831,7 @@ __NO_SAFESTACK void _dl_log_unlogged(void) {
   }
 }
 
-__NO_SAFESTACK NO_ASAN static zx_status_t map_library(zx_handle_t vmo, struct dso* dso) {
+LIBC_NO_SAFESTACK NO_ASAN static zx_status_t map_library(zx_handle_t vmo, struct dso* dso) {
   struct {
     Ehdr ehdr;
     // A typical ELF file has 7 or 8 phdrs, so in practice
@@ -1070,7 +1072,7 @@ error:
   return status;
 }
 
-__NO_SAFESTACK NO_ASAN static void decode_dyn(struct dso* p) {
+LIBC_NO_SAFESTACK NO_ASAN static void decode_dyn(struct dso* p) {
   size_t dyn[DT_NUM];
   decode_vec(p->l_map.l_ld, dyn, DT_NUM);
   p->syms = laddr(p, dyn[DT_SYMTAB]);
@@ -1087,7 +1089,7 @@ __NO_SAFESTACK NO_ASAN static void decode_dyn(struct dso* p) {
     p->versym = laddr(p, *dyn);
 }
 
-__NO_SAFESTACK static size_t count_syms(struct dso* p) {
+LIBC_NO_SAFESTACK static size_t count_syms(struct dso* p) {
   if (p->hashtab)
     return p->hashtab[1];
 
@@ -1107,7 +1109,7 @@ __NO_SAFESTACK static size_t count_syms(struct dso* p) {
   return nsym;
 }
 
-__NO_SAFESTACK static struct dso* find_library_in(struct dso* p, const char* name) {
+LIBC_NO_SAFESTACK static struct dso* find_library_in(struct dso* p, const char* name) {
   while (p != NULL) {
     if (!strcmp(p->l_map.l_name, name) || (p->soname != NULL && !strcmp(p->soname, name))) {
       ++p->refcnt;
@@ -1118,7 +1120,7 @@ __NO_SAFESTACK static struct dso* find_library_in(struct dso* p, const char* nam
   return p;
 }
 
-__NO_SAFESTACK static struct dso* find_library(const char* name) {
+LIBC_NO_SAFESTACK static struct dso* find_library(const char* name) {
   // First see if it's in the general list.
   struct dso* p = find_library_in(head, name);
   if (p == NULL && detached_head != NULL) {
@@ -1156,7 +1158,7 @@ __NO_SAFESTACK static struct dso* find_library(const char* name) {
 
 #define MAX_BUILDID_SIZE 64
 
-__NO_SAFESTACK static void trace_load(struct dso* p) {
+LIBC_NO_SAFESTACK static void trace_load(struct dso* p) {
   static zx_koid_t pid = ZX_KOID_INVALID;
   if (pid == ZX_KOID_INVALID) {
     zx_info_handle_basic_t process_info;
@@ -1200,7 +1202,7 @@ __NO_SAFESTACK static void trace_load(struct dso* p) {
   ++seqno;
 }
 
-__NO_SAFESTACK static void do_tls_layout(struct dso* p, char* tls_buffer, int n_th) {
+LIBC_NO_SAFESTACK static void do_tls_layout(struct dso* p, char* tls_buffer, int n_th) {
   if (p->tls.size == 0)
     return;
 
@@ -1227,8 +1229,9 @@ __NO_SAFESTACK static void do_tls_layout(struct dso* p, char* tls_buffer, int n_
   tls_tail = &p->tls;
 }
 
-__NO_SAFESTACK static zx_status_t load_library_vmo(zx_handle_t vmo, const char* name, int rtld_mode,
-                                                   struct dso* needed_by, struct dso** loaded) {
+LIBC_NO_SAFESTACK static zx_status_t load_library_vmo(zx_handle_t vmo, const char* name,
+                                                      int rtld_mode, struct dso* needed_by,
+                                                      struct dso** loaded) {
   struct dso *p, temp_dso = {};
   size_t alloc_size;
   int n_th = 0;
@@ -1323,8 +1326,8 @@ __NO_SAFESTACK static zx_status_t load_library_vmo(zx_handle_t vmo, const char* 
   return ZX_OK;
 }
 
-__NO_SAFESTACK static zx_status_t load_library(const char* name, int rtld_mode,
-                                               struct dso* needed_by, struct dso** loaded) {
+LIBC_NO_SAFESTACK static zx_status_t load_library(const char* name, int rtld_mode,
+                                                  struct dso* needed_by, struct dso** loaded) {
   if (!*name)
     return ZX_ERR_INVALID_ARGS;
 
@@ -1342,7 +1345,7 @@ __NO_SAFESTACK static zx_status_t load_library(const char* name, int rtld_mode,
   return status;
 }
 
-__NO_SAFESTACK static void load_deps(struct dso* p) {
+LIBC_NO_SAFESTACK static void load_deps(struct dso* p) {
   for (; p; p = dso_next(p)) {
     struct dso** deps = NULL;
     // The two preallocated DSOs don't get space allocated for ->deps.
@@ -1366,7 +1369,7 @@ __NO_SAFESTACK static void load_deps(struct dso* p) {
   }
 }
 
-__NO_SAFESTACK NO_ASAN static void reloc_all(struct dso* p) {
+LIBC_NO_SAFESTACK NO_ASAN static void reloc_all(struct dso* p) {
   size_t dyn[DT_NUM];
   for (; p; p = dso_next(p)) {
     if (p->relocated)
@@ -1416,7 +1419,7 @@ __NO_SAFESTACK NO_ASAN static void reloc_all(struct dso* p) {
   }
 }
 
-__NO_SAFESTACK NO_ASAN static void kernel_mapped_dso(struct dso* p) {
+LIBC_NO_SAFESTACK NO_ASAN static void kernel_mapped_dso(struct dso* p) {
   size_t min_addr = -1, max_addr = 0, cnt;
   const Phdr* ph = p->phdr;
   for (cnt = p->phnum; cnt--; ph = (void*)((char*)ph + p->phentsize)) {
@@ -1566,7 +1569,7 @@ __attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t* v) {
   return mem + v[1] + DTP_OFFSET;
 }
 
-__NO_SAFESTACK thrd_info_t __init_main_thread(zx_handle_t thread_self) {
+LIBC_NO_SAFESTACK thrd_info_t __init_main_thread(zx_handle_t thread_self) {
   pthread_attr_t attr = DEFAULT_PTHREAD_ATTR;
 
   char thread_self_name[ZX_MAX_NAME_LEN];
@@ -1589,7 +1592,7 @@ __NO_SAFESTACK thrd_info_t __init_main_thread(zx_handle_t thread_self) {
   return info;
 }
 
-__NO_SAFESTACK static void update_tls_size(void) {
+LIBC_NO_SAFESTACK static void update_tls_size(void) {
   libc.tls_cnt = tls_cnt;
   libc.tls_align = tls_align;
   libc.tls_size =
@@ -1613,7 +1616,7 @@ __NO_SAFESTACK static void update_tls_size(void) {
 
 static dl_start_return_t __dls3(void* start_arg);
 
-__NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return_t __dls2(
+LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return_t __dls2(
     void* start_arg, void* vdso_map) {
   ldso.l_map.l_addr = (uintptr_t)__ehdr_start;
 
@@ -1692,8 +1695,8 @@ __NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return
 #define LIBS_VAR "LD_DEBUG="
 #define TRACE_VAR "LD_TRACE="
 
-__NO_SAFESTACK static void scan_env_strings(const char* strings, const char* limit,
-                                            uint32_t count) {
+LIBC_NO_SAFESTACK static void scan_env_strings(const char* strings, const char* limit,
+                                               uint32_t count) {
   while (count-- > 0) {
     char* end = memchr(strings, '\0', limit - strings);
     if (end == NULL) {
@@ -1720,8 +1723,9 @@ __NO_SAFESTACK static void scan_env_strings(const char* strings, const char* lim
  * process dependencies and relocations for the main application and
  * transfer control to its entry point. */
 
-__NO_SAFESTACK static void* dls3(zx_handle_t exec_vmo, const char* argv0, const char* env_strings,
-                                 const char* env_strings_limit, uint32_t env_strings_count) {
+LIBC_NO_SAFESTACK static void* dls3(zx_handle_t exec_vmo, const char* argv0,
+                                    const char* env_strings, const char* env_strings_limit,
+                                    uint32_t env_strings_count) {
   // First load our own dependencies.  Usually this will be just the
   // vDSO, which is already loaded, so there will be nothing to do.
   // In a sanitized build, we'll depend on the sanitizer runtime DSO
@@ -1867,7 +1871,7 @@ __NO_SAFESTACK static void* dls3(zx_handle_t exec_vmo, const char* argv0, const 
   return laddr(&app, ehdr->e_entry);
 }
 
-__NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
+LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
   zx_handle_t bootstrap = (uintptr_t)start_arg;
 
   uint32_t nbytes, nhandles;
@@ -2132,7 +2136,7 @@ __NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
 }
 
 // Do sanitizer setup and whatever else must be done before dls3.
-__NO_SAFESTACK NO_ASAN static void early_init(void) {
+LIBC_NO_SAFESTACK NO_ASAN static void early_init(void) {
   __asan_early_init();
 #ifdef DYNLINK_LDSVC_CONFIG
   // Inform the loader service to look for libraries of the right variant.
@@ -2484,8 +2488,9 @@ __attribute__((__visibility__("hidden"))) void __dl_vseterr(const char*, va_list
 
 #define LOADER_SVC_MSG_MAX 1024
 
-__NO_SAFESTACK static zx_status_t loader_svc_rpc(uint64_t ordinal, const void* data, size_t len,
-                                                 zx_handle_t request_handle, zx_handle_t* result) {
+LIBC_NO_SAFESTACK static zx_status_t loader_svc_rpc(uint64_t ordinal, const void* data, size_t len,
+                                                    zx_handle_t request_handle,
+                                                    zx_handle_t* result) {
   // Use a static buffer rather than one on the stack to avoid growing
   // the stack size too much.  Calls to this function are always
   // serialized anyway, so there is no danger of collision.
@@ -2558,14 +2563,14 @@ err:
   return status;
 }
 
-__NO_SAFESTACK static void loader_svc_config(const char* config) {
+LIBC_NO_SAFESTACK static void loader_svc_config(const char* config) {
   zx_status_t status =
       loader_svc_rpc(LDMSG_OP_CONFIG, config, strlen(config), ZX_HANDLE_INVALID, NULL);
   if (status != ZX_OK)
     debugmsg("LDMSG_OP_CONFIG(%s): %s\n", config, _zx_status_get_string(status));
 }
 
-__NO_SAFESTACK static zx_status_t get_library_vmo(const char* name, zx_handle_t* result) {
+LIBC_NO_SAFESTACK static zx_status_t get_library_vmo(const char* name, zx_handle_t* result) {
   if (loader_svc == ZX_HANDLE_INVALID) {
     error("cannot look up \"%s\" with no loader service", name);
     return ZX_ERR_UNAVAILABLE;
@@ -2573,7 +2578,7 @@ __NO_SAFESTACK static zx_status_t get_library_vmo(const char* name, zx_handle_t*
   return loader_svc_rpc(LDMSG_OP_LOAD_OBJECT, name, strlen(name), ZX_HANDLE_INVALID, result);
 }
 
-__NO_SAFESTACK zx_status_t dl_clone_loader_service(zx_handle_t* out) {
+LIBC_NO_SAFESTACK zx_status_t dl_clone_loader_service(zx_handle_t* out) {
   if (loader_svc == ZX_HANDLE_INVALID) {
     return ZX_ERR_UNAVAILABLE;
   }
@@ -2620,8 +2625,8 @@ __NO_SAFESTACK zx_status_t dl_clone_loader_service(zx_handle_t* out) {
   return status;
 }
 
-__NO_SAFESTACK __attribute__((__visibility__("hidden"))) void _dl_log_write(const char* buffer,
-                                                                            size_t len) {
+LIBC_NO_SAFESTACK __attribute__((__visibility__("hidden"))) void _dl_log_write(const char* buffer,
+                                                                               size_t len) {
   if (logger != ZX_HANDLE_INVALID) {
     while (len > 0) {
       size_t chunk = len < ZX_LOG_RECORD_DATA_MAX ? len : ZX_LOG_RECORD_DATA_MAX;
@@ -2645,7 +2650,7 @@ __NO_SAFESTACK __attribute__((__visibility__("hidden"))) void _dl_log_write(cons
   }
 }
 
-__NO_SAFESTACK static size_t errormsg_write(FILE* f, const unsigned char* buf, size_t len) {
+LIBC_NO_SAFESTACK static size_t errormsg_write(FILE* f, const unsigned char* buf, size_t len) {
   if (f != NULL && f->wpos > f->wbase) {
     _dl_log_write((const char*)f->wbase, f->wpos - f->wbase);
   }
@@ -2662,7 +2667,7 @@ __NO_SAFESTACK static size_t errormsg_write(FILE* f, const unsigned char* buf, s
   return len;
 }
 
-__NO_SAFESTACK static int errormsg_vprintf(const char* restrict fmt, va_list ap) {
+LIBC_NO_SAFESTACK static int errormsg_vprintf(const char* restrict fmt, va_list ap) {
   FILE f = {
       .lbf = EOF,
       .write = errormsg_write,
@@ -2673,14 +2678,14 @@ __NO_SAFESTACK static int errormsg_vprintf(const char* restrict fmt, va_list ap)
   return vfprintf(&f, fmt, ap);
 }
 
-__NO_SAFESTACK static void debugmsg(const char* fmt, ...) {
+LIBC_NO_SAFESTACK static void debugmsg(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   errormsg_vprintf(fmt, ap);
   va_end(ap);
 }
 
-__NO_SAFESTACK static void error(const char* fmt, ...) {
+LIBC_NO_SAFESTACK static void error(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   if (!runtime) {
