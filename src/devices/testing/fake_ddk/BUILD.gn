@@ -83,6 +83,5 @@ zx_library("fake_ddk") {
     "//src/graphics/lib/magma/tests/unit_tests/*",
     "//src/media/audio/drivers/intel-hda/controller/*",
     "//src/media/audio/drivers/usb-audio/tests/*",
-    "//src/media/audio/lib/simple-audio-stream/tests/*",
   ]
 }
