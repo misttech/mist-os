@@ -118,12 +118,7 @@ template("product_bundle") {
            "scrutiny_args should not be supplied when skip_scrutiny=true")
     skip_scrutiny = invoker.skip_scrutiny
   } else {
-    # TODO(fxbug.dev/121673): Enforce that all callers to specify either
-    # skip_scrutiny or scrutiny_args once all callers are changed to do so.
-    # assert(defined(invoker.scrutiny_args), "scrutiny_args must be supplied")
-    if (!defined(invoker.scrutiny_args)) {
-      skip_scrutiny = true
-    }
+    assert(defined(invoker.scrutiny_args), "scrutiny_args must be supplied")
   }
 
   skip_scrutiny_recovery = false
@@ -134,13 +129,8 @@ template("product_bundle") {
         "scrutiny_recovery_args should not be supplied when skip_scrutiny_recovery=true")
     skip_scrutiny_recovery = invoker.skip_scrutiny_recovery
   } else {
-    # TODO(fxbug.dev/121673): Enforce that all callers to specify either
-    # skip_scrutiny_recovery or scrutiny_args_recovery once all callers are
-    # changed to do so.
-    # assert(defined(invoker.scrutiny_recovery_args), "scrutiny_recovery_args must be supplied")
-    if (!defined(invoker.scrutiny_args_recovery)) {
-      skip_scrutiny_recovery = true
-    }
+    assert(defined(invoker.scrutiny_recovery_args),
+           "scrutiny_recovery_args must be supplied")
   }
 
   python_action(labels.hermetic_inputs) {
