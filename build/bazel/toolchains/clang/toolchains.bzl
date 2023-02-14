@@ -17,6 +17,7 @@ load(
 )
 load("@prebuilt_clang//:generated_constants.bzl", clang_constants = "constants")
 load("@//:build/bazel/toolchains/clang/sanitizer.bzl", "sanitizer_features")
+load("@//build/bazel/platforms:utils.bzl", "to_bazel_cpu_name")
 
 def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     clang_binprefix = "bin/"
@@ -203,7 +204,7 @@ def prebuilt_clang_cc_toolchain(
          the cc_toolchain_config() will use "${name}_toolchain_config".
 
        host_os: Host os string (e.g. "linux" or "mac").
-       host_arch: Host cpu architecture string (e.g. "x64" or "arm64").
+       host_arch: Host cpu architecture string, (e.g. "x64" or "arm64").
        target_os: Target os string (e.g. "linux" or "fuchsia").
        target_arch: Target cpu architecture string.
        sysroot_files: A target list for the sysroot files to be used.
@@ -264,12 +265,12 @@ def prebuilt_clang_cc_toolchain(
     native.toolchain(
         name = name + "_cc_toolchain",
         exec_compatible_with = [
-            "@//build/bazel/platforms/os:" + host_os,
-            "@//build/bazel/platforms/arch:" + host_arch,
+            "@platforms//os:" + host_os,
+            "@platforms//cpu:" + to_bazel_cpu_name(host_arch),
         ],
         target_compatible_with = [
-            "@//build/bazel/platforms/os:" + target_os,
-            "@//build/bazel/platforms/arch:" + target_arch,
+            "@platforms//os:" + target_os,
+            "@platforms//cpu:" + to_bazel_cpu_name(target_arch),
         ],
         toolchain = ":" + name,
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",

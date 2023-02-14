@@ -87,14 +87,15 @@ cc_library(
         "zircon_utils.h",
     ] + select(
         {
-            "//build/bazel/platforms/arch:is_x64": [
+            "@platforms//cpu:x86_64": [
                 "arch_x64.cc",
                 "debug_registers_x64.cc",
             ],
-            "//build/bazel/platforms/arch:is_arm64": [
+            "@platforms//cpu:arm64": [
                 "arch_arm64.cc",
                 "debug_registers_arm64.cc",
             ],
+            # TODO(121729): Add riscv64 support.
         },
     ),
     hdrs = [

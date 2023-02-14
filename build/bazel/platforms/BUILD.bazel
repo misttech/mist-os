@@ -55,24 +55,32 @@ platform(
 platform(
     name = "fuchsia_x64",
     constraint_values = [
-        "//build/bazel/platforms/os:fuchsia",
-        "//build/bazel/platforms/arch:x64",
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:x86_64",
     ],
 )
 
 platform(
     name = "fuchsia_arm64",
     constraint_values = [
-        "//build/bazel/platforms/os:fuchsia",
-        "//build/bazel/platforms/arch:arm64",
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+platform(
+    name = "fuchsia_riscv64",
+    constraint_values = [
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:riscv64",
     ],
 )
 
 platform(
     name = "linux_x64",
     constraint_values = [
-        "//build/bazel/platforms/os:linux",
-        "//build/bazel/platforms/arch:x64",
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
     ],
     exec_properties = {
         "container-image": build_config.rbe_container_image,
@@ -83,23 +91,80 @@ platform(
 platform(
     name = "linux_arm64",
     constraint_values = [
-        "//build/bazel/platforms/os:linux",
-        "//build/bazel/platforms/arch:arm64",
+        "@platforms//os:linux",
+        "@platforms//cpu:arm64",
     ],
 )
 
 platform(
     name = "mac_x64",
     constraint_values = [
-        "//build/bazel/platforms/os:mac",
-        "//build/bazel/platforms/arch:x64",
+        "@platforms//os:osx",
+        "@platforms//cpu:x86_64",
     ],
 )
 
 platform(
     name = "mac_arm64",
     constraint_values = [
-        "//build/bazel/platforms/os:mac",
-        "//build/bazel/platforms/arch:arm64",
+        "@platforms//os:osx",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+# Configuration conditions for the platform values above.
+config_setting(
+    name = "is_fuchsia_x64",
+    constraint_values = [
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "is_fuchsia_arm64",
+    constraint_values = [
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+config_setting(
+    name = "is_fuchsia_riscv64",
+    constraint_values = [
+        "@platforms//os:fuchsia",
+        "@platforms//cpu:riscv64",
+    ],
+)
+
+config_setting(
+    name = "is_linux_x64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "is_linux_arm64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+config_setting(
+    name = "is_mac_x64",
+    constraint_values = [
+        "@platforms//os:osx",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "is_mac_arm64",
+    constraint_values = [
+        "@platforms//os:osx",
+        "@platforms//cpu:arm64",
     ],
 )
