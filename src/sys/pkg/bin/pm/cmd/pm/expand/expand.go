@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -138,6 +139,21 @@ func writeMetadataAndManifest(cfg *build.Config, pkgArchive *far.Reader, outputD
 			Size:       pkgArchive.GetSize(merkle.String()),
 		})
 	}
+
+	// Sort the blobs, but make the meta/ entry come first.
+	sort.SliceStable(blobs, func(i, j int) bool {
+		lhs := blobs[i]
+		rhs := blobs[j]
+
+		if lhs.Path == "meta/" {
+			return true
+		}
+		if rhs.Path == "meta/" {
+			return false
+		}
+
+		return lhs.Merkle.LessThan(rhs.Merkle)
+	})
 
 	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
 		return err
