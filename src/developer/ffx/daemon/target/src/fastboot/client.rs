@@ -15,7 +15,7 @@ use async_utils::async_once::Once;
 use fastboot::UploadProgressListener as _;
 use ffx_config::get;
 use ffx_daemon_events::{TargetConnectionState, TargetEvent};
-use fidl::Error as FidlError;
+use fidl::{prelude::*, Error as FidlError};
 use fidl_fuchsia_developer_ffx::{
     FastbootError, FastbootRequest, FastbootRequestStream, RebootError, RebootListenerProxy,
 };
@@ -91,6 +91,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
     }
 
     async fn reboot_from_zedboot(&self, listener: &RebootListenerProxy) -> Result<(), RebootError> {
+        if listener.is_closed() {
+            return Err(RebootError::FailedToSendOnReboot);
+        }
         listener.on_reboot().map_err(|_| RebootError::FailedToSendOnReboot)?;
         match self.target.netsvc_address() {
             Some(addr) => {
@@ -130,6 +133,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
     }
 
     async fn reboot_from_product(&self, listener: &RebootListenerProxy) -> Result<(), RebootError> {
+        if listener.is_closed() {
+            return Err(RebootError::FailedToSendOnReboot);
+        }
         listener.on_reboot().map_err(|_| RebootError::FailedToSendOnReboot)?;
         match self
             .get_admin_proxy()
@@ -315,11 +321,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                                 })
                                 .map_err(|_| RebootError::TimedOut),
                             async move {
-                                listener
+                                let proxy = listener
                                     .into_proxy()
-                                    .map_err(|_| RebootError::FailedToSendOnReboot)?
-                                    .on_reboot()
-                                    .map_err(|_| RebootError::FailedToSendOnReboot)
+                                    .map_err(|_| RebootError::FailedToSendOnReboot)?;
+                                if proxy.is_closed() {
+                                    return Err(RebootError::FailedToSendOnReboot);
+                                }
+                                proxy.on_reboot().map_err(|_| RebootError::FailedToSendOnReboot)
                             }
                         ) {
                             Ok(_) => {
