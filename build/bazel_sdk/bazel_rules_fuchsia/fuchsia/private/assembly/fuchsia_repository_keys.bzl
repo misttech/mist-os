@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """Rule for collecting Fuchsia TUF repository keys."""
 
-load(":providers.bzl", "FuchsiaRepositoryKeys")
+load(":providers.bzl", "FuchsiaRepositoryKeysInfo")
 
 _VALID_KEY_FILES = {
     "root.json": None,
@@ -27,13 +27,13 @@ def _fuchsia_repository_keys(ctx):
 
     return [
         DefaultInfo(files = depset(direct = keys)),
-        FuchsiaRepositoryKeys(dir = dirs[0]),
+        FuchsiaRepositoryKeysInfo(dir = dirs[0]),
     ]
 
 fuchsia_repository_keys = rule(
     doc = """Collects all Fuchsia TUF repository keys. All keys must come from the same directory.""",
     implementation = _fuchsia_repository_keys,
-    provides = [FuchsiaRepositoryKeys],
+    provides = [FuchsiaRepositoryKeysInfo],
     attrs = {
         "keys": attr.label_list(
             doc = "A list of JSON files containing private keys, which can optionally contain the following files: root.json, targets.json, snapshot.json, timestamp.json.",

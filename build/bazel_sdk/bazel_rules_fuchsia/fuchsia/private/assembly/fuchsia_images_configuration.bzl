@@ -14,6 +14,7 @@ load(
     "FuchsiaFsEmptyAccountInfo",
     "FuchsiaFsEmptyDataInfo",
     "FuchsiaFsReservedInfo",
+    "FuchsiaVbmetaExtraDescriptorInfo",
     "FuchsiaVbmetaInfo",
     "FuchsiaZbiInfo",
 )
@@ -73,13 +74,14 @@ def _fuchsia_images_configuration_impl(ctx):
                 "name": raw_image.zbi_name,
                 "compression": raw_image.compression,
             }
-            if raw_image.post_processing_script != None:
-                post_processing_script = {
-                    "path": raw_image.post_processing_script.path,
-                    "args": raw_image.post_processing_args,
+            if raw_image.postprocessing_script != None:
+                postprocessing_script = {
+                    "path": raw_image.postprocessing_script.path,
                 }
-                zbi_image["post_processing_script"] = post_processing_script
-                files.append(raw_image.post_processing_script)
+                if raw_image.postprocessing_args:
+                    postprocessing_script["args"] = raw_image.postprocessing_args
+                zbi_image["postprocessing_script"] = postprocessing_script
+                files.append(raw_image.postprocessing_script)
             images.append(zbi_image)
         elif FuchsiaVbmetaInfo in image:
             raw_image = image[FuchsiaVbmetaInfo]
@@ -91,6 +93,16 @@ def _fuchsia_images_configuration_impl(ctx):
                 vbmeta_image["key"] = raw_image.key.path
                 vbmeta_image["key_metadata"] = raw_image.key_metadata.path
                 files += [raw_image.key, raw_image.key_metadata]
+            if raw_image.extra_descriptors:
+                vbmeta_image["additional_descriptors"] = []
+                for descriptor in raw_image.extra_descriptors:
+                    descriptor = descriptor[FuchsiaVbmetaExtraDescriptorInfo]
+                    vbmeta_image["additional_descriptors"].append({
+                        "name": descriptor.name,
+                        "size": int(descriptor.size),
+                        "flags": int(descriptor.flags),
+                        "min_avb_version": descriptor.min_avb_version,
+                    })
             images.append(vbmeta_image)
         elif FuchsiaFVMStandardInfo in image:
             raw_image = image[FuchsiaFVMStandardInfo]
@@ -108,14 +120,15 @@ def _fuchsia_images_configuration_impl(ctx):
             nand_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems)
             fvms.append(nand_fvm)
 
-    fvm = {
-        "type": "fvm",
-        "filesystems": filesystems.values(),
-        "outputs": fvms,
-    }
-    if ctx.attr.fvm_slice_size:
-        fvm["slice_size"] = int(ctx.attr.fvm_slice_size)
-    images.append(fvm)
+    if fvms:
+        fvm = {
+            "type": "fvm",
+            "filesystems": filesystems.values(),
+            "outputs": fvms,
+        }
+        if ctx.attr.fvm_slice_size:
+            fvm["slice_size"] = int(ctx.attr.fvm_slice_size)
+        images.append(fvm)
     image_config = {"images": images}
     ctx.actions.write(config_file, json.encode(image_config))
     return [

@@ -8,7 +8,7 @@ load(
     "FuchsiaAssemblyConfigInfo",
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
-    "FuchsiaRepositoryKeys",
+    "FuchsiaRepositoryKeysInfo",
     "FuchsiaScrutinyConfigInfo",
     "FuchsiaVirtualDeviceInfo",
 )
@@ -439,7 +439,7 @@ def _fuchsia_product_bundle_impl(ctx):
     # If a repository is supplied, add it to the product bundle.
     if ctx.attr.repository_keys != None:
         ffx_invocation.append("--tuf-keys $ORIG_DIR/$REPOKEYS")
-        env["REPOKEYS"] = ctx.attr.repository_keys[FuchsiaRepositoryKeys].dir
+        env["REPOKEYS"] = ctx.attr.repository_keys[FuchsiaRepositoryKeysInfo].dir
         inputs += ctx.files.repository_keys
     script_lines = [
         "set -e",
@@ -518,7 +518,7 @@ fuchsia_product_bundle = rule(
         ),
         "repository_keys": attr.label(
             doc = "A fuchsia_repository_keys target, must be specified when update_version_file is specified",
-            providers = [FuchsiaRepositoryKeys],
+            providers = [FuchsiaRepositoryKeysInfo],
             default = None,
         ),
         "update_version_file": attr.label(

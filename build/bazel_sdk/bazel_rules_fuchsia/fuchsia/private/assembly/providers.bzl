@@ -129,8 +129,8 @@ FuchsiaZbiInfo = provider(
     fields = {
         "zbi_name": "Name of zbi image appeared in image configuration",
         "compression": "Zbi compression format",
-        "post_processing_script": "Post procesing script",
-        "post_processing_args": "Args needed by post processing script",
+        "postprocessing_script": "Post-procesing script",
+        "postprocessing_args": "Args needed by post-processing script",
     },
 )
 
@@ -138,8 +138,19 @@ FuchsiaVbmetaInfo = provider(
     doc = """An Image info for Vbmeta.""",
     fields = {
         "vbmeta_name": "Name of vbmeta image appeared in image configuration",
-        "key": "the key for signing VBMeta.",
-        "key_metadata": "key metadata to add to the VBMeta.",
+        "key": "The key for signing VBMeta",
+        "key_metadata": "Key metadata to add to the VBMeta",
+        "extra_descriptors": "Optional descriptors to add to the VBMeta image",
+    },
+)
+
+FuchsiaVbmetaExtraDescriptorInfo = provider(
+    doc = """An extra descriptor for a VBMeta image""",
+    fields = {
+        "name": "Name of this descriptor",
+        "size": "Size of the partitions in bytes",
+        "flags": "Custom VBMeta flags to add",
+        "min_avb_version": "Minimum AVB version to add",
     },
 )
 
@@ -231,7 +242,7 @@ FuchsiaScrutinyConfigInfo = provider(
     },
 )
 
-FuchsiaRepositoryKeys = provider(
+FuchsiaRepositoryKeysInfo = provider(
     doc = "A directory containing Fuchsia TUF repository keys.",
     fields = {"dir": "Path to the directory"},
 )

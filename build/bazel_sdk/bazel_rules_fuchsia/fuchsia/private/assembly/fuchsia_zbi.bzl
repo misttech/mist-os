@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Rule for desclaring a ZBI image."""
+
 load(":providers.bzl", "FuchsiaZbiInfo")
 
 # Define Zbi compression format
@@ -15,8 +17,8 @@ def _fuchsia_zbi_impl(ctx):
         FuchsiaZbiInfo(
             zbi_name = ctx.attr.zbi_name,
             compression = ctx.attr.compression,
-            post_processing_script = ctx.file.post_processing_script,
-            post_processing_args = ctx.attr.post_processing_args,
+            postprocessing_script = ctx.file.postprocessing_script,
+            postprocessing_args = ctx.attr.postprocessing_args,
         ),
     ]
 
@@ -34,13 +36,13 @@ fuchsia_zbi = rule(
             default = "zstd",
             values = [ZBI_COMPRESSION.ZSTD_MAX, ZBI_COMPRESSION.ZSTD],
         ),
-        "post_processing_script": attr.label(
-            doc = "Post procesing script",
+        "postprocessing_script": attr.label(
+            doc = "Post-procesing script",
             allow_single_file = True,
             default = None,
         ),
-        "post_processing_args": attr.string_list(
-            doc = "Args needed by post processing script",
+        "postprocessing_args": attr.string_list(
+            doc = "Args needed by post-processing script",
             default = [],
         ),
     },

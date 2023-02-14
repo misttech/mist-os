@@ -95,6 +95,7 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_vbmeta.bzl",
     _fuchsia_vbmeta = "fuchsia_vbmeta",
+    _fuchsia_vbmeta_extra_descriptor = "fuchsia_vbmeta_extra_descriptor",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_filesystem_blobfs.bzl",
@@ -180,6 +181,7 @@ fuchsia_repository_keys = _fuchsia_repository_keys
 fuchsia_task_flash = _fuchsia_task_flash
 fuchsia_zbi = _fuchsia_zbi
 fuchsia_vbmeta = _fuchsia_vbmeta
+fuchsia_vbmeta_extra_descriptor = _fuchsia_vbmeta_extra_descriptor
 fuchsia_filesystem_blobfs = _fuchsia_filesystem_blobfs
 fuchsia_filesystem_empty_account = _fuchsia_filesystem_empty_account
 fuchsia_filesystem_empty_data = _fuchsia_filesystem_empty_data
