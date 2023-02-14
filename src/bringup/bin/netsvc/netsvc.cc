@@ -4,10 +4,10 @@
 
 #include "src/bringup/bin/netsvc/netsvc.h"
 
-#include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/namespace.h>
+#include <lib/fit/defer.h>
 #include <lib/netboot/netboot.h>
 #include <lib/zx/clock.h>
 #include <unistd.h>
@@ -19,8 +19,6 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-
-#include <fbl/unique_fd.h>
 
 #include "src/bringup/bin/netsvc/args.h"
 #include "src/bringup/bin/netsvc/debuglog.h"
@@ -36,15 +34,19 @@
 #define ENABLE_SLAAC 0
 #endif
 
-static bool g_netbootloader = false;
+namespace {
+
+bool g_netbootloader = false;
 
 // When false (default), will only respond to a limited number of commands.
 // Currently, NB_QUERY (to support netls and netaddr), as well as responding to
 // ICMP as usual.
-static bool g_all_features = false;
-static bool g_log_packets = false;
+bool g_all_features = false;
+bool g_log_packets = false;
 
-static char g_nodename[HOST_NAME_MAX];
+char g_nodename[HOST_NAME_MAX];
+
+}  // namespace
 
 bool netbootloader() { return g_netbootloader; }
 bool all_features() { return g_all_features; }
@@ -95,7 +97,7 @@ void netifc_recv(async_dispatcher_t* dispatcher, void* data, size_t len) {
   eth_recv(dispatcher, data, len);
 }
 
-static const char* zedboot_banner =
+constexpr char zedboot_banner[] =
     "              _ _                 _   \n"
     "             | | |               | |  \n"
     "  _______  __| | |__   ___   ___ | |_ \n"
@@ -107,21 +109,37 @@ static const char* zedboot_banner =
 
 int main(int argc, char** argv) {
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
-    setbuf(stdout, nullptr);
-    setbuf(stderr, nullptr);
+    setbuffer(stdout, nullptr, 0);
+    setbuffer(stderr, nullptr, 0);
     printf("Failed to redirect stdout to debuglog, assuming test environment and continuing: %s\n",
            zx_status_get_string(status));
   }
 
-  fbl::unique_fd svc_root(open("/svc", O_RDWR | O_DIRECTORY));
-  fdio_cpp::UnownedFdioCaller caller(svc_root.get());
-
   NetsvcArgs args;
-  const char* error;
-  if (ParseArgs(argc, argv, caller.directory(), &error, &args) < 0) {
-    printf("netsvc: fatal error: %s\n", error);
-    return -1;
-  };
+  {
+    fdio_flat_namespace_t* ns;
+    if (zx_status_t status = fdio_ns_export_root(&ns); status != ZX_OK) {
+      printf("netsvc: FATAL: fdio_ns_export_root() = %s\n", zx_status_get_string(status));
+      return -1;
+    }
+    auto free = fit::defer([ns]() { fdio_ns_free_flat_ns(ns); });
+    fidl::ClientEnd<fuchsia_io::Directory> svc_root;
+    for (size_t i = 0; i < ns->count; ++i) {
+      if (std::string_view{ns->path[i]} == "/svc") {
+        svc_root = decltype(svc_root){zx::channel{std::exchange(ns->handle[i], ZX_HANDLE_INVALID)}};
+        break;
+      }
+    }
+    if (!svc_root.is_valid()) {
+      printf("netsvc: FATAL: did not find /svc in namespace\n");
+      return -1;
+    }
+    const char* error;
+    if (ParseArgs(argc, argv, svc_root, &error, &args) < 0) {
+      printf("netsvc: fatal error: %s\n", error);
+      return -1;
+    };
+  }
   if (args.disable) {
     printf("netsvc: Disabled. Exiting.\n");
     return 0;

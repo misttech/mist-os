@@ -21,7 +21,6 @@
 #include <optional>
 #include <string_view>
 
-#include <fbl/unique_fd.h>
 #include <tftp/tftp.h>
 
 namespace netsvc {
@@ -38,10 +37,13 @@ class PaverInterface {
   virtual void Abort() = 0;
 };
 
-class Paver : public PaverInterface {
+class Paver final : public PaverInterface {
  public:
   // Get the singleton instance.
-  static Paver* Get();
+  static Paver& Get();
+
+  // Reset the singleton instance. Used for testing.
+  static void Reset();
 
   std::shared_future<zx_status_t> exit_code() final;
 
@@ -50,9 +52,10 @@ class Paver : public PaverInterface {
   void Close() final;
   void Abort() final;
 
-  // Visible for testing.
-  explicit Paver(fidl::ClientEnd<fuchsia_io::Directory> svc_root, fbl::unique_fd devfs_root)
-      : svc_root_(std::move(svc_root)), devfs_root_(std::move(devfs_root)) {
+  // Public for testing and to allow delegated construction via std::optional::emplace.
+  Paver(fidl::ClientEnd<fuchsia_io::Directory> dev_root,
+        fidl::ClientEnd<fuchsia_io::Directory> svc_root)
+      : dev_root_(std::move(dev_root)), svc_root_(std::move(svc_root)) {
     exit_code_.set_value(ZX_OK);
   }
 
@@ -63,6 +66,8 @@ class Paver : public PaverInterface {
   }
 
  private:
+  static std::optional<Paver> instance_;
+
   static constexpr uint32_t kBufferRefWorker = 1 << 0;
   static constexpr uint32_t kBufferRefApi = 1 << 1;
   // Refer to //sdk/fidl/fuchsia.paver/paver.fidl for a list of what
@@ -109,11 +114,7 @@ class Paver : public PaverInterface {
   // Paver command to call into.
   Command command_;
 
-  // Channel to svc.
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
-
-  // File descriptor to dev.
-  fbl::unique_fd devfs_root_;
+  fidl::ClientEnd<fuchsia_io::Directory> dev_root_, svc_root_;
 
   fidl::WireSyncClient<fuchsia_paver::Paver> paver_svc_;
   fidl::WireSyncClient<fuchsia_fshost::Admin> fshost_admin_svc_;

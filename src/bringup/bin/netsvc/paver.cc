@@ -9,9 +9,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fit/defer.h>
 #include <lib/netboot/netboot.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/zx/clock.h>
 #include <stdio.h>
 #include <zircon/errors.h>
@@ -19,6 +19,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <optional>
 #include <string_view>
 
 #include <fbl/algorithm.h>
@@ -27,22 +28,17 @@
 
 namespace netsvc {
 
-Paver* Paver::Get() {
-  static Paver* instance_ = nullptr;
-  if (instance_ == nullptr) {
-    zx::result client_end = component::Connect<fuchsia_io::Directory>("/svc");
-    if (client_end.is_error()) {
-      return nullptr;
-    }
-    fbl::unique_fd devfs_root(open("/dev", O_RDONLY));
-    if (!devfs_root) {
-      return nullptr;
-    }
+std::optional<Paver> Paver::instance_ = std::nullopt;
 
-    instance_ = new Paver(std::move(client_end.value()), std::move(devfs_root));
+Paver& Paver::Get() {
+  if (instance_.has_value()) {
+    return instance_.value();
   }
-  return instance_;
+  return instance_.emplace(fidl::ClientEnd<fuchsia_io::Directory>{},
+                           fidl::ClientEnd<fuchsia_io::Directory>{});
 }
+
+void Paver::Reset() { instance_.reset(); }
 
 std::shared_future<zx_status_t> Paver::exit_code() {
   if (exit_code_future_.has_value()) {
@@ -339,18 +335,26 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
     fprintf(stderr, "netsvc: Invalid block device path specified\n");
     return ZX_ERR_INVALID_ARGS;
   }
-
-  constexpr char kDevfsPrefix[] = "/dev/";
-  if (strncmp(kDevfsPrefix, partition_info.block_device_path, strlen(kDevfsPrefix)) != 0) {
+  const std::string_view block_device_path{partition_info.block_device_path};
+  constexpr std::string_view kDevfsPrefix = "/dev/";
+  if (!cpp20::starts_with(block_device_path, kDevfsPrefix)) {
     fprintf(stderr, "netsvc: Invalid block device path specified %s\n",
             partition_info.block_device_path);
     return ZX_ERR_INVALID_ARGS;
   }
-
-  fdio_cpp::UnownedFdioCaller caller(devfs_root_.get());
-
-  zx::result client_end = component::ConnectAt<fuchsia_hardware_block::Block>(
-      caller.directory(), &partition_info.block_device_path[5]);
+  zx::result client_end = [&]() {
+    // `dev_root_` allows dependency injection in tests. However "/dev" is not guaranteed to be
+    // backed by a channel in the local namespace, preventing `dev_root` from always being provided.
+    // In particular, it may be that a subdirectory of "/dev" is installed in the namespace - this
+    // would result in "/dev" itself being a local node in the namespace, and not backed by a
+    // channel. We handle both cases by using `dev_root_` only when it has been provided and
+    // otherwise connecting through the namespace.
+    if (dev_root_.is_valid()) {
+      return component::ConnectAt<fuchsia_hardware_block::Block>(
+          dev_root_, block_device_path.substr(kDevfsPrefix.size()));
+    }
+    return component::Connect<fuchsia_hardware_block::Block>(block_device_path);
+  }();
   if (client_end.is_error()) {
     fprintf(stderr, "netsvc: Unable to open %s.\n", partition_info.block_device_path);
     return client_end.status_value();
@@ -540,6 +544,19 @@ tftp_status Paver::ProcessAsFirmwareImage(std::string_view host_filename) {
   return TFTP_ERR_NOT_FOUND;
 }
 
+namespace {
+
+template <typename Protocol>
+zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir) {
+  if (svc_dir.is_valid()) {
+    return component::ConnectAt<Protocol>(svc_dir);
+  }
+  return component::Connect<Protocol>();
+}
+
+}  // namespace
+
 tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duration timeout) {
   // Skip past the NB_IMAGE_PREFIX prefix.
   std::string_view host_filename;
@@ -625,13 +642,13 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
   }
   auto buffer_cleanup = fit::defer([this]() { buffer_mapper_.Reset(); });
 
-  auto paver = component::ConnectAt<fuchsia_paver::Paver>(svc_root_);
+  zx::result paver = ConnectAt<fuchsia_paver::Paver>(svc_root_);
   if (paver.is_error()) {
     fprintf(stderr, "netsvc: Unable to open /svc/%s.\n",
             fidl::DiscoverableProtocolName<fuchsia_paver::Paver>);
     return TFTP_ERR_IO;
   }
-  auto fshost = component::ConnectAt<fuchsia_fshost::Admin>(svc_root_);
+  zx::result fshost = ConnectAt<fuchsia_fshost::Admin>(svc_root_);
   if (fshost.is_error()) {
     fprintf(stderr, "netsvc: Unable to open /svc/%s.\n",
             fidl::DiscoverableProtocolName<fuchsia_fshost::Admin>);

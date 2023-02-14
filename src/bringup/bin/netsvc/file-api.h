@@ -48,7 +48,7 @@ class FileApi : public FileApiInterface {
                    std::unique_ptr<NetCopyInterface> netcp = std::make_unique<NetCopy>(),
                    fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo =
                        fidl::ClientEnd<fuchsia_sysinfo::SysInfo>(),
-                   PaverInterface* paver = Paver::Get());
+                   PaverInterface& paver = Paver::Get());
 
   ssize_t OpenRead(const char* filename, zx::duration timeout) final;
   tftp_status OpenWrite(const char* filename, size_t size, zx::duration timeout) final;
@@ -89,7 +89,7 @@ class FileApi : public FileApiInterface {
   nbfile* netboot_file_ = nullptr;
 
   // Used when type_ == NetfileType::kPaver.
-  PaverInterface* paver_;
+  PaverInterface& paver_;
 };
 
 }  // namespace netsvc

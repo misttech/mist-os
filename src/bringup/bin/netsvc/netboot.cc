@@ -387,8 +387,8 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
       }
       break;
     case NB_BOOT:
-      // Wait for the paver to complete
-      if (zx_status_t exit_code = netsvc::Paver::Get()->exit_code().get(); exit_code != ZX_OK) {
+      // Wait for the paver to complete if it is running.
+      if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
         printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
         break;
       }
@@ -396,8 +396,8 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
       printf("netboot: Boot Kernel...\n");
       break;
     case NB_REBOOT:
-      // Wait for the paver to complete
-      if (zx_status_t exit_code = netsvc::Paver::Get()->exit_code().get(); exit_code != ZX_OK) {
+      // Wait for the paver to complete if it is running.
+      if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
         printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
         break;
       }

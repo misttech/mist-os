@@ -23,13 +23,11 @@ size_t NB_FILENAME_PREFIX_LEN() { return strlen(NB_FILENAME_PREFIX); }
 }  // namespace
 
 FileApi::FileApi(bool is_zedboot, std::unique_ptr<NetCopyInterface> netcp,
-                 fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo, PaverInterface* paver)
+                 fidl::ClientEnd<fuchsia_sysinfo::SysInfo> sysinfo, PaverInterface& paver)
     : is_zedboot_(is_zedboot),
       sysinfo_(std::move(sysinfo)),
       netcp_(std::move(netcp)),
       paver_(paver) {
-  ZX_ASSERT(paver_ != nullptr);
-
   if (!sysinfo_) {
     zx::result client_end = component::Connect<fuchsia_sysinfo::SysInfo>();
     if (client_end.is_ok()) {
@@ -40,7 +38,7 @@ FileApi::FileApi(bool is_zedboot, std::unique_ptr<NetCopyInterface> netcp,
 
 ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
   // Make sure all in-progress paving operations have completed
-  std::shared_future fut = paver_->exit_code();
+  std::shared_future fut = paver_.exit_code();
   if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
     return TFTP_ERR_SHOULD_WAIT;
   }
@@ -69,7 +67,7 @@ ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
 
 tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration timeout) {
   // Make sure all in-progress paving operations have completed
-  std::shared_future fut = paver_->exit_code();
+  std::shared_future fut = paver_.exit_code();
   if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
     return TFTP_ERR_SHOULD_WAIT;
   }
@@ -94,7 +92,7 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
     return TFTP_NO_ERROR;
   } else if (is_zedboot_ && !strncmp(filename_, NB_IMAGE_PREFIX, NB_IMAGE_PREFIX_LEN())) {
     type_ = NetfileType::kPaver;
-    tftp_status status = paver_->OpenWrite(filename_, size, timeout);
+    tftp_status status = paver_.OpenWrite(filename_, size, timeout);
     if (status != TFTP_NO_ERROR) {
       filename_[0] = '\0';
     }
@@ -151,7 +149,7 @@ tftp_status FileApi::Write(const void* data, size_t* length, off_t offset) {
       return TFTP_NO_ERROR;
     }
     case NetfileType::kPaver:
-      return paver_->Write(data, length, offset);
+      return paver_.Write(data, length, offset);
 
     case NetfileType::kBoardInfo: {
       zx::result status = CheckBoardName(sysinfo_, reinterpret_cast<const char*>(data), *length);
@@ -187,7 +185,7 @@ void FileApi::Close() {
   if (type_ == NetfileType::kNetCopy) {
     netcp_->Close();
   } else if (type_ == NetfileType::kPaver) {
-    paver_->Close();
+    paver_.Close();
   }
   type_ = NetfileType::kUnknown;
 }
@@ -199,7 +197,7 @@ void FileApi::Abort() {
         netcp_->AbortWrite();
         break;
       case NetfileType::kPaver:
-        paver_->Abort();
+        paver_.Abort();
         break;
       default:
         break;

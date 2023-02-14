@@ -40,7 +40,6 @@ executable("netsvc") {
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/tftp",
     "//zircon/system/ulib/zx",
@@ -88,7 +87,6 @@ source_set("netsvc_common") {
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
   ]
@@ -238,6 +236,7 @@ source_set("netifc-discover") {
     "//src/lib/fsl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",

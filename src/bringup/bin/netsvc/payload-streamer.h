@@ -12,8 +12,6 @@
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
-#include <fbl/unique_fd.h>
-
 namespace netsvc {
 
 // Reads the data into the vmo at offset, size. Can block.

@@ -119,7 +119,7 @@ class FileApiTest : public zxtest::Test {
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         fake_sysinfo_(loop_.dispatcher()),
         file_api_(true, std::make_unique<FakeNetCopy>(), std::move(fake_sysinfo_.svc_chan()),
-                  &fake_paver_) {
+                  fake_paver_) {
     loop_.StartThread("file-api-test-loop");
   }
 

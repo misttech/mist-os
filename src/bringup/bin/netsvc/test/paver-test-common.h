@@ -12,6 +12,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/devmgr-integration-test/fixture.h>
+#include <lib/fdio/fd.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/netboot/netboot.h>
 #include <lib/sync/completion.h>
@@ -39,13 +40,6 @@
 
 class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
  public:
-  zx_status_t Connect(async_dispatcher_t* dispatcher,
-                      fidl::ServerEnd<fuchsia_fshost::Admin> request) {
-    dispatcher_ = dispatcher;
-    return fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_fshost::Admin>>(
-        dispatcher, std::move(request), this);
-  }
-
   void WriteDataFile(WriteDataFileRequestView request,
                      WriteDataFileCompleter::Sync& completer) override {
     data_file_path_ = request->filename.get();
@@ -59,7 +53,6 @@ class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
   const std::string& data_file_path() const { return data_file_path_; }
 
  private:
-  async_dispatcher_t* dispatcher_ = nullptr;
   std::string data_file_path_;
 };
 
@@ -75,7 +68,7 @@ class FakeSvc {
     root_dir->AddEntry(
         fidl::DiscoverableProtocolName<fuchsia_fshost::Admin>,
         fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_fshost::Admin> request) {
-          return fake_fshost_.Connect(dispatcher_, std::move(request));
+          return fidl::BindSingleInFlightOnly(dispatcher_, std::move(request), &fake_fshost_);
         }));
 
     zx::result server_end = fidl::CreateEndpoints(&svc_local_);
@@ -118,8 +111,14 @@ class PaverTest : public zxtest::Test {
  protected:
   PaverTest()
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        fake_svc_(loop_.dispatcher()),
-        paver_(std::move(fake_svc_.svc_chan()), fake_dev_.devmgr_.devfs_root().duplicate()) {
+        paver_(
+            [this]() {
+              zx::channel client;
+              EXPECT_OK(fdio_fd_clone(fake_dev_.devmgr_.devfs_root().get(),
+                                      client.reset_and_get_address()));
+              return fidl::ClientEnd<fuchsia_io::Directory>{std::move(client)};
+            }(),
+            std::move(fake_svc_.svc_chan())) {
     loop_.StartThread("paver-test-loop");
   }
 
@@ -145,7 +144,7 @@ class PaverTest : public zxtest::Test {
 
   async::Loop loop_;
   ramdisk_client_t* ramdisk_ = nullptr;
-  FakeSvc fake_svc_;
+  FakeSvc fake_svc_{loop_.dispatcher()};
   FakeDev fake_dev_{loop_.dispatcher()};
   netsvc::Paver paver_;
 };

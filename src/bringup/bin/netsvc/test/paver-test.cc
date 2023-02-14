@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <lib/fdio/namespace.h>
+#include <lib/fit/defer.h>
 
 #include <string>
 #include <string_view>
@@ -19,22 +20,18 @@ std::string FirmwareFilename(const std::string& type = "") {
   return NB_FIRMWARE_FILENAME_PREFIX + type;
 }
 
-TEST(PaverTest, Constructor) { netsvc::Paver paver({}, {}); }
-
 TEST(PaverTest, GetSingleton) {
-  int fd = open("/svc", O_DIRECTORY | O_RDWR);
-  ASSERT_GE(fd, 0);
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_get_installed(&ns));
-  ASSERT_OK(fdio_ns_bind_fd(ns, "/dev", fd));
-  ASSERT_NOT_NULL(netsvc::Paver::Get());
-  ASSERT_OK(fdio_ns_unbind(ns, "/dev"));
-}
-
-TEST(PaverTest, InitialExitCode) {
-  fbl::unique_fd fd;
-  netsvc::Paver paver_({}, std::move(fd));
-  ASSERT_OK(paver_.exit_code().get());
+  for (const char* path : {"/dev/", "/dev/class/network/"}) {
+    SCOPED_TRACE(path);
+    netsvc::Paver::Reset();
+    zx::channel client, server;
+    ASSERT_OK(zx::channel::create(0, &client, &server));
+    ASSERT_OK(fdio_ns_bind(ns, path, client.release()));
+    auto unbind = fit::defer([ns, path]() { ASSERT_OK(fdio_ns_unbind(ns, path)); });
+    std::ignore = netsvc::Paver::Get();
+  }
 }
 
 TEST_F(PaverTest, OpenWriteInvalidFile) {

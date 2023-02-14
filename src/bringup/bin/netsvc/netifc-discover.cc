@@ -9,13 +9,14 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
+#include <lib/stdcompat/string_view.h>
 #include <stdio.h>
 
 #include <fbl/unique_fd.h>
 
-#include "lib/stdcompat/string_view.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace {
@@ -213,7 +214,7 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
   fidl::ClientEnd<fuchsia_hardware_network::DeviceInstance> dev;
   {
     zx::result status =
-        component::ConnectAt<fuchsia_hardware_network::DeviceInstance>(dir, filename.c_str());
+        component::ConnectAt<fuchsia_hardware_network::DeviceInstance>(dir, filename);
     if (status.is_error()) {
       printf("netifc: failed to connect to %s/%s: %s\n", dirname.c_str(), filename.c_str(),
              status.status_string());
@@ -265,27 +266,17 @@ zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
     printf("failed to open %s: %s\n", classdir.c_str(), strerror(errno));
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+  fdio_cpp::FdioCaller caller(std::move(dir));
 
-  fidl::ClientEnd<fuchsia_io::Directory> dir_channel;
-  {
-    zx::result status = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (status.is_error()) {
-      return status.take_error();
-    }
-    auto& [client, server] = status.value();
-    if (zx_status_t status = fdio_open(
-            classdir.c_str(), static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-            server.TakeChannel().release());
-        status != ZX_OK) {
-      return zx::error(status);
-    }
-    dir_channel = std::move(client);
+  zx::result dir_channel = caller.take_directory();
+  if (dir_channel.is_error()) {
+    return dir_channel.take_error();
   }
 
   std::unique_ptr watcher = fsl::DeviceWatcher::Create(
       classdir,
-      [dispatcher, classdir, topological_path, dir_channel = std::move(dir_channel), &selected_ifc](
-          int dir_fd, const std::string& filename) {
+      [dispatcher, classdir, topological_path, dir_channel = std::move(dir_channel.value()),
+       &selected_ifc](int dir_fd, const std::string& filename) {
         std::optional r =
             netifc_evaluate(topological_path, dir_channel.borrow(), classdir, filename);
         if (r.has_value()) {
