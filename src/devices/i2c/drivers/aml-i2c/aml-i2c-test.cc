@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "aml-i2c.h"
+
 #include <endian.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
-#include <threads.h>
 
 #include <array>
 #include <atomic>
@@ -22,8 +22,6 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-
-zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent);
 
 namespace aml_i2c {
 
@@ -51,22 +49,6 @@ class AmlI2cTest : public zxtest::Test {
     kStop,
   };
 
-  struct AmlI2cDev {
-    zx_handle_t irq;
-    zx_handle_t event;
-    mmio_buffer_t regs_iobuff;
-    void* virt_regs;
-    zx_duration_t timeout;
-    thrd_t irqthrd;
-  };
-
-  struct AmlI2c {
-    pdev_protocol_t pdev;
-    zx_device_t* zxdev;
-    AmlI2cDev* i2c_devs;
-    uint32_t dev_count;
-  };
-
   uint32_t* mmio() const { return reinterpret_cast<uint32_t*>(mmio_mapper_.start()); }
   zx::unowned_interrupt irq(uint32_t index) const { return irqs_[index]->borrow(); }
 
@@ -88,10 +70,10 @@ class AmlI2cTest : public zxtest::Test {
   void Init(uint32_t bus_count) {
     EXPECT_NO_FATAL_FAILURE(InitResources(bus_count));
 
-    EXPECT_OK(aml_i2c_bind(nullptr, root_.get()));
+    EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
     ASSERT_EQ(root_->child_count(), 1);
 
-    // Must map after aml_i2c_bind sets the VMO cache policy.
+    // Must map after AmlI2c::Bind sets the VMO cache policy.
     EXPECT_OK(mmio_mapper_.Map(mmio_, 0, 0));
 
     AmlI2c* const i2c = root_->GetLatestChild()->GetDeviceContext<AmlI2c>();
@@ -518,7 +500,7 @@ TEST_F(AmlI2cTest, MetadataTooBig) {
 
   EXPECT_NO_FATAL_FAILURE(InitResources(3));
 
-  EXPECT_NOT_OK(aml_i2c_bind(nullptr, root_.get()));
+  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 
 TEST_F(AmlI2cTest, MetadataTooSmall) {
@@ -537,7 +519,7 @@ TEST_F(AmlI2cTest, MetadataTooSmall) {
 
   EXPECT_NO_FATAL_FAILURE(InitResources(3));
 
-  EXPECT_NOT_OK(aml_i2c_bind(nullptr, root_.get()));
+  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 
 TEST_F(AmlI2cTest, CanUsePDevFragment) {
@@ -551,7 +533,7 @@ TEST_F(AmlI2cTest, CanUsePDevFragment) {
 
   pdev_.set_device_info({{.mmio_count = 1, .irq_count = 1}});
 
-  EXPECT_OK(aml_i2c_bind(nullptr, root_.get()));
+  EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
   ASSERT_EQ(root_->child_count(), 1);
 }
 
@@ -560,7 +542,7 @@ TEST_F(AmlI2cTest, MmioIrqMismatch) {
 
   pdev_.set_device_info({{.mmio_count = 2, .irq_count = 1}});
 
-  EXPECT_NOT_OK(aml_i2c_bind(nullptr, root_.get()));
+  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 
 }  // namespace aml_i2c
