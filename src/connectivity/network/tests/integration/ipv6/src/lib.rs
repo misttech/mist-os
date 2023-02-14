@@ -4,13 +4,11 @@
 
 #![cfg(test)]
 
-use std::{convert::TryInto as _, mem::size_of};
+use std::mem::size_of;
 
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as net_stack;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
@@ -30,7 +28,7 @@ use netstack_testing_common::{
     interfaces,
     ndp::{
         self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
-        fail_dad_with_na, fail_dad_with_ns, send_ra_with_router_lifetime, DadState,
+        fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
     },
     realms::{
         constants, KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _,
@@ -39,7 +37,7 @@ use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
+use packet::ParsablePacket as _;
 use packet_formats::{
     ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
     icmp::{
@@ -192,13 +190,30 @@ async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn sends_router_solicitations(test_name: &str, sub_test_name: &str, forwarding: bool) {
+async fn sends_router_solicitations<N: Netstack>(
+    test_name: &str,
+    sub_test_name: &str,
+    forwarding: bool,
+) {
+    match (N::VERSION, forwarding) {
+        (NetstackVersion::Netstack3, true) => {
+            // TODO(https://fxbug.dev/76987): Enable this when forwarding is supported.
+            return;
+        }
+        (NetstackVersion::Netstack3, false)
+        | (
+            NetstackVersion::Netstack2
+            | NetstackVersion::Netstack2WithFastUdp
+            | NetstackVersion::ProdNetstack2,
+            true | false,
+        ) => (),
+    }
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_network, _realm, iface, fake_ep) =
-        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
@@ -307,12 +322,29 @@ async fn sends_router_solicitations(test_name: &str, sub_test_name: &str, forwar
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, forwarding: bool) {
+async fn slaac_with_privacy_extensions<N: Netstack>(
+    test_name: &str,
+    sub_test_name: &str,
+    forwarding: bool,
+) {
+    match (N::VERSION, forwarding) {
+        (NetstackVersion::Netstack3, true) => {
+            // TODO(https://fxbug.dev/76987): Enable this when forwarding is supported.
+            return;
+        }
+        (NetstackVersion::Netstack3, false)
+        | (
+            NetstackVersion::Netstack2
+            | NetstackVersion::Netstack2WithFastUdp
+            | NetstackVersion::ProdNetstack2,
+            true | false,
+        ) => (),
+    }
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_network, realm, iface, fake_ep) =
-        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
@@ -1073,30 +1105,35 @@ async fn sends_mld_reports(
 }
 
 #[netstack_test]
-async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
+async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
-    let (_network, realm, iface, _fake_ep) = setup_network::<Netstack2>(&sandbox, name, None)
-        .await
-        .expect("error setting up networking");
+    let (network, realm, iface, _fake_ep) =
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up networking");
 
     let interfaces_state = &realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
 
-    let src_ip = netstack_testing_common::interfaces::wait_for_v6_ll(&interfaces_state, iface.id())
-        .await
-        .expect("waiting for link local address");
-    let dst_ip = net_types_ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS;
+    // Wait for the netstack to be up before sending the RA.
+    let iface_ip: net_types_ip::Ipv6Addr =
+        netstack_testing_common::interfaces::wait_for_v6_ll(&interfaces_state, iface.id())
+            .await
+            .expect("waiting for link local address");
 
-    let sock = realm
-        .raw_socket(
-            fposix_socket::Domain::Ipv6,
-            fposix_socket_raw::ProtocolAssociation::Associated(
-                packet_formats::ip::Ipv6Proto::Icmpv6.into(),
-            ),
-        )
-        .await
-        .expect("create raw socket");
+    // Pick a source address that is not the same as the interface's address by
+    // flipping the low bytes.
+    let src_ip = net_types_ip::Ipv6Addr::from_bytes(
+        iface_ip
+            .ipv6_bytes()
+            .into_iter()
+            .enumerate()
+            .map(|(i, b)| if i < 8 { b } else { !b })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap(),
+    );
+
+    let fake_router = network.create_fake_endpoint().expect("endpoint created");
 
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
         ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
@@ -1114,30 +1151,7 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
         0,     /* reachable_time */
         0,     /* retransmit_timer */
     );
-
-    let msg = packet_formats::icmp::ndp::OptionSequenceBuilder::<_>::new(options.iter())
-        .into_serializer()
-        .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<_, &[u8], _>::new(
-            src_ip,
-            dst_ip,
-            packet_formats::icmp::IcmpUnusedCode,
-            ra,
-        ))
-        .serialize_vec_outer()
-        .expect("failed to serialize NDP packet")
-        .unwrap_b();
-
-    // NDP requires that this be the hop limit.
-    let () = sock.set_multicast_hops_v6(255).expect("set multicast hops");
-
-    let written = sock
-        .send_to(
-            msg.as_ref(),
-            &std::net::SocketAddrV6::new((*dst_ip).into(), 0, 0, iface.id().try_into().unwrap())
-                .into(),
-        )
-        .expect("failed to write to socket");
-    assert_eq!(written, msg.as_ref().len());
+    send_ra(&fake_router, ra, &options, src_ip).await.expect("RA sent");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)

@@ -59,6 +59,27 @@ pub async fn write_message<
     ep.write(ser.as_ref()).await.context("failed to write to fake endpoint")
 }
 
+/// Send Router Advertisement NDP message.
+pub async fn send_ra<'a>(
+    fake_ep: &netemul::TestFakeEndpoint<'a>,
+    ra: RouterAdvertisement,
+    options: &[NdpOptionBuilder<'_>],
+    src_ip: net_types::ip::Ipv6Addr,
+) -> crate::Result {
+    write_message::<&[u8], _>(
+        constants::eth::MAC_ADDR,
+        net_types::ethernet::Mac::from(
+            &net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS,
+        ),
+        src_ip,
+        net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
+        ra,
+        options,
+        fake_ep,
+    )
+    .await
+}
+
 /// Send Router Advertisement NDP message with router lifetime.
 pub async fn send_ra_with_router_lifetime<'a>(
     fake_ep: &netemul::TestFakeEndpoint<'a>,
@@ -74,18 +95,7 @@ pub async fn send_ra_with_router_lifetime<'a>(
         0,        /* reachable_time */
         0,        /* retransmit_timer */
     );
-    write_message::<&[u8], _>(
-        constants::eth::MAC_ADDR,
-        net_types::ethernet::Mac::from(
-            &net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS,
-        ),
-        src_ip,
-        net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
-        ra,
-        options,
-        fake_ep,
-    )
-    .await
+    send_ra(fake_ep, ra, options, src_ip).await
 }
 
 /// A result type that can be used to evaluate the outcome of Duplicate Address
