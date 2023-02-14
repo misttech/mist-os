@@ -14,7 +14,7 @@ use {
     AudioDaemonProxy = "core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"
 )]
 pub async fn play_cmd(audio_proxy: AudioDaemonProxy, cmd: PlayCommand) -> Result<()> {
-    let (play_remote, play_local) = fidl::Socket::create(fidl::SocketOpts::DATAGRAM)?;
+    let (play_remote, play_local) = fidl::Socket::create_datagram();
 
     let request = AudioDaemonPlayRequest {
         socket: Some(play_remote),
