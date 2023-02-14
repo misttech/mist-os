@@ -45,8 +45,8 @@ impl AudioDaemon {
         request: AudioDaemonRecordRequest,
         responder: AudioDaemonRecordResponder,
     ) -> Result<(), anyhow::Error> {
-        let (stdout_remote, stdout_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
-        let (stderr_remote, _stderr_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
+        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
 
         let response = AudioDaemonRecordResponse {
             stdout: Some(stdout_remote),
@@ -254,8 +254,8 @@ impl AudioDaemon {
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
                 .context("Failed to connect to fuchsia.media.Audio")?;
         let num_packets = 4;
-        let (stdout_remote, stdout_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
-        let (stderr_remote, _stderr_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
+        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
 
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>()?;
@@ -369,8 +369,8 @@ impl AudioDaemon {
         request: AudioDaemonPlayRequest,
         responder: AudioDaemonPlayResponder,
     ) -> Result<(), anyhow::Error> {
-        let (stdout_remote, stdout_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
-        let (stderr_remote, _stderr_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
+        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
 
         let response = AudioDaemonPlayResponse {
             stdout: Some(stdout_remote),
