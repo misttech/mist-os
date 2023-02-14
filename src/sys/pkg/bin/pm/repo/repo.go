@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -225,8 +226,12 @@ func (r *Repo) HasBlob(root string) bool {
 // Addblob always returns the plaintext size of the blob that is added, even if
 // blob encryption is used.
 func (r *Repo) AddBlob(root string, rd io.Reader) (string, int64, error) {
+	var dstPath string
+
+	// Exit early if the blob already exists.
 	if root != "" {
-		dstPath := filepath.Join(r.blobsDir, root)
+		dstPath = filepath.Join(r.blobsDir, root)
+
 		if fi, err := os.Stat(dstPath); err == nil {
 			fileSize := fi.Size()
 
@@ -236,25 +241,9 @@ func (r *Repo) AddBlob(root string, rd io.Reader) (string, int64, error) {
 
 			return root, fileSize, nil
 		}
-
-		var dst io.WriteCloser
-		var err error
-		dst, err = os.OpenFile(dstPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
-		if err != nil {
-			return root, 0, err
-		}
-		defer dst.Close()
-		if r.encryptionKey != nil {
-			dst, err = cryptingWriter(dst, r.encryptionKey)
-			if err != nil {
-				return root, 0, err
-			}
-		}
-		n, err := io.Copy(dst, rd)
-		return root, n, err
 	}
 
-	var tree merkle.Tree
+	// Otherwise write the blob into a temporary file.
 	f, err := os.CreateTemp(r.blobsDir, "blob")
 	if err != nil {
 		return "", 0, err
@@ -269,12 +258,34 @@ func (r *Repo) AddBlob(root string, rd io.Reader) (string, int64, error) {
 		}
 	}
 
-	n, err := tree.ReadFrom(io.TeeReader(rd, dst))
-	if err != nil {
-		return "", n, err
+	// Copy the blob into the destination. Compute the merkle if we were not passed one.
+	var n int64
+	if root == "" {
+		var tree merkle.Tree
+		n, err = tree.ReadFrom(io.TeeReader(rd, dst))
+		if err != nil {
+			return "", n, err
+		}
+
+		root = hex.EncodeToString(tree.Root())
+		dstPath = filepath.Join(r.blobsDir, root)
+	} else {
+		n, err = io.Copy(dst, rd)
+		if err != nil {
+			return "", n, err
+		}
 	}
-	root = hex.EncodeToString(tree.Root())
-	return root, n, os.Rename(f.Name(), filepath.Join(r.blobsDir, root))
+
+	// Atomically rename the blob to the destination path. Ignore "file
+	// exists" error, since that means we lost a race with some other
+	// process trying to create this blob.
+	if err = os.Rename(f.Name(), dstPath); err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			return "", n, err
+		}
+	}
+
+	return root, n, nil
 }
 
 // CommitUpdates finalizes the changes to the update repository that have been
