@@ -1,0 +1,57 @@
+// Copyright 2023 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "skip",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                // The Starnix test runner may emit one or more synthetic test cases matching this pattern to capture logs for batches.
+                // It will always pass, so we must mark it expect_pass or the blanket "skip" rule above will be incorrect.
+                "fuchsia-pkg://*bionic_unit_tests_static*",
+                "bionic_allocator.*",
+                "sys_*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "sys_msg.smoke",
+                "sys_personality.current_persona",
+                "sys_prctl.bug_20017123",
+                "sys_prctl.pr_cap_ambient",
+                "sys_ptrace.watchpoint_imprecise",
+                "sys_ptrace.hardware_breakpoint",
+                "sys_random.getrandom_EINVAL",
+                "sys_select.select_smoke",
+                "sys_select.pselect_smoke",
+                "sys_sem.smoke",
+                "sys_sendfile.sendfile",
+                "sys_sendfile.sendfile64_smoke",
+                "sys_shm.smoke",
+                "sys_stat.futimens",
+                "sys_stat.futimens_EBADF",
+                "sys_stat.stat64_lstat64_fstat64",
+                "sys_stat.statx",
+                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",
+                "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_dangling_symlink",
+                "sys_sysinfo.smoke",
+                "sys_sysinfo.sysinfo",
+                "sys_timex.adjtimex_smoke",
+                "sys_timex.adjtimex_EFAULT",
+                "sys_timex.clock_adjtime_smoke",
+                "sys_timex.clock_adjtime_EFAULT",
+                "sys_uio.preadv2_pwritev2",
+                "sys_uio.preadv64v2_pwritev64v2",
+                "sys_uio.process_vm_readv",
+                "sys_uio.process_vm_writev",
+            ],
+        },
+    ],
+}
