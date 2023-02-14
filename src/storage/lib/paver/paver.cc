@@ -648,18 +648,6 @@ zx::result<> DataSinkImpl::WriteVolumes(
   return FvmPave(devfs_root_, *partitioner_, std::move(status.value()));
 }
 
-// Deprecated in favor of WriteFirmware().
-// TODO(fxbug.dev/45606): move clients off this function and delete it.
-zx::result<> DataSinkImpl::WriteBootloader(fuchsia_mem::wire::Buffer payload) {
-  PartitionSpec spec(Partition::kBootloaderA);
-
-  if (!partitioner_->SupportsPartition(spec)) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  return PartitionPave(*partitioner_, std::move(payload.vmo), payload.size, spec);
-}
-
 zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>>
 DataSinkImpl::WipeVolume() {
   auto status = GetFvmPartition(*partitioner_);
