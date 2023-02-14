@@ -21,7 +21,7 @@ async fn main() {
 }
 
 async fn foo() {
-    futures::join!(baz(10), baz(11));
+    futures::join!(baz(10).boxed(), baz(11).boxed_local());
 }
 
 async fn bar() {

@@ -19,10 +19,12 @@
 #include "src/developer/debug/zxdb/symbols/collection.h"
 #include "src/developer/debug/zxdb/symbols/data_member.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol.h"
+#include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
 #include "src/developer/debug/zxdb/symbols/symbol_utils.h"
+#include "src/developer/debug/zxdb/symbols/template_parameter.h"
 
 namespace zxdb {
 
@@ -37,12 +39,9 @@ const char kVtableMemberPrefix[] = "_vptr";
 // The Clang demangler produces this prefix for vtable symbols.
 const char kVtableSymbolNamePrefix[] = "vtable for ";
 
-// The Rust compiler produces this prefix for fat pointers.
-const char kFatPointerTypePrefix[] = "*mut dyn ";
-
 void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprValue value,
                                 EvalCallback cb) {
-  // Rust fat pointer is a struct that looks like
+  // Rust dyn pointer is a struct that looks like
   //
   // 0x000957c3:   DW_TAG_structure_type
   //                 DW_AT_name	("*mut dyn core::future::future::Future<Output=()>")
@@ -64,7 +63,13 @@ void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprVal
   // 0x000957e0:     NULL
 
   fxl::RefPtr<Collection> coll_type = context->GetConcreteTypeAs<Collection>(value.type());
-  if (!coll_type || !debug::StringStartsWith(coll_type->GetAssignedName(), kFatPointerTypePrefix))
+  if (!coll_type)
+    return cb(std::move(value));
+
+  // The name could be either "*mut dyn ..." for raw pointers, or "alloc::boxed::Box<dyn ...>" for
+  // boxed pointers. "dyn ..." could be parenthesized as "(dyn ... + ...)".
+  if (!debug::StringStartsWith(coll_type->GetAssignedName(), "*mut ") &&
+      !debug::StringStartsWith(coll_type->GetAssignedName(), "alloc::boxed::Box<"))
     return cb(std::move(value));
 
   // Extract pointer and vtable from the fat pointer.
@@ -79,8 +84,8 @@ void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprVal
   //
   // One approach is to find the DW_TAG_variable at the address |vtable|, but we don't have such
   // index to resolve addresses to variables. Instead, we read the first member of the vtable which
-  // is the address of |core::ptr::drop_in_place<DerivedType>(DerivedType*)| and get the type of
-  // the first parameter.
+  // is the address of |core::ptr::drop_in_place<DerivedType>(Arg1)|. Note that the Arg1 is usually
+  // DerivedType* but could be different for boxes so we use the template parameter instead.
 
   // Read the memory directly to bypass type manipulations.
   context->GetDataProvider()->GetMemoryAsync(
@@ -97,14 +102,13 @@ void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprVal
           return cb(std::move(value));
 
         const Function* func = loc.symbol().Get()->As<Function>();
-        if (!func || func->parameters().empty())
+        if (!func || func->template_params().empty())
           return cb(std::move(value));
 
-        // Function parameter is a Variable.
-        const Type* derived = func->parameters()[0].Get()->As<Variable>()->type().Get()->As<Type>();
-        if (!derived)
-          return cb(std::move(value));
-        return cb(ExprValue(RefPtrTo(derived), pointer.data(), pointer.source()));
+        // Get the templated parameter and create a ModifiedType to that type.
+        LazySymbol pointed_to = func->template_params()[0].Get()->As<TemplateParameter>()->type();
+        auto derived = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, pointed_to);
+        return cb(ExprValue(derived, pointer.data(), pointer.source()));
       });
 }
 

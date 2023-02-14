@@ -307,8 +307,15 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
                                             const FormatFutureOptions& options,
                                             const fxl::RefPtr<EvalContext>& context, int indent,
                                             const std::string& awaiter_file_name) {
-  // Resolve pointers first.
-  if (future.type()->As<ModifiedType>()) {
+  std::string_view type = StripTemplate(future.type()->GetFullName());
+
+  // Resolve pointers first. A pointer could be either non-dyn or dyn, raw or boxed.
+  //
+  // A non-dyn pointer (raw or boxed) is a ModifiedType.
+  // A dyn raw pointer is a Collection and has a name "*mut dyn ..." or "*mut (dyn ... + ...)".
+  // A dyn boxed pointer has the same layout but with a name "alloc::boxed::Box<(dyn ... + ...)>".
+  if (future.type()->As<ModifiedType>() || debug::StringStartsWith(type, "*mut ") ||
+      type == "alloc::boxed::Box") {
     auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
     ResolvePointer(context, future, [=](ErrOrValue val) {
       if (val.has_error()) {
@@ -323,7 +330,6 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
   if (IsAsyncFunctionOrBlock(future.type()))
     return FormatAsyncFunctionOrBlock(future, options, context, indent);
 
-  std::string_view type = StripTemplate(future.type()->GetFullName());
   if (type == "futures_util::future::future::fuse::Fuse")
     return FormatFuse(future, options, context, indent);
   if (type == "futures_util::future::maybe_done::MaybeDone")
@@ -387,14 +393,8 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMapTuple(
     if (future.has_error())
       return out->Complete(FormatError("Invalid HashMap tuple (6)", future.err()));
 
-    // |future| is a $(*mut dyn core::future::future::Future<Output=()>), we want to downcast
-    // it to the actual future object.
-    PromotePtrRefToDerived(
-        context, PromoteToDerived::kPtrOnly, future.value(), [=](ErrOrValue future) {
-          if (future.has_error())
-            return out->Complete(FormatError("Invalid HashMap tuple (7)", future.err()));
-          out->Complete(FormatFuture(future.value(), options, context, 3));
-        });
+    // |future| is a $(*mut dyn core::future::future::Future<Output=()>).
+    out->Complete(FormatFuture(future.value(), options, context, 3));
   });
   return out;
 }
