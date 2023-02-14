@@ -164,6 +164,9 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
         info!("Skipping zbi signing");
     }
 
+    // Relativize the paths in the images manifest
+    let assembly_manifest = assembly_manifest.relativize(&outdir)?;
+
     // Write the images manifest.
     let images_json_path = outdir.join("images.json");
     let images_json = File::create(images_json_path).context("Creating images manifest")?;

@@ -36,13 +36,16 @@ def main():
     args = parser.parse_args()
 
     images_manifest = json.load(args.images_manifest)
+    manifest_path = os.path.dirname(args.images_manifest.name)
 
     lines = []
     for image in images_manifest:
         contents = image.get("contents", dict())
         if "packages" in contents:
             for package in contents["packages"][args.package_set]:
-                lines.append(package[args.contents])
+                # Paths in the manifest are relative to the manifest file itself
+                lines.append(
+                    os.path.join(manifest_path, package[args.contents]))
 
     for l in lines:
         args.output.write(l)

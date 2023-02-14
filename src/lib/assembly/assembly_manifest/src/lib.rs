@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #![deny(missing_docs)]
+#![warn(clippy::all)]
 
 //! Reading and writing a manifest specifying all the images generated as part
 //! of Image Assembly.

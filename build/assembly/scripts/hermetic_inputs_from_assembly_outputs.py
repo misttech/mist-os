@@ -98,8 +98,9 @@ def main():
     package_manifest_paths: Set[FilePath] = set()
     for image_manifest_file in args.system:
         image_manifest = json.load(image_manifest_file)
+        manifest_path = os.path.dirname(image_manifest_file.name)
         for image in image_manifest:
-            inputs.append(image['path'])
+            inputs.append(os.path.join(manifest_path, image['path']))
             if not args.include_blobs:
                 continue
 
@@ -110,7 +111,10 @@ def main():
                 packages.extend(image['contents']['packages'].get('base', []))
                 packages.extend(image['contents']['packages'].get('cache', []))
                 package_manifest_paths.update(
-                    [package['manifest'] for package in packages])
+                    [
+                        os.path.join(manifest_path, package['manifest'])
+                        for package in packages
+                    ])
 
     # If we collected any package manifests, include all the blobs referenced
     # by them.

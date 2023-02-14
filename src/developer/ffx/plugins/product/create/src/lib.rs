@@ -248,6 +248,7 @@ fn load_assembly_manifest(
             File::open(path).with_context(|| format!("Opening assembly manifest: {}", path))?;
         let manifest: AssemblyManifest = serde_json::from_reader(file)
             .with_context(|| format!("Parsing assembly manifest: {}", path))?;
+        let manifest = manifest.derelativize(path.parent().context("Invalid path")?)?;
 
         // Filter out the base package, and the blobfs contents.
         let mut images = Vec::new();

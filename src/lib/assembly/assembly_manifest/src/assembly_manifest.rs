@@ -9,6 +9,7 @@ use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
+use utf8_path::path_relative_from;
 
 /// A manifest containing a list of images produced by the Image Assembler.
 ///
@@ -36,7 +37,7 @@ pub struct AssemblyManifest {
     pub images: Vec<Image>,
 }
 
-/// A specific Image type.
+/// An item in the AssemblyManifest.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Image {
     /// Base Package.
@@ -109,6 +110,90 @@ impl Image {
         }
     }
 }
+
+impl AssemblyManifest {
+    /// Return a new Assembly Manifest with all the paths relativized to a
+    /// target path
+    pub fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
+        // Change the images list in-place so fields can be added to the AssemblyManifest without
+        // changing this method
+        let mut images = Vec::default();
+        for image in self.images {
+            match image {
+                Image::BasePackage(path) => {
+                    images.push(Image::BasePackage(path_relative_from(path, &base_path)?))
+                }
+                Image::VBMeta(path) => {
+                    images.push(Image::VBMeta(path_relative_from(path, &base_path)?))
+                }
+                Image::FVM(path) => images.push(Image::FVM(path_relative_from(path, &base_path)?)),
+                Image::FVMSparse(path) => {
+                    images.push(Image::FVMSparse(path_relative_from(path, &base_path)?))
+                }
+                Image::FVMSparseBlob(path) => {
+                    images.push(Image::FVMSparseBlob(path_relative_from(path, &base_path)?))
+                }
+                Image::FVMFastboot(path) => {
+                    images.push(Image::FVMFastboot(path_relative_from(path, &base_path)?))
+                }
+                Image::QemuKernel(path) => {
+                    images.push(Image::QemuKernel(path_relative_from(path, &base_path)?))
+                }
+                Image::ZBI { path, signed } => {
+                    images.push(Image::ZBI { path: path_relative_from(path, &base_path)?, signed })
+                }
+                Image::BlobFS { path, contents } => images.push(Image::BlobFS {
+                    path: path_relative_from(path, &base_path)?,
+                    contents: contents.relativize(&base_path)?,
+                }),
+            }
+        }
+        self.images = images;
+
+        Ok(self)
+    }
+
+    /// Return a new Assembly manifest with all the paths made joined to the
+    /// provided directory where the manifest is located
+    pub fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
+        // Change the images list in-place so fields can be added to the AssemblyManifest without
+        // changing this method
+        let mut images = Vec::default();
+        for image in self.images {
+            match image {
+                Image::BasePackage(path) => {
+                    images.push(Image::BasePackage(manifest_dir.as_ref().join(path)))
+                }
+                Image::VBMeta(path) => images.push(Image::VBMeta(manifest_dir.as_ref().join(path))),
+                Image::FVM(path) => images.push(Image::FVM(manifest_dir.as_ref().join(path))),
+                Image::FVMSparse(path) => {
+                    images.push(Image::FVMSparse(manifest_dir.as_ref().join(path)))
+                }
+                Image::FVMSparseBlob(path) => {
+                    images.push(Image::FVMSparseBlob(manifest_dir.as_ref().join(path)))
+                }
+                Image::FVMFastboot(path) => {
+                    images.push(Image::FVMFastboot(manifest_dir.as_ref().join(path)))
+                }
+                Image::QemuKernel(path) => {
+                    images.push(Image::QemuKernel(manifest_dir.as_ref().join(path)))
+                }
+                Image::ZBI { path, signed } => {
+                    images.push(Image::ZBI { path: manifest_dir.as_ref().join(path), signed })
+                }
+                Image::BlobFS { path, contents } => images.push(Image::BlobFS {
+                    path: manifest_dir.as_ref().join(path),
+                    contents: contents.derelativize(&manifest_dir)?,
+                }),
+            }
+        }
+        self.images = images;
+
+        Ok(self)
+    }
+}
+
+/// A specific Image type.
 
 #[derive(Debug, Serialize)]
 struct ImageSerializeHelper<'a> {
@@ -272,10 +357,34 @@ impl BlobfsContents {
         let name = package_manifest.name().to_string();
         let mut package_blobs: Vec<PackageBlob> = vec![];
         Self::add_package_blobs(package_manifest, &mut package_blobs, merkle_size_map)
-            .with_context(|| format!("adding package: {}", manifest))?;
+            .with_context(|| format!("adding package: {manifest}"))?;
         package_blobs.sort();
         package_set.0.push(PackageMetadata { name, manifest, blobs: package_blobs });
         Ok(())
+    }
+
+    /// Relativize all manifest locations in the BlobFsContents to the output file's location
+    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
+        // Modify in-place so we can add fields to the struct without updating this code
+        for mut package in self.packages.base.0.iter_mut() {
+            package.manifest = path_relative_from(&package.manifest, &base_path)?
+        }
+        for mut package in self.packages.cache.0.iter_mut() {
+            package.manifest = path_relative_from(&package.manifest, &base_path)?
+        }
+        Ok(self)
+    }
+
+    /// Join all manifest paths in the BlobFsContents to the location of the file it is serialized in
+    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
+        // Modify in-place so we can add fields without updating this code
+        for mut package in self.packages.base.0.iter_mut() {
+            package.manifest = manifest_dir.as_ref().join(&package.manifest)
+        }
+        for mut package in self.packages.cache.0.iter_mut() {
+            package.manifest = manifest_dir.as_ref().join(&package.manifest)
+        }
+        Ok(self)
     }
 }
 
@@ -356,7 +465,7 @@ impl<'de> Deserialize<'de> for Image {
             ("blk", "fvm.fastboot", None) => Ok(Image::FVMFastboot(helper.path)),
             ("kernel", "qemu-kernel", None) => Ok(Image::QemuKernel(helper.path)),
             (partition_type, name, _) => Err(de::Error::unknown_variant(
-                &format!("({}, {})", partition_type, name),
+                &format!("({partition_type}, {name})"),
                 &[
                     "(far, base-package)",
                     "(zbi, zircon-a)",
@@ -386,6 +495,51 @@ mod tests {
         assert_eq!(image.source(), &Utf8PathBuf::from("path/to/fvm.blk"));
         image.set_source("path/to/fvm2.blk");
         assert_eq!(image.source(), &Utf8PathBuf::from("path/to/fvm2.blk"));
+    }
+
+    #[test]
+    fn relativize() {
+        let manifest = AssemblyManifest {
+            images: vec![
+                Image::BasePackage("base.far".into()),
+                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
+                Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
+                Image::FVM("fvm.blk".into()),
+                Image::FVMSparse("fvm.sparse.blk".into()),
+                Image::FVMSparseBlob("fvm.blob.sparse.blk".into()),
+                Image::FVMFastboot("fvm.fastboot.blk".into()),
+                Image::QemuKernel("qemu/kernel".into()),
+            ],
+        };
+
+        let relativized_manifest =
+            serde_json::from_value::<AssemblyManifest>(generate_test_value())
+                .unwrap()
+                .relativize(Utf8PathBuf::from("path/to"))
+                .unwrap();
+        assert_eq!(relativized_manifest, manifest);
+    }
+
+    #[test]
+    fn derelativize() {
+        let manifest = AssemblyManifest {
+            images: vec![
+                Image::BasePackage("base.far".into()),
+                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
+                Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
+                Image::FVM("fvm.blk".into()),
+                Image::FVMSparse("fvm.sparse.blk".into()),
+                Image::FVMSparseBlob("fvm.blob.sparse.blk".into()),
+                Image::FVMFastboot("fvm.fastboot.blk".into()),
+                Image::QemuKernel("qemu/kernel".into()),
+            ],
+        };
+
+        let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
+        let manifest = serde_json::from_value::<AssemblyManifest>(generate_test_value()).unwrap();
+        assert_eq!(manifest, derelativized_manifest);
     }
 
     #[test]
@@ -484,7 +638,7 @@ mod tests {
         let mut package_manifest_temp_file = NamedTempFile::new()?;
         let dir = tempdir().unwrap();
         let root = Utf8Path::from_path(dir.path()).unwrap();
-        write!(package_manifest_temp_file, "{}", content)?;
+        write!(package_manifest_temp_file, "{content}")?;
         let path = package_manifest_temp_file.into_temp_path();
         path.persist(dir.path().join("package_manifest_temp_file.json"))?;
 
@@ -566,7 +720,7 @@ mod tests {
             "repository": "fuchsia.com"
         }
         "#;
-        return content.to_string();
+        content.to_string()
     }
 
     fn generate_test_value() -> Value {

@@ -61,6 +61,9 @@ struct VisualizationBlobNode {
 /// Verifies that the product budget is not exceeded.
 pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
     let assembly_manifest: AssemblyManifest = read_config(&args.assembly_manifest)?;
+    let assembly_manifest = assembly_manifest
+        .derelativize(args.assembly_manifest.parent().context("Invalid manifest path")?)?;
+
     let blobfs_contents = match extract_blobfs_contents(&assembly_manifest) {
         Some(contents) => contents,
         None => {
