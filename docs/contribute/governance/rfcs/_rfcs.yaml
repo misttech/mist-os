@@ -2709,3 +2709,16 @@
   submitted: '2022-11-02'
   reviewed: '2023-02-01'
 
+- name: 'RFC-0209'
+  title: 'Memory priority profiles'
+  short_description: 'Mark VMARs with a priority using profiles.'
+  authors: ['adanis@google.com']
+  file: '0209_memory_priority_profiles.md'
+  area: ['Kernel']
+  issue: ['101641']
+  gerrit_change_id: ['762586']
+  submitted: '2022-08-16'
+  status: 'Accepted'
+  reviewers: ['rashaeqbal@google.com', 'eieio@google.com', 'tombergan@google.com']
+  consulted: ['andresoportus@google.com']
+  reviewed: '2023-02-15'
