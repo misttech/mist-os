@@ -15,7 +15,8 @@
         },
         {
             name: "stardroid",
-            url: "fuchsia-pkg://fuchsia.com/stardroid#meta/starnix_kernel.cm",
+            url: "fuchsia-pkg://fuchsia.com/stardroid#meta/stardroid.cm",
+            environment: "#galaxy-env",
         },
         {
             name: "chromiumos",
@@ -68,6 +69,7 @@
             protocol: "fuchsia.starnix.galaxy.Controller",
             from: "#stardroid",
             path: "/stardroid/fuchsia.starnix.galaxy.Controller",
+            dependency: "weak",
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
@@ -127,16 +129,7 @@
         {
             directory: "dev-gpu",
             from: "parent",
-            to: [
-                "#kernels",
-                "#stardroid",
-            ],
-        },
-        {
-            directory: "galaxy_config",
-            from: "void",
-            to: [ "#stardroid" ],
-            availability: "optional",
+            to: [ "#kernels" ],
         },
     ],
     expose: [

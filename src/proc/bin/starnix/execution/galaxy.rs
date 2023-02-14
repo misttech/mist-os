@@ -6,6 +6,7 @@ use anyhow::{anyhow, Error};
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
@@ -174,6 +175,7 @@ impl Galaxy {
 /// The services that are exposed in the galaxy component's outgoing directory.
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
+    Binder(fbinder::DevBinderRequestStream),
 }
 
 /// Creates a new galaxy.
@@ -237,24 +239,44 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
 
     let galaxy = Arc::new(Galaxy { kernel, root_fs, system_task, _node: node });
 
+    let serve_binder = config.features.contains(&"binder".to_string());
     if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
         let galaxy_clone = galaxy.clone();
         // Add `ComponentRunner` to the exposed services of the galaxy, and then serve the
         // outgoing directory.
         let mut outgoing_directory = ServiceFs::new_local();
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
+        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Binder);
         outgoing_directory
             .serve_connection(outgoing_dir_channel.into())
             .map_err(|_| errno!(EINVAL))?;
 
         fasync::Task::local(async move {
-            while let Some(ExposedServices::ComponentRunner(request_stream)) =
-                outgoing_directory.next().await
-            {
-                match serve_component_runner(request_stream, galaxy_clone.clone()).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log_error!("Error serving component runner: {:?}", e);
+            let galaxy_clone = galaxy_clone.clone();
+            while let Some(request_stream) = outgoing_directory.next().await {
+                let galaxy_clone = galaxy_clone.clone();
+                match request_stream {
+                    ExposedServices::ComponentRunner(request_stream) => {
+                        fasync::Task::local(async move {
+                            match serve_component_runner(request_stream, galaxy_clone.clone()).await
+                            {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    log_error!("Error serving component runner: {:?}", e);
+                                }
+                            }
+                        })
+                        .detach();
+                    }
+                    ExposedServices::Binder(request_stream) => {
+                        if serve_binder {
+                            fasync::Task::local(async move {
+                                serve_dev_binder(request_stream, galaxy_clone.clone())
+                                    .await
+                                    .expect("failed to start binder.")
+                            })
+                            .detach();
+                        }
                     }
                 }
             }
