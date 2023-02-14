@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context, Result},
+    anyhow::{anyhow, Result},
     async_net::{TcpListener, TcpStream},
     ffx_core::ffx_plugin,
     ffx_starnix_adb_args::AdbStarnixCommand,
@@ -58,8 +58,7 @@ pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand
     println!("To connect: adb connect {}", address);
     while let Some(stream) = listener.incoming().next().await {
         let stream = stream?;
-        let (sbridge, cbridge) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create socket")?;
+        let (sbridge, cbridge) = fidl::Socket::create_stream();
 
         manager_proxy
             .vsock_connect(&command.galaxy, ADB_DEFAULT_PORT, sbridge)
@@ -100,7 +99,7 @@ mod test {
 
         let port = local_address.port();
 
-        let (sbridge, cbridge) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (sbridge, cbridge) = fidl::Socket::create_stream();
 
         fasync::Task::spawn(async move {
             run_connection(listener, sbridge).await;

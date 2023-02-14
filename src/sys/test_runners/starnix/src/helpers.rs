@@ -104,9 +104,9 @@ pub async fn instantiate_kernel_in_realm(
 
 /// Returns numbered handles with their respective stdout and stderr clients.
 pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, zx::Socket, zx::Socket) {
-    let (test_stdin, _) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
-    let (test_stdout, stdout_client) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
-    let (test_stderr, stderr_client) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+    let (test_stdin, _) = zx::Socket::create_stream();
+    let (test_stdout, stdout_client) = zx::Socket::create_stream();
+    let (test_stderr, stderr_client) = zx::Socket::create_stream();
     let stdin_handle_info = fprocess::HandleInfo {
         handle: test_stdin.into_handle(),
         id: fruntime::HandleInfo::new(fruntime::HandleType::FileDescriptor, 0).as_raw(),
