@@ -411,6 +411,9 @@ protocol DisplayControllerImpl {
 
     /// Imports an image from a buffer collection into the driver. The driver should set
     /// image->handle.
+    ///
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
     ImportImage(struct {
         @in_out
         image Image;
@@ -428,6 +431,9 @@ protocol DisplayControllerImpl {
     ///
     /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED and
     /// the value of `capture_handle` will be undefined.
+    ///
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
     ImportImageForCapture(struct {
         collection ZxUnownedHandle;
         index uint32;

@@ -91,20 +91,13 @@ void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer
     return;
   }
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
-
-  auto check_status = collection->CheckBuffersAllocated();
-  if (!check_status.ok() || check_status.value().status != ZX_OK) {
-    completer.Reply(ZX_ERR_SHOULD_WAIT);
-    return;
-  }
-
   image_t dc_image = {};
   dc_image.height = request->image_config.height;
   dc_image.width = request->image_config.width;
   dc_image.pixel_format = request->image_config.pixel_format;
   dc_image.type = request->image_config.type;
 
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
   zx_status_t status = controller_->dc()->ImportImage(
       &dc_image, collection.client_end().borrow().channel()->get(), request->index);
   if (status != ZX_OK) {
@@ -827,17 +820,10 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
     return;
   }
 
-  // Check whether buffer has already been allocated for the requested collection id.
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
-  auto check_status = collection->CheckBuffersAllocated();
-  if (!check_status.ok() || check_status.value().status != ZX_OK) {
-    completer.ReplyError(ZX_ERR_SHOULD_WAIT);
-    return;
-  }
-
   // capture_image will contain a handle that will be used by display driver to trigger
   // capture start/release.
   image_t capture_image = {};
+  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second.driver;
   zx_status_t status = controller_->dc()->ImportImageForCapture(
       collection.client_end().borrow().channel()->get(), request->index, &capture_image.handle);
   if (status == ZX_OK) {

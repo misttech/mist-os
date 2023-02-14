@@ -78,6 +78,10 @@ class MockNoCpuBufferCollection
     constraints_ = request->constraints;
   }
 
+  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(ZX_OK);
+  }
+
   void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
     fuchsia_sysmem::wire::BufferCollectionInfo2 info;
     info.settings.has_image_format_constraints = true;

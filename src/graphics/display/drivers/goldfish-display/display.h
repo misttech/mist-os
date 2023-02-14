@@ -59,7 +59,7 @@ class Display : public DisplayType,
       const display_capture_interface_protocol_t* intf) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
+  zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t collection,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
                                                          uint32_t index,

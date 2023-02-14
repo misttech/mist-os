@@ -64,6 +64,10 @@ class MockBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::
     set_name_called_ = true;
   }
 
+  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(ZX_OK);
+  }
+
   void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
     sysmem::wire::BufferCollectionInfo2 collection;
     collection.buffer_count = 1;

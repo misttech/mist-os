@@ -151,18 +151,35 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return status;
   }
 
-  fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(
-                                               zx::unowned_channel(handle)))
-                                ->WaitForBuffersAllocated();
-  if (!result.ok()) {
-    return result.status();
+  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
+  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!check_result.ok()) {
+    return check_result.status();
   }
-  if (result.value().status != ZX_OK) {
-    return result.value().status;
+  const auto& check_response = check_result.value();
+  if (check_response.status == ZX_ERR_UNAVAILABLE) {
+    return ZX_ERR_SHOULD_WAIT;
+  }
+  if (check_response.status != ZX_OK) {
+    return check_response.status;
   }
 
+  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!wait_result.ok()) {
+    return wait_result.status();
+  }
+  auto& wait_response = wait_result.value();
+  if (wait_response.status != ZX_OK) {
+    return wait_response.status;
+  }
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
-      result.value().buffer_collection_info;
+      wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints ||
       index >= collection_info.buffer_count) {
@@ -604,16 +621,34 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
     return ZX_ERR_NO_MEMORY;
   }
   fbl::AutoLock lock(&capture_lock_);
-  fidl::WireResult result = fidl::WireCall(collection)->WaitForBuffersAllocated();
-  if (!result.ok()) {
-    return result.status();
+  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!check_result.ok()) {
+    return check_result.status();
   }
-  if (result.value().status != ZX_OK) {
-    return result.value().status;
+  const auto& check_response = check_result.value();
+  if (check_response.status == ZX_ERR_UNAVAILABLE) {
+    return ZX_ERR_SHOULD_WAIT;
+  }
+  if (check_response.status != ZX_OK) {
+    return check_response.status;
   }
 
+  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!wait_result.ok()) {
+    return wait_result.status();
+  }
+  auto& wait_response = wait_result.value();
+  if (wait_response.status != ZX_OK) {
+    return wait_response.status;
+  }
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
-      result.value().buffer_collection_info;
+      wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints ||
       index >= collection_info.buffer_count) {

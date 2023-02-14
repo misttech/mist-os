@@ -91,19 +91,39 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
 zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image,
                                                             zx_unowned_handle_t handle,
                                                             uint32_t index) {
-  auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(
-                                   zx::unowned_channel(handle)))
-                    ->WaitForBuffersAllocated();
-  if (!result.ok()) {
-    zxlogf(ERROR, "failed to wait for buffers allocated, %s", result.FormatDescription().c_str());
-    return result.status();
+  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
+  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!check_result.ok()) {
+    zxlogf(ERROR, "failed to check buffers allocated, %s",
+           check_result.FormatDescription().c_str());
+    return check_result.status();
   }
-  if (result.value().status != ZX_OK) {
-    return result.value().status;
+  const auto& check_response = check_result.value();
+  if (check_response.status == ZX_ERR_UNAVAILABLE) {
+    return ZX_ERR_SHOULD_WAIT;
+  }
+  if (check_response.status != ZX_OK) {
+    return check_response.status;
   }
 
+  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!wait_result.ok()) {
+    zxlogf(ERROR, "failed to wait for buffers allocated, %s",
+           wait_result.FormatDescription().c_str());
+    return wait_result.status();
+  }
+  auto& wait_response = wait_result.value();
+  if (wait_response.status != ZX_OK) {
+    return wait_response.status;
+  }
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
-      result.value().buffer_collection_info;
+      wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints) {
     zxlogf(ERROR, "no image format constraints");

@@ -83,19 +83,38 @@ zx_status_t GpuDevice::GetVmoAndStride(
     image_t* image, fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> client_end,
     uint32_t index, zx::vmo* vmo_out, size_t* offset_out, uint32_t* pixel_size_out,
     uint32_t* row_bytes_out) const {
+  fidl::WireResult check_result = fidl::WireCall(client_end)->CheckBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
+  if (!check_result.ok()) {
+    zxlogf(ERROR, "%s: failed to CheckBuffersAllocated %d", tag(), check_result.status());
+    return check_result.status();
+  }
+  const auto& check_response = check_result.value();
+  if (check_response.status == ZX_ERR_UNAVAILABLE) {
+    return ZX_ERR_SHOULD_WAIT;
+  }
+  if (check_response.status != ZX_OK) {
+    zxlogf(ERROR, "%s: failed to CheckBuffersAllocated call %d", tag(), check_response.status);
+    return check_response.status;
+  }
+
   auto wait_result = fidl::WireCall(client_end)->WaitForBuffersAllocated();
+  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // inconsistent across drivers. The FIDL error handling and logging should be
+  // unified.
   if (!wait_result.ok()) {
     zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated %d", tag(), wait_result.status());
     return wait_result.status();
   }
-  if (wait_result.value().status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated call %d", tag(),
-           wait_result.value().status);
-    return wait_result.value().status;
+  auto& wait_response = wait_result.value();
+  if (wait_response.status != ZX_OK) {
+    zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated call %d", tag(), wait_response.status);
+    return wait_response.status;
   }
-
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
-      wait_result.value().buffer_collection_info;
+      wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints) {
     zxlogf(ERROR, "%s: bad image format constraints", tag());
