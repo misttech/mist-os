@@ -915,7 +915,7 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 			ifs.ns.routeTable.AddRoute(
 				ipv6LinkLocalOnLinkRoute(ifs.nicid),
 				routes.MediumPreference,
-				metricNotSet,
+				ifs.metric,
 				true, /* metricTracksInterface */
 				staticRouteAvoidingLifeCycleHooks,
 				true, /* enabled */

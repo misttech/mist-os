@@ -332,7 +332,6 @@ fn assert_eq_unordered<T: Debug + Eq + Hash + PartialEq>(a: Vec<T>, b: Vec<T>) {
 // See `src/connectivity/network/netstack/netstack.go`.
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
-const DEFAULT_UNSET_METRIC: u32 = 0;
 
 // Verifies the startup behavior of the watcher protocols; including the
 // expected preinstalled routes.
@@ -380,13 +379,10 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
                     DEFAULT_INTERFACE_METRIC,
                     true,
                 ),
-                // TODO(https://fxbug.dev/120250): Once IPv6 link-local subnet
-                // routes have the correct metric, switch this to
-                // `DEFAULT_INTERFACE_METRIC`.
                 new_installed_route(
                     net_subnet_v6!("fe80::/64"),
                     loopback_id,
-                    DEFAULT_UNSET_METRIC,
+                    DEFAULT_INTERFACE_METRIC,
                     true,
                 ),
             ])

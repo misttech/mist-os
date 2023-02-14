@@ -366,25 +366,6 @@ func (rt *RouteTable) UpdateStack(stack *stack.Stack, onUpdateSucceeded func()) 
 	rt.UpdateStackLocked(stack, onUpdateSucceeded)
 }
 
-// UpdateMetricByInterface changes the metric for all routes that track a
-// given interface.
-func (rt *RouteTable) UpdateMetricByInterface(nicid tcpip.NICID, metric Metric) {
-	syslog.VLogf(syslog.DebugVerbosity, "RouteTable:Update route table on nic-%d metric change to %d", nicid, metric)
-
-	rt.Lock()
-	defer rt.Unlock()
-
-	for i, er := range rt.routes {
-		if er.Route.NIC == nicid && er.MetricTracksInterface {
-			rt.routes[i].Metric = metric
-		}
-	}
-
-	rt.sortRouteTableLocked()
-
-	rt.dumpLocked()
-}
-
 func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action Action) {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Update route table for routes to nic-%d with action:%d", nicid, action)
 
