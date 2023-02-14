@@ -78,7 +78,7 @@ pub async fn print_output(
 /// Returns a buffer containing the data that MemoryMonitor wrote.
 async fn get_raw_data(monitor_proxy: &MonitorProxy) -> Result<Vec<u8>> {
     // Create a socket.
-    let (rx, tx) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (rx, tx) = fidl::Socket::create_stream();
 
     // Send one end of the socket to the remote device.
     monitor_proxy.write_json_capture_and_buckets(tx)?;
