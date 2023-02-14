@@ -414,8 +414,10 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
                     peer_guard.browse_channel.disconnect();
                     continue;
                 }
-                // We always use the newest Browse connection.
-                browse_channel_task = Some(start_browse_stream_processing_task(peer.clone()));
+                if browse_channel_task.is_none() {
+                    trace!("state_watcher: Starting browse stream task for peer {}", id);
+                    browse_channel_task = Some(start_browse_stream_processing_task(peer.clone()));
+                }
 
                 // Run metrics logging task after browse connection is set up.
                 post_browse_setup_task = Some(run_metrics_logging_task(peer.clone()));
