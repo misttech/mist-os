@@ -15,31 +15,10 @@
             name: "element_manager",
             url: "fuchsia-pkg://fuchsia.com/element_manager#meta/element_manager.cm",
         },
-        {
-            name: "dart_jit_runner",
-            url: "fuchsia-pkg://fuchsia.com/dart_jit_runner#meta/dart_jit_runner.cm",
-            startup: "lazy",
-        },
-        {
-            name: "dart_aot_runner",
-            url: "fuchsia-pkg://fuchsia.com/dart_aot_runner#meta/dart_aot_runner.cm",
-            startup: "lazy",
-        },
-        {
-            name: "flutter_jit_runner",
-            url: "fuchsia-pkg://fuchsia.com/flutter_jit_runner#meta/flutter_jit_runner.cm",
-            startup: "lazy",
-        },
-        {
-            name: "flutter_aot_runner",
-            url: "fuchsia-pkg://fuchsia.com/flutter_aot_runner#meta/flutter_aot_runner.cm",
-            startup: "lazy",
-        },
     ],
     collections: [
         {
             name: "elements",
-            environment: "#elements_env",
             durability: "transient",
         },
     ],
@@ -127,63 +106,6 @@
             from: "framework",
             to: "#element_manager",
         },
-
-        // Dependencies for Dart & Flutter runners
-        {
-            protocol: [
-                "fuchsia.device.NameProvider",
-                "fuchsia.feedback.CrashReporter",
-                "fuchsia.intl.PropertyProvider",
-                "fuchsia.logger.LogSink",
-                "fuchsia.net.name.Lookup",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "parent",
-            to: [
-                "#dart_aot_runner",
-                "#dart_jit_runner",
-                "#flutter_aot_runner",
-                "#flutter_jit_runner",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.fonts.Provider",
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input.ImeService",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: [
-                "#flutter_aot_runner",
-                "#flutter_jit_runner",
-            ],
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: [
-                "#dart_aot_runner",
-                "#dart_jit_runner",
-                "#flutter_aot_runner",
-                "#flutter_jit_runner",
-            ],
-        },
-        {
-            directory: "root-ssl-certificates",
-            from: "parent",
-            to: [
-                "#flutter_aot_runner",
-                "#flutter_jit_runner",
-            ],
-        },
     ],
     expose: [
         {
@@ -197,30 +119,6 @@
         {
             protocol: [ "fuchsia.element.Manager" ],
             from: "#element_manager",
-        },
-    ],
-    environments: [
-        {
-            name: "elements_env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "dart_jit_runner",
-                    from: "#dart_jit_runner",
-                },
-                {
-                    runner: "dart_aot_runner",
-                    from: "#dart_aot_runner",
-                },
-                {
-                    runner: "flutter_jit_runner",
-                    from: "#flutter_jit_runner",
-                },
-                {
-                    runner: "flutter_aot_runner",
-                    from: "#flutter_aot_runner",
-                },
-            ],
         },
     ],
 }
