@@ -89,15 +89,6 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
     // We do an initial build here, because we need an initial configuration before staging.
     let mut emulator_cmd = engine.build_emulator_cmd();
 
-    if cmd.verbose || cmd.dry_run {
-        println!("\n[emulator] Command line after Configuration: {:?}\n", emulator_cmd);
-        println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
-        if cmd.dry_run {
-            engine.save_to_disk()?;
-            return Ok(());
-        }
-    }
-
     if cmd.config.is_none() && !cmd.reuse {
         // We don't stage files for custom configurations, because the EmulatorConfiguration
         // doesn't hold valid paths to the system images.
@@ -108,12 +99,12 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
         // We rebuild the command, since staging likely changed the file paths.
         emulator_cmd = engine.build_emulator_cmd();
 
-        if cmd.verbose || cmd.stage {
-            println!("\n[emulator] Command line after Staging: {:?}\n", emulator_cmd);
-            println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
-            if cmd.stage {
-                return Ok(());
+        if cmd.stage {
+            if cmd.verbose {
+                println!("\n[emulator] Command line after Staging: {:?}\n", emulator_cmd);
+                println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
             }
+            return Ok(());
         }
     }
 
@@ -128,6 +119,11 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
     if cmd.verbose {
         println!("\n[emulator] Final Command line: {:?}\n", emulator_cmd);
         println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
+    }
+
+    if cmd.dry_run {
+        engine.save_to_disk()?;
+        return Ok(());
     }
 
     match engine.start(emulator_cmd, &proxy).await {
@@ -382,7 +378,13 @@ mod tests {
         cmd.dry_run = true;
         new_engine_ctx
             .expect()
-            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .returning(|_| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
             .times(2);
         let _ = start(cmd.clone(), proxy.clone()).await?;
 

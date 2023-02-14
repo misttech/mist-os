@@ -193,14 +193,29 @@ pub(crate) fn finalize_port_mapping(emu_config: &mut EmulatorConfiguration) -> R
                 name,
                 emu_config.runtime.name
             );
-            if let Some(value) = pick_unused_port() {
-                port.host = Some(value);
-                used_ports.push(value);
-            } else {
+
+            // There have been some incidents in automated tests of the same port
+            // being returned multiple times.
+            // So we'll try multiple times and avoid duplicates.
+            for _ in 0..10 {
+                if let Some(value) = pick_unused_port() {
+                    if !used_ports.contains(&value) {
+                        port.host = Some(value);
+                        used_ports.push(value);
+                        break;
+                    } else {
+                        tracing::warn!("pick unused port returned: {} multiple times\n", value);
+                    }
+                } else {
+                    tracing::warn!("pick unused port returned: None\n");
+                }
+            }
+            if !port.host.is_some() {
                 bail!("Unable to assign a host port for '{}'. Terminating emulation.", name);
             }
         }
     }
+    tracing::debug!("Port map finalized: {:?}\n", &emu_config.host.port_map);
     if emu_config.runtime.log_level == LogLevel::Verbose {
         println!("Port map finalized: {:?}\n", &emu_config.host.port_map);
     }
