@@ -25,11 +25,19 @@ import("//build/info/info.gni")
 #   produce_spdx (optional)
 #     [bool] Whether to also produce an SPDX output. Default == false.
 #
+#   emit_metadata (optional)
+#     [bool] Whether to emit metadata for uploading artifacts to GCS. Default == true.
+#
 #   testonly, visibility
 template("license_data") {
   target = "//:default"
   if (defined(invoker.target)) {
     target = invoker.target
+  }
+
+  emit_metadata = true
+  if (defined(invoker.emit_metadata)) {
+    emit_metadata = invoker.emit_metadata
   }
 
   run_analysis = false
@@ -127,15 +135,17 @@ template("license_data") {
 
     args += [ target ]
 
-    metadata = {
-      licenses = [
-        {
-          license_files = rebase_path(temp_out_licenses_dir, root_build_dir)
-          compliance_file =
-              rebase_path("$temp_out_dir/$path_prefix/out/$compliance_output",
-                          root_build_dir)
-        },
-      ]
+    if (emit_metadata) {
+      metadata = {
+        licenses = [
+          {
+            license_files = rebase_path(temp_out_licenses_dir, root_build_dir)
+            compliance_file =
+                rebase_path("$temp_out_dir/$path_prefix/out/$compliance_output",
+                            root_build_dir)
+          },
+        ]
+      }
     }
   }
 

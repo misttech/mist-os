@@ -31,6 +31,7 @@ license_data("licenses_data") {
   target = "//build/bazel/licenses:all_bazel_inputs"
   out_dir = "$target_out_dir/licenses_data"
   produce_spdx = true
+  emit_metadata = false
 }
 
 # Note: To make this target on the Bazel side, this target needs be added:
