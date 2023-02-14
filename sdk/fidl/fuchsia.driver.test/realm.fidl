@@ -75,7 +75,8 @@ protocol Realm {
     /// Start the realm. Calling this will cause DriverTestRealm to start
     /// servicing other protocols (like /dev/). `args` is used to configure
     /// the DriverTestRealm.
-    /// Calling `Start` while the realm is already started will return ZX_ERR_ALREADY_BOUND.
+    ///
+    /// * error `ZX_ERR_ALREADY_EXISTS` the realm has already had `Start` called.
     Start(resource struct {
         args RealmArgs;
     }) -> () error zx.status;
