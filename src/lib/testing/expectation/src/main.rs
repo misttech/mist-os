@@ -3,63 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
+use expectations_matcher::Outcome;
 use fuchsia_component::client;
 use fuchsia_fs::file::read_in_namespace_to_string;
 use futures::{StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 
-#[derive(Debug)]
-struct Expectation<'a>(&'a ser::Expectation);
-
-impl Expectation<'_> {
-    fn expected_outcome(
-        &self,
-        invocation: &fidl_fuchsia_test::Invocation,
-        cases_to_run: &ser::CasesToRun,
-    ) -> Option<Outcome> {
-        let Expectation(expectation) = self;
-        let (ser::Matchers { matchers }, outcome) = match expectation {
-            ser::Expectation::Skip(a) => (a, Outcome::Skip),
-            ser::Expectation::ExpectFailure(a) => match cases_to_run {
-                ser::CasesToRun::WithErrLogs => (a, Outcome::Skip),
-                _ => (a, Outcome::Fail),
-            },
-            ser::Expectation::ExpectPass(a) => match cases_to_run {
-                ser::CasesToRun::WithErrLogs => (a, Outcome::Skip),
-                _ => (a, Outcome::Pass),
-            },
-            ser::Expectation::ExpectFailureWithErrLogs(a) => match cases_to_run {
-                ser::CasesToRun::NoErrLogs => (a, Outcome::Skip),
-                _ => (a, Outcome::Fail),
-            },
-            ser::Expectation::ExpectPassWithErrLogs(a) => match cases_to_run {
-                ser::CasesToRun::NoErrLogs => (a, Outcome::Skip),
-                _ => (a, Outcome::Pass),
-            },
-        };
-        let name = invocation
-            .name
-            .as_ref()
-            .unwrap_or_else(|| panic!("invocation {invocation:?} did not have name"));
-
-        matchers.iter().any(|matcher| matcher.matches(name)).then_some(outcome)
-    }
-}
-
-#[derive(serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-enum Outcome {
-    Pass,
-    Fail,
-    Skip,
-}
-
-impl From<fidl_fuchsia_test::Status> for Outcome {
-    fn from(status: fidl_fuchsia_test::Status) -> Self {
-        match status {
-            fidl_fuchsia_test::Status::Passed => Outcome::Pass,
-            fidl_fuchsia_test::Status::Failed => Outcome::Fail,
-            fidl_fuchsia_test::Status::Skipped => Outcome::Skip,
-        }
+fn outcome_from_test_status(status: fidl_fuchsia_test::Status) -> Outcome {
+    match status {
+        fidl_fuchsia_test::Status::Passed => Outcome::Pass,
+        fidl_fuchsia_test::Status::Failed => Outcome::Fail,
+        fidl_fuchsia_test::Status::Skipped => Outcome::Skip,
     }
 }
 
@@ -86,9 +40,11 @@ struct ExpectationsComparer {
 
 impl ExpectationsComparer {
     fn expected_outcome(&self, invocation: &fidl_fuchsia_test::Invocation) -> Option<Outcome> {
-        self.expectations.expectations.iter().rev().find_map(|expectation| {
-            Expectation(expectation).expected_outcome(invocation, &self.expectations.cases_to_run)
-        })
+        let name = invocation
+            .name
+            .as_ref()
+            .unwrap_or_else(|| panic!("invocation {invocation:?} did not have name"));
+        expectations_matcher::expected_outcome(name, &self.expectations)
     }
 
     fn check_against_expectation(
@@ -96,7 +52,7 @@ impl ExpectationsComparer {
         invocation: &fidl_fuchsia_test::Invocation,
         status: fidl_fuchsia_test::Status,
     ) -> Result<fidl_fuchsia_test::Status, ExpectationError> {
-        let got_outcome = Outcome::from(status);
+        let got_outcome = outcome_from_test_status(status);
         let want_outcome = self.expected_outcome(invocation);
         match (got_outcome, want_outcome) {
             // TODO(https://fxbug.dev/113117): Determine how to handle tests skipped at runtime.

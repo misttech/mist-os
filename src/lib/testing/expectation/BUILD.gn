@@ -12,6 +12,7 @@ rustc_binary("bin") {
   name = "expectation_comparer"
   with_unit_tests = true
   deps = [
+    "expectations_matcher",
     "ser",
     "//sdk/fidl/fuchsia.test:fuchsia.test_rust",
     "//src/lib/fidl/rust/fidl",
@@ -21,7 +22,6 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:tracing",
   ]
@@ -83,5 +83,6 @@ group("tests") {
     ":expectation-example-package-no-err-logs-cases",
     "preprocess:tests",
     "ser:tests",
+    "tool:tests",
   ]
 }

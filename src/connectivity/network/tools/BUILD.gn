@@ -7,6 +7,7 @@ group("tools") {
   deps = [
     "nc",
     "sockscripter",
+    "//src/lib/testing/expectation/tool",
   ]
 }
 
