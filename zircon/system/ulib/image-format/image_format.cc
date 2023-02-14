@@ -1474,7 +1474,9 @@ fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstrai
   result.pixel_format() = constraints.pixel_format().value();
   result.pixel_format_modifier() = constraints.pixel_format_modifier().value();
   result.size() = {width, height};
-  result.display_size() = {width, height};
+  // We intentionally default to x, y == 0, 0 here, since that's by far the most common.  The caller
+  // can fix this up if the caller needs non-zero x or non-zero y.
+  result.display_rect() = {0, 0, width, height};
   if (constraints.color_spaces().has_value() && !constraints.color_spaces()->empty()) {
     result.color_space() = constraints.color_spaces()->at(0);
   }

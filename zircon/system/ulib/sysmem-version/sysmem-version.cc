@@ -477,12 +477,12 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
   PROCESS_SCALAR_FIELD_V1(start_offset_divisor);
 
   if (v1.display_width_divisor() != 0 || v1.display_height_divisor() != 0) {
-    ZX_DEBUG_ASSERT(!v2b.display_size_alignment().has_value());
-    v2b.display_size_alignment() = {1, 1};
-    v2b.display_size_alignment()->width() =
-        std::max(v2b.display_size_alignment()->width(), v1.display_width_divisor());
-    v2b.display_size_alignment()->height() =
-        std::max(v2b.display_size_alignment()->height(), v1.display_height_divisor());
+    ZX_DEBUG_ASSERT(!v2b.display_rect_alignment().has_value());
+    v2b.display_rect_alignment() = {1, 1};
+    v2b.display_rect_alignment()->width() =
+        std::max(v2b.display_rect_alignment()->width(), v1.display_width_divisor());
+    v2b.display_rect_alignment()->height() =
+        std::max(v2b.display_rect_alignment()->height(), v1.display_height_divisor());
   }
 
   if (v1.required_min_coded_width() != 0 || v1.required_min_coded_height() != 0) {
@@ -648,13 +648,13 @@ fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
   // asymmetric.
   v2b.size() = {v1.coded_width(), v1.coded_height()};
   PROCESS_SCALAR_FIELD_V1(bytes_per_row);
-  v2b.display_size() = {v1.display_width(), v1.display_height()};
+  v2b.display_rect() = {0, 0, v1.display_width(), v1.display_height()};
 
   // The coded_width and coded_height may or may not actually be the "valid" pixels from a video
   // decoder.  V2 allows us to be more precise here.  Since output from a video decoder will
   // _typically_ have size == valid_size, and because coded_width,coded_height is documented
   // to be the valid non-padding actual pixels, which can include some that are outside the
-  // display_size, we go ahead and place coded_width,coded_height in valid_size as well as in
+  // display_rect, we go ahead and place coded_width,coded_height in valid_size as well as in
   // size above.  The ability to be more precise here in V2 is one of the reasons to switch
   // to V2.  V1 lacks any way to specify the UV plane offset separately from the coded_height, so
   // there can be situations in which coded_height is artificially larger than the valid_size.height
@@ -1101,9 +1101,9 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
   PROCESS_SCALAR_FIELD_V2(bytes_per_row_divisor);
   PROCESS_SCALAR_FIELD_V2(start_offset_divisor);
 
-  if (v2.display_size_alignment().has_value()) {
-    v1.display_width_divisor() = v2.display_size_alignment()->width();
-    v1.display_height_divisor() = v2.display_size_alignment()->height();
+  if (v2.display_rect_alignment().has_value()) {
+    v1.display_width_divisor() = v2.display_rect_alignment()->width();
+    v1.display_height_divisor() = v2.display_rect_alignment()->height();
   }
 
   if (v2.required_min_size().has_value()) {
@@ -1195,9 +1195,13 @@ fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
 
   PROCESS_SCALAR_FIELD_V2(bytes_per_row);
 
-  if (v2.display_size().has_value()) {
-    v1.display_width() = v2.display_size()->width();
-    v1.display_height() = v2.display_size()->height();
+  if (v2.display_rect().has_value()) {
+    if (v2.display_rect()->x() != 0 || v2.display_rect()->y() != 0) {
+      LOG(ERROR, "v2.display_rect.x != 0 || v2.display_rect.y != 0 can't convert to v1");
+      return fpromise::error();
+    }
+    v1.display_width() = v2.display_rect()->width();
+    v1.display_height() = v2.display_rect()->height();
   }
 
   v1.layers() = 1;

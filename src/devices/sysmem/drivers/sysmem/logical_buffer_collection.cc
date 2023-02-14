@@ -2496,8 +2496,8 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     constraints.size_alignment() = {1, 1};
   }
 
-  if (!constraints.display_size_alignment().has_value()) {
-    constraints.display_size_alignment() = {1, 1};
+  if (!constraints.display_rect_alignment().has_value()) {
+    constraints.display_rect_alignment() = {1, 1};
   }
 
   if (!constraints.required_min_size().has_value()) {
@@ -2583,12 +2583,12 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     return false;
   }
 
-  if (!IsNonZeroPowerOf2(constraints.display_size_alignment()->width())) {
-    LogError(FROM_HERE, "non-power-of-2 display_size_alignment.width not supported");
+  if (!IsNonZeroPowerOf2(constraints.display_rect_alignment()->width())) {
+    LogError(FROM_HERE, "non-power-of-2 display_rect_alignment.width not supported");
     return false;
   }
-  if (!IsNonZeroPowerOf2(constraints.display_size_alignment()->height())) {
-    LogError(FROM_HERE, "non-power-of-2 display_size_alignment.height not supported");
+  if (!IsNonZeroPowerOf2(constraints.display_rect_alignment()->height())) {
+    LogError(FROM_HERE, "non-power-of-2 display_rect_alignment.height not supported");
     return false;
   }
 
@@ -3000,12 +3000,12 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
         *acc->start_offset_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
   }
 
-  ZX_DEBUG_ASSERT(acc->display_size_alignment().has_value());
-  ZX_DEBUG_ASSERT(c.display_size_alignment().has_value());
-  acc->display_size_alignment()->width() =
-      std::max(acc->display_size_alignment()->width(), c.display_size_alignment()->width());
-  acc->display_size_alignment()->height() =
-      std::max(acc->display_size_alignment()->height(), c.display_size_alignment()->height());
+  ZX_DEBUG_ASSERT(acc->display_rect_alignment().has_value());
+  ZX_DEBUG_ASSERT(c.display_rect_alignment().has_value());
+  acc->display_rect_alignment()->width() =
+      std::max(acc->display_rect_alignment()->width(), c.display_rect_alignment()->width());
+  acc->display_rect_alignment()->height() =
+      std::max(acc->display_rect_alignment()->height(), c.display_rect_alignment()->height());
 
   // The required_ space is accumulated by taking the union, and must be fully
   // within the non-required_ space, else fail.  For example, this allows a
@@ -3377,7 +3377,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     }
 
     // The display size and valid size don't matter for computing size in bytes.
-    ZX_DEBUG_ASSERT(!min_image.display_size().has_value());
+    ZX_DEBUG_ASSERT(!min_image.display_rect().has_value());
     ZX_DEBUG_ASSERT(!min_image.valid_size().has_value());
 
     // Checked previously.
@@ -4158,8 +4158,8 @@ void LogicalBufferCollection::LogConstraints(
     LogInfo(FROM_HERE, "size_alignment.width: %u", ifc.size_alignment()->width());
     LogInfo(FROM_HERE, "size_alignment.height: %u", ifc.size_alignment()->height());
 
-    LogInfo(FROM_HERE, "display_size_alignment.width: %u", ifc.display_size_alignment()->width());
-    LogInfo(FROM_HERE, "display_size_alignment.height: %u", ifc.display_size_alignment()->height());
+    LogInfo(FROM_HERE, "display_rect_alignment.width: %u", ifc.display_rect_alignment()->width());
+    LogInfo(FROM_HERE, "display_rect_alignment.height: %u", ifc.display_rect_alignment()->height());
 
     LogInfo(FROM_HERE, "required_min_size.width: %u", ifc.required_min_size()->width());
     LogInfo(FROM_HERE, "required_min_size.height: %u", ifc.required_min_size()->height());

@@ -531,7 +531,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     PRINT_DIFF(max_bytes_per_row);
     PRINT_DIFF(max_surface_width_times_surface_height);
     PRINT_DIFF(size_alignment);
-    PRINT_DIFF(display_size_alignment);
+    PRINT_DIFF(display_rect_alignment);
     PRINT_DIFF(required_min_size);
     PRINT_DIFF(required_max_size);
     PRINT_DIFF(bytes_per_row_divisor);

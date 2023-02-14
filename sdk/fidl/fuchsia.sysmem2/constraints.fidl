@@ -344,10 +344,12 @@ type ImageFormatConstraints = table {
     /// 1, 1.
     9: size_alignment fuchsia.math.SizeU;
 
-    /// * `display_size.width % display_size_alignment.width` must be 0.
-    /// * `display_size.height % display_size_alignment.height` must be 0.
+    /// * `display_rect.x % display_rect_alignment.width` must be 0.
+    /// * `display_rect.y % display_rect_alignment.height` must be 0.
+    /// * `display_rect.width % display_rect_alignment.width` must be 0.
+    /// * `display_rect.height % display_rect_alignment.height` must be 0.
     /// Un-set is treated as 1, 1.
-   10: display_size_alignment fuchsia.math.SizeU;
+   10: display_rect_alignment fuchsia.math.SizeU;
 
     /// These fields can be used to ensure the aggregated constraints have
     /// min_size and max_size such that both required_min_size and

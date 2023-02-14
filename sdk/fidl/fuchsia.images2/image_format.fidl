@@ -32,7 +32,7 @@ type ImageFormat = table {
     /// potentially-smaller rectangle of valid pixels.
     ///
     /// The right and bottom of the image may have some valid pixels which are
-    /// not to be displayed.  See `display_size`.
+    /// not to be displayed.  See `display_rect`.
     4: size fuchsia.math.SizeU;
 
     /// Number of bytes per row. For multi-plane YUV formats, this is the number
@@ -60,49 +60,61 @@ type ImageFormat = table {
     /// `size.width`.
     5: bytes_per_row uint32;
 
-    /// The size of a frame for display purposes. This is the size in pixels of
-    /// the rectangle of pixels that should be displayed.  This must be <= the
-    /// `size` in both dimensions.
+    /// The rect within a frame that's for display. This is the location and
+    /// size in pixels of the rectangle of pixels that should be displayed, when
+    /// displaying the "whole image" in a UI display sense.
     ///
-    /// This field is intentionally limited to only allow cropping on the right
-    /// and bottom, not on the top or left. This addresses video codecs, but is
-    /// not meant to address arbitrary downstream UI transforms which may
-    /// perform their own additional cropping/culling.
+    /// The `x` + `width` must be <= `size.width`, and the `y` + `height` must
+    /// be <= `size.height`.
     ///
-    /// For output from a video decoder, pixels outside the display_size are
+    /// For output from a video decoder, pixels outside the display_rect are
     /// never to be displayed (outside of test programs), but must be preserved
-    /// for correct decoder function.  The `display_size` will always be less
-    /// than or equal to the corresponding `valid_size` values (in both
-    /// dimensions), when `valid_size` is set.  The `display_size` will always
-    /// be less than or equal to the corresponding `size` values. In
-    /// other words, `display_size` <= 'valid_size` <= `size`.
+    /// for correct decoder function.  The `display_rect` will always fall
+    /// within the rect starting at (0, 0) and having `valid_size` size, when
+    /// `valid_size` is set.  In other words, `display_rect` is a subset (not
+    /// necessarily a proper subset) of `valid_size`, and `valid_size` is a
+    /// subset (not necessarily a proper subset) of `size`.
     ///
     /// Downstream texture filtering operations should avoid letting any pixel
-    /// outside of display_size influence the visual appearance of any displayed
+    /// outside of display_rect influence the visual appearance of any displayed
     /// pixel, to avoid the potential for the right or bottom edge leaking in
     /// arbitrary pixels defined by the decode process but not intended for
     /// display.
     ///
     /// Behavior when this field is not set is protocol-specific. In some
-    /// protocols, fallback to `valid_size`, then to `size` may be
-    /// implemented. In other protocols, this field must be set or the channel
-    /// will close.
-    6: display_size fuchsia.math.SizeU;
+    /// protocols, fallback to `valid_size`, then to `size` may be implemented.
+    /// In others, fallback directly to `size` may be implemented. In others,
+    /// this field must be set or the channel will close.
+    ///
+    /// WARNING: fuchsia.sysmem.Images2 (V1) doesn't handle non-zero x, y, so
+    /// any non-zero x, y here (V2) will prevent conversion to V1.  Due to the
+    /// rarity of non-zero x, y in practice, even components that have moved to
+    /// V2 may in some cases still assume both x and y are 0, until there's a
+    /// practical reason to implment and test handling of non-zero x, y.  The
+    /// symptom of sending non-zero x, y to a downstream render and/or display
+    /// pipeline that assumes 0, 0 will be incorrect display, but not a crash,
+    /// since assuming 0, 0 for x, y does not cause reading out of buffer
+    /// bounds.
+    6: display_rect RectU;
 
     /// The size of a frame in terms of the number of pixels that have valid
     /// pixel data in terms of video decoding, but not in terms of which pixels
     /// are intended for display.
     ///
-    /// In the case of a video decoder, this can include some pixels beyond
-    /// `display_size`. The extra pixels are not meant to be displayed, and may
-    /// or may not contain any real image data. Typically anything that looks
-    /// like real image data in these regions is only an artifact of video
+    /// To convert valid_size into a rect that's directly comparable to
+    /// `display_rect`, one can make a rect with (`x`: 0, `y`: 0, `width`:
+    /// `valid_size.width`, `height`: `valid_size.height`).
+    ///
+    /// In the case of a video decoder, `valid_size` can include some pixels
+    /// outside `display_rect`. The extra pixels are not meant to be displayed,
+    /// and may or may not contain any real image data. Typically anything that
+    /// looks like real image data in these regions is only an artifact of video
     /// compression and the existence of the remainder of a macroblock which can
     /// be referenced by later frames despite not being within the displayed
     /// region, and not really any additional "real" pixels from the source. The
     /// pixel values in this region are defined by the codec decode process and
-    /// must be retained for correct decoder operation. Typically the difference
-    /// between `valid_size` and `display_size` will be up to the size of a
+    /// must be retained for correct decoder operation. Typically the pixels
+    /// inside valid_size but outside display_rect will be up to the size of a
     /// macroblock minus 1. The `valid_size` is can be useful for testing video
     /// decoders and for certain transcoding scenarios.
     7: valid_size fuchsia.math.SizeU;

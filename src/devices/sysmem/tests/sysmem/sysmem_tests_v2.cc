@@ -505,7 +505,7 @@ bool AttachTokenSucceedsV2(
   image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
-  image_constraints_1.display_size_alignment() = {1, 1};
+  image_constraints_1.display_rect_alignment() = {1, 1};
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
@@ -1227,7 +1227,7 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
   image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
-  image_constraints.display_size_alignment() = {1, 1};
+  image_constraints.display_rect_alignment() = {1, 1};
 
   // TODO(fxb/115937): Make this work for sysmem2.
 #if 0
@@ -1635,7 +1635,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
-  image_constraints_1.display_size_alignment() = {1, 1};
+  image_constraints_1.display_rect_alignment() = {1, 1};
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
@@ -2672,7 +2672,7 @@ TEST(Sysmem, RequiredSizeV2) {
   image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = 1;
   image_constraints.start_offset_divisor() = 1;
-  image_constraints.display_size_alignment() = {1, 1};
+  image_constraints.display_rect_alignment() = {1, 1};
   image_constraints.required_max_size() = {512, 1024};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3173,7 +3173,7 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = divisor;
   image_constraints.start_offset_divisor() = divisor;
-  image_constraints.display_size_alignment() = {1, 1};
+  image_constraints.display_rect_alignment() = {1, 1};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3942,7 +3942,7 @@ bool BasicAllocationSucceedsV2(
   image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
-  image_constraints.display_size_alignment() = {1, 1};
+  image_constraints.display_rect_alignment() = {1, 1};
 
   modify_constraints(constraints);
 

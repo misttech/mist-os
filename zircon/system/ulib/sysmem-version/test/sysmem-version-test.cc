@@ -906,6 +906,37 @@ TEST(SysmemVersion, ImageFormatWire) {
   }
 }
 
+TEST(SysmemVersion, ImageFormatNonZeroDisplayRectOriginFails) {
+  for (uint32_t run = 0; run < kRunCount; ++run) {
+    auto v1_1 = V1RandomImageFormat();
+    auto v2 = sysmem::V2CopyFromV1ImageFormat(v1_1).value();
+    ASSERT_EQ(v2.display_rect()->x(), 0);
+    ASSERT_EQ(v2.display_rect()->y(), 0);
+    switch (run % 3) {
+      case 0:
+        // leave 0
+        break;
+      case 1:
+        v2.display_rect()->x() = 1;
+        break;
+      case 2:
+        v2.display_rect()->y() = 1;
+        break;
+    }
+    auto v1_2_result = sysmem::V1CopyFromV2ImageFormat(v2);
+    switch (run % 3) {
+      case 0:
+        EXPECT_TRUE(v1_2_result.is_ok());
+        break;
+      case 1:
+        // fallthrough
+      case 2:
+        EXPECT_TRUE(v1_2_result.is_error());
+        break;
+    }
+  }
+}
+
 TEST(SysmemVersion, BufferMemorySettings) {
   for (uint32_t run = 0; run < kRunCount; ++run) {
     auto v1_1 = V1RandomBufferMemorySettings();
