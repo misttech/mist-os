@@ -107,21 +107,27 @@
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.filter.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.stack.Stack",
                 "fuchsia.netstack.Netstack",
             ],
             from: "#netstack",
             to: [ "#netcfg" ],
         },
         {
-            protocol: [
-                "fuchsia.net.interfaces.State",
-                "fuchsia.net.stack.Stack",
-            ],
+            protocol: [ "fuchsia.net.interfaces.State" ],
             from: "#netstack",
             to: [
                 "#netcfg",
                 "#reachability",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+            ],
+            from: "#netstack",
+            to: [ "#reachability" ],
         },
         {
             protocol: [ "fuchsia.net.routes.State" ],

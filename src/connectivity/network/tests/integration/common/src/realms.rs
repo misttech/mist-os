@@ -494,9 +494,6 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_interfaces::StateMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_stack::StackMarker>(
-                        constants::netstack::COMPONENT_NAME,
-                    )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fposix_socket::ProviderMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
@@ -507,6 +504,12 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::netstack::COMPONENT_NAME,
                     )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::InterfacesMarker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_routes::StateV4Marker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_routes::StateV6Marker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::DiagnosticsMarker>(

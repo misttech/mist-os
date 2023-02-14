@@ -282,14 +282,10 @@ where
         let mut neighbors = neighbors.as_ref()?.iter_health();
         let found_healthy_gateway = neighbors
             .fold_while(None, |found_healthy_gateway, (neighbor, health)| {
-                let is_router = routes.iter().any(|route| {
-                    route.device_id == interface
-                        && route
-                            .next_hop
-                            .as_ref()
-                            .map(|next_hop| neighbor == &**next_hop)
-                            .unwrap_or(false)
+                let is_router = routes.device_routes(interface).any(|route| {
+                    route.next_hop.map(|next_hop| *neighbor == next_hop).unwrap_or(false)
                 });
+
                 if !is_router {
                     return itertools::FoldWhile::Continue(found_healthy_gateway);
                 }
@@ -456,15 +452,15 @@ impl GatewayHealth {
 mod tests {
     use super::*;
 
+    use crate::route_table::Route;
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as fnet;
     use fidl_fuchsia_net_interfaces as fnet_interfaces;
-    use fidl_fuchsia_net_stack as fnet_stack;
     use futures::FutureExt as _;
     use net_declare::{fidl_ip, fidl_subnet};
     use std::sync::{Arc, Mutex};
 
-    use crate::neighbor_cache::NeighborState;
+    use crate::{neighbor_cache::NeighborState, route_table::RouteTable, testutil};
 
     #[test]
     fn health_status_healthy() {
@@ -554,7 +550,7 @@ mod tests {
         let sys = MockSystem::default();
         let now = SOME_TIME;
         let mut state = sys.new_diagnostics_state(now, IFACE1);
-        let view = MockInterfaceView::new(IFACE1, None, [(NEIGH1, UNHEALTHY_NEIGHBOR)]);
+        let view = MockInterfaceView::new(IFACE1, None, [(NEIGH_V4, UNHEALTHY_NEIGHBOR)]);
         assert_eq!(Watchdog::evaluate_interface_state(now, &mut state, view.view()).await, None);
     }
 
@@ -565,8 +561,12 @@ mod tests {
         let mut state = sys.new_diagnostics_state(now, IFACE1);
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1)],
-            [(NEIGH1, UNHEALTHY_NEIGHBOR)],
+            [Route {
+                destination: SUBNET_V4,
+                outbound_interface: IFACE1,
+                next_hop: Some(NEIGH_V4),
+            }],
+            [(NEIGH_V4, UNHEALTHY_NEIGHBOR)],
         );
         sys.set_counters_return_timeout(IFACE1);
         assert_eq!(
@@ -589,8 +589,12 @@ mod tests {
         let mut state = sys.new_diagnostics_state(now, IFACE1);
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH2)],
-            [(NEIGH2, NEVER_HEALTHY_NEIGHBOR)],
+            [Route {
+                destination: SUBNET_V6,
+                outbound_interface: IFACE1,
+                next_hop: Some(NEIGH_V6),
+            }],
+            [(NEIGH_V6, NEVER_HEALTHY_NEIGHBOR)],
         );
         // Only never healthy neighbor doesn't trigger actions.
         assert_eq!(Watchdog::evaluate_interface_state(now, &mut state, view.view()).await, None);
@@ -599,8 +603,19 @@ mod tests {
         // triggered.
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1), new_gateway_route(IFACE1, NEIGH2)],
-            [(NEIGH1, UNHEALTHY_NEIGHBOR), (NEIGH2, NEVER_HEALTHY_NEIGHBOR)],
+            [
+                Route {
+                    destination: SUBNET_V4,
+                    outbound_interface: IFACE1,
+                    next_hop: Some(NEIGH_V4),
+                },
+                Route {
+                    destination: SUBNET_V6,
+                    outbound_interface: IFACE1,
+                    next_hop: Some(NEIGH_V6),
+                },
+            ],
+            [(NEIGH_V4, UNHEALTHY_NEIGHBOR), (NEIGH_V6, NEVER_HEALTHY_NEIGHBOR)],
         );
         sys.set_counters_return_timeout(IFACE1);
         assert_eq!(
@@ -620,8 +635,19 @@ mod tests {
         let mut state = sys.new_diagnostics_state(now, IFACE1);
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1), new_gateway_route(IFACE1, NEIGH2)],
-            [(NEIGH1, UNHEALTHY_NEIGHBOR), (NEIGH2, HEALTHY_NEIGHBOR)],
+            [
+                Route {
+                    destination: SUBNET_V4,
+                    outbound_interface: IFACE1,
+                    next_hop: Some(NEIGH_V4),
+                },
+                Route {
+                    destination: SUBNET_V6,
+                    outbound_interface: IFACE1,
+                    next_hop: Some(NEIGH_V6),
+                },
+            ],
+            [(NEIGH_V4, UNHEALTHY_NEIGHBOR), (NEIGH_V6, HEALTHY_NEIGHBOR)],
         );
         assert_eq!(Watchdog::evaluate_interface_state(now, &mut state, view.view()).await, None);
     }
@@ -633,8 +659,12 @@ mod tests {
         let mut state = sys.new_diagnostics_state(now, IFACE1);
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1)],
-            [(NEIGH1, UNHEALTHY_NEIGHBOR)],
+            [Route {
+                destination: SUBNET_V4,
+                outbound_interface: IFACE1,
+                next_hop: Some(NEIGH_V4),
+            }],
+            [(NEIGH_V4, UNHEALTHY_NEIGHBOR)],
         );
         let now = now + DEVICE_COUNTERS_UNHEALTHY_TIME;
         sys.increment_counters(IFACE1, DeviceCounters { rx_frames: 10, tx_frames: 10 });
@@ -673,7 +703,7 @@ mod tests {
 
         // If the gateway disappears, no action is taken but we maintain the
         // unhealthy state.
-        let view = MockInterfaceView::new(IFACE1, [], [(NEIGH1, HEALTHY_NEIGHBOR)]);
+        let view = MockInterfaceView::new(IFACE1, None, [(NEIGH_V4, HEALTHY_NEIGHBOR)]);
         assert_eq!(Watchdog::evaluate_interface_state(later, &mut state, view.view()).await, None);
         assert_eq!(state.health, HealthStatus::Unhealthy { last_action: now });
 
@@ -682,8 +712,12 @@ mod tests {
         let later = later + zx::Duration::from_seconds(1);
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1)],
-            [(NEIGH1, HEALTHY_NEIGHBOR)],
+            [Route {
+                destination: SUBNET_V4,
+                outbound_interface: IFACE1,
+                next_hop: Some(NEIGH_V4),
+            }],
+            [(NEIGH_V4, HEALTHY_NEIGHBOR)],
         );
         assert_eq!(Watchdog::evaluate_interface_state(later, &mut state, view.view()).await, None);
         assert_eq!(state.health, HealthStatus::Healthy { last_action: Some(now) });
@@ -696,8 +730,12 @@ mod tests {
         let now = SOME_TIME;
         let view = MockInterfaceView::new(
             IFACE1,
-            [new_gateway_route(IFACE1, NEIGH1)],
-            [(NEIGH1, UNHEALTHY_NEIGHBOR)],
+            [Route {
+                destination: SUBNET_V4,
+                outbound_interface: IFACE1,
+                next_hop: Some(NEIGH_V4),
+            }],
+            [(NEIGH_V4, UNHEALTHY_NEIGHBOR)],
         );
 
         let mut watchdog = Watchdog::new();
@@ -777,31 +815,21 @@ mod tests {
         NeighborState::new(NeighborHealth::Healthy { last_observed: ZERO_TIME });
 
     const IFACE1: InterfaceId = 1;
-    const NEIGH1: fnet::IpAddress = fidl_ip!("192.0.2.1");
-    const NEIGH2: fnet::IpAddress = fidl_ip!("2001:db8::1");
-
-    fn new_gateway_route(
-        iface: InterfaceId,
-        neighbor: fnet::IpAddress,
-    ) -> fnet_stack::ForwardingEntry {
-        fnet_stack::ForwardingEntry {
-            // NB: this field is not used; we can put whatever here.
-            subnet: fidl_subnet!("0.0.0.0/0"),
-            device_id: iface,
-            next_hop: Some(Box::new(neighbor)),
-            metric: 1,
-        }
-    }
+    const NEIGH_V4: fnet::IpAddress = fidl_ip!("192.0.2.1");
+    const NEIGH_V6: fnet::IpAddress = fidl_ip!("2001:db8::1");
+    // Arbitrary subnet values with which to create routes.
+    const SUBNET_V4: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
+    const SUBNET_V6: fnet::Subnet = fidl_subnet!("::0/0");
 
     struct MockInterfaceView {
         properties: fnet_interfaces_ext::Properties,
-        routes: Vec<fnet_stack::ForwardingEntry>,
+        routes: RouteTable,
         neighbors: crate::InterfaceNeighborCache,
     }
 
     impl MockInterfaceView {
         fn new<
-            R: IntoIterator<Item = fnet_stack::ForwardingEntry>,
+            R: IntoIterator<Item = Route>,
             N: IntoIterator<Item = (fnet::IpAddress, NeighborState)>,
         >(
             id: InterfaceId,
@@ -818,14 +846,14 @@ mod tests {
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: true,
                 },
-                routes: routes.into_iter().collect(),
+                routes: testutil::build_route_table_from_flattened_routes(routes),
                 neighbors: neighbors.into_iter().collect(),
             }
         }
 
         fn view(&self) -> InterfaceView<'_> {
             let Self { properties, routes, neighbors } = self;
-            InterfaceView { properties, routes: &routes[..], neighbors: Some(neighbors) }
+            InterfaceView { properties, routes: &routes, neighbors: Some(neighbors) }
         }
     }
 

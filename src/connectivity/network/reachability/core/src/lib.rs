@@ -5,14 +5,18 @@
 mod inspect;
 mod neighbor_cache;
 mod ping;
+pub mod route_table;
 pub mod watchdog;
+
+#[cfg(test)]
+mod testutil;
 
 use {
     crate::ping::Ping,
+    crate::route_table::{Route, RouteTable},
     fidl_fuchsia_hardware_network, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
-    fuchsia_async as fasync,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
     fuchsia_inspect::Inspector,
     futures::{FutureExt as _, StreamExt as _},
     inspect::InspectInfo,
@@ -386,7 +390,7 @@ impl StateInfo {
 #[derive(Copy, Clone, Debug)]
 pub struct InterfaceView<'a> {
     pub properties: &'a fnet_interfaces_ext::Properties,
-    pub routes: &'a [fnet_stack::ForwardingEntry],
+    pub routes: &'a RouteTable,
     pub neighbors: Option<&'a InterfaceNeighborCache>,
 }
 
@@ -481,7 +485,7 @@ impl Monitor {
         &mut self,
         InterfaceView { properties, routes, neighbors }: InterfaceView<'_>,
     ) {
-        if let Some(info) = compute_state(properties, &routes, &ping::Pinger, neighbors).await {
+        if let Some(info) = compute_state(properties, routes, &ping::Pinger, neighbors).await {
             let id = Id::from(properties.id);
             let () = self.update_state(id, &properties.name, info);
         }
@@ -517,7 +521,7 @@ async fn compute_state(
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
     }: &fnet_interfaces_ext::Properties,
-    routes: &[fnet_stack::ForwardingEntry],
+    routes: &RouteTable,
     pinger: &dyn Ping,
     neighbors: Option<&InterfaceNeighborCache>,
 ) -> Option<IpVersions<StateEvent>> {
@@ -562,19 +566,14 @@ async fn compute_state(
 async fn network_layer_state(
     name: &str,
     interface_id: u64,
-    routes: &[fnet_stack::ForwardingEntry],
+    routes: &RouteTable,
     p: &dyn Ping,
     neighbors: Option<&InterfaceNeighborCache>,
     internet_ping_address: std::net::IpAddr,
 ) -> State {
     use std::convert::TryInto as _;
 
-    let device_routes: Vec<_> = routes
-        .into_iter()
-        .filter(|fnet_stack::ForwardingEntry { subnet: _, device_id, next_hop: _, metric: _ }| {
-            *device_id == interface_id
-        })
-        .collect();
+    let device_routes: Vec<_> = routes.device_routes(interface_id).collect();
 
     let (discovered_healthy_neighbors, discovered_healthy_gateway) = match neighbors {
         None => (false, false),
@@ -585,13 +584,11 @@ async fn network_layer_state(
                     (false, false),
                     |(discovered_healthy_neighbors, _discovered_healthy_gateway),
                      (neighbor, health)| {
-                        let is_gateway = device_routes.iter().any(|route| {
-                            route
-                                .next_hop
-                                .as_ref()
-                                .map(|next_hop| neighbor == &**next_hop)
-                                .unwrap_or(false)
-                        });
+                        let is_gateway = device_routes.iter().any(
+                            |Route { destination: _, outbound_interface: _, next_hop }| {
+                                next_hop.map(|next_hop| *neighbor == next_hop).unwrap_or(false)
+                            },
+                        );
                         match health {
                             // When we find an unhealthy or unknown neighbor, continue,
                             // keeping whether we've previously found a healthy neighbor.
@@ -620,43 +617,41 @@ async fn network_layer_state(
 
     let relevant_routes: Vec<_> = device_routes
         .iter()
-        .filter(|fnet_stack::ForwardingEntry { subnet, device_id: _, next_hop: _, metric: _ }| {
-            *subnet == UNSPECIFIED_V4 || *subnet == UNSPECIFIED_V6
+        .filter(|Route { destination, outbound_interface: _, next_hop: _ }| {
+            *destination == UNSPECIFIED_V4 || *destination == UNSPECIFIED_V6
         })
         .collect();
 
     let gateway_pingable = relevant_routes
         .iter()
-        .filter_map(
-            move |fnet_stack::ForwardingEntry { subnet: _, device_id, next_hop, metric: _ }| {
-                next_hop.as_ref().and_then(|next_hop| {
-                    let fnet_ext::IpAddress(next_hop) = (**next_hop).into();
-                    match next_hop {
-                        std::net::IpAddr::V4(v4) => {
-                            Some(std::net::SocketAddr::V4(std::net::SocketAddrV4::new(v4, 0)))
-                        }
-                        std::net::IpAddr::V6(v6) => match (*device_id).try_into() {
-                            Err(std::num::TryFromIntError { .. }) => {
-                                error!("device id {} doesn't fit in u32", device_id);
-                                None
-                            }
-                            Ok(device_id) => {
-                                if device_id == 0
-                                    && net_types::ip::Ipv6Addr::from_bytes(v6.octets()).scope()
-                                        != net_types::ip::Ipv6Scope::Global
-                                {
-                                    None
-                                } else {
-                                    Some(std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
-                                        v6, 0, 0, device_id,
-                                    )))
-                                }
-                            }
-                        },
+        .filter_map(move |Route { destination: _, outbound_interface, next_hop }| {
+            next_hop.and_then(|next_hop| {
+                let fnet_ext::IpAddress(next_hop) = next_hop.into();
+                match next_hop.into() {
+                    std::net::IpAddr::V4(v4) => {
+                        Some(std::net::SocketAddr::V4(std::net::SocketAddrV4::new(v4, 0)))
                     }
-                })
-            },
-        )
+                    std::net::IpAddr::V6(v6) => match (*outbound_interface).try_into() {
+                        Err(std::num::TryFromIntError { .. }) => {
+                            error!("device id {} doesn't fit in u32", outbound_interface);
+                            None
+                        }
+                        Ok(device_id) => {
+                            if device_id == 0
+                                && net_types::ip::Ipv6Addr::from_bytes(v6.octets()).scope()
+                                    != net_types::ip::Ipv6Scope::Global
+                            {
+                                None
+                            } else {
+                                Some(std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
+                                    v6, 0, 0, device_id,
+                                )))
+                            }
+                        }
+                    },
+                }
+            })
+        })
         .map(|next_hop| p.ping(name, next_hop))
         .collect::<futures::stream::FuturesUnordered<_>>()
         .filter(|ok| futures::future::ready(*ok))
@@ -756,10 +751,15 @@ async fn network_layer_state(
 mod tests {
     use {
         super::*,
-        crate::neighbor_cache::{NeighborHealth, NeighborState},
+        crate::{
+            neighbor_cache::{NeighborHealth, NeighborState},
+            route_table::Route,
+            testutil,
+        },
         async_trait::async_trait,
         fidl_fuchsia_net as fnet, fuchsia_async as fasync,
         net_declare::{fidl_ip, fidl_subnet, std_ip},
+        net_types::ip,
         std::task::Poll,
         test_case::test_case,
     };
@@ -846,7 +846,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_network_layer_state_ipv4() {
-        test_network_layer_state(
+        test_network_layer_state::<ip::Ipv4>(
             fidl_ip!("1.2.3.0"),
             fidl_ip!("1.2.3.4"),
             fidl_ip!("1.2.3.1"),
@@ -862,7 +862,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_network_layer_state_ipv6() {
-        test_network_layer_state(
+        test_network_layer_state::<ip::Ipv6>(
             fidl_ip!("123::"),
             fidl_ip!("123::4"),
             fidl_ip!("123::1"),
@@ -876,7 +876,7 @@ mod tests {
         .await
     }
 
-    async fn test_network_layer_state(
+    async fn test_network_layer_state<I: ip::Ip>(
         net1: fnet::IpAddress,
         _net1_addr: fnet::IpAddress,
         net1_gateway: fnet::IpAddress,
@@ -887,68 +887,59 @@ mod tests {
         ping_internet_addr: std::net::IpAddr,
         prefix_len: u8,
     ) {
-        let route_table = [
-            fnet_stack::ForwardingEntry {
-                subnet: unspecified_addr,
-                device_id: ID1,
-                next_hop: Some(Box::new(net1_gateway)),
-                metric: 0,
+        let route_table = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: unspecified_addr,
+                outbound_interface: ID1,
+                next_hop: Some(net1_gateway),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: net1, prefix_len },
-                device_id: ID1,
+            Route {
+                destination: fnet::Subnet { addr: net1, prefix_len },
+                outbound_interface: ID1,
                 next_hop: None,
-                metric: 0,
             },
-        ];
-        let route_table_2 = [
-            fnet_stack::ForwardingEntry {
-                subnet: unspecified_addr,
-                device_id: ID1,
-                next_hop: Some(Box::new(net2_gateway)),
-                metric: 0,
+        ]);
+        let route_table_2 = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: unspecified_addr,
+                outbound_interface: ID1,
+                next_hop: Some(net2_gateway),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: net1, prefix_len },
-                device_id: ID1,
+            Route {
+                destination: fnet::Subnet { addr: net1, prefix_len },
+                outbound_interface: ID1,
                 next_hop: None,
-                metric: 0,
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: net2, prefix_len },
-                device_id: ID1,
+            Route {
+                destination: fnet::Subnet { addr: net2, prefix_len },
+                outbound_interface: ID1,
                 next_hop: None,
-                metric: 0,
             },
-        ];
-        let route_table_3 = [
-            fnet_stack::ForwardingEntry {
-                subnet: unspecified_addr,
-                device_id: ID2,
-                next_hop: Some(Box::new(net1_gateway)),
-                metric: 0,
+        ]);
+        let route_table_3 = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: unspecified_addr,
+                outbound_interface: ID2,
+                next_hop: Some(net1_gateway),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: net1, prefix_len },
-                device_id: ID2,
+            Route {
+                destination: fnet::Subnet { addr: net1, prefix_len },
+                outbound_interface: ID2,
                 next_hop: None,
-                metric: 0,
             },
-        ];
-        let route_table_4 = [
-            fnet_stack::ForwardingEntry {
-                subnet: non_default_addr,
-                device_id: ID1,
-                next_hop: Some(Box::new(net1_gateway)),
-                metric: 0,
+        ]);
+        let route_table_4 = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: non_default_addr,
+                outbound_interface: ID1,
+                next_hop: Some(net1_gateway),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: net1, prefix_len },
-                device_id: ID1,
+            Route {
+                destination: fnet::Subnet { addr: net1, prefix_len },
+                outbound_interface: ID1,
                 next_hop: None,
-                metric: 0,
             },
-        ];
+        ]);
 
         let fnet_ext::IpAddress(net1_gateway_ext) = net1_gateway.into();
 
@@ -1299,7 +1290,7 @@ mod tests {
             online: true,
             addresses: vec![
                 fnet_interfaces_ext::Address {
-                    addr: fidl_subnet!("1.2.3.4/24"),
+                    addr: fidl_subnet!("1.2.3.0/24"),
                     valid_until: fuchsia_zircon::Time::INFINITE.into_nanos(),
                 },
                 fnet_interfaces_ext::Address {
@@ -1308,40 +1299,35 @@ mod tests {
                 },
             ],
         };
-        let local_routes = [fnet_stack::ForwardingEntry {
-            subnet: fidl_subnet!("1.2.3.4/24"),
-            device_id: ID1,
+        let local_routes = testutil::build_route_table_from_flattened_routes([Route {
+            destination: fidl_subnet!("1.2.3.0/24"),
+            outbound_interface: ID1,
             next_hop: None,
-            metric: 0,
-        }];
-        let route_table = [
-            fnet_stack::ForwardingEntry {
-                subnet: fidl_subnet!("0.0.0.0/0"),
-                device_id: ID1,
-                next_hop: Some(Box::new(fidl_ip!("1.2.3.1"))),
-                metric: 0,
+        }]);
+        let route_table = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: fidl_subnet!("0.0.0.0/0"),
+                outbound_interface: ID1,
+                next_hop: Some(fidl_ip!("1.2.3.1")),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fidl_subnet!("::/0"),
-                device_id: ID1,
-                next_hop: Some(Box::new(fidl_ip!("123::1"))),
-                metric: 0,
+            Route {
+                destination: fidl_subnet!("::0/0"),
+                outbound_interface: ID1,
+                next_hop: Some(fidl_ip!("123::1")),
             },
-        ];
-        let route_table2 = [
-            fnet_stack::ForwardingEntry {
-                subnet: fidl_subnet!("0.0.0.0/0"),
-                device_id: ID1,
-                next_hop: Some(Box::new(fidl_ip!("2.2.3.1"))),
-                metric: 0,
+        ]);
+        let route_table2 = testutil::build_route_table_from_flattened_routes([
+            Route {
+                destination: fidl_subnet!("0.0.0.0/0"),
+                outbound_interface: ID1,
+                next_hop: Some(fidl_ip!("2.2.3.1")),
             },
-            fnet_stack::ForwardingEntry {
-                subnet: fidl_subnet!("::/0"),
-                device_id: ID1,
-                next_hop: Some(Box::new(fidl_ip!("223::1"))),
-                metric: 0,
+            Route {
+                destination: fidl_subnet!("::0/0"),
+                outbound_interface: ID1,
+                next_hop: Some(fidl_ip!("223::1")),
             },
-        ];
+        ]);
 
         const NON_ETHERNET_INTERFACE_NAME: &str = "test01";
 
@@ -1352,7 +1338,7 @@ mod tests {
         fn run_compute_state(
             exec: &mut fasync::TestExecutor,
             properties: &fnet_interfaces_ext::Properties,
-            routes: &[fnet_stack::ForwardingEntry],
+            routes: &RouteTable,
             pinger: &dyn Ping,
         ) -> Result<Option<IpVersions<StateEvent>>, anyhow::Error> {
             let fut = compute_state(&properties, routes, pinger, None);
@@ -1376,7 +1362,7 @@ mod tests {
                 has_default_ipv6_route: false,
                 addresses: vec![],
             },
-            &[],
+            &Default::default(),
             &FakePing::default(),
         )
         .expect(
@@ -1387,7 +1373,7 @@ mod tests {
         let got = run_compute_state(
             &mut exec,
             &fnet_interfaces_ext::Properties { online: false, ..properties.clone() },
-            &[],
+            &Default::default(),
             &FakePing::default(),
         )
         .expect("error calling compute_state, want Down state");

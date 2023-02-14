@@ -13,14 +13,17 @@ use {
     fidl_fuchsia_net_debug as fnet_debug, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _},
     fidl_fuchsia_net_name as fnet_name, fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_stack as fnet_stack, fuchsia_async as fasync,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fuchsia_async::{self as fasync},
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     futures::{future::FusedFuture, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
-    reachability_core::{watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID},
+    reachability_core::{
+        route_table::RouteTable, watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID,
+    },
     reachability_handler::ReachabilityHandler,
-    std::collections::HashMap,
+    std::collections::{HashMap, HashSet},
     tracing::{debug, error},
 };
 
@@ -142,6 +145,7 @@ pub struct EventLoop {
     watchdog: Watchdog,
     interface_properties: HashMap<u64, fnet_interfaces_ext::Properties>,
     neighbor_cache: NeighborCache,
+    routes: RouteTable,
     latest_dns_addresses: Vec<fnet::IpAddress>,
 }
 
@@ -155,6 +159,7 @@ impl EventLoop {
             watchdog: Watchdog::new(),
             interface_properties: Default::default(),
             neighbor_cache: Default::default(),
+            routes: Default::default(),
             latest_dns_addresses: Vec::new(),
         }
     }
@@ -162,9 +167,6 @@ impl EventLoop {
     /// `run` starts the event loop.
     pub async fn run(&mut self) -> Result<(), anyhow::Error> {
         use fuchsia_component::client::connect_to_protocol;
-
-        let stack = connect_to_protocol::<fnet_stack::StackMarker>()
-            .context("network_manager failed to connect to netstack")?;
 
         let if_watcher_stream = {
             let interface_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -202,7 +204,21 @@ impl EventLoop {
             .context("failed to connect to Lookup")?;
         let dns_lookup_fut = dns_lookup(&name_lookup).fuse();
 
-        debug!("starting event loop");
+        let ipv4_route_event_stream = {
+            let state_v4 = connect_to_protocol::<fnet_routes::StateV4Marker>()
+                .context("failed to connect to fuchsia.net.routes/StateV4")?;
+            fnet_routes_ext::event_stream_from_state(&state_v4)
+                .context("failed to initialize a `WatcherV4` client")?
+                .fuse()
+        };
+        let ipv6_route_event_stream = {
+            let state_v6 = connect_to_protocol::<fnet_routes::StateV6Marker>()
+                .context("failed to connect to fuchsia.net.routes/StateV6")?;
+            fnet_routes_ext::event_stream_from_state(&state_v6)
+                .context("failed to initialize a `WatcherV6` client")?
+                .fuse()
+        };
+
         let mut probe_futures = futures::stream::FuturesUnordered::new();
         let report_stream = fasync::Interval::new(REPORT_PERIOD).fuse();
         let dns_interval_timer = fasync::Interval::new(DNS_PROBE_PERIOD).fuse();
@@ -212,8 +228,26 @@ impl EventLoop {
             report_stream,
             neigh_watcher_stream,
             dns_lookup_fut,
-            dns_interval_timer
+            dns_interval_timer,
+            ipv4_route_event_stream,
+            ipv6_route_event_stream
         );
+
+        // Establish the current routing table state.
+        let (v4_routes, v6_routes) = futures::join!(
+            fnet_routes_ext::collect_routes_until_idle::<_, HashSet<_>>(
+                ipv4_route_event_stream.by_ref(),
+            ),
+            fnet_routes_ext::collect_routes_until_idle::<_, HashSet<_>>(
+                ipv6_route_event_stream.by_ref(),
+            )
+        );
+        self.routes = RouteTable::new_with_existing_routes(
+            v4_routes.context("get existing IPv4 routes")?,
+            v6_routes.context("get existing IPv6 routes")?,
+        );
+
+        debug!("starting event loop");
 
         fuchsia_inspect::component::health().set_ok();
 
@@ -223,7 +257,7 @@ impl EventLoop {
                     match if_watcher_res {
                         Ok(Some(event)) => {
                             let discovered_id = self
-                                .handle_interface_watcher_event(&stack, event)
+                                .handle_interface_watcher_event(event)
                                 .await
                                 .context("failed to handle interface watcher event")?;
                             if let Some(id) = discovered_id {
@@ -243,7 +277,17 @@ impl EventLoop {
                     let event = neigh_res.context("neighbor stream error")?
                                          .context("neighbor stream ended")?;
                     self.neighbor_cache.process_neighbor_event(event);
-                },
+                }
+                route_v4_res = ipv4_route_event_stream.try_next() => {
+                    let event = route_v4_res.context("ipv4 route event stream error")?
+                    .context("ipv4 route event stream ended")?;
+                    self.handle_route_watcher_event(event);
+                }
+                route_v6_res = ipv6_route_event_stream.try_next() => {
+                    let event = route_v6_res.context("ipv6 route event stream error")?
+                    .context("ipv6 route event stream ended")?;
+                    self.handle_route_watcher_event(event);
+                }
                 report = report_stream.next() => {
                     let () = report.context("periodic timer for reporting unexpectedly ended")?;
                     let () = self.monitor.report_state();
@@ -255,7 +299,8 @@ impl EventLoop {
                                 Self::compute_state(
                                     &mut self.monitor,
                                     &mut self.watchdog,
-                                    &stack, properties,
+                                    properties,
+                                    &self.routes,
                                     &self.neighbor_cache
                                 ).await;
                                 let () = probe_futures.push(stream.into_future());
@@ -312,7 +357,6 @@ impl EventLoop {
 
     async fn handle_interface_watcher_event(
         &mut self,
-        stack: &fnet_stack::StackProxy,
         event: fnet_interfaces::Event,
     ) -> Result<Option<u64>, anyhow::Error> {
         match self
@@ -327,8 +371,8 @@ impl EventLoop {
                 Self::compute_state(
                     &mut self.monitor,
                     &mut self.watchdog,
-                    &stack,
                     properties,
+                    &self.routes,
                     &self.neighbor_cache,
                 )
                 .await;
@@ -373,8 +417,8 @@ impl EventLoop {
                     Self::compute_state(
                         &mut self.monitor,
                         &mut self.watchdog,
-                        &stack,
                         properties,
+                        &self.routes,
                         &self.neighbor_cache,
                     )
                     .await;
@@ -389,21 +433,48 @@ impl EventLoop {
         Ok(None)
     }
 
+    /// Handles events observed by the route watchers by adding/removing routes
+    /// from the underlying `RouteTable`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given event is unexpected (e.g. not an add or remove).
+    pub fn handle_route_watcher_event<I: net_types::ip::Ip>(
+        &mut self,
+        event: fnet_routes_ext::Event<I>,
+    ) {
+        match event {
+            fnet_routes_ext::Event::Added(route) => {
+                if !self.routes.add_route(route) {
+                    error!("Received add event for already existing route: {:?}", route)
+                }
+            }
+            fnet_routes_ext::Event::Removed(route) => {
+                if !self.routes.remove_route(&route) {
+                    error!("Received removed event for non-existing route: {:?}", route)
+                }
+            }
+            // Note that we don't expect to observe any existing events, because
+            // the route watchers were drained of existing events prior to
+            // starting the event loop.
+            fnet_routes_ext::Event::Existing(_)
+            | fnet_routes_ext::Event::Idle
+            | fnet_routes_ext::Event::Unknown => {
+                panic!("route watcher observed unexpected event: {:?}", event)
+            }
+        }
+    }
+
     async fn compute_state(
         monitor: &mut Monitor,
         watchdog: &mut Watchdog,
-        stack: &fnet_stack::StackProxy,
         properties: &fnet_interfaces_ext::Properties,
+        routes: &RouteTable,
         neighbor_cache: &NeighborCache,
     ) {
-        let routes = stack.get_forwarding_table().await.unwrap_or_else(|e| {
-            error!("failed to get route table: {}", e);
-            Vec::new()
-        });
-
         let view = InterfaceView {
             properties,
-            routes: &routes[..],
+            routes,
             neighbors: neighbor_cache.get_interface_neighbors(properties.id),
         };
 
