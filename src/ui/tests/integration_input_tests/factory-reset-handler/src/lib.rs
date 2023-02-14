@@ -59,6 +59,21 @@ async fn assemble_realm(
     // Allow the input pipeline to access the capabilities it needs. All of these
     // capabilities are run hermetically, so they are all routed from peers.
     b.route_to_peer::<fidl_fuchsia_ui_scenic::ScenicMarker>(&scenic_test_realm, &input_owner).await;
+    b.route_to_peer::<fidl_fuchsia_ui_composition::FlatlandMarker>(
+        &scenic_test_realm,
+        &input_owner,
+    )
+    .await;
+    b.route_to_peer::<fidl_fuchsia_ui_composition::FlatlandDisplayMarker>(
+        &scenic_test_realm,
+        &input_owner,
+    )
+    .await;
+    b.route_to_peer::<fidl_fuchsia_ui_display_singleton::InfoMarker>(
+        &scenic_test_realm,
+        &input_owner,
+    )
+    .await;
     b.route_to_peer::<fidl_fuchsia_ui_pointerinjector::RegistryMarker>(
         &scenic_test_realm,
         &input_owner,
