@@ -30,7 +30,6 @@ pub use {
         },
         meta_contents::MetaContents,
         meta_package::MetaPackage,
-        meta_subpackages::transitional,
         meta_subpackages::MetaSubpackages,
         package_build_manifest::PackageBuildManifest,
         package_builder::PackageBuilder,

@@ -104,45 +104,11 @@ impl Serialize for MetaSubpackagesV1 {
     }
 }
 
-/// The following functions may be deprecated. They support the initial
-/// implementation of Subpackages (RFC-0154) but are likely to move to
-/// a different module.
-pub mod transitional {
-    use super::*;
-
-    /// Returns a package-resolver-specific value representing the given
-    /// subpackage name-to-merkle map, or `None` if the map is empty.
-    pub fn context_bytes_from_subpackages_map(
-        subpackage_hashes: &HashMap<RelativePackageUrl, Hash>,
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        if subpackage_hashes.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(serde_json::to_vec(&subpackage_hashes).map_err(|err| {
-                anyhow::format_err!(
-                    "could not convert subpackages map to json: {:?}, with map values: {:?}",
-                    err,
-                    subpackage_hashes
-                )
-            })?))
-        }
-    }
-
-    /// The inverse of `context_bytes_from_subpackages_map()`.
-    pub fn subpackages_map_from_context_bytes(
-        context_bytes: &[u8],
-    ) -> Result<HashMap<RelativePackageUrl, Hash>, anyhow::Error> {
-        let json_value = serde_json::from_slice(context_bytes)?;
-        Ok(serde_json::from_value::<HashMap<RelativePackageUrl, Hash>>(json_value)?)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
-        super::transitional::*, super::*, crate::test::*,
-        fuchsia_url::test::random_relative_package_url, maplit::hashmap, proptest::prelude::*,
-        serde_json::json,
+        super::*, crate::test::*, fuchsia_url::test::random_relative_package_url, maplit::hashmap,
+        proptest::prelude::*, serde_json::json,
     };
 
     fn zeros_hash() -> Hash {
@@ -217,16 +183,5 @@ mod tests {
             .unwrap();
             prop_assert_eq!(meta_subpackages, deserialized);
         }
-    }
-
-    #[test]
-    fn test_context_bytes_from_subpackages_map_and_back() {
-        let subpackages_map = hashmap! {
-            RelativePackageUrl::parse("a_0_subpackage").unwrap() => zeros_hash(),
-            RelativePackageUrl::parse("other-1-subpackage").unwrap() => ones_hash(),
-        };
-        let bytes = context_bytes_from_subpackages_map(&subpackages_map).unwrap().unwrap();
-        let restored_map = subpackages_map_from_context_bytes(&bytes).unwrap();
-        assert_eq!(&restored_map, &subpackages_map);
     }
 }
