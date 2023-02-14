@@ -166,7 +166,7 @@ impl AsyncRead for &'_ Socket {
 
 #[cfg(test)]
 mod test {
-    use super::super::{Socket, SocketOpts};
+    use super::super::Socket;
     use super::Socket as AsyncSocket;
     use futures::executor::block_on;
     use futures::prelude::*;
@@ -177,7 +177,7 @@ mod test {
     #[test]
     fn async_socket_write_read() {
         block_on(async move {
-            let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+            let (a, b) = Socket::create_stream();
             let (mut a, mut b) =
                 (AsyncSocket::from_socket(a).unwrap(), AsyncSocket::from_socket(b).unwrap());
             let mut buf = [0u8; 128];

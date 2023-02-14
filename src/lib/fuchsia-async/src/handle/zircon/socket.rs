@@ -436,7 +436,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let bytes = &[0, 1, 2, 3];
 
-        let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (tx, rx) = zx::Socket::create_stream();
         let (mut tx, mut rx) = (Socket::from_socket(tx).unwrap(), Socket::from_socket(rx).unwrap());
 
         let receive_future = async {
@@ -469,7 +469,7 @@ mod tests {
 
         let (one, two) = (&[0, 1], &[2, 3, 4, 5]);
 
-        let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (tx, rx) = zx::Socket::create_datagram();
         let rx = Socket::from_socket(rx).unwrap();
 
         let mut out = vec![50];
@@ -496,7 +496,7 @@ mod tests {
     fn stream_datagram() {
         let mut exec = TestExecutor::new();
 
-        let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (tx, rx) = zx::Socket::create_datagram();
         let mut rx = Socket::from_socket(rx).unwrap().into_datagram_stream();
 
         let packets = 20;
@@ -527,8 +527,7 @@ mod tests {
     fn peer_closed_signal_raised() {
         let mut executor = TestExecutor::new();
 
-        let (s1, s2) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");
+        let (s1, s2) = zx::Socket::create_stream();
         let async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
 
         drop(s1);
@@ -547,8 +546,7 @@ mod tests {
     fn reacquiring_read_signal_ensures_freshness() {
         let mut executor = TestExecutor::new();
 
-        let (s1, s2) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");
+        let (s1, s2) = zx::Socket::create_stream();
         let async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
 
         // The read signal is optimistically set on socket creation, so even though there is
@@ -572,8 +570,7 @@ mod tests {
     fn reacquiring_write_signal_ensures_freshness() {
         let mut executor = TestExecutor::new();
 
-        let (s1, s2) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");
+        let (s1, s2) = zx::Socket::create_stream();
 
         // Completely fill the transmit buffer. This socket is no longer writable.
         let socket_info = s2.info().expect("failed to get socket info");

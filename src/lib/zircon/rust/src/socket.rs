@@ -120,7 +120,7 @@ impl Socket {
     /// If the process' job policy denies socket creation or the kernel reports no memory
     /// available to create a new socket.
     pub fn create_stream() -> (Socket, Socket) {
-        Self::create(SocketOpts::STREAM).expect("socket creation can't fail with valid options")
+        Self::try_create(SocketOpts::STREAM).expect("socket creation can't fail with valid options")
     }
 
     /// Create a datagram socket, accessed through a pair of endpoints. Data written
@@ -134,15 +134,11 @@ impl Socket {
     /// If the process' job policy denies socket creation or the kernel reports no memory
     /// available to create a new socket.
     pub fn create_datagram() -> (Socket, Socket) {
-        Self::create(SocketOpts::DATAGRAM).expect("socket creation can't fail with valid options")
+        Self::try_create(SocketOpts::DATAGRAM)
+            .expect("socket creation can't fail with valid options")
     }
 
-    /// Create a socket, accessed through a pair of endpoints. Data written
-    /// into one may be read from the other.
-    ///
-    /// Wraps
-    /// [zx_socket_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_create.md).
-    pub fn create(sock_opts: SocketOpts) -> Result<(Socket, Socket), Status> {
+    fn try_create(sock_opts: SocketOpts) -> Result<(Socket, Socket), Status> {
         unsafe {
             let mut out0 = 0;
             let mut out1 = 0;
@@ -264,7 +260,11 @@ mod tests {
     use super::*;
 
     fn socket_basic_helper(opts: SocketOpts) {
-        let (s1, s2) = Socket::create(opts).unwrap();
+        let (s1, s2) = match opts {
+            SocketOpts::STREAM => Socket::create_stream(),
+            SocketOpts::DATAGRAM => Socket::create_datagram(),
+            _ => panic!("unsupported socket options"),
+        };
 
         // Write two packets and read from other end
         assert_eq!(s1.write(b"hello").unwrap(), 5);
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn socket_info() {
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
         let s1info = s1.info().unwrap();
         // Socket should be empty.
         assert_eq!(s1info.rx_buf_available, 0);
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn socket_disposition() {
         const PAYLOAD: &'static [u8] = b"Hello";
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
         // Disable write on s1 but enable on s2.
         assert_eq!(
             s1.set_disposition(

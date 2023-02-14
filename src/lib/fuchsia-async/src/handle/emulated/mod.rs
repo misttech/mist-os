@@ -717,56 +717,44 @@ impl Drop for Socket {
 impl Socket {
     /// Create a streaming socket.
     pub fn create_stream() -> (Socket, Socket) {
-        Self::create(SocketOpts::STREAM).expect("socket creation can't fail with valid options")
+        let rights = Rights::SOCKET_DEFAULT;
+        let (left, right, obj) = new_handle_pair(HdlType::StreamSocket, rights);
+
+        let mut obj = obj.lock().unwrap();
+        let KObjectEntry::StreamSocket(obj) = &mut *obj else {
+                    unreachable!("Channel we just allocated wasn't present or wasn't a channel");
+                };
+        let mut hdl_ref = HdlRef::StreamSocket(obj);
+        hdl_ref
+            .as_hdl_data()
+            .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
+            .expect("Handle wasn't open immediately after creation");
+        hdl_ref
+            .as_hdl_data()
+            .signal(Side::Right, Signals::NONE, Signals::OBJECT_WRITABLE)
+            .expect("Handle wasn't open immediately after creation");
+        (Socket(left), Socket(right))
     }
 
     /// Create a datagram socket.
     pub fn create_datagram() -> (Socket, Socket) {
-        Self::create(SocketOpts::DATAGRAM).expect("socket creation can't fail with valid options")
-    }
+        let rights = Rights::SOCKET_DEFAULT;
+        let (left, right, obj) = new_handle_pair(HdlType::DatagramSocket, rights);
 
-    /// Create a pair of sockets
-    pub fn create(sock_opts: SocketOpts) -> Result<(Socket, Socket), zx_status::Status> {
-        match sock_opts {
-            SocketOpts::STREAM => {
-                let rights = Rights::SOCKET_DEFAULT;
-                let (left, right, obj) = new_handle_pair(HdlType::StreamSocket, rights);
-
-                let mut obj = obj.lock().unwrap();
-                let KObjectEntry::StreamSocket(obj) = &mut *obj else {
+        let mut obj = obj.lock().unwrap();
+        let KObjectEntry::DatagramSocket(obj) = &mut *obj else {
                     unreachable!("Channel we just allocated wasn't present or wasn't a channel");
                 };
-                let mut hdl_ref = HdlRef::StreamSocket(obj);
-                hdl_ref
-                    .as_hdl_data()
-                    .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
-                    .expect("Handle wasn't open immediately after creation");
-                hdl_ref
-                    .as_hdl_data()
-                    .signal(Side::Right, Signals::NONE, Signals::OBJECT_WRITABLE)
-                    .expect("Handle wasn't open immediately after creation");
-                Ok((Socket(left), Socket(right)))
-            }
-            SocketOpts::DATAGRAM => {
-                let rights = Rights::SOCKET_DEFAULT;
-                let (left, right, obj) = new_handle_pair(HdlType::DatagramSocket, rights);
-
-                let mut obj = obj.lock().unwrap();
-                let KObjectEntry::DatagramSocket(obj) = &mut *obj else {
-                    unreachable!("Channel we just allocated wasn't present or wasn't a channel");
-                };
-                let mut hdl_ref = HdlRef::DatagramSocket(obj);
-                hdl_ref
-                    .as_hdl_data()
-                    .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
-                    .expect("Handle wasn't open immediately after creation");
-                hdl_ref
-                    .as_hdl_data()
-                    .signal(Side::Right, Signals::NONE, Signals::OBJECT_WRITABLE)
-                    .expect("Handle wasn't open immediately after creation");
-                Ok((Socket(left), Socket(right)))
-            }
-        }
+        let mut hdl_ref = HdlRef::DatagramSocket(obj);
+        hdl_ref
+            .as_hdl_data()
+            .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
+            .expect("Handle wasn't open immediately after creation");
+        hdl_ref
+            .as_hdl_data()
+            .signal(Side::Right, Signals::NONE, Signals::OBJECT_WRITABLE)
+            .expect("Handle wasn't open immediately after creation");
+        (Socket(left), Socket(right))
     }
 
     /// Write the given bytes into the socket.
@@ -2106,7 +2094,7 @@ mod test {
 
     #[test]
     fn socket_write_read() {
-        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (a, b) = Socket::create_stream();
         a.write(&[1, 2, 3]).unwrap();
         let mut buf = [0u8; 128];
         assert_eq!(b.read(&mut buf).unwrap(), 3);
@@ -2115,7 +2103,7 @@ mod test {
 
     #[test]
     fn socket_dup_write_read() {
-        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (a, b) = Socket::create_stream();
         let c = a.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
         a.write(&[1, 2, 3]).unwrap();
         c.write(&[4, 5, 6]).unwrap();
@@ -2128,7 +2116,7 @@ mod test {
 
     #[test]
     fn socket_write_dup_read() {
-        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (a, b) = Socket::create_stream();
         let c = b.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
         a.write(&[1, 2, 3, 4, 5, 6]).unwrap();
         let mut buf = [0u8; 3];
@@ -2141,7 +2129,7 @@ mod test {
 
     #[test]
     fn socket_dup_requires_right() {
-        let (_a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (_a, b) = Socket::create_stream();
         let c = b.duplicate_handle(Rights::SOCKET_DEFAULT & !Rights::DUPLICATE).unwrap();
         assert!(matches!(c.duplicate_handle(Rights::SAME_RIGHTS), Err(Status::ACCESS_DENIED)));
     }
@@ -2164,7 +2152,7 @@ mod test {
 
         // Create a pair of channels and a pair of sockets.
         let (p1, p2) = Channel::create();
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
 
         // Send one socket down the channel
         let mut handles_to_send: Vec<Handle> = vec![s1.into_handle()];
@@ -2197,7 +2185,7 @@ mod test {
 
     #[test]
     fn socket_basic() {
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
 
         // Write two packets and read from other end
         assert_eq!(s1.write(b"hello").unwrap(), 5);
@@ -2215,7 +2203,7 @@ mod test {
     #[test]
     fn object_type_is_correct() {
         let (c1, c2) = Channel::create();
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
         assert_eq!(c1.into_handle().object_type(), ObjectType::CHANNEL);
         assert_eq!(c2.into_handle().object_type(), ObjectType::CHANNEL);
         assert_eq!(s1.into_handle().object_type(), ObjectType::SOCKET);
@@ -2429,13 +2417,13 @@ mod test {
     #[test]
     fn handles_always_writable() {
         let mut ctx = futures_test::task::noop_context();
-        let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (s1, s2) = Socket::create_stream();
         let mut on_sig = on_signals::OnSignals::new(&s1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
         let mut on_sig = on_signals::OnSignals::new(&s2, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
 
-        let (s1, s2) = Socket::create(SocketOpts::DATAGRAM).unwrap();
+        let (s1, s2) = Socket::create_datagram();
         let mut on_sig = on_signals::OnSignals::new(&s1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
         let mut on_sig = on_signals::OnSignals::new(&s2, Signals::OBJECT_WRITABLE);
