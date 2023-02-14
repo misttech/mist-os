@@ -5,7 +5,7 @@
 use anyhow::Result;
 use component_debug::cli::reload_cmd;
 use errors::FfxError;
-use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer};
+use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_reload_args::ReloadComponentCommand;
 use ffx_core::ffx_plugin;
 use fidl_fuchsia_developer_remotecontrol as rc;
@@ -13,10 +13,10 @@ use fidl_fuchsia_developer_remotecontrol as rc;
 #[ffx_plugin]
 pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: ReloadComponentCommand) -> Result<()> {
     let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
-    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
     // All errors from component_debug library are user-visible.
-    reload_cmd(args.query, lifecycle_controller, realm_explorer, std::io::stdout())
+    reload_cmd(args.query, lifecycle_controller, realm_query, std::io::stdout())
         .await
         .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())

@@ -477,8 +477,8 @@ mod tests {
         super::*,
         crate::test_utils::{
             generate_directory_paths, generate_file_paths, populate_host_with_file_contents,
-            read_data_from_namespace, serve_realm_query, serve_realm_query_with_namespace, File,
-            SeedPath,
+            read_data_from_namespace, serve_realm_query_deprecated,
+            serve_realm_query_with_namespace, File, SeedPath,
         },
         fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy},
         fidl_fuchsia_io as fio,
@@ -571,7 +571,7 @@ mod tests {
         let () = serve_realm_query_with_namespace(ns_server, seed_files, is_read_only).unwrap();
         let query_instance =
             create_hashmap_of_instance_info(RELATIVE_FOO_MONIKER, RELATIVE_FOO_MONIKER, ns_dir);
-        serve_realm_query(query_instance)
+        serve_realm_query_deprecated(query_instance)
     }
 
     fn create_realm_query_with_ns_client(
@@ -584,7 +584,7 @@ mod tests {
         let ns_dir = ClientEnd::<fio::DirectoryMarker>::new(ns_dir.into_channel().unwrap().into());
         let query_instance =
             create_hashmap_of_instance_info(RELATIVE_FOO_MONIKER, RELATIVE_FOO_MONIKER, ns_dir);
-        let realm_query = serve_realm_query(query_instance);
+        let realm_query = serve_realm_query_deprecated(query_instance);
 
         (realm_query, dup_client)
     }
@@ -611,7 +611,7 @@ mod tests {
             instances.extend(query_instance);
         }
 
-        let realm_query = serve_realm_query(instances);
+        let realm_query = serve_realm_query_deprecated(instances);
         (realm_query, proxies.last().unwrap().to_owned())
     }
 

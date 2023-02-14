@@ -84,6 +84,7 @@ rustc_library("component_debug") {
     "src/list.rs",
     "src/path.rs",
     "src/query.rs",
+    "src/realm.rs",
     "src/show.rs",
     "src/storage/copy.rs",
     "src/storage/delete.rs",

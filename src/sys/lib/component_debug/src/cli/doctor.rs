@@ -15,10 +15,10 @@ use {
 pub async fn doctor_cmd_print<W: std::io::Write>(
     query: String,
     route_validator: fsys::RouteValidatorProxy,
-    realm_explorer: fsys::RealmExplorerProxy,
+    realm_query: fsys::RealmQueryProxy,
     mut writer: W,
 ) -> Result<()> {
-    let moniker = get_cml_moniker_from_query(&query, &realm_explorer).await?;
+    let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
@@ -41,9 +41,9 @@ pub async fn doctor_cmd_print<W: std::io::Write>(
 pub async fn doctor_cmd_serialized(
     query: String,
     route_validator: fsys::RouteValidatorProxy,
-    realm_explorer: fsys::RealmExplorerProxy,
+    realm_query: fsys::RealmQueryProxy,
 ) -> Result<Vec<RouteReport>> {
-    let moniker = get_cml_moniker_from_query(&query, &realm_explorer).await?;
+    let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.

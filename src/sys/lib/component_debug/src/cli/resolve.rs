@@ -15,10 +15,10 @@ use {
 pub async fn resolve_cmd<W: std::io::Write>(
     query: String,
     lifecycle_controller: fsys::LifecycleControllerProxy,
-    realm_explorer: fsys::RealmExplorerProxy,
+    realm_query: fsys::RealmQueryProxy,
     mut writer: W,
 ) -> Result<()> {
-    let moniker = get_cml_moniker_from_query(&query, &realm_explorer).await?;
+    let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Resolving component instance...")?;
@@ -38,7 +38,7 @@ pub async fn resolve_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use {
-        super::*, crate::test_utils::serve_realm_explorer,
+        super::*, crate::test_utils::serve_realm_query_instances,
         fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
     };
 
@@ -65,16 +65,17 @@ mod test {
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
         let lifecycle_controller = setup_fake_lifecycle_controller("./core/ffx-laboratory:test");
-        let realm_explorer = serve_realm_explorer(vec![fsys::InstanceInfo {
-            moniker: "./core/ffx-laboratory:test".to_string(),
-            url: "fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string(),
+        let realm_query = serve_realm_query_instances(vec![fsys::Instance {
+            moniker: Some("./core/ffx-laboratory:test".to_string()),
+            url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),
             instance_id: None,
-            state: fsys::InstanceState::Started,
+            resolved_info: None,
+            ..fsys::Instance::EMPTY
         }]);
         let response = resolve_cmd(
             "/core/ffx-laboratory:test".to_string(),
             lifecycle_controller,
-            realm_explorer,
+            realm_query,
             &mut output,
         )
         .await;

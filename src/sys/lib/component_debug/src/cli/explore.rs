@@ -15,9 +15,9 @@ pub async fn explore_cmd(
     command: Option<String>,
     tools_urls: Vec<String>,
     dash_launcher: fdash::LauncherProxy,
-    realm_explorer: fsys::RealmExplorerProxy,
+    realm_query: fsys::RealmQueryProxy,
 ) -> Result<()> {
-    let moniker = get_cml_moniker_from_query(&query, &realm_explorer).await?;
+    let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
 
     println!("Moniker: {}", moniker);
 

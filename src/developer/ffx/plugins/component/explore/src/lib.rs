@@ -5,7 +5,7 @@
 use anyhow::Result;
 use component_debug::cli::explore_cmd;
 use errors::FfxError;
-use ffx_component::rcs::connect_to_realm_explorer;
+use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
 use ffx_core::ffx_plugin;
 use fidl_fuchsia_dash::LauncherProxy;
@@ -18,18 +18,11 @@ pub async fn cmd(
     dash_launcher: LauncherProxy,
     args: ExploreComponentCommand,
 ) -> Result<()> {
-    let realm_explorer = connect_to_realm_explorer(&rcs).await?;
+    let realm_query = connect_to_realm_query(&rcs).await?;
 
     // All errors from component_debug library are user-visible.
-    explore_cmd(
-        args.query,
-        args.ns_layout,
-        args.command,
-        args.tools,
-        dash_launcher,
-        realm_explorer,
-    )
-    .await
-    .map_err(|e| FfxError::Error(e, 1))?;
+    explore_cmd(args.query, args.ns_layout, args.command, args.tools, dash_launcher, realm_query)
+        .await
+        .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())
 }

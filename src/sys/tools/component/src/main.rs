@@ -35,22 +35,22 @@ pub async fn exec() -> Result<()> {
             create_cmd(args.url, args.moniker, lifecycle_controller, writer).await
         }
         ComponentSubcommand::Destroy(args) => {
-            destroy_cmd(args.query, lifecycle_controller, realm_explorer, writer).await
+            destroy_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Resolve(args) => {
-            resolve_cmd(args.query, lifecycle_controller, realm_explorer, writer).await
+            resolve_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Reload(args) => {
-            reload_cmd(args.query, lifecycle_controller, realm_explorer, writer).await
+            reload_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Start(args) => {
-            start_cmd(args.query, lifecycle_controller, realm_explorer, writer).await
+            start_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Stop(args) => {
-            stop_cmd(args.query, lifecycle_controller, realm_explorer, writer).await
+            stop_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Doctor(args) => {
-            doctor_cmd_print(args.query, route_validator, realm_explorer, writer).await
+            doctor_cmd_print(args.query, route_validator, realm_query, writer).await
         }
         ComponentSubcommand::Capability(args) => {
             capability_cmd(args.capability_name, realm_query, realm_explorer, writer).await
