@@ -16,7 +16,6 @@
         {
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
-                "fuchsia.sys.Launcher",
                 "fuchsia.ui.scenic.Scenic",
             ],
         },

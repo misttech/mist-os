@@ -22,7 +22,6 @@ use {
     element_config::Config,
     fidl_connector::ServiceReconnector,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-    fidl_fuchsia_sys as fsys,
     fidl_fuchsia_ui_scenic::ScenicMarker,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::StreamExt,
@@ -48,8 +47,6 @@ async fn main() -> Result<(), Error> {
     let realm = connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("Failed to connect to Realm service");
 
-    let sys_launcher = connect_to_protocol::<fsys::LauncherMarker>()
-        .expect("Failed to connect to fuchsia.sys.Launcher service");
     let graphical_presenter =
         Box::new(ServiceReconnector::<felement::GraphicalPresenterMarker>::new());
 
@@ -78,7 +75,6 @@ async fn main() -> Result<(), Error> {
     let element_manager = Rc::new(ElementManager::new(
         realm,
         Some(graphical_presenter),
-        sys_launcher,
         collection_config,
         scenic_uses_flatland,
     ));
@@ -221,15 +217,9 @@ mod tests {
             .unwrap();
         let graphical_presenter_connector = Box::new(MockConnector::new(graphical_presenter));
 
-        let launcher = spawn_stream_handler(move |_launcher_request| async move {
-            panic!("Launcher should not receive any requests as it's only used for v1 components");
-        })
-        .unwrap();
-
         let element_manager = Box::new(ElementManager::new(
             realm,
             Some(graphical_presenter_connector),
-            launcher,
             collection_config,
             false,
         ));

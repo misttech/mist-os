@@ -6,50 +6,27 @@ use {
     anyhow::Error,
     fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker},
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    std::fmt,
 };
-
-enum ExposedCapabilities {
-    /// v1 component App
-    App(fuchsia_component::client::App),
-    /// v2 component exposed capabilities directory
-    Directory(zx::Channel),
-}
-
-impl fmt::Debug for ExposedCapabilities {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ExposedCapabilities::App(_) => write!(f, "CFv1 App"),
-            ExposedCapabilities::Directory(_) => write!(f, "CFv2 exposed capabilities Directory"),
-        }
-    }
-}
 
 /// Represents a component launched by an Element Manager.
 ///
-/// The component can be either a v1 component launched by the fuchsia.sys.Launcher, or a v2
-/// component launched as a child of the Element Manager's realm.
-///
-/// The Element can be used to connect to services exposed by the underlying v1 or v2 component.
+/// The Element can be used to connect to services exposed by the underlying component.
 #[derive(Debug)]
 pub struct Element {
-    /// CF v1 or v2 object that manages a `Directory` request channel for requesting services
-    /// exposed by the component.
-    exposed_capabilities: ExposedCapabilities,
+    /// A `Directory` request channel for requesting services exposed by the component.
+    exposed_capabilities: zx::Channel,
 
     /// The component URL used to launch the component.
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
     url: String,
 
-    /// v2 component child name, or empty string if not a child of the realm (such as a CFv1
-    /// component).
+    /// Component child name, or empty string if not a child of the realm.
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
     name: String,
 
-    /// v2 component child collection name or empty string if not a child of the realm (such as a
-    /// CFv1 component).
+    /// Component child collection name or empty string if not a child of the realm.
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
     collection: String,
@@ -59,24 +36,7 @@ pub struct Element {
 ///
 /// A session uses `ElementManager` to launch and return the Element, and can then use the Element
 /// to connect to exposed capabilities.
-///
-/// An Element composes either a CFv2 component (launched as a child of the `ElementManager`'s
-/// realm) or a CFv1 component (launched via a fuchsia::sys::Launcher).
 impl Element {
-    /// Creates an Element from a `fuchsia_component::client::App`.
-    ///
-    /// # Parameters
-    /// - `url`: The launched component URL.
-    /// - `app`: The v1 component wrapped in an App, returned by the launch function.
-    pub fn from_app(app: fuchsia_component::client::App, url: &str) -> Element {
-        Element {
-            exposed_capabilities: ExposedCapabilities::App(app),
-            url: url.to_string(),
-            name: "".to_string(),
-            collection: "".to_string(),
-        }
-    }
-
     /// Creates an Element from a component's exposed capabilities directory.
     ///
     /// # Parameters
@@ -85,13 +45,13 @@ impl Element {
     /// - `url`: The launched component URL.
     /// - `collection`: The launched component's collection name.
     pub fn from_directory_channel(
-        directory_channel: zx::Channel,
+        exposed_capabilities: zx::Channel,
         name: &str,
         url: &str,
         collection: &str,
     ) -> Element {
         Element {
-            exposed_capabilities: ExposedCapabilities::Directory(directory_channel),
+            exposed_capabilities,
             url: url.to_string(),
             name: name.to_string(),
             collection: collection.to_string(),
@@ -109,8 +69,7 @@ impl Element {
     // # Note
     //
     // The methods below are copied from fuchsia_component::client::App in order to offer
-    // services in the same way, but from any `Element`, wrapping either a v1 `App` or a v2
-    // component's `Directory` of exposed services.
+    // services in the same way, but from any `Element`.
 
     /// Returns a reference to the component's `Directory` of exposed capabilities. A session can
     /// request services, and/or other capabilities, from the Element, using this channel.
@@ -119,10 +78,7 @@ impl Element {
     /// A `channel` to the component's `Directory` of exposed capabilities.
     #[inline]
     pub fn directory_channel(&self) -> &zx::Channel {
-        match &self.exposed_capabilities {
-            ExposedCapabilities::App(app) => app.directory_channel().channel(),
-            ExposedCapabilities::Directory(directory_channel) => &directory_channel,
-        }
+        &self.exposed_capabilities
     }
 
     /// Connect to a protocol provided by the `Element`.

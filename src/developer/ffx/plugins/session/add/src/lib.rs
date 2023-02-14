@@ -76,11 +76,7 @@ mod test {
             }
         });
 
-        let add_cmd = SessionAddCommand {
-            url: TEST_ELEMENT_URL.to_string(),
-            args: vec![],
-            interactive: false,
-        };
+        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
         let response = add(proxy, add_cmd).await;
         assert!(response.is_ok());
     }
@@ -95,11 +91,7 @@ mod test {
             }
         });
 
-        let add_cmd = SessionAddCommand {
-            url: TEST_ELEMENT_URL.to_string(),
-            args: vec![],
-            interactive: false,
-        };
+        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: false };
         let response = add(proxy, add_cmd).await;
         assert!(response.is_ok());
     }
@@ -114,11 +106,7 @@ mod test {
             }
         });
 
-        let add_cmd = SessionAddCommand {
-            url: TEST_ELEMENT_URL.to_string(),
-            args: vec![],
-            interactive: true,
-        };
+        let add_cmd = SessionAddCommand { url: TEST_ELEMENT_URL.to_string(), interactive: true };
         let (ctrl_c_sender, ctrl_c_receiver) = oneshot::channel();
         let mut stdout = std::io::stdout();
         let mut add_fut =
