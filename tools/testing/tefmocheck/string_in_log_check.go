@@ -530,10 +530,5 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
 			Type:   swarmingOutputType,
 		},
-		// This error happens when ffx test returns early and skips running some tests.
-		&stringInLogCheck{
-			String: fmt.Sprintf("botanist FATAL: %s", testrunnerconstants.SkippedRunningTestsMsg),
-			Type:   swarmingOutputType,
-		},
 	}
 }

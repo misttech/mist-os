@@ -370,7 +370,6 @@ func TestFFXTester(t *testing.T) {
 		name            string
 		sshRunErrs      []error
 		expectedResult  runtests.TestResult
-		testMulti       bool
 		experimentLevel int
 	}{
 		{
@@ -398,12 +397,6 @@ func TestFFXTester(t *testing.T) {
 			name:            "ffx test skipped",
 			expectedResult:  runtests.TestSkipped,
 			experimentLevel: 2,
-		},
-		{
-			name:            "run multiple tests",
-			expectedResult:  runtests.TestSuccess,
-			testMulti:       true,
-			experimentLevel: 3,
 		},
 	}
 	for _, c := range cases {
@@ -443,57 +436,37 @@ func TestFFXTester(t *testing.T) {
 				RunAlgorithm: testsharder.StopOnSuccess,
 			}
 			ctx := context.Background()
-			var testResults []*TestResult
-			var err error
-			if c.testMulti {
-				tests := []testsharder.Test{
-					test,
-					{
-						Test:         build.Test{PackageURL: "fuchsia-pkg://foo#meta/baz.cm"},
-						Runs:         1,
-						RunAlgorithm: testsharder.StopOnSuccess,
-					},
-				}
-				testResults, err = tester.TestMultiple(ctx, tests, io.Discard, io.Discard, t.TempDir())
-			} else {
-				var testResult *TestResult
-				testResult, err = tester.Test(ctx, test, io.Discard, io.Discard, t.TempDir())
-				testResults = []*TestResult{testResult}
-			}
+			testResult, err := tester.Test(ctx, test, io.Discard, io.Discard, t.TempDir())
 			if err != nil {
 				t.Errorf("tester.Test got unexpected error: %s", err)
 			}
-			var sinks []runtests.DataSinkReference
-			for _, testResult := range testResults {
-				if testResult.Result != c.expectedResult {
-					t.Errorf("tester.Test got result: %s, want result: %s", testResult.Result, c.expectedResult)
-				}
+			if testResult.Result != c.expectedResult {
+				t.Errorf("tester.Test got result: %s, want result: %s", testResult.Result, c.expectedResult)
+			}
 
-				if tester.EnabledForTest(test) {
-					testArgs := []string{}
-					if c.experimentLevel == 3 {
-						testArgs = append(testArgs, "--experimental-parallel-execution", "8")
-					}
-					if !ffx.ContainsCmd("test", testArgs...) {
-						t.Errorf("failed to call `ffx test`, called: %s", ffx.CmdsCalled)
-					}
-					expectedCaseStatus := runtests.TestSuccess
-					if c.expectedResult != runtests.TestSuccess {
-						expectedCaseStatus = runtests.TestFailure
-					}
-					if len(testResult.Cases) != 1 {
-						t.Errorf("expected 1 test case, got %d", len(testResult.Cases))
-					} else {
-						if testResult.Cases[0].Status != expectedCaseStatus {
-							t.Errorf("test case has status: %s, want: %s", testResult.Cases[0].Status, expectedCaseStatus)
-						}
-					}
+			if tester.EnabledForTest(test) {
+				testArgs := []string{}
+				if c.experimentLevel == 3 {
+					testArgs = append(testArgs, "--experimental-parallel-execution", "8")
+				}
+				if !ffx.ContainsCmd("test", testArgs...) {
+					t.Errorf("failed to call `ffx test`, called: %s", ffx.CmdsCalled)
+				}
+				expectedCaseStatus := runtests.TestSuccess
+				if c.expectedResult != runtests.TestSuccess {
+					expectedCaseStatus = runtests.TestFailure
+				}
+				if len(testResult.Cases) != 1 {
+					t.Errorf("expected 1 test case, got %d", len(testResult.Cases))
 				} else {
-					if ffx.ContainsCmd("test") {
-						t.Errorf("unexpectedly called ffx test")
+					if testResult.Cases[0].Status != expectedCaseStatus {
+						t.Errorf("test case has status: %s, want: %s", testResult.Cases[0].Status, expectedCaseStatus)
 					}
 				}
-				sinks = append(sinks, testResult.DataSinks)
+			} else {
+				if ffx.ContainsCmd("test") {
+					t.Errorf("unexpectedly called ffx test")
+				}
 			}
 			p := filepath.Join(t.TempDir(), "testrunner-cmd-test")
 			if err = tester.RunSnapshot(ctx, p); err != nil {
@@ -512,7 +485,7 @@ func TestFFXTester(t *testing.T) {
 				// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
 				// v1 tests will already have set the appropriate remoteDir value within Test().
 				outputs := &TestOutputs{OutDir: t.TempDir()}
-				if err = tester.EnsureSinks(ctx, sinks, outputs); err != nil {
+				if err = tester.EnsureSinks(ctx, []runtests.DataSinkReference{testResult.DataSinks}, outputs); err != nil {
 					t.Errorf("failed to collect sinks: %s", err)
 				}
 				foundEarlyBootSinks := false

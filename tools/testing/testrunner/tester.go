@@ -544,13 +544,13 @@ func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	if t.EnabledForTest(test) {
 		finalTestResult := BaseTestResultFromTest(test)
-		testResults, err := t.TestMultiple(ctx, []testsharder.Test{test}, stdout, stderr, outDir)
+		testResult, err := t.testWithFile(ctx, test, stdout, stderr, outDir)
 		if err != nil {
 			finalTestResult.FailReason = err.Error()
-		} else if len(testResults) != 1 {
-			finalTestResult.FailReason = fmt.Sprintf("expected 1 test result, got %d", len(testResults))
+		} else if testResult == nil {
+			finalTestResult.FailReason = "expected 1 test result, got none"
 		} else {
-			finalTestResult = testResults[0]
+			finalTestResult = testResult
 		}
 		if finalTestResult.Result != runtests.TestSuccess {
 			err = retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
@@ -565,40 +565,20 @@ func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, std
 	return t.sshTester.Test(ctx, test, stdout, stderr, outDir)
 }
 
-// TestMultiple runs `ffx test` with multiple tests in one invocation and stores the results in lastTestResults.
-func (t *FFXTester) TestMultiple(ctx context.Context, tests []testsharder.Test, stdout, stderr io.Writer, outDir string) ([]*TestResult, error) {
-	var testDefs []build.TestListEntry
-	testsByURL := make(map[string]testsharder.Test)
-	for _, test := range tests {
-		var numRuns int
-		if test.RunAlgorithm == testsharder.KeepGoing {
-			numRuns = test.Runs
-		} else {
-			// StopOnFailure and StopOnSuccess are used to determine retries, which are not
-			// supported yet with ffx. Retries are now run at the end after all tests have
-			// run, so they can just be rerun with another call to Test() for StopOnSuccess.
-			// StopOnFailure is used for multiplier shards to run as many times as test.Runs
-			// or until it gets a failure. This will need to be supported in ffx so that we
-			// can use the multiple test feature in ffx to run multiplier tests.
-			numRuns = 1
-		}
-		testsByURL[test.PackageURL] = test
-
-		for i := 0; i < numRuns; i++ {
-			testDefs = append(testDefs, build.TestListEntry{
-				Name:   test.PackageURL,
-				Labels: []string{test.Label},
-				Execution: build.ExecutionDef{
-					Type:            "fuchsia_component",
-					ComponentURL:    test.PackageURL,
-					TimeoutSeconds:  int(test.Timeout.Seconds()),
-					Parallel:        test.Parallel,
-					MaxSeverityLogs: test.LogSettings.MaxSeverity,
-				},
-				Tags: test.Tags,
-			})
-		}
-	}
+// testWithFile runs `ffx test` with -test-file and returns the test result.
+func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
+	testDef := []build.TestListEntry{{
+		Name:   test.PackageURL,
+		Labels: []string{test.Label},
+		Execution: build.ExecutionDef{
+			Type:            "fuchsia_component",
+			ComponentURL:    test.PackageURL,
+			TimeoutSeconds:  int(test.Timeout.Seconds()),
+			Parallel:        test.Parallel,
+			MaxSeverityLogs: test.LogSettings.MaxSeverity,
+		},
+		Tags: test.Tags,
+	}}
 	t.ffx.SetStdoutStderr(stdout, stderr)
 	defer t.ffx.SetStdoutStderr(os.Stdout, os.Stderr)
 
@@ -607,115 +587,109 @@ func (t *FFXTester) TestMultiple(ctx context.Context, tests []testsharder.Test, 
 		extraArgs = append(extraArgs, "--experimental-parallel-execution", "8")
 	}
 	startTime := clock.Now(ctx)
-	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDefs, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
+	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
 	if err != nil {
-		return []*TestResult{}, err
+		return nil, err
 	}
-	return t.processTestResult(runResult, testsByURL, clock.Now(ctx).Sub(startTime))
+	return t.processTestResult(runResult, test, clock.Now(ctx).Sub(startTime))
 }
 
-func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, testsByURL map[string]testsharder.Test, totalDuration time.Duration) ([]*TestResult, error) {
-	var testResults []*TestResult
+func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, totalDuration time.Duration) (*TestResult, error) {
 	if runResult == nil {
-		return testResults, fmt.Errorf("no test result was found")
+		return nil, fmt.Errorf("no test result was found")
 	}
 	testOutDir := runResult.GetTestOutputDir()
 	t.testOutDirs = append(t.testOutDirs, testOutDir)
 	suiteResults, err := runResult.GetSuiteResults()
 	if err != nil {
-		return testResults, err
+		return nil, err
+	}
+	if len(suiteResults) != 1 {
+		return nil, fmt.Errorf("expected 1 test result, got %d", len(suiteResults))
 	}
 
-	var totalRecordedDuration time.Duration
-	for _, suiteResult := range suiteResults {
-		test := testsByURL[suiteResult.Name]
-		testResult := BaseTestResultFromTest(test)
+	suiteResult := suiteResults[0]
+	testResult := BaseTestResultFromTest(test)
 
-		switch suiteResult.Outcome {
+	switch suiteResult.Outcome {
+	case ffxutil.TestPassed:
+		testResult.Result = runtests.TestSuccess
+	case ffxutil.TestTimedOut:
+		testResult.Result = runtests.TestAborted
+	case ffxutil.TestNotStarted:
+		testResult.Result = runtests.TestSkipped
+	default:
+		testResult.Result = runtests.TestFailure
+	}
+
+	var suiteArtifacts []string
+	var stdioPath string
+	suiteArtifactDir := filepath.Join(testOutDir, suiteResult.ArtifactDir)
+	for artifact, metadata := range suiteResult.Artifacts {
+		if metadata.ArtifactType == ffxutil.ReportType {
+			// Copy the report log into the filename expected by infra.
+			// TODO(fxbug.dev/91013): Remove dependencies on this filename.
+			absPath := filepath.Join(suiteArtifactDir, artifact)
+			stdioPath = filepath.Join(suiteArtifactDir, runtests.TestOutputFilename)
+			if err := os.Rename(absPath, stdioPath); err != nil {
+				return testResult, err
+			}
+			suiteArtifacts = append(suiteArtifacts, runtests.TestOutputFilename)
+		} else {
+			suiteArtifacts = append(suiteArtifacts, artifact)
+		}
+	}
+	testResult.OutputFiles = suiteArtifacts
+	testResult.OutputDir = suiteArtifactDir
+
+	var cases []runtests.TestCaseResult
+	for _, testCase := range suiteResult.Cases {
+		var status runtests.TestResult
+		switch testCase.Outcome {
 		case ffxutil.TestPassed:
-			testResult.Result = runtests.TestSuccess
-		case ffxutil.TestTimedOut:
-			testResult.Result = runtests.TestAborted
-		case ffxutil.TestNotStarted:
-			testResult.Result = runtests.TestSkipped
+			status = runtests.TestSuccess
+		case ffxutil.TestSkipped:
+			status = runtests.TestSkipped
 		default:
-			testResult.Result = runtests.TestFailure
+			status = runtests.TestFailure
 		}
 
-		var suiteArtifacts []string
-		var stdioPath string
-		suiteArtifactDir := filepath.Join(testOutDir, suiteResult.ArtifactDir)
-		for artifact, metadata := range suiteResult.Artifacts {
-			if metadata.ArtifactType == ffxutil.ReportType {
-				// Copy the report log into the filename expected by infra.
-				// TODO(fxbug.dev/91013): Remove dependencies on this filename.
-				absPath := filepath.Join(suiteArtifactDir, artifact)
-				stdioPath = filepath.Join(suiteArtifactDir, runtests.TestOutputFilename)
-				if err := os.Rename(absPath, stdioPath); err != nil {
-					return testResults, err
+		var artifacts []string
+		var failReason string
+		testCaseArtifactDir := filepath.Join(testOutDir, testCase.ArtifactDir)
+		for artifact, metadata := range testCase.Artifacts {
+			// Get the failReason from the stderr log.
+			// TODO(ihuh): The stderr log may contain unsymbolized logs.
+			// Consider symbolizing them within ffx or testrunner.
+			if metadata.ArtifactType == ffxutil.StderrType {
+				stderrBytes, err := os.ReadFile(filepath.Join(testCaseArtifactDir, artifact))
+				if err != nil {
+					failReason = fmt.Sprintf("failed to read stderr for test case %s: %s", testCase.Name, err)
+				} else {
+					failReason = string(stderrBytes)
 				}
-				suiteArtifacts = append(suiteArtifacts, runtests.TestOutputFilename)
-			} else {
-				suiteArtifacts = append(suiteArtifacts, artifact)
 			}
+			artifacts = append(artifacts, artifact)
 		}
-		testResult.OutputFiles = suiteArtifacts
-		testResult.OutputDir = suiteArtifactDir
-
-		var cases []runtests.TestCaseResult
-		for _, testCase := range suiteResult.Cases {
-			var status runtests.TestResult
-			switch testCase.Outcome {
-			case ffxutil.TestPassed:
-				status = runtests.TestSuccess
-			case ffxutil.TestSkipped:
-				status = runtests.TestSkipped
-			default:
-				status = runtests.TestFailure
-			}
-
-			var artifacts []string
-			var failReason string
-			testCaseArtifactDir := filepath.Join(testOutDir, testCase.ArtifactDir)
-			for artifact, metadata := range testCase.Artifacts {
-				// Get the failReason from the stderr log.
-				// TODO(ihuh): The stderr log may contain unsymbolized logs.
-				// Consider symbolizing them within ffx or testrunner.
-				if metadata.ArtifactType == ffxutil.StderrType {
-					stderrBytes, err := os.ReadFile(filepath.Join(testCaseArtifactDir, artifact))
-					if err != nil {
-						failReason = fmt.Sprintf("failed to read stderr for test case %s: %s", testCase.Name, err)
-					} else {
-						failReason = string(stderrBytes)
-					}
-				}
-				artifacts = append(artifacts, artifact)
-			}
-			cases = append(cases, runtests.TestCaseResult{
-				DisplayName: testCase.Name,
-				CaseName:    testCase.Name,
-				Status:      status,
-				FailReason:  failReason,
-				Format:      "FTF",
-				OutputFiles: artifacts,
-				OutputDir:   testCaseArtifactDir,
-			})
-		}
-		testResult.Cases = cases
-
-		testResult.StartTime = time.UnixMilli(suiteResult.StartTime)
-		testResult.EndTime = time.UnixMilli(suiteResult.StartTime + suiteResult.DurationMilliseconds)
-		totalRecordedDuration += testResult.Duration()
-		testResults = append(testResults, testResult)
+		cases = append(cases, runtests.TestCaseResult{
+			DisplayName: testCase.Name,
+			CaseName:    testCase.Name,
+			Status:      status,
+			FailReason:  failReason,
+			Format:      "FTF",
+			OutputFiles: artifacts,
+			OutputDir:   testCaseArtifactDir,
+		})
 	}
-	// Calculate amortized per-test overhead from running ffx test and add it to the recorded
+	testResult.Cases = cases
+
+	testResult.StartTime = time.UnixMilli(suiteResult.StartTime)
+	testResult.EndTime = time.UnixMilli(suiteResult.StartTime + suiteResult.DurationMilliseconds)
+	// Calculate overhead from running ffx test and add it to the recorded
 	// test duration to more accurately capture the total duration of the test.
-	overhead := totalDuration - totalRecordedDuration
-	overheadPerTest := overhead / time.Duration(len(testResults))
-	for i := range testResults {
-		testResults[i].EndTime = testResults[i].EndTime.Add(overheadPerTest)
-	}
-	return testResults, nil
+	overhead := totalDuration - testResult.Duration()
+	testResult.EndTime = testResult.EndTime.Add(overhead)
+	return testResult, nil
 }
 
 // UpdateOutputDir updates the output dir with the oldDir substring with the newDir.
