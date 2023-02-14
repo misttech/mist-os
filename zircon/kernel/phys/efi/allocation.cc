@@ -19,8 +19,6 @@
 
 namespace {
 
-constexpr size_t kEfiPageSize = 4096;
-
 constexpr size_t EfiPageCount(size_t bytes) { return (bytes + kEfiPageSize - 1) / kEfiPageSize; }
 
 }  // namespace

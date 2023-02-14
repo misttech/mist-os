@@ -267,6 +267,7 @@ if (current_toolchain != default_toolchain) {
     public_configs = [ ":includes" ]
     public_deps = [
       "..:allocation",
+      "..:boot-zbi",
       "..:symbolize",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",

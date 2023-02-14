@@ -27,6 +27,12 @@ class Image : public View<Storage> {
   // Copy/move-constructible or constructible from a Storage argument, like View.
   using View<Storage>::View;
 
+  // Also copy/move-constructible from the View counterpart type.
+  // This permits implicit conversion from View<Storage> to Image<Storage>.
+  // The inverse is already implicit in the subclass relationship.
+  Image(const View<Storage>& other) : View<Storage>(other) {}
+  Image(View<Storage>&& other) : View<Storage>(std::move(other)) {}
+
   // Updates the underlying storage to hold an empty ZBI. It is valid to call
   // this method even if the underlying storage does not already represent a
   // ZBI or is too small to do so; it will attempt to extend the capacity and

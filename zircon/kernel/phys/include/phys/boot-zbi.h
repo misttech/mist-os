@@ -92,7 +92,7 @@ class BootZbi {
 
   // Boot into the kernel loaded by Load(), which must have been called first.
   // This cannot fail and never returns.  If the optional pointer argument is
-  // supplied it is given the to the new kernel instead of DataLoadAddress().
+  // supplied it is given to the new kernel instead of DataLoadAddress().
   [[noreturn]] void Boot(ktl::optional<void*> argument = {});
 
   // The Kernel* methods can be used at any time, even before Load().
@@ -135,13 +135,16 @@ class BootZbi {
   }
 
  protected:
-  void LogAddresses();
-  void LogBoot(uint64_t entry) const;
+  void LogAddresses() const;
+  static void LogBoot(uint64_t entry);
 
   bool FixedKernelOverlapsData(uint64_t kernel_load_address) const;
 
+  void InitKernel(Allocation kernel);
+  void InitData(Allocation data);
+
  private:
-  fit::result<Error> InitKernelFromItem();
+  void InitKernelFromItem();
 
   // These are set on construction by Init().
   InputZbi zbi_;

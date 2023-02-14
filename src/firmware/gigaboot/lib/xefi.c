@@ -71,7 +71,7 @@ static int xefi_getc_loop(int64_t timeout_ms) {
 
     if (gSerial) {
       char read_char;
-      uint64_t read_len = 1;
+      size_t read_len = 1;
       status = gSerial->Read(gSerial, &read_len, &read_char);
       if (status == EFI_SUCCESS && read_len == 1) {
         result = read_char;

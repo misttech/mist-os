@@ -13,6 +13,8 @@
 #include <efi/system-table.h>
 #include <efi/types.h>
 
+inline constexpr size_t kEfiPageSize = 4096;
+
 // This is the entry point in the PE-COFF headers.
 extern "C" efi_status EfiMain(efi_handle image, efi_system_table* systab);
 

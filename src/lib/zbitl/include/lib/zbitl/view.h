@@ -331,7 +331,10 @@ class View {
       return &value_;
     }
 
-    uint32_t item_offset() const { return offset_; }
+    uint32_t item_offset() const {
+      Assert(__func__);
+      return offset_;
+    }
 
     uint32_t payload_offset() const {
       Assert(__func__);

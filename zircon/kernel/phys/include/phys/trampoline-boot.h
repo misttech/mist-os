@@ -10,7 +10,8 @@
 #include <zircon/assert.h>
 
 #include <ktl/optional.h>
-#include <phys/boot-zbi.h>
+
+#include "boot-zbi.h"
 
 class TrampolineBoot : public BootZbi {
  public:

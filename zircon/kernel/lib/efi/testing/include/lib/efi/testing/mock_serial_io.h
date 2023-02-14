@@ -33,14 +33,14 @@ class MockSerialIoProtocol : public MockProtocolBase<MockSerialIoProtocol, efi_s
                efi_parity_type Parity, uint8_t DataBits, efi_stop_bits_type StopBits));
   MOCK_METHOD(efi_status, SetControl, (uint32_t Control));
   MOCK_METHOD(efi_status, GetControl, (uint32_t * Control));
-  MOCK_METHOD(efi_status, Write, (uint64_t * BufferSize, void* Buffer));
-  MOCK_METHOD(efi_status, Read, (uint64_t * BufferSize, void* Buffer));
+  MOCK_METHOD(efi_status, Write, (size_t * BufferSize, void* Buffer));
+  MOCK_METHOD(efi_status, Read, (size_t * BufferSize, void* Buffer));
 
   // Sets up expectations for Read() to return the given chars.
   // |input| gets saved internally so does not need to be kept alive.
   void ExpectRead(const std::string& input) {
     EXPECT_CALL(*this, Read(::testing::Pointee(::testing::Ge(input.size())), ::testing::_))
-        .WillOnce([input](uint64_t* BufferSize, void* Buffer) {
+        .WillOnce([input](size_t* BufferSize, void* Buffer) {
           *BufferSize = input.size();
           memcpy(Buffer, input.data(), input.size());
           return EFI_SUCCESS;

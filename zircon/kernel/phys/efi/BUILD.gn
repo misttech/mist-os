@@ -109,7 +109,7 @@ source_set("main") {
   deps = [ ":protocol" ]
   allow_circular_includes_from = [ ":protocol" ]
 
-  if (is_kernel) {
+  if (is_efi_toolchain) {
     sources = [
       "allocation.cc",
       "efi-main.cc",
@@ -180,9 +180,26 @@ if (is_efi) {
   }
 }
 
+if (is_efi_toolchain) {
+  source_set("efi-boot-zbi") {
+    public = [ "include/phys/efi/efi-boot-zbi.h" ]
+    public_deps = [
+      ":file",
+      ":main",
+      "..:boot-zbi",
+      "..:symbolize",
+      "//src/lib/zbitl",
+    ]
+    public_configs = [ ":includes" ]
+    sources = [ "efi-boot-zbi.cc" ]
+    deps = [ "..:allocation" ]
+  }
+}
+
 efi_executable("efi-zbi") {
   sources = [ "efi-zbi.cc" ]
   deps = [
+    ":efi-boot-zbi",
     ":file",
     "..:symbolize",
     "//src/lib/zbitl",

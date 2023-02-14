@@ -93,9 +93,18 @@ BootZbi::Size BootZbi::GetKernelAllocationSize(BootZbi::Zbi::iterator kernel_ite
                                                    zircon_kernel->data_kernel.reserve_memory_size));
 }
 
-fit::result<BootZbi::Error> BootZbi::InitKernelFromItem() {
-  kernel_ = GetZirconKernel(kernel_item_->payload.data());
-  return fit::ok();
+void BootZbi::InitKernelFromItem() { kernel_ = GetZirconKernel(kernel_item_->payload.data()); }
+
+void BootZbi::InitKernel(Allocation kernel) {
+  kernel_buffer_ = ktl::move(kernel);
+  zbi_ = InputZbi{kernel_buffer_.data()};
+  kernel_item_ = zbi_.begin();
+  InitKernelFromItem();
+}
+
+void BootZbi::InitData(Allocation data) {
+  data_buffer_ = ktl::move(data);
+  data_ = Zbi{data_buffer_.data()};
 }
 
 fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi) {
@@ -116,7 +125,8 @@ fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi) {
         kernel_item_ = it;
         // Valid kernel_item implies no iteration error.
         zbi_.ignore_error();
-        return InitKernelFromItem();
+        InitKernelFromItem();
+        return fit::ok();
       }
 
       case ZBI_TYPE_DISCARD:
@@ -153,7 +163,8 @@ fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi, InputZbi::iterator k
   }
   // Valid kernel_item implies no error.
   zbi_.ignore_error();
-  return InitKernelFromItem();
+  InitKernelFromItem();
+  return fit::ok();
 }
 
 bool BootZbi::KernelCanLoadInPlace() const {
@@ -422,14 +433,13 @@ void BootZbi::Log() {
 
 [[noreturn]] void BootZbi::Boot(ktl::optional<void*> argument) {
   ZX_ASSERT_MSG(KernelCanLoadInPlace(), "Has Load() been called?");
-  Log();
   auto kernel_hdr = const_cast<zircon_kernel_t*>(kernel_);
   arch::ZbiBoot(kernel_hdr, argument.value_or(data_.storage().data()));
 }
 
 #define ADDR "0x%016" PRIx64
 
-void BootZbi::LogAddresses() {
+void BootZbi::LogAddresses() const {
   debugf("%s:    Kernel @ [" ADDR ", " ADDR ")  %s\n", ProgramName(), KernelLoadAddress(),
          KernelLoadAddress() + KernelLoadSize(), pretty::FormattedBytes(KernelLoadSize()).c_str());
   debugf("%s:       BSS @ [" ADDR ", " ADDR ")  %s\n", ProgramName(),
@@ -440,6 +450,6 @@ void BootZbi::LogAddresses() {
          pretty::FormattedBytes(static_cast<size_t>(DataLoadSize())).c_str());
 }
 
-void BootZbi::LogBoot(uint64_t entry) const {
+void BootZbi::LogBoot(uint64_t entry) {
   debugf("%s:     Entry @  " ADDR "  Booting...\n", ProgramName(), entry);
 }

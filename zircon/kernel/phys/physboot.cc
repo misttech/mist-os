@@ -115,10 +115,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 
   // `boot`'s data ZBI at this point is the tail of the decompressed kernel
   // ZBI; overwrite that with the original data ZBI.
-  boot.DataZbi().storage() = {
-      const_cast<ktl::byte*>(kernel_storage.zbi().storage().data()),
-      kernel_storage.zbi().storage().size(),
-  };
+  boot.DataZbi() = kernel_storage.zbi();
 
   Allocation relocated_zbi;
   if (boot.MustRelocateDataZbi()) {
