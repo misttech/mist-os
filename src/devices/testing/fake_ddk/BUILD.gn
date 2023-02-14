@@ -76,11 +76,8 @@ zx_library("fake_ddk") {
   # To regenerate:
   # scripts/gn/trim_visibility.py --target="//src/devices/testing/fake_ddk"
   visibility = [
-    "//build/*",
     "//src/camera/drivers/controller/test/*",
-    "//src/devices/testing/*",
     "//src/devices/testing/fake_ddk/test/*",
-    "//src/graphics/lib/magma/tests/unit_tests/*",
     "//src/media/audio/drivers/usb-audio/tests/*",
   ]
 }
