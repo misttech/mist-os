@@ -19,11 +19,9 @@ use {
 /// `external_contents` and `far_contents` are maps from package resource paths in the to-be-created
 /// package to paths on the local filesystem. Package resource paths start with "meta/" if and only
 /// if they are in `far_contents`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PackageBuildManifest {
-    external_contents: BTreeMap<String, String>,
-    far_contents: BTreeMap<String, String>,
-}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct PackageBuildManifest(VersionedPackageBuildManifest);
 
 impl PackageBuildManifest {
     /// Creates a `PackageBuildManifest` from external and far contents maps.
@@ -89,7 +87,10 @@ impl PackageBuildManifest {
                 });
             }
         }
-        Ok(PackageBuildManifest { external_contents, far_contents })
+        Ok(PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
+            external_contents,
+            far_contents,
+        })))
     }
 
     /// Deserializes a `PackageBuildManifest` from versioned json.
@@ -241,12 +242,14 @@ impl PackageBuildManifest {
 
     /// `external_contents` lists the blobs that make up the meta/contents file
     pub fn external_contents(&self) -> &BTreeMap<String, String> {
-        &self.external_contents
+        let VersionedPackageBuildManifest::Version1(manifest) = &self.0;
+        &manifest.external_contents
     }
 
     /// `far_contents` lists the files to be included bodily in the meta.far
     pub fn far_contents(&self) -> &BTreeMap<String, String> {
-        &self.far_contents
+        let VersionedPackageBuildManifest::Version1(manifest) = &self.0;
+        &manifest.far_contents
     }
 }
 
@@ -460,7 +463,7 @@ mod tests {
                 }
             ))
             .unwrap(),
-            PackageBuildManifest {
+            PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
                 external_contents: btreemap! {
                     "this-path".to_string() => "this-host-path".to_string(),
                     "that/path".to_string() => "that/host/path".to_string()
@@ -469,7 +472,7 @@ mod tests {
                     "meta/some-path".to_string() => "some-host-path".to_string(),
                     "meta/other/path".to_string() => "other/host/path".to_string()
                 }
-            }
+            }))
         );
     }
 
@@ -488,7 +491,7 @@ mod tests {
                     .as_bytes()
             )
             .unwrap(),
-            PackageBuildManifest {
+            PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
                 external_contents: btreemap! {
                     "this-path".to_string() => "this-host-path".to_string(),
                     "that/path".to_string() => "that/host/path".to_string(),
@@ -500,7 +503,7 @@ mod tests {
                     "meta/other/path".to_string() => "other/host/path".to_string(),
                     "meta/another/path".to_string() => "another/host=path".to_string(),
                 },
-            },
+            })),
         );
     }
 
@@ -508,7 +511,10 @@ mod tests {
     fn test_from_pm_fini_empty() {
         assert_eq!(
             PackageBuildManifest::from_pm_fini("".as_bytes()).unwrap(),
-            PackageBuildManifest { external_contents: btreemap! {}, far_contents: btreemap! {} },
+            PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
+                external_contents: btreemap! {},
+                far_contents: btreemap! {}
+            })),
         );
     }
 
@@ -531,12 +537,12 @@ mod tests {
 
         assert_eq!(
             PackageBuildManifest::from_pm_fini(fini.as_bytes()).unwrap(),
-            PackageBuildManifest {
+            PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
                 external_contents: btreemap! {
                     "path".to_string() => path.to_str().unwrap().to_string(),
                 },
                 far_contents: btreemap! {},
-            },
+            })),
         );
     }
 
@@ -636,12 +642,12 @@ mod tests {
 
         assert_eq!(
             PackageBuildManifest::from_pm_fini(fini.as_bytes()).unwrap(),
-            PackageBuildManifest {
+            PackageBuildManifest(VersionedPackageBuildManifest::Version1(PackageBuildManifestV1 {
                 external_contents: btreemap! {
                     "path".to_string() => path.to_str().unwrap().to_string(),
                 },
                 far_contents: btreemap! {},
-            },
+            })),
         );
     }
 
