@@ -58,6 +58,13 @@ class SimpleDisplay : public DeviceType,
       const display_capture_interface_protocol_t* intf) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
+                                                          zx::channel collection_token) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,

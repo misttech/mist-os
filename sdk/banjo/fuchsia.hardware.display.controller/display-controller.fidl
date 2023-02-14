@@ -409,6 +409,28 @@ protocol DisplayControllerImpl {
         s zx.status;
     });
 
+    /// Import a sysmem buffer collection token.
+    ///
+    /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
+    ImportBufferCollection(resource struct {
+        collection_id uint64;
+        // TODO(fxbug.dev/89649): This is a client end channel of FIDL protocol
+        // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
+        // replaced with FIDL client end once banjo to FIDL migration finishes.
+        collection_token zx.handle:CHANNEL;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Release an imported buffer collection.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` isn't successfully imported.
+    ReleaseBufferCollection(struct {
+        collection_id uint64;
+    }) -> (struct {
+        s zx.status;
+    });
+
     /// Imports an image from a buffer collection into the driver. The driver should set
     /// image->handle.
     ///

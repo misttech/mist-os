@@ -56,6 +56,13 @@ class FakeDisplay : public DeviceType,
   // Required functions needed to implement Display Controller Protocol
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
+  zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
+                                                          zx::channel collection_token) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
