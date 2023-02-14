@@ -13,7 +13,6 @@ type DataPatternType = strict enum : uint8 {
     RANDOM = 2;
 };
 
-@for_deprecated_c_bindings
 type BulkTestParams = struct {
     /// The type of data to transfer.
     data_pattern DataPatternType;
@@ -21,7 +20,6 @@ type BulkTestParams = struct {
     len uint64;
 };
 
-@for_deprecated_c_bindings
 type PacketOptions = struct {
     /// Whether to request a callback for the transfer.
     set_cb bool;
@@ -31,7 +29,6 @@ type PacketOptions = struct {
     expect_cb bool;
 };
 
-@for_deprecated_c_bindings
 type IsochTestParams = struct {
     /// The type of data to transfer.
     data_pattern DataPatternType;
@@ -49,7 +46,6 @@ type IsochTestParams = struct {
     packet_opts_len uint64;
 };
 
-@for_deprecated_c_bindings
 type SgEntry = struct {
     /// Number of bytes in the scatter gather entry.
     length uint64;
@@ -57,7 +53,6 @@ type SgEntry = struct {
     offset uint64;
 };
 
-@for_deprecated_c_bindings
 type SgList = struct {
     // A vector would break the current requirement for a simple C binding.
     entries array<SgEntry, MAX_SG_SEGMENTS>;
@@ -65,7 +60,6 @@ type SgList = struct {
     len uint64;
 };
 
-@for_deprecated_c_bindings
 type IsochResult = struct {
     /// Number of packets loopbacked successfully.
     num_passed uint64;
@@ -73,7 +67,6 @@ type IsochResult = struct {
     num_packets uint64;
 };
 
-@for_deprecated_c_bindings
 protocol Device {
     /// Resets the device to firmware loader mode.
     SetModeFwloader() -> (struct {

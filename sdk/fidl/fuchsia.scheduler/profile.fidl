@@ -6,13 +6,11 @@ library fuchsia.scheduler;
 using zx;
 
 // Corresponds to zx_cpu_set_t.
-@for_deprecated_c_bindings
 type CpuSet = struct {
     mask array<uint64, 8>;
 };
 
 @discoverable
-@for_deprecated_c_bindings
 protocol ProfileProvider {
     /// Obtain a profile handle.
     ///

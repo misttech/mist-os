@@ -6,7 +6,6 @@ library fuchsia.hardware.ax88179;
 using zx;
 
 /// Test helper for asix-88179-function to explicitly control online.
-@for_deprecated_c_bindings
 closed protocol Hooks {
     strict SetOnline(struct {
         online bool;

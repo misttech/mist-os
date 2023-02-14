@@ -17,7 +17,6 @@ type Class = strict enum : uint32 {
     INTEL_FLASH_DESCRIPTOR = 5;
 };
 
-@for_deprecated_c_bindings
 type Info = struct {
     page_size uint32; // Read/write unit size, in bytes.
     pages_per_block uint32; // Erase block size, in pages.

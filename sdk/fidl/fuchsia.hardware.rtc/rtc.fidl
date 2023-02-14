@@ -5,7 +5,6 @@ library fuchsia.hardware.rtc;
 
 using zx;
 
-@for_deprecated_c_bindings
 type Time = struct {
     seconds uint8;
     minutes uint8;
@@ -15,7 +14,6 @@ type Time = struct {
     year uint16;
 };
 
-@for_deprecated_c_bindings
 protocol Device {
     /// Get the current RTC time
     Get() -> (struct {

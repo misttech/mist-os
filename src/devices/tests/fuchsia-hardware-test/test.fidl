@@ -5,7 +5,6 @@ library fuchsia.hardware.test;
 
 using zx;
 
-@for_deprecated_c_bindings
 closed protocol Device {
     strict GetChannel() -> (resource struct {
         ch zx.handle:CHANNEL;

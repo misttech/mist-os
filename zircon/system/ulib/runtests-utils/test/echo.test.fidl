@@ -5,7 +5,6 @@ library fidl.test.echo;
 
 const MAX_LENGTH uint64 = 1024;
 
-@for_deprecated_c_bindings
 protocol Echo {
     EchoString(struct {
         value string:MAX_LENGTH;

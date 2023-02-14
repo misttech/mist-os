@@ -11,7 +11,6 @@ const MAX_STRING_DESCRIPTORS uint32 = 255;
 
 const MAX_STRING_LENGTH uint32 = 127;
 
-@for_deprecated_c_bindings
 type FunctionDescriptor = struct {
     interface_class uint8;
     interface_subclass uint8;
@@ -41,7 +40,6 @@ type DeviceDescriptor = struct {
 /// of the completion of various server-side events.
 /// This callback interface can be registered using the SetStateChangeListener
 /// method on the Device protocol.
-@for_deprecated_c_bindings
 protocol Events {
     /// Invoked when a function registers
     FunctionRegistered() -> ();

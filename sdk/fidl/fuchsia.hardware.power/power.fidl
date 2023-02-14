@@ -14,7 +14,6 @@ const POWER_STATE_DISCHARGING uint8 = 0x2;
 const POWER_STATE_CHARGING uint8 = 0x4;
 const POWER_STATE_CRITICAL uint8 = 0x8;
 
-@for_deprecated_c_bindings
 type SourceInfo = struct {
     type PowerType;
     state uint8;
@@ -27,7 +26,6 @@ type BatteryUnit = strict enum {
     MA = 1;
 };
 
-@for_deprecated_c_bindings
 type BatteryInfo = struct {
     /// capacity unit. all voltage fields are in millivolts
     unit BatteryUnit;
@@ -56,7 +54,6 @@ type BatteryInfo = struct {
     present_voltage uint32;
 };
 
-@for_deprecated_c_bindings
 protocol Source {
     /// Get device info.
     GetPowerInfo() -> (struct {

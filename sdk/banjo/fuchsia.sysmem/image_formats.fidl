@@ -7,7 +7,6 @@ library fuchsia.sysmem;
 /// Describes how the pixels within an image are represented.
 /// Simple formats need only a type.
 /// Parametric pixel formats may require additional properties.
-@for_deprecated_c_bindings
 type PixelFormat = struct {
     type PixelFormatType;
     /// This bool effectively makes format_modifier optional, to satisfy
@@ -110,7 +109,6 @@ type PixelFormatType = strict enum {
 /// Describes how the pixels within an image are meant to be presented.
 /// Simple color spaces need only a type.
 /// Parametric color spaces may require additional properties.
-@for_deprecated_c_bindings
 type ColorSpace = struct {
     type ColorSpaceType;
 };

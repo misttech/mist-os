@@ -8,7 +8,6 @@ using zx;
 const MAX_PARTITIONS uint32 = 10;
 const NAME_LEN uint32 = 32;
 
-@for_deprecated_c_bindings
 type Partition = struct {
     /// GUID specifying the format and use of data stored in the partition.
     type_guid array<uint8, GUID_LEN>;
@@ -34,7 +33,6 @@ type Partition = struct {
     bbt bool;
 };
 
-@for_deprecated_c_bindings
 type PartitionMap = struct {
     device_guid array<uint8, GUID_LEN>;
 
@@ -44,7 +42,6 @@ type PartitionMap = struct {
 };
 
 /// Defines how a newly created ram-nand volume should operate.
-@for_deprecated_c_bindings
 type RamNandInfo = resource struct {
     /// VMO to use as backing store for nand device. Size should match size of `nand_info`.
     /// If a vmo is not provided, the device will create its own buffer and initialize it to be
@@ -68,7 +65,6 @@ type RamNandInfo = resource struct {
     fail_after uint32;
 };
 
-@for_deprecated_c_bindings
 protocol RamNandCtl {
     /// Creates a new ram-nand device. On success, returns the device's name (not the full
     /// topological name, just the last component).
@@ -80,7 +76,6 @@ protocol RamNandCtl {
     });
 };
 
-@for_deprecated_c_bindings
 protocol RamNand {
     /// Removes the device.
     Unlink() -> (struct {

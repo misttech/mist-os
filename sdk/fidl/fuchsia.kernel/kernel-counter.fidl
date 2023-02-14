@@ -8,7 +8,6 @@ using zx;
 
 /// Protocol for retrieving kcounter information.
 @discoverable
-@for_deprecated_c_bindings
 protocol Counter {
     /// Retrives a VMO containining summarized kcounter data. The vmo returned
     /// in `buffer` is in "inspect-vmo" format, documented elsewhere.

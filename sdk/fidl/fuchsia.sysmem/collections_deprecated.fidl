@@ -7,7 +7,6 @@ using zx;
 
 // TODO(fxbug.dev/32119): change struct to table
 /// Information about a buffer collection and its buffers.
-@for_deprecated_c_bindings
 type BufferCollectionInfo = resource struct {
     /// The number of buffers in the collection.
     buffer_count uint32;

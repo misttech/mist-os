@@ -7,7 +7,6 @@ library fuchsia.storage.metrics;
 /// Stats for calls. These stats track completed calls - they may or may not have
 /// succeeded. Unless specified otherwise , time units are in nanoseconds and
 /// data transferred is in bytes
-@for_deprecated_c_bindings
 type CallStatRaw = struct {
     /// Minimum time taken by a request to be served.
     minimum_latency uint64;
@@ -38,7 +37,6 @@ type CallStatRaw = struct {
     bytes_transferred uint64;
 };
 
-@for_deprecated_c_bindings
 type CallStat = struct {
     /// CallStat keeps track of the successful commands and failed commands
     /// seperately as successful commands may generate completely different stats
@@ -49,7 +47,6 @@ type CallStat = struct {
     failure CallStatRaw;
 };
 
-@for_deprecated_c_bindings
 type FsMetrics = struct {
     /// Call stats for create
     create CallStat;

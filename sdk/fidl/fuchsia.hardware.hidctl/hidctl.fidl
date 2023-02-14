@@ -7,7 +7,6 @@ using zx;
 
 const MAX_RPT_DESC_LEN uint32 = 8196;
 
-@for_deprecated_c_bindings
 type HidCtlConfig = struct {
     /// The device number. This is used in print statements to identify the device. Can be set to
     /// any value.
@@ -24,7 +23,6 @@ type HidCtlConfig = struct {
 ///
 /// The device is controlled through a socket that can Read/Write HID reports. When the socket
 /// is closed the device will remove itself from the system.
-@for_deprecated_c_bindings
 protocol Device {
     /// Create a fake HID device with a given report descriptor. Returns a
     /// socket that can Read/Write HID reports.

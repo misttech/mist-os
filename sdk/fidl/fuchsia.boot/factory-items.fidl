@@ -7,7 +7,6 @@ using zx;
 
 /// Protocol for retrieving factory boot item payloads.
 @discoverable
-@for_deprecated_c_bindings
 protocol FactoryItems {
     /// Gets a `payload` for a `ZBI_TYPE_STORAGE_BOOTFS_FACTORY` boot item with
     /// extra field set to `extra`.

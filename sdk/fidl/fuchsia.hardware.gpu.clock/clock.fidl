@@ -5,7 +5,6 @@ library fuchsia.hardware.gpu.clock;
 
 using zx;
 
-@for_deprecated_c_bindings
 protocol Clock {
     SetFrequencySource(struct {
         source uint32;

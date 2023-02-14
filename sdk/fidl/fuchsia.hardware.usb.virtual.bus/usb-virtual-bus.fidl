@@ -5,7 +5,6 @@ library fuchsia.hardware.usb.virtual.bus;
 
 using zx;
 
-@for_deprecated_c_bindings
 protocol Bus {
     /// Enables the virtual bus.
     Enable() -> (struct {

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.sysmem;
 
-@for_deprecated_c_bindings
 type FormatModifier = struct {
     /// The upper 8 bits are a vendor code as allocated in FormatModifierVendor
     /// enum.  The lower 56 bits are vendor-defined.

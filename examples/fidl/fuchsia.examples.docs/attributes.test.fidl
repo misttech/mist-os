@@ -28,7 +28,6 @@ type WithAttribute = struct {
         };
 
 // [START layout-simple]
-@for_deprecated_c_bindings
 protocol SimpleProtocol {
     DynamicCountOfFixedArguments(struct {
         inputs vector<uint8>:1024;

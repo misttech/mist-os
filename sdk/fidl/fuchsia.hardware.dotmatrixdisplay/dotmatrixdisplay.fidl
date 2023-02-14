@@ -23,7 +23,6 @@ type ScreenLayout = strict enum : uint32 {
     ROW_LR_COLUMN_TB = 2;
 };
 
-@for_deprecated_c_bindings
 type DotmatrixDisplayConfig = struct {
     /// The screen's width in pixels.
     width uint32;
@@ -39,7 +38,6 @@ type DotmatrixDisplayConfig = struct {
 /// of pixels. The display could be monochromatic or have RGB values. This
 /// protocol is NOT for a display with lots of pixels or extra hardware like an
 /// HDMI or DP display.
-@for_deprecated_c_bindings
 protocol DotmatrixDisplay {
     /// Get the configuration to display the screen.
     GetConfig() -> (struct {

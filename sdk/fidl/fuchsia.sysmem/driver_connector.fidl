@@ -25,7 +25,6 @@ using fuchsia.io;
 /// constraints from other participants.
 @available(added=7, deprecated=9, removed=HEAD)
 @discoverable
-@for_deprecated_c_bindings
 protocol DriverConnector {
     /// This one-way message sends in the server end of an Allocator channel.
     ///

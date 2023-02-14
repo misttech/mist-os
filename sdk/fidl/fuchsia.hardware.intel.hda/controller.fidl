@@ -5,7 +5,6 @@ library fuchsia.hardware.intel.hda;
 
 using zx;
 
-@for_deprecated_c_bindings
 protocol ControllerDevice {
     // Note: this method obtains a channel to the controller device which
     // communicates using a legcy custom binary serialized format.  Once the

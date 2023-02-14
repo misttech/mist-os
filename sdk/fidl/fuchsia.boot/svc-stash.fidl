@@ -8,7 +8,6 @@ using fuchsia.io;
 using zx;
 
 /// Protocol for storing svc server ends of 'svc' for later processing during early boot.
-@for_deprecated_c_bindings
 protocol SvcStash {
     /// Store a svc_endpoint in the stash. Stored endpoints will remain in transit,
     /// since there might not be a server side implementation. The server end

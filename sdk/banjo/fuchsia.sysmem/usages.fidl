@@ -5,7 +5,6 @@ library fuchsia.sysmem;
 
 // Describes how a client will access the contents of a buffer.
 // TODO(fxbug.dev/32119): change struct to table
-@for_deprecated_c_bindings
 type BufferUsage = struct {
     none uint32;
     cpu uint32;

@@ -8,7 +8,6 @@ using zx;
 // Matches the value of ZBI_PARTITION_GUID_LEN.
 const GUID_LEN uint32 = 16;
 
-@for_deprecated_c_bindings
 type PartitionInfo = struct {
     /// Partition type GUID.
     partition_guid array<uint8, GUID_LEN>;
@@ -18,7 +17,6 @@ type PartitionInfo = struct {
     partition_block_count uint32;
 };
 
-@for_deprecated_c_bindings
 type ReadWriteOperation = resource struct {
     /// Memory object describing buffer to read into or write from.
     vmo zx.handle:VMO;
@@ -73,7 +71,6 @@ type WriteBytesOperation = resource struct {
 /// Skip-block partitions are used when data needs to be accessible by the bootloader. The
 /// bootloader doesn't understand the more advanced FTL partitions and this data isn't written
 /// frequently enough for performance or wear-leveling to be an issue.
-@for_deprecated_c_bindings
 protocol SkipBlock {
     /// Returns information about the skip-block partition.
     ///

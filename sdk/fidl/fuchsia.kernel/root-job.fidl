@@ -9,7 +9,6 @@ using zx;
 ///
 /// TODO(fxbug.dev/33856): Do not use this without first consulting the Zircon team.
 @discoverable
-@for_deprecated_c_bindings
 protocol RootJob {
     /// Get the root `job`.
     Get() -> (resource struct {
@@ -20,7 +19,6 @@ protocol RootJob {
 /// Protocol for providing the root job with restricted rights, specifically:
 /// INSPECT | ENUMERATE | DUPLICATE | TRANSFER
 @discoverable
-@for_deprecated_c_bindings
 protocol RootJobForInspect {
     compose RootJob;
 };

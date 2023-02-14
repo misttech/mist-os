@@ -28,7 +28,6 @@ type PowerDomain = strict enum : uint32 {
 };
 
 /// scpi_opp_t is typedef'd to this.
-@for_deprecated_c_bindings
 type OperatingPoint = struct {
     /// The device's operating points.
     opp array<OperatingPointEntry, MAX_DVFS_OPPS>;
@@ -39,7 +38,6 @@ type OperatingPoint = struct {
 };
 
 /// scpi_opp_entry_t is typedef'd to this.
-@for_deprecated_c_bindings
 type OperatingPointEntry = struct {
     /// The operating point frequency in Hz.
     freq_hz uint32;
@@ -48,7 +46,6 @@ type OperatingPointEntry = struct {
 };
 
 /// Temperature units are degrees Celsius.
-@for_deprecated_c_bindings
 type ThermalInfo = struct {
     /// State is a bitmask of `THERMAL_STATE_`* values.
     state uint32;
@@ -63,7 +60,6 @@ type ThermalInfo = struct {
 };
 
 /// Temperature units are degrees Celsius.
-@for_deprecated_c_bindings
 type ThermalTemperatureInfo = struct {
     /// The temperature must rise to up_temp to get to this trip point.
     up_temp_celsius float32;
@@ -79,7 +75,6 @@ type ThermalTemperatureInfo = struct {
     gpu_clk_freq_source uint32;
 };
 
-@for_deprecated_c_bindings
 type ThermalDeviceInfo = struct {
     /// Active cooling support.
     active_cooling bool;
@@ -99,7 +94,6 @@ type ThermalDeviceInfo = struct {
     opps array<OperatingPoint, MAX_DVFS_DOMAINS>;
 };
 
-@for_deprecated_c_bindings
 protocol Device {
     compose fuchsia.hardware.temperature.Device;
 

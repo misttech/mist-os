@@ -14,7 +14,6 @@ const MAX_CONFIG_DESC_SIZE uint32 = 65536;
 /// See GetStringDescriptor description below
 const MAX_STRING_DESC_SIZE uint32 = 384;
 
-@for_deprecated_c_bindings
 protocol Device {
     /// Returns the speed of the USB device as a usb_speed_t value.
     GetDeviceSpeed() -> (struct {

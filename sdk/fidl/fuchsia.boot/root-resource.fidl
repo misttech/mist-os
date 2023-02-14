@@ -7,7 +7,6 @@ using zx;
 
 /// Protocol for providing the root resource.
 @discoverable
-@for_deprecated_c_bindings
 protocol RootResource {
     /// Get the root `resource`.
     Get() -> (resource struct {

@@ -19,7 +19,6 @@ const MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS uint32 = 64;
 /// Constraints on BufferCollection parameters.  These constraints can be
 /// specified per-participant.  The sysmem service implements aggregation of
 /// constraints from multiple participants.
-@for_deprecated_c_bindings
 type BufferCollectionConstraints = struct {
     /// The usage is only meant as a hint to help sysmem choose a more optimal
     /// PixelFormat or similar when multiple compatible options exist.
@@ -114,7 +113,6 @@ type BufferCollectionConstraints = struct {
             array<ImageFormatConstraints, MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS>;
 };
 
-@for_deprecated_c_bindings
 type BufferCollectionConstraintsAuxBuffers = struct {
     /// If true, a secure heap may only be selected if all participants with
     /// BufferMemoryConstraints specify allow_clear_aux_buffers_for_secure.  If
@@ -141,7 +139,6 @@ type BufferCollectionConstraintsAuxBuffers = struct {
     allow_clear_aux_buffers_for_secure bool;
 };
 
-@for_deprecated_c_bindings
 type VmoBuffer = resource struct {
     /// The same VMO can be used by more than one CodecBuffer (only of the same
     /// buffer_lifetime_ordinal), but each vmo handle must be a separate handle.
@@ -158,7 +155,6 @@ type VmoBuffer = resource struct {
 
 // TODO(fxbug.dev/32119): change struct to table
 /// Information about a buffer collection and its buffers.
-@for_deprecated_c_bindings
 type BufferCollectionInfo_2 = resource struct {
     /// The total number of buffers.
     buffer_count uint32;
@@ -183,7 +179,6 @@ type BufferCollectionInfo_2 = resource struct {
     buffers array<VmoBuffer, MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS>;
 };
 
-@for_deprecated_c_bindings
 type SingleBufferInfo = resource struct {
     settings SingleBufferSettings;
     buffer VmoBuffer;
@@ -194,7 +189,6 @@ type SingleBufferInfo = resource struct {
 /// differ from the rest of the buffers in the collection, and the single
 /// buffer's settings are delivered via OnSingleBufferAllocated() using this
 /// struct:
-@for_deprecated_c_bindings
 type SingleBufferSettings = struct {
     buffer_settings BufferMemorySettings;
 
@@ -233,7 +227,6 @@ type HeapType = strict enum : uint64 {
     FRAMEBUFFER = 0x1000000000030001;
 };
 
-@for_deprecated_c_bindings
 type BufferMemoryConstraints = struct {
     @allow_deprecated_struct_defaults
     min_size_bytes uint32 = 0;
@@ -283,7 +276,6 @@ type CoherencyDomain = strict enum {
     INACCESSIBLE = 2;
 };
 
-@for_deprecated_c_bindings
 type BufferMemorySettings = struct {
     size_bytes uint32;
     is_physically_contiguous bool;
@@ -296,7 +288,6 @@ type BufferMemorySettings = struct {
 
 // TODO(fxbug.dev/32119): change struct to table
 /// Describes constraints on layout of image data in buffers.
-@for_deprecated_c_bindings
 type ImageFormatConstraints = struct {
     /// The PixelFormat for which the following constraints apply.  A
     /// participant may have more than one PixelFormat that's supported, in
@@ -432,7 +423,6 @@ type ImageFormatConstraints = struct {
 
 // TODO(fxbug.dev/32119): change struct to table
 /// Describes how an image is represented.
-@for_deprecated_c_bindings
 type ImageFormat_2 = struct {
     /// Pixel format.
     pixel_format PixelFormat;

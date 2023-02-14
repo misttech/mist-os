@@ -7,7 +7,6 @@ const LOG_MESSAGE_MAX uint32 = 1024;
 const TEST_CASE_NAME_MAX uint32 = 256;
 
 /// Contains the counts of test results within the test case.
-@for_deprecated_c_bindings
 type TestCaseResult = struct {
     /// Number of tests that passed.
     passed uint64;
@@ -17,7 +16,6 @@ type TestCaseResult = struct {
     skipped uint64;
 };
 
-@for_deprecated_c_bindings
 protocol Logger {
     /// Logs a message from the driver unit test.
     LogMessage(struct {

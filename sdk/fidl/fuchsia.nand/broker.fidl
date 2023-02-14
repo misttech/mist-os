@@ -6,7 +6,6 @@ using fuchsia.hardware.nand;
 using zx;
 
 // Defines a Read/Write/Erase request to be sent to the nand driver.
-@for_deprecated_c_bindings
 type BrokerRequestData = resource struct {
     vmo zx.handle:<VMO, optional>; // Only used for read and write.
     length uint32; // In pages (read / write) or blocks (erase).
@@ -17,7 +16,6 @@ type BrokerRequestData = resource struct {
     oob_vmo bool; // True to read or write OOB data.
 };
 
-@for_deprecated_c_bindings
 type BrokerRequestDataBytes = resource struct {
     vmo zx.handle:<VMO>; // Only used for read and write.
     length uint64; // In bytes.
@@ -29,7 +27,6 @@ type BrokerRequestDataBytes = resource struct {
 /// ever talking to the nand device, and all higher level clients have disconnected. In addition,
 /// access to raw nand is restricted from the system during production where nand-broker is not
 /// present.
-@for_deprecated_c_bindings
 protocol Broker {
     // Retrieves the nand info from the underlying device.
     GetInfo() -> (struct {

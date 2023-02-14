@@ -7,7 +7,6 @@ using zx;
 
 /// `VolumeManagerInfo` describes the properties of the volume manager and not
 /// each individual volume.
-@for_deprecated_c_bindings
 type VolumeManagerInfo = struct {
     /// Size of a single slice, in bytes.
     slice_size uint64;
@@ -30,7 +29,6 @@ type VolumeManagerInfo = struct {
     max_virtual_slice uint64;
 };
 
-@for_deprecated_c_bindings
 type VolumeInfo = struct {
     /// Number of slices allocated to the volume.
     partition_slice_count uint64;

@@ -12,7 +12,6 @@ using zx;
 /// description of this and related process bootstrapping protocols, and
 /// for specifics about the default global loader service's
 /// interpretation of names, paths, and configurations.
-@for_deprecated_c_bindings
 protocol Loader {
     /// Cleanly shutdown the connection to the Loader service.
     Done();
