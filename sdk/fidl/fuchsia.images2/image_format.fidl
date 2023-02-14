@@ -95,7 +95,7 @@ type ImageFormat = table {
     /// pipeline that assumes 0, 0 will be incorrect display, but not a crash,
     /// since assuming 0, 0 for x, y does not cause reading out of buffer
     /// bounds.
-    6: display_rect RectU;
+    6: display_rect fuchsia.math.RectU;
 
     /// The size of a frame in terms of the number of pixels that have valid
     /// pixel data in terms of video decoding, but not in terms of which pixels
