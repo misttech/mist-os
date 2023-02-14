@@ -2,17 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/span.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include <cerrno>
-#include <cstring>
-#include <string_view>
-
-#include "core.h"
 #include "dump-tests.h"
-#include "job-archive.h"
 #include "test-file.h"
 #include "test-tool-process.h"
 
@@ -156,73 +146,6 @@ TEST(ZxdumpTests, ReadMemoryStringElided) {
     ASSERT_TRUE(result.is_error());
     EXPECT_EQ(result.error_value().status_, ZX_ERR_NOT_SUPPORTED);
   }
-}
-
-TEST(ZxdumpTests, ReadMemoryMisaligned) {
-  zxdump::testing::TestFile file;
-  fbl::unique_fd fd = file.RewoundFd();
-
-  // This constructs an archive that will place the ELF dump file's contents at
-  // an alignment of 2 mod 4.
-  struct MisalignedHeader {
-    char magic[zxdump::kArchiveMagic.size()];
-    zxdump::ar_hdr remarks_hdr;
-    char remarks_body[2] = {'x', '\n'};
-    zxdump::ar_hdr dump_hdr;
-  };
-  static_assert(sizeof(MisalignedHeader) % sizeof(int) == 2);
-
-  constexpr auto fill_header = [](zxdump::ar_hdr& hdr, std::string_view name, size_t size) {
-    constexpr auto fill = [](cpp20::span<char> chars, std::string_view pfx) {
-      memset(chars.data(), ' ', chars.size());
-      pfx.copy(chars.data(), chars.size());
-    };
-    fill(hdr.ar_name, name);
-    fill(hdr.ar_date, "0");
-    fill(hdr.ar_uid, "0");
-    fill(hdr.ar_gid, "0");
-    fill(hdr.ar_mode, "400");
-    fill(hdr.ar_size, std::to_string(size));
-    fill(hdr.ar_fmag, zxdump::ar_hdr::kMagic);
-  };
-
-  // Set up the writer to start streaming just after where the header will go.
-  ASSERT_EQ(lseek(fd.get(), sizeof(MisalignedHeader), SEEK_SET),
-            static_cast<off_t>(sizeof(MisalignedHeader)))
-      << strerror(errno);
-
-  zxdump::FdWriter writer(std::move(fd));
-
-  zxdump::testing::TestProcessForMemory process;
-  ASSERT_NO_FATAL_FAILURE(process.StartChild());
-
-  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
-
-  // Now that the dump has been written, compute its size to fix up the header.
-  fd = file.RewoundFd();
-  struct stat st;
-  ASSERT_EQ(0, fstat(fd.get(), &st));
-  const size_t file_size = static_cast<size_t>(st.st_size);
-  ASSERT_GT(file_size, sizeof(MisalignedHeader));
-  const size_t dump_size = file_size - sizeof(MisalignedHeader);
-
-  // Fill in the header now that the file size is known.
-  MisalignedHeader misaligned_hdr;
-  zxdump::kArchiveMagic.copy(misaligned_hdr.magic, sizeof(misaligned_hdr.magic));
-  fill_header(misaligned_hdr.remarks_hdr, std::string(zxdump::kRemarkNotePrefix) + "x.txt", 1);
-  fill_header(misaligned_hdr.dump_hdr, "core", dump_size);
-
-  ASSERT_EQ(pwrite(fd.get(), &misaligned_hdr, sizeof(misaligned_hdr), 0),
-            static_cast<ssize_t>(sizeof(misaligned_hdr)));
-
-  // pwrite doesn't move the file position, so the reader will see the archive
-  // headers.
-  ASSERT_EQ(lseek(fd.get(), 0, SEEK_CUR), 0);
-
-  zxdump::TaskHolder holder;
-  auto read_result = holder.Insert(std::move(fd));
-  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
-  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
 }
 
 }  // namespace

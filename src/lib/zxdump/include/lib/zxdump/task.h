@@ -492,16 +492,11 @@ class Process : public Task {
           .status_ = ZX_ERR_INVALID_ARGS,
       }};
     }
-
-    Buffer<> buffer;
-    if (auto result = ReadMemoryImpl(vaddr, count * sizeof(T), size_mode, alignof(T));
-        result.is_ok()) {
-      buffer = *std::move(result);
-    } else {
+    auto result = ReadMemoryImpl(vaddr, count * sizeof(T), size_mode);
+    if (result.is_error()) {
       return result.take_error();
     }
-
-    return fit::ok(static_cast<Buffer<T, View>>(std::move(buffer)));
+    return fit::ok(static_cast<Buffer<T, View>>(*std::move(result)));
   }
 
   // This just reads a single datum of type T from dumped process memory at
@@ -575,8 +570,8 @@ class Process : public Task {
     uint64_t offset, filesz, memsz;
   };
 
-  fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size, ReadMemorySize size_mode,
-                                              size_t alignment);
+  fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size,
+                                              ReadMemorySize size_mode);
   fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size,
                                               ReadMemorySize size_mode);
 

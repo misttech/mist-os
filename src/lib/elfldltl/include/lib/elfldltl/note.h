@@ -94,7 +94,7 @@ struct ElfNote {
 };
 
 // This is a forward-iterable container view of notes in a note segment,
-// constructible from the raw bytes.
+// constructible from the raw bytes known to be properly aligned.
 template <ElfData Data = ElfData::kNative>
 class ElfNoteSegment {
  public:
@@ -171,13 +171,7 @@ class ElfNoteSegment {
 
  private:
   // This is safe only if the size has been checked.
-  static Nhdr Header(Bytes data) {
-    assert(data.size_bytes() >= sizeof(Nhdr));
-    // Use memcpy just in case the data is not properly aligned in memory.
-    Nhdr nhdr;
-    memcpy(&nhdr, data.data(), sizeof(nhdr));
-    return nhdr;
-  }
+  static auto& Header(Bytes data) { return *reinterpret_cast<const Nhdr*>(data.data()); }
 
   // Returns true if the data starts with a valid note.
   static bool Check(Bytes data) {
