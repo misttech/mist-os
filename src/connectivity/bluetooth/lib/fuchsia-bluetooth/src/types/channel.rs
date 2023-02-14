@@ -114,7 +114,7 @@ impl Channel {
     /// Make a pair of channels which are connected to each other, used commonly for testing.
     /// The maximum transmittable unit is taken from `max_tx_size`.
     pub fn create_with_max_tx(max_tx_size: usize) -> (Self, Self) {
-        let (remote, local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, local) = zx::Socket::create_datagram();
         (
             Channel::from_socket(remote, max_tx_size).unwrap(),
             Channel::from_socket(local, max_tx_size).unwrap(),
@@ -327,7 +327,7 @@ mod tests {
         let empty = bredr::Channel::EMPTY;
         assert!(Channel::try_from(empty).is_err());
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
 
         let okay = bredr::Channel {
             socket: Some(remote),
@@ -362,7 +362,7 @@ mod tests {
     fn test_direction_ext() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
         let no_ext = bredr::Channel {
             socket: Some(remote),
             channel_mode: Some(bredr::ChannelMode::Basic),
@@ -376,7 +376,7 @@ mod tests {
             .is_err());
         assert!(exec.run_singlethreaded(channel.set_audio_priority(A2dpDirection::Sink)).is_err());
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
         let (client_end, mut direction_request_stream) =
             create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
         let ext = bredr::Channel {
@@ -438,7 +438,7 @@ mod tests {
     fn test_flush_timeout() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
         let no_ext = bredr::Channel {
             socket: Some(remote),
             channel_mode: Some(bredr::ChannelMode::Basic),
@@ -463,7 +463,7 @@ mod tests {
             .is_err());
         assert!(exec.run_singlethreaded(channel.set_flush_timeout(None)).is_err());
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
         let (client_end, mut l2cap_request_stream) =
             create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
         let ext = bredr::Channel {

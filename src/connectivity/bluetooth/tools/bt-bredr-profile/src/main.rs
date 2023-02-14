@@ -544,7 +544,7 @@ mod tests {
             rfcomm_test,
         ))));
 
-        let (s, _) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (s, _) = fidl::Socket::create_stream();
         assert_eq!(
             0,
             state.lock().await.l2cap_channels.insert(L2capChannel {

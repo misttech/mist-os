@@ -918,7 +918,7 @@ mod tests {
         assert_matches!(s.start(), Err(ErrorCode::BadState));
         assert_matches!(s.suspend(), Err(ErrorCode::BadState));
 
-        let (remote, local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, local) = zx::Socket::create_datagram();
         let (client_end, mut direction_request_stream) =
             create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
         let ext = bredr::Channel {
@@ -996,7 +996,7 @@ mod tests {
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
         assert_matches!(s.establish(), Ok(()));
 
-        let (remote, local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, local) = zx::Socket::create_datagram();
         let (client_end, l2cap_params_requests) =
             create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
         let ext = bredr::Channel {

@@ -443,7 +443,7 @@ mod tests {
         futures::pin_mut!(call_manager);
         assert!(exec.run_until_stalled(&mut call_manager).is_pending());
 
-        let (remote, _local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (remote, _local) = zx::Socket::create_datagram();
         let chan = bredr::Channel {
             socket: Some(remote),
             channel_mode: Some(bredr::ChannelMode::Basic),
@@ -664,7 +664,7 @@ mod tests {
             Some(Ok(bredr::ProfileRequest::Connect { peer_id, connection: _, responder })) => {
                 assert_eq!(peer_id, bt::PeerId { value: 1 });
                 if connect_from_search {
-                    let (remote, local) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+                    let (remote, local) = zx::Socket::create_datagram();
                     server.connections.push(local);
                     let chan = bredr::Channel {
                         socket: Some(remote),
