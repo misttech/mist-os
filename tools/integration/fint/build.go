@@ -221,20 +221,25 @@ func buildImpl(
 
 	if ninjaErr != nil {
 		if contextSpec.ArtifactDir != "" {
-			crashReportFiles, err := collectClangCrashReports(contextSpec.BuildDir)
-			if err != nil {
-				return artifacts, err
-			}
-			if err := saveDebugFiles(crashReportFiles); err != nil {
-				return artifacts, err
-			}
+			if err := func() error {
+				crashReportFiles, err := collectClangCrashReports(contextSpec.BuildDir)
+				if err != nil {
+					return err
+				}
+				if err := saveDebugFiles(crashReportFiles); err != nil {
+					return err
+				}
 
-			traces, err := collectFileAccessTraces(contextSpec.BuildDir)
-			if err != nil {
-				return artifacts, fmt.Errorf("collecting file access traces: %w", err)
-			}
-			if err := saveDebugFiles(traces); err != nil {
-				return artifacts, fmt.Errorf("writing file access traces to debug files: %w", err)
+				traces, err := collectFileAccessTraces(contextSpec.BuildDir)
+				if err != nil {
+					return fmt.Errorf("collecting file access traces: %w", err)
+				}
+				if err := saveDebugFiles(traces); err != nil {
+					return fmt.Errorf("writing file access traces to debug files: %w", err)
+				}
+				return nil
+			}(); err != nil {
+				logger.Warningf(ctx, "Failed to collect debug files: %s", err)
 			}
 		}
 		return artifacts, fmt.Errorf("build failed, see ninja output for details: %w", ninjaErr)
