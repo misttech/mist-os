@@ -8,6 +8,7 @@
 #include <lib/stdcompat/span.h>
 
 #include <optional>
+#include <string_view>
 
 #include <efi/protocol/block-io.h>
 #include <efi/protocol/device-path.h>
@@ -108,6 +109,10 @@ efi_status PrintTpm2Capability();
 // Check whether secure boot is turned on by querying the `SecureBoot` global variable.
 // Returns error if fail to query `SecureBoot`.
 fit::result<efi_status, bool> IsSecureBootOn();
+
+// Can't include gpt.h due to circular includes so declare the type here.
+class EfiGptBlockDevice;
+std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device, std::string_view partition);
 
 enum class RebootMode : uint8_t {
   kNormal = 0x1,

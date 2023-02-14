@@ -7,9 +7,14 @@
 #include <bootbyte.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
+#include <zircon/hw/gpt.h>
+
+#include <algorithm>
 
 #include <efi/global-variable.h>
 #include <efi/types.h>
+
+#include "gpt.h"
 
 namespace gigaboot {
 
@@ -171,6 +176,40 @@ fit::result<efi_status, bool> IsSecureBootOn() {
   }
 
   return fit::ok(value);
+}
+
+std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device,
+                                       std::string_view partition) {
+  struct partition_names {
+    std::string_view legacy;
+    std::string_view modern;
+  };
+  constexpr partition_names names[]{
+      {GUID_ABR_META_NAME, GPT_DURABLE_BOOT_NAME},
+      {GUID_ZIRCON_A_NAME, GPT_ZIRCON_A_NAME},
+      {GUID_ZIRCON_B_NAME, GPT_ZIRCON_B_NAME},
+      {GUID_ZIRCON_R_NAME, GPT_ZIRCON_R_NAME},
+  };
+
+  auto name_entry =
+      std::find_if(std::begin(names), std::end(names),
+                   [&partition](const auto& entry) { return entry.modern == partition; });
+  if (name_entry == std::end(names)) {
+    // This is some other partition without a legacy naming scheme that we care about.
+    return partition;
+  }
+
+  for (const auto& p : device.ListPartitionNames()) {
+    if (p.data() == name_entry->legacy) {
+      return name_entry->legacy;
+    }
+    if (p.data() == name_entry->modern) {
+      return name_entry->modern;
+    }
+  }
+
+  // Should never reach here.
+  return partition;
 }
 
 bool SetRebootMode(RebootMode mode) {

@@ -10,6 +10,7 @@
 #include <string.h>
 #endif
 
+#include <lib/abr/abr.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zircon_boot.h>
 #include <zircon/hw/gpt.h>
@@ -34,6 +35,7 @@ const char* GetSlotPartitionName(const AbrSlotIndex* slot) {
 static bool ReadAbrMetaData(void* context, size_t size, uint8_t* buffer) {
   ZirconBootOps* ops = (ZirconBootOps*)context;
   size_t read_size;
+
   return ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, GPT_DURABLE_BOOT_NAME, 0, size, buffer,
                               &read_size) &&
          read_size == size;
@@ -42,6 +44,7 @@ static bool ReadAbrMetaData(void* context, size_t size, uint8_t* buffer) {
 static bool WriteAbrMetaData(void* context, const uint8_t* buffer, size_t size) {
   ZirconBootOps* ops = (ZirconBootOps*)context;
   size_t write_size;
+
   return ZIRCON_BOOT_OPS_CALL(ops, write_to_partition, GPT_DURABLE_BOOT_NAME, 0, size, buffer,
                               &write_size) &&
          write_size == size;

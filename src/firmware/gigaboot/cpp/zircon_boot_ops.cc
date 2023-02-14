@@ -1,3 +1,4 @@
+
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -17,29 +18,6 @@ namespace {
 // Reasonable guess for the size of additional zbi items on this platform.
 constexpr size_t kKernelBufferZbiSizeEstimate = 0x1000;
 
-// TODO(b/235489025): NUC GPT partitions still uses legacy zircon partition names. Thus we use the
-// following mapping as a workaround so that zircon_boot library works correctly. Remove this after
-// we update the GPT partition table to use new partition names.
-const char* MapPartitionName(const char* name) {
-  static const struct PartitionMap {
-    const char* part_name;
-    const char* mapped_name;
-  } kPartitionNameMap[] = {
-      {GPT_DURABLE_BOOT_NAME, "misc"},
-      {GPT_ZIRCON_A_NAME, "zircon-a"},
-      {GPT_ZIRCON_B_NAME, "zircon-b"},
-      {GPT_ZIRCON_R_NAME, "zircon-r"},
-  };
-
-  for (auto ele : kPartitionNameMap) {
-    if (strcmp(ele.part_name, name) == 0) {
-      return ele.mapped_name;
-    }
-  }
-
-  return name;
-}
-
 bool ReadFromPartition(ZirconBootOps* ops, const char* part, size_t offset, size_t size, void* dst,
                        size_t* read_size) {
   auto gpt_device = FindEfiGptDevice();
@@ -53,7 +31,8 @@ bool ReadFromPartition(ZirconBootOps* ops, const char* part, size_t offset, size
   }
 
   *read_size = size;
-  return gpt_device.value().ReadPartition(MapPartitionName(part), offset, size, dst).is_ok();
+  part = MaybeMapPartitionName(gpt_device.value(), part).data();
+  return gpt_device.value().ReadPartition(part, offset, size, dst).is_ok();
 }
 
 bool WriteToPartition(ZirconBootOps* ops, const char* part, size_t offset, size_t size,
@@ -69,7 +48,8 @@ bool WriteToPartition(ZirconBootOps* ops, const char* part, size_t offset, size_
   }
 
   *write_size = size;
-  return gpt_device.value().WritePartition(MapPartitionName(part), src, offset, size).is_ok();
+  part = MaybeMapPartitionName(gpt_device.value(), part).data();
+  return gpt_device.value().WritePartition(part, src, offset, size).is_ok();
 }
 
 void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity) {
@@ -135,6 +115,7 @@ uint8_t* GetLoadBuffer(ZirconBootOps* ops, size_t* size) {
 
 }  // namespace
 
+// TODO(b/269178761): write unit tests for "default" implementation of zircon boot ops code.
 ZirconBootOps GetZirconBootOps() {
   ZirconBootOps zircon_boot_ops;
   zircon_boot_ops.context = nullptr;
