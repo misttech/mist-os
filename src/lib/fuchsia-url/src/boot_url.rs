@@ -62,6 +62,17 @@ impl BootUrl {
         let () = validate_resource_path(&resource).map_err(ParseError::InvalidResourcePath)?;
         Ok(Self { path, resource: Some(resource) })
     }
+
+    pub fn new_resource_without_variant(
+        path: String,
+        resource: String,
+    ) -> Result<BootUrl, ParseError> {
+        let () = validate_path(&path)?;
+        let (name, _) = crate::parse_path_to_name_and_variant(&path)?;
+
+        let () = validate_resource_path(&resource).map_err(ParseError::InvalidResourcePath)?;
+        Ok(Self { path: format!("/{}", name), resource: Some(resource) })
+    }
 }
 
 impl std::fmt::Display for BootUrl {
@@ -362,5 +373,19 @@ mod tests {
         url_no_resource.resource = None;
         assert_eq!(url_no_resource, url.root_url());
         assert_eq!("fuchsia-boot:///path/to", format!("{}", url.root_url()));
+    }
+
+    #[test]
+    fn test_new_resource_without_variant() {
+        let url =
+            BootUrl::new_resource_without_variant("/name/0".to_string(), "foo/bar".to_string())
+                .unwrap();
+        assert_eq!("/name", url.path());
+        assert_eq!(Some("foo/bar"), url.resource());
+
+        let url = BootUrl::new_resource_without_variant("/name".to_string(), "foo/bar".to_string())
+            .unwrap();
+        assert_eq!("/name", url.path());
+        assert_eq!(Some("foo/bar"), url.resource());
     }
 }

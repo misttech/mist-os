@@ -12,7 +12,9 @@ use {
             },
             package::{
                 is_cf_v1_manifest, is_cf_v2_manifest,
-                reader::{read_package_definition, PackageReader, PackagesFromUpdateReader},
+                reader::{
+                    read_partial_package_definition, PackageReader, PackagesFromUpdateReader,
+                },
             },
             util::types::{
                 ComponentManifest, PackageDefinition, PartialPackageDefinition, ServiceMapping,
@@ -39,7 +41,6 @@ use {
         artifact::{ArtifactReader, FileArtifactReader},
         bootfs::BootfsReader,
         key_value::parse_key_value,
-        url::from_package_name_variant_path,
         zbi::{ZbiReader, ZbiType},
     },
     serde_json::Value,
@@ -474,6 +475,7 @@ impl PackageDataCollector {
                 let url = Url::parse(&url.to_string()).with_context(|| {
                     format!("Failed to convert package URL to standard URL: {}", url)
                 })?;
+
                 components.insert(
                     url.clone(),
                     Component {
@@ -684,6 +686,77 @@ impl PackageDataCollector {
         let url = BootUrl::new_resource("/".to_string(), file_name.to_string())?;
         let url = Url::parse(&url.to_string())
             .with_context(|| format!("Failed to convert boot URL to standard URL: {}", url))?;
+
+        Self::extract_bootfs_data(
+            component_id,
+            service_map,
+            components,
+            manifests,
+            &zbi.bootfs,
+            &url,
+            file_name,
+            file_data,
+        )
+    }
+
+    fn extract_bootfs_packaged_data(
+        component_id: &mut i32,
+        service_map: &mut ServiceMapping,
+        components: &mut HashMap<Url, Component>,
+        manifests: &mut Vec<Manifest>,
+        zbi: &Zbi,
+        package_index: HashMap<String, String>,
+    ) -> Result<()> {
+        for (name_and_variant, merkle) in package_index {
+            let package_path = format!("blob/{}", merkle);
+            let far_cursor = Cursor::new(zbi.bootfs.get(&package_path).ok_or_else(|| {
+                anyhow!("Zbi does not contain meta.far at path: {:?}", package_path)
+            })?);
+            let partial_package_def = read_partial_package_definition(far_cursor)?;
+
+            for (path, cm) in &partial_package_def.cms {
+                let path_str = path.to_str().ok_or_else(|| {
+                    anyhow!("Cannot format component manifest path as string: {:?}", path)
+                })?;
+                match cm {
+                    ComponentManifest::Version2(bytes) => {
+                        let url = BootUrl::new_resource_without_variant(
+                            format!("/{}", name_and_variant),
+                            path_str.to_string(),
+                        )?;
+                        let url = Url::parse(&url.to_string()).with_context(|| {
+                            format!("Failed to convert boot URL to standard URL: {}", url)
+                        })?;
+                        Self::extract_bootfs_data(
+                            component_id,
+                            service_map,
+                            components,
+                            manifests,
+                            &partial_package_def.cvfs,
+                            &url,
+                            path_str,
+                            bytes,
+                        )?;
+                    }
+                    _ => anyhow::bail!("Bootfs only supports V2 components."),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn extract_bootfs_data(
+        component_id: &mut i32,
+        service_map: &mut ServiceMapping,
+        components: &mut HashMap<Url, Component>,
+        manifests: &mut Vec<Manifest>,
+        cvf_source: &HashMap<String, Vec<u8>>,
+        url: &Url,
+        file_name: &str,
+        file_data: &Vec<u8>,
+    ) -> Result<()> {
+        info!(%file_name, "Extracting bootfs manifest");
         let cm_base64 = base64::encode(&file_data);
         if let Ok(cm_decl) = unpersist::<fdecl::Component>(&file_data) {
             if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
@@ -697,7 +770,7 @@ impl PackageDataCollector {
                         .context("getting value source from config schema")?
                     {
                         fdecl::ConfigValueSource::PackagePath(pkg_path) => {
-                            zbi.bootfs.get(pkg_path).cloned()
+                            cvf_source.get(pkg_path).cloned()
                         }
                         other => {
                             anyhow::bail!("Unsupported config value source {:?}.", other);
@@ -763,7 +836,7 @@ impl PackageDataCollector {
                     url.clone(),
                     Component {
                         id: *component_id,
-                        url: url,
+                        url: url.clone(),
                         version: 2,
                         source: ComponentSource::ZbiBootfs,
                     },
@@ -774,32 +847,6 @@ impl PackageDataCollector {
                     uses: cap_uses,
                 });
             }
-        }
-
-        Ok(())
-    }
-
-    fn extract_bootfs_packaged_data(
-        component_id: &mut i32,
-        service_map: &mut ServiceMapping,
-        components: &mut HashMap<Url, Component>,
-        manifests: &mut Vec<Manifest>,
-        zbi: &Zbi,
-        package_index: HashMap<String, String>,
-    ) -> Result<()> {
-        for (name_and_variant, merkle) in package_index {
-            let package_path = format!("blob/{}", merkle);
-            let url = from_package_name_variant_path(name_and_variant)?;
-            let far_cursor = Cursor::new(zbi.bootfs.get(&package_path).unwrap());
-            let package_def = read_package_definition(&url, far_cursor)?;
-            Self::extract_package_data(
-                component_id,
-                service_map,
-                components,
-                manifests,
-                &package_def,
-                &ComponentSource::ZbiBootfs,
-            )?;
         }
 
         Ok(())
