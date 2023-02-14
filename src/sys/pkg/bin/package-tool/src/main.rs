@@ -10,8 +10,9 @@ use {
     anyhow::Result,
     argh::FromArgs,
     package_tool::{
-        cmd_package_build, cmd_repo_create, cmd_repo_publish, PackageBuildCommand,
-        RepoCreateCommand, RepoPublishCommand,
+        cmd_package_archive_create, cmd_package_archive_extract, cmd_package_build,
+        cmd_repo_create, cmd_repo_publish, PackageArchiveCreateCommand,
+        PackageArchiveExtractCommand, PackageBuildCommand, RepoCreateCommand, RepoPublishCommand,
     },
 };
 
@@ -40,7 +41,23 @@ struct PackageCommand {
 #[derive(FromArgs)]
 #[argh(subcommand)]
 enum PackageSubCommands {
+    Archive(PackageArchiveCommand),
     Build(PackageBuildCommand),
+}
+
+/// Package Archive subcommands
+#[derive(FromArgs)]
+#[argh(subcommand, name = "archive")]
+struct PackageArchiveCommand {
+    #[argh(subcommand)]
+    subcommands: PackageArchiveSubCommands,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand)]
+enum PackageArchiveSubCommands {
+    Create(PackageArchiveCreateCommand),
+    Extract(PackageArchiveExtractCommand),
 }
 
 /// Repository subcommands
@@ -63,6 +80,10 @@ async fn main() -> Result<()> {
     let cmd: Command = argh::from_env();
     match cmd.subcommands {
         SubCommands::Package(cmd) => match cmd.subcommands {
+            PackageSubCommands::Archive(cmd) => match cmd.subcommands {
+                PackageArchiveSubCommands::Create(cmd) => cmd_package_archive_create(cmd).await,
+                PackageArchiveSubCommands::Extract(cmd) => cmd_package_archive_extract(cmd).await,
+            },
             PackageSubCommands::Build(cmd) => cmd_package_build(cmd).await,
         },
         SubCommands::Repository(cmd) => match cmd.subcommands {

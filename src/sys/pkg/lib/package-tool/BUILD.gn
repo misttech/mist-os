@@ -4,8 +4,15 @@
 
 import("//build/host.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/host_test_data.gni")
 
 if (is_host) {
+  host_test_data("test_tools") {
+    sources = [ "$host_tools_dir/pm" ]
+    outputs = [ "$root_out_dir/test_data/package-tool/{{source_file_part}}" ]
+    deps = [ "//src/sys/pkg/bin/pm:host($host_toolchain)" ]
+  }
+
   rustc_library("package-tool") {
     version = "0.1.0"
     edition = "2021"
@@ -31,6 +38,7 @@ if (is_host) {
     ]
 
     test_deps = [
+      ":test_tools",
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
       "//src/developer/ffx/lib/pkg:empty-repo-metadata",
       "//src/lib/fuchsia",
@@ -39,11 +47,13 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:pretty_assertions",
+      "//third_party/rust_crates:walkdir",
     ]
 
     sources = [
       "src/args.rs",
       "src/lib.rs",
+      "src/package_archive.rs",
       "src/package_build.rs",
       "src/repo_create.rs",
       "src/repo_publish.rs",

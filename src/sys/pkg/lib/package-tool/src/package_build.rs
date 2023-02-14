@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    crate::args::PackageBuildCommand,
+    crate::{
+        args::PackageBuildCommand, to_writer_json_pretty, BLOBS_JSON_NAME, META_FAR_MERKLE_NAME,
+        PACKAGE_MANIFEST_NAME,
+    },
     anyhow::{bail, Context as _, Result},
     fuchsia_pkg::{
         PackageBuildManifest, PackageBuilder, SubpackagesBuildManifest,
         SubpackagesBuildManifestEntry, SubpackagesBuildManifestEntryKind,
     },
-    serde::Serialize,
     std::{
         collections::BTreeSet,
         fs::{create_dir_all, File},
@@ -19,19 +21,8 @@ use {
 };
 
 const META_FAR_NAME: &str = "meta.far";
-const META_FAR_MERKLE_NAME: &str = "meta.far.merkle";
 const META_FAR_DEPFILE_NAME: &str = "meta.far.d";
-const PACKAGE_MANIFEST_NAME: &str = "package_manifest.json";
-const BLOBS_JSON_NAME: &str = "blobs.json";
 const BLOBS_MANIFEST_NAME: &str = "blobs.manifest";
-
-fn to_writer_json_pretty<S: Serialize>(writer: impl Write, value: S) -> Result<()> {
-    let mut ser = serde_json::ser::Serializer::with_formatter(
-        BufWriter::new(writer),
-        serde_json::ser::PrettyFormatter::with_indent(b"    "),
-    );
-    Ok(value.serialize(&mut ser)?)
-}
 
 pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     let package_build_manifest = File::open(&cmd.package_build_manifest_path)

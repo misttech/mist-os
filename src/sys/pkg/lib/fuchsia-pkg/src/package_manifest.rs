@@ -61,6 +61,8 @@ impl PackageManifest {
         }
     }
 
+    /// Write a package archive into the `out` file. The source files are relative to the `root_dir`
+    /// directory.
     pub async fn archive(
         self,
         root_dir: impl AsRef<Path>,
@@ -106,6 +108,14 @@ impl PackageManifest {
     pub fn repository(&self) -> Option<&str> {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => manifest.repository.as_deref(),
+        }
+    }
+
+    pub fn set_repository(&mut self, repository: Option<String>) {
+        match &mut self.0 {
+            VersionedPackageManifest::Version1(manifest) => {
+                manifest.repository = repository;
+            }
         }
     }
 

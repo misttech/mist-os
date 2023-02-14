@@ -10,6 +10,56 @@ use {
     std::path::PathBuf,
 };
 
+#[derive(Eq, FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "create",
+    description = "create a package archive from a package_manifest.json"
+)]
+pub struct PackageArchiveCreateCommand {
+    #[argh(option, short = 'o', description = "output package archive")]
+    pub out: PathBuf,
+
+    #[argh(
+        option,
+        short = 'r',
+        description = "root directory for paths in package_manifest.json",
+        default = "Utf8PathBuf::from(\".\")"
+    )]
+    pub root_dir: Utf8PathBuf,
+
+    #[argh(positional, description = "package_manifest.json to archive")]
+    pub package_manifest: Utf8PathBuf,
+}
+
+#[derive(Eq, FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "extract",
+    description = "extract  the contents of <far_path> inside the Fuchia package archive file to the output directory"
+)]
+pub struct PackageArchiveExtractCommand {
+    #[argh(
+        option,
+        short = 'o',
+        description = "output directory for writing the extracted files. Defaults to the current directory.",
+        default = "PathBuf::from(\"./\")"
+    )]
+    pub out: PathBuf,
+
+    #[argh(option, description = "repository of the package")]
+    pub repository: Option<String>,
+
+    #[argh(switch, description = "produce a meta.far.merkle file")]
+    pub meta_far_merkle: bool,
+
+    #[argh(switch, description = "produce a blobs.json file")]
+    pub blobs_json: bool,
+
+    #[argh(positional, description = "package archive")]
+    pub archive: PathBuf,
+}
+
 /// Builds a package.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "build")]
