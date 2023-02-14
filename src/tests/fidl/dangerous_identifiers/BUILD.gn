@@ -50,6 +50,7 @@ fidl_library_prefix = "fidl.test.dangerous"
 #  fidl_library: the fidl library name
 #  fidl_target: the target for the FIDL library
 #  hlcpp_target: the target for the HLCPP test binary
+#  cpp_target: the target for the CPP test binary
 #  rust_target: the target for the Rust test binary
 dangerous_tests = []
 foreach(use, uses) {
@@ -63,6 +64,7 @@ foreach(use, uses) {
           fidl_library = "${fidl_library_prefix}.${use}.${style}${shard}"
           fidl_target = fidl_library
           hlcpp_target = "hlcpp_${use}_${style}_${shard}"
+          cpp_target = "cpp_${use}_${style}_${shard}"
           dart_target = "dart_${use}_${style}_${shard}"
 
           # Deny list of libraries we can compile in Rust.
@@ -158,6 +160,22 @@ foreach(test, dangerous_tests) {
   hlcpp_targets += [ ":${test.hlcpp_target}" ]
 }
 
+# Define all C++ targets
+cpp_targets = []
+foreach(test, dangerous_tests) {
+  executable(test.cpp_target) {
+    output_dir = target_out_dir
+    sources = [ "main.cc" ]
+    header_path = "fidl/" + test.fidl_library + "/cpp/fidl.h"
+    cflags_cc = [
+      "-include",
+      header_path,
+    ]
+    deps = [ ":${test.fidl_target}_cpp" ]
+  }
+  cpp_targets += [ ":${test.cpp_target}" ]
+}
+
 # Define all Rust targets
 rust_targets = []
 foreach(test, dangerous_tests) {
@@ -180,5 +198,6 @@ foreach(test, dangerous_tests) {
 
 group("tests") {
   testonly = true
-  deps = fidl_targets + hlcpp_targets + rust_targets + dart_targets
+  deps =
+      fidl_targets + hlcpp_targets + cpp_targets + rust_targets + dart_targets
 }
