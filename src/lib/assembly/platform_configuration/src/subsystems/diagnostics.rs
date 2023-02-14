@@ -67,6 +67,13 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             .field("serve_unattributed_logs", false)?;
         // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
 
+        let exception_handler_available =
+            !matches!(context.feature_set_level, FeatureSupportLevel::Bringup);
+        builder
+            .package("svchost")
+            .component("meta/svchost.cm")?
+            .field("exception_handler_available", exception_handler_available)?;
+
         Ok(())
     }
 }

@@ -30,7 +30,7 @@
 #include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
 
-#include "src/bringup/bin/svchost/args.h"
+#include "src/bringup/bin/svchost/svchost_config.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 #include "sysmem.h"
@@ -178,26 +178,12 @@ int main(int argc, char** argv) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
   svc::Outgoing outgoing(dispatcher);
 
-  // Parse boot arguments.
-  zx::result boot_args = component::ConnectAt<fuchsia_boot::Arguments>(caller.directory());
-  if (boot_args.is_error()) {
-    fprintf(stderr, "svchost: unable to connect to fuchsia.boot.Arguments: %s\n",
-            boot_args.status_string());
-    return 1;
-  }
-  svchost::Arguments args;
-  zx_status_t status = svchost::ParseArgs(boot_args.value(), &args);
-  if (status != ZX_OK) {
-    fprintf(stderr, "svchost: unable to read args: %s", zx_status_get_string(status));
-    return 1;
-  }
-
   // Get the root job.
   zx::job root_job;
   {
     auto res = GetRootJob(caller.directory());
     if (!res.is_ok()) {
-      fprintf(stderr, "svchost: error: Failed to get root job: %s\n", zx_status_get_string(status));
+      fprintf(stderr, "svchost: error: Failed to get root job: %s\n", res.status_string());
       return 1;
     }
     root_job = std::move(res.value());
@@ -208,14 +194,13 @@ int main(int argc, char** argv) {
   {
     auto res = GetRootResource(caller.directory());
     if (!res.is_ok()) {
-      fprintf(stderr, "svchost: error: Failed to get root resource: %s\n",
-              zx_status_get_string(status));
+      fprintf(stderr, "svchost: error: Failed to get root resource: %s\n", res.status_string());
       return 1;
     }
     root_resource = std::move(res.value());
   }
 
-  status = outgoing.ServeFromStartupInfo();
+  zx_status_t status = outgoing.ServeFromStartupInfo();
   if (status != ZX_OK) {
     fprintf(stderr, "svchost: error: Failed to serve outgoing directory: %d (%s).\n", status,
             zx_status_get_string(status));
@@ -255,10 +240,12 @@ int main(int argc, char** argv) {
     }
   }
 
+  auto config = svchost_config::Config::TakeFromStartupHandle();
+
   thrd_t thread;
-  status =
-      start_crashsvc(std::move(root_job),
-                     args.require_system ? caller.borrow_channel() : ZX_HANDLE_INVALID, &thread);
+  status = start_crashsvc(
+      std::move(root_job),
+      config.exception_handler_available() ? caller.borrow_channel() : ZX_HANDLE_INVALID, &thread);
   if (status != ZX_OK) {
     // The system can still function without crashsvc, log the error but
     // keep going.

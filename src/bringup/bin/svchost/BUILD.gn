@@ -40,20 +40,23 @@ zx_library("crashsvc") {
   configs += [ "//build/config:all_source" ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "svchost"
+  manifest = "meta/svchost.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("svchost_config") {
+  cm_label = ":manifest"
+}
+
 executable("svchost") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   sources = [
-    "args.cc",
     "svchost.cc",
     "sysmem.cc",
   ]
   deps = [
     ":crashsvc",
+    ":svchost_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
@@ -78,8 +81,7 @@ executable("svchost") {
 }
 
 fuchsia_component("component") {
-  component_name = "svchost"
-  manifest = "meta/svchost.cml"
+  cm_label = ":manifest"
   deps = [ ":svchost" ]
 }
 
@@ -89,12 +91,6 @@ fuchsia_package("pkg") {
 }
 
 test("crashsvc-test") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   output_name = "crashsvc-test"
   sources = [ "crashsvc-test.cc" ]
   deps = [

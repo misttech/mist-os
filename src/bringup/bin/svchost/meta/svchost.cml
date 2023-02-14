@@ -32,7 +32,6 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.exception.Handler",
@@ -54,4 +53,7 @@
             from: "self",
         },
     ],
+    config: {
+        exception_handler_available: { type: "bool" },
+    },
 }
