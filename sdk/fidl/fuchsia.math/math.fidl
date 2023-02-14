@@ -177,6 +177,33 @@ type RectF = struct {
     height float32;
 };
 
+/// An integral, rectangular, axis-aligned region in a 2D cartesian
+/// space, with unsigned location and distance fields.
+///
+/// This type does not specify units. Protocols that use this type should
+/// specify the characteristics of the vector space, including orientation and
+/// units.
+@available(added=HEAD)
+type RectU = struct {
+    /// The location of the origin of the rectangle in the x-axis.
+    x uint32;
+
+    /// The location of the origin of the rectangle in the y-axis.
+    y uint32;
+
+    /// The distance along the x-axis.
+    ///
+    /// The region includes x values starting at `x` and increasing along the
+    /// x-axis.
+    width uint32;
+
+    /// The distance along the y-axis.
+    ///
+    /// The region includes y values starting at `y` and increasing along the
+    /// y-axis.
+    height uint32;
+};
+
 /// A floating point rounded rectangle with the custom radii for all four
 /// corners.
 ///

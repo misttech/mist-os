@@ -13,6 +13,8 @@ library fuchsia.images2;
 /// This type does not specify units. Protocols that use this type should
 /// specify the characteristics of the vector space, including orientation and
 /// units.
+//
+// TODO: Replace usage of this struct with fuchsia.math.RectU.
 type RectU = struct {
     /// The location of the origin of the rectangle in the x-axis.
     x uint32;
