@@ -16,6 +16,8 @@ Currently, the only automated use for metadata files is for automatically adding
 reviewers to CLs and emailing notifications when CLs are added/submitted. These
 are described in the [Presubmits](#presubmits) section.
 
+Metadata files only apply to first-party code.
+
 ## Format
 
 Metadata files are:
@@ -138,3 +140,7 @@ is a change to any file in the entire repository. Reviewers in
 well as the child directory `/foo/bar/baz`. Reviewers in
 `/foo/bar/baz/METADATA.textproto` only apply to files edited in the
 `/foo/bar/baz/` directory.
+
+## Relationship to other files
+
+Metadata files have no relationship to other files, such as [`OWNERS`](owners.md) (used to specify the owners of directories) or [`README.fuchsia`](third-party-metadata.md) (used for defining metadata for third-party code).
