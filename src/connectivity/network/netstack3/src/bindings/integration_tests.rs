@@ -21,11 +21,15 @@ use net_types::{
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    ip::types::{AddableEntry, AddableEntryEither},
+    ip::{
+        device::slaac::STABLE_IID_SECRET_KEY_BYTES,
+        types::{AddableEntry, AddableEntryEither},
+    },
     Ctx,
 };
 
 use crate::bindings::{
+    devices::Devices,
     util::{ConversionContext as _, IntoFidl as _, TryFromFidlWithContext as _},
     BindingsNonSyncCtxImpl, RequestStreamExt as _, LOOPBACK_NAME,
 };
@@ -256,6 +260,7 @@ pub(crate) struct TestSetup {
 
 impl TestSetup {
     /// Gets the [`TestStack`] at index `i`.
+    #[track_caller]
     pub(crate) fn get(&mut self, i: usize) -> &mut TestStack {
         &mut self.stacks[i]
     }
@@ -765,4 +770,71 @@ async fn test_add_remote_routes() {
         stack.add_forwarding_entry(&mut fwd_entry).await.unwrap(),
         Err(fidl_net_stack::Error::AlreadyExists)
     );
+}
+
+async fn get_slaac_secret<'s>(
+    test_stack: &'s mut TestStack,
+    if_id: u64,
+) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
+    test_stack
+        .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+            let mut secret = None;
+            let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
+            netstack3_core::device::update_ipv6_configuration(
+                sync_ctx,
+                non_sync_ctx,
+                &device,
+                |config| {
+                    secret = config
+                        .slaac_config
+                        .temporary_address_configuration
+                        .map(|t| t.secret_key.clone())
+                },
+            );
+            secret
+        })
+        .await
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_ipv6_slaac_secret_stable() {
+    const ENDPOINT: &'static str = "endpoint";
+
+    let mut t = TestSetupBuilder::new()
+        .add_named_endpoint(ENDPOINT)
+        .add_empty_stack()
+        .build()
+        .await
+        .unwrap();
+    let (endpoint, mut port_id) = t.get_endpoint(ENDPOINT).await.expect("has endpoint");
+
+    let test_stack = t.get(0);
+    let installer = test_stack.connect_interfaces_installer();
+    let (device_control, server_end) = fidl::endpoints::create_proxy().expect("new proxy");
+    installer.install_device(endpoint, server_end).expect("install device");
+
+    let (interface_control, server_end) = fidl::endpoints::create_proxy().unwrap();
+    device_control
+        .create_interface(
+            &mut port_id,
+            server_end,
+            fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+        )
+        .expect("create interface");
+
+    let if_id = interface_control.get_id().await.unwrap();
+    let installed_secret =
+        get_slaac_secret(test_stack, if_id).await.expect("has temporary address secret");
+
+    // Bringing the interface up does not change the secret.
+    assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
+    let enabled_secret =
+        get_slaac_secret(test_stack, if_id).await.expect("has temporary address secret");
+    assert_eq!(enabled_secret, installed_secret);
+
+    // Bringing the interface down and up does not change the secret.
+    assert_eq!(true, interface_control.disable().await.expect("FIDL call").expect("disabled"));
+    assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
+
+    assert_eq!(get_slaac_secret(test_stack, if_id).await, Some(enabled_secret));
 }

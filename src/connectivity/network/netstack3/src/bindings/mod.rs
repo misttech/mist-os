@@ -45,7 +45,7 @@ use futures::{
 use log::{debug, error};
 use packet::{BufferMut, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
-use rand::{rngs::OsRng, Rng as _};
+use rand::rngs::OsRng;
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{BindingId, CommonInfo, DeviceSpecificInfo, Devices, LoopbackInfo, NetdeviceInfo};
@@ -65,9 +65,7 @@ use netstack3_core::{
     handle_timer,
     ip::{
         device::{
-            slaac::{
-                SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
-            },
+            slaac::SlaacConfiguration,
             state::{IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6DeviceConfiguration},
             IpDeviceEvent, RemovedReason,
         },
@@ -552,19 +550,19 @@ fn set_interface_enabled(
     let device = non_sync_ctx.devices.get_device_mut(id).ok_or(fidl_net_stack::Error::NotFound)?;
     let core_id = device.core_id().clone();
 
-    let (dev_enabled, ndp_and_slaac_enabled) = match device.info_mut() {
+    let dev_enabled = match device.info_mut() {
         DeviceSpecificInfo::Netdevice(NetdeviceInfo {
             common_info:
                 CommonInfo { admin_enabled, mtu: _, events: _, name: _, control_hook: _, addresses: _ },
             handler: _,
             mac: _,
             phy_up,
-        }) => (*admin_enabled && *phy_up, true),
+        }) => *admin_enabled && *phy_up,
         DeviceSpecificInfo::Loopback(LoopbackInfo {
             common_info:
                 CommonInfo { admin_enabled, mtu: _, events: _, name: _, control_hook: _, addresses: _ },
             rx_notifier: _,
-        }) => (*admin_enabled, false),
+        }) => *admin_enabled,
     };
 
     if should_enable {
@@ -583,17 +581,8 @@ fn set_interface_enabled(
     netstack3_core::device::update_ipv4_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
         config.ip_config.ip_enabled = should_enable;
     });
-    let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-    non_sync_ctx.rng_mut().fill(&mut secret_key);
     netstack3_core::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
         config.ip_config.ip_enabled = should_enable;
-        if ndp_and_slaac_enabled {
-            config.slaac_config.enable_stable_addresses = true;
-            config.slaac_config.temporary_address_configuration =
-                Some(TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key));
-            config.max_router_solicitations =
-                Some(Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS);
-        }
     });
 
     Ok(())

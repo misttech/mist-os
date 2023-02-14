@@ -14,7 +14,18 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
-use netstack3_core::{device::ethernet, Ctx};
+use netstack3_core::{
+    context::RngContext as _,
+    device::ethernet,
+    ip::device::{
+        slaac::{
+            SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
+        },
+        state::{IpDeviceConfiguration, Ipv6DeviceConfiguration},
+    },
+    Ctx,
+};
+use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, StackTime,
@@ -255,6 +266,30 @@ impl DeviceHandler {
             non_sync_ctx,
             mac_addr,
             max_frame_size,
+        );
+        // TODO(https://fxbug.dev/69644): Use a different secret key (not this
+        // one) to generate stable opaque interface identifiers.
+        let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
+        non_sync_ctx.rng_mut().fill(&mut secret_key);
+        netstack3_core::device::update_ipv6_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &core_id,
+            |config| {
+                *config = Ipv6DeviceConfiguration {
+                    dad_transmits: None,
+                    max_router_solicitations: Some(
+                        Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
+                    ),
+                    slaac_config: SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: Some(
+                            TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
+                        ),
+                    },
+                    ip_config: IpDeviceConfiguration { ip_enabled: false, gmp_enabled: false },
+                };
+            },
         );
         state_entry.insert(core_id.clone());
         let make_info = |id| {
