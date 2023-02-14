@@ -101,3 +101,4 @@ board_is_emu = false
 board_is_phys = true
 
 images_config_label = "//boards/images:vim3"
+zedboot_images_config_label = "//boards/images:zedboot_vim3"

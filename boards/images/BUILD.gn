@@ -5,6 +5,10 @@
 import("//build/assembly/generated_images_config.gni")
 import("//build/images/vboot/vboot.gni")
 
+#################################
+# Fuchsia images configurations #
+#################################
+
 _default_zbi = {
   zbi = {
     name = "fuchsia"
@@ -17,6 +21,14 @@ _default_vbmeta = {
     key = "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
     key_metadata =
         "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
+  }
+}
+
+_vim3_vbmeta = {
+  vbmeta = {
+    key = "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
+    key_metadata =
+        "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
   }
 }
 
@@ -80,13 +92,8 @@ generated_images_config("qemu-arm64") {
 
 generated_images_config("av400") {
   forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
   forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  vbmeta.key =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-  vbmeta.key_metadata =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
 
   fvm.emmc = {
     compress = true
@@ -96,13 +103,8 @@ generated_images_config("av400") {
 
 generated_images_config("buckeye") {
   forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
   forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  vbmeta.key =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-  vbmeta.key_metadata =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
 
   fvm.emmc = {
     compress = true
@@ -112,13 +114,8 @@ generated_images_config("buckeye") {
 
 generated_images_config("vim3") {
   forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
   forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  vbmeta.key =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-  vbmeta.key_metadata =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
 
   fvm.emmc = {
     compress = true
@@ -128,13 +125,8 @@ generated_images_config("vim3") {
 
 generated_images_config("clover") {
   forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
   forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  vbmeta.key =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-  vbmeta.key_metadata =
-      "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
 
   fvm.nand = {
     compress = false
@@ -170,8 +162,48 @@ generated_images_config("imx8mmevk") {
   deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
 }
 
+#################################
+# zedboot images configurations #
+#################################
+
+_default_zedboot_zbi = {
+  zbi = {
+    name = "zedboot"
+    compression = "zstd"
+  }
+}
+
+generated_images_config("zedboot_default") {
+  forward_variables_from(_default_zedboot_zbi, "*")
+  forward_variables_from(_default_vbmeta, "*")
+}
+
+generated_images_config("zedboot_vim3") {
+  forward_variables_from(_default_zedboot_zbi, "*")
+  forward_variables_from(_vim3_vbmeta, "*")
+}
+
+generated_images_config("zedboot_imx8mmevk") {
+  forward_variables_from(_default_zedboot_zbi, "*")
+  zbi.signing_script =
+      "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh"
+  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
+}
+
+generated_images_config("zedboot_chromebook-x64") {
+  forward_variables_from(_default_zedboot_zbi, "*")
+  forward_variables_from(_default_vbmeta, "*")
+  zbi.signing_script = vboot_action.script
+  zbi.signing_args = vboot_action.args
+}
+
+generated_images_config("zedboot_qemu") {
+  forward_variables_from(_default_zedboot_zbi, "*")
+}
+
 group("images") {
   public_deps = [
+    # Fuchsia images configs
     ":arm64",
     ":av400",
     ":buckeye",
@@ -182,5 +214,12 @@ group("images") {
     ":qemu-x64",
     ":vim3",
     ":x64",
+
+    # zedboot images configs
+    ":zedboot_chromebook-x64",
+    ":zedboot_default",
+    ":zedboot_imx8mmevk",
+    ":zedboot_qemu",
+    ":zedboot_vim3",
   ]
 }

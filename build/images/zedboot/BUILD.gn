@@ -24,6 +24,10 @@ assembled_system("zedboot_assembly") {
   fshost_config = board_zedboot_fshost_config
   allow_eng_platform_bundle_use = true
 
+  if (zedboot_images_config_label != false) {
+    assembly_images_config_label = zedboot_images_config_label
+  }
+
   base_packages = []
 
   devmgr_config = [
