@@ -50,7 +50,7 @@ class FileApi : public FileApiInterface {
                        fidl::ClientEnd<fuchsia_sysinfo::SysInfo>(),
                    PaverInterface* paver = Paver::Get());
 
-  ssize_t OpenRead(const char* filename, zx::duration timeout);
+  ssize_t OpenRead(const char* filename, zx::duration timeout) final;
   tftp_status OpenWrite(const char* filename, size_t size, zx::duration timeout) final;
   tftp_status Read(void* data, size_t* length, off_t offset) final;
   tftp_status Write(const void* data, size_t* length, off_t offset) final;

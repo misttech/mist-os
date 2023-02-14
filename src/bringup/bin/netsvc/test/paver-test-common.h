@@ -125,17 +125,12 @@ class PaverTest : public zxtest::Test {
 
   ~PaverTest() override {
     // Need to make sure paver thread exits.
-    Wait();
+    paver_.exit_code().wait();
     if (ramdisk_ != nullptr) {
       ramdisk_destroy(ramdisk_);
       ramdisk_ = nullptr;
     }
     loop_.Shutdown();
-  }
-
-  void Wait() {
-    while (paver_.InProgress())
-      continue;
   }
 
   void SpawnBlockDevice() {

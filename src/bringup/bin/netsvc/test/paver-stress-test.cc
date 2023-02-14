@@ -43,8 +43,7 @@ TEST_F(PaverTest, WriteFvmManyLargeWrites) {
   }
   fake_svc_.fake_paver().WaitForWritten(payload_size + 1);
   paver_.Close();
-  Wait();
-  ASSERT_OK(paver_.exit_code());
+  ASSERT_OK(paver_.exit_code().get());
   ASSERT_EQ(fake_svc_.fake_paver().GetCommandTrace(),
             std::vector<paver_test::Command>{paver_test::Command::kWriteVolumes});
 }

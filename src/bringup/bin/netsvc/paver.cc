@@ -44,9 +44,12 @@ Paver* Paver::Get() {
   return instance_;
 }
 
-bool Paver::InProgress() { return in_progress_.load(); }
-zx_status_t Paver::exit_code() { return exit_code_.load(); }
-void Paver::reset_exit_code() { exit_code_.store(ZX_OK); }
+std::shared_future<zx_status_t> Paver::exit_code() {
+  if (exit_code_future_.has_value()) {
+    return exit_code_future_.value();
+  }
+  return exit_code_future_.emplace(exit_code_.get_future());
+}
 
 int Paver::StreamBuffer() {
   zx::time last_reported = zx::clock::get_monotonic();
@@ -62,17 +65,15 @@ int Paver::StreamBuffer() {
     while (write_offset == read_offset) {
       // Wait for more data to be written -- we are allowed up to 3 tftp timeouts before
       // a connection is dropped, so we should wait at least that long before giving up.
-      auto status = sync_completion_wait(&data_ready_, timeout_.get());
-      if (status != ZX_OK) {
+      if (zx_status_t status = sync_completion_wait(&data_ready_, timeout_.get());
+          status != ZX_OK) {
         printf("netsvc: 1 timed out while waiting for data in paver-copy thread\n");
-        exit_code_.store(status);
         result = TFTP_ERR_TIMED_OUT;
-        return ZX_ERR_TIMED_OUT;
+        return status;
       }
       sync_completion_reset(&data_ready_);
       if (aborted_) {
         printf("netsvc: 1 paver aborted, exiting copy thread\n");
-        exit_code_.store(ZX_ERR_CANCELED);
         result = TFTP_ERR_BAD_STATE;
         return ZX_ERR_CANCELED;
       }
@@ -116,29 +117,24 @@ int Paver::StreamBuffer() {
     if (result != 0) {
       printf("netsvc: copy exited prematurely (%d): expect paver errors\n", result);
     }
-
-    in_progress_.store(false);
   });
 
   zx::result data_sink = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
   if (data_sink.is_error()) {
-    fprintf(stderr, "netsvc: unable to create channel\n");
-    exit_code_.store(data_sink.status_value());
-    return 0;
+    fprintf(stderr, "netsvc: unable to create channel: %s\n", data_sink.status_string());
+    return data_sink.status_value();
   }
 
   fidl::Status res = paver_svc_->FindDataSink(std::move(data_sink->server));
   if (!res.ok()) {
-    fprintf(stderr, "netsvc: unable to find data sink\n");
-    exit_code_.store(res.status());
-    return 0;
+    fprintf(stderr, "netsvc: unable to find data sink: %s\n", res.FormatDescription().c_str());
+    return res.status();
   }
 
   zx::result payload_stream = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
   if (payload_stream.is_error()) {
-    fprintf(stderr, "netsvc: unable to create channel\n");
-    exit_code_.store(payload_stream.status_value());
-    return 0;
+    fprintf(stderr, "netsvc: unable to create channel: %s\n", payload_stream.status_string());
+    return payload_stream.status_value();
   }
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -150,13 +146,11 @@ int Paver::StreamBuffer() {
       fidl::WireCall(data_sink->client)->WriteVolumes(std::move(payload_stream->client));
   zx_status_t status = res2.ok() ? res2.value().status : res2.status();
 
-  exit_code_.store(status);
-
   // Shutdown the loop. Destructor ordering will destroy the streamer first, so
   // we must force the loop to stop before then.
   loop.Shutdown();
   loop.JoinThreads();
-  return 0;
+  return status;
 }
 
 namespace {
@@ -166,19 +160,20 @@ using WriteFirmwareResult = fidl::WireResult<fuchsia_paver::DataSink::WriteFirmw
 zx_status_t ProcessWriteFirmwareResult(const WriteFirmwareResult& res, const char* firmware_type) {
   if (!res.ok()) {
     return res.status();
-  } else if (res.value().result.is_status()) {
+  }
+  if (res.value().result.is_status()) {
     return res.value().result.status();
-  } else if (res.value().result.is_unsupported()) {
+  }
+  if (res.value().result.is_unsupported()) {
     // Log a message but just skip this, we want to keep going so that we
     // can add new firmware types in the future without breaking older
     // paver versions.
     printf("netsvc: skipping unsupported firmware type '%s'\n", firmware_type);
     return ZX_OK;
-  } else {
-    // We must have added another union field but forgot to update this code.
-    fprintf(stderr, "netsvc: unknown WriteFirmware result\n");
-    return ZX_ERR_INTERNAL;
   }
+  // We must have added another union field but forgot to update this code.
+  fprintf(stderr, "netsvc: unknown WriteFirmware result\n");
+  return ZX_ERR_INTERNAL;
 }
 
 }  // namespace
@@ -187,16 +182,14 @@ zx_status_t Paver::WriteABImage(fidl::WireSyncClient<fuchsia_paver::DataSink> da
                                 fuchsia_mem::wire::Buffer buffer) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::BootManager>();
   if (endpoints.is_error()) {
-    fprintf(stderr, "netsvc: unable to create channel\n");
-    exit_code_.store(endpoints.status_value());
-    return 0;
+    fprintf(stderr, "netsvc: unable to create channel: %s\n", endpoints.status_string());
+    return endpoints.status_value();
   }
 
   fidl::Status res = paver_svc_->FindBootManager(std::move(endpoints->server));
   if (!res.ok()) {
-    fprintf(stderr, "netsvc: unable to find boot manager\n");
-    exit_code_.store(res.status());
-    return 0;
+    fprintf(stderr, "netsvc: unable to find boot manager: %s\n", res.FormatDescription().c_str());
+    return res.status();
   }
   fidl::WireSyncClient<fuchsia_paver::BootManager> boot_manager =
       fidl::WireSyncClient(std::move(endpoints->client));
@@ -317,7 +310,8 @@ zx_status_t Paver::ClearSysconfig() {
     // consider it as not supported.
     fprintf(stderr, "netsvc: sysconfig is not supported\n");
     return ZX_OK;
-  } else if (wipe_status != ZX_OK) {
+  }
+  if (wipe_status != ZX_OK) {
     fprintf(stderr, "netsvc: Failed to wipe sysconfig partition.\n");
     return wipe_status;
   }
@@ -381,15 +375,13 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
 
 zx_status_t Paver::InitPartitionTables(fuchsia_mem::wire::Buffer buffer) {
   fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink;
-  auto status = OpenDataSink(std::move(buffer), &data_sink);
-  if (status != ZX_OK) {
+  if (zx_status_t status = OpenDataSink(std::move(buffer), &data_sink); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to open data sink.\n");
     return status;
   }
 
   auto result = data_sink->InitializePartitionTables();
-  status = result.ok() ? result.value().status : result.status();
-  if (status != ZX_OK) {
+  if (zx_status_t status = result.ok() ? result.value().status : result.status(); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to initialize partition tables.\n");
     return status;
   }
@@ -398,22 +390,20 @@ zx_status_t Paver::InitPartitionTables(fuchsia_mem::wire::Buffer buffer) {
 
 zx_status_t Paver::WipePartitionTables(fuchsia_mem::wire::Buffer buffer) {
   fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink;
-  auto status = OpenDataSink(std::move(buffer), &data_sink);
-  if (status != ZX_OK) {
+  if (zx_status_t status = OpenDataSink(std::move(buffer), &data_sink); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to open data sink.\n");
     return status;
   }
 
   auto result = data_sink->WipePartitionTables();
-  status = result.ok() ? result.value().status : result.status();
-  if (status != ZX_OK) {
+  if (zx_status_t status = result.ok() ? result.value().status : result.status(); status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to wipe partition tables.\n");
     return status;
   }
   return ZX_OK;
 }
 
-int Paver::MonitorBuffer() {
+zx_status_t Paver::MonitorBuffer() {
   int result = TFTP_NO_ERROR;
 
   auto cleanup = fit::defer([this, &result]() {
@@ -424,8 +414,6 @@ int Paver::MonitorBuffer() {
     if (result != 0) {
       printf("netsvc: copy exited prematurely (%d): expect paver errors\n", result);
     }
-
-    in_progress_.store(false);
   });
 
   size_t write_ndx = 0;
@@ -435,30 +423,25 @@ int Paver::MonitorBuffer() {
     auto status = sync_completion_wait(&data_ready_, timeout_.get());
     if (status != ZX_OK) {
       printf("netsvc: 2 timed out while waiting for data in paver-copy thread\n");
-      exit_code_.store(status);
       result = TFTP_ERR_TIMED_OUT;
-      return result;
+      return status;
     }
     sync_completion_reset(&data_ready_);
     if (aborted_) {
       printf("netsvc: 2 paver aborted, exiting copy thread\n");
-      exit_code_.store(ZX_ERR_CANCELED);
       result = TFTP_ERR_BAD_STATE;
-      return result;
+      return ZX_ERR_CANCELED;
     }
     write_ndx = write_offset_.load();
   } while (write_ndx < size_);
 
   zx::vmo dup;
-  auto status = buffer_mapper_.vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-  if (status != ZX_OK) {
-    exit_code_.store(status);
-    return 0;
+  if (zx_status_t status = buffer_mapper_.vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+      status != ZX_OK) {
+    return status;
   }
-  status = dup.set_prop_content_size(buffer_mapper_.size());
-  if (status != ZX_OK) {
-    exit_code_.store(status);
-    return 0;
+  if (zx_status_t status = dup.set_prop_content_size(buffer_mapper_.size()); status != ZX_OK) {
+    return status;
   }
 
   fuchsia_mem::wire::Buffer buffer = {
@@ -470,29 +453,23 @@ int Paver::MonitorBuffer() {
   // management commands.
   switch (command_) {
     case Command::kInitPartitionTables:
-      status = InitPartitionTables(std::move(buffer));
-      exit_code_.store(status);
-      return 0;
+      return InitPartitionTables(std::move(buffer));
     case Command::kWipePartitionTables:
-      status = WipePartitionTables(std::move(buffer));
-      exit_code_.store(status);
-      return 0;
+      return WipePartitionTables(std::move(buffer));
     default:
       break;
   };
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
   if (endpoints.is_error()) {
-    fprintf(stderr, "netsvc: unable to create channel\n");
-    exit_code_.store(endpoints.status_value());
-    return 0;
+    fprintf(stderr, "netsvc: unable to create channel: %s\n", endpoints.status_string());
+    return endpoints.status_value();
   }
 
   fidl::Status res = paver_svc_->FindDataSink(std::move(endpoints->server));
   if (!res.ok()) {
-    fprintf(stderr, "netsvc: unable to find data sink\n");
-    exit_code_.store(res.status());
-    return 0;
+    fprintf(stderr, "netsvc: unable to find data sink: %s\n", res.FormatDescription().c_str());
+    return res.status();
   }
   fidl::WireSyncClient data_sink{std::move(endpoints->client)};
 
@@ -501,22 +478,16 @@ int Paver::MonitorBuffer() {
     case Command::kDataFile: {
       auto res = fshost_admin_svc_->WriteDataFile(fidl::StringView::FromExternal(path_),
                                                   std::move(buffer.vmo));
-      status = res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status();
-      break;
+      return (res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status());
     }
     case Command::kFirmware:
       [[fallthrough]];
     case Command::kAsset:
-      status = WriteABImage(std::move(data_sink), std::move(buffer));
-      break;
+      return WriteABImage(std::move(data_sink), std::move(buffer));
     default:
       result = TFTP_ERR_INTERNAL;
-      status = ZX_ERR_INTERNAL;
-      break;
+      return ZX_ERR_INTERNAL;
   }
-  exit_code_.store(status);
-
-  return 0;
 }
 
 namespace {
@@ -678,8 +649,9 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
 
   buffer_refs_.store(kBufferRefWorker | kBufferRefApi);
   write_offset_.store(0ul);
-  exit_code_.store(0);
-  in_progress_.store(true);
+  exit_code_future_.reset();
+  exit_code_ = {};
+
   // Use a fixed multiplier on requested timeout based on empirical tests for
   // paving stability.
   timeout_ = timeout * 5;
@@ -687,15 +659,10 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
   aborted_ = false;
   sync_completion_reset(&data_ready_);
 
-  auto thread_fn = command_ == Command::kFvm
-                       ? [](void* arg) { return static_cast<Paver*>(arg)->StreamBuffer(); }
-                       : [](void* arg) { return static_cast<Paver*>(arg)->MonitorBuffer(); };
-  if (thrd_create(&buf_thrd_, thread_fn, this) != thrd_success) {
-    fprintf(stderr, "netsvc: unable to launch buffer stream/monitor thread\n");
-    status = ZX_ERR_NO_RESOURCES;
-    return status;
-  }
-  thrd_detach(buf_thrd_);
+  threads_.emplace_back([this]() {
+    exit_code_.set_value_at_thread_exit(command_ == Command::kFvm ? StreamBuffer()
+                                                                  : MonitorBuffer());
+  });
   svc_cleanup.cancel();
   buffer_cleanup.cancel();
 
@@ -703,10 +670,10 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
 }
 
 tftp_status Paver::Write(const void* data, size_t* length, off_t offset) {
-  if (!InProgress()) {
+  std::shared_future fut = exit_code();
+  if (fut.wait_for(std::chrono::nanoseconds::zero()) == std::future_status::ready) {
     printf("netsvc: paver exited prematurely with %s. Check the debuglog for more information.\n",
-           zx_status_get_string(exit_code()));
-    reset_exit_code();
+           zx_status_get_string(fut.get()));
     return TFTP_ERR_IO;
   }
 

@@ -40,40 +40,42 @@ FileApi::FileApi(bool is_zedboot, std::unique_ptr<NetCopyInterface> netcp,
 
 ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
   // Make sure all in-progress paving operations have completed
-  if (paver_->InProgress() == true) {
+  std::shared_future fut = paver_->exit_code();
+  if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
     return TFTP_ERR_SHOULD_WAIT;
   }
-  if (paver_->exit_code() != ZX_OK) {
-    fprintf(stderr, "paver exited with error: %d\n", paver_->exit_code());
-    paver_->reset_exit_code();
+  zx_status_t exit_code = fut.get();
+  if (exit_code != ZX_OK) {
+    fprintf(stderr, "paver exited with error: %s\n", zx_status_get_string(exit_code));
     return TFTP_ERR_IO;
   }
 
   is_write_ = false;
   strlcpy(filename_, filename, sizeof(filename_));
-  netboot_file_ = NULL;
+  netboot_file_ = nullptr;
   size_t file_size;
 
   if (is_zedboot_ && !strcmp(filename_, NB_BOARD_INFO_FILENAME)) {
     type_ = NetfileType::kBoardInfo;
     return BoardInfoSize();
-  } else {
-    type_ = NetfileType::kNetCopy;
-    if (netcp_->Open(filename, O_RDONLY, &file_size) == 0) {
-      return static_cast<ssize_t>(file_size);
-    }
   }
+  type_ = NetfileType::kNetCopy;
+  if (netcp_->Open(filename, O_RDONLY, &file_size) == 0) {
+    return static_cast<ssize_t>(file_size);
+  }
+
   return TFTP_ERR_NOT_FOUND;
 }
 
 tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration timeout) {
   // Make sure all in-progress paving operations have completed
-  if (paver_->InProgress() == true) {
+  std::shared_future fut = paver_->exit_code();
+  if (fut.wait_for(std::chrono::nanoseconds::zero()) != std::future_status::ready) {
     return TFTP_ERR_SHOULD_WAIT;
   }
-  if (paver_->exit_code() != ZX_OK) {
-    fprintf(stderr, "paver exited with error: %s\n", zx_status_get_string(paver_->exit_code()));
-    paver_->reset_exit_code();
+  zx_status_t exit_code = fut.get();
+  if (exit_code != ZX_OK) {
+    fprintf(stderr, "paver exited with error: %s\n", zx_status_get_string(exit_code));
     return TFTP_ERR_IO;
   }
 
@@ -83,7 +85,7 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
   if (is_zedboot_ && !strncmp(filename_, NB_FILENAME_PREFIX, NB_FILENAME_PREFIX_LEN())) {
     type_ = NetfileType::kNetboot;
     netboot_file_ = netboot_get_buffer(filename_, size);
-    if (netboot_file_ != NULL) {
+    if (netboot_file_ != nullptr) {
       return TFTP_NO_ERROR;
     }
   } else if (is_zedboot_ && !strcmp(filename_, NB_BOARD_NAME_FILENAME)) {
@@ -99,7 +101,7 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
     return status;
   } else {
     type_ = NetfileType::kNetCopy;
-    if (netcp_->Open(filename_, O_WRONLY, NULL) == 0) {
+    if (netcp_->Open(filename_, O_WRONLY, nullptr) == 0) {
       return TFTP_NO_ERROR;
     }
   }
@@ -107,7 +109,7 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
 }
 
 tftp_status FileApi::Read(void* data, size_t* length, off_t offset) {
-  if (length == NULL) {
+  if (length == nullptr) {
     return TFTP_ERR_INVALID_ARGS;
   }
 
@@ -135,7 +137,7 @@ tftp_status FileApi::Read(void* data, size_t* length, off_t offset) {
 }
 
 tftp_status FileApi::Write(const void* data, size_t* length, off_t offset) {
-  if (length == NULL) {
+  if (length == nullptr) {
     return TFTP_ERR_INVALID_ARGS;
   }
   switch (type_) {

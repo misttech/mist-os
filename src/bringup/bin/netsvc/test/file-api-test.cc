@@ -18,29 +18,40 @@ namespace {
 
 class FakePaver : public netsvc::PaverInterface {
  public:
-  bool InProgress() override { return in_progress_; }
-  zx_status_t exit_code() override { return exit_code_; }
-  void reset_exit_code() override { exit_code_ = ZX_OK; }
+  FakePaver() { exit_code_.set_value(ZX_OK); }
+
+  std::shared_future<zx_status_t> exit_code() override {
+    if (exit_code_future_.has_value()) {
+      return exit_code_future_.value();
+    }
+    return exit_code_future_.emplace(exit_code_.get_future());
+  }
 
   tftp_status OpenWrite(std::string_view filename, size_t size, zx::duration) override {
-    in_progress_ = true;
+    exit_code_future_.reset();
+    exit_code_ = {};
     return TFTP_NO_ERROR;
   }
+
   tftp_status Write(const void* data, size_t* length, off_t offset) override {
-    if (!in_progress_) {
+    if (exit_code().wait_for(std::chrono::nanoseconds::zero()) == std::future_status::ready) {
       return TFTP_ERR_INTERNAL;
     }
-    exit_code_ = ZX_OK;
     return TFTP_NO_ERROR;
   }
-  void Close() override { in_progress_ = false; }
+
+  void Close() override {}
   void Abort() override { ADD_FATAL_FAILURE("unexpected call to abort"); }
 
-  void set_exit_code(zx_status_t exit_code) { exit_code_ = exit_code; }
+  void set_exit_code(zx_status_t exit_code) {
+    exit_code_future_.reset();
+    exit_code_ = {};
+    exit_code_.set_value(exit_code);
+  }
 
  private:
-  bool in_progress_ = false;
-  zx_status_t exit_code_ = ZX_OK;
+  std::promise<zx_status_t> exit_code_;
+  std::optional<std::shared_future<zx_status_t>> exit_code_future_;
 };
 
 constexpr char kReadData[] = "laksdfjsadfa";
@@ -68,7 +79,7 @@ class FakeNetCopy : public netsvc::NetCopyInterface {
 
 class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
  public:
-  FakeSysinfo(async_dispatcher_t* dispatcher) {
+  explicit FakeSysinfo(async_dispatcher_t* dispatcher) {
     zx::result server_end = fidl::CreateEndpoints(&svc_chan_);
     ASSERT_OK(server_end.status_value());
     fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end.value()), this);
@@ -101,8 +112,6 @@ class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
   char board_[32] = {};
   char vendor_[32] = {};
 };
-
-}  // namespace
 
 class FileApiTest : public zxtest::Test {
  protected:
@@ -248,3 +257,5 @@ TEST_F(FileApiTest, AbortNetCopyWrite) {
   ASSERT_EQ(len, sizeof(kFakeData));
   file_api_.Abort();
 }
+
+}  // namespace

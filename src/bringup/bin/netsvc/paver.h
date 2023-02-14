@@ -17,21 +17,18 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <future>
 #include <optional>
 #include <string_view>
 
 #include <fbl/unique_fd.h>
 #include <tftp/tftp.h>
 
-#include "src/bringup/bin/netsvc/tftp.h"
-
 namespace netsvc {
 
 class PaverInterface {
  public:
-  virtual bool InProgress() = 0;
-  virtual zx_status_t exit_code() = 0;
-  virtual void reset_exit_code() = 0;
+  virtual std::shared_future<zx_status_t> exit_code() = 0;
 
   // TODO: Explore returning an object which implements write and when it goes
   // out of scope, closes.
@@ -46,9 +43,7 @@ class Paver : public PaverInterface {
   // Get the singleton instance.
   static Paver* Get();
 
-  bool InProgress() final;
-  zx_status_t exit_code() final;
-  void reset_exit_code() final;
+  std::shared_future<zx_status_t> exit_code() final;
 
   tftp_status OpenWrite(std::string_view filename, size_t size, zx::duration timeout) final;
   tftp_status Write(const void* data, size_t* length, off_t offset) final;
@@ -57,7 +52,15 @@ class Paver : public PaverInterface {
 
   // Visible for testing.
   explicit Paver(fidl::ClientEnd<fuchsia_io::Directory> svc_root, fbl::unique_fd devfs_root)
-      : svc_root_(std::move(svc_root)), devfs_root_(std::move(devfs_root)) {}
+      : svc_root_(std::move(svc_root)), devfs_root_(std::move(devfs_root)) {
+    exit_code_.set_value(ZX_OK);
+  }
+
+  ~Paver() {
+    for (std::thread& thread : threads_) {
+      thread.join();
+    }
+  }
 
  private:
   static constexpr uint32_t kBufferRefWorker = 1 << 0;
@@ -85,10 +88,10 @@ class Paver : public PaverInterface {
 
   // Pushes all data from the paver buffer (filled by netsvc) into the paver input VMO. When
   // there's no data to copy, blocks on data_ready until more data is written into the buffer.
-  int StreamBuffer();
+  zx_status_t StreamBuffer();
 
   // Monitors the vmo progress, and calls into paver service once finished.
-  int MonitorBuffer();
+  zx_status_t MonitorBuffer();
 
   // Clear Sysconfig if the device has one.
   zx_status_t ClearSysconfig();
@@ -97,8 +100,8 @@ class Paver : public PaverInterface {
 
   void ClearBufferRef(uint32_t ref);
 
-  std::atomic<bool> in_progress_ = false;
-  std::atomic<zx_status_t> exit_code_ = ZX_OK;
+  std::promise<zx_status_t> exit_code_;
+  std::optional<std::shared_future<zx_status_t>> exit_code_future_;
 
   // Total size of file
   size_t size_ = 0;
@@ -128,7 +131,7 @@ class Paver : public PaverInterface {
   // Buffer write offset.
   std::atomic<size_t> write_offset_ = 0;
   std::atomic<uint32_t> buffer_refs_ = 0;
-  thrd_t buf_thrd_ = 0;
+  std::vector<std::thread> threads_;
   sync_completion_t data_ready_;
   std::atomic<bool> aborted_;
 

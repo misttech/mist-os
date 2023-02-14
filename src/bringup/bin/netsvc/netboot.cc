@@ -24,34 +24,32 @@
 #include "src/bringup/bin/netsvc/paver.h"
 #include "src/bringup/bin/netsvc/zbi.h"
 
-static uint32_t last_cookie = 0;
-static uint32_t last_cmd = 0;
-static uint32_t last_arg = 0;
-static uint32_t last_ack_cmd = 0;
-static uint32_t last_ack_arg = 0;
+bool xfer_active = false;
+
+namespace {
+
+uint32_t last_cookie = 0;
+uint32_t last_cmd = 0;
+uint32_t last_arg = 0;
+uint32_t last_ack_cmd = 0;
+uint32_t last_ack_arg = 0;
 
 #define MAX_ADVERTISE_DATA_LEN 256
-
-bool xfer_active = false;
 
 struct nbfilecontainer_t {
   nbfile file;
   zx_handle_t data;  // handle to vmo that backs netbootfile.
 };
 
-static nbfilecontainer_t nbzbi;
-static nbfilecontainer_t nbcmdline;
+nbfilecontainer_t nbzbi;
+nbfilecontainer_t nbcmdline;
 
 // Pointer to the currently active transfer.
-static nbfile* active;
-
-namespace {
+nbfile* active;
 
 namespace statecontrol = fuchsia_hardware_power_statecontrol;
 
-}  // namespace
-
-static zx_status_t nbfilecontainer_init(size_t size, nbfilecontainer_t* target) {
+zx_status_t nbfilecontainer_init(size_t size, nbfilecontainer_t* target) {
   zx_status_t st = ZX_OK;
 
   assert(target);
@@ -76,7 +74,7 @@ static zx_status_t nbfilecontainer_init(size_t size, nbfilecontainer_t* target) 
 
     target->file.offset = 0;
     target->file.size = 0;
-    target->file.data = 0;
+    target->file.data = nullptr;
   }
 
   st = zx_vmo_create(size, 0, &target->data);
@@ -105,6 +103,8 @@ static zx_status_t nbfilecontainer_init(size_t size, nbfilecontainer_t* target) 
   return ZX_OK;
 }
 
+}  // namespace
+
 nbfile* netboot_get_buffer(const char* name, size_t size) {
   zx_status_t st = ZX_OK;
   nbfilecontainer_t* result;
@@ -114,7 +114,7 @@ nbfile* netboot_get_buffer(const char* name, size_t size) {
   } else if (!strcmp(name, NB_CMDLINE_FILENAME)) {
     result = &nbcmdline;
   } else {
-    return NULL;
+    return nullptr;
   }
 
   st = nbfilecontainer_init(size, result);
@@ -123,7 +123,7 @@ nbfile* netboot_get_buffer(const char* name, size_t size) {
         "netbootloader: failed to initialize file container for "
         "file = '%s', retcode = %d\n",
         name, st);
-    return NULL;
+    return nullptr;
   }
 
   return &result->file;
@@ -151,13 +151,15 @@ void netboot_advertise(const char* nodename) {
             NB_SERVER_PORT, false);
 }
 
-static void nb_open(const char* filename, uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr,
-                    uint16_t sport, uint16_t dport) {
+namespace {
+
+void nb_open(const char* filename, uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr,
+             uint16_t sport, uint16_t dport) {
   nbmsg m;
   m.magic = NB_MAGIC;
   m.cookie = cookie;
   m.cmd = NB_ACK;
-  m.arg = netcp_open(filename, arg, NULL);
+  m.arg = netcp_open(filename, arg, nullptr);
   udp6_send(&m, sizeof(m), saddr, sport, dport, false);
 }
 
@@ -166,8 +168,8 @@ struct netfilemsg {
   uint8_t data[1024];
 };
 
-static void nb_read(uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr, uint16_t sport,
-                    uint16_t dport) {
+void nb_read(uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr, uint16_t sport,
+             uint16_t dport) {
   static netfilemsg m = {
       .hdr =
           {
@@ -209,8 +211,8 @@ static void nb_read(uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr, uint
   udp6_send(&m, msg_size, saddr, sport, dport, false);
 }
 
-static void nb_write(const char* data, size_t len, uint32_t cookie, uint32_t arg,
-                     const ip6_addr_t* saddr, uint16_t sport, uint16_t dport) {
+void nb_write(const char* data, size_t len, uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr,
+              uint16_t sport, uint16_t dport) {
   static nbmsg m = {
       .magic = NB_MAGIC,
       .cookie = 0,
@@ -233,7 +235,7 @@ static void nb_write(const char* data, size_t len, uint32_t cookie, uint32_t arg
   udp6_send(&m, sizeof(m), saddr, sport, dport, false);
 }
 
-static void nb_close(uint32_t cookie, const ip6_addr_t* saddr, uint16_t sport, uint16_t dport) {
+void nb_close(uint32_t cookie, const ip6_addr_t* saddr, uint16_t sport, uint16_t dport) {
   nbmsg m;
   m.magic = NB_MAGIC;
   m.cookie = cookie;
@@ -242,7 +244,7 @@ static void nb_close(uint32_t cookie, const ip6_addr_t* saddr, uint16_t sport, u
   udp6_send(&m, sizeof(m), saddr, sport, dport, false);
 }
 
-static zx_status_t do_dmctl_mexec() {
+zx_status_t do_dmctl_mexec() {
   zx::vmo kernel_zbi, data_zbi;
   // TODO(scottmg): range check nbcmdline.file.size rather than just casting.
   zx_status_t status = netboot_prepare_zbi(
@@ -270,7 +272,7 @@ static zx_status_t do_dmctl_mexec() {
   return ZX_ERR_INTERNAL;
 }
 
-static zx_status_t reboot() {
+zx_status_t reboot() {
   zx::result client_end = component::Connect<statecontrol::Admin>();
   if (client_end.is_error()) {
     return client_end.status_value();
@@ -288,8 +290,8 @@ static zx_status_t reboot() {
   return ZX_ERR_INTERNAL;
 }
 
-static void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t dport,
-                            const ip6_addr_t* saddr, uint16_t sport) {
+void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t dport,
+                     const ip6_addr_t* saddr, uint16_t sport) {
   nbmsg msg_header;
   nbmsg ack;
 
@@ -361,7 +363,7 @@ static void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uin
     case NB_DATA:
     case NB_LAST_DATA:
       xfer_active = true;
-      if (active == 0) {
+      if (active == nullptr) {
         printf("netboot: > received chunk before NB_FILE\n");
         return;
       }
@@ -386,12 +388,8 @@ static void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uin
       break;
     case NB_BOOT:
       // Wait for the paver to complete
-      while (netsvc::Paver::Get()->InProgress()) {
-        thrd_yield();
-      }
-      if (netsvc::Paver::Get()->exit_code() != 0) {
-        printf("netboot: detected paver error: %d\n", netsvc::Paver::Get()->exit_code());
-        netsvc::Paver::Get()->reset_exit_code();
+      if (zx_status_t exit_code = netsvc::Paver::Get()->exit_code().get(); exit_code != ZX_OK) {
+        printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
         break;
       }
       do_boot = true;
@@ -399,12 +397,8 @@ static void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uin
       break;
     case NB_REBOOT:
       // Wait for the paver to complete
-      while (netsvc::Paver::Get()->InProgress()) {
-        thrd_yield();
-      }
-      if (netsvc::Paver::Get()->exit_code() != 0) {
-        printf("netboot: detected paver error: %d\n", netsvc::Paver::Get()->exit_code());
-        netsvc::Paver::Get()->reset_exit_code();
+      if (zx_status_t exit_code = netsvc::Paver::Get()->exit_code().get(); exit_code != ZX_OK) {
+        printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
         break;
       }
       do_reboot = true;
@@ -447,6 +441,8 @@ transmit:
   }
 }
 
+}  // namespace
+
 void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr, uint16_t dport,
                   const ip6_addr_t* saddr, uint16_t sport) {
   nbmsg msg_header;
@@ -478,7 +474,8 @@ void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr
 
   switch (msg_header.cmd) {
     case NB_QUERY: {
-      if (strcmp(msg_data, "*") && strcmp(msg_data, nodename())) {
+      std::string_view msg_data_view{msg_data};
+      if (msg_data_view != "*" && msg_data_view != nodename()) {
         break;
       }
       size_t dlen = strlen(nodename()) + 1;
