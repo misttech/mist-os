@@ -79,18 +79,6 @@ class UsbInterface : public UsbInterfaceType,
                                                       size_t* out_desc_actual);
   zx_status_t UsbCompositeClaimInterface(const usb_interface_descriptor_t* desc, uint32_t length);
 
-  // FIDL messages.
-  zx_status_t MsgGetDeviceSpeed(fidl_txn_t* txn);
-  zx_status_t MsgGetDeviceDescriptor(fidl_txn_t* txn);
-  zx_status_t MsgGetConfigurationDescriptorSize(uint8_t config, fidl_txn_t* txn);
-  zx_status_t MsgGetConfigurationDescriptor(uint8_t config, fidl_txn_t* txn);
-  zx_status_t MsgGetStringDescriptor(uint8_t desc_id, uint16_t lang_id, fidl_txn_t* txn);
-  zx_status_t MsgSetInterface(uint8_t interface_number, uint8_t alt_setting, fidl_txn_t* txn);
-  zx_status_t MsgGetDeviceId(fidl_txn_t* txn);
-  zx_status_t MsgGetHubDeviceId(fidl_txn_t* txn);
-  zx_status_t MsgGetConfiguration(fidl_txn_t* txn);
-  zx_status_t MsgSetConfiguration(uint8_t configuration, fidl_txn_t* txn);
-
   bool ContainsInterface(uint8_t interface_id);
   zx_status_t SetAltSetting(uint8_t interface_id, uint8_t alt_setting);
 
