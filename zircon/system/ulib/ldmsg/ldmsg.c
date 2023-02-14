@@ -7,6 +7,10 @@
 
 #include <ldmsg/ldmsg.h>
 
+// TODO(fxbug.dev/121817): These handwritten encoding/decoding functions should
+// be replaced with generated FIDL bindings after the linked bug about libc
+// improvements.
+
 static_assert(sizeof(ldmsg_req_t) == 1024, "Loader service requests can be at most 1024 bytes.");
 
 static size_t FidlAlign(size_t offset) {

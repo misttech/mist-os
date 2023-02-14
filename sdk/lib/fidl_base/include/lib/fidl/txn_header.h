@@ -10,6 +10,9 @@
 // These functions are declared `static inline` to make it available in source
 // form to specific functions in early bootstrapping libraries (such as libc)
 // which cannot be compiled with sanitizers.
+//
+// TODO(fxbug.dev/121817): Make these regular C functions after the linked bug
+// about libc improvements.
 
 __BEGIN_CDECLS
 
