@@ -32,6 +32,10 @@ toc:
   section:
   - title: "Null safety"
     path: /docs/contribute/open_projects/dart/null_safety.md
+- title: "Driver projects"
+  section:
+  - title: "FIDL multiplexing deprecation"
+    path: /docs/contribute/open_projects/drivers/fidl_multiplexing.md
 - title: "Testing"
   section:
   - title: "Migrate driver unit tests to mock-ddk"

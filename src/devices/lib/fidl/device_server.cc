@@ -162,7 +162,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
       constexpr char kNotSupportedErrorMessage[] =
           "Failed to send message to device: ZX_ERR_NOT_SUPPORTED\n"
           "It is possible that this message relied on deprecated FIDL multiplexing.\n"
-          "For more information see https://fxbug.dev/112484.\n";
+          "For more information see https://fuchsia.dev/fuchsia-src/contribute/open_projects/drivers/fidl_multiplexing";
       parent_.controller_.LogError(kNotSupportedErrorMessage);
     }
 
