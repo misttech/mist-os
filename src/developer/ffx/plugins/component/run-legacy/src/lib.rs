@@ -34,10 +34,8 @@ async fn run_component_cmd<W: std::io::Write>(
     writer: &mut W,
 ) -> Result<()> {
     let (control_proxy, control_server_end) = create_proxy::<ComponentControllerMarker>()?;
-    let (sout, cout) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create socket")?;
-    let (serr, cerr) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).context("failed to create socket")?;
+    let (sout, cout) = fidl::Socket::create_stream();
+    let (serr, cerr) = fidl::Socket::create_stream();
 
     let mut stdout = Unblock::new(std::io::stdout());
     let mut stderr = Unblock::new(std::io::stderr());
