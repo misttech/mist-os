@@ -57,7 +57,7 @@ impl SingleSessionTrace {
     /// [terminate] may be used to ensure that no trace session is active on the system.
     pub async fn initialize(&self, categories: Vec<String>) -> Result<(), Error> {
         let trace_controller = app::client::connect_to_protocol::<ControllerMarker>()?;
-        let (write_socket, read_socket) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+        let (write_socket, read_socket) = zx::Socket::create_stream();
         let config = TraceConfig {
             buffer_size_megabytes_hint: Some(BUFFER_SIZE_MB),
             categories: Some(categories),

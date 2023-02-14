@@ -83,7 +83,7 @@ impl TracingFacade {
         let request: InitializeRequest = parse_args(args)?;
 
         let trace_controller = app::client::connect_to_protocol::<ControllerMarker>()?;
-        let (write_socket, read_socket) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+        let (write_socket, read_socket) = zx::Socket::create_stream();
         let mut config = TraceConfig::EMPTY;
         match request.categories {
             Some(cats) => {
