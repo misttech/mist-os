@@ -252,9 +252,9 @@ pub fn create_authenticator(
         Protection::Wpa2Wpa3Personal => {
             wlan_rsn::ProtectionInfo::Rsne(rsne::Rsne::wpa2_wpa3_rsne())
         }
-        Protection::Wpa2Personal | Protection::Wpa1Wpa2Personal => {
-            wlan_rsn::ProtectionInfo::Rsne(rsne::Rsne::wpa2_rsne())
-        }
+        Protection::Wpa2Personal | Protection::Wpa1Wpa2Personal => wlan_rsn::ProtectionInfo::Rsne(
+            rsne::Rsne::wpa2_rsne_with_caps(rsne::RsnCapabilities(0)),
+        ),
         Protection::Wpa2PersonalTkipOnly | Protection::Wpa1Wpa2PersonalTkipOnly => {
             panic!("need tkip support")
         }
@@ -281,7 +281,9 @@ pub fn create_authenticator(
                 Protection::Wpa1 => wlan_rsn::ProtectionInfo::LegacyWpa(
                     wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie(),
                 ),
-                Protection::Wpa2Personal => wlan_rsn::ProtectionInfo::Rsne(rsne::Rsne::wpa2_rsne()),
+                Protection::Wpa2Personal => wlan_rsn::ProtectionInfo::Rsne(
+                    rsne::Rsne::wpa2_rsne_with_caps(rsne::RsnCapabilities(0)),
+                ),
                 _ => unreachable!("impossible combination in this nested match"),
             };
             wlan_rsn::Authenticator::new_wpa2psk_ccmp128(
@@ -447,7 +449,8 @@ pub trait ApAdvertisement {
                 rsne?: match protection {
                     Protection::Unknown => panic!("Cannot send beacon with unknown protection"),
                     Protection::Open | Protection::Wep | Protection::Wpa1 => None,
-                    Protection::Wpa1Wpa2Personal | Protection::Wpa2Personal => Some(rsne::Rsne::wpa2_rsne()),
+                    Protection::Wpa1Wpa2Personal | Protection::Wpa2Personal =>
+                        Some(rsne::Rsne::wpa2_rsne_with_caps(rsne::RsnCapabilities(0))),
                     Protection::Wpa2Wpa3Personal => Some(rsne::Rsne::wpa2_wpa3_rsne()),
                     Protection::Wpa3Personal => Some(rsne::Rsne::wpa3_rsne()),
                     _ => panic!("unsupported fake beacon: {:?}", protection),

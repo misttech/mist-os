@@ -25,7 +25,11 @@ use {
     wlan_common::{
         capabilities::get_device_band_cap,
         channel::{Cbw, Channel},
-        ie::{parse_ht_capabilities, rsn::rsne::Rsne, ChanWidthSet, SupportedRate},
+        ie::{
+            parse_ht_capabilities,
+            rsn::rsne::{RsnCapabilities, Rsne},
+            ChanWidthSet, SupportedRate,
+        },
         mac,
         timer::{self, EventId, TimedEvent, Timer},
         RadioConfig,
@@ -824,7 +828,7 @@ fn create_rsn_cfg(ssid: &Ssid, password: &[u8]) -> Result<Option<RsnCfg>, StartR
 
         // Note: TKIP is legacy and considered insecure. Only allow CCMP usage
         // for group and pairwise ciphers.
-        Ok(Some(RsnCfg { psk, rsne: Rsne::wpa2_rsne() }))
+        Ok(Some(RsnCfg { psk, rsne: Rsne::wpa2_rsne_with_caps(RsnCapabilities(0)) }))
     }
 }
 
