@@ -58,8 +58,7 @@ resource("intl_wisdom_test_resources") {
 group("tests") {
   testonly = true
   deps = [
-    # TODO(fxbug.dev/121678): Re-enable when the bug is fixed.
-    #":intl_wisdom_cpp_test",
-    #":intl_wisdom_rust_test",
+    ":intl_wisdom_cpp_test",
+    ":intl_wisdom_rust_test",
   ]
 }
