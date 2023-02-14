@@ -246,6 +246,7 @@ group("tests") {
     ":netstack3-core-test-package",
     ":netstack3-core_test($host_toolchain)",
     "ip-test-macro:tests",
+    "lock-order:tests",
     "sync:tests",
   ]
 }
