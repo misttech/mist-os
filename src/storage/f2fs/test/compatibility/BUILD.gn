@@ -106,6 +106,7 @@ fuchsia_test_component("f2fs-file-rw-compatibility-test-cmp") {
 }
 
 fuchsia_test_component("f2fs-file-slow-compatibility-test-cmp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-file-slow-compatibility-test-cmp"
   deps = [ ":f2fs-file-slow-compatibility-test" ] + component_deps
   manifest = "f2fs_file_slow_compatibility.cml"
