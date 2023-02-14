@@ -17,14 +17,17 @@ use net_types::{
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{
     ip::IpProto,
-    tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilder},
+    tcp::{
+        TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
+        TcpSegmentBuilderWithOptions,
+    },
 };
 use thiserror::Error;
 
 use crate::{
     ip::{
-        socket::DefaultSendOptions, BufferIpTransportContext, BufferTransportIpContext, IpExt,
-        TransportReceiveError,
+        socket::{DefaultSendOptions, DeviceIpSocketHandler, MmsError},
+        BufferIpTransportContext, BufferTransportIpContext, IpLayerIpExt, TransportReceiveError,
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
@@ -32,7 +35,7 @@ use crate::{
     },
     transport::tcp::{
         buffer::SendPayload,
-        segment::Segment,
+        segment::{Options, Segment},
         seqnum::WindowSize,
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
@@ -41,7 +44,7 @@ use crate::{
             TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
-        BufferSizes, Control, KeepAlive, SocketOptions, UserError,
+        BufferSizes, Control, KeepAlive, Mss, SocketOptions, UserError,
     },
 };
 
@@ -59,7 +62,7 @@ impl<C: NonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
 
 impl<I, B, C, SC> BufferIpTransportContext<I, C, SC, B> for TcpIpTransportContext
 where
-    I: IpExt,
+    I: IpLayerIpExt,
     B: BufferMut,
     C: NonSyncContext
         + BufferProvider<
@@ -146,7 +149,7 @@ fn handle_incoming_packet<I, B, C, SC>(
     incoming: Segment<&[u8]>,
     now: C::Instant,
 ) where
-    I: IpExt,
+    I: IpLayerIpExt,
     B: BufferMut,
     C: NonSyncContext
         + BufferProvider<
@@ -155,7 +158,7 @@ fn handle_incoming_packet<I, B, C, SC>(
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
 {
     let any_usable_conn = addrs_to_search.any(|addr| {
         match addr {
@@ -260,7 +263,7 @@ fn try_handle_incoming_for_connection<I, SC, C, B>(
     now: C::Instant,
 ) -> bool
 where
-    I: IpExt,
+    I: IpLayerIpExt,
     B: BufferMut,
     C: NonSyncContext
         + BufferProvider<
@@ -269,7 +272,7 @@ where
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
 {
     let (conn, _, addr) = sockets
         .socketmap
@@ -356,7 +359,7 @@ fn try_handle_incoming_for_listener<I, SC, C, B>(
     now: C::Instant,
 ) -> bool
 where
-    I: IpExt,
+    I: IpLayerIpExt,
     B: BufferMut,
     C: NonSyncContext
         + BufferProvider<
@@ -365,7 +368,7 @@ where
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>> + DeviceIpSocketHandler<I, C>,
 {
     let socketmap = &mut sockets.socketmap;
     let (maybe_listener, sharing, listener_addr) =
@@ -419,8 +422,26 @@ where
         (ip_sock.local_ip().clone(), local_port),
         (ip_sock.remote_ip().clone(), remote_port),
     );
+    let device_mms = match ip_transport_ctx.get_mms(ctx, &ip_sock) {
+        Ok(mms) => mms,
+        Err(err) => {
+            // If we cannot find a device or the device's MTU is too small,
+            // there isn't much we can do here since sending a RST back is
+            // impossible, we just need to silent drop the segment.
+            log::error!("Cannot find a device with large enough MTU for the connection");
+            match err {
+                MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => return true,
+            }
+        }
+    };
+    let Some(device_mss) = Mss::from_mms(device_mms) else { return true };
 
-    let mut state = State::Listen(Closed::<Initial>::listen(isn, buffer_sizes.clone()));
+    let mut state = State::Listen(Closed::<Initial>::listen(
+        isn,
+        buffer_sizes.clone(),
+        device_mss,
+        Mss::default::<I>(),
+    ));
     let reply = assert_matches!(
         state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),
         (reply, None) => reply
@@ -509,13 +530,14 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
         let fin = from.fin().then(|| Control::FIN);
         let rst = from.rst().then(|| Control::RST);
         let control = syn.or(fin).or(rst);
-
-        let (to, discarded) = Segment::with_data(
+        let options = Options::from_iter(from.iter_options());
+        let (to, discarded) = Segment::with_data_options(
             from.seq_num().into(),
             from.ack_num().map(Into::into),
             control,
             WindowSize::from_u16(from.window_size()),
             from.into_body(),
+            options,
         );
         debug_assert_eq!(discarded, 0);
         Ok(to)
@@ -530,7 +552,7 @@ where
     S: Into<Segment<SendPayload<'a>>>,
     A: IpAddress,
 {
-    let Segment { seq, ack, wnd, contents } = segment.into();
+    let Segment { seq, ack, wnd, contents, options } = segment.into();
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
         *local_ip,
@@ -547,7 +569,13 @@ where
         Some(Control::FIN) => builder.fin(true),
         Some(Control::RST) => builder.rst(true),
     }
-    contents.data().encapsulate(builder)
+    contents.data().encapsulate(
+        TcpSegmentBuilderWithOptions::new(builder, options.iter()).unwrap_or_else(
+            |TcpOptionsTooLongError| {
+                panic!("Too many TCP options");
+            },
+        ),
+    )
 }
 
 #[cfg(test)]
@@ -558,7 +586,10 @@ mod test {
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
-    use crate::{testutil::TestIpExt, transport::tcp::seqnum::SeqNum};
+    use crate::{
+        testutil::TestIpExt,
+        transport::tcp::{seqnum::SeqNum, Mss},
+    };
 
     use super::*;
 
@@ -586,7 +617,8 @@ mod test {
     }
 
     #[ip_test]
-    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT).into(), &[]; "syn")]
+    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT, Options { mss: None }).into(), &[]; "syn")]
+    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT, Options { mss: Some(Mss(nonzero_ext::nonzero!(1440 as u16))) }).into(), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, WindowSize::DEFAULT).into(), &[]; "ack")]
     #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
@@ -597,6 +629,7 @@ mod test {
         const SOURCE_PORT: NonZeroU16 = nonzero!(1111u16);
         const DEST_PORT: NonZeroU16 = nonzero!(2222u16);
 
+        let options = segment.options;
         let serializer = super::tcp_serialize_segment(
             segment,
             ConnIpAddr {
@@ -617,6 +650,10 @@ mod test {
         assert_eq!(parsed_segment.dst_port(), DEST_PORT);
         assert_eq!(parsed_segment.seq_num(), u32::from(SEQ));
         assert_eq!(WindowSize::from_u16(parsed_segment.window_size()), WindowSize::DEFAULT);
+        assert_eq!(options.iter().count(), parsed_segment.iter_options().count());
+        for (orig, parsed) in options.iter().zip(parsed_segment.iter_options()) {
+            assert_eq!(orig, parsed);
+        }
         assert_eq!(parsed_segment.into_body(), expected_body);
     }
 }

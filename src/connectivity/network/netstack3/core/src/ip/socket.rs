@@ -7,7 +7,7 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::convert::Infallible;
-use core::num::NonZeroU8;
+use core::num::{NonZeroU32, NonZeroU8};
 
 use net_types::ip::{Ip, IpVersion, Ipv6Addr};
 use net_types::{SpecifiedAddr, UnicastAddr};
@@ -16,11 +16,11 @@ use packet::{Buf, BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::{
-    context::{CounterContext, InstantContext},
+    context::{CounterContext, InstantContext, NonTestCtxMarker},
     ip::{
         device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
         forwarding::Destination,
-        IpDeviceIdContext, IpExt, SendIpPacketMeta,
+        IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, Mtu, SendIpPacketMeta,
     },
 };
 
@@ -176,6 +176,57 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
                 }),
         }
     }
+}
+
+/// Maximum packet size, that is the maximum IP payload one packet can carry.
+///
+/// More details from https://www.rfc-editor.org/rfc/rfc1122#section-3.3.2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Mms<I: IpExt>(NonZeroU32, core::marker::PhantomData<I>);
+
+impl<I: IpLayerIpExt> Mms<I> {
+    pub(crate) fn from_mtu(mtu: Mtu, options_size: u32) -> Option<Self> {
+        NonZeroU32::new(mtu.get().get().saturating_sub(I::IP_HEADER_LENGTH + options_size)).map(
+            |mms| {
+                Self(
+                    mms.min(NonZeroU32::new(I::IP_MAX_PAYLOAD_LENGTH).unwrap()),
+                    core::marker::PhantomData,
+                )
+            },
+        )
+    }
+
+    pub(crate) fn get(&self) -> NonZeroU32 {
+        let Self(mms, _marker) = *self;
+        mms
+    }
+}
+
+/// Possible errors when retrieving the maximum transport message size.
+pub(crate) enum MmsError {
+    /// Cannot find the device that is used for the ip socket, possibly because
+    /// there is no route.
+    NoDevice(IpSockRouteError),
+    /// The MTU provided by the device is too small such that there is no room
+    /// for a transport message at all.
+    MTUTooSmall(Mtu),
+}
+
+/// Gets device related information of an IP socket.
+pub(crate) trait DeviceIpSocketHandler<I, C>: IpDeviceIdContext<I>
+where
+    I: IpLayerIpExt,
+{
+    /// Gets the maximum message size for the transport layer, it equals the
+    /// device MTU minus the IP header size.
+    ///
+    /// This corresponds to the GET_MAXSIZES call described in:
+    /// https://www.rfc-editor.org/rfc/rfc1122#section-3.4
+    fn get_mms<O: SendOptions<I>>(
+        &mut self,
+        ctx: &mut C,
+        ip_sock: &IpSock<I, Self::DeviceId, O>,
+    ) -> Result<Mms<I>, MmsError>;
 }
 
 /// An error encountered when creating an IP socket.
@@ -484,6 +535,26 @@ impl<
         ctx.increment_debug_counter(counter_name);
 
         send_ip_packet(self, ctx, ip_sock, body, mtu)
+    }
+}
+
+impl<
+        I: IpLayerIpExt + IpDeviceStateIpExt,
+        C: IpSocketNonSyncContext,
+        SC: IpDeviceContext<I, C> + IpSocketContext<I, C> + NonTestCtxMarker,
+    > DeviceIpSocketHandler<I, C> for SC
+{
+    fn get_mms<O: SendOptions<I>>(
+        &mut self,
+        ctx: &mut C,
+        ip_sock: &IpSock<I, Self::DeviceId, O>,
+    ) -> Result<Mms<I>, MmsError> {
+        let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
+        let IpSockRoute { destination: Destination { next_hop: _, device }, local_ip: _ } = self
+            .lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip)
+            .map_err(MmsError::NoDevice)?;
+        let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
+        Mms::from_mtu(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))
     }
 }
 

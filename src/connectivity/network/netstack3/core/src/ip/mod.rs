@@ -128,14 +128,22 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt {
     ///
     /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
     type RecvSrcAddr: Into<Self::Addr>;
+    /// The length of an IP header without any IP options.
+    const IP_HEADER_LENGTH: u32;
+    /// The maximum payload size an IP payload can have.
+    const IP_MAX_PAYLOAD_LENGTH: u32;
 }
 
 impl IpExt for Ipv4 {
     type RecvSrcAddr = Ipv4Addr;
+    const IP_HEADER_LENGTH: u32 = packet_formats::ipv4::HDR_PREFIX_LEN as u32;
+    const IP_MAX_PAYLOAD_LENGTH: u32 = u16::MAX as u32 - Self::IP_HEADER_LENGTH;
 }
 
 impl IpExt for Ipv6 {
     type RecvSrcAddr = Ipv6SourceAddr;
+    const IP_HEADER_LENGTH: u32 = packet_formats::ipv6::IPV6_FIXED_HDR_LEN as u32;
+    const IP_MAX_PAYLOAD_LENGTH: u32 = u16::MAX as u32;
 }
 
 /// The execution context provided by a transport layer protocol to the IP
@@ -314,7 +322,7 @@ trait IpTransportLayerContext<I: IpExt, C>: IpDeviceIdContext<I> {
 }
 
 impl<
-        I: IpExt,
+        I: IpLayerIpExt,
         C: crate::transport::udp::StateNonSyncContext<I>
             + crate::transport::tcp::socket::NonSyncContext,
         SC: crate::transport::udp::StateContext<I, C>

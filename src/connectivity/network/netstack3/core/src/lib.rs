@@ -228,7 +228,6 @@ pub trait NonSyncContext:
     + IcmpContext<Ipv4>
     + IcmpContext<Ipv6>
     + transport::tcp::socket::NonSyncContext
-    + device::DeviceLayerEventDispatcher
     + 'static
 {
 }

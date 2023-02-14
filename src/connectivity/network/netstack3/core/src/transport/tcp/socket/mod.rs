@@ -58,10 +58,11 @@ use crate::{
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         socket::{
-            BufferIpSocketHandler as _, DefaultSendOptions, IpSock, IpSockCreationError,
-            IpSocketHandler as _,
+            BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
+            IpSockCreationError, IpSocketHandler as _, Mms,
         },
-        BufferTransportIpContext, IpDeviceId, IpDeviceIdContext, IpExt, TransportIpContext as _,
+        BufferTransportIpContext, IpDeviceId, IpDeviceIdContext, IpExt, IpLayerIpExt,
+        TransportIpContext as _,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -73,7 +74,7 @@ use crate::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
         socket::{demux::tcp_serialize_segment, isn::IsnGenerator},
         state::{CloseError, Closed, Initial, State, Takeable},
-        BufferSizes, SocketOptions, DEFAULT_MAXIMUM_SEGMENT_SIZE,
+        BufferSizes, Mss, SocketOptions,
     },
     DeviceId, Instant, SyncCtx,
 };
@@ -143,8 +144,11 @@ pub trait NonSyncContext: TimerContext<TimerId> {
 }
 
 /// Sync context for TCP.
-pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> {
-    type IpTransportCtx: BufferTransportIpContext<I, C, Buf<Vec<u8>>, DeviceId = Self::DeviceId>;
+pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
+    IpDeviceIdContext<I>
+{
+    type IpTransportCtx: BufferTransportIpContext<I, C, Buf<Vec<u8>>, DeviceId = Self::DeviceId>
+        + DeviceIpSocketHandler<I, C>;
 
     /// Calls the function with a `Self::IpTransportCtx`, immutable reference to
     /// an initial sequence number generator and a mutable reference to TCP
@@ -1098,7 +1102,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     fn reuseaddr(&self, id: SocketId<I>) -> bool;
 }
 
-impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
+impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
     fn create_socket(&mut self, _ctx: &mut C) -> UnboundId<I> {
         let unbound = Unbound::default();
         UnboundId(
@@ -1285,6 +1289,14 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                         IpSockCreationError::Route(_) => ConnectError::NoRoute,
                     })?;
 
+                let mms = ip_transport_ctx.get_mms(ctx, &ip_sock).map_err(
+                    |_err: crate::ip::socket::MmsError| {
+                        // We either cannot find the route, or the device for
+                        // the route cannot handle the smallest TCP/IP packet.
+                        ConnectError::NoRoute
+                    },
+                )?;
+
                 let device = device.clone();
                 let ListenerSharingState { sharing, listening: _ } = *sharing;
                 let conn_id = connect_inner(
@@ -1300,6 +1312,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     buffer_sizes.clone(),
                     socket_options.clone(),
                     sharing,
+                    mms,
                 )?;
                 let _: Option<_> = sockets.socketmap.listeners_mut().remove(&bound_id);
                 Ok(conn_id)
@@ -1356,6 +1369,10 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                 let Unbound { buffer_sizes, bound_device: _, socket_options, sharing } =
                     inactive.get();
 
+                let mms = ip_transport_ctx
+                    .get_mms(ctx, &ip_sock)
+                    .map_err(|_err: crate::ip::socket::MmsError| ConnectError::NoRoute)?;
+
                 let conn_id = connect_inner(
                     isn,
                     &mut sockets.socketmap,
@@ -1369,6 +1386,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     buffer_sizes.clone(),
                     socket_options.clone(),
                     *sharing,
+                    mms,
                 )?;
                 let _: Unbound<_> = inactive.remove();
                 Ok(conn_id)
@@ -1821,7 +1839,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
     }
 }
 
-fn get_reuseaddr<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
+fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
     sync_ctx: &SC,
     id: SocketId<I>,
 ) -> bool {
@@ -1857,7 +1875,7 @@ fn get_reuseaddr<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
     })
 }
 
-fn set_reuseaddr_maybe_listener<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
+fn set_reuseaddr_maybe_listener<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
     listener: bool,
     sync_ctx: &mut SC,
     id: MaybeListenerId<I>,
@@ -1902,9 +1920,7 @@ fn do_send_inner<I, SC, C>(
     C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
-    while let Some(seg) =
-        conn.state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, ctx.now(), &conn.socket_options)
-    {
+    while let Some(seg) = conn.state.poll_send(u32::MAX, ctx.now(), &conn.socket_options) {
         let ser = tcp_serialize_segment(seg, addr.ip.clone());
         ip_transport_ctx.send_ip_packet(ctx, &conn.ip_sock, ser, None).unwrap_or_else(
             |(body, err)| {
@@ -2248,9 +2264,10 @@ fn connect_inner<I, SC, C>(
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
+    device_mms: Mms<I>,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
-    I: IpExt,
+    I: IpLayerIpExt,
     C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
@@ -2267,7 +2284,14 @@ where
         device,
     };
     let now = ctx.now();
-    let (syn_sent, syn) = Closed::<Initial>::connect(isn, now, netstack_buffers, buffer_sizes);
+    let (syn_sent, syn) = Closed::<Initial>::connect(
+        isn,
+        now,
+        netstack_buffers,
+        buffer_sizes,
+        Mss::from_mms(device_mms).ok_or(ConnectError::NoRoute)?,
+        Mss::default::<I>(),
+    );
     let state = State::SynSent(syn_sent);
     let poll_send_at = state.poll_send_at().expect("no retrans timer");
     let conn_id = socketmap
@@ -2764,11 +2788,15 @@ mod tests {
             FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
             WrappedFakeSyncCtx,
         },
+        device::Mtu,
         ip::{
             device::state::{
                 AddrConfig, AddressState, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry,
             },
-            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+            socket::{
+                testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+                MmsError, SendOptions,
+            },
             testutil::{FakeDeviceId, MultipleDevicesId},
             BufferIpTransportContext as _, SendIpPacketMeta,
         },
@@ -2782,7 +2810,7 @@ mod tests {
 
     use super::*;
 
-    trait TcpTestIpExt: IpExt + TestIpExt + IpDeviceStateIpExt {
+    trait TcpTestIpExt: IpExt + TestIpExt + IpDeviceStateIpExt + IpLayerIpExt {
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
 
         fn new_device_state(
@@ -2958,6 +2986,18 @@ mod tests {
             *self.as_ref().borrow_mut() = Some(buffers.clone());
             let ClientBuffers { receive, send } = buffers;
             (receive, TestSendBuffer::new(send, Default::default()))
+        }
+    }
+
+    impl<I: TcpTestIpExt, D: IpDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
+        for FakeBufferIpTransportCtx<I, D>
+    {
+        fn get_mms<O: SendOptions<I>>(
+            &mut self,
+            _ctx: &mut TcpNonSyncCtx,
+            _ip_sock: &IpSock<I, D, O>,
+        ) -> Result<Mms<I>, MmsError> {
+            Ok(Mms::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32)), 0).unwrap())
         }
     }
 

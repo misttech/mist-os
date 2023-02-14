@@ -20,7 +20,10 @@
 
 use core::{num::NonZeroU32, time::Duration};
 
-use crate::{transport::tcp::congestion::CongestionControlParams, Instant};
+use crate::{
+    transport::tcp::{congestion::CongestionControlParams, Mss},
+    Instant,
+};
 
 /// Per RFC 8312 (https://tools.ietf.org/html/rfc8312#section-4.5):
 ///  Parameter beta_cubic SHOULD be set to 0.7.
@@ -49,7 +52,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
     ///
     /// This function is responsible for the concave/convex regions described
     /// in the RFC.
-    fn cubic_window(&self, t: Duration, mss: u32) -> u32 {
+    fn cubic_window(&self, t: Duration, mss: Mss) -> u32 {
         // Per RFC 8312 (https://www.rfc-editor.org/rfc/rfc8312#section-4.1):
         //   W_cubic(t) = C*(t-K)^3 + W_max (Eq. 1)
         let x = t.as_secs_f32() - self.k;
@@ -58,13 +61,13 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
     }
 
     /// Returns the window size for standard TCP, in bytes.
-    fn standard_tcp_window(&self, t: Duration, rtt: Duration, mss: u32) -> u32 {
+    fn standard_tcp_window(&self, t: Duration, rtt: Duration, mss: Mss) -> u32 {
         // Per RFC 8312 (https://www.rfc-editor.org/rfc/rfc8312#section-4.2):
         //   W_est(t) = W_max*beta_cubic +
         //         [3*(1-beta_cubic)/(1+beta_cubic)] * (t/RTT) (Eq. 4)
         let round_trips = t.as_secs_f32() / rtt.as_secs_f32();
         let w_tcp = self.w_max as f32 * CUBIC_BETA
-            + (3.0 * (1.0 - CUBIC_BETA) / (1.0 + CUBIC_BETA)) * round_trips * mss as f32;
+            + (3.0 * (1.0 - CUBIC_BETA) / (1.0 + CUBIC_BETA)) * round_trips * u32::from(mss) as f32;
         w_tcp as u32
     }
 
@@ -79,7 +82,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
             // Slow start, Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#page-6):
             // we RECOMMEND that TCP implementations increase cwnd, per:
             //   cwnd += min (N, SMSS)                      (2)
-            *cwnd += u32::min(bytes_acked.get(), *mss);
+            *cwnd += u32::min(bytes_acked.get(), u32::from(*mss));
             if *cwnd <= *ssthresh {
                 return;
             }
@@ -157,13 +160,13 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         // and it doesn't make much sense to have byte number not to be a whole
         // number.
         // [1]: (https://www.cs.princeton.edu/courses/archive/fall16/cos561/papers/Cubic08.pdf)
-        if target >= *cwnd + *mss // An increase to cwnd is needed
-            && self.bytes_acked >= *cwnd / (target - *cwnd) * *mss
+        if target >= *cwnd + u32::from(*mss) // An increase to cwnd is needed
+            && self.bytes_acked >= *cwnd / (target - *cwnd) * u32::from(*mss)
         // And the # of acked bytes is at least the required amount of bytes for
         // increasing 1 MSS.
         {
-            self.bytes_acked -= *cwnd / (target - *cwnd) * *mss;
-            *cwnd += *mss;
+            self.bytes_acked -= *cwnd / (target - *cwnd) * u32::from(*mss);
+            *cwnd += u32::from(*mss);
         }
 
         // Per RFC 8312 (https://www.rfc-editor.org/rfc/rfc8312#section-4.2):
@@ -207,7 +210,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         //   In case of timeout, CUBIC follows Standard TCP to reduce cwnd
         //   [RFC5681], but sets ssthresh using beta_cubic (same as in
         //   Section 4.5) that is different from Standard TCP [RFC5681].
-        *ssthresh = u32::max((*cwnd as f32 * CUBIC_BETA) as u32, 2 * *mss);
+        *ssthresh = u32::max((*cwnd as f32 * CUBIC_BETA) as u32, 2 * u32::from(*mss));
         *cwnd = *ssthresh;
         // Reset our running count of the acked bytes.
         self.bytes_acked = 0;
@@ -219,13 +222,13 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         //   Furthermore, upon a timeout (as specified in [RFC2988]) cwnd MUST be
         //   set to no more than the loss window, LW, which equals 1 full-sized
         //   segment (regardless of the value of IW).
-        params.cwnd = params.mss;
+        params.cwnd = u32::from(params.mss);
     }
 
-    fn cubic_c(&self, mss: u32) -> f32 {
+    fn cubic_c(&self, mss: Mss) -> f32 {
         // Note: cwnd and w_max are in unit of bytes as opposed to segments in
         // RFC, so C should be CUBIC_C * mss for our implementation.
-        CUBIC_C * mss as f32
+        CUBIC_C * u32::from(mss) as f32
     }
 }
 
@@ -236,7 +239,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{testutil::FakeInstantCtx, InstantContext as _},
-        transport::tcp::DEFAULT_MAXIMUM_SEGMENT_SIZE,
+        transport::tcp::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
     };
 
     impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
@@ -277,7 +280,7 @@ mod tests {
         // The theoretical predictions do not consider fast convergence,
         // disable it.
         let mut cubic = Cubic::<_, false /* FAST_CONVERGENCE */>::default();
-        let mut params = CongestionControlParams::default();
+        let mut params = CongestionControlParams::with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
         // The theoretical value is a prediction for the congestion avoidance
         // only, set ssthresh to 1 so that we skip slow start. Slow start can
         // grow the window size very quickly.
@@ -296,15 +299,15 @@ mod tests {
                 ack_cnt -= loss_rate_reciprocal;
                 cubic.on_loss_detected(&mut params);
             } else {
-                ack_cnt += cwnd / params.mss;
+                ack_cnt += cwnd / u32::from(params.mss);
                 // We will get at least one ack for every two segments we send.
-                for _ in 0..u32::max(cwnd / params.mss / 2, 1) {
-                    let bytes_acked = 2 * params.mss;
+                for _ in 0..u32::max(cwnd / u32::from(params.mss) / 2, 1) {
+                    let bytes_acked = 2 * u32::from(params.mss);
                     cubic.on_ack_u32(&mut params, bytes_acked, clock.now(), rtt);
                 }
             }
             clock.sleep(rtt);
-            avg_pkts += (cwnd / params.mss) as f32 / ROUND_TRIPS as f32;
+            avg_pkts += (cwnd / u32::from(params.mss)) as f32 / ROUND_TRIPS as f32;
         }
         avg_pkts as u32
     }
@@ -313,50 +316,81 @@ mod tests {
     fn cubic_example() {
         let mut clock = FakeInstantCtx::default();
         let mut cubic = Cubic::<_, true /* FAST_CONVERGENCE */>::default();
-        let mut params = CongestionControlParams::default();
+        let mut params = CongestionControlParams::with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
         const RTT: Duration = Duration::from_millis(100);
 
         // Assert we have the correct initial window.
-        assert_eq!(params.cwnd, 4 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(params.cwnd, 4 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         // Slow start.
         clock.sleep(RTT);
-        for _seg in 0..params.cwnd / DEFAULT_MAXIMUM_SEGMENT_SIZE {
-            cubic.on_ack_u32(&mut params, DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), RTT);
+        for _seg in 0..params.cwnd / u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE) {
+            cubic.on_ack_u32(
+                &mut params,
+                u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                clock.now(),
+                RTT,
+            );
         }
-        assert_eq!(params.cwnd, 8 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(params.cwnd, 8 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         clock.sleep(RTT);
         cubic.on_retransmission_timeout(&mut params);
-        assert_eq!(params.cwnd, DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(params.cwnd, u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         // We are now back in slow start.
         clock.sleep(RTT);
-        cubic.on_ack_u32(&mut params, DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), RTT);
-        assert_eq!(params.cwnd, 2 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        cubic.on_ack_u32(
+            &mut params,
+            u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+            clock.now(),
+            RTT,
+        );
+        assert_eq!(params.cwnd, 2 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         clock.sleep(RTT);
         for _ in 0..2 {
-            cubic.on_ack_u32(&mut params, DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), RTT);
+            cubic.on_ack_u32(
+                &mut params,
+                u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                clock.now(),
+                RTT,
+            );
         }
-        assert_eq!(params.cwnd, 4 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(params.cwnd, 4 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         // In this roundtrip, we enter a new congestion epoch from slow start,
         // in this round trip, both cubic and tcp equations will have t=0, so
         // the cwnd in this round trip will be ssthresh, which is 3001 bytes,
         // or 5 full sized segments.
         clock.sleep(RTT);
-        for _seg in 0..params.cwnd / DEFAULT_MAXIMUM_SEGMENT_SIZE {
-            cubic.on_ack_u32(&mut params, DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), RTT);
+        for _seg in 0..params.cwnd / u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE) {
+            cubic.on_ack_u32(
+                &mut params,
+                u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                clock.now(),
+                RTT,
+            );
         }
-        assert_eq!(u32::from(params.rounded_cwnd()), 5 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(
+            u32::from(params.rounded_cwnd()),
+            5 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
+        );
 
         // Now we are at `epoch_start+RTT`, the window size should grow by at
-        // lease 1 MSS per RTT (standard TCP).
+        // lease 1 u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE) per RTT (standard TCP).
         clock.sleep(RTT);
-        for _seg in 0..params.cwnd / DEFAULT_MAXIMUM_SEGMENT_SIZE {
-            cubic.on_ack_u32(&mut params, DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), RTT);
+        for _seg in 0..params.cwnd / u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE) {
+            cubic.on_ack_u32(
+                &mut params,
+                u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                clock.now(),
+                RTT,
+            );
         }
-        assert_eq!(u32::from(params.rounded_cwnd()), 6 * DEFAULT_MAXIMUM_SEGMENT_SIZE);
+        assert_eq!(
+            u32::from(params.rounded_cwnd()),
+            6 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
+        );
     }
 }

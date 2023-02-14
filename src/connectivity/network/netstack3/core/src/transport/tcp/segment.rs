@@ -4,12 +4,18 @@
 
 //! The definition of a TCP segment.
 
-use core::{convert::TryFrom as _, num::TryFromIntError, ops::Range};
+use core::{
+    convert::TryFrom as _,
+    num::{NonZeroU16, TryFromIntError},
+    ops::Range,
+};
+
+use packet_formats::tcp::options::TcpOption;
 
 use crate::transport::tcp::{
     buffer::SendPayload,
     seqnum::{SeqNum, WindowSize},
-    Control,
+    Control, Mss,
 };
 
 /// A TCP segment.
@@ -23,6 +29,38 @@ pub(crate) struct Segment<P: Payload> {
     pub(crate) wnd: WindowSize,
     /// The carried data and its control flag.
     pub(crate) contents: Contents<P>,
+    /// Options carried by this segment.
+    pub(crate) options: Options,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub(crate) struct Options {
+    pub(crate) mss: Option<Mss>,
+}
+
+impl Options {
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = TcpOption<'static>> + core::fmt::Debug + Clone {
+        self.mss.map(|mss| TcpOption::Mss(mss.get().get())).into_iter()
+    }
+
+    pub(crate) fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
+        let mut options = Options::default();
+        for option in iter {
+            match option {
+                TcpOption::Mss(mss) => {
+                    options.mss = NonZeroU16::new(mss).map(Mss);
+                }
+                // TODO(https://fxbug.dev/121882): We don't support these yet.
+                TcpOption::WindowScale(_)
+                | TcpOption::SackPermitted
+                | TcpOption::Sack(_)
+                | TcpOption::Timestamp { ts_val: _, ts_echo_reply: _ } => {}
+            }
+        }
+        options
+    }
 }
 
 /// The maximum length that the sequence number doesn't wrap around.
@@ -65,16 +103,13 @@ impl<P: Payload> Contents<P> {
 }
 
 impl<P: Payload> Segment<P> {
-    /// Creates a new segment with data.
-    ///
-    /// Returns the segment along with how many bytes were removed to make sure
-    /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
-    pub(super) fn with_data(
+    pub(super) fn with_data_options(
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
         wnd: WindowSize,
         data: P,
+        options: Options,
     ) -> (Self, usize) {
         let has_control_len = control.map(Control::has_sequence_no).unwrap_or(false);
 
@@ -96,14 +131,28 @@ impl<P: Payload> Segment<P> {
             Contents { control, data }
         };
 
-        (Segment { seq, ack, wnd, contents }, discarded_len)
+        (Segment { seq, ack, wnd, contents, options }, discarded_len)
+    }
+
+    /// Creates a new segment with data.
+    ///
+    /// Returns the segment along with how many bytes were removed to make sure
+    /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
+    pub(super) fn with_data(
+        seq: SeqNum,
+        ack: Option<SeqNum>,
+        control: Option<Control>,
+        wnd: WindowSize,
+        data: P,
+    ) -> (Self, usize) {
+        Self::with_data_options(seq, ack, control, wnd, data, Options::default())
     }
 }
 
 impl<P: Payload> Segment<P> {
     /// Returns the part of the incoming segment within the receive window.
     pub(super) fn overlap(self, rnxt: SeqNum, rwnd: WindowSize) -> Option<Segment<P>> {
-        let Segment { seq, ack, wnd, contents } = self;
+        let Segment { seq, ack, wnd, contents, options } = self;
         let len = contents.len();
         let Contents { control, data } = contents;
         // RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
@@ -184,6 +233,7 @@ impl<P: Payload> Segment<P> {
                 ack,
                 wnd,
                 contents: Contents { control: new_control, data: new_data },
+                options,
             }
         })
     }
@@ -197,9 +247,19 @@ impl Segment<()> {
         control: Option<Control>,
         wnd: WindowSize,
     ) -> Self {
+        Self::with_options(seq, ack, control, wnd, Options::default())
+    }
+
+    pub(super) fn with_options(
+        seq: SeqNum,
+        ack: Option<SeqNum>,
+        control: Option<Control>,
+        wnd: WindowSize,
+        options: Options,
+    ) -> Self {
         // All of the checks on lengths are optimized out:
         // https://godbolt.org/z/KPd537G6Y
-        let (seg, truncated) = Segment::with_data(seq, ack, control, wnd, ());
+        let (seg, truncated) = Segment::with_data_options(seq, ack, control, wnd, (), options);
         debug_assert_eq!(truncated, 0);
         seg
     }
@@ -210,13 +270,13 @@ impl Segment<()> {
     }
 
     /// Creates a SYN segment.
-    pub(super) fn syn(seq: SeqNum, wnd: WindowSize) -> Self {
-        Segment::new(seq, None, Some(Control::SYN), wnd)
+    pub(super) fn syn(seq: SeqNum, wnd: WindowSize, options: Options) -> Self {
+        Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
     }
 
     /// Creates a SYN-ACK segment.
-    pub(super) fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: WindowSize) -> Self {
-        Segment::new(seq, Some(ack), Some(Control::SYN), wnd)
+    pub(super) fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: WindowSize, options: Options) -> Self {
+        Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
     }
 
     /// Creates a RST segment.
@@ -304,21 +364,22 @@ impl Payload for () {
 
 impl From<Segment<()>> for Segment<&'static [u8]> {
     fn from(
-        Segment { seq, ack, wnd, contents: Contents { control, data: () } }: Segment<()>,
+        Segment { seq, ack, wnd, contents: Contents { control, data: () }, options }: Segment<()>,
     ) -> Self {
-        Segment { seq, ack, wnd, contents: Contents { control, data: &[] } }
+        Segment { seq, ack, wnd, contents: Contents { control, data: &[] }, options }
     }
 }
 
 impl From<Segment<()>> for Segment<SendPayload<'static>> {
     fn from(
-        Segment { seq, ack, wnd, contents: Contents { control, data: () } }: Segment<()>,
+        Segment { seq, ack, wnd, contents: Contents { control, data: () }, options }: Segment<()>,
     ) -> Self {
         Segment {
             seq,
             ack,
             wnd,
             contents: Contents { control, data: SendPayload::Contiguous(&[]) },
+            options,
         }
     }
 }
@@ -630,6 +691,7 @@ mod test {
                  ack: _,
                  wnd: _,
                  contents: Contents { control, data: TestPayload(range) },
+                 options: _,
              }| { (seq, control, range) },
         )
     }

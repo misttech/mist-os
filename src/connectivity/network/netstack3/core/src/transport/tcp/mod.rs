@@ -12,14 +12,15 @@ mod seqnum;
 pub mod socket;
 pub mod state;
 
-use core::num::{NonZeroU64, NonZeroU8};
+use core::num::{NonZeroU16, NonZeroU64, NonZeroU8};
 
 use const_unwrap::const_unwrap_option;
+use net_types::ip::{Ip, IpVersion};
 use packet_formats::utils::NonZeroDuration;
 use rand::RngCore;
 
 use crate::{
-    ip::{IpDeviceId, IpExt},
+    ip::{socket::Mms, IpDeviceId, IpExt, IpLayerIpExt},
     sync::Mutex,
     transport::tcp::{
         self,
@@ -27,14 +28,6 @@ use crate::{
         socket::{isn::IsnGenerator, Sockets},
     },
 };
-
-/// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
-///
-/// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS
-/// FORTY.
-///   The default IP Maximum Datagram Size is 576.
-///   The default TCP Maximum Segment Size is 536.
-const DEFAULT_MAXIMUM_SEGMENT_SIZE: u32 = 536;
 
 /// Control flags that can alter the state of a TCP control block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,6 +69,45 @@ pub(crate) struct TcpState<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncConte
 impl<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
     pub(crate) fn new(now: C::Instant, rng: &mut impl RngCore) -> Self {
         Self { isn_generator: IsnGenerator::new(now, rng), sockets: Mutex::new(Sockets::new(rng)) }
+    }
+}
+
+const TCP_HEADER_LEN: u32 = packet_formats::tcp::HDR_PREFIX_LEN as u32;
+
+/// Maximum segment size, that is the maximum TCP payload one segment can carry.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+pub(crate) struct Mss(NonZeroU16);
+
+impl Mss {
+    /// Creates MSS from the maximum message size of the IP layer.
+    fn from_mms<I: IpLayerIpExt>(mms: Mms<I>) -> Option<Self> {
+        NonZeroU16::new(
+            u16::try_from(mms.get().get().saturating_sub(TCP_HEADER_LEN)).unwrap_or(u16::MAX),
+        )
+        .map(Self)
+    }
+
+    const fn default<I: Ip>() -> Self {
+        // Per RFC 9293 Section 3.7.1:
+        //  If an MSS Option is not received at connection setup, TCP
+        //  implementations MUST assume a default send MSS of 536 (576 - 40) for
+        //  IPv4 or 1220 (1280 - 60) for IPv6 (MUST-15).
+        match I::VERSION {
+            IpVersion::V4 => Mss(nonzero_ext::nonzero!(536_u16)),
+            IpVersion::V6 => Mss(nonzero_ext::nonzero!(1220_u16)),
+        }
+    }
+
+    /// Gets the numeric value of the MSS.
+    const fn get(&self) -> NonZeroU16 {
+        let Self(mss) = *self;
+        mss
+    }
+}
+
+impl From<Mss> for u32 {
+    fn from(Mss(mss): Mss) -> Self {
+        u32::from(mss.get())
     }
 }
 
@@ -149,4 +181,18 @@ impl Default for KeepAlive {
             enabled: false,
         }
     }
+}
+
+#[cfg(test)]
+mod testutil {
+    use super::Mss;
+    /// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
+    ///
+    /// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS
+    /// FORTY.
+    ///   The default IP Maximum Datagram Size is 576.
+    ///   The default TCP Maximum Segment Size is 536.
+    pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
+    pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
+        Mss(nonzero_ext::nonzero!(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16));
 }

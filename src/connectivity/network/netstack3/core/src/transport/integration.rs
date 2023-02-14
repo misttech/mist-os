@@ -5,14 +5,17 @@
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
+    ip::device::IpDeviceNonSyncContext,
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
-        udp::{self},
+        udp,
     },
     DeviceId, NonSyncContext, SyncCtx,
 };
 
-impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
+    tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C>
+{
     type IpTransportCtx = Self;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
@@ -40,7 +43,9 @@ impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C> {
     }
 }
 
-impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
+    tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C>
+{
     type IpTransportCtx = Self;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<

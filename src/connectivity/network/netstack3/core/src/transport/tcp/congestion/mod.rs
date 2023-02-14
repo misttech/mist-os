@@ -21,7 +21,7 @@ use core::{
 use crate::{
     transport::tcp::{
         seqnum::{SeqNum, WindowSize},
-        DEFAULT_MAXIMUM_SEGMENT_SIZE,
+        Mss,
     },
     Instant,
 };
@@ -39,11 +39,12 @@ struct CongestionControlParams {
     /// Congestion control window size, in bytes.
     cwnd: u32,
     /// Sender MSS.
-    mss: u32,
+    mss: Mss,
 }
 
 impl CongestionControlParams {
-    fn with_mss(mss: u32) -> Self {
+    fn with_mss(mss: Mss) -> Self {
+        let mss_u32 = u32::from(mss);
         // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#page-5):
         //   IW, the initial value of cwnd, MUST be set using the following
         //   guidelines as an upper bound.
@@ -53,24 +54,19 @@ impl CongestionControlParams {
         //       IW = 3 * SMSS bytes and MUST NOT be more than 3 segments
         //   if SMSS <= 1095 bytes:
         //       IW = 4 * SMSS bytes and MUST NOT be more than 4 segments
-        let cwnd = if mss > 2190 {
-            mss * 2
-        } else if mss > 1095 {
-            mss * 3
+        let cwnd = if mss_u32 > 2190 {
+            mss_u32 * 2
+        } else if mss_u32 > 1095 {
+            mss_u32 * 3
         } else {
-            mss * 4
+            mss_u32 * 4
         };
         Self { cwnd, ssthresh: u32::MAX, mss }
     }
 
     fn rounded_cwnd(&self) -> WindowSize {
-        WindowSize::from_u32(self.cwnd / self.mss * self.mss).unwrap_or(WindowSize::MAX)
-    }
-}
-
-impl Default for CongestionControlParams {
-    fn default() -> Self {
-        Self::with_mss(DEFAULT_MAXIMUM_SEGMENT_SIZE)
+        let mss_u32 = u32::from(self.mss);
+        WindowSize::from_u32(self.cwnd / mss_u32 * mss_u32).unwrap_or(WindowSize::MAX)
     }
 }
 
@@ -191,7 +187,9 @@ impl<I: Instant> CongestionControl<I> {
             // algorithm will continue to operate the same way as if the 2 SMSS
             // is never added to cwnd.
             if fast_recovery.dup_acks.get() < DUP_ACK_THRESHOLD {
-                return cwnd.saturating_add(u32::from(fast_recovery.dup_acks.get()) * params.mss);
+                return cwnd.saturating_add(
+                    u32::from(fast_recovery.dup_acks.get()) * u32::from(params.mss),
+                );
             }
         }
         cwnd
@@ -203,16 +201,20 @@ impl<I: Instant> CongestionControl<I> {
         self.fast_recovery.as_mut().and_then(|r| r.fast_retransmit.take())
     }
 
-    pub(super) fn cubic() -> Self {
+    pub(super) fn cubic_with_mss(mss: Mss) -> Self {
         Self {
-            params: CongestionControlParams::default(),
+            params: CongestionControlParams::with_mss(mss),
             algorithm: LossBasedAlgorithm::Cubic(Default::default()),
             fast_recovery: None,
         }
     }
 
     pub(super) fn take(&mut self) -> Self {
-        core::mem::replace(self, Self::cubic())
+        core::mem::replace(self, Self::cubic_with_mss(self.mss()))
+    }
+
+    pub(super) fn mss(&self) -> Mss {
+        self.params.mss
     }
 }
 
@@ -262,7 +264,8 @@ impl FastRecovery {
                 //   (three) that have left the network and which the receiver
                 //   has buffered.
                 self.fast_retransmit = Some(seg_ack);
-                params.cwnd = params.ssthresh + u32::from(DUP_ACK_THRESHOLD) * params.mss;
+                params.cwnd =
+                    params.ssthresh + u32::from(DUP_ACK_THRESHOLD) * u32::from(params.mss);
             }
             Ordering::Greater => {
                 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
@@ -270,7 +273,7 @@ impl FastRecovery {
                 //   cwnd MUST be incremented by SMSS. This artificially inflates
                 //   the congestion window in order to reflect the additional
                 //   segment that has left the network.
-                params.cwnd += params.mss;
+                params.cwnd += u32::from(params.mss);
             }
         }
     }
@@ -281,11 +284,14 @@ mod test {
     use core::{num::NonZeroU32, time::Duration};
 
     use super::*;
-    use crate::context::testutil::FakeInstant;
+    use crate::{
+        context::testutil::FakeInstant, transport::tcp::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+    };
 
     #[test]
     fn no_recovery_before_reaching_threshold() {
-        let mut congestion_control = CongestionControl::cubic();
+        let mut congestion_control =
+            CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
         let old_cwnd = congestion_control.params.cwnd;
         assert_eq!(congestion_control.params.ssthresh, u32::MAX);
         congestion_control.on_dup_ack(SeqNum::new(0));
