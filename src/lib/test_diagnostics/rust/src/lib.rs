@@ -206,8 +206,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn collect_test_stdout() {
-        let (sock_server, sock_client) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("Failed while creating socket");
+        let (sock_server, sock_client) = fidl::Socket::create_stream();
 
         let (sender, mut recv) = mpsc::channel(1);
 

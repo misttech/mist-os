@@ -390,9 +390,7 @@ mod tests {
                                 responder.send(&mut Ok(vec![result])).expect("send response");
                             }
                             true => {
-                                let sock_opts = fidl::SocketOpts::STREAM;
-                                let (socket, tx_socket) =
-                                    fidl::Socket::create(sock_opts).expect("create socket");
+                                let (socket, tx_socket) = fidl::Socket::create_stream();
                                 let mut tx_socket = fasync::Socket::from_socket(tx_socket)
                                     .expect("create async socket");
                                 let response = ArchiveIteratorEntry {

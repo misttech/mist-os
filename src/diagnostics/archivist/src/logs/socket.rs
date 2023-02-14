@@ -119,7 +119,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn logger_stream_test() {
-        let (sin, sout) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (sin, sout) = zx::Socket::create_datagram();
         let mut packet: fx_log_packet_t = Default::default();
         packet.metadata.pid = 1;
         packet.metadata.severity = 0x30; // INFO
@@ -156,7 +156,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn structured_logger_stream_test() {
-        let (sin, sout) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (sin, sout) = zx::Socket::create_datagram();
         let timestamp = 107;
         let record = Record {
             timestamp,

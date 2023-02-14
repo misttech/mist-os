@@ -39,8 +39,7 @@ pub(crate) struct Sink {
 
 impl Sink {
     pub fn new(log_sink: &LogSinkProxy) -> Result<Self, PublishError> {
-        let (socket, remote_socket) =
-            zx::Socket::create(zx::SocketOpts::DATAGRAM).map_err(PublishError::MakeSocket)?;
+        let (socket, remote_socket) = zx::Socket::create_datagram();
         log_sink.connect_structured(remote_socket).map_err(PublishError::SendSocket)?;
 
         Ok(Self {

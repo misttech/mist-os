@@ -497,8 +497,7 @@ mod test {
     fn test_build_with_socket() {
         // Create the socket and logger with a couple of tags
         // and write a simple message to it.
-        let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM)
-            .expect("Datagram socket could not be made");
+        let (tx, rx) = zx::Socket::create_datagram();
         let tags = ["[testing]"];
         let logger = build_with_tags_and_socket(tx, &tags).expect("failed to create logger");
         logger.log_f(levels::ERROR, format_args!("{}-{}", "hello", "world"), None);
@@ -508,8 +507,7 @@ mod test {
 
     #[test]
     fn test() {
-        let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM)
-            .expect("Datagram socket could not be made");
+        let (tx, rx) = zx::Socket::create_datagram();
         let config = syslog::fx_logger_config_t {
             min_severity: levels::INFO,
             log_sink_channel: zx::sys::ZX_HANDLE_INVALID,

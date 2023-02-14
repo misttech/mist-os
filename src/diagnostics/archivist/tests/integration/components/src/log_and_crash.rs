@@ -10,7 +10,7 @@ use fuchsia_zircon as zx;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    let (send, sink) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+    let (send, sink) = zx::Socket::create_datagram();
 
     for (message, severity) in &[
         (&b"crasher has initialized"[..], LogLevelFilter::Info),

@@ -52,8 +52,8 @@ async fn timestamp_sorting_for_batches() {
     {
         // there are two writers in this test, a "tortoise" and a "hare"
         // the hare's messages are always timestamped earlier but arrive later
-        let (send_tort, recv_tort) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
-        let (send_hare, recv_hare) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (send_tort, recv_tort) = zx::Socket::create_datagram();
+        let (send_hare, recv_hare) = zx::Socket::create_datagram();
 
         // put a message in each socket
         send_tort.write(packets[tort_times.0].as_bytes()).unwrap();

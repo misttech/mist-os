@@ -209,7 +209,7 @@ impl TestHarness {
         fasync::Task::spawn(log_receiver.for_each_concurrent(None, |rx| async move { rx.await }))
             .detach();
 
-        let (sin, sout) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+        let (sin, sout) = zx::Socket::create_datagram();
         E::connect(&_log_sink_proxy, sout);
 
         let _alive = Arc::new(());
@@ -523,8 +523,7 @@ impl LogSinkHelper {
     }
 
     pub fn connect(&self) -> zx::Socket {
-        let (sin, sout) =
-            zx::Socket::create(zx::SocketOpts::DATAGRAM).expect("Cannot create socket");
+        let (sin, sout) = zx::Socket::create_datagram();
         self.log_sink.as_ref().unwrap().connect(sin).expect("unable to send socket to log sink");
         sout
     }

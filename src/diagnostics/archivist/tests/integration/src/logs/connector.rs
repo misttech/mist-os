@@ -9,7 +9,7 @@ use component_events::{events::*, matcher::*};
 use diagnostics_message::fx_log_packet_t;
 use fidl::{
     endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-    Socket, SocketOpts,
+    Socket,
 };
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_diagnostics_test::ControllerMarker;
@@ -116,7 +116,7 @@ async fn serve_mocks(
     // connect multiple identical log sinks
     let mut sockets = Vec::new();
     for _ in 0..50 {
-        let (message_client, message_server) = Socket::create(SocketOpts::DATAGRAM).unwrap();
+        let (message_client, message_server) = Socket::create_datagram();
         sockets.push(message_server);
 
         // each with the same message repeated multiple times

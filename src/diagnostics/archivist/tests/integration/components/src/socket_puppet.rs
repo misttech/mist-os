@@ -19,7 +19,7 @@ async fn main() {
     let (client, mut requests) = create_request_stream::<SocketPuppetMarker>().unwrap();
     controller.control_puppet(client).unwrap();
 
-    let (send, recv) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
+    let (send, recv) = zx::Socket::create_datagram();
     let mut recv = Some(recv); // so we can send it to LogSink
     while let Some(Ok(next)) = requests.next().await {
         match next {

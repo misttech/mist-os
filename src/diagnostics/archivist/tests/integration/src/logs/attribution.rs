@@ -10,7 +10,7 @@ use component_events::{
 use diagnostics_hierarchy::assert_data_tree;
 use diagnostics_message::fx_log_packet_t;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
-use fidl::{Socket, SocketOpts};
+use fidl::Socket;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogSinkMarker};
 use fuchsia_async as fasync;
@@ -116,7 +116,7 @@ async fn log_unattributed_stream() {
 
     // connect multiple identical log sinks
     for _ in 0..50 {
-        let (message_client, message_server) = Socket::create(SocketOpts::DATAGRAM).unwrap();
+        let (message_client, message_server) = Socket::create_datagram();
         let log_sink = instance.root.connect_to_protocol_at_exposed_dir::<LogSinkMarker>().unwrap();
         log_sink.connect(message_server).unwrap();
 
