@@ -114,6 +114,8 @@ The following are the approved licenses for production target devices:
 *   BSD 2-clause license, specifically the text at
     [https://opensource.org/licenses/BSD-2-Clause](https://opensource.org/licenses/BSD-2-Clause)
 
+*   BSD AES variant, specifically the text at [https://fedoraproject.org/wiki/Licensing:BSD#AES_Variant](https://web.archive.org/web/20221220074725/https://fedoraproject.org/wiki/Licensing:BSD#AES_Variant)
+
 *   MIT license, specifically the text at
     [/zircon/kernel/LICENSE](/zircon/kernel/LICENSE)
 
