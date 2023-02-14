@@ -5,7 +5,7 @@
 use crate::{
     fastboot::{get_var, network::tcp::TcpNetworkFactory, open_interface_with_serial},
     logger::{streamer::DiagnosticsStreamer, Logger},
-    overnet::host_pipe::{HostAddr, HostPipeConnection, LogBuffer},
+    overnet::host_pipe::{spawn, spawn_circuit, HostAddr, LogBuffer},
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
 use addr::TargetAddr;
@@ -909,19 +909,24 @@ impl Target {
         let weak_target = Rc::downgrade(self);
         self.host_pipe.borrow_mut().replace(Task::local(async move {
             let modes = ffx_config::get_connection_modes().await;
-
             let legacy = async {
                 if modes.use_legacy() {
-                    let r = HostPipeConnection::new(weak_target.clone()).await;
-                    // XXX(raggi): decide what to do with this log data:
-                    tracing::info!("HostPipeConnection returned: {:?}", r);
+                    let nr = spawn(weak_target.clone()).await;
+                    if let Ok(mut hp) = nr {
+                        let r = hp.wait().await;
+                        // XXX(raggi): decide what to do with this log data:
+                        tracing::info!("HostPipeConnection returned: {:?}", r);
+                    }
                 }
             };
             let circuit = async {
                 if modes.use_cso() {
-                    let r = HostPipeConnection::new_circuit(weak_target.clone()).await;
-                    // XXX(raggi): decide what to do with this log data:
-                    tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                    let nr = spawn_circuit(weak_target.clone()).await;
+                    if let Ok(mut hp) = nr {
+                        let r = hp.wait().await;
+                        // XXX(raggi): decide what to do with this log data:
+                        tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                    }
                 }
             };
             futures::future::join(legacy, circuit).await;

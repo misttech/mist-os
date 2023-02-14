@@ -6,21 +6,22 @@ use super::ssh::build_ssh_command;
 use crate::{target::Target, RETRY_DELAY};
 use anyhow::{anyhow, Context, Result};
 use async_io::Async;
+use async_trait::async_trait;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use fuchsia_async::{unblock, Task, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
 use hoist::OvernetInstance;
+use shared_child::SharedChild;
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    fmt,
-    future::Future,
-    io,
+    fmt, io,
     net::SocketAddr,
-    process::{Child, Stdio},
+    process::Stdio,
     rc::{Rc, Weak},
+    sync::Arc,
     time::Duration,
 };
 
@@ -78,30 +79,58 @@ impl From<String> for HostAddr {
     }
 }
 
-struct HostPipeChild {
-    inner: Child,
+#[async_trait(?Send)]
+pub(crate) trait HostPipeChildBuilder {
+    async fn new(
+        &self,
+        addr: SocketAddr,
+        id: u64,
+        stderr_buf: Rc<LogBuffer>,
+        event_queue: events::Queue<TargetEvent>,
+    ) -> Result<(Option<HostAddr>, HostPipeChild)>
+    where
+        Self: Sized;
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct HostPipeChildCircuitBuilder {}
+
+#[async_trait(?Send)]
+impl HostPipeChildBuilder for HostPipeChildCircuitBuilder {
+    async fn new(
+        &self,
+        addr: SocketAddr,
+        id: u64,
+        stderr_buf: Rc<LogBuffer>,
+        event_queue: events::Queue<TargetEvent>,
+    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, true).await
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct HostPipeChildDefaultBuilder {}
+
+#[async_trait(?Send)]
+impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
+    async fn new(
+        &self,
+        addr: SocketAddr,
+        id: u64,
+        stderr_buf: Rc<LogBuffer>,
+        event_queue: events::Queue<TargetEvent>,
+    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, false).await
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct HostPipeChild {
+    inner: SharedChild,
     task: Option<Task<()>>,
 }
 
 impl HostPipeChild {
-    async fn new(
-        addr: SocketAddr,
-        id: u64,
-        stderr_buf: Rc<LogBuffer>,
-        event_queue: events::Queue<TargetEvent>,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        Self::new_inner(addr, id, stderr_buf, event_queue, false).await
-    }
-
-    async fn new_circuit(
-        addr: SocketAddr,
-        id: u64,
-        stderr_buf: Rc<LogBuffer>,
-        event_queue: events::Queue<TargetEvent>,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        Self::new_inner(addr, id, stderr_buf, event_queue, true).await
-    }
-
     async fn new_inner(
         addr: SocketAddr,
         id: u64,
@@ -129,12 +158,9 @@ impl HostPipeChild {
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
-        let mut ssh = ssh
-            .stdout(Stdio::piped())
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .context("running target overnet pipe")?;
+        let mut ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
+
+        let ssh = SharedChild::spawn(&mut ssh_cmd).context("running target overnet pipe")?;
 
         // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
         // instead -- this one is very deeply embedded, but isn't used by tests (that I've found).
@@ -143,13 +169,13 @@ impl HostPipeChild {
         );
 
         let stdout =
-            Async::new(ssh.stdout.take().ok_or(anyhow!("unable to get stdout from target pipe"))?)?;
+            Async::new(ssh.take_stdout().ok_or(anyhow!("unable to get stdout from target pipe"))?)?;
 
         let mut stdin =
-            Async::new(ssh.stdin.take().ok_or(anyhow!("unable to get stdin from target pipe"))?)?;
+            Async::new(ssh.take_stdin().ok_or(anyhow!("unable to get stdin from target pipe"))?)?;
 
         let stderr =
-            Async::new(ssh.stderr.take().ok_or(anyhow!("unable to stderr from target pipe"))?)?;
+            Async::new(ssh.take_stderr().ok_or(anyhow!("unable to stderr from target pipe"))?)?;
 
         // Read the first line. This can be either either be an empty string "",
         // which signifies the STDOUT has been closed, or the $SSH_CONNECTION
@@ -208,11 +234,11 @@ impl HostPipeChild {
         ))
     }
 
-    fn kill(&mut self) -> io::Result<()> {
+    fn kill(&self) -> io::Result<()> {
         self.inner.kill()
     }
 
-    fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
+    fn wait(&self) -> io::Result<std::process::ExitStatus> {
         self.inner.wait()
     }
 }
@@ -320,60 +346,108 @@ impl Drop for HostPipeChild {
     }
 }
 
-pub struct HostPipeConnection {}
+#[derive(Debug)]
+pub(crate) struct HostPipeConnection<T>
+where
+    T: HostPipeChildBuilder + Copy,
+{
+    target: Rc<Target>,
+    inner: Arc<HostPipeChild>,
+    relaunch_command_delay: Duration,
+    host_pipe_child_builder: T,
+}
 
-impl HostPipeConnection {
-    pub fn new(target: Weak<Target>) -> impl Future<Output = Result<()>> {
-        HostPipeConnection::new_with_cmd(target, HostPipeChild::new, RETRY_DELAY)
+impl<T> Drop for HostPipeConnection<T>
+where
+    T: HostPipeChildBuilder + Copy,
+{
+    fn drop(&mut self) {
+        let res = self.inner.kill();
+        tracing::info!("killed inner {:?}", res)
     }
+}
 
-    pub fn new_circuit(target: Weak<Target>) -> impl Future<Output = Result<()>> {
-        HostPipeConnection::new_with_cmd(target, HostPipeChild::new_circuit, RETRY_DELAY)
-    }
+pub(crate) async fn spawn_circuit(
+    target: Weak<Target>,
+) -> Result<HostPipeConnection<HostPipeChildCircuitBuilder>> {
+    let host_pipe_child_builder = HostPipeChildCircuitBuilder {};
+    HostPipeConnection::<HostPipeChildCircuitBuilder>::spawn_with_builder(
+        target,
+        host_pipe_child_builder,
+        RETRY_DELAY,
+    )
+    .await
+}
 
-    async fn new_with_cmd<F>(
-        target: Weak<Target>,
-        cmd_func: impl FnOnce(SocketAddr, u64, Rc<LogBuffer>, events::Queue<TargetEvent>) -> F
-            + Copy
-            + 'static,
-        relaunch_command_delay: Duration,
-    ) -> Result<()>
-    where
-        F: futures::Future<Output = Result<(Option<HostAddr>, HostPipeChild)>>,
-    {
-        loop {
-            let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
-            let target_nodename = target.nodename();
-            tracing::debug!("Spawning new host-pipe instance to target {:?}", target_nodename);
-            let log_buf = target.host_pipe_log_buffer();
-            log_buf.clear();
+pub(crate) async fn spawn(
+    target: Weak<Target>,
+) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder>> {
+    let host_pipe_child_builder = HostPipeChildDefaultBuilder {};
+    HostPipeConnection::<HostPipeChildDefaultBuilder>::spawn_with_builder(
+        target,
+        host_pipe_child_builder,
+        RETRY_DELAY,
+    )
+    .await
+}
 
-            let ssh_address = target.ssh_address().ok_or_else(|| {
-                anyhow!("target {:?} does not yet have an ssh address", target_nodename)
+impl<T> HostPipeConnection<T>
+where
+    T: HostPipeChildBuilder + Copy,
+{
+    async fn start_child_pipe(target: &Weak<Target>, builder: T) -> Result<Arc<HostPipeChild>> {
+        let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
+        let target_nodename = target.nodename();
+        tracing::debug!("Spawning new host-pipe instance to target {:?}", target_nodename);
+        let log_buf = target.host_pipe_log_buffer();
+        log_buf.clear();
+
+        let ssh_address = target.ssh_address().ok_or_else(|| {
+            anyhow!("target {:?} does not yet have an ssh address", target_nodename)
+        })?;
+
+        let (host_addr, cmd) = builder
+            .new(ssh_address, target.id(), log_buf.clone(), target.events.clone())
+            .await
+            .with_context(|| {
+                format!("creating host-pipe command to target {:?}", target_nodename)
             })?;
-            let (host_addr, mut cmd) =
-                cmd_func(ssh_address, target.id(), log_buf.clone(), target.events.clone())
-                    .await
-                    .with_context(|| {
-                        format!("creating host-pipe command to target {:?}", target_nodename)
-                    })?;
 
-            *target.ssh_host_address.borrow_mut() = host_addr;
+        *target.ssh_host_address.borrow_mut() = host_addr;
+        let hpc = Arc::new(cmd);
+        Ok(hpc)
+    }
 
-            // Attempts to run the command. If it exits successfully (disconnect
+    async fn spawn_with_builder(
+        target: Weak<Target>,
+        host_pipe_child_builder: T,
+        relaunch_command_delay: Duration,
+    ) -> Result<Self> {
+        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder).await?;
+        let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
+
+        Ok(Self { target, inner: hpc, relaunch_command_delay, host_pipe_child_builder })
+    }
+
+    pub async fn wait(&mut self) -> Result<()> {
+        loop {
+            // Waits on the running the command. If it exits successfully (disconnect
             // due to peer dropping) then will set the target to disconnected
             // state. If there was an error running the command for some reason,
             // then continue and attempt to run the command again.
-            let res = unblock(move || cmd.wait()).await.map_err(|e| {
+            let target_nodename = self.target.nodename();
+            let clone = self.inner.clone();
+            let res = unblock(move || clone.wait()).await.map_err(|e| {
                 anyhow!(
                     "host-pipe error to target {:?} running try-wait: {}",
                     target_nodename,
                     e.to_string()
                 )
             });
+
             tracing::debug!("host-pipe command res: {:?}", res);
 
-            target.ssh_host_address.borrow_mut().take();
+            self.target.ssh_host_address.borrow_mut().take();
 
             match res {
                 Ok(_) => {
@@ -385,7 +459,12 @@ impl HostPipeConnection {
             // TODO(fxbug.dev/52038): Want an exponential backoff that
             // is sync'd with an explicit "try to start this again
             // anyway" channel using a select! between the two of them.
-            Timer::new(relaunch_command_delay).await;
+            Timer::new(self.relaunch_command_delay).await;
+
+            let hpc =
+                Self::start_child_pipe(&Rc::downgrade(&self.target), self.host_pipe_child_builder)
+                    .await?;
+            self.inner = hpc;
         }
     }
 }
@@ -407,6 +486,7 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use assert_matches::assert_matches;
+    use std::process::Command;
     use std::{rc::Rc, str::FromStr};
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";
@@ -415,8 +495,44 @@ mod test {
         /// Implements some fake join handles that wait on a join command before
         /// closing. The reader and writer handles don't do anything other than
         /// spin until they receive a message to stop.
-        pub fn fake_new(child: Child) -> Self {
+        pub fn fake_new(child: &mut Command) -> Self {
+            let child = SharedChild::spawn(child).context(ERR_CTX).unwrap();
             Self { inner: child, task: Some(Task::local(async {})) }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    enum ChildOperationType {
+        Normal,
+        InternalFailure,
+        SshFailure,
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    struct FakeHostPipeChildBuilder {
+        operation_type: ChildOperationType,
+    }
+
+    #[async_trait(?Send)]
+    impl HostPipeChildBuilder for FakeHostPipeChildBuilder {
+        async fn new(
+            &self,
+            addr: SocketAddr,
+            id: u64,
+            stderr_buf: Rc<LogBuffer>,
+            event_queue: events::Queue<TargetEvent>,
+        ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+            match self.operation_type {
+                ChildOperationType::Normal => {
+                    start_child_normal_operation(addr, id, stderr_buf, event_queue).await
+                }
+                ChildOperationType::InternalFailure => {
+                    start_child_internal_failure(addr, id, stderr_buf, event_queue).await
+                }
+                ChildOperationType::SshFailure => {
+                    start_child_ssh_failure(addr, id, stderr_buf, event_queue).await
+                }
+            }
         }
     }
 
@@ -432,9 +548,7 @@ mod test {
                 std::process::Command::new("echo")
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .context(ERR_CTX)?,
+                    .stdin(Stdio::piped()),
             ),
         ))
     }
@@ -461,9 +575,7 @@ mod test {
                 std::process::Command::new("echo")
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .context(ERR_CTX)?,
+                    .stdin(Stdio::piped()),
             ),
         ))
     }
@@ -474,9 +586,9 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
-        let res = HostPipeConnection::new_with_cmd(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
-            start_child_normal_operation,
+            FakeHostPipeChildBuilder { operation_type: ChildOperationType::Normal },
             Duration::default(),
         )
         .await;
@@ -491,9 +603,9 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
-        let res = HostPipeConnection::new_with_cmd(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
-            start_child_internal_failure,
+            FakeHostPipeChildBuilder { operation_type: ChildOperationType::InternalFailure },
             Duration::default(),
         )
         .await;
@@ -519,9 +631,9 @@ mod test {
         // This is here to allow for the above task to get polled so that the `wait_for` can be
         // placed on at the appropriate time (before the failure occurs in the function below).
         futures_lite::future::yield_now().await;
-        let res = HostPipeConnection::new_with_cmd(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
-            start_child_ssh_failure,
+            FakeHostPipeChildBuilder { operation_type: ChildOperationType::SshFailure },
             Duration::default(),
         )
         .await;
