@@ -27,6 +27,7 @@ source_set("devfs_fidl") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fidl/cpp/wire",
+    "//src/lib/ddk",
   ]
 }
 

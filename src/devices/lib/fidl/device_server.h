@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
+#include <lib/ddk/device.h>
 #include <lib/fidl/cpp/wire/internal/server_details.h>
 
 namespace devfs_fidl {

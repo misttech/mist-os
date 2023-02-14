@@ -65,6 +65,22 @@ typedef struct zx_protocol_device zx_protocol_device_t;
 
 //@doc(docs/ddk/device-ops.md)
 
+// An outstanding FIDL transaction used when the driver host is managing
+// a FIDL channel.
+typedef struct fidl_txn fidl_txn_t;
+struct fidl_txn {
+  // Replies to the outstanding request and complete the FIDL transaction.
+  //
+  // Pass the |fidl_txn_t| object itself as the first parameter. The |msg|
+  // should already be encoded. This function always consumes any handles
+  // present in |msg|.
+  //
+  // Call |reply| only once for each |txn| object. After |reply| returns, the
+  // |txn| object is considered invalid and might have been freed or reused
+  // for another purpose.
+  zx_status_t (*reply)(fidl_txn_t* txn, const fidl_outgoing_msg_t* msg);
+};
+
 //@ # The Device Protocol
 //
 // Device drivers implement a set of hooks (methods) to support the

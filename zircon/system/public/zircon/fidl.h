@@ -609,21 +609,6 @@ typedef struct fidl_incoming_msg {
   uint32_t num_handles;
 } fidl_incoming_msg_t;
 
-// An outstanding FIDL transaction.
-typedef struct fidl_txn fidl_txn_t;
-struct fidl_txn {
-  // Replies to the outstanding request and complete the FIDL transaction.
-  //
-  // Pass the |fidl_txn_t| object itself as the first parameter. The |msg|
-  // should already be encoded. This function always consumes any handles
-  // present in |msg|.
-  //
-  // Call |reply| only once for each |txn| object. After |reply| returns, the
-  // |txn| object is considered invalid and might have been freed or reused
-  // for another purpose.
-  zx_status_t (*reply)(fidl_txn_t* txn, const fidl_outgoing_msg_t* msg);
-};
-
 // An epitaph is a message that a server sends just prior to closing the
 // connection.  It provides an indication of why the connection is being closed.
 // Epitaphs are defined in the FIDL wire format specification.  Once sent down
