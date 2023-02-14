@@ -141,7 +141,7 @@
     "<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus\">Platform Bus</a>"
   ]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "bootfs"
   short_description: "The boot filesystem that contains the files needed early in the boot process."
@@ -298,6 +298,16 @@
              "<a href=\"https://chrome-infra-packages.appspot.com/\">CIPD web UI</a>"]
   related_guides: [""]
   area: ["General", "Developer"]
+
+- term: "colocate"
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> is colocated with another
+  driver when they share the same <a href=\"/docs/glossary#driver-host\">driver host</a>."
+  full_description: ""
+  see_also: [
+    "<a href=\"/docs/concepts/drivers/driver_framework.md#driver_host\">Driver framework (DFv2)</a>"
+  ]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Compat driver"
   short_description: "A Driver Framework v2 (DFv2)
@@ -512,6 +522,18 @@
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
+- term: "Composite node specification"
+  short_description: "A composite node specification is a mechanism for creating a
+  <a href=\"/docs/glossary#composite-node\">composite node</a>. It describe the
+  <a href=\"/docs/glossary#node\">nodes</a> that can parent the composite node and
+  the <a href=\"/docs/glossary#node\">driver</a> that can bind to the composite node."
+  full_description: ""
+  see_also: [
+    "<a href=\"/docs/development/drivers/developer_guide/composite-node.md\">Composite nodes</a>"
+  ]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 - term: "Concurrent device driver"
   short_description: "A
   <a href=\"/docs/glossary#hardware-driver\">hardware driver</a> that supports multiple
@@ -620,6 +642,14 @@
   related_guides: ["<a href=\"/docs/concepts/drivers/driver-dispatcher-and-threads.md\">Driver dispatcher and threads</a>"]
   area: ["Languages and Libraries", "Devices", "Drivers", "Driver SDK"]
 
+- term: "Domain object"
+  short_description: "The corresponding class or data type in a target language (such as C++) used
+  to represent a FIDL type. A domain object usually models an entity in a problem domain space."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["FIDL"]
+
 - term: "Driver"
   short_description: "A driver is a dynamic shared library that enables and
   controls one or more <a href=\"/docs/glossary#node\">nodes</a>."
@@ -657,6 +687,15 @@
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
+- term: "Driver index"
+  short_description: "The driver index is a Fuchsia
+  <a href=\"/docs/glossary#component\">component</a> that is responsible for keeping track of all
+  available <a href=\"/docs/glossary#driver\">drivers</a>."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers"]
+
 - term: "Driver manager"
   short_description: "The Driver Manager (formerly devmgr or devcoordinator) is responsible for
   enumerating, loading, and managing the life cycle of device drivers."
@@ -676,14 +715,30 @@
                    "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
-
-- term: "Domain object"
-  short_description: "The corresponding class or data type in a target language (such as C++) used
-  to represent a FIDL type. A domain object usually models an entity in a problem domain space."
-  full_description: ""
-  see_also: [""]
+- term: "Driver runtime"
+  short_description: "The driver runtime is an in-process runtime modeled after the Zircon kernel
+  that enables <a href=\"/docs/glossary#colocate\">colocated</a> drivers to communicate with
+  each other locally. It is much more efficient than communicating using Zircon
+  <a href=\"/docs/glossary#channel\">channels</a>."
+  full_description: "The driver runtime is an in-process runtime modeled after the Zircon kernel
+  that enables <a href=\"/docs/glossary#colocate\">colocated</a> drivers to communicate with
+  each other locally. It is much more efficient than communicating using Zircon
+  <a href=\"/docs/glossary#channel\">channels</a>. It also provides a set of primitives mirroring
+  Zircon kernel objects and a threading model for <a href=\"/docs/glossary#driver\">drivers</a>
+  which allows for the sharing of Zircon threads."
+  see_also: ["<a href=\"/docs/concepts/drivers/driver_framework#driver_runtime\">Driver runtime</a>"]
   related_guides: [""]
-  area: ["FIDL"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Driver transport"
+  short_description: "The driver transport is a transport system in FIDL that's implemented on top
+  of <a href=\"/docs/glossary#driver-runtime\"driver runtime</a> channels."
+  full_description: ""
+  see_also: [
+    "<a href=\"/docs/development/languages/fidl/tutorials/cpp/topics/driver-transport\">Using new C++ bindings over the driver transport</a>"
+  ]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Environment"
   short_description: "A container for a set of components."
