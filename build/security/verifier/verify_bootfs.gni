@@ -9,8 +9,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Parameters
 #
-#   product_bundle (required)
-#     [label] Path to a product bundle.
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
 #
 #   goldens (required)
 #     [list of strings] Path to a list of golden files that contain golden
@@ -34,8 +34,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     Usual GN meaning.
 
 template("verify_bootfs_filelist") {
-  assert(defined(invoker.product_bundle),
-         "verify_bootfs_filelist() must specify product_bundle")
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
   assert(defined(invoker.goldens),
          "verify_bootfs_filelist() must specify goldens")
   assert(defined(invoker.golden_packages),
@@ -52,16 +52,12 @@ template("verify_bootfs_filelist") {
                            ])
     stamp_file = "$target_gen_dir/$target_name.verified"
     depfile = "$target_gen_dir/$target_name.d"
-
-    pb_name = get_label_info(invoker.product_bundle, "name")
-    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
-    pb_dir = "$pb_out/$pb_name"
-    pb_manifest = "$pb_dir/product_bundle.json"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
 
     # This verifiers reads blobs from the product bundle, but we do not know
     # which blobs ahead of time, therefore we allow everything inside the
     # product bundle directory.
-    hermetic_action_ignored_prefixes = [ pb_dir ]
+    hermetic_action_ignored_prefixes = [ invoker.product_bundle_path ]
 
     inputs = [ pb_manifest ] + invoker.goldens + invoker.golden_packages
     outputs = [ stamp_file ]
@@ -89,7 +85,7 @@ template("verify_bootfs_filelist") {
     args += [
       "bootfs",
       "--product-bundle",
-      rebase_path(pb_dir, root_build_dir),
+      rebase_path(invoker.product_bundle_path, root_build_dir),
     ]
 
     if (invoker.golden_packages != []) {
@@ -107,10 +103,5 @@ template("verify_bootfs_filelist") {
         rebase_path(golden, root_build_dir),
       ]
     }
-
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
-    deps += [ invoker.product_bundle ]
   }
 }

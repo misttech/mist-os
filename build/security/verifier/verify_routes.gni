@@ -11,8 +11,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Parameters
 #
-#   product_bundle (required)
-#     [label] The label of a product_bundle target.
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
 #
 #   allowlist (required)
 #     [list of strings] paths to allowlist files to be passed to
@@ -29,8 +29,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     Usual GN meaning.
 
 template("verify_routes") {
-  assert(defined(invoker.product_bundle),
-         "verify_routes() must specify product_bundle")
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
   assert(defined(invoker.allowlist), "verify_routes() must specify allowlist")
 
   ffx_action(target_name) {
@@ -46,11 +46,7 @@ template("verify_routes") {
     depfile = "$target_out_dir/$target_name.d"
     stamp_file = "$target_gen_dir/$target_name.verified"
     tmp_dir = "$target_out_dir/$target_name/tmp"
-
-    pb_name = get_label_info(invoker.product_bundle, "name")
-    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
-    pb_dir = "$pb_out/$pb_name"
-    pb_manifest = "$pb_dir/product_bundle.json"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
 
     hermetic_action_ignored_prefixes = [ tmp_dir ]
 
@@ -82,7 +78,7 @@ template("verify_routes") {
     args += [
       "routes",
       "--product-bundle",
-      rebase_path(pb_dir, root_build_dir),
+      rebase_path(invoker.product_bundle_path, root_build_dir),
     ]
 
     if (defined(invoker.component_tree_config)) {
@@ -99,10 +95,5 @@ template("verify_routes") {
         rebase_path(allowlist, root_build_dir),
       ]
     }
-
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
-    deps += [ invoker.product_bundle ]
   }
 }

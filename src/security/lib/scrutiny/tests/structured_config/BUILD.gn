@@ -121,6 +121,8 @@ if (is_fuchsia) {
 
   product_bundle("product_bundle") {
     testonly = true
+    skip_scrutiny = true
+    skip_scrutiny_recovery = true
     deps = [
       ":assembly",
       ":partitions_config",
@@ -160,9 +162,9 @@ if (is_fuchsia) {
 
   extract_assembled_structured_config("extractor") {
     testonly = true
-    product_bundle = ":product_bundle"
+    product_bundle_path = "$target_out_dir/product_bundle"
     output = "$target_out_dir/structured_config.json"
-    deps = [ ":assembly" ]
+    deps = [ ":product_bundle" ]
   }
 }
 
@@ -240,8 +242,9 @@ if (is_host) {
 
   verify_assembled_structured_config("verifier_pass") {
     testonly = true
-    product_bundle = labels.product_bundle
+    product_bundle_path = files.product_bundle_dir
     policy = "passing_policy.json5"
+    deps = [ labels.product_bundle ]
   }
 
   python_binary("check_failed_verifier_bin") {

@@ -15,7 +15,6 @@ import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//build/security/policies.gni")
 import("//build/security/policies_swd.gni")
-import("//build/security/verifier/scrutiny_verifiers.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -305,10 +304,6 @@ if (is_fuchsia) {
       public_deps += [ ":copy_fvm_blob_sparse" ]
     }
 
-    if (!is_coverage && custom_signing_script == "" && run_scrutiny_verifiers) {
-      deps = [ ":scrutiny_verifiers" ]
-    }
-
     metadata = {
       # Only include the update package(s) manifest(s) in metadata collection.
       # To get a file containing a list of the base & cache packages, use the
@@ -430,6 +425,34 @@ if (is_fuchsia) {
     partitions_contents = partitions_config_contents
     system_a_contents = _assembly_contents
     system_r_contents = _recovery_contents
+
+    # Skip scrutiny on slot R.
+    skip_scrutiny_recovery = true
+
+    # Skip scrutiny on slot A for particular cases.
+    if (is_coverage || custom_signing_script != "" || !run_scrutiny_verifiers) {
+      skip_scrutiny = true
+    } else {
+      scrutiny_args = {
+        assembly_image_name = "fuchsia"
+        route_sources_config = fuchsia_route_sources_config
+        static_pkgs_goldens = fuchsia_static_pkgs_goldens
+        structured_config_policy = fuchsia_structured_config_policy
+        verify_component_resolvers_allowlist =
+            fuchsia_verify_component_resolvers_allowlist
+        verify_routes_component_tree_config =
+            fuchsia_verify_routes_component_tree_config
+        verify_routes_exceptions_allowlist =
+            fuchsia_verify_routes_exceptions_allowlist
+        verify_routes_exceptions_allowlist_product =
+            fuchsia_verify_routes_exceptions_allowlist_product
+        zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
+        zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
+        zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
+        product_assembly_config_dep = fuchsia_base.product_assembly_config_dep
+        product_assembly_config_file = fuchsia_base.product_assembly_config_file
+      }
+    }
   }
 
   generated_assembly_inputs("assembly_inputs") {
@@ -590,36 +613,6 @@ if (is_fuchsia) {
         archive = enable_netboot
         bootserver_netboot = [ "--boot" ]
       }
-    }
-  }
-
-  if (!is_coverage && custom_signing_script == "" && run_scrutiny_verifiers) {
-    # Run ALL the scrutiny verifiers for the provided product bundle.
-    scrutiny_verifiers("scrutiny_verifiers") {
-      assembly_image_name = "fuchsia"
-      product_bundle = ":product_bundle"
-
-      route_sources_config = fuchsia_route_sources_config
-      static_pkgs_goldens = fuchsia_static_pkgs_goldens
-      structured_config_policy = fuchsia_structured_config_policy
-      verify_component_resolvers_allowlist =
-          fuchsia_verify_component_resolvers_allowlist
-      verify_routes_component_tree_config =
-          fuchsia_verify_routes_component_tree_config
-      verify_routes_exceptions_allowlist =
-          fuchsia_verify_routes_exceptions_allowlist
-      verify_routes_exceptions_allowlist_product =
-          fuchsia_verify_routes_exceptions_allowlist_product
-      zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
-      zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
-      zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
-
-      forward_variables_from(fuchsia_base,
-                             [
-                               "product_assembly_config_dep",
-                               "testonly",
-                               "product_assembly_config_file",
-                             ])
     }
   }
 }

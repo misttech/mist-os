@@ -4,6 +4,7 @@
 
 import("//build/compiled_action.gni")
 import("//build/python/python_action.gni")
+import("//build/security/verifier/scrutiny_verifiers.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 # Generate a product bundle that can be used to flash, emulate, or update a
@@ -59,6 +60,28 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   default_virtual_device (optional)
 #     [string] The name of the default virtual device
 #
+#   scrutiny_args           (optional; default={})
+#   scrutiny_recovery_args  (optional; default={})
+#     [scope] The scrutiny arguments that are forwarded to scrutiny_verifiers,
+#     which must include:
+#       assembly_image_name
+#       product_assembly_config_file
+#       product_assembly_config_dep
+#       route_sources_config
+#       static_pkgs_golden
+#       verify_component_resolvers_allowlist
+#       verify_routes_component_tree_config
+#       verify_routes_exceptions_allowlist
+#       verify_routes_exceptions_allowlist_product
+#       zbi_bootfs_filelist_goldens
+#       zbi_bootfs_packages_goldens
+#       zbi_kernel_cmdline_goldens
+#
+#   skip_scrutiny           (optional; default=false)
+#   skip_scrutiny_recovery  (optional; default=false)
+#     [bool] Whether to skip running scrutiny verifiers on a particular slot.
+#     These should not be true if the corresponding scrutiny args are supplied.
+#
 template("product_bundle") {
   assert(defined(invoker.partitions), "Need to define partitions")
 
@@ -66,6 +89,8 @@ template("product_bundle") {
     hermetic_inputs = "${target_name}_hermetic_inputs"
     product_bundle = "${target_name}_product_bundle"
     transfer_manifest = "${target_name}_transfer_manifest"
+    scrutiny = "${target_name}_scrutiny"
+    scrutiny_recovery = "${target_name}_scrutiny_recovery"
   }
 
   files = {
@@ -85,6 +110,37 @@ template("product_bundle") {
   virtual_devices = []
   if (defined(invoker.virtual_devices)) {
     virtual_devices += invoker.virtual_devices
+  }
+
+  skip_scrutiny = false
+  if (defined(invoker.skip_scrutiny) && invoker.skip_scrutiny) {
+    assert(!defined(invoker.scrutiny_args),
+           "scrutiny_args should not be supplied when skip_scrutiny=true")
+    skip_scrutiny = invoker.skip_scrutiny
+  } else {
+    # TODO(fxbug.dev/121673): Enforce that all callers to specify either
+    # skip_scrutiny or scrutiny_args once all callers are changed to do so.
+    # assert(defined(invoker.scrutiny_args), "scrutiny_args must be supplied")
+    if (!defined(invoker.scrutiny_args)) {
+      skip_scrutiny = true
+    }
+  }
+
+  skip_scrutiny_recovery = false
+  if (defined(invoker.skip_scrutiny_recovery) &&
+      invoker.skip_scrutiny_recovery) {
+    assert(
+        !defined(invoker.scrutiny_recovery_args),
+        "scrutiny_recovery_args should not be supplied when skip_scrutiny_recovery=true")
+    skip_scrutiny_recovery = invoker.skip_scrutiny_recovery
+  } else {
+    # TODO(fxbug.dev/121673): Enforce that all callers to specify either
+    # skip_scrutiny_recovery or scrutiny_args_recovery once all callers are
+    # changed to do so.
+    # assert(defined(invoker.scrutiny_recovery_args), "scrutiny_recovery_args must be supplied")
+    if (!defined(invoker.scrutiny_args_recovery)) {
+      skip_scrutiny_recovery = true
+    }
   }
 
   python_action(labels.hermetic_inputs) {
@@ -306,6 +362,33 @@ template("product_bundle") {
     }
   }
 
+  if (!skip_scrutiny) {
+    scrutiny_verifiers(labels.scrutiny) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      product_bundle = ":${labels.product_bundle}"
+      product_bundle_path = files.outdir
+      forward_variables_from(invoker.scrutiny_args, "*")
+    }
+  }
+
+  if (!skip_scrutiny_recovery) {
+    scrutiny_verifiers(labels.scrutiny_recovery) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      product_bundle = ":${labels.product_bundle}"
+      product_bundle_path = files.outdir
+      recovery = true
+      forward_variables_from(invoker.scrutiny_recovery_args, "*")
+    }
+  }
+
   group(target_name) {
     forward_variables_from(invoker,
                            [
@@ -317,6 +400,12 @@ template("product_bundle") {
       ":${labels.product_bundle}",
       ":${labels.transfer_manifest}",
     ]
+    if (!skip_scrutiny) {
+      public_deps += [ ":${labels.scrutiny}" ]
+    }
+    if (!skip_scrutiny_recovery) {
+      public_deps += [ ":${labels.scrutiny_recovery}" ]
+    }
 
     metadata = {
       product_bundles = [

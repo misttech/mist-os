@@ -9,8 +9,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Parameters
 #
-#   product_bundle (required)
-#     [label] The label of a product_bundle target.
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
 #
 #   output (required)
 #     [path] The JSON file to which to write the extracted values.
@@ -21,8 +21,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   deps, public_deps, data_deps (optional)
 #     Usual GN meaning.
 template("extract_assembled_structured_config") {
-  assert(defined(invoker.product_bundle),
-         "extract_assembled_structured_config() must specify product_bundle")
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
   assert(defined(invoker.output),
          "extract_assembled_structured_config() must specify an output")
 
@@ -36,11 +36,7 @@ template("extract_assembled_structured_config") {
                              "visibility",
                            ])
     depfile = "$target_gen_dir/$target_name.d"
-
-    pb_name = get_label_info(invoker.product_bundle, "name")
-    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
-    pb_dir = "$pb_out/$pb_name"
-    pb_manifest = "$pb_dir/product_bundle.json"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
 
     inputs = [ pb_manifest ]
     outputs = [ invoker.output ]
@@ -61,7 +57,7 @@ template("extract_assembled_structured_config") {
       "--build-path",
       rebase_path(root_build_dir, root_build_dir),
       "--product-bundle",
-      rebase_path(pb_dir, root_build_dir),
+      rebase_path(invoker.product_bundle_path, root_build_dir),
       "--output",
       rebase_path(invoker.output, root_build_dir),
     ]
@@ -69,11 +65,6 @@ template("extract_assembled_structured_config") {
     if (defined(invoker.recovery) && invoker.recovery) {
       args += [ "--recovery" ]
     }
-
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
-    deps += [ invoker.product_bundle ]
   }
 }
 
@@ -82,8 +73,8 @@ template("extract_assembled_structured_config") {
 #
 # Parameters
 #
-#   product_bundle (required)
-#     [label] The label of a product_bundle target.
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
 #
 #   policy (required)
 #     [path] The JSON policy file containing allowed configuration values for the build.
@@ -94,8 +85,8 @@ template("extract_assembled_structured_config") {
 #   deps, public_deps, data_deps (optional)
 #     Usual GN meaning.
 template("verify_assembled_structured_config") {
-  assert(defined(invoker.product_bundle),
-         "verify_assembled_structured_config() must specify product_bundle")
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
   assert(defined(invoker.policy),
          "verify_assembled_structured_config() must specify a policy file")
 
@@ -113,11 +104,7 @@ template("verify_assembled_structured_config") {
     stamp_file = "$target_gen_dir/$target_name.verified"
     depfile = "$target_gen_dir/$target_name.d"
     tmp_dir = "$target_out_dir/$target_name/tmp"
-
-    pb_name = get_label_info(invoker.product_bundle, "name")
-    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
-    pb_dir = "$pb_out/$pb_name"
-    pb_manifest = "$pb_dir/product_bundle.json"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
 
     hermetic_action_ignored_prefixes = [ tmp_dir ]
 
@@ -154,12 +141,7 @@ template("verify_assembled_structured_config") {
       "--policy",
       rebase_path(invoker.policy, root_build_dir),
       "--product-bundle",
-      rebase_path(pb_dir, root_build_dir),
+      rebase_path(invoker.product_bundle_path, root_build_dir),
     ]
-
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
-    deps += [ invoker.product_bundle ]
   }
 }

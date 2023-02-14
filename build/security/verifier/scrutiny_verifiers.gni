@@ -18,7 +18,12 @@ import("//build/security/verifier/verify_structured_config.gni")
 # Basic parameters
 #
 #   product_bundle (required)
-#     [label] The label of a product_bundle target.
+#     [label] Target that builds the product bundle.
+#
+#   product_bundle_path (optional)
+#     [path] Path to product bundle.
+#     If the product_bundle is not a product_bundle() then the
+#     product_bundle_path can be supplied here.
 #
 #   assembly_image_name (required)
 #     [string] The image name used to assemble the system.
@@ -117,6 +122,14 @@ template("scrutiny_verifiers") {
              invoker.zbi_kernel_cmdline_goldens != [],
          "zbi_kernel_cmdline_goldens is required for scrutiny_verifiers()")
 
+  if (defined(invoker.product_bundle_path)) {
+    pb_dir = invoker.product_bundle_path
+  } else {
+    pb_name = get_label_info(invoker.product_bundle, "name")
+    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
+    pb_dir = "$pb_out/$pb_name"
+  }
+
   verify_structured_config_policy_by_build_type(
       "${invoker.assembly_image_name}_verify_structured_config_policy_exists") {
     forward_variables_from(invoker,
@@ -141,9 +154,14 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     goldens = invoker.zbi_bootfs_filelist_goldens
     golden_packages = invoker.zbi_bootfs_packages_goldens
+
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ invoker.product_bundle ]
   }
 
   verify_kernel_cmdline(
@@ -155,8 +173,13 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     goldens = invoker.zbi_kernel_cmdline_goldens
+
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ invoker.product_bundle ]
   }
 
   verify_route_sources("${invoker.assembly_image_name}_verify_route_sources") {
@@ -166,8 +189,9 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     config_path = invoker.route_sources_config
+    deps = [ invoker.product_bundle ]
   }
 
   verify_component_resolvers(
@@ -178,8 +202,9 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     allowlist = invoker.verify_component_resolvers_allowlist
+    deps = [ invoker.product_bundle ]
   }
 
   verify_routes("${invoker.assembly_image_name}_verify_capability_routes") {
@@ -189,10 +214,11 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     allowlist = [ invoker.verify_routes_exceptions_allowlist ]
     allowlist += invoker.verify_routes_exceptions_allowlist_product
     component_tree_config = invoker.verify_routes_component_tree_config
+    deps = [ invoker.product_bundle ]
   }
 
   verify_static_pkgs("${invoker.assembly_image_name}_verify_static_pkgs") {
@@ -202,8 +228,9 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     goldens = invoker.static_pkgs_goldens
+    deps = [ invoker.product_bundle ]
   }
 
   verify_assembled_structured_config(
@@ -214,8 +241,9 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     policy = invoker.structured_config_policy
+    deps = [ invoker.product_bundle ]
   }
 
   extract_assembled_structured_config(
@@ -226,9 +254,10 @@ template("scrutiny_verifiers") {
                              "visiblity",
                              "recovery",
                            ])
-    product_bundle = invoker.product_bundle
+    product_bundle_path = pb_dir
     output =
         "$target_out_dir/${invoker.assembly_image_name}.structured_config.json"
+    deps = [ invoker.product_bundle ]
   }
 
   group(target_name) {

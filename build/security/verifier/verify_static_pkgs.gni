@@ -11,8 +11,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Parameters
 #
-#   product_bundle (required)
-#     [label] The label of a product_bundle target.
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
 #
 #   goldens (required)
 #     [list of strings] Path to a list of golden files that contain golden
@@ -29,8 +29,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     Usual GN meaning.
 
 template("verify_static_pkgs") {
-  assert(defined(invoker.product_bundle),
-         "verify_static_pkgs() must specify product_bundle")
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
   assert(defined(invoker.goldens), "verify_static_pkgs() must specify goldens")
 
   ffx_action(target_name) {
@@ -48,11 +48,7 @@ template("verify_static_pkgs") {
     stamp_file = "$target_gen_dir/$target_name.verified"
     depfile = "$target_gen_dir/$target_name.d"
     tmp_dir = "$target_out_dir/$target_name/tmp"
-
-    pb_name = get_label_info(invoker.product_bundle, "name")
-    pb_out = get_label_info(invoker.product_bundle, "target_out_dir")
-    pb_dir = "$pb_out/$pb_name"
-    pb_manifest = "$pb_dir/product_bundle.json"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
 
     hermetic_action_ignored_prefixes = [ tmp_dir ]
 
@@ -84,7 +80,7 @@ template("verify_static_pkgs") {
     args += [
       "static-pkgs",
       "--product-bundle",
-      rebase_path(pb_dir, root_build_dir),
+      rebase_path(invoker.product_bundle_path, root_build_dir),
     ]
 
     foreach(golden, invoker.goldens) {
@@ -93,10 +89,5 @@ template("verify_static_pkgs") {
         rebase_path(golden, root_build_dir),
       ]
     }
-
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
-    deps += [ invoker.product_bundle ]
   }
 }
