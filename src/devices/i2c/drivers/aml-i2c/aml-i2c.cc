@@ -36,9 +36,9 @@
 #define AML_I2C_CONTROL_REG_QTR_CLK_DLY_MASK \
   (uint32_t)(AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX << AML_I2C_CONTROL_REG_QTR_CLK_DLY_SHIFT)
 
-#define AML_I2C_SLAVE_ADDR_REG_USE_CNTL_SCL_LOW (1 << 28)
-#define AML_I2C_SLAVE_ADDR_REG_SCL_LOW_DELAY_MAX 0xfff
-#define AML_I2C_SLAVE_ADDR_REG_SCL_LOW_DELAY_SHIFT 16
+#define AML_I2C_TARGET_ADDR_REG_USE_CNTL_SCL_LOW (1 << 28)
+#define AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_MAX 0xfff
+#define AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_SHIFT 16
 
 #define AML_I2C_MAX_TRANSFER 512
 
@@ -46,7 +46,7 @@ namespace aml_i2c {
 
 struct aml_i2c_regs_t {
   uint32_t control;
-  uint32_t slave_addr;
+  uint32_t target_addr;
   uint32_t token_list_0;
   uint32_t token_list_1;
   uint32_t token_wdata_0;
@@ -58,19 +58,19 @@ struct aml_i2c_regs_t {
 enum aml_i2c_token_t : uint64_t {
   TOKEN_END,
   TOKEN_START,
-  TOKEN_SLAVE_ADDR_WR,
-  TOKEN_SLAVE_ADDR_RD,
+  TOKEN_TARGET_ADDR_WR,
+  TOKEN_TARGET_ADDR_RD,
   TOKEN_DATA,
   TOKEN_DATA_LAST,
   TOKEN_STOP
 };
 
-static zx_status_t aml_i2c_set_slave_addr(aml_i2c_dev_t* dev, uint16_t addr) {
+static zx_status_t aml_i2c_set_target_addr(aml_i2c_dev_t* dev, uint16_t addr) {
   addr &= 0x7f;
-  uint32_t reg = MmioRead32(&dev->virt_regs->slave_addr);
+  uint32_t reg = MmioRead32(&dev->virt_regs->target_addr);
   reg = reg & ~0xff;
   reg = reg | ((addr << 1) & 0xff);
-  MmioWrite32(reg, &dev->virt_regs->slave_addr);
+  MmioWrite32(reg, &dev->virt_regs->target_addr);
 
   return ZX_OK;
 }
@@ -101,7 +101,7 @@ static int aml_i2c_irq_thread(void* arg) {
 #if 0
 static zx_status_t aml_i2c_dumpstate(aml_i2c_dev_t* dev) {
   printf("control reg      : %08x\n", MmioRead32(&dev->virt_regs->control));
-  printf("slave addr  reg  : %08x\n", MmioRead32(&dev->virt_regs->slave_addr));
+  printf("target addr reg  : %08x\n", MmioRead32(&dev->virt_regs->target_addr));
   printf("token list0 reg  : %08x\n", MmioRead32(&dev->virt_regs->token_list_0));
   printf("token list1 reg  : %08x\n", MmioRead32(&dev->virt_regs->token_list_1));
   printf("token wdata0     : %08x\n", MmioRead32(&dev->virt_regs->token_wdata_0));
@@ -153,7 +153,7 @@ static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32
   uint64_t token_reg = 0;
 
   token_reg |= TOKEN_START << (4 * (token_num++));
-  token_reg |= TOKEN_SLAVE_ADDR_WR << (4 * (token_num++));
+  token_reg |= TOKEN_TARGET_ADDR_WR << (4 * (token_num++));
 
   while (len > 0) {
     bool is_last_iter = len <= 8;
@@ -201,7 +201,7 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
   uint64_t token_reg = 0;
 
   token_reg |= TOKEN_START << (4 * (token_num++));
-  token_reg |= TOKEN_SLAVE_ADDR_RD << (4 * (token_num++));
+  token_reg |= TOKEN_TARGET_ADDR_RD << (4 * (token_num++));
 
   while (len > 0) {
     bool is_last_iter = len <= 8;
@@ -268,7 +268,7 @@ zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDe
   virt_regs = reinterpret_cast<MMIO_PTR aml_i2c_regs_t*>(regs_iobuff_->get());
 
   if (delay.quarter_clock_delay > AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX ||
-      delay.clock_low_delay > AML_I2C_SLAVE_ADDR_REG_SCL_LOW_DELAY_MAX) {
+      delay.clock_low_delay > AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_MAX) {
     zxlogf(ERROR, "invalid clock delay");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -281,9 +281,9 @@ zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDe
   }
 
   if (delay.clock_low_delay > 0) {
-    uint32_t reg = delay.clock_low_delay << AML_I2C_SLAVE_ADDR_REG_SCL_LOW_DELAY_SHIFT;
-    reg |= AML_I2C_SLAVE_ADDR_REG_USE_CNTL_SCL_LOW;
-    MmioWrite32(reg, &virt_regs->slave_addr);
+    uint32_t reg = delay.clock_low_delay << AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_SHIFT;
+    reg |= AML_I2C_TARGET_ADDR_REG_USE_CNTL_SCL_LOW;
+    MmioWrite32(reg, &virt_regs->target_addr);
   }
 
   status = pdev.GetInterrupt(index, 0, &irq_);
@@ -360,7 +360,7 @@ zx_status_t aml_i2c_transact(void* ctx, uint32_t bus_id, const i2c_impl_op_t* rw
 
   zx_status_t status = ZX_OK;
   for (i = 0; i < count; ++i) {
-    status = aml_i2c_set_slave_addr(dev, rws[i].address);
+    status = aml_i2c_set_target_addr(dev, rws[i].address);
     if (status != ZX_OK) {
       return status;
     }
