@@ -19,16 +19,25 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
+def replace_with_file_hash(dict, key, root_dir, extra_files_read):
+    p = os.path.join(root_dir, dict[key])
+    dict[key] = file_sha1(p)
+    extra_files_read.append(p)
+
+
 def normalize(config, root_dir, extra_files_read):
     for image in config["images"]:
-        if "key" in image:
-            p = os.path.join(root_dir, image["key"])
-            image["key"] = file_sha1(p)
-            extra_files_read.append(p)
-        if "key_metadata" in image:
-            p = os.path.join(root_dir, image["key_metadata"])
-            image["key_metadata"] = file_sha1(p)
-            extra_files_read.append(p)
+        for key in ("key", "key_metadata"):
+            if key in image:
+                replace_with_file_hash(image, key, root_dir, extra_files_read)
+
+        if "postprocessing_script" in image:
+            replace_with_file_hash(
+                image["postprocessing_script"],
+                "path",
+                root_dir,
+                extra_files_read,
+            )
 
         # `filesystems` is a unordered list of all filesystems used.
         if "filesystems" in image:
@@ -43,7 +52,8 @@ def normalize(config, root_dir, extra_files_read):
             for output in image["outputs"]:
                 # Explicitly set defaults for compress for different filesystem
                 # for consistency between GN and Bazel generated images configs.
-                if output["type"] in {"standard", "nand"} and "compress" not in output:
+                if output["type"] in {"standard", "nand"
+                                     } and "compress" not in output:
                     output["compress"] = False
 
 
@@ -94,10 +104,10 @@ def main():
     args.depfile.write(
         "{}: {}".format(args.output.name, " ".join(extra_files_read)))
 
-    if (len(diffstr) != 0):
+    if len(diffstr) != 0:
         print(
-            f"Error: non-empty diff between canonical json representations:\n{diffstr}"
-        )
+            "Error: non-empty diff between canonical json"
+            f" representations:\n{diffstr}")
         return 1
 
     return 0
