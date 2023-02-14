@@ -69,6 +69,11 @@ To add an external crate, do the following:
       See [cargo-gnaw's README][cargo-gnaw-readme]
       for more details.
 
+      <!-- TODO(https://fxbug.dev/59592) remove this step -->
+      After committing your change locally, run `fx update-rustc-third-party`
+      a second time and ensure it completes successfully without producing any
+      changes. You can run `git status` to be certain.
+
    1. Run the following command to perform a build test:
 
       ```posix-terminal
@@ -143,6 +148,11 @@ To update an external crate, do the following:
       configuration is used by `cargo-gnaw`, which generates the GN rules from
       the `Cargo.toml` file.
       See [cargo-gnaw's README][cargo-gnaw-readme] for more details.
+
+      <!-- TODO(https://fxbug.dev/59592) remove this step -->
+      After committing your change locally, run `fx update-rustc-third-party`
+      a second time and ensure it completes successfully without producing any
+      changes. You can run `git status` to be certain.
 
    1. Run the following command to perform a build test:
 
