@@ -21,6 +21,7 @@ use net_types::{
 };
 use netstack3_core::{
     add_ip_addr_subnet,
+    device::update_ipv6_configuration,
     ip::{
         device::slaac::STABLE_IID_SECRET_KEY_BYTES,
         types::{AddableEntry, AddableEntryEither},
@@ -444,6 +445,17 @@ impl TestSetupBuilder {
                 // online before returning, so users of `TestSetupBuilder` can
                 // be 100% sure of the state once the setup is done.
                 stack.wait_for_interface_online(if_id).await;
+
+                // Disable DAD for simplicity of testing.
+                stack
+                    .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+                        let devices: &mut Devices<_> = non_sync_ctx.as_mut();
+                        let device = devices.get_core_id(if_id).unwrap();
+                        update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
+                            config.dad_transmits = None
+                        })
+                    })
+                    .await;
                 if let Some(addr) = addr {
                     stack
                         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {

@@ -298,6 +298,11 @@ impl Ipv6DeviceConfiguration {
     ///
     /// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
     pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = nonzero!(3u8);
+
+    /// The default `DupAddrDetectTransmits` value from [RFC 4862 Section 5.1]
+    ///
+    /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
+    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU8 = nonzero!(1u8);
 }
 
 /// The state common to all IPv6 devices.

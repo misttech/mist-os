@@ -277,7 +277,9 @@ impl DeviceHandler {
             &core_id,
             |config| {
                 *config = Ipv6DeviceConfiguration {
-                    dad_transmits: None,
+                    dad_transmits: Some(
+                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
+                    ),
                     max_router_solicitations: Some(
                         Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
                     ),

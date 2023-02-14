@@ -414,7 +414,7 @@ async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, for
 /// If no remote node has any interest in an address the netstack is attempting to assign to
 /// an interface, DAD should succeed.
 #[netstack_test]
-async fn duplicate_address_detection(name: &str) {
+async fn duplicate_address_detection<N: Netstack>(name: &str) {
     /// Adds `ipv6_consts::LINK_LOCAL_ADDR` to the interface and makes sure a Neighbor Solicitation
     /// message is transmitted by the netstack for DAD.
     ///
@@ -502,7 +502,7 @@ async fn duplicate_address_detection(name: &str) {
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_network, realm, iface, fake_ep) =
-        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     let debug_control = realm
         .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
