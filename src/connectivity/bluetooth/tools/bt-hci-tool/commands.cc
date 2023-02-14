@@ -371,12 +371,11 @@ bool HandleLESetAdvEnable(const CommandData* cmd_data, const fxl::CommandLine& c
     return false;
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetAdvertisingEnableCommandParams);
-
-  auto packet =
-      ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetAdvertisingEnable, kPayloadSize);
-  packet->mutable_payload<::bt::hci_spec::LESetAdvertisingEnableCommandParams>()
-      ->advertising_enable = value;
+  auto packet = ::bt::hci::EmbossCommandPacket::New<
+      ::pw::bluetooth::emboss::LESetAdvertisingEnableCommandWriter>(
+      ::bt::hci_spec::kLESetAdvertisingEnable);
+  auto packet_view = packet.view_t();
+  packet_view.advertising_enable().Write(value);
 
   auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
 
