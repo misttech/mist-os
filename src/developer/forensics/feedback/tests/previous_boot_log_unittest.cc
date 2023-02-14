@@ -80,4 +80,22 @@ TEST_F(PreviousBootLogTest, ForceCompletionCalledWhenPromiseIsIncomplete) {
   EXPECT_TRUE(files::IsFile(path));
 }
 
+TEST_F(PreviousBootLogTest, NoPreviousBootLog) {
+  // Create a file even though we're testing what happens when PreviousBootLog thinks there's no
+  // file. This will let us ensure PreviousBootLog doesn't attempt to delete the file.
+  const std::string path = NewFile();
+  const uint64_t kTicket = 21;
+
+  EXPECT_TRUE(files::IsFile(path));
+
+  PreviousBootLog previous_boot_log_(dispatcher(), Clock(),
+                                     /*delete_previous_boot_log_at=*/std::nullopt, path);
+  previous_boot_log_.Get(kTicket);
+
+  // Arbitrarily run for 25 hours.
+  RunLoopFor(zx::hour(25));
+
+  EXPECT_TRUE(files::IsFile(path));
+}
+
 }  // namespace forensics::feedback

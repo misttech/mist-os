@@ -10,6 +10,7 @@
 #include <lib/fpromise/promise.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "src/developer/forensics/feedback/attachments/file_backed_provider.h"
@@ -24,7 +25,7 @@ namespace forensics::feedback {
 class PreviousBootLog : public FileBackedProvider {
  public:
   PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
-                  zx::duration delete_previous_boot_log_at, std::string path);
+                  std::optional<zx::duration> delete_previous_boot_log_at, std::string path);
 
   // Returns a promise, that is immediately available, to the previous boot log.
   ::fpromise::promise<AttachmentValue> Get(uint64_t ticket) override;

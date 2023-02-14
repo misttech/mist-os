@@ -8,6 +8,7 @@
 #include <lib/sys/cpp/service_directory.h>
 
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -29,8 +30,9 @@ class AttachmentProviders {
  public:
   AttachmentProviders(async_dispatcher_t* dispatcher,
                       std::shared_ptr<sys::ServiceDirectory> services,
-                      zx::duration delete_previous_boot_log_at, timekeeper::Clock* clock,
-                      RedactorBase* redactor, feedback_data::InspectDataBudget* inspect_data_budget,
+                      std::optional<zx::duration> delete_previous_boot_log_at,
+                      timekeeper::Clock* clock, RedactorBase* redactor,
+                      feedback_data::InspectDataBudget* inspect_data_budget,
                       std::set<std::string> allowlist);
 
   AttachmentManager* GetAttachmentManager() { return &attachment_manager_; }
