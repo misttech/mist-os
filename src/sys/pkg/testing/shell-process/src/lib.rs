@@ -71,10 +71,8 @@ pub async fn run_process_async<'a>(
     proxies: impl IntoIterator<Item = (&'a str, &fidl_fuchsia_io::DirectoryProxy)>,
 ) -> (fasync::Task<i64>, fasync::Socket, fasync::Socket) {
     //
-    let (stdout_reader, stdout_writer) =
-        zx::Socket::create(zx::SocketOpts::STREAM).expect("create stdout socket");
-    let (stderr_reader, stderr_writer) =
-        zx::Socket::create(zx::SocketOpts::STREAM).expect("create stderr socket");
+    let (stdout_reader, stdout_writer) = zx::Socket::create_stream();
+    let (stderr_reader, stderr_writer) = zx::Socket::create_stream();
     // The reader-ends should not write.
     let () = stdout_writer.half_close().expect("stdout_reader.half_close");
     let () = stderr_writer.half_close().expect("stderr_reader.half_close");
