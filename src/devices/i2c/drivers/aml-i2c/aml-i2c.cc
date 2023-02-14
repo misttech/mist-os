@@ -240,7 +240,7 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
     rdata = MmioRead32(&dev->virt_regs->token_rdata_0);
     rdata |= static_cast<uint64_t>(MmioRead32(&dev->virt_regs->token_rdata_1)) << 32;
 
-    for (uint32_t i = 0; i < len; i++, rdata >>= 8) {
+    for (uint32_t i = 0; i < rx_size; i++, rdata >>= 8) {
       buff[i] = rdata & 0xff;
     }
 
