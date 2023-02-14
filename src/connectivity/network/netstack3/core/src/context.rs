@@ -230,10 +230,8 @@ pub trait RecvFrameContext<C, B: BufferMut, Meta> {
     fn receive_frame(&mut self, ctx: &mut C, metadata: Meta, frame: B);
 }
 
-// TODO(joshlf): Rename `FrameContext` to `SendFrameContext`
-
 /// A context for sending frames.
-pub trait FrameContext<C, B: BufferMut, Meta> {
+pub trait SendFrameContext<C, B: BufferMut, Meta> {
     // TODO(joshlf): Add an error type parameter or associated type once we need
     // different kinds of errors.
 
@@ -888,7 +886,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<C, B: BufferMut, Meta> FrameContext<C, B, Meta> for FakeFrameCtx<Meta> {
+    impl<C, B: BufferMut, Meta> SendFrameContext<C, B, Meta> for FakeFrameCtx<Meta> {
         fn send_frame<S: Serializer<Buffer = B>>(
             &mut self,
             _ctx: &mut C,
@@ -1276,7 +1274,7 @@ pub(crate) mod testutil {
     }
 
     impl<B: BufferMut, S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState>
-        FrameContext<FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B, Meta>
+        SendFrameContext<FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B, Meta>
         for FakeSyncCtx<S, Meta, DeviceId>
     {
         fn send_frame<SS: Serializer<Buffer = B>>(

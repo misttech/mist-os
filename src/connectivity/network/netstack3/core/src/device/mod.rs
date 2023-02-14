@@ -32,7 +32,7 @@ use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
-    context::{FrameContext, InstantContext, RecvFrameContext},
+    context::{InstantContext, RecvFrameContext, SendFrameContext},
     data_structures::{
         id_map::{self, IdMap},
         id_map_collection::IdMapCollectionKey,
@@ -613,7 +613,8 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ip
 }
 
 impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
-    FrameContext<NonSyncCtx, B, EthernetDeviceId<NonSyncCtx::Instant>> for &'_ SyncCtx<NonSyncCtx>
+    SendFrameContext<NonSyncCtx, B, EthernetDeviceId<NonSyncCtx::Instant>>
+    for &'_ SyncCtx<NonSyncCtx>
 {
     fn send_frame<S: Serializer<Buffer = B>>(
         &mut self,

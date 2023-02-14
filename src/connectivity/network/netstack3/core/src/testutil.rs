@@ -20,7 +20,7 @@ use rand_xorshift::XorShiftRng;
 use crate::{
     context::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
-        EventContext, FrameContext as _, InstantContext, TimerContext,
+        EventContext, InstantContext, SendFrameContext as _, TimerContext,
     },
     device::{
         ethernet, BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher, Mtu,

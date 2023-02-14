@@ -18,7 +18,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CounterContext, FrameContext, TimerContext},
+    context::{CounterContext, SendFrameContext, TimerContext},
     device::{link::LinkDevice, DeviceIdContext},
     ip::device::nud::{
         BufferNudContext, DynamicNeighborUpdateSource, NudContext, NudHandler, NudState, NudTimerId,
@@ -72,7 +72,7 @@ pub(crate) struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
 /// [`handle_packet`]), and allows ARP to reuse that buffer rather than needing
 /// to always allocate a new one.
 pub(crate) trait BufferArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>, B: BufferMut>:
-    ArpContext<D, C> + FrameContext<C, B, ArpFrameMetadata<D, Self::DeviceId>>
+    ArpContext<D, C> + SendFrameContext<C, B, ArpFrameMetadata<D, Self::DeviceId>>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
@@ -115,7 +115,7 @@ impl<DeviceId, D: ArpDevice, C: TimerContext<ArpTimerId<D, DeviceId>> + CounterC
 
 /// An execution context for the ARP protocol.
 pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
-    DeviceIdContext<D> + FrameContext<C, EmptyBuf, ArpFrameMetadata<D, Self::DeviceId>>
+    DeviceIdContext<D> + SendFrameContext<C, EmptyBuf, ArpFrameMetadata<D, Self::DeviceId>>
 {
     /// Get a protocol address of this interface.
     ///
@@ -353,7 +353,7 @@ fn handle_packet<
                 let self_hw_addr = sync_ctx.get_hardware_addr(ctx, &device_id);
 
                 // TODO(joshlf): Do something if send_frame returns an error?
-                let _: Result<(), _> = FrameContext::send_frame(
+                let _: Result<(), _> = SendFrameContext::send_frame(
                     sync_ctx,
                     ctx,
                     ArpFrameMetadata { device_id, dst_addr: sender_hw_addr },
@@ -384,7 +384,7 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
     if let Some(sender_protocol_addr) = sync_ctx.get_protocol_addr(ctx, device_id) {
         let self_hw_addr = sync_ctx.get_hardware_addr(ctx, device_id);
         // TODO(joshlf): Do something if send_frame returns an error?
-        let _ = FrameContext::send_frame(
+        let _ = SendFrameContext::send_frame(
             sync_ctx,
             ctx,
             ArpFrameMetadata { device_id: device_id.clone(), dst_addr: D::HType::BROADCAST },

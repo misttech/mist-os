@@ -587,7 +587,7 @@ mod tests {
                 handle_timer_helper_with_sc_ref_mut, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
                 FakeTimerCtxExt as _,
             },
-            FrameContext as _, InstantContext as _,
+            InstantContext as _, SendFrameContext as _,
         },
         device::link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
         ip::{

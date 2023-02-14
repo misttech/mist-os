@@ -783,7 +783,7 @@ pub(crate) mod testutil {
     use crate::{
         context::{
             testutil::{FakeCounterCtx, FakeInstant, FakeInstantCtx, FakeNonSyncCtx, FakeSyncCtx},
-            FrameContext, RngContext,
+            RngContext, SendFrameContext,
         },
         ip::{
             device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
@@ -912,7 +912,7 @@ pub(crate) mod testutil {
         > BufferIpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B>
         for FakeSyncCtx<S, Meta, DeviceId>
     where
-        FakeSyncCtx<S, Meta, DeviceId>: FrameContext<
+        FakeSyncCtx<S, Meta, DeviceId>: SendFrameContext<
                 FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
                 B,
                 SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,

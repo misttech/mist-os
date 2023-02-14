@@ -18,7 +18,7 @@ use packet_formats::icmp::{
 };
 
 use crate::{
-    context::FrameContext,
+    context::SendFrameContext,
     device::Mtu,
     error::{ExistsError, NotFoundError},
     ip::{
@@ -274,7 +274,7 @@ impl<
 impl<
         C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
         SC: device::BufferIpDeviceContext<Ipv4, C, EmptyBuf>,
-    > FrameContext<C, EmptyBuf, IgmpPacketMetadata<SC::DeviceId>> for SC
+    > SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<SC::DeviceId>> for SC
 {
     fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
         &mut self,
@@ -668,7 +668,7 @@ fn assignment_state_v6<Instant: crate::Instant>(
 impl<
         C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
         SC: device::BufferIpDeviceContext<Ipv6, C, EmptyBuf>,
-    > FrameContext<C, EmptyBuf, MldFrameMetadata<SC::DeviceId>> for SC
+    > SendFrameContext<C, EmptyBuf, MldFrameMetadata<SC::DeviceId>> for SC
 {
     fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
         &mut self,

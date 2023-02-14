@@ -238,7 +238,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
-            FrameContext as _, InstantContext as _,
+            InstantContext as _, SendFrameContext as _,
         },
         ip::testutil::FakeDeviceId,
     };

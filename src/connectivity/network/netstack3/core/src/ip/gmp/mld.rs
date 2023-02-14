@@ -35,7 +35,7 @@ use thiserror::Error;
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{FrameContext, RngContext, TimerContext, TimerHandler},
+    context::{RngContext, SendFrameContext, TimerContext, TimerHandler},
     ip::{
         gmp::{
             gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
@@ -78,7 +78,7 @@ impl<DeviceId, C: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
 pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
-    IpDeviceIdContext<Ipv6> + FrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
+    IpDeviceIdContext<Ipv6> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
 {
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(

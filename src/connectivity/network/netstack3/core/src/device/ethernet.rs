@@ -32,7 +32,7 @@ use packet_formats::{
 use crate::ip::device::nud::NudHandler;
 use crate::{
     context::{
-        CounterContext, FrameContext, RecvFrameContext, RngContext, TimerContext, TimerHandler,
+        CounterContext, RecvFrameContext, RngContext, SendFrameContext, TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -80,8 +80,8 @@ impl<DeviceId, C: CounterContext + RngContext + TimerContext<EthernetTimerId<Dev
 /// The execution context for an Ethernet device.
 pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<EthernetLinkDevice>
-    + FrameContext<C, EmptyBuf, Self::DeviceId>
-    + FrameContext<C, Buf<Vec<u8>>, Self::DeviceId>
+    + SendFrameContext<C, EmptyBuf, Self::DeviceId>
+    + SendFrameContext<C, Buf<Vec<u8>>, Self::DeviceId>
 {
     /// Calls the function with the ethernet device's static state.
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
@@ -237,7 +237,7 @@ pub(super) trait BufferEthernetIpLinkDeviceContext<
     B: BufferMut,
 >:
     EthernetIpLinkDeviceContext<C>
-    + FrameContext<C, B, Self::DeviceId>
+    + SendFrameContext<C, B, Self::DeviceId>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv4>>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv6>>
 {
@@ -247,7 +247,7 @@ impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
         SC: EthernetIpLinkDeviceContext<C>
-            + FrameContext<C, B, SC::DeviceId>
+            + SendFrameContext<C, B, SC::DeviceId>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv6>>,
     > BufferEthernetIpLinkDeviceContext<C, B> for SC
@@ -319,7 +319,7 @@ fn send_ip_frame_to_dst<
     B: BufferMut,
     S: Serializer<Buffer = B>,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C> + FrameContext<C, B, SC::DeviceId>,
+    SC: EthernetIpLinkDeviceContext<C> + SendFrameContext<C, B, SC::DeviceId>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -557,7 +557,7 @@ pub(super) fn send_ip_frame<
     B: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceContext<C>
-        + FrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>
+        + SendFrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>
         + BufferNudHandler<B, Ipv4, EthernetLinkDevice, C>
         + BufferNudHandler<B, Ipv6, EthernetLinkDevice, C>,
     A: IpAddress,
@@ -852,8 +852,8 @@ impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
         SC: EthernetIpLinkDeviceContext<C>
-            + FrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>,
-    > FrameContext<C, B, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
+            + SendFrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>,
+    > SendFrameContext<C, B, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
     fn send_frame<S: Serializer<Buffer = B>>(
         &mut self,

@@ -31,7 +31,7 @@ use thiserror::Error;
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{FrameContext, RngContext, TimerContext, TimerHandler},
+    context::{RngContext, SendFrameContext, TimerContext, TimerHandler},
     ip::{
         gmp::{
             gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
@@ -73,7 +73,7 @@ impl<DeviceId, C: RngContext + TimerContext<IgmpTimerId<DeviceId>>> IgmpNonSyncC
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
-    IpDeviceIdContext<Ipv4> + FrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
+    IpDeviceIdContext<Ipv4> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
 {
     /// Gets an IP address and subnet associated with this device.
     fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
