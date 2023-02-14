@@ -21,7 +21,7 @@ use {
 const TEST_DATA_LEN: u64 = 60000;
 
 fn make_socket_pair() -> Result<(fasync::Socket, zx::Socket), Error> {
-    let (a, b) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+    let (a, b) = zx::Socket::create_stream();
     let info = a.info()?;
     a.set_tx_threshold(&(info.tx_buf_max as usize))?;
     let a_stream = fasync::Socket::from_socket(a)?;

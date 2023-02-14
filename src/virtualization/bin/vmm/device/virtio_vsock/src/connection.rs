@@ -420,8 +420,7 @@ mod tests {
     #[fuchsia::test]
     async fn write_credit_with_credit_available() {
         let mut credit = ConnectionCredit::default();
-        let (_remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (_remote, local) = zx::Socket::create_stream();
 
         // Shove some data into the local socket, but less than the maximum.
         let max_tx_bytes = local.info().unwrap().tx_buf_max;
@@ -449,8 +448,7 @@ mod tests {
     #[fuchsia::test]
     async fn write_credit_with_no_credit_available() {
         let mut credit = ConnectionCredit::default();
-        let (remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (remote, local) = zx::Socket::create_stream();
 
         // Max out the host socket, leaving zero bytes available.
         let max_tx_bytes = local.info().unwrap().tx_buf_max;
@@ -501,8 +499,7 @@ mod tests {
     #[fuchsia::test]
     async fn connection_credit_handles_tx_overflow() {
         let mut credit = ConnectionCredit::default();
-        let (_remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (_remote, local) = zx::Socket::create_stream();
 
         let max_tx_bytes = local.info().unwrap().tx_buf_max;
         let async_local =
@@ -553,8 +550,7 @@ mod tests {
         assert!(executor.run_until_stalled(&mut state_action_fut).is_pending());
 
         // Respond to the guest's connection request from the client's acceptor.
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         if let Poll::Ready(val) = executor.run_until_stalled(&mut stream.try_next()) {
             let (_, _, _, responder) =
                 val.unwrap().unwrap().into_accept().expect("received unexpected message on stream");

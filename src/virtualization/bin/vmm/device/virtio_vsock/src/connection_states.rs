@@ -199,7 +199,7 @@ impl ClientInitiated {
                         ));
                     }
 
-                    let (client, device) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+                    let (client, device) = zx::Socket::create_stream();
                     let local_async = fasync::Socket::from_socket(device)?;
 
                     // TODO(fxbug.dev/110903): Remove once flake is resolved.
@@ -1148,8 +1148,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (_client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (_client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1426,8 +1425,7 @@ mod tests {
         futures::pin_mut!(fut);
         assert!(executor.run_until_stalled(&mut fut).is_pending());
 
-        let (_client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (_client_socket, device_socket) = zx::Socket::create_stream();
         if let Poll::Ready(val) = executor.run_until_stalled(&mut stream.try_next()) {
             let (_, _, _, responder) =
                 val.unwrap().unwrap().into_accept().expect("received unexpected message on stream");
@@ -1538,8 +1536,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1617,8 +1614,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1731,8 +1727,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1767,8 +1762,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1837,8 +1831,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1860,8 +1853,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -1986,8 +1978,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -2124,8 +2115,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -2211,8 +2201,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 
@@ -2282,8 +2271,7 @@ mod tests {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
-        let (_client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (_client_socket, device_socket) = zx::Socket::create_stream();
         let socket =
             fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
 

@@ -152,8 +152,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn guest_console_copies_async_stream() {
         // Wire up a mock guest console, mocking out the virtio-console on a guest.
-        let (guest_console_socket, guest_console_tx) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (guest_console_socket, guest_console_tx) = fidl::Socket::create_stream();
         let guest_console_rx =
             guest_console_tx.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap();
         let guest_console = GuestConsole::new(guest_console_rx, guest_console_tx)
@@ -161,7 +160,7 @@ mod test {
 
         // This represents a host's stdio. While stdout and stdin are unidirectional, sockets
         // are bidirectional so we can duplicate one and split it into both in and out.
-        let (host_stdio, host_stdin_sock) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (host_stdio, host_stdin_sock) = fidl::Socket::create_stream();
         let host_stdout_sock = host_stdin_sock.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap();
         let host_stdout = fasync::Socket::from_socket(host_stdout_sock).unwrap();
         let host_stdin = fasync::Socket::from_socket(host_stdin_sock).unwrap();

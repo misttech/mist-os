@@ -195,7 +195,7 @@ mod test {
         super::*,
         crate::platform::FuchsiaPlatformServices,
         async_utils::PollExt,
-        fidl::{endpoints::create_proxy_and_stream, Socket, SocketOpts},
+        fidl::{endpoints::create_proxy_and_stream, Socket},
         fidl_fuchsia_virtualization::GuestManagerMarker,
         futures::TryStreamExt,
     };
@@ -235,8 +235,7 @@ mod test {
             .into_get_console()
             .expect("received unexpected request on stream");
 
-        let (client, device) =
-            Socket::create(SocketOpts::STREAM).expect("failed to create sockets");
+        let (client, device) = Socket::create_stream();
         responder.send(&mut Ok(client)).expect("failed to send response");
 
         assert!(executor.run_until_stalled(&mut fut).is_pending());

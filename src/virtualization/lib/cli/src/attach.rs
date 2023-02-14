@@ -102,7 +102,7 @@ async fn attach_serial(guest: GuestProxy) -> Result<(), Error> {
 mod test {
     use {
         super::*,
-        fidl::{endpoints::create_proxy_and_stream, Socket, SocketOpts},
+        fidl::{endpoints::create_proxy_and_stream, Socket},
         fidl_fuchsia_virtualization::GuestError,
         futures::future::join,
         futures::StreamExt,
@@ -111,7 +111,7 @@ mod test {
     #[fasync::run_until_stalled(test)]
     async fn launch_invalid_console_returns_error() {
         let (guest_proxy, mut guest_stream) = create_proxy_and_stream::<GuestMarker>().unwrap();
-        let (serial_launch_sock, _serial_server_sock) = Socket::create(SocketOpts::STREAM).unwrap();
+        let (serial_launch_sock, _serial_server_sock) = Socket::create_stream();
 
         let server = async move {
             let serial_responder = guest_stream

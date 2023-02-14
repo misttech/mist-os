@@ -70,8 +70,7 @@ mod test {
     use vsh_rust_proto::vm_tools::vsh;
 
     fn create_async_sockets() -> Result<(fasync::Socket, fasync::Socket)> {
-        let (s1, s2) =
-            zx::Socket::create(zx::SocketOpts::STREAM).context("socket creation failure")?;
+        let (s1, s2) = zx::Socket::create_stream();
         let s1 = fasync::Socket::from_socket(s1).context("failed to create async socket s1")?;
         let s2 = fasync::Socket::from_socket(s2).context("failed to create async socket s2")?;
         Ok((s1, s2))

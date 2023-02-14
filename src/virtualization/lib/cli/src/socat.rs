@@ -119,7 +119,7 @@ async fn handle_socat_listen(
         ));
     }
 
-    let (socket, remote_socket) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (socket, remote_socket) = fidl::Socket::create_stream();
     responder.send(&mut Ok(remote_socket))?;
 
     let (input, output) = duplicate_socket(socket)?;

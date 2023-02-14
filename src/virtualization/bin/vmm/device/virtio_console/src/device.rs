@@ -154,8 +154,7 @@ mod tests {
     #[fuchsia::test]
     fn tx_blocked_on_full_socket() {
         let mut executor = fasync::TestExecutor::new();
-        let (remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (remote, local) = zx::Socket::create_stream();
 
         let max_socket_bytes = local.info().unwrap().tx_buf_max;
         let total_bytes_to_send = max_socket_bytes + 128;
@@ -209,8 +208,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_chain_returns_any_data_available() {
-        let (remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (remote, local) = zx::Socket::create_stream();
         let mut remote = fasync::Socket::from_socket(remote).unwrap();
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
@@ -261,8 +259,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_chain_returns_data_from_closed_socket() {
-        let (remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (remote, local) = zx::Socket::create_stream();
         let mut remote = fasync::Socket::from_socket(remote).unwrap();
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
@@ -333,8 +330,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_more_bytes_on_socket_than_chain_size() {
-        let (remote, local) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
+        let (remote, local) = zx::Socket::create_stream();
         let mut remote = fasync::Socket::from_socket(remote).unwrap();
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 

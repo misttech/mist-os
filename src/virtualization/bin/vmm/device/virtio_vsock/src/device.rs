@@ -1050,8 +1050,7 @@ mod tests {
         assert_eq!(src_port, guest_port);
         assert_eq!(port, host_port);
 
-        let (_client_socket, device_socket) =
-            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create sockets");
+        let (_client_socket, device_socket) = zx::Socket::create_stream();
         responder.send(&mut Ok(device_socket)).expect("failed to send response to device");
 
         // The device sent a reply to the guest.
