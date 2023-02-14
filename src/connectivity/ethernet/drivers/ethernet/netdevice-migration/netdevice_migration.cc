@@ -405,8 +405,14 @@ void NetdeviceMigration::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_lis
           // that arrive immediately after.
           {
             std::lock_guard tx_lock(netdev->tx_lock_);
-            netdev->tx_in_flight_.erase(result.id);
             netdev->netbuf_pool_.push(std::move(op));
+            auto iter = netdev->tx_in_flight_.find(result.id);
+            if (iter == netdev->tx_in_flight_.end()) {
+              // No longer in flight, stop has been called. Don't complete the
+              // transaction.
+              return;
+            }
+            netdev->tx_in_flight_.erase(iter);
           }
           netdev->netdevice_.CompleteTx(&result, 1);
         },

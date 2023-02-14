@@ -1006,19 +1006,17 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, ReturnsRxBuffersOnStop) {
 TEST_F(NetdeviceMigrationDefaultSetupTest, ReturnsTxBuffersOnStop) {
   ASSERT_NO_FATAL_FAILURE(NetdevImplPrepareVmo(kVmoId));
   ASSERT_NO_FATAL_FAILURE(NetdevImplStart(ZX_OK));
-  netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
   constexpr uint32_t kBufId = 42;
   buffer_region_t region = {.vmo = kVmoId, .length = ETH_MTU_SIZE};
   tx_buffer_t buf = {.id = kBufId, .data_list = &region, .data_count = 1};
+
+  fit::callback<void()> complete_tx_callback;
   EXPECT_CALL(MockEthernet(), EthernetImplQueueTx)
-      .WillOnce([&helper](uint32_t options, ethernet_netbuf_t* netbuf,
-                          ethernet_impl_queue_tx_callback callback, void* cookie) {
-        // We must artificially return this netbuf to the pool, otherwise its
-        // memory will leak.
-        size_t size = helper.netbuf_size();
-        helper.WithNetbufPool<void>([netbuf, &size](netdevice_migration::NetbufPool& pool) {
-          pool.push(netdevice_migration::Netbuf(netbuf, size));
-        });
+      .WillOnce([&complete_tx_callback](uint32_t options, ethernet_netbuf_t* netbuf,
+                                        ethernet_impl_queue_tx_callback callback, void* cookie) {
+        complete_tx_callback = [callback, cookie, netbuf]() {
+          callback(cookie, ZX_ERR_CANCELED, netbuf);
+        };
       });
   Device().NetworkDeviceImplQueueTx(&buf, 1);
 
@@ -1034,6 +1032,9 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, ReturnsTxBuffersOnStop) {
   Device().NetworkDeviceImplStop([](void* ctx) { *static_cast<bool*>(ctx) = true; },
                                  &callback_called);
   EXPECT_TRUE(callback_called);
+  if (complete_tx_callback) {
+    complete_tx_callback();
+  }
 }
 
 }  // namespace
