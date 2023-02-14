@@ -82,7 +82,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
             d.generate_test_config()
 
     @patch('api_mobly.get_result_path')
-    @patch('api_mobly.get_test_output_dir_path', return_value='path/to/remove')
+    @patch(
+        'api_mobly.get_latest_test_output_dir_symlink_path',
+        return_value='path/to/remove')
     @patch('api_infra.TESTPARSER_PREAMBLE', '---MOCK_PREAMBLE---')
     @patch('builtins.open', new_callable=mock_open, read_data='test_result')
     @patch('os.remove')
@@ -96,7 +98,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         mock_rm.assert_called_once_with('path/to/remove')
 
     @patch('api_mobly.get_result_path')
-    @patch('api_mobly.get_test_output_dir_path')
+    @patch('api_mobly.get_latest_test_output_dir_symlink_path')
     @patch('api_infra.TESTPARSER_PREAMBLE')
     @patch('builtins.open', side_effect=OSError)
     @patch('os.remove', side_effect=OSError)

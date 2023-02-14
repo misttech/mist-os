@@ -64,13 +64,13 @@ if (is_host) {
     ]
     libraries = [ ":infra_driver" ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":common_test($host_toolchain)",
-      ":infra_driver_test($host_toolchain)",
-      ":local_driver_test($host_toolchain)",
-    ]
-  }
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":common_test($host_toolchain)",
+    ":infra_driver_test($host_toolchain)",
+    ":local_driver_test($host_toolchain)",
+  ]
 }

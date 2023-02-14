@@ -67,16 +67,6 @@ if (is_host) {
     ]
   }
 
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":api_mobly_test($host_toolchain)",
-      ":driver_factory_test($host_toolchain)",
-      ":mobly_driver_lib_test($host_toolchain)",
-      "drivers:tests",
-    ]
-  }
-
   # Mobly Driver Python binary definition.
   _md_bin_target = "mobly_driver_binary_target"
   _md_bin_name = "mobly_driver.pyz"
@@ -110,4 +100,14 @@ if (is_host) {
     outputs = [ "${target_out_dir}/test_data/${_md_bin_name}" ]
     deps = [ ":${_md_bin_target}" ]
   }
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":api_mobly_test($host_toolchain)",
+    ":driver_factory_test($host_toolchain)",
+    ":mobly_driver_lib_test($host_toolchain)",
+    "drivers:tests",
+  ]
 }
