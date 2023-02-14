@@ -71,19 +71,11 @@ impl StorageUnlockMechanism {
         match request {
             StorageUnlockMechanismRequest::Authenticate { interaction, enrollments, responder } => {
                 let mut response = self.authenticate(interaction, enrollments).await;
-                match responder.send(&mut response) {
-                    // TODO(fxbug.dev/113160): Remove this since it will never occur.
-                    Err(e) if e.is_closed() => Ok(()),
-                    result => result,
-                }
+                responder.send(&mut response)
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {
                 let mut response = self.enroll(interaction).await;
-                match responder.send(&mut response) {
-                    // TODO(fxbug.dev/113160): Remove this since it will never occur.
-                    Err(e) if e.is_closed() => Ok(()),
-                    result => result,
-                }
+                responder.send(&mut response)
             }
         }
     }

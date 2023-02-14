@@ -648,6 +648,10 @@ mod tests {
         routing_test_helpers::component_id_index::make_index_file,
     };
 
+    fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
+        handle.wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::from_nanos(0)).is_ok()
+    }
+
     #[fuchsia::test]
     async fn get_instance_test() {
         // Create index.
@@ -837,9 +841,9 @@ mod tests {
 
         model.start().await;
 
-        let (_, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
         let server_end = ServerEnd::new(server_end.into_channel());
-        let err = query
+        query
             .open(
                 "./",
                 fsys::OpenDirType::OutgoingDir,
@@ -850,14 +854,14 @@ mod tests {
             )
             .await
             .unwrap()
-            .unwrap_err();
+            .unwrap();
         // The test runner has not been configured to serve the outgoing dir, so this directory
         // should just be closed.
-        assert_eq!(err, fsys::OpenError::FidlError);
+        assert!(is_closed(outgoing_dir));
 
-        let (_, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (runtime_dir, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
         let server_end = ServerEnd::new(server_end.into_channel());
-        let err = query
+        query
             .open(
                 "./",
                 fsys::OpenDirType::RuntimeDir,
@@ -868,10 +872,10 @@ mod tests {
             )
             .await
             .unwrap()
-            .unwrap_err();
+            .unwrap();
         // The test runner has not been configured to serve the runtime dir, so this directory
         // should just be closed.
-        assert_eq!(err, fsys::OpenError::FidlError);
+        assert!(is_closed(runtime_dir));
 
         let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
         let server_end = ServerEnd::new(server_end.into_channel());

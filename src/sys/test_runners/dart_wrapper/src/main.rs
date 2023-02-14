@@ -138,24 +138,14 @@ async fn proxy_component_controller(
             }
             ProxyEvent::ClientRequest(StreamItem::Item(Ok(request))) => match request {
                 fcrunner::ComponentControllerRequest::Stop { control_handle: _ } => {
-                    // TODO(fxbug.dev/113160): Remove is_closed() check once
-                    // Rust bindings hide PEER_CLOSED.
-                    match nested_controller.stop() {
-                        Err(e) if !e.is_closed() => {
-                            warn!("failed forwarding Stop() to dart runner: {e}")
-                        }
-                        _ => {}
+                    if let Err(e) = nested_controller.stop() {
+                        warn!("failed forwarding Stop() to dart runner: {e}")
                     }
                     stop_or_kill_called = true;
                 }
                 fcrunner::ComponentControllerRequest::Kill { control_handle: _ } => {
-                    // TODO(fxbug.dev/113160): Remove is_closed() check once
-                    // Rust bindings hide PEER_CLOSED.
-                    match nested_controller.kill() {
-                        Err(e) if !e.is_closed() => {
-                            warn!("failed forwarding Kill() to dart runner: {e}")
-                        }
-                        _ => {}
+                    if let Err(e) = nested_controller.kill() {
+                        warn!("failed forwarding Kill() to dart runner: {e}")
                     }
                     stop_or_kill_called = true;
                 }

@@ -1230,9 +1230,10 @@ mod tests {
 
         drop(fake_device.mlme_proxy_channel);
 
-        let result =
-            dev.mlme_control_handle().send_deauthenticate_conf(&mut make_deauth_confirm_msg());
-        assert!(result.unwrap_err().is_closed());
+        // FIDL does not expose PEER_CLOSED from channel writes, to avoid races.
+        dev.mlme_control_handle()
+            .send_deauthenticate_conf(&mut make_deauth_confirm_msg())
+            .expect("error sending MLME message");
     }
 
     #[test]

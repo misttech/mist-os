@@ -294,15 +294,8 @@ impl Client {
         handles: &mut Vec<HandleDisposition<'_>>,
     ) -> Result<(), Error> {
         match self.inner.channel.write_etc(bytes, handles) {
-            Ok(()) => Ok(()),
-            Err(zx_status::Status::PEER_CLOSED) => {
-                Err(Error::ClientChannelClosed {
-                    // Try to receive the epitaph.
-                    status: self.inner.recv_all()?.unwrap_or(zx_status::Status::PEER_CLOSED),
-                    protocol_name: self.inner.protocol_name,
-                })
-            }
-            Err(e) => Err(Error::ClientWrite(e.into())),
+            Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
+            Err(e) => Err(Error::ClientWrite(e)),
         }
     }
 
@@ -849,10 +842,10 @@ pub mod sync {
                 maybe_overflowing_after_encode(&mut write_bytes, &mut write_handles)?;
             }
 
-            self.channel
-                .write_etc(&mut write_bytes, &mut write_handles)
-                .map_err(|e| self.wrap_error(Error::ClientWrite, e))?;
-            Ok(())
+            match self.channel.write_etc(&mut write_bytes, &mut write_handles) {
+                Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
+                Err(e) => Err(Error::ClientWrite(e)),
+            }
         }
 
         /// Send a new message expecting a response.
@@ -1148,13 +1141,29 @@ mod tests {
     }
 
     #[test]
-    fn sync_client_peer_closed() -> Result<(), Error> {
+    fn sync_client_one_way_call_suceeds_after_peer_closed() -> Result<(), Error> {
         let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
-        // Close the server channel.
         drop(server_end);
         assert_matches!(
             client.send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty()),
+            Ok(())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sync_client_two_way_call_fails_after_peer_closed() -> Result<(), Error> {
+        let (client_end, server_end) = zx::Channel::create();
+        let client = sync::Client::new(client_end, "test_protocol");
+        drop(server_end);
+        assert_matches!(
+            client.send_query::<u8, u8, false, false>(
+                &mut SEND_DATA.clone(),
+                SEND_ORDINAL,
+                DynamicFlags::empty(),
+                zx::Time::after(5.seconds())
+            ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
                 protocol_name: "test_protocol",
@@ -1174,7 +1183,12 @@ mod tests {
             .close_with_epitaph(zx_status::Status::UNAVAILABLE)
             .expect("failed to write epitaph");
         assert_matches!(
-            client.send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty()),
+            client.send_query::<u8, u8, false, false>(
+                &mut SEND_DATA.clone(),
+                SEND_ORDINAL,
+                DynamicFlags::empty(),
+                zx::Time::after(5.seconds())
+            ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
                 protocol_name: "test_protocol",
@@ -1665,33 +1679,41 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn client_reports_epitaph_from_all_actions() {
+    async fn client_reports_epitaph_from_all_read_actions() {
         #[derive(Debug, PartialEq)]
         enum Action {
-            SendMsg,    // send a one-way message
-            SendQuery,  // send a two-way message and wait for the response
-            CheckQuery, // send a two-way message and just call .check()
-            RecvEvent,  // wait to receive an event
+            SendMsg,   // send a one-way message
+            SendQuery, // send a two-way message and just call .check()
+            WaitQuery, // send a two-way message and wait for the response
+            RecvEvent, // wait to receive an event
+        }
+        impl Action {
+            fn should_report_epitaph(&self) -> bool {
+                match self {
+                    Action::SendMsg | Action::SendQuery => false,
+                    Action::WaitQuery | Action::RecvEvent => true,
+                }
+            }
         }
         use Action::*;
-        // Test all permutations of two actions. The first one reports an
-        // epitaph, and then second one re-reports the epitaph.
+        // Test all permutations of two actions. Verify the epitaph is reported
+        // twice (2 reads), once (1 read, 1 write), or not at all (2 writes).
         for two_actions in &[
             [SendMsg, SendMsg],
             [SendMsg, SendQuery],
-            [SendMsg, CheckQuery],
+            [SendMsg, WaitQuery],
             [SendMsg, RecvEvent],
             [SendQuery, SendMsg],
             [SendQuery, SendQuery],
-            [SendQuery, CheckQuery],
+            [SendQuery, WaitQuery],
             [SendQuery, RecvEvent],
-            [CheckQuery, SendMsg],
-            [CheckQuery, SendQuery],
-            [CheckQuery, CheckQuery],
-            [CheckQuery, RecvEvent],
+            [WaitQuery, SendMsg],
+            [WaitQuery, SendQuery],
+            [WaitQuery, WaitQuery],
+            [WaitQuery, RecvEvent],
             [RecvEvent, SendMsg],
             [RecvEvent, SendQuery],
-            [RecvEvent, CheckQuery],
+            [RecvEvent, WaitQuery],
             // No [RecvEvent, RecvEvent] because it behaves differently: after
             // reporting an epitaph, the next call returns None.
         ] {
@@ -1717,7 +1739,7 @@ mod tests {
                             DynamicFlags::empty(),
                         )
                         .err(),
-                    SendQuery => client
+                    WaitQuery => client
                         .send_query::<u8, u8, false, false>(
                             &mut SEND_DATA.clone(),
                             SEND_ORDINAL,
@@ -1725,7 +1747,7 @@ mod tests {
                         )
                         .await
                         .err(),
-                    CheckQuery => client
+                    SendQuery => client
                         .send_query::<u8, u8, false, false>(
                             &mut SEND_DATA.clone(),
                             SEND_ORDINAL,
@@ -1735,21 +1757,20 @@ mod tests {
                         .err(),
                     RecvEvent => event_receiver.next().await.unwrap().err(),
                 };
-                // TODO(fxbug.dev/72968): Switch to built-in assert_matches once
-                // stabilized, and just provide "index: {:?}, actions: {:?}".
+                let details = format!("index: {index:?}, two_actions: {two_actions:?}");
                 match err {
+                    None => assert!(
+                        !action.should_report_epitaph(),
+                        "expected epitaph, but succeeded.\n{details}"
+                    ),
                     Some(crate::Error::ClientChannelClosed {
                         status: zx_status::Status::UNAVAILABLE,
                         protocol_name: "test_protocol",
-                    }) => (),
-                    Some(err) => panic!(
-                        "expected epitaph, got {:#?}.\nindex: {:?}, two_actions: {:?}",
-                        err, index, two_actions
+                    }) => assert!(
+                        action.should_report_epitaph(),
+                        "got epitaph unexpectedly.\n{details}",
                     ),
-                    None => panic!(
-                        "expected epitaph, but it succeeded unexpectedly.\nindex: {:?}, two_actions: {:?}",
-                        index, two_actions
-                    )
+                    Some(err) => panic!("unexpected error: {err:#?}.\n{details}"),
                 }
             }
 
@@ -1794,7 +1815,7 @@ mod tests {
             .map(|x| assert_eq!(x, SEND_DATA))
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
-        // Close the server channel, meaning the next query will fail before it even starts.
+        // Close the server channel, meaning the next query will fail.
         drop(server);
 
         let query_fut = client.send_query::<u8, u8, false, false>(
@@ -1803,8 +1824,16 @@ mod tests {
             DynamicFlags::empty(),
         );
 
-        // This should be an error, because the server end is closed.
-        query_fut.check().expect_err("Didn't make an error on check");
+        // The check succeeds, because we do not expose PEER_CLOSED on writes.
+        let mut checked_fut = query_fut.check().expect("failed to check future");
+        // But the query will fail when it tries to read the response.
+        assert_matches!(
+            executor.run_singlethreaded(&mut checked_fut),
+            Err(crate::Error::ClientChannelClosed {
+                status: zx_status::Status::PEER_CLOSED,
+                protocol_name: "test_protocol"
+            })
+        );
     }
 
     #[fasync::run_singlethreaded(test)]

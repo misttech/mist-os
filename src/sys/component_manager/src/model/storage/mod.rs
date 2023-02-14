@@ -452,12 +452,9 @@ fn generate_instance_id_based_storage_path(instance_id: &ComponentInstanceId) ->
 mod tests {
     use super::*;
     use {
-        crate::model::{
-            error::OpenOutgoingDirError,
-            testing::{
-                routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-                test_helpers::{self, component_decl_with_test_runner},
-            },
+        crate::model::testing::{
+            routing_test_helpers::{RoutingTest, RoutingTestBuilder},
+            test_helpers::{self, component_decl_with_test_runner},
         },
         assert_matches::assert_matches,
         cm_rust::*,
@@ -672,10 +669,7 @@ mod tests {
             None,
         )
         .await;
-        assert_matches!(
-            res,
-            Err(ModelError::OpenOutgoingDirError { err: OpenOutgoingDirError::Fidl { .. } })
-        );
+        assert_matches!(res, Err(ModelError::StorageError { err: StorageError::Open { .. } }));
     }
 
     #[fuchsia::test]

@@ -49,22 +49,19 @@ impl LocalMirrorManager {
         metadata: ServerEnd<fio::FileMarker>,
     ) -> Result<(), GetMetadataError> {
         let path = format!("{}/{}", repo_url.url().host(), path);
-        match self.metadata_dir.open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::NOT_DIRECTORY
-                | fio::OpenFlags::DESCRIBE,
-            fio::ModeType::empty(),
-            &path,
-            ServerEnd::new(metadata.into_channel()),
-        ) {
-            Ok(()) => Ok(()),
-            // TODO(fxbug.dev/113160): Remove this line since it will never occur.
-            Err(e) if e.is_closed() => Ok(()),
-            Err(e) => {
+        self.metadata_dir
+            .open(
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::NOT_DIRECTORY
+                    | fio::OpenFlags::DESCRIBE,
+                fio::ModeType::empty(),
+                &path,
+                ServerEnd::new(metadata.into_channel()),
+            )
+            .map_err(|e| {
                 fx_log_info!("while opening metadata {}: {:#}", path, anyhow!(e));
-                Err(GetMetadataError::ErrorOpeningMetadata)
-            }
-        }
+                GetMetadataError::ErrorOpeningMetadata
+            })
     }
 
     /// Connects the file in the USB blobs directory to the passed-in handle.
@@ -77,21 +74,18 @@ impl LocalMirrorManager {
         let (first, last) = blob_id.split_at(2);
         let path = format!("{first}/{last}");
 
-        match self.blobs_dir.open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::NOT_DIRECTORY
-                | fio::OpenFlags::DESCRIBE,
-            fio::ModeType::empty(),
-            &path,
-            ServerEnd::new(blob.into_channel()),
-        ) {
-            Ok(()) => Ok(()),
-            // TODO(fxbug.dev/113160): Remove this line since it will never occur.
-            Err(e) if e.is_closed() => Ok(()),
-            Err(e) => {
+        self.blobs_dir
+            .open(
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::NOT_DIRECTORY
+                    | fio::OpenFlags::DESCRIBE,
+                fio::ModeType::empty(),
+                &path,
+                ServerEnd::new(blob.into_channel()),
+            )
+            .map_err(|e| {
                 fx_log_info!("while opening blob {}: {:#}", path, anyhow!(e));
-                Err(GetBlobError::ErrorOpeningBlob)
-            }
-        }
+                GetBlobError::ErrorOpeningBlob
+            })
     }
 }

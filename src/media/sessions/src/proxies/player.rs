@@ -476,8 +476,12 @@ impl FusedStream for Player {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::encoding::Decodable;
-    use fidl::endpoints::*;
+    use fidl::{
+        encoding::Decodable,
+        endpoints::{create_endpoints, create_proxy_and_stream},
+        prelude::*,
+    };
+    use fuchsia_zircon as zx;
     use futures::{
         future,
         stream::{StreamExt, TryStreamExt},
@@ -507,11 +511,8 @@ mod test {
     async fn client_channel_closes_when_backing_player_disconnects() -> Result<()> {
         let (_inspector, mut player, _player_server) = test_player();
 
-        let (session_control_client, session_control_server) =
-            create_endpoints::<SessionControlMarker>()?;
-        let session_control_fidl_proxy: SessionControlProxy =
-            session_control_client.into_proxy()?;
-        let session_control_request_stream = session_control_server.into_stream()?;
+        let (session_control_fidl_proxy, session_control_request_stream) =
+            create_proxy_and_stream::<SessionControlMarker>()?;
         let control_request_stream = session_control_request_stream
             .filter_map(|r| future::ready(r.ok()))
             .map(ForwardControlRequest::try_from)
@@ -523,7 +524,11 @@ mod test {
 
         drop(player);
 
-        assert!(session_control_fidl_proxy.pause().is_err());
+        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
+        assert!(session_control_fidl_proxy
+            .as_channel()
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
+            .is_ok());
 
         Ok(())
     }

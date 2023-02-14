@@ -1260,7 +1260,7 @@ pub mod capability_util {
                     &file,
                     fio::OpenFlags::RIGHT_READABLE,
                 )
-                .expect_err("opened file successfully when it should fail");
+                .expect("failed to open file");
                 let epitaph = dir_proxy.take_event_stream().next().await.expect("no epitaph");
                 assert_matches!(
                     epitaph,
@@ -1275,7 +1275,7 @@ pub mod capability_util {
                     &file,
                     fio::OpenFlags::RIGHT_READABLE,
                 )
-                .expect_err("opened file successfully when it should fail");
+                .expect("failed to open file");
                 assert_matches!(dir_proxy.take_event_stream().next().await, None);
             }
         }

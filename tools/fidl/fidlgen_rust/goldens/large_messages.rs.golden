@@ -1254,11 +1254,7 @@ impl futures::Stream for OverflowingRequestStream {
                     fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
                     fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-                    control_handle
-                        .inner
-                        .channel()
-                        .write_etc(&*bytes, &mut handles)
-                        .map_err(fidl::Error::ServerResponseWrite)?;
+                    control_handle.inner.send_raw_msg(&*bytes, &mut handles)?;
 
                     Ok(OverflowingRequest::_UnknownMethod {
                         ordinal: header.ordinal(),
@@ -1619,12 +1615,7 @@ impl OverflowingEncodeBoundedKnownToBeSmallResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1702,12 +1693,7 @@ impl OverflowingEncodeBoundedMaybeLargeResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1787,12 +1773,7 @@ impl OverflowingEncodeSemiBoundedBelievedToBeSmallResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1873,12 +1854,7 @@ impl OverflowingEncodeSemiBoundedMaybeLargeResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1956,12 +1932,7 @@ impl OverflowingEncodeUnboundedMaybeLargeValueResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -2042,12 +2013,7 @@ impl OverflowingEncodeUnboundedMaybeLargeResourceResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }

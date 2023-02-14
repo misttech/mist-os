@@ -282,12 +282,7 @@ pub fn clone_onto_no_describe(
     let node_request = ServerEnd::new(request.into_channel());
     let flags = flags.unwrap_or(fio::OpenFlags::CLONE_SAME_RIGHTS);
 
-    match dir.clone(flags, node_request) {
-        Ok(()) => Ok(()),
-        // TODO(fxbug.dev/113160): Remove this line since it will never occur.
-        Err(e) if e.is_closed() => Ok(()),
-        Err(e) => Err(CloneError::SendCloneRequest(e)),
-    }
+    dir.clone(flags, node_request).map_err(CloneError::SendCloneRequest)
 }
 
 /// Gracefully closes the directory proxy from the remote end.

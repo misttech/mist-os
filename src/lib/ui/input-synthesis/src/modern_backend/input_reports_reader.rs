@@ -62,9 +62,6 @@ impl InputReportsReader {
                     (InputReportsReaderRequest::ReadInputReports { responder }, reports) => {
                         responder
                             .send(&mut Ok(reports))
-                            // TODO(fxbug.dev/113160): Remove this line since
-                            // is_closed() will always be false.
-                            .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                             .map_err(anyhow::Error::from)
                             .context("while sending reports")
                     }

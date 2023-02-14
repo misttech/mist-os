@@ -491,10 +491,16 @@ async fn run_runner_server(mut stream: RunnerRequestStream) -> Result<(), Error>
                         // TODO(fxbug.dev/99738): Rust bindings should reject V1 wire format.
                         false
                     }
-                    Test::EventSendingDoNotReportPeerClosed
-                    | Test::ReplySendingDoNotReportPeerClosed => {
-                        // TODO(fxbug.dev/113160): Peer-closed errors should be
-                        // hidden from one-way calls.
+                    Test::EventSendingDoNotReportPeerClosed => {
+                        // TODO(fxbug.dev/74241): There are many tests where the harness sends
+                        // something invalid and expects a PEER_CLOSED. Right now the Rust bindings
+                        // don't actually close the channel until everything is dropped, so to make
+                        // things get dropped and avoid tests hanging, we shut down the controller
+                        // after sending WillTeardown. That works for most tests, but breaks
+                        // EventSendingDoNotReportPeerClosed where the harness calls SendStrictEvent
+                        // after closing the target channel. Once we make channel closure happen
+                        // more promptly, we can remove the ctl_handle.shutdown() calls below and
+                        // re-enable this test.
                         false
                     }
                     _ => true,

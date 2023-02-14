@@ -5,7 +5,13 @@
 //! An implementation of a server for a fidl interface.
 
 use {
-    crate::{create_trace_provider, epitaph, AsyncChannel},
+    crate::{
+        create_trace_provider,
+        encoding::{DynamicFlags, Encodable, TransactionHeader, TransactionMessage},
+        epitaph,
+        handle::HandleDisposition,
+        AsyncChannel, Error,
+    },
     fuchsia_zircon_status as zx_status,
     futures::task::{AtomicWaker, Context},
     std::sync::atomic::{self, AtomicBool},
@@ -66,5 +72,34 @@ impl ServeInner {
         }
         self.waker.register(cx.waker());
         self.shutdown.load(atomic::Ordering::Relaxed)
+    }
+
+    /// Send an encodable message to the client.
+    pub fn send<T: Encodable, const OVERFLOWABLE: bool>(
+        &self,
+        body: &mut T,
+        tx_id: u32,
+        ordinal: u64,
+        dynamic_flags: DynamicFlags,
+    ) -> Result<(), Error> {
+        let msg = &mut TransactionMessage {
+            header: TransactionHeader::new(tx_id, ordinal, dynamic_flags),
+            body,
+        };
+        crate::encoding::with_tls_encoded::<_, _, OVERFLOWABLE>(msg, |bytes, handles| {
+            self.send_raw_msg(&**bytes, handles)
+        })
+    }
+
+    /// Send a raw message to the client.
+    pub fn send_raw_msg(
+        &self,
+        bytes: &[u8],
+        handles: &mut Vec<HandleDisposition<'_>>,
+    ) -> Result<(), Error> {
+        match self.channel.write_etc(bytes, handles) {
+            Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
+            Err(e) => Err(Error::ServerResponseWrite(e.into())),
+        }
     }
 }

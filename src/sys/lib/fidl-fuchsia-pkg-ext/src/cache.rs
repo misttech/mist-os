@@ -252,11 +252,7 @@ impl Get {
         let (blob_iterator, blob_iterator_server_end) =
             fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>()?;
 
-        self.needed_blobs
-            .get_missing_blobs(blob_iterator_server_end)
-            // TODO(fxbug.dev/113160): Remove this line since
-            // is_closed() will always be false.
-            .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })?;
+        self.needed_blobs.get_missing_blobs(blob_iterator_server_end)?;
         Ok(Some(blob_iterator))
     }
 

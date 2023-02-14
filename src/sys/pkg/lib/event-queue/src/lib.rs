@@ -516,12 +516,7 @@ mod tests {
             match stream.try_next().await.unwrap().unwrap() {
                 ExampleEventMonitorRequest::OnEvent { event, responder } => {
                     assert_eq!(&event, expected_event);
-                    responder
-                        .send()
-                        // TODO(fxbug.dev/113160): Remove this line since
-                        // is_closed() will always be false.
-                        .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
-                        .unwrap();
+                    responder.send().unwrap();
                 }
             }
         }

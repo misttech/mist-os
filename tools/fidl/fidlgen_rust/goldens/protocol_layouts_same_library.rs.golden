@@ -1547,24 +1547,12 @@ impl ComposedProtocolControlHandle {
         mut payload: &mut ComposedProtocolOnAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x49a6eee3a0300e28,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x49a6eee3a0300e28,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_anon_composed_with_error(
@@ -1572,24 +1560,12 @@ impl ComposedProtocolControlHandle {
         mut result: &mut ComposedProtocolOnAnonComposedWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x297a909727d08a60,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x297a909727d08a60,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_named_composed(
@@ -1597,24 +1573,12 @@ impl ComposedProtocolControlHandle {
         mut payload: &mut UnionPayload,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x17c4edb4a4a36d7b,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x17c4edb4a4a36d7b,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_named_composed_with_error(
@@ -1622,24 +1586,12 @@ impl ComposedProtocolControlHandle {
         mut result: &mut ComposedProtocolOnNamedComposedWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3ff74c1cafdbabcf,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3ff74c1cafdbabcf,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -1724,12 +1676,7 @@ impl ComposedProtocolTwoWayAnonComposedResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1815,12 +1762,7 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1897,12 +1839,7 @@ impl ComposedProtocolTwoWayNamedComposedResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -1988,12 +1925,7 @@ impl ComposedProtocolTwoWayNamedComposedWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -3375,24 +3307,12 @@ impl MainProtocolControlHandle {
         mut payload: &mut ComposedProtocolOnAnonComposedRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x49a6eee3a0300e28,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x49a6eee3a0300e28,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_anon_composed_with_error(
@@ -3400,24 +3320,12 @@ impl MainProtocolControlHandle {
         mut result: &mut ComposedProtocolOnAnonComposedWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x297a909727d08a60,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x297a909727d08a60,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_named_composed(
@@ -3425,24 +3333,12 @@ impl MainProtocolControlHandle {
         mut payload: &mut UnionPayload,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x17c4edb4a4a36d7b,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x17c4edb4a4a36d7b,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_named_composed_with_error(
@@ -3450,46 +3346,22 @@ impl MainProtocolControlHandle {
         mut result: &mut ComposedProtocolOnNamedComposedWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3ff74c1cafdbabcf,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3ff74c1cafdbabcf,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_local(&self, mut payload: &mut UnionPayload) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x71e90a3d364d2e8d,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x71e90a3d364d2e8d,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_local_with_error(
@@ -3497,24 +3369,12 @@ impl MainProtocolControlHandle {
         mut result: &mut MainProtocolOnLocalWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x2dac7e32bd351bdb,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x2dac7e32bd351bdb,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_anon(
@@ -3522,24 +3382,12 @@ impl MainProtocolControlHandle {
         mut payload: &mut MainProtocolOnAnonRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xd8fa6d0f5fabb94,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xd8fa6d0f5fabb94,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_on_anon_with_error(
@@ -3547,24 +3395,12 @@ impl MainProtocolControlHandle {
         mut result: &mut MainProtocolOnAnonWithErrorResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6658cf43e550fa02,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6658cf43e550fa02,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -3649,12 +3485,7 @@ impl MainProtocolTwoWayAnonComposedResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -3740,12 +3571,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -3822,12 +3648,7 @@ impl MainProtocolTwoWayNamedComposedResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -3913,12 +3734,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -3995,12 +3811,7 @@ impl MainProtocolTwoWayLocalResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -4086,12 +3897,7 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -4171,12 +3977,7 @@ impl MainProtocolTwoWayAnonResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -4262,12 +4063,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }

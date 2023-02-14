@@ -4649,46 +4649,22 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsAjarProtocolControlHa
 impl UnknownInteractionsAjarProtocolControlHandle {
     pub fn send_strict_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6022ae999e9dc2b0,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6022ae999e9dc2b0,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         let mut response = (some_field);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x510586752445c769,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x510586752445c769,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union(
@@ -4696,24 +4672,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut payload: &mut UnknownInteractionsAjarProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x57794b4cc91f816f,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x57794b4cc91f816f,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table(
@@ -4721,24 +4685,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut payload: UnknownInteractionsAjarProtocolStrictEventTableRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x92639249201f89d,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x92639249201f89d,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_err(
@@ -4746,24 +4698,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolStrictEventErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x715bfcab27f735ed,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x715bfcab27f735ed,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields_err(
@@ -4771,24 +4711,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolStrictEventFieldsErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3ae22659224effb9,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3ae22659224effb9,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union_err(
@@ -4796,24 +4724,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolStrictEventUnionErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xab5b2d1199942b,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xab5b2d1199942b,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table_err(
@@ -4821,68 +4737,32 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolStrictEventTableErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6c6abc426c7c8406,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6c6abc426c7c8406,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_flexible_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x11c9ba570ce71df3,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x11c9ba570ce71df3,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         let mut response = (some_field);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3ba8fd32bf87d862,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3ba8fd32bf87d862,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_union(
@@ -4890,24 +4770,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut payload: &mut UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x7c3823f47ce0fcad,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x7c3823f47ce0fcad,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_table(
@@ -4915,24 +4783,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut payload: UnknownInteractionsAjarProtocolFlexibleEventTableRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x9ca944d1d6436b0,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x9ca944d1d6436b0,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_err(
@@ -4940,24 +4796,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolFlexibleEventErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x4fbe0d51e074e5bc,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x4fbe0d51e074e5bc,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_fields_err(
@@ -4965,24 +4809,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x22a3e45e944031c4,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x22a3e45e944031c4,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_union_err(
@@ -4990,24 +4822,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xc1637e7694d6680,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xc1637e7694d6680,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_table_err(
@@ -5015,24 +4835,12 @@ impl UnknownInteractionsAjarProtocolControlHandle {
         mut result: &mut UnknownInteractionsAjarProtocolFlexibleEventTableErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6e69d4c524bf3a27,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6e69d4c524bf3a27,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -5108,12 +4916,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5190,12 +4993,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5281,12 +5079,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5372,12 +5165,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5463,12 +5251,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5554,12 +5337,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5645,12 +5423,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -5736,12 +5509,7 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -6871,46 +6639,22 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsClosedProtocolControl
 impl UnknownInteractionsClosedProtocolControlHandle {
     pub fn send_strict_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xa8ee6ee302f693b,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xa8ee6ee302f693b,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         let mut response = (some_field);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x5d7c57b62e9c3a74,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x5d7c57b62e9c3a74,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union(
@@ -6918,24 +6662,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut payload: &mut UnknownInteractionsClosedProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3b8475deeb4a9d64,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3b8475deeb4a9d64,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table(
@@ -6943,24 +6675,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut payload: UnknownInteractionsClosedProtocolStrictEventTableRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x27da43fc85a7f5be,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x27da43fc85a7f5be,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_err(
@@ -6968,24 +6688,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut result: &mut UnknownInteractionsClosedProtocolStrictEventErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x12b105b1430a1201,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x12b105b1430a1201,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields_err(
@@ -6993,24 +6701,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut result: &mut UnknownInteractionsClosedProtocolStrictEventFieldsErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x2d16399d2e8a5c96,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x2d16399d2e8a5c96,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union_err(
@@ -7018,24 +6714,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut result: &mut UnknownInteractionsClosedProtocolStrictEventUnionErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6dcf67f2a1d16034,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6dcf67f2a1d16034,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table_err(
@@ -7043,24 +6727,12 @@ impl UnknownInteractionsClosedProtocolControlHandle {
         mut result: &mut UnknownInteractionsClosedProtocolStrictEventTableErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x4e90e92eafa9eefa,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x4e90e92eafa9eefa,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -7136,12 +6808,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7218,12 +6885,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7309,12 +6971,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7400,12 +7057,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7491,12 +7143,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7584,12 +7231,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7675,12 +7317,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -7766,12 +7403,7 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -9529,11 +9161,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
                     fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-                    control_handle
-                        .inner
-                        .channel()
-                        .write_etc(&*bytes, &mut handles)
-                        .map_err(fidl::Error::ServerResponseWrite)?;
+                    control_handle.inner.send_raw_msg(&*bytes, &mut handles)?;
 
                     Ok(UnknownInteractionsProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal(),
@@ -9887,46 +9515,22 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsProtocolControlHandle
 impl UnknownInteractionsProtocolControlHandle {
     pub fn send_strict_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x9842669255c4fc1,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x9842669255c4fc1,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         let mut response = (some_field);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x7b75ae46520ee732,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x7b75ae46520ee732,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union(
@@ -9934,24 +9538,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut payload: &mut UnknownInteractionsProtocolStrictEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3663b5197598cbda,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3663b5197598cbda,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table(
@@ -9959,24 +9551,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut payload: UnknownInteractionsProtocolStrictEventTableRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x25a10039a9f96910,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x25a10039a9f96910,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_err(
@@ -9984,24 +9564,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolStrictEventErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3d956048f723bc6d,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3d956048f723bc6d,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_fields_err(
@@ -10009,24 +9577,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolStrictEventFieldsErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x72c0566865e53c8b,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x72c0566865e53c8b,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_union_err(
@@ -10034,24 +9590,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolStrictEventUnionErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x40f96851e6f82abb,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x40f96851e6f82abb,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_strict_event_table_err(
@@ -10059,68 +9603,32 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolStrictEventTableErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x6ca24cbed7b2784a,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x6ca24cbed7b2784a,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 
     pub fn send_flexible_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x61bb1fab7d767866,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x61bb1fab7d767866,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_fields(&self, mut some_field: i32) -> Result<(), fidl::Error> {
         let mut response = (some_field);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x3226dff9b0c1d801,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x3226dff9b0c1d801,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_union(
@@ -10128,24 +9636,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut payload: &mut UnknownInteractionsProtocolFlexibleEventUnionRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x22afd161ca71e467,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x22afd161ca71e467,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_table(
@@ -10153,24 +9649,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut payload: UnknownInteractionsProtocolFlexibleEventTableRequest,
     ) -> Result<(), fidl::Error> {
         let mut response = (payload);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x4f72dd46888b89e0,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x4f72dd46888b89e0,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_err(
@@ -10178,24 +9662,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolFlexibleEventErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x4bda3e6fb22bb5a9,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x4bda3e6fb22bb5a9,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_fields_err(
@@ -10203,24 +9675,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolFlexibleEventFieldsErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xf370ade2f7c7a4a,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xf370ade2f7c7a4a,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_union_err(
@@ -10228,24 +9688,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolFlexibleEventUnionErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0xc94989e5f6707ec,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0xc94989e5f6707ec,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 
     pub fn send_flexible_event_table_err(
@@ -10253,24 +9701,12 @@ impl UnknownInteractionsProtocolControlHandle {
         mut result: &mut UnknownInteractionsProtocolFlexibleEventTableErrResult,
     ) -> Result<(), fidl::Error> {
         let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x4dca02085aeb2d43,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x4dca02085aeb2d43,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -10346,12 +9782,7 @@ impl UnknownInteractionsProtocolStrictTwoWayResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10428,12 +9859,7 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10519,12 +9945,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10610,12 +10031,7 @@ impl UnknownInteractionsProtocolStrictTwoWayTableResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10701,12 +10117,7 @@ impl UnknownInteractionsProtocolStrictTwoWayErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10792,12 +10203,7 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10883,12 +10289,7 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -10974,12 +10375,7 @@ impl UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11056,12 +10452,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11138,12 +10529,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11229,12 +10615,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11320,12 +10701,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11411,12 +10787,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11502,12 +10873,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11593,12 +10959,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }
@@ -11684,12 +11045,7 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }

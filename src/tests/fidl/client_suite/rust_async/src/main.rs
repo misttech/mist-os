@@ -36,9 +36,6 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     // TODO(fxbug.dev/116294): Rust bindings should reject
                     // responses with the wrong ordinal.
                     Test::TwoWayWrongResponseOrdinal => responder.send(false),
-                    // TODO(fxbug.dev/113160): Peer-closed errors should be
-                    // hidden from one-way calls.
-                    Test::OneWayCallDoNotReportPeerClosed => responder.send(false),
                     _ => responder.send(true),
                 }
                 .context("sending response failed"),

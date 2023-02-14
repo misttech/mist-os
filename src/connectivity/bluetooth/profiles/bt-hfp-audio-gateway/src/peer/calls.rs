@@ -288,10 +288,7 @@ impl Calls {
                 }
             }
             Err(e) => {
-                // TODO(fxbug.dev/113160): Warn unconditionally once one-ways hide PEER_CLOSED.
-                if !e.is_closed() {
-                    warn!("Error making request on Call channel for call {:?}: {}", index, e);
-                }
+                warn!("Error making request on Call channel for call {:?}: {}", index, e);
                 // Call channel is unreachable, so we expect to record a terminated state.
                 self.pending.pending_call(index, CallState::Terminated);
                 self.remove_call(index);

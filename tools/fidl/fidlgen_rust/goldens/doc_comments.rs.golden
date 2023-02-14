@@ -741,24 +741,12 @@ impl fidl::endpoints::ControlHandle for InterfaceControlHandle {
 impl InterfaceControlHandle {
     pub fn send_on_event(&self) -> Result<(), fidl::Error> {
         let mut response = ();
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x663f6d5971bef0,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x663f6d5971bef0,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

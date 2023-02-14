@@ -425,24 +425,12 @@ impl fidl::endpoints::ControlHandle for EmptyProtocolControlHandle {
 impl EmptyProtocolControlHandle {
     pub fn send_receive(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
         let mut response = (e);
-
-        let mut msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                0,
-                0x1ff0ccf9b710e23f,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: &mut response,
-        };
-
-        fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, handles| {
-            self.inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)
-        })?;
-
-        Ok(())
+        self.inner.send::<_, false>(
+            &mut response,
+            0,
+            0x1ff0ccf9b710e23f,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 #[must_use = "FIDL methods require a response to be sent"]
@@ -518,12 +506,7 @@ impl EmptyProtocolSendAndReceiveResponder {
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
-            self.control_handle
-                .inner
-                .channel()
-                .write_etc(&*bytes, &mut *handles)
-                .map_err(fidl::Error::ServerResponseWrite)?;
-            Ok(())
+            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
         })
     }
 }

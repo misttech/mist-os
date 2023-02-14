@@ -2289,7 +2289,7 @@ mod test {
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
             \n[✗] Searching for targets\
-            \n    [✗] Error getting targets: <reason omitted>\n",
+            \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
                 isolated_root=test_env.isolate_root.path().display(),
                 env_file=test_env.env_file.path().display(),

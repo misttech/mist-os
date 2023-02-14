@@ -1720,8 +1720,6 @@ pub struct ComponentStopOutcome {
 /// ComponentController channel or that sending the request was not necessary
 /// because the component stopped previously.
 pub enum StopRequestSuccess {
-    /// Component stopped before its stopped was requested.
-    AlreadyStopped,
     /// The component did not stop in time, but was killed before the kill
     /// timeout.
     Killed,
@@ -1733,9 +1731,6 @@ pub enum StopRequestSuccess {
     NoController,
     /// The component stopped within the timeout.
     Stopped,
-    /// The component stopped after the timeout, but before the kill message
-    /// could be sent.
-    StoppedWithTimeoutRace,
 }
 
 impl Runtime {
@@ -1841,18 +1836,10 @@ async fn do_runner_stop<'a>(
     stop_timer: BoxFuture<'a, ()>,
 ) -> Option<Result<StopRequestSuccess, StopActionError>> {
     // Ask the controller to stop the component
-    match controller.stop() {
-        Ok(()) => {}
-        Err(e) => {
-            if fidl::Error::is_closed(&e) {
-                // Channel was closed already, component is considered stopped
-                return Some(Ok(StopRequestSuccess::AlreadyStopped));
-            } else {
-                // There was some problem sending the message, perhaps a
-                // protocol error, but there isn't really a way to recover.
-                return Some(Err(StopActionError::ControllerStopFidlError(e)));
-            }
-        }
+    if let Err(e) = controller.stop() {
+        // There was some problem sending the message, perhaps a
+        // protocol error, but there isn't really a way to recover.
+        return Some(Err(StopActionError::ControllerStopFidlError(e)));
     }
 
     let channel_close = Box::pin(async move {
@@ -1884,16 +1871,9 @@ async fn do_runner_kill<'a>(
             }
         }
         Err(e) => {
-            if fidl::Error::is_closed(&e) {
-                // Even though we hit the timeout, the channel is closed,
-                // so we assume stop succeeded and there was a race with
-                // the timeout
-                Ok(StopRequestSuccess::StoppedWithTimeoutRace)
-            } else {
-                // There was some problem sending the message, perhaps a
-                // protocol error, but there isn't really a way to recover.
-                Err(StopActionError::ControllerKillFidlError(e))
-            }
+            // There was some problem sending the message, perhaps a
+            // protocol error, but there isn't really a way to recover.
+            Err(StopActionError::ControllerKillFidlError(e))
         }
     }
 }
@@ -2006,7 +1986,7 @@ pub mod tests {
         drop(server);
         match stop_component_internal(&component, stop_timer, kill_timer).await {
             Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::AlreadyStopped,
+                request: StopRequestSuccess::Stopped,
                 component_exit_status: zx::Status::PEER_CLOSED,
             }) => {}
             Ok(result) => {
@@ -2372,7 +2352,7 @@ pub mod tests {
         // happening after its timeout expired.
         assert_eq!(
             Poll::Ready(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::StoppedWithTimeoutRace,
+                request: StopRequestSuccess::Killed,
                 component_exit_status: zx::Status::OK
             })),
             exec.run_until_stalled(&mut stop_fut)
