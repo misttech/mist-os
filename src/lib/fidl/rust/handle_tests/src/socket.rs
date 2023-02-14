@@ -81,7 +81,13 @@ struct FidlFixture;
 #[async_trait]
 impl Fixture for FidlFixture {
     async fn create_handles(&self, opts: fidl::SocketOpts) -> (fidl::Socket, fidl::Socket) {
-        fidl::Socket::create(opts).unwrap()
+        match opts {
+            fidl::SocketOpts::STREAM => fidl::Socket::create_stream(),
+            fidl::SocketOpts::DATAGRAM => fidl::Socket::create_datagram(),
+
+            #[cfg(target_os = "fuchsia")]
+            _ => panic!("unsupported socket options"),
+        }
     }
 }
 
