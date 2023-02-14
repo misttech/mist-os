@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_test as ftest, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{HandleBased, Rights, Socket, SocketOpts, Vmo},
+    fuchsia_zircon::{HandleBased, Rights, Socket, Vmo},
     futures::prelude::*,
     process_builder::StartupHandle,
     std::ffi::CString,
@@ -77,7 +77,7 @@ async fn run_tests(
     let listener = listener.into_proxy()?;
     for test in tests {
         let (case_listener, case_listener_server) = create_proxy::<ftest::CaseListenerMarker>()?;
-        let (stderr, stderr_server) = Socket::create(SocketOpts::STREAM)?;
+        let (stderr, stderr_server) = Socket::create_stream();
         let std_handles =
             ftest::StdHandles { err: Some(stderr_server), ..ftest::StdHandles::EMPTY };
         let name = test.name.clone().unwrap_or_default();
