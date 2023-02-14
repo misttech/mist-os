@@ -31,6 +31,7 @@ const (
 
 type SetCommand struct {
 	BaseCommand
+	skipLocalArgs bool
 }
 
 func (*SetCommand) Name() string { return "set" }
@@ -44,6 +45,11 @@ flags:
 `
 }
 
+func (c *SetCommand) SetFlags(f *flag.FlagSet) {
+	c.BaseCommand.SetFlags(f)
+	f.BoolVar(&c.skipLocalArgs, "skip-local-args", false, "skip inclusion of $CHECKOUT_DIR/local/args.gn")
+}
+
 func (c *SetCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	return c.execute(ctx, func(ctx context.Context) error {
 		staticSpec, contextSpec, err := c.loadSpecs()
@@ -51,7 +57,7 @@ func (c *SetCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfac
 			return err
 		}
 
-		artifacts, setErr := fint.Set(ctx, staticSpec, contextSpec)
+		artifacts, setErr := fint.Set(ctx, staticSpec, contextSpec, c.skipLocalArgs)
 		if contextSpec.ArtifactDir != "" {
 			path := filepath.Join(contextSpec.ArtifactDir, setArtifactsManifest)
 			if err := writeJSONPB(artifacts, path); err != nil {

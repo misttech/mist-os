@@ -130,7 +130,7 @@ func mainImpl(ctx context.Context) error {
 		BuildDir:    filepath.Join(args.checkoutDir, args.buildDir),
 	}
 
-	_, err = fint.Set(ctx, staticSpec, contextSpec)
+	_, err = fint.Set(ctx, staticSpec, contextSpec, args.skipLocalArgs)
 	if err != nil {
 		return err
 	}
@@ -158,9 +158,10 @@ type setArgs struct {
 	verbose        bool
 	fintParamsPath string
 
-	checkoutDir  string
-	noEnsureGoma bool
-	buildDir     string
+	checkoutDir   string
+	noEnsureGoma  bool
+	buildDir      string
+	skipLocalArgs bool
 
 	// Flags passed to GN.
 	board         string
@@ -207,6 +208,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	// We log a final error to stderr, so no need to have pflag print
 	// intermediate errors.
 	flagSet.SetOutput(io.Discard)
+
+	flagSet.BoolVar(&cmd.skipLocalArgs, "skip-local-args", false, "")
 
 	var autoDir bool
 

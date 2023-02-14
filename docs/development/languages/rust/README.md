@@ -59,7 +59,11 @@ let CQ enforce the hard boundary.
 
 The `deny_warnings` GN arg allows you to control this behavior in your development environment.
 Setting `deny_warnings = false` in `fx args` or adding `--args=deny_warnings=false` to
-your `fx set` will allow you to develop locally without being blocked by warnings.
+your `fx set` will allow you to develop locally without being blocked by warnings. You can
+add the argument to [`local/args.gn`][local-args] in your checkout so that it will be applied
+to all builds without needing to type it in your terminal each time.
+
+[local-args]: /docs/development/build/fx.md#defining-persistent-local-build-arguments
 
 ## Style
 

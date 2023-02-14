@@ -70,7 +70,7 @@ func TestSet(t *testing.T) {
 
 	t.Run("sets artifacts metadata fields", func(t *testing.T) {
 		runner := &fakeSubprocessRunner{}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64")
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -92,7 +92,7 @@ func TestSet(t *testing.T) {
 			mockStdout: []byte("some stdout"),
 			fail:       true,
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64")
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
 		if !errors.Is(err, errSubprocessFailure) {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -108,7 +108,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64")
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -130,7 +130,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64")
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -147,7 +147,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64")
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -269,6 +269,8 @@ func TestToGNValue(t *testing.T) {
 }
 
 func TestGenArgs(t *testing.T) {
+	ctx := context.Background()
+
 	// Magic strings that will be replaced with the actual paths to mock
 	// checkout and build dirs before making any assertions.
 	checkoutDir := "$CHECKOUT_DIR"
@@ -294,6 +296,8 @@ func TestGenArgs(t *testing.T) {
 		// Callback that will be called for each test case to add extra
 		// arbitrary validation of the resulting args.
 		extraChecks func(t *testing.T, args []string)
+		// Whether to skip any local arguments file.
+		skipLocalArgs bool
 	}{
 		{
 			name: "minimal specs",
@@ -526,6 +530,18 @@ func TestGenArgs(t *testing.T) {
 				t.Errorf("Expected an arg with prefix %s in args: %s", prefix, args)
 			},
 		},
+		{
+			name:          "includes local/args.gn",
+			checkoutFiles: []string{"local/args.gn"},
+			skipLocalArgs: false,
+			expectedArgs:  []string{"\n\n# Local args from $CHECKOUT_DIR/local/args.gn:"},
+		},
+		{
+			name:           "excludes local/args.gn",
+			checkoutFiles:  []string{"local/args.gn"},
+			skipLocalArgs:  true,
+			unexpectedArgs: []string{"\n\n# Local args from $CHECKOUT_DIR/local/args.gn:"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -562,7 +578,7 @@ func TestGenArgs(t *testing.T) {
 				}
 			}
 
-			args, err := genArgs(tc.staticSpec, tc.contextSpec)
+			args, err := genArgs(ctx, tc.staticSpec, tc.contextSpec, tc.skipLocalArgs)
 			if err != nil {
 				if tc.expectErr {
 					return

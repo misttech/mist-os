@@ -133,7 +133,7 @@ function repro {
 
   print_spacer
   print_comment "Set the build configuration:"
-  print_cmd "fx --dir=${build_dir_name} set --fint-params-path '$fint_params_file_relative'"
+  print_cmd "fx --dir=${build_dir_name} set --fint-params-path '$fint_params_file_relative' --skip-local-args"
   print_spacer
 
   print_comment "Build:"

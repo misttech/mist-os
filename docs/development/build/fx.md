@@ -626,6 +626,14 @@ fx sync-to reset
 
 For more options, see the [`fx sync-to` reference][fx-sync-to-ref] page.
 
+### Defining persistent local build arguments
+
+If you want to define build arguments that will be included whenever running
+`fx set`, add them to `$FUCHSIA_DIR/local/args.gn`. They will be appended to
+`$FUCHSIA_BUILD_DIR/args.gn` whenever regenerating the build arguments.
+
+To suppress the inclusion of `local/args.gn`, run `fx set ... --skip-local-args`.
+
 <!-- Reference links -->
 
 [build-overview]: /docs/development/build/build_system/fuchsia_build_system_overview.md

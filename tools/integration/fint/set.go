@@ -7,6 +7,7 @@ package fint
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,7 +33,7 @@ var (
 
 // Set runs `gn gen` given a static and context spec. It's intended to be
 // consumed as a library function.
-func Set(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context) (*fintpb.SetArtifacts, error) {
+func Set(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context, skipLocalArgs bool) (*fintpb.SetArtifacts, error) {
 	platform, err := hostplatform.Name()
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func Set(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Con
 		return nil, err
 	}
 
-	artifacts, err := setImpl(ctx, &subprocess.Runner{}, staticSpec, contextSpec, platform)
+	artifacts, err := setImpl(ctx, &subprocess.Runner{}, staticSpec, contextSpec, platform, skipLocalArgs)
 	if err != nil && artifacts != nil && artifacts.FailureSummary == "" {
 		// Fall back to using the error text as the failure summary if the
 		// failure summary is unset. It's better than failing without emitting
@@ -61,6 +62,7 @@ func setImpl(
 	staticSpec *fintpb.Static,
 	contextSpec *fintpb.Context,
 	platform string,
+	skipLocalArgs bool,
 ) (*fintpb.SetArtifacts, error) {
 	if contextSpec.CheckoutDir == "" {
 		return nil, fmt.Errorf("checkout_dir must be set")
@@ -69,7 +71,7 @@ func setImpl(
 		return nil, fmt.Errorf("build_dir must be set")
 	}
 
-	genArgs, err := genArgs(staticSpec, contextSpec)
+	genArgs, err := genArgs(ctx, staticSpec, contextSpec, skipLocalArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func runGen(
 	gn := thirdPartyPrebuilt(contextSpec.CheckoutDir, platform, "gn")
 
 	formattedArgs := gnFormat(ctx, gn, runner, args)
-	logger.Infof(ctx, "GN args:\n%s", formattedArgs)
+	logger.Infof(ctx, "GN args:\n%s\n", formattedArgs)
 
 	// gn will return an error if the argument list is too long, so write the
 	// args directly to the build dir instead of using the --args flag.
@@ -218,7 +220,7 @@ func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
 	return "", nil
 }
 
-func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, error) {
+func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context, skipLocalArgs bool) ([]string, error) {
 	// GN variables to set via args (mapping from variable name to value).
 	vars := make(map[string]interface{})
 	// GN list variables to which we want to append via args (mapping from
@@ -362,7 +364,12 @@ func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, 
 		vars["rust_incremental"] = filepath.Join(contextSpec.CacheDir, "rust_cache")
 	}
 
-	var importArgs, varArgs, appendArgs []string
+	var importArgs, varArgs, appendArgs, localArgs []string
+
+	// add comments
+	varArgs = append(varArgs, "\n\n# Basic args:")
+	appendArgs = append(appendArgs, "\n\n# Target lists:")
+
 	for _, arg := range staticSpec.GnArgs {
 		if strings.HasPrefix(arg, "import(") {
 			importArgs = append(importArgs, arg)
@@ -388,6 +395,21 @@ func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, 
 	}
 	sort.Strings(importArgs)
 
+	if !skipLocalArgs {
+		localArgsPath := filepath.Join(contextSpec.CheckoutDir, "local/args.gn")
+		localArgsBytes, err := os.ReadFile(localArgsPath)
+		localArgsContents := string(localArgsBytes)
+		if err == nil {
+			logger.Infof(ctx, "Including local args from %s.", localArgsPath)
+			localArgs = append(localArgs, fmt.Sprintf("\n\n# Local args from %s:", localArgsPath))
+			localArgs = append(localArgs, localArgsContents)
+		} else if errors.Is(err, os.ErrNotExist) {
+			logger.Infof(ctx, "No local args available.")
+		} else {
+			return nil, err
+		}
+	}
+
 	// Ensure that imports come before args that set or modify variables, as
 	// otherwise the imported files might blindly redefine variables set or
 	// modified by other arguments.
@@ -395,6 +417,7 @@ func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, 
 	finalArgs = append(finalArgs, importArgs...)
 	finalArgs = append(finalArgs, varArgs...)
 	finalArgs = append(finalArgs, appendArgs...)
+	finalArgs = append(finalArgs, localArgs...)
 	return finalArgs, nil
 }
 
