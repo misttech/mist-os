@@ -18,9 +18,6 @@ void udp6_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t dport,
 void netifc_recv(void* data, size_t len) {}
 bool netifc_send_pending() { return false; }
 
-// TODO(fxbug.dev/84697) Re-enable once FIDL wire format migration is complete.
-#if !__has_feature(address_sanitizer)
-
 // We attempt to write more data than we have memory to ensure we are not keeping the file in memory
 // the entire time.
 TEST_F(PaverTest, WriteFvmManyLargeWrites) {
@@ -51,5 +48,3 @@ TEST_F(PaverTest, WriteFvmManyLargeWrites) {
   ASSERT_EQ(fake_svc_.fake_paver().GetCommandTrace(),
             std::vector<paver_test::Command>{paver_test::Command::kWriteVolumes});
 }
-
-#endif  // !__has_feature(address_sanitizer)
