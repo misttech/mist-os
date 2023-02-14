@@ -31,8 +31,12 @@ zx_status_t Timer::StartOneshot(zx_duration_t delay) { return Start(delay, false
 zx_status_t Timer::Stop() {
   // Make sure Start/Stop cannot be called from multiple threads at once. Doing so would open up
   // for race conditions for the section below where we don't hold unlock handler_mutex_ and wait
-  // for handler completion. std::scoped_lock locks both mutexes without deadlocks.
-  std::scoped_lock locks(start_stop_mutex_, handler_mutex_);
+  // for handler completion. std::lock locks both std::unique_locks without deadlocks.
+  // Note: std::scoped_lock can cause a double unlock in this case, since need handler_mutex_ to be
+  // unlocked while start_stop_mutex_ is still locked. see fxbug.dev/121807 for context.
+  std::unique_lock start_stop_lock(start_stop_mutex_, std::defer_lock);
+  std::unique_lock handler_lock(handler_mutex_, std::defer_lock);
+  std::lock(start_stop_lock, handler_lock);
 
   // Set is_periodic_ to false right away. This ensures that if Stop was called from the callback
   // of a periodic timer (where scheduled_ would be false) it will not re-arm again.
@@ -56,7 +60,7 @@ zx_status_t Timer::Stop() {
   // from the dispatcher task list but did not acquire the handler mutex yet. We know this because
   // scheduled_ was still true and we hold the lock. By setting scheduled_ to false above we prevent
   // the timer handler from calling the callback. It should short-circuit and signal the completion.
-  handler_mutex_.unlock();
+  handler_lock.unlock();
 
   status = sync_completion_wait(&finished_, ZX_TIME_INFINITE);
   if (status != ZX_OK) {
@@ -79,8 +83,12 @@ zx_status_t Timer::Start(zx_duration_t interval, bool periodic) {
 
   // Make sure Start/Stop cannot be called from multiple threads at once. Doing so would open up
   // for race conditions for the section below where we have to unlock handler_mutex_ and wait for
-  // handler completion. std::scoped_lock locks both mutexes without deadlocks.
-  std::scoped_lock locks(start_stop_mutex_, handler_mutex_);
+  // handler completion. std::lock locks both mutexes without deadlocks.
+  // Note: std::scoped_lock can cause a double unlock in this case, since need handler_mutex_ to be
+  // unlocked while start_stop_mutex_ is still locked. see fxbug.dev/121807 for context.
+  std::unique_lock start_stop_lock(start_stop_mutex_, std::defer_lock);
+  std::unique_lock handler_lock(handler_mutex_, std::defer_lock);
+  std::lock(start_stop_lock, handler_lock);
   if (scheduled_) {
     // If Start was called from the dispatcher thread and scheduled_ is true that means that the
     // user called Start at least twice in the same callback, so we can safely cancel the previous
@@ -94,13 +102,13 @@ zx_status_t Timer::Start(zx_duration_t interval, bool periodic) {
       // We encountered the situation where the dispatcher has taken the task out its queue but the
       // timer handler has not yet locked the mutex. We've set scheduled_ to false so once the timer
       // handler is allowed to run it should immediately signal the completion and return.
-      handler_mutex_.unlock();
+      handler_lock.unlock();
       status = sync_completion_wait(&finished_, ZX_TIME_INFINITE);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to wait for completion: %s", zx_status_get_string(status));
         return status;
       }
-      handler_mutex_.lock();
+      handler_lock.lock();
     } else if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to cancel task: %s", zx_status_get_string(status));
       return status;
