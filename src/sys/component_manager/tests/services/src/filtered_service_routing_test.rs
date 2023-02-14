@@ -797,7 +797,7 @@ async fn regular_echo_at_service_instance(
         // Accessing a non-existent service instance can fail when opening the member protocol
         // or calling a method on the protocol, depending on when the underlying channel used to open the
         // service capability is closed.
-        let proxy = service_instance.regular_echo()?;
+        let proxy = service_instance.connect_to_regular_echo()?;
         proxy.echo_string(echo_string).await
     }
     .await;

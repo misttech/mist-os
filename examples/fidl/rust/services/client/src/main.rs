@@ -11,11 +11,13 @@ async fn main() -> Result<(), Error> {
     let echo =
         connect_to_service::<EchoServiceMarker>().context("Failed to connect to echo service")?;
 
-    let regular = echo.regular_echo().context("failed to connect to regular_echo member")?;
+    let regular =
+        echo.connect_to_regular_echo().context("failed to connect to regular_echo member")?;
     let regular_response = regular.echo_string("hello world!").await?;
     println!("regular response: {:?}", regular_response);
 
-    let reversed = echo.reversed_echo().context("failed to connect to reversed_echo member")?;
+    let reversed =
+        echo.connect_to_reversed_echo().context("failed to connect to reversed_echo member")?;
     let reversed_response = reversed.echo_string("hello world!").await?;
     println!("reversed response: {:?}", reversed_response);
 

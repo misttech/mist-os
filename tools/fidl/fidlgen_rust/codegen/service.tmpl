@@ -76,11 +76,15 @@ impl {{ $service.Name }}Proxy {
     {{- range $member.DocComments }}
     ///{{ . }}
     {{- end }}
-    pub fn r#{{ $member.SnakeName }}(&self) -> Result<{{ $member.ProtocolType }}Proxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create();
-        self.0.open_member("{{ $member.Name }}", server)?;
-        let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
-        Ok({{ $member.ProtocolType }}Proxy::new(proxy))
+    pub fn connect_to_{{ $member.SnakeName }}(&self) -> Result<{{ $member.ProtocolType }}Proxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<{{ $member.ProtocolType }}Marker>()?;
+        self.connect_channel_to_{{ $member.SnakeName }}(server_end)?;
+        Ok(proxy)
+    }
+
+    /// Like `connect_to_{{ $member.SnakeName }}`, but accepts a server end.
+    pub fn connect_channel_to_{{ $member.SnakeName }}(&self, server_end: fidl::endpoints::ServerEnd<{{ $member.ProtocolType }}Marker>) -> Result<(), fidl::Error> {
+        self.0.open_member("{{ $member.Name }}", server_end.into_channel())
     }
     {{- end }}
 }

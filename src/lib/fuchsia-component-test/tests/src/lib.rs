@@ -1527,7 +1527,7 @@ async fn route_service() -> Result<(), Error> {
                 async move {
                     let read_only_account = handles
                         .connect_to_service::<fex_services::BankAccountMarker>()?
-                        .read_only()?;
+                        .connect_to_read_only()?;
                     let owner = read_only_account.get_owner().await?;
                     assert_eq!("hippos", owner.as_str());
                     send_service_used.send(()).await.expect("failed to send results");

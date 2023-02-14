@@ -85,12 +85,12 @@ async fn connect_to_instances_test() {
             &instance,
         )
         .expect("failed to connect to service instance");
-        let read_only_account = proxy.read_only().expect("read_only protocol");
+        let read_only_account = proxy.connect_to_read_only().expect("read_only protocol");
         let owner = read_only_account.get_owner().await.expect("failed to get owner");
         let initial_balance = read_only_account.get_balance().await.expect("failed to get_balance");
         info!("retrieved account for owner '{}' with balance ${}", &owner, &initial_balance);
 
-        let read_write_account = proxy.read_write().expect("read_write protocol");
+        let read_write_account = proxy.connect_to_read_write().expect("read_write protocol");
         assert_eq!(read_write_account.get_owner().await.expect("failed to get_owner"), owner);
         assert_eq!(
             read_write_account.get_balance().await.expect("failed to get_balance"),

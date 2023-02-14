@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    fidl::prelude::*,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
     fidl_test_structuredconfig_receiver as scr, fidl_test_structuredconfig_receiver_shim as scrs,
     fuchsia_async as fasync,
@@ -18,9 +19,9 @@ enum IncomingRequest {
     Puppet(scr::ConfigReceiverPuppetRequestStream),
 }
 
-async fn connect_to_puppet(
+async fn connect_to_config_service(
     expose_dir: &fio::DirectoryProxy,
-) -> anyhow::Result<scr::ConfigReceiverPuppetProxy> {
+) -> anyhow::Result<scrs::ConfigServiceProxy> {
     // Find an instance of `ConfigService`.
     let instance_name;
     let service =
@@ -37,14 +38,10 @@ async fn connect_to_puppet(
     }
 
     // Connect to `ConfigService`.
-    let config_service = fuchsia_component::client::connect_to_service_instance_at_dir::<
-        scrs::ConfigServiceMarker,
-    >(expose_dir, &instance_name)?;
-
-    // TODO(fxbug.dev/94727): The test tries to connect to the shim's exposed Puppet capability.
-    // We should be able to pass the server end from the test directly to the driver.
-    let puppet = config_service.puppet()?;
-    Ok(puppet)
+    fuchsia_component::client::connect_to_service_instance_at_dir::<scrs::ConfigServiceMarker>(
+        expose_dir,
+        &instance_name,
+    )
 }
 
 #[fuchsia::main]
@@ -70,26 +67,23 @@ async fn main() -> anyhow::Result<()> {
     realm.driver_test_realm_start(args).await?;
     info!("started driver test realm");
 
-    let puppet = connect_to_puppet(realm.root.get_exposed_dir()).await?;
-    let receiver_config = puppet.get_config().await?;
+    let config_service = connect_to_config_service(realm.root.get_exposed_dir()).await?;
 
     // Serve this configuration back to the test
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(IncomingRequest::Puppet);
     fs.take_and_serve_directory_handle().unwrap();
-    fs.for_each_concurrent(None, move |request: IncomingRequest| {
-        let mut receiver_config = receiver_config.clone();
-        async move {
-            match request {
-                IncomingRequest::Puppet(mut reqs) => {
-                    while let Some(Ok(req)) = reqs.next().await {
-                        match req {
-                            scr::ConfigReceiverPuppetRequest::GetConfig { responder } => {
-                                responder.send(&mut receiver_config).unwrap()
-                            }
-                        }
-                    }
-                }
+    fs.for_each_concurrent(None, |request: IncomingRequest| async {
+        match request {
+            IncomingRequest::Puppet(stream) => {
+                // TOOD(fxbug.dev/121847): Make this conversion less verbose.
+                let server_end: fidl::endpoints::ServerEnd<scr::ConfigReceiverPuppetMarker> =
+                    std::sync::Arc::try_unwrap(stream.into_inner().0)
+                        .unwrap()
+                        .into_channel()
+                        .into_zx_channel()
+                        .into();
+                config_service.connect_channel_to_puppet(server_end).unwrap()
             }
         }
     })

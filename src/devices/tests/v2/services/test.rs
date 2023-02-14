@@ -59,10 +59,10 @@ async fn test_services() -> Result<()> {
     )
     .context("Failed to open service")?;
     // Use the `ControlPlane` protocol from the `Device` service.
-    let control = device.control()?;
+    let control = device.connect_to_control()?;
     control.control_do().await?;
     // Use the `DataPlane` protocol from the `Device` service.
-    let data = device.data()?;
+    let data = device.connect_to_data()?;
     data.data_do().await?;
 
     Ok(())
