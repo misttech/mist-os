@@ -228,10 +228,14 @@ struct ChildRef {
   std::string_view name;
 };
 
+struct CollectionRef {
+  std::string_view name;
+};
+
 // Only valid as the source of a route; routes the capabilities from the framework.
 struct FrameworkRef {};
 
-using Ref = cpp17::variant<ParentRef, ChildRef, FrameworkRef>;
+using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef>;
 
 struct Route {
   std::vector<Capability> capabilities;

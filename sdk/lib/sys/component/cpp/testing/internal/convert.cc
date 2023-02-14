@@ -42,6 +42,11 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<ParentRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithParent(fuchsia::component::decl::ParentRef());
   }
+  if (auto collection_ref = cpp17_get_if<CollectionRef>(&ref)) {
+    fuchsia::component::decl::CollectionRef result;
+    result.name = std::string(collection_ref->name);
+    return fuchsia::component::decl::Ref::WithCollection(std::move(result));
+  }
   if (auto _ = cpp17_get_if<FrameworkRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithFramework(fuchsia::component::decl::FrameworkRef());
   }
