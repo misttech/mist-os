@@ -5,11 +5,12 @@
 #![cfg(test)]
 
 use fidl_fuchsia_net as net;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 
 use futures::StreamExt as _;
 use net_declare::{net_ip_v4, std_ip_v4};
-use net_types::ip::{self as net_types_ip};
+use net_types::{ip as net_types_ip, MulticastAddress as _};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     interfaces, realms::Netstack2, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -19,21 +20,164 @@ use packet::ParsablePacket as _;
 use packet_formats::{
     ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
     igmp::{
-        messages::{IgmpGroupRecordType, IgmpMembershipReportV3},
-        IgmpMessage,
+        messages::{
+            IgmpGroupRecordType, IgmpMembershipReportV1, IgmpMembershipReportV2,
+            IgmpMembershipReportV3,
+        },
+        IgmpMessage, MessageType,
     },
     ip::Ipv4Proto,
     testutil::parse_ip_packet,
 };
+use test_case::test_case;
+
+fn check_igmpv1v2_report<'a, M: MessageType<&'a [u8], FixedHeader = net_types_ip::Ipv4Addr>>(
+    dst_ip: net_types_ip::Ipv4Addr,
+    igmp: IgmpMessage<&'a [u8], M>,
+    expected_group: net_types_ip::Ipv4Addr,
+) -> bool {
+    let group_addr = igmp.group_addr();
+    assert!(
+        group_addr.is_multicast(),
+        "IGMP reports must only be sent for multicast addresses; group_addr = {}",
+        group_addr
+    );
+
+    if group_addr != expected_group {
+        // We are only interested in the report for the multicast group we
+        // joined.
+        return false;
+    }
+
+    assert_eq!(
+        dst_ip, group_addr,
+        "the destination of an IGMP report should be the multicast group the report is for"
+    );
+
+    true
+}
+
+fn check_igmpv1_report(
+    dst_ip: net_types_ip::Ipv4Addr,
+    mut payload: &[u8],
+    expected_group: net_types_ip::Ipv4Addr,
+) -> bool {
+    check_igmpv1v2_report(
+        dst_ip,
+        IgmpMessage::<_, IgmpMembershipReportV1>::parse(&mut payload, ())
+            .expect("error parsing IGMP message"),
+        expected_group,
+    )
+}
+
+fn check_igmpv2_report(
+    dst_ip: net_types_ip::Ipv4Addr,
+    mut payload: &[u8],
+    expected_group: net_types_ip::Ipv4Addr,
+) -> bool {
+    check_igmpv1v2_report(
+        dst_ip,
+        IgmpMessage::<_, IgmpMembershipReportV2>::parse(&mut payload, ())
+            .expect("error parsing IGMP message"),
+        expected_group,
+    )
+}
+
+fn check_igmpv3_report(
+    dst_ip: net_types_ip::Ipv4Addr,
+    mut payload: &[u8],
+    expected_group: net_types_ip::Ipv4Addr,
+) -> bool {
+    let igmp = IgmpMessage::<_, IgmpMembershipReportV3>::parse(&mut payload, ())
+        .expect("error parsing IGMP message");
+
+    let records = igmp
+        .body()
+        .iter()
+        .map(|record| {
+            let hdr = record.header();
+
+            (*hdr.multicast_addr(), hdr.record_type(), record.sources().to_vec())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        records,
+        [(expected_group, Ok(IgmpGroupRecordType::ChangeToExcludeMode), Vec::new(),)]
+    );
+
+    assert_eq!(
+        dst_ip,
+        net_ip_v4!("224.0.0.22"),
+        "IGMPv3 reports should should be sent to the IGMPv3 routers address",
+    );
+
+    true
+}
 
 #[netstack_test]
-async fn sends_igmp_reports(name: &str) {
+#[test_case(fnet_interfaces_admin::IgmpVersion::V1, check_igmpv1_report)]
+#[test_case(fnet_interfaces_admin::IgmpVersion::V2, check_igmpv2_report)]
+#[test_case(fnet_interfaces_admin::IgmpVersion::V3, check_igmpv3_report)]
+async fn sends_igmp_reports(
+    name: &str,
+    igmp_version: fnet_interfaces_admin::IgmpVersion,
+    check_igmp_report: fn(net_types_ip::Ipv4Addr, &[u8], net_types_ip::Ipv4Addr) -> bool,
+) {
     const INTERFACE_ADDR: std::net::Ipv4Addr = std_ip_v4!("192.168.0.1");
     const MULTICAST_ADDR: std::net::Ipv4Addr = std_ip_v4!("224.1.2.3");
 
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, realm, iface, fake_ep) =
         setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
+
+    {
+        let gen_config = |igmp_version| fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
+                    version: Some(igmp_version),
+                    ..fnet_interfaces_admin::IgmpConfiguration::EMPTY
+                }),
+                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        };
+        let control = iface.control();
+        let new_config = gen_config(igmp_version);
+        let old_config = gen_config(fnet_interfaces_admin::IgmpVersion::V3);
+        assert_eq!(
+            control
+                .set_configuration(new_config.clone())
+                .await
+                .expect("set_configuration fidl error")
+                .expect("failed to set interface configuration"),
+            old_config,
+        );
+        assert_eq!(
+            control
+                .set_configuration(new_config.clone())
+                .await
+                .expect("set_configuration fidl error")
+                .expect("failed to set interface configuration"),
+            new_config,
+        );
+        assert_matches::assert_matches!(
+            control
+                .get_configuration()
+                .await
+                .expect("get_configuration fidl error")
+                .expect("failed to get interface configuration"),
+            fnet_interfaces_admin::Configuration {
+                ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                    igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
+                        version: Some(got),
+                        ..
+                    }),
+                    ..
+                }),
+                ..
+            } => assert_eq!(got, igmp_version)
+        );
+    }
 
     let addr = net::Ipv4Address { addr: INTERFACE_ADDR.octets() };
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
@@ -75,7 +219,7 @@ async fn sends_igmp_reports(name: &str) {
                     return None;
                 }
 
-                let (mut payload, src_ip, dst_ip, proto, ttl) =
+                let (payload, src_ip, dst_ip, proto, ttl) =
                     parse_ip_packet::<net_types_ip::Ipv4>(&data)
                         .expect("error parsing IPv4 packet");
 
@@ -90,40 +234,13 @@ async fn sends_igmp_reports(name: &str) {
                     "IGMP messages must be sent from an address assigned to the NIC",
                 );
 
-                assert_eq!(
-                    dst_ip,
-                    net_ip_v4!("224.0.0.22"),
-                    "IGMPv3 reports should should be sent to the IGMPv3 routers address",
-                );
-
                 // As per RFC 2236 section 2,
                 //
                 //   All IGMP messages described in this document are sent with
                 //   IP TTL 1, ...
                 assert_eq!(ttl, 1, "IGMP messages must have a TTL of 1");
 
-                let igmp = IgmpMessage::<_, IgmpMembershipReportV3>::parse(&mut payload, ())
-                    .expect("error parsing IGMP message");
-
-                let records = igmp
-                    .body()
-                    .iter()
-                    .map(|record| {
-                        let hdr = record.header();
-
-                        (*hdr.multicast_addr(), hdr.record_type(), record.sources().to_vec())
-                    })
-                    .collect::<Vec<_>>();
-                assert_eq!(
-                    records,
-                    [(
-                        net_types_ip_multicast_addr,
-                        Ok(IgmpGroupRecordType::ChangeToExcludeMode),
-                        Vec::new(),
-                    )]
-                );
-
-                Some(())
+                check_igmp_report(dst_ip, payload, net_types_ip_multicast_addr).then_some(())
             }
         },
     );

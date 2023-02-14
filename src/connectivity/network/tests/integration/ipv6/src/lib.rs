@@ -7,7 +7,7 @@
 use std::{convert::TryInto as _, mem::size_of};
 
 use fidl_fuchsia_net as net;
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as net_stack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
@@ -22,7 +22,8 @@ use net_declare::net_ip_v6;
 use net_types::{
     ethernet::Mac,
     ip::{self as net_types_ip, Ip},
-    LinkLocalAddress as _, SpecifiedAddress as _, Witness as _,
+    LinkLocalAddress as _, MulticastAddr, MulticastAddress as _, SpecifiedAddress as _,
+    Witness as _,
 };
 use netstack_testing_common::{
     constants::{eth as eth_consts, ipv6 as ipv6_consts},
@@ -168,12 +169,12 @@ async fn consistent_initial_ipv6_addrs(name: &str) {
 
 /// Enables IPv6 forwarding configuration.
 async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
-    let config_with_ipv6_forwarding_set = |forwarding| finterfaces_admin::Configuration {
-        ipv6: Some(finterfaces_admin::Ipv6Configuration {
+    let config_with_ipv6_forwarding_set = |forwarding| fnet_interfaces_admin::Configuration {
+        ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(forwarding),
-            ..finterfaces_admin::Ipv6Configuration::EMPTY
+            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
         }),
-        ..finterfaces_admin::Configuration::EMPTY
+        ..fnet_interfaces_admin::Configuration::EMPTY
     };
 
     let configuration = iface
@@ -873,12 +874,123 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     .expect("failed to wait for SLAAC addresses");
 }
 
+fn check_mldv2_report(
+    dst_ip: net_types_ip::Ipv6Addr,
+    mld: MldPacket<&[u8]>,
+    group: MulticastAddr<net_types_ip::Ipv6Addr>,
+) -> bool {
+    // Ignore non-report messages.
+    let MldPacket::MulticastListenerReportV2(report) = mld else { return false };
+
+    let has_snmc_record = report.body().iter_multicast_records().any(|record| {
+        assert_eq!(record.sources(), &[]);
+        let hdr = record.header();
+        *hdr.multicast_addr() == group.get()
+            && hdr.record_type() == Ok(Mldv2MulticastRecordType::ChangeToExcludeMode)
+    });
+
+    assert_eq!(
+        dst_ip,
+        net_ip_v6!("ff02::16"),
+        "MLDv2 reports should should be sent to the MLDv2 routers address"
+    );
+
+    has_snmc_record
+}
+
+fn check_mldv1_report(
+    dst_ip: net_types_ip::Ipv6Addr,
+    mld: MldPacket<&[u8]>,
+    expected_group: MulticastAddr<net_types_ip::Ipv6Addr>,
+) -> bool {
+    // Ignore non-report messages.
+    let MldPacket::MulticastListenerReport(report) = mld else { return false };
+
+    let group_addr = report.body().group_addr;
+    assert!(
+        group_addr.is_multicast(),
+        "MLD reports must only be sent for multicast addresses; group_addr = {}",
+        group_addr
+    );
+    if group_addr != expected_group.get() {
+        return false;
+    }
+
+    assert_eq!(
+        dst_ip, group_addr,
+        "the destination of an MLD report should be the multicast group the report is for",
+    );
+
+    true
+}
+
 #[netstack_test]
-async fn sends_mld_reports(name: &str) {
+#[test_case(fnet_interfaces_admin::MldVersion::V1, check_mldv1_report)]
+#[test_case(fnet_interfaces_admin::MldVersion::V2, check_mldv2_report)]
+async fn sends_mld_reports(
+    name: &str,
+    mld_version: fnet_interfaces_admin::MldVersion,
+    check_mld_report: fn(
+        net_types_ip::Ipv6Addr,
+        MldPacket<&[u8]>,
+        MulticastAddr<net_types_ip::Ipv6Addr>,
+    ) -> bool,
+) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, _realm, iface, fake_ep) = setup_network::<Netstack2>(&sandbox, name, None)
         .await
         .expect("error setting up networking");
+
+    {
+        let gen_config = |mld_version| fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                mld: Some(fnet_interfaces_admin::MldConfiguration {
+                    version: Some(mld_version),
+                    ..fnet_interfaces_admin::MldConfiguration::EMPTY
+                }),
+                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        };
+        let control = iface.control();
+        let new_config = gen_config(mld_version);
+        let old_config = gen_config(fnet_interfaces_admin::MldVersion::V2);
+        assert_eq!(
+            control
+                .set_configuration(new_config.clone())
+                .await
+                .expect("set_configuration fidl error")
+                .expect("failed to set interface configuration"),
+            old_config,
+        );
+        // Set configuration again to check the returned value is the new config
+        // to show that nothing actually changed.
+        assert_eq!(
+            control
+                .set_configuration(new_config.clone())
+                .await
+                .expect("set_configuration fidl error")
+                .expect("failed to set interface configuration"),
+            new_config,
+        );
+        assert_matches::assert_matches!(
+            control
+                .get_configuration()
+                .await
+                .expect("get_configuration fidl error")
+                .expect("failed to get interface configuration"),
+            fnet_interfaces_admin::Configuration {
+                ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                    mld: Some(fnet_interfaces_admin::MldConfiguration {
+                        version: Some(got),
+                        ..
+                    }),
+                    ..
+                }),
+                ..
+            } => assert_eq!(got, mld_version)
+        );
+    }
 
     // Add an address so we join the address's solicited node multicast group.
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
@@ -939,11 +1051,6 @@ async fn sends_mld_reports(name: &str) {
                 //   address (::) as the IPv6 source address.
                 assert!(!src_ip.is_specified() || src_ip.is_link_local(), "MLD messages must be sent from the unspecified or link local address; src_ip = {}", src_ip);
 
-                assert_eq!(
-                    dst_ip,
-                    net_ip_v6!("ff02::16"),
-                    "MLDv2 reports should should be sent to the MLDv2 routers address"
-                );
 
                 // As per RFC 2710 section 3,
                 //
@@ -951,23 +1058,7 @@ async fn sends_mld_reports(name: &str) {
                 //   link-local IPv6 Source Address, an IPv6 Hop Limit of 1, ...
                 assert_eq!(ttl, 1, "MLD messages must have a hop limit of 1");
 
-                let report = if let MldPacket::MulticastListenerReportV2(report) = mld {
-                    report
-                } else {
-                    // Ignore non-report messages.
-                    return Ok(None);
-                };
-
-                let has_snmc_record = report
-                    .body()
-                    .iter_multicast_records()
-                    .any(|record| {
-                        assert_eq!(record.sources(), &[]);
-                        let hdr = record.header();
-                        *hdr.multicast_addr() == snmc.get() &&  hdr.record_type() == Ok(Mldv2MulticastRecordType::ChangeToExcludeMode)
-                    });
-
-                Ok(has_snmc_record.then_some(()))
+                Ok(check_mld_report(dst_ip, mld, snmc).then_some(()))
             }
         });
     futures::pin_mut!(stream);

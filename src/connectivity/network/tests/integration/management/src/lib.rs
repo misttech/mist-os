@@ -623,11 +623,19 @@ async fn test_forwarding<M: Manager>(name: &str) {
                         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                             forwarding: Some(true),
                             multicast_forwarding: Some(true),
+                            igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
+                                version: Some(fnet_interfaces_admin::IgmpVersion::V3),
+                                ..fnet_interfaces_admin::IgmpConfiguration::EMPTY
+                            }),
                             ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
                         }),
                         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                             forwarding: Some(false),
                             multicast_forwarding: Some(false),
+                            mld: Some(fnet_interfaces_admin::MldConfiguration {
+                                version: Some(fnet_interfaces_admin::MldVersion::V2),
+                                ..fnet_interfaces_admin::MldConfiguration::EMPTY
+                            }),
                             ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
                         }),
                         ..fnet_interfaces_admin::Configuration::EMPTY

@@ -440,7 +440,68 @@ func (ci *adminControlImpl) setMulticastIPForwardingLocked(netProto tcpip.Networ
 	return handleIPForwardingConfigurationResult(prevEnabled, err, fmt.Sprintf("ci.ns.stack.SetNICMulticastForwarding(tcpip.NICID(%d), %d, %t)", ci.nicid, netProto, enabled))
 }
 
+func (ci *adminControlImpl) getNetworkEndpoint(netProto tcpip.NetworkProtocolNumber) stack.NetworkEndpoint {
+	ep, err := ci.ns.stack.GetNetworkEndpoint(tcpip.NICID(ci.nicid), netProto)
+	if err != nil {
+		panic(fmt.Sprintf("ci.ns.stack.GetNetworkEndpoint(tcpip.NICID(%d), %d): %s", ci.nicid, netProto, err))
+	}
+
+	return ep
+}
+
+func (ci *adminControlImpl) getIGMPEndpoint() ipv4.IGMPEndpoint {
+	// We want this to panic if EP does not implement ipv4.IGMPEndpoint.
+	return ci.getNetworkEndpoint(ipv4.ProtocolNumber).(ipv4.IGMPEndpoint)
+}
+
+func (ci *adminControlImpl) getMLDEndpoint() ipv6.MLDEndpoint {
+	// We want this to panic if EP does not implement ipv6.MLDEndpoint.
+	return ci.getNetworkEndpoint(ipv6.ProtocolNumber).(ipv6.MLDEndpoint)
+}
+
+func toAdminIgmpVersion(v ipv4.IGMPVersion) admin.IgmpVersion {
+	switch v {
+	case ipv4.IGMPVersion1:
+		return admin.IgmpVersionV1
+	case ipv4.IGMPVersion2:
+		return admin.IgmpVersionV2
+	case ipv4.IGMPVersion3:
+		return admin.IgmpVersionV3
+	default:
+		panic(fmt.Sprintf("unrecognized version = %d", v))
+	}
+}
+
+func toAdminMldVersion(v ipv6.MLDVersion) admin.MldVersion {
+	switch v {
+	case ipv6.MLDVersion1:
+		return admin.MldVersionV1
+	case ipv6.MLDVersion2:
+		return admin.MldVersionV2
+	default:
+		panic(fmt.Sprintf("unrecognized version = %d", v))
+	}
+}
+
 func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Configuration) (admin.ControlSetConfigurationResult, error) {
+	// Make sure the IGMP version (if specified) is supported.
+	if config.HasIpv4() && config.Ipv4.HasIgmp() && config.Ipv4.Igmp.HasVersion() {
+		switch config.Ipv4.Igmp.Version {
+		case admin.IgmpVersionV1, admin.IgmpVersionV2, admin.IgmpVersionV3:
+		default:
+			return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4IgmpVersionUnsupported), nil
+		}
+	}
+
+	// Make sure the MLD version (if specified) is supported.
+	if config.HasIpv6() && config.Ipv6.HasMld() && config.Ipv6.Mld.HasVersion() {
+		switch config.Ipv6.Mld.Version {
+		case admin.MldVersionV1, admin.MldVersionV2:
+		default:
+			return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MldVersionUnsupported), nil
+		}
+	}
+
 	ifs := ci.getNICContext()
 	ifs.mu.Lock()
 	defer ifs.mu.Unlock()
@@ -459,6 +520,30 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			previousIpv4Config.SetMulticastForwarding(ci.setMulticastIPForwardingLocked(ipv4.ProtocolNumber, ipv4Config.MulticastForwarding))
 		}
 
+		if ipv4Config.HasIgmp() {
+			var previousIgmpConfig admin.IgmpConfiguration
+			igmpConfig := ipv4Config.Igmp
+
+			if igmpConfig.HasVersion() {
+				var newVersion ipv4.IGMPVersion
+				switch igmpConfig.Version {
+				case admin.IgmpVersionV1:
+					newVersion = ipv4.IGMPVersion1
+				case admin.IgmpVersionV2:
+					newVersion = ipv4.IGMPVersion2
+				case admin.IgmpVersionV3:
+					newVersion = ipv4.IGMPVersion3
+				default:
+					// We validated IGMP version above.
+					panic(fmt.Sprintf("unexpected IGMP version = %d", igmpConfig.Version))
+				}
+
+				previousIgmpConfig.SetVersion(toAdminIgmpVersion(ci.getIGMPEndpoint().SetIGMPVersion(newVersion)))
+			}
+
+			previousIpv4Config.SetIgmp(previousIgmpConfig)
+		}
+
 		previousConfig.SetIpv4(previousIpv4Config)
 	}
 
@@ -472,6 +557,28 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 
 		if ipv6Config.HasMulticastForwarding() {
 			previousIpv6Config.SetMulticastForwarding(ci.setMulticastIPForwardingLocked(ipv6.ProtocolNumber, ipv6Config.MulticastForwarding))
+		}
+
+		if ipv6Config.HasMld() {
+			var previousMldConfig admin.MldConfiguration
+			mldConfig := ipv6Config.Mld
+
+			if mldConfig.HasVersion() {
+				var newVersion ipv6.MLDVersion
+				switch mldConfig.Version {
+				case admin.MldVersionV1:
+					newVersion = ipv6.MLDVersion1
+				case admin.MldVersionV2:
+					newVersion = ipv6.MLDVersion2
+				default:
+					// We validated MLD version above.
+					panic(fmt.Sprintf("unexpected MLD version = %d", mldConfig.Version))
+				}
+
+				previousMldConfig.SetVersion(toAdminMldVersion(ci.getMLDEndpoint().SetMLDVersion(newVersion)))
+			}
+
+			previousIpv6Config.SetMld(previousMldConfig)
 		}
 
 		previousConfig.SetIpv6(previousIpv6Config)
@@ -514,6 +621,11 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		var ipv4Config admin.Ipv4Configuration
 		ipv4Config.SetForwarding(ci.ipForwardingRLocked(ipv4.ProtocolNumber))
 		ipv4Config.SetMulticastForwarding(ci.multicastIPForwardingRLocked(ipv4.ProtocolNumber))
+
+		var igmpConfig admin.IgmpConfiguration
+		igmpConfig.SetVersion(toAdminIgmpVersion(ci.getIGMPEndpoint().GetIGMPVersion()))
+		ipv4Config.SetIgmp(igmpConfig)
+
 		config.SetIpv4(ipv4Config)
 	}
 
@@ -521,6 +633,11 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		var ipv6Config admin.Ipv6Configuration
 		ipv6Config.SetForwarding(ci.ipForwardingRLocked(ipv6.ProtocolNumber))
 		ipv6Config.SetMulticastForwarding(ci.multicastIPForwardingRLocked(ipv6.ProtocolNumber))
+
+		var mldConfig admin.MldConfiguration
+		mldConfig.SetVersion(toAdminMldVersion(ci.getMLDEndpoint().GetMLDVersion()))
+		ipv6Config.SetMld(mldConfig)
+
 		config.SetIpv6(ipv6Config)
 	}
 
