@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::{convert::TryFrom, mem::MaybeUninit, ops::Range, task::Waker};
 
-use explicit::ResultExt as _;
+use explicit::{PollExt as _, ResultExt as _};
 use fidl_fuchsia_hardware_network as netdev;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async as fasync;
@@ -247,13 +247,13 @@ impl Future for Task {
             let mut all_pending = true;
             // TODO(https://fxbug.dev/78342): poll once for all completed
             // descriptors if this becomes a performance bottleneck.
-            while inner.poll_complete_tx(cx)?.is_ready() {
+            while inner.poll_complete_tx(cx)?.is_ready_checked::<()>() {
                 all_pending = false;
             }
-            if inner.poll_submit_rx(cx)?.is_ready() {
+            if inner.poll_submit_rx(cx)?.is_ready_checked::<usize>() {
                 all_pending = false;
             }
-            if inner.poll_submit_tx(cx).is_ready() {
+            if inner.poll_submit_tx(cx)?.is_ready_checked::<usize>() {
                 all_pending = false;
             }
             if all_pending {
@@ -623,14 +623,20 @@ impl<T> ReadyBuffer<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZeroU32, ops::Deref};
+    use std::{num::NonZeroU32, ops::Deref, sync::Arc, task::Poll};
 
     use assert_matches::assert_matches;
+    use fuchsia_async::Fifo;
+    use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use test_case::test_case;
+    use zerocopy::{AsBytes, FromBytes};
 
     use super::{
-        buffer::NETWORK_DEVICE_DESCRIPTOR_LENGTH, buffer::NETWORK_DEVICE_DESCRIPTOR_VERSION,
-        BufferLayout, Config, DeviceBaseInfo, DeviceInfo, Error,
+        buffer::{
+            AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
+        },
+        BufferLayout, Config, DeviceBaseInfo, DeviceInfo, Error, Inner, Mutex, Pending, Pool,
+        ReadyBuffer, Task,
     };
 
     const DEFAULT_DEVICE_BASE_INFO: DeviceBaseInfo = DeviceBaseInfo {
@@ -768,5 +774,78 @@ mod tests {
             options: _,
         } = config;
         assert_eq!(length, expected_length);
+    }
+
+    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo) {
+        let size = std::mem::size_of::<DescId<K>>();
+        let (handle, other_end) = fuchsia_zircon::Fifo::create(1, size).unwrap();
+        (Fifo::from_fifo(handle).unwrap(), other_end)
+    }
+
+    fn remove_rights<T: FromBytes + AsBytes>(
+        fifo: Fifo<T>,
+        rights_to_remove: fuchsia_zircon::Rights,
+    ) -> Fifo<T> {
+        let fifo = fuchsia_zircon::Fifo::from(fifo);
+        let rights = fifo.as_handle_ref().basic_info().expect("can retrieve info").rights;
+
+        let fifo = fifo.replace_handle(rights ^ rights_to_remove).expect("can replace");
+        Fifo::from_fifo(fifo).expect("is still a valid FIFO")
+    }
+
+    enum TxOrRx {
+        Tx,
+        Rx,
+    }
+    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::READ; "tx read")]
+    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::WRITE; "tx write")]
+    #[test_case(TxOrRx::Rx, fuchsia_zircon::Rights::WRITE; "rx read")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn task_as_future_poll_error(
+        which_fifo: TxOrRx,
+        right_to_remove: fuchsia_zircon::Rights,
+    ) {
+        // This is a regression test for https://fxbug.dev/121478. The flake
+        // that caused that bug occurred because the Zircon channel was closed
+        // but the error returned by a failed attempt to write to it wasn't
+        // being propagated upwards. This test produces a similar situation by
+        // altering the right on the FIFOs the task uses so as to cause either
+        // an attempt to write or to read to fail. For completeness, it
+        // exercises all the FIFO polls that comprise Task::poll.
+        let (pool, _descriptors, _data) =
+            Pool::new(DEFAULT_DEVICE_INFO.primary_config(DEFAULT_BUFFER_LENGTH).expect("is valid"))
+                .expect("is valid");
+        let (session_proxy, _session_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::SessionMarker>()
+                .expect("create proxy");
+
+        let (rx, _rx_sender) = make_fifos();
+        let (tx, _tx_receiver) = make_fifos();
+
+        // Attenuate rights on one of the FIFOs.
+        let (tx, rx) = match which_fifo {
+            TxOrRx::Tx => (remove_rights(tx, right_to_remove), rx),
+            TxOrRx::Rx => (tx, remove_rights(rx, right_to_remove)),
+        };
+
+        let buf = pool.alloc_tx_buffer(1).await.expect("can allocate");
+        let inner = Arc::new(Inner {
+            pool,
+            proxy: session_proxy,
+            name: "fake_task".to_string(),
+            rx,
+            tx,
+            tx_pending: Pending::new(vec![]),
+            rx_ready: Mutex::new(ReadyBuffer::new(10)),
+            tx_ready: Mutex::new(ReadyBuffer::new(10)),
+        });
+
+        inner.send(buf).expect("can send");
+
+        let mut task = Task { inner };
+
+        // The task should not be able to continue because it can't read from or
+        // write to one of the FIFOs.
+        assert_matches!(futures::poll!(&mut task), Poll::Ready(Err(Error::Fifo(_, _, _))));
     }
 }
