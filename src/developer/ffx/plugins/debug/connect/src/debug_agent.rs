@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_net::unix::UnixListener;
 use fuchsia_zircon_status::Status;
 use futures_util::{
@@ -44,8 +44,7 @@ impl DebugAgentSocket {
         let (unix_conn, _) = self.unix_socket.accept().await?;
 
         // Create a FIDL socket to the debug_agent on the device.
-        let (fidl_left, fidl_right) = fidl::Socket::create(fidl::SocketOpts::STREAM)
-            .map_err(|s| anyhow!("Failed while creating socket: {}", s))?;
+        let (fidl_left, fidl_right) = fidl::Socket::create_stream();
         Status::ok(self.debugger_proxy.connect(fidl_right).await?)?;
         let fidl_conn = fidl::AsyncSocket::from_socket(fidl_left)?;
 
