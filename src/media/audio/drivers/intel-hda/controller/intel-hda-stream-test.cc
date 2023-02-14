@@ -5,7 +5,6 @@
 #include "intel-hda-stream.h"
 
 #include <fuchsia/hardware/intelhda/codec/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 
 #include <optional>
@@ -16,6 +15,8 @@
 #include <intel-hda/codec-utils/codec-driver-base.h>
 #include <intel-hda/codec-utils/streamconfig-base.h>
 #include <zxtest/zxtest.h>
+
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 namespace audio_fidl = fuchsia_hardware_audio;
@@ -28,18 +29,14 @@ constexpr float kTestMaxGain = -10.f;
 constexpr float kTestGainStep = 2.f;
 
 fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
-    fidl::ClientEnd<audio_fidl::StreamConfigConnector> client) {
-  fidl::WireSyncClient client_wrap{std::move(client)};
-  if (!client_wrap.is_valid()) {
-    return {};
-  }
+    fidl::WireSyncClient<audio_fidl::StreamConfigConnector>& client) {
   auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
   if (!endpoints.is_ok()) {
     return {};
   }
   auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client_wrap->Connect(std::move(stream_channel_remote));
+  (void)client->Connect(std::move(stream_channel_remote));
   return fidl::WireSyncClient<audio_fidl::StreamConfig>(std::move(stream_channel_local));
 }
 
@@ -84,7 +81,7 @@ class FakeController : public FakeControllerType, public ddk::IhdaCodecProtocol<
   ~FakeController() { loop_.Shutdown(); }
   zx_device_t* dev() { return reinterpret_cast<zx_device_t*>(this); }
   zx_status_t Bind() { return DdkAdd("fake-controller-device-test"); }
-  void DdkRelease() {}
+  void DdkRelease() { delete this; }
 
   ihda_codec_protocol_t proto() const {
     ihda_codec_protocol_t proto;
@@ -127,39 +124,54 @@ class FakeController : public FakeControllerType, public ddk::IhdaCodecProtocol<
   fbl::RefPtr<Channel> codec_driver_channel_;
 };
 
-class Binder : public fake_ddk::Bind {
+class HdaStreamTest : public zxtest::Test {
  public:
- private:
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id,
-                                void* protocol) override {
-    auto context = reinterpret_cast<const FakeController*>(device);
-    if (proto_id == ZX_PROTOCOL_IHDA_CODEC) {
-      *reinterpret_cast<ihda_codec_protocol_t*>(protocol) = context->proto();
-      return ZX_OK;
-    }
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+  void SetUp() override {
+    SetUpControllerAndCodec();
+    SetUpStream();
   }
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    zx_status_t status = fake_ddk::Bind::DeviceAdd(drv, parent, args, out);
-    bad_parent_ = false;
-    return status;
+
+  void SetUpControllerAndCodec() {
+    fake_controller_ = new FakeController(root_.get());
+    ASSERT_OK(fake_controller_->Bind());
+    auto fake_controller_mock_device = root_->GetLatestChild();
+    fake_controller_mock_device->AddProtocol(ZX_PROTOCOL_IHDA_CODEC, fake_controller_->proto().ops,
+                                             fake_controller_->proto().ctx);
+
+    loop_.StartThread();
+
+    codec_ = fbl::AdoptRef(new TestCodec);
+    auto ret = codec_->Bind(fake_controller_mock_device, "test");
+    ASSERT_OK(ret.status_value());
   }
+
+  void SetUpStream() {
+    stream_ = fbl::AdoptRef(new TestStream);
+    ASSERT_OK(codec_->ActivateStream(stream_));
+    ASSERT_OK(stream_->Bind());
+
+    auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), stream_.get());
+    client_.Bind(std::move(endpoints->client));
+  }
+
+  void TearDown() override {
+    loop_.Shutdown();
+    fake_controller_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(root_.get());
+  }
+
+ protected:
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  FakeController* fake_controller_;
+  fbl::RefPtr<TestCodec> codec_;
+  fbl::RefPtr<TestStream> stream_;
+  fidl::WireSyncClient<audio_fidl::StreamConfigConnector> client_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
-TEST(HdaStreamTest, GetStreamPropertiesDefaults) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
-
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-  auto stream = fbl::AdoptRef(new TestStream);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
-
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+TEST_F(HdaStreamTest, GetStreamPropertiesDefaults) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetProperties();
@@ -177,26 +189,10 @@ TEST(HdaStreamTest, GetStreamPropertiesDefaults) {
   EXPECT_EQ(result.value().properties.plug_detect_capabilities(),
             audio_fidl::wire::PlugDetectCapabilities::kHardwired);
   EXPECT_EQ(result.value().properties.clock_domain(), 0);
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
-TEST(HdaStreamTest, SetAndGetGainDefaults) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
-
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-  auto stream = fbl::AdoptRef(new TestStream);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
-
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+TEST_F(HdaStreamTest, SetAndGetGainDefaults) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   {
@@ -213,37 +209,15 @@ TEST(HdaStreamTest, SetAndGetGainDefaults) {
         0,
         gain_state.value().gain_state.gain_db());  // Gain was not changed, default range is 0.
   }
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
-TEST(HdaStreamTest, WatchPlugStateDefaults) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
-
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-
-  auto stream = fbl::AdoptRef(new TestStream);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
-
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+TEST_F(HdaStreamTest, WatchPlugStateDefaults) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto state = stream_client->WatchPlugState();
   ASSERT_OK(state.status());
   ASSERT_TRUE(state.value().plug_state.plugged());
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
 class TestStreamCustom : public TestStream {
@@ -284,19 +258,28 @@ class TestStreamCustom : public TestStream {
   bool plugged_ = true;
 };
 
-TEST(HdaStreamTest, GetStreamProperties) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
+class HdaStreamTest2 : public HdaStreamTest {
+  void SetUp() override {
+    SetUpControllerAndCodec();
+    SetUpStreamCustom();
+  }
 
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-  auto stream = fbl::AdoptRef(new TestStreamCustom);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
+  void SetUpStreamCustom() {
+    stream_custom_ = fbl::AdoptRef(new TestStreamCustom);
+    ASSERT_OK(codec_->ActivateStream(stream_custom_));
+    ASSERT_OK(stream_custom_->Bind());
 
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+    auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), stream_custom_.get());
+    client_.Bind(std::move(endpoints->client));
+  }
+
+ protected:
+  fbl::RefPtr<TestStreamCustom> stream_custom_;
+};
+
+TEST_F(HdaStreamTest2, GetStreamProperties) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetProperties();
@@ -314,26 +297,10 @@ TEST(HdaStreamTest, GetStreamProperties) {
   EXPECT_EQ(result.value().properties.plug_detect_capabilities(),
             audio_fidl::wire::PlugDetectCapabilities::kCanAsyncNotify);
   EXPECT_EQ(result.value().properties.clock_domain(), 0);
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
-TEST(HdaStreamTest, SetAndGetGain) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
-
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-  auto stream = fbl::AdoptRef(new TestStreamCustom);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
-
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+TEST_F(HdaStreamTest2, SetAndGetGain) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   {
@@ -362,26 +329,10 @@ TEST(HdaStreamTest, SetAndGetGain) {
     EXPECT_OK(status.status());
     th.join();
   }
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
-TEST(HdaStreamTest, WatchPlugState) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
-
-  auto codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
-  ASSERT_OK(ret.status_value());
-  auto stream = fbl::AdoptRef(new TestStreamCustom);
-  ASSERT_OK(codec->ActivateStream(stream));
-  ASSERT_OK(stream->Bind());
-
-  auto stream_client = GetStreamClient(tester.FidlClient<audio_fidl::StreamConfigConnector>());
+TEST_F(HdaStreamTest2, WatchPlugState) {
+  auto stream_client = GetStreamClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
   {
     auto state = stream_client->WatchPlugState();
@@ -395,14 +346,9 @@ TEST(HdaStreamTest, WatchPlugState) {
       EXPECT_FALSE(state.value().plug_state.plugged());
       EXPECT_EQ(state.value().plug_state.plug_state_time(), kTestTime);
     });
-    stream->NotifyPlugState(false, kTestTime);
+    stream_custom_->NotifyPlugState(false, kTestTime);
     th.join();
   }
-
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
 }
 
 }  // namespace audio::intel_hda

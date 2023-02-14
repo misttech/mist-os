@@ -5,7 +5,6 @@
 #include "intel-dsp-stream.h"
 
 #include <fuchsia/hardware/intelhda/codec/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 
 #include <optional>
@@ -17,22 +16,20 @@
 #include <intel-hda/codec-utils/streamconfig-base.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
+
 namespace {
 
 static constexpr char kTestProductName[] = "Builtin Headphone Jack";
 
 fidl::WireSyncClient<fuchsia_hardware_audio::Dai> GetDaiClient(
-    fidl::ClientEnd<fuchsia_hardware_audio::DaiConnector> client) {
-  fidl::WireSyncClient client_wrap{std::move(client)};
-  if (!client_wrap.is_valid()) {
-    return {};
-  }
+    fidl::WireSyncClient<fuchsia_hardware_audio::DaiConnector>& client) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Dai>();
   if (!endpoints.is_ok()) {
     return {};
   }
   auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
-  ZX_ASSERT(client_wrap->Connect(std::move(stream_channel_remote)).ok());
+  ZX_ASSERT(client->Connect(std::move(stream_channel_remote)).ok());
   return fidl::WireSyncClient<fuchsia_hardware_audio::Dai>(std::move(stream_channel_local));
 }
 
@@ -105,7 +102,7 @@ class FakeController : public FakeControllerType, public ddk::IhdaCodecProtocol<
   ~FakeController() { loop_.Shutdown(); }
   zx_device_t* dev() { return reinterpret_cast<zx_device_t*>(this); }
   zx_status_t Bind() { return DdkAdd("fake-controller-device-test"); }
-  void DdkRelease() {}
+  void DdkRelease() { delete this; }
 
   ihda_codec_protocol_t proto() const {
     ihda_codec_protocol_t proto;
@@ -148,56 +145,46 @@ class FakeController : public FakeControllerType, public ddk::IhdaCodecProtocol<
   fbl::RefPtr<Channel> codec_driver_channel_;
 };
 
-class Binder : public fake_ddk::Bind {
- public:
- private:
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id,
-                                void* protocol) override {
-    auto context = reinterpret_cast<const FakeController*>(device);
-    if (proto_id == ZX_PROTOCOL_IHDA_CODEC) {
-      *reinterpret_cast<ihda_codec_protocol_t*>(protocol) = context->proto();
-      return ZX_OK;
-    }
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
-  }
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    zx_status_t status = fake_ddk::Bind::DeviceAdd(drv, parent, args, out);
-    bad_parent_ = false;
-    return status;
-  }
-};
-
 class SstStreamTest : public zxtest::Test {
  public:
-  SstStreamTest() : fake_controller_(fake_ddk::kFakeParent) {}
 
   void SetUp() override {
-    ASSERT_OK(fake_controller_.Bind());
+    fake_controller_ = new FakeController(root_.get());
+    ASSERT_OK(fake_controller_->Bind());  // fake_controller_ is owned by mock ddk.
+    auto fake_controller_mock_device = root_->GetLatestChild();
+    fake_controller_mock_device->AddProtocol(ZX_PROTOCOL_IHDA_CODEC, fake_controller_->proto().ops,
+                                             fake_controller_->proto().ctx);
+
     codec_ = fbl::AdoptRef(new TestCodec);
-    auto ret = codec_->Bind(fake_controller_.dev(), "test");
+    auto ret = codec_->Bind(fake_controller_mock_device, "test");
     ASSERT_OK(ret.status_value());
     stream_ = fbl::AdoptRef(new TestStream);
     ASSERT_OK(codec_->ActivateStream(stream_));
     ASSERT_OK(stream_->Bind());
+
+    loop_.StartThread();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::DaiConnector>();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), stream_.get());
+    client_.Bind(std::move(endpoints->client));
   }
 
   void TearDown() override {
-    codec_->DeviceRelease();
-    fake_controller_.DdkAsyncRemove();
-    EXPECT_TRUE(tester_.Ok());
-    fake_controller_.DdkRelease();
+    loop_.Shutdown();
+    fake_controller_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(root_.get());
   }
 
  protected:
-  Binder tester_;
-  FakeController fake_controller_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  FakeController* fake_controller_;
   fbl::RefPtr<TestCodec> codec_;
   fbl::RefPtr<TestStream> stream_;
+  fidl::WireSyncClient<fuchsia_hardware_audio::DaiConnector> client_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(SstStreamTest, GetStreamProperties) {
-  auto stream_client = GetDaiClient(tester_.FidlClient<fuchsia_hardware_audio::DaiConnector>());
+  auto stream_client = GetDaiClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetProperties();
@@ -212,7 +199,7 @@ TEST_F(SstStreamTest, GetStreamProperties) {
 }
 
 TEST_F(SstStreamTest, Reset) {
-  auto stream_client = GetDaiClient(tester_.FidlClient<fuchsia_hardware_audio::DaiConnector>());
+  auto stream_client = GetDaiClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->Reset();
@@ -220,7 +207,7 @@ TEST_F(SstStreamTest, Reset) {
 }
 
 TEST_F(SstStreamTest, GetRingBufferFormats) {
-  auto stream_client = GetDaiClient(tester_.FidlClient<fuchsia_hardware_audio::DaiConnector>());
+  auto stream_client = GetDaiClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetRingBufferFormats();
@@ -241,7 +228,7 @@ TEST_F(SstStreamTest, GetRingBufferFormats) {
 }
 
 TEST_F(SstStreamTest, GetDaiFormats) {
-  auto stream_client = GetDaiClient(tester_.FidlClient<fuchsia_hardware_audio::DaiConnector>());
+  auto stream_client = GetDaiClient(client_);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetDaiFormats();
@@ -307,17 +294,28 @@ class TestStream2 : public IntelDspStream {
 };
 
 TEST(SstStream, GetDaiFormats2) {
-  Binder tester;
-  FakeController fake_controller(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_controller.Bind());
+  std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  FakeController* fake_controller = new FakeController(root.get());
+  ASSERT_OK(fake_controller->Bind());
+  auto fake_controller_mock_device = root->GetLatestChild();
+  fake_controller_mock_device->AddProtocol(ZX_PROTOCOL_IHDA_CODEC, fake_controller->proto().ops,
+                                           fake_controller->proto().ctx);
   fbl::RefPtr<TestCodec> codec = fbl::AdoptRef(new TestCodec);
-  auto ret = codec->Bind(fake_controller.dev(), "test");
+  auto ret = codec->Bind(fake_controller_mock_device, "test");
   ASSERT_OK(ret.status_value());
   auto stream = fbl::AdoptRef(new TestStream2);
   ASSERT_OK(codec->ActivateStream(stream));
   ASSERT_OK(stream->Bind());
 
-  auto stream_client = GetDaiClient(tester.FidlClient<fuchsia_hardware_audio::DaiConnector>());
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  loop.StartThread();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::DaiConnector>();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), stream.get());
+
+  fidl::WireSyncClient<fuchsia_hardware_audio::DaiConnector> client;
+  client.Bind(std::move(endpoints->client));
+
+  auto stream_client = GetDaiClient(client);
   ASSERT_TRUE(stream_client.is_valid());
 
   auto result = stream_client->GetDaiFormats();
@@ -339,10 +337,9 @@ TEST(SstStream, GetDaiFormats2) {
   EXPECT_EQ(formats[0].bits_per_sample.count(), 1);
   EXPECT_EQ(formats[0].bits_per_sample[0], 16);
 
-  codec->DeviceRelease();
-  fake_controller.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_controller.DdkRelease();
+  loop.Shutdown();
+  fake_controller->DdkAsyncRemove();
+  mock_ddk::ReleaseFlaggedDevices(root.get());
 }
 
 }  // namespace audio::intel_hda

@@ -171,9 +171,7 @@ executable("intel-hda-stream-test-bin") {
   sources = [ "intel-hda-stream-test.cc" ]
   deps = [
     ":src",
-
-    # TODO(fxb/115086): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",
   ]
 
@@ -198,9 +196,7 @@ executable("intel-dsp-stream-test-bin") {
   sources = [ "intel-dsp-stream-test.cc" ]
   deps = [
     ":src",
-
-    # TODO(fxb/115086): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }

@@ -20,6 +20,7 @@
 #include <intel-hda/utils/utils.h>
 
 #include "debug-logging.h"
+#include "fbl/ref_ptr.h"
 
 namespace audio {
 namespace intel_hda {
@@ -422,6 +423,17 @@ void IntelHDACodecDriverBase::ReleaseAllUnsolTags(const IntelHDAStreamBase& stre
 }
 
 zx_status_t IntelHDACodecDriverBase::DeactivateStream(uint32_t stream_id) {
+  fbl::RefPtr<IntelHDAStreamBase> stream = GetActiveStream(stream_id);
+
+  if (stream == nullptr)
+    return ZX_ERR_NOT_FOUND;
+
+  stream->Deactivate();
+
+  return ZX_OK;
+}
+
+zx_status_t IntelHDACodecDriverBase::EraseStream(uint32_t stream_id) {
   fbl::RefPtr<IntelHDAStreamBase> stream;
   {
     fbl::AutoLock active_streams_lock(&active_streams_lock_);
@@ -430,8 +442,6 @@ zx_status_t IntelHDACodecDriverBase::DeactivateStream(uint32_t stream_id) {
 
   if (stream == nullptr)
     return ZX_ERR_NOT_FOUND;
-
-  stream->Deactivate();
 
   return ZX_OK;
 }

@@ -97,6 +97,8 @@ void IntelHDAStreamBase::Deactivate() {
       unsol_tag_count_ = 0;
     }
 
+    parent_codec_->EraseStream(id());
+
     // Clear out our parent_codec_ pointer.  This will mark us as being
     // inactive and prevent any new connections from being made.
     parent_codec_.reset();

@@ -44,6 +44,7 @@ class IntelHDACodecDriverBase : public fbl::RefCounted<IntelHDACodecDriverBase> 
   zx_status_t AllocateUnsolTag(const IntelHDAStreamBase& stream, uint8_t* out_tag);
   void ReleaseUnsolTag(const IntelHDAStreamBase& stream, uint8_t tag);
   void ReleaseAllUnsolTags(const IntelHDAStreamBase& stream);
+  zx_status_t EraseStream(uint32_t stream_id) __TA_EXCLUDES(active_streams_lock_);
 
  protected:
   static constexpr uint32_t CODEC_TID = 0xFFFFFFFF;

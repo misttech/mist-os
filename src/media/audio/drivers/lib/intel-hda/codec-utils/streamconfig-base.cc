@@ -36,6 +36,7 @@ zx_protocol_device_t IntelHDAStreamConfigBase::STREAM_DEVICE_THUNKS = []() {
         thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
     return transaction.Status();
   };
+  sdt.release = [](void* ctx) { reinterpret_cast<IntelHDAStreamConfigBase*>(ctx)->Deactivate(); };
   return sdt;
 }();
 
