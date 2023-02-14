@@ -12,3 +12,7 @@ project('fuchsia', 'cpp', 'c',
 inc_top=include_directories('.')
 
 subdir('src/graphics/lib/magma')
+
+if get_option('with_tests')
+    subdir('src/graphics/tests/vkreadback')
+endif
