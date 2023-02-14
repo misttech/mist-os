@@ -63,6 +63,7 @@ source_set("crash_reporter") {
   public_deps = [
     ":crash_register",
     ":crash_server",
+    ":filing_result",
     ":log_tags",
     ":network_watcher",
     ":product",
@@ -129,6 +130,10 @@ source_set("errors") {
   ]
 }
 
+source_set("filing_result") {
+  sources = [ "filing_result.h" ]
+}
+
 source_set("item_location") {
   sources = [
     "item_location.cc",
@@ -185,6 +190,7 @@ source_set("queue") {
 
   public_deps = [
     ":crash_server",
+    ":filing_result",
     ":log_tags",
     ":network_watcher",
     ":report_id",

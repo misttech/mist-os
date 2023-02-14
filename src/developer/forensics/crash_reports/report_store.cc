@@ -165,16 +165,17 @@ ReportStore::ReportStore(LogTags* tags, std::shared_ptr<InfoContext> info,
   RecreateFromFilesystem(cache_metadata_);
 }
 
-bool ReportStore::Add(Report report, std::vector<ReportId>* garbage_collected_reports) {
+std::optional<ItemLocation> ReportStore::Add(Report report,
+                                             std::vector<ReportId>* garbage_collected_reports) {
   if (Contains(report.Id())) {
     FX_LOGST(ERROR, tags_->Get(report.Id())) << "Duplicate local report id";
-    return false;
+    return std::nullopt;
   }
 
   for (const auto& key : kReservedAttachmentNames) {
     if (report.Attachments().find(key) != report.Attachments().end()) {
       FX_LOGST(ERROR, tags_->Get(report.Id())) << "Attachment is using reserved key: " << key;
-      return false;
+      return std::nullopt;
     }
   }
 
@@ -222,7 +223,7 @@ bool ReportStore::Add(Report report, std::vector<ReportId>* garbage_collected_re
     FX_LOGST(INFO, tags_->Get(report.Id())) << "Associated snapshot is not available";
   }
 
-  return report_location.has_value();
+  return report_location;
 }
 
 std::optional<ItemLocation> ReportStore::AddToRoot(

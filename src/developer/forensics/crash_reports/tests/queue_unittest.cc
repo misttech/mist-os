@@ -8,12 +8,14 @@
 #include <lib/zx/time.h>
 
 #include <memory>
+#include <variant>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/crash_reports/constants.h"
+#include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/network_watcher.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
@@ -41,6 +43,7 @@ namespace {
 
 using testing::Contains;
 using testing::ElementsAre;
+using testing::ElementsAreArray;
 using testing::IsEmpty;
 using testing::IsSupersetOf;
 using testing::Not;
@@ -151,12 +154,20 @@ class QueueTest : public UnitTestFixture {
 
   std::optional<ReportId> AddNewReport(const bool is_hourly_report,
                                        const bool empty_annotations = false) {
+    return AddNewReportWithStatus(
+        is_hourly_report, [](const FilingResult& result, const std::string& report_id) {},
+        empty_annotations);
+  }
+
+  std::optional<ReportId> AddNewReportWithStatus(const bool is_hourly_report,
+                                                 FilingResultFn callback,
+                                                 const bool empty_annotations = false) {
     ++report_id_;
     queue_->AddReportUsingSnapshot(kSnapshotUuidValue, report_id_);
     Report report = (is_hourly_report) ? MakeHourlyReport(report_id_, empty_annotations)
                                        : MakeReport(report_id_, empty_annotations);
 
-    if (queue_->Add(std::move(report))) {
+    if (queue_->Add(std::move(report), std::move(callback))) {
       return report_id_;
     }
     return std::nullopt;
@@ -399,6 +410,185 @@ TEST_F(QueueTest, Upload) {
                   cobalt::Event(cobalt::UploadAttemptState::kUploaded, 1u),
                   cobalt::Event(cobalt::UploadAttemptState::kUploaded, 1u),
               }));
+}
+
+TEST_F(QueueTest, FilingStatusUpload) {
+  SetUpQueue({kUploadSuccessful, kUploadSuccessful});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::vector<FilingResult> results;
+  std::vector<std::string> report_ids;
+  for (size_t i = 0; i < 2; ++i) {
+    AddNewReportWithStatus(
+        /*is_hourly_report=*/false,
+        [&results, &report_ids](const FilingResult& new_result, const std::string& new_report_id) {
+          results.push_back(new_result);
+          report_ids.push_back(new_report_id);
+        });
+  }
+
+  RunLoopFor(kUploadResponseDelay * 2);
+
+  EXPECT_THAT(results, ElementsAreArray({
+                           FilingResult::kReportUploaded,
+                           FilingResult::kReportUploaded,
+                       }));
+
+  EXPECT_THAT(report_ids, ElementsAreArray({
+                              "1",
+                              "2",
+                          }));
+}
+
+TEST_F(QueueTest, FilingStatusReportOnDisk) {
+  SetUpQueue({kUploadFailed});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_EQ(result, FilingResult::kReportOnDisk);
+  EXPECT_EQ(report_id, "");
+}
+
+TEST_F(QueueTest, FilingStatusReportInMemory) {
+  report_store_ = std::make_unique<ScopedTestReportStore>(
+      &annotation_manager_, info_context_,
+      /*max_reports_tmp_size=*/crash_reports::kReportStoreMaxTmpSize,
+      /*max_reports_cache_size=*/StorageSize::Bytes(0));
+
+  SetUpQueue({kUploadFailed});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_EQ(result, FilingResult::kReportInMemory);
+  EXPECT_EQ(report_id, "");
+}
+
+TEST_F(QueueTest, FilingStatusDelete) {
+  SetUpQueue();
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kDoNotFileAndDelete);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  EXPECT_EQ(result, FilingResult::kReportNotFiledUserOptedOut);
+  EXPECT_EQ(report_id, "");
+}
+
+TEST_F(QueueTest, FilingStatusDeleteDuringUpload) {
+  SetUpQueue({kUploadFailed});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::vector<FilingResult> results;
+  std::vector<std::string> report_ids;
+  for (size_t i = 0; i < 2; ++i) {
+    AddNewReportWithStatus(
+        /*is_hourly_report=*/false,
+        [&results, &report_ids](const FilingResult& new_result, const std::string& new_report_id) {
+          results.push_back(new_result);
+          report_ids.push_back(new_report_id);
+        });
+  }
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kDoNotFileAndDelete);
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_THAT(results, ElementsAreArray({
+                           FilingResult::kReportNotFiledUserOptedOut,
+                           FilingResult::kReportNotFiledUserOptedOut,
+                       }));
+
+  EXPECT_THAT(report_ids, ElementsAreArray({
+                              "",
+                              "",
+                          }));
+}
+
+TEST_F(QueueTest, FilingStatusServerTimedOut) {
+  SetUpQueue({kUploadTimedOut});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_EQ(result, FilingResult::kServerError);
+  EXPECT_EQ(report_id, "");
+}
+
+TEST_F(QueueTest, FilingStatusServerThrottled) {
+  SetUpQueue({kUploadThrottled});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_EQ(result, FilingResult::kServerError);
+  EXPECT_EQ(report_id, "");
+}
+
+TEST_F(QueueTest, FilingStatusPersistenceError) {
+  report_store_ =
+      std::make_unique<ScopedTestReportStore>(&annotation_manager_, info_context_,
+                                              /*max_reports_tmp_size=*/StorageSize::Bytes(0),
+                                              /*max_reports_cache_size=*/StorageSize::Bytes(0));
+
+  SetUpQueue({kUploadFailed});
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  std::optional<FilingResult> result;
+  std::optional<std::string> report_id;
+  AddNewReportWithStatus(
+      /*is_hourly_report=*/false,
+      [&result, &report_id](const FilingResult& new_result, const std::string& new_report_id) {
+        result = new_result;
+        report_id = new_report_id;
+      });
+
+  RunLoopFor(kUploadResponseDelay);
+
+  EXPECT_EQ(result, FilingResult::kPersistenceError);
+  EXPECT_EQ(report_id, "");
 }
 
 TEST_F(QueueTest, SkipEmptyAnnotationUpload) {
@@ -774,7 +964,8 @@ TEST_F(QueueTest, Check_SpecialCaseClientsRemoved) {
   // Modify report to have special case uuid.
   report.SnapshotUuid() = kShutdownSnapshotUuid;
 
-  queue_->Add(std::move(report));
+  queue_->Add(std::move(report),
+              [](const FilingResult& new_result, const std::string& new_report_id) {});
 
   EXPECT_TRUE(queue_->Contains(report_id_));
 

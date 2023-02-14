@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "src/developer/forensics/crash_reports/crash_server.h"
+#include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/info/queue_info.h"
 #include "src/developer/forensics/crash_reports/log_tags.h"
@@ -40,7 +41,7 @@ class Queue {
   void WatchReportingPolicy(ReportingPolicyWatcher* watcher);
   void WatchNetwork(NetworkWatcher* network_watcher);
 
-  bool Add(Report report);
+  bool Add(Report report, FilingResultFn callback);
 
   // Identifies |report| as a crash report that used the snapshot referred to by |uuid|.
   //
@@ -68,7 +69,7 @@ class Queue {
   //
   // Note: |report| will be set iff it is actively being uploaded or hasn't been added to the store.
   struct PendingReport {
-    explicit PendingReport(Report report);
+    explicit PendingReport(Report report, FilingResultFn callback);
     PendingReport(ReportId report_id, SnapshotUuid snapshot_uuid, bool is_hourly_report);
 
     PendingReport(const PendingReport&) = delete;
@@ -81,10 +82,15 @@ class Queue {
     Report TakeReport();
     bool HasReport() const;
 
+    // Executes |callback| using the parameters specified.
+    void SendFilingResult(FilingResult filing_result,
+                          const std::optional<std::string>& report_id = std::nullopt);
+
     ReportId report_id;
     SnapshotUuid snapshot_uuid;
     bool is_hourly_report;
     std::optional<Report> report;
+    FilingResultFn callback;
 
     // Set to true iff the report is the active report and needs to be deleted once it becomes
     // blocked.
@@ -102,10 +108,12 @@ class Queue {
   // already has an upload attempt or put in the store, respectively.
   bool Add(PendingReport pending_report, bool consider_eager_upload, bool add_to_store);
 
-  bool AddToStore(Report report);
+  std::optional<ItemLocation> AddToStore(Report report);
 
   // Stops using |pending_report| for the provided reason and cleans up its resources.
-  void Retire(PendingReport pending_report, RetireReason reason, std::string server_report_id = "");
+  void Retire(PendingReport pending_report, RetireReason reason,
+              std::optional<FilingResult> filing_result = std::nullopt,
+              const std::optional<std::string>& server_report_id = std::nullopt);
 
   // Attempts to upload all reports in |ready_reports_|. Reports are retired if they're uploaded or
   // throttled and re-added to the queue if the upload fails.
@@ -149,7 +157,7 @@ class Queue {
 
     // Record |report_id| as being retired and erase any state associated with it.
     void Retire(const PendingReport& pending_report, RetireReason retire_reason,
-                std::string server_report_id = "");
+                const std::optional<std::string>& server_report_id = std::nullopt);
 
    private:
     QueueInfo info_;

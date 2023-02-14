@@ -17,7 +17,6 @@ namespace forensics {
 namespace crash_reports {
 
 extern const char kStubCrashServerUrl[];
-extern const char kStubServerReportId[];
 
 class StubCrashServer : public CrashServer {
  public:
@@ -55,6 +54,7 @@ class StubCrashServer : public CrashServer {
   const zx::duration response_delay_;
   const std::vector<CrashServer::UploadStatus> request_return_values_;
   std::vector<CrashServer::UploadStatus>::const_iterator next_return_value_;
+  uint64_t next_report_id_ = 1;
 
   AnnotationMap latest_annotations_;
   std::vector<std::string> latest_attachment_keys_;

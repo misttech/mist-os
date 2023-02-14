@@ -8,14 +8,13 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "lib/fit/function.h"
+#include "src/developer/forensics/crash_reports/crash_server.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
 namespace crash_reports {
 
 const char kStubCrashServerUrl[] = "localhost:1234";
-
-const char kStubServerReportId[] = "server-report-id";
 
 StubCrashServer::~StubCrashServer() {
   FX_CHECK(!ExpectRequest()) << fxl::StringPrintf(
@@ -59,8 +58,9 @@ void StubCrashServer::MakeRequest(const Report& report, const Snapshot& snapshot
 
   async::PostDelayedTask(
       dispatcher_,
-      [this, callback = std::move(callback), status = *next_return_value_]() mutable {
-        const std::string server_report_id = (status) ? kStubServerReportId : "";
+      [this, callback = std::move(callback), status = *next_return_value_,
+       report_id = next_report_id_]() mutable {
+        const std::string server_report_id = (status == kSuccess) ? std::to_string(report_id) : "";
         has_pending_request_ = false;
         callback(status, server_report_id);
       },
@@ -68,6 +68,7 @@ void StubCrashServer::MakeRequest(const Report& report, const Snapshot& snapshot
 
   has_pending_request_ = true;
   ++next_return_value_;
+  ++next_report_id_;
 }
 
 }  // namespace crash_reports

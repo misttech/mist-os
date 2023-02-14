@@ -382,14 +382,14 @@ TEST_F(SnapshotCollectorTest, Check_ClientsAddedToQueue) {
   // Add to queue to ensure we don't delete the snapshot prematurely after upload of the first
   // report.
   ASSERT_TRUE(GetSnapshotStore()->SnapshotExists(report1->SnapshotUuid()));
-  queue_->Add(std::move(*report1));
+  queue_->Add(std::move(*report1), [](const FilingResult& result, const std::string& report_id) {});
 
   // Run loop until idle so Queue will finish "upload".
   RunLoopUntilIdle();
 
   const SnapshotUuid uuid2 = report2->SnapshotUuid();
   ASSERT_TRUE(GetSnapshotStore()->SnapshotExists(uuid2));
-  queue_->Add(std::move(*report2));
+  queue_->Add(std::move(*report2), [](const FilingResult& result, const std::string& report_id) {});
 
   // Run loop until idle so Queue will finish "upload".
   RunLoopUntilIdle();

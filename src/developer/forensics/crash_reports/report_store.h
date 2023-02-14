@@ -47,9 +47,8 @@ class ReportStore {
               const std::optional<SnapshotPersistence::Root>& persistent_snapshots_root,
               const std::string& garbage_collected_snapshots_path, StorageSize max_archives_size);
 
-  // Adds a report to the store and returns the ReportIds of any report garbage collected in the
-  // process.
-  bool Add(Report report, std::vector<ReportId>* garbage_collected_reports);
+  // Adds a report to the store and returns the location of the report if it was stored.
+  std::optional<ItemLocation> Add(Report report, std::vector<ReportId>* garbage_collected_reports);
 
   // Adds the annotation to the report. Check-fails that an annotation for |key| doesn't already
   // exist.

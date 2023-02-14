@@ -16,6 +16,7 @@
 #include <src/lib/fostr/fidl/fuchsia/mem/formatting.h>
 #include <src/lib/fostr/indent.h>
 
+#include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/item_location.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/utils/errors.h"
@@ -74,6 +75,36 @@ inline void PrintTo(const ItemLocation& location, std::ostream* os) {
       break;
   }
   *os << location_str;
+}
+
+// Pretty-prints FilingResult in gTest matchers instead of the default byte string in case of
+// failed expectations.
+inline void PrintTo(const FilingResult& result, std::ostream* os) {
+  std::string result_str;
+  switch (result) {
+    case FilingResult::kReportUploaded:
+      result_str = "REPORT_UPLOADED";
+      break;
+    case FilingResult::kReportOnDisk:
+      result_str = "REPORT_ON_DISK";
+      break;
+    case FilingResult::kReportInMemory:
+      result_str = "REPORT_IN_MEMORY";
+      break;
+    case FilingResult::kReportNotFiledUserOptedOut:
+      result_str = "REPORT_NOT_FILED_USER_OPTED_OUT";
+      break;
+    case FilingResult::kInvalidArgsError:
+      result_str = "INVALID_ARGS_ERROR";
+      break;
+    case FilingResult::kServerError:
+      result_str = "SERVER_ERROR";
+      break;
+    case FilingResult::kPersistenceError:
+      result_str = "PERSISTENCE_ERROR";
+      break;
+  }
+  *os << result_str;
 }
 
 }  // namespace crash_reports

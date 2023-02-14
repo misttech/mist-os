@@ -205,7 +205,8 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_ho
                                          "Failed to file report: MakeReport failed. Won't retry");
                  }
 
-                 if (!queue_.Add(std::move(result.value()))) {
+                 if (!queue_.Add(std::move(result.value()),
+                                 [](const FilingResult& result, const std::string& report_id) {})) {
                    return record_failure(cobalt::CrashState::kDropped,
                                          "Failed to file report: Queue::Add failed. Won't retry");
                  }

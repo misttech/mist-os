@@ -10,8 +10,11 @@
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 
+#include <utility>
+
 #include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/constants.h"
+#include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/info/queue_info.h"
 #include "src/developer/forensics/crash_reports/item_location.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
@@ -133,7 +136,7 @@ void Queue::StopUploading() {
   unblock_all_every_fifteen_minutes_task_.Cancel();
 }
 
-bool Queue::Add(Report report) {
+bool Queue::Add(Report report, FilingResultFn callback) {
   // Only allow a single hourly report in the queue at a time.
   if (report.IsHourlyReport()) {
     FX_CHECK(!HasHourlyReport());
@@ -150,14 +153,16 @@ bool Queue::Add(Report report) {
     }
   }
 
-  return Add(PendingReport(std::move(report)), /*consider_eager_upload=*/true,
+  return Add(PendingReport(std::move(report), std::move(callback)),
+             /*consider_eager_upload=*/true,
              /*add_to_store=*/true);
 }
 
 bool Queue::Add(PendingReport pending_report, const bool consider_eager_upload,
                 const bool add_to_store) {
   if (reporting_policy_ == ReportingPolicy::kDoNotFileAndDelete) {
-    Retire(std::move(pending_report), RetireReason::kDelete);
+    Retire(std::move(pending_report), RetireReason::kDelete,
+           FilingResult::kReportNotFiledUserOptedOut);
     return true;
   }
 
@@ -168,9 +173,20 @@ bool Queue::Add(PendingReport pending_report, const bool consider_eager_upload,
   }
 
   if (add_to_store && pending_report.HasReport()) {
-    if (!AddToStore(pending_report.TakeReport())) {
-      Retire(std::move(pending_report), RetireReason::kDelete);
+    const std::optional<ItemLocation> report_location = AddToStore(pending_report.TakeReport());
+    if (!report_location.has_value()) {
+      Retire(std::move(pending_report), RetireReason::kDelete, FilingResult::kPersistenceError);
       return false;
+    }
+
+    switch (*report_location) {
+      case ItemLocation::kCache:
+        pending_report.SendFilingResult(FilingResult::kReportOnDisk);
+        break;
+      case ItemLocation::kTmp:
+      case ItemLocation::kMemory:
+        pending_report.SendFilingResult(FilingResult::kReportInMemory);
+        break;
     }
   }
 
@@ -185,9 +201,10 @@ bool Queue::Add(PendingReport pending_report, const bool consider_eager_upload,
   return true;
 }
 
-bool Queue::AddToStore(Report report) {
+std::optional<ItemLocation> Queue::AddToStore(Report report) {
   std::vector<ReportId> garbage_collected_reports;
-  const bool success = report_store_->Add(std::move(report), &garbage_collected_reports);
+  const std::optional<ItemLocation> location =
+      report_store_->Add(std::move(report), &garbage_collected_reports);
 
   // Retire each pending report that is garbage collected by the store.
   for (auto& pending_report : ready_reports_) {
@@ -221,7 +238,7 @@ bool Queue::AddToStore(Report report) {
                                         }),
                          blocked_reports_.end());
 
-  return success;
+  return location;
 }
 
 void Queue::Upload() {
@@ -283,17 +300,20 @@ void Queue::Upload() {
       [this, add_to_store](CrashServer::UploadStatus status, std::string server_report_id) mutable {
         switch (status) {
           case CrashServer::UploadStatus::kSuccess:
-            Retire(std::move(*active_report_), RetireReason::kUpload, server_report_id);
+            Retire(std::move(*active_report_), RetireReason::kUpload, FilingResult::kReportUploaded,
+                   server_report_id);
             break;
           case CrashServer::UploadStatus::kThrottled:
-            Retire(std::move(*active_report_), RetireReason::kThrottled);
+            Retire(std::move(*active_report_), RetireReason::kThrottled,
+                   FilingResult::kServerError);
             break;
           case CrashServer::UploadStatus::kTimedOut:
-            Retire(std::move(*active_report_), RetireReason::kTimedOut);
+            Retire(std::move(*active_report_), RetireReason::kTimedOut, FilingResult::kServerError);
             break;
           case CrashServer::UploadStatus::kFailure:
             if (active_report_->delete_post_upload) {
-              Retire(std::move(*active_report_), RetireReason::kDelete);
+              Retire(std::move(*active_report_), RetireReason::kDelete,
+                     FilingResult::kReportNotFiledUserOptedOut);
             } else {
               // If the report isn't deleted and should be added to the store post-upload, its
               // content should still be present, e.g., DeleteAll didn't delete it.
@@ -316,18 +336,20 @@ void Queue::Upload() {
   }
 }
 
-void Queue::Retire(const PendingReport pending_report, const Queue::RetireReason reason,
-                   const std::string server_report_id) {
+void Queue::Retire(PendingReport pending_report, const Queue::RetireReason reason,
+                   const std::optional<FilingResult> filing_result,
+                   const std::optional<std::string>& server_report_id) {
   auto tags = tags_->Get(pending_report.report_id);
   switch (reason) {
     case RetireReason::kArchive:
       FX_LOGST(INFO, tags) << "Archived local report. Located under /tmp/reports or /cache/reports";
-      metrics_.Retire(pending_report, reason, server_report_id);
+      metrics_.Retire(pending_report, reason);
       // Don't clean up resources if the report is being archived.
       return;
     case RetireReason::kUpload:
+      FX_CHECK(server_report_id.has_value());
       FX_LOGST(INFO, tags) << "Successfully uploaded report at https://crash.corp.google.com/"
-                           << server_report_id;
+                           << *server_report_id;
       break;
     case RetireReason::kThrottled:
       FX_LOGST(INFO, tags) << "Upload throttled by server";
@@ -341,6 +363,11 @@ void Queue::Retire(const PendingReport pending_report, const Queue::RetireReason
     case RetireReason::kGarbageCollected:
       FX_LOGST(INFO, tags) << "Garbage collected local report";
       break;
+  }
+
+  // SendFilingResult is immediately called when reports are put into persistence.
+  if (filing_result.has_value() && pending_report.callback != nullptr) {
+    pending_report.SendFilingResult(*filing_result, server_report_id);
   }
 
   metrics_.Retire(pending_report, reason, server_report_id);
@@ -443,11 +470,13 @@ void Queue::DeleteAll() {
                                      Size());
 
   for (auto& pending_report : ready_reports_) {
-    Retire(std::move(pending_report), RetireReason::kDelete);
+    Retire(std::move(pending_report), RetireReason::kDelete,
+           FilingResult::kReportNotFiledUserOptedOut);
   }
   ready_reports_.clear();
 
   for (auto& pending_report : blocked_reports_) {
+    // |blocked_reports_| are in persistence; FilingResultCallback was already called.
     Retire(std::move(pending_report), RetireReason::kDelete);
   }
   blocked_reports_.clear();
@@ -530,11 +559,17 @@ void Queue::UnblockAllEveryFifteenMinutes() {
   }
 }
 
-Queue::PendingReport::PendingReport(Report report)
+void Queue::PendingReport::SendFilingResult(FilingResult result,
+                                            const std::optional<std::string>& report_id) {
+  report_id.has_value() ? callback(result, *report_id) : callback(result, "");
+}
+
+Queue::PendingReport::PendingReport(Report report, FilingResultFn callback)
     : report_id(report.Id()),
       snapshot_uuid(report.SnapshotUuid()),
       is_hourly_report(report.IsHourlyReport()),
       report(std::move(report)),
+      callback(std::move(callback)),
       delete_post_upload(false) {}
 
 Queue::PendingReport::PendingReport(const ReportId report_id, const SnapshotUuid snapshot_uuid,
@@ -543,6 +578,7 @@ Queue::PendingReport::PendingReport(const ReportId report_id, const SnapshotUuid
       snapshot_uuid(std::move(snapshot_uuid)),
       is_hourly_report(is_hourly_report),
       report(std::nullopt),
+      callback([](const FilingResult& result, const std::string& report_id) {}),
       delete_post_upload(false) {}
 
 void Queue::PendingReport::SetReport(Report r) { report = std::move(r); }
@@ -566,10 +602,11 @@ void Queue::UploadMetrics::IncrementUploadAttempts(const ReportId report_id) {
 
 void Queue::UploadMetrics::Retire(const PendingReport& pending_report,
                                   const RetireReason retire_reason,
-                                  const std::string server_report_id) {
+                                  const std::optional<std::string>& server_report_id) {
   switch (retire_reason) {
     case RetireReason::kUpload:
-      info_.MarkReportAsUploaded(server_report_id, upload_attempts_[pending_report.report_id]);
+      FX_CHECK(server_report_id.has_value());
+      info_.MarkReportAsUploaded(*server_report_id, upload_attempts_[pending_report.report_id]);
       break;
     case RetireReason::kDelete:
       info_.MarkReportAsDeleted(upload_attempts_[pending_report.report_id]);
