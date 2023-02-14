@@ -9,7 +9,9 @@ python_library("honeydew") {
   source_root = "."
   sources = [
     "__init__.py",
+    "errors.py",
     "utils/__init__.py",
+    "utils/ffx_cli.py",
     "utils/host_utils.py",
   ]
 }

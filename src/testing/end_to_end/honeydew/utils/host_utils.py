@@ -28,14 +28,14 @@ def is_pingable(
     """Checks if the ip_address responds to network pings.
 
     Args:
-        ip_address (str): IPv4|IPv6 address.
-        timeout (float): Timeout in seconds to wait for a ping response.
-        packet_count (int): How many packets will be sent before the deadline.
-        deadline (float): Timeout in seconds before ping exits regardless of how
+        ip_address: IPv4|IPv6 address.
+        timeout: Timeout in seconds to wait for a ping response.
+        packet_count: How many packets will be sent before the deadline.
+        deadline: Timeout in seconds before ping exits regardless of how
             many packets have been sent or received.
 
     Returns:
-        bool: True if the IP is (valid and) pingable, otherwise False.
+        True if the IP is (valid and) pingable, otherwise False.
     """
     if not _validate_ip_address(ip_address):
         return False
@@ -68,10 +68,10 @@ def _get_ip_version(ip_address: str) -> int:
     """Returns the version (v4 or v6) of the ip address.
 
     Args:
-        ip_address (str): IPv4|IPv6 address.
+        ip_address: IPv4|IPv6 address.
 
     Returns:
-        int: IP Version (4 or 6).
+        IP Version (4 or 6).
     """
     return ipaddress.ip_address(_normalize_ip_addr(ip_address)).version
 
@@ -80,10 +80,10 @@ def _get_ping_cmd(ip_address: str) -> str:
     """Returns the ping command to use based on the ip address specified.
 
     Args:
-        ip_address (str): IPv4|IPv6 address.
+        ip_address: IPv4|IPv6 address.
 
     Returns:
-        str: Ping command to use
+        Ping command to use
     """
     return _PING_CMD[_get_ip_version(ip_address)]
 
@@ -99,11 +99,10 @@ def _normalize_ip_addr(ip_address: str) -> str:
     identifier.
 
     Args:
-        ip_address (str): IPv4|IPv6 address.
+        ip_address: IPv4|IPv6 address.
 
     Returns:
-        str: ip address with or without scope identifier based on python
-            version.
+        ip address with or without scope identifier based on python version.
     """
     if sys.version_info < (3, 9):
         ip_address = ip_address.split('%')[0]
@@ -114,10 +113,10 @@ def _validate_ip_address(ip_address: str) -> bool:
     """Checks if the ip address specified is of a valid ip address format.
 
     Args:
-        ip_address (str): IPv4|IPv6 address.
+        ip_address: IPv4|IPv6 address.
 
     Returns:
-        bool: True if it is a valid ip address format, else False.
+        True if it is a valid ip address format, else False.
     """
     try:
         ipaddress.ip_address(_normalize_ip_addr(ip_address))

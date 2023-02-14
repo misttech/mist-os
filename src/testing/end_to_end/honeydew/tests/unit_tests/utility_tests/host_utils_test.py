@@ -12,7 +12,7 @@ from honeydew.utils import host_utils
 from parameterized import parameterized
 
 
-def _is_pingable_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param):
     """Custom name function method."""
     test_func_name = testcase_func.__name__
 
@@ -81,7 +81,7 @@ class HostUtilsTests(unittest.TestCase):
                         ["ping", "-c", "4", "-W", "3", "12.34.56.78"]
                 },),
         ],
-        name_func=_is_pingable_test_name_func)
+        name_func=_custom_test_name_func)
     def test_is_pingable_success(self, parameterized_dict):
         """Verifies is_pingable succeeds with correct flag parsing."""
         result = host_utils.is_pingable(
@@ -132,7 +132,7 @@ class HostUtilsTests(unittest.TestCase):
                 "expected": False
             },),
         ],
-        name_func=_is_pingable_test_name_func)
+        name_func=_custom_test_name_func)
     def test_is_pingable_ip_address_format(self, parameterized_dict):
         """Verifies is_pingable check if the ip_address format is valid."""
         result = host_utils.is_pingable(parameterized_dict["ip"])

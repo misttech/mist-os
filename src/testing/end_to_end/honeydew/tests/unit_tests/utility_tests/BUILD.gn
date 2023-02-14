@@ -15,8 +15,21 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
+  python_host_test("ffx_cli_test") {
+    main_source = "ffx_cli_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   group("tests") {
     testonly = true
-    public_deps = [ ":host_utils_test($host_toolchain)" ]
+    public_deps = [
+      ":ffx_cli_test($host_toolchain)",
+      ":host_utils_test($host_toolchain)",
+    ]
   }
 }

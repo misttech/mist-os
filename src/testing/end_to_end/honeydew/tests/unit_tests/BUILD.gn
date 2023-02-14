@@ -5,6 +5,9 @@
 if (is_host) {
   group("tests") {
     testonly = true
-    public_deps = [ "//src/testing/end_to_end/honeydew/tests/unit_tests/utility_tests:host_utils_test($host_toolchain)" ]
+    public_deps = [
+      "//src/testing/end_to_end/honeydew/tests/unit_tests/utility_tests:ffx_cli_test($host_toolchain)",
+      "//src/testing/end_to_end/honeydew/tests/unit_tests/utility_tests:host_utils_test($host_toolchain)",
+    ]
   }
 }
