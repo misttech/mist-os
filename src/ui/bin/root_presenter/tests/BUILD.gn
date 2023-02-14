@@ -29,7 +29,9 @@ fuchsia_unittest_component("root_presenter_unittests") {
 
 fuchsia_test_package("root_presenter_tests") {
   test_components = [
-    ":root_presenter_unittests",
+    # TODO(fxbug.dev/74262): We decided to disable this test instead of
+    # hermeticizing it.
+    # ":root_presenter_unittests",
     ":focus_dispatcher_unittests",
   ]
   test_specs = {
