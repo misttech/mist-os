@@ -9,7 +9,7 @@ use {
             merge::{Merger, MergerIterator},
             types::{ItemRef, LayerIterator},
         },
-        object_handle::{ObjectHandle, ObjectProperties},
+        object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID},
         object_store::{
             object_record::{
                 ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
@@ -103,17 +103,20 @@ impl<S: HandleOwner> Directory<S> {
         }
     }
 
-    /// Acquires a transaction with the appropriate locks to unlink |name|. Returns the transaction,
-    /// as well as the ID and type of the child.
+    /// Acquires a transaction with the appropriate locks to replace |name|. Returns the
+    /// transaction, as well as the ID and type of the child. If the child doesn't exist then a
+    /// transaction is returned with a lock only on the parent and None for the target info so that
+    /// the transaction can be executed with the confidence that the target doesn't exist.
     ///
-    /// We need to lock |self|, but also the child when it is a directory to prevent entries being
-    /// added at the same time, while a file needs to be able to decrement the reference count.
-    pub async fn acquire_transaction_for_unlink<'a>(
+    /// We need to lock |self|, but also the child if it exists. When it is a directory the lock
+    /// prevents entries being added at the same time. When it is a file needs to be able to
+    /// decrement the reference count.
+    pub async fn acquire_transaction_for_replace<'a>(
         &self,
         extra_keys: &[LockKey],
         name: &str,
         borrow_metadata_space: bool,
-    ) -> Result<(Transaction<'a>, u64, ObjectDescriptor), Error> {
+    ) -> Result<(Transaction<'a>, Option<(u64, ObjectDescriptor)>), Error> {
         // Since we don't know the child object ID until we've looked up the child, we need to loop
         // until we have acquired a lock on a child whose ID is the same as it was in the last
         // iteration.
@@ -122,12 +125,15 @@ impl<S: HandleOwner> Directory<S> {
         // if the child "foo" was first a directory, then was renamed to "bar" and a file "foo" was
         // created, we might acquire a lock on both the parent and "bar").
         let store = self.store();
-        let (mut child_object_id, _) = self.lookup(name).await?.ok_or(FxfsError::NotFound)?;
+        let mut child_object_id = INVALID_OBJECT_ID;
         loop {
-            let mut lock_keys = vec![
-                LockKey::object(store.store_object_id(), self.object_id),
-                LockKey::object(store.store_object_id(), child_object_id),
-            ];
+            let mut lock_keys = match child_object_id {
+                INVALID_OBJECT_ID => vec![LockKey::object(store.store_object_id(), self.object_id)],
+                _ => vec![
+                    LockKey::object(store.store_object_id(), self.object_id),
+                    LockKey::object(store.store_object_id(), child_object_id),
+                ],
+            };
             lock_keys.extend_from_slice(extra_keys);
             let fs = store.filesystem().clone();
             let transaction = fs
@@ -137,19 +143,25 @@ impl<S: HandleOwner> Directory<S> {
                 )
                 .await?;
 
-            let (object_id, object_descriptor) =
-                self.lookup(name).await?.ok_or(FxfsError::NotFound)?;
-            match object_descriptor {
-                ObjectDescriptor::File
-                | ObjectDescriptor::Directory
-                | ObjectDescriptor::Symlink => {
-                    if object_id == child_object_id {
-                        return Ok((transaction, object_id, object_descriptor));
+            match self.lookup(name).await? {
+                Some((object_id, object_descriptor)) => match object_descriptor {
+                    ObjectDescriptor::File
+                    | ObjectDescriptor::Directory
+                    | ObjectDescriptor::Symlink => {
+                        if object_id == child_object_id {
+                            return Ok((transaction, Some((object_id, object_descriptor))));
+                        }
+                        child_object_id = object_id
                     }
-                    child_object_id = object_id
+                    _ => bail!(FxfsError::Inconsistent),
+                },
+                None => {
+                    if child_object_id == INVALID_OBJECT_ID {
+                        return Ok((transaction, None));
+                    }
+                    child_object_id = INVALID_OBJECT_ID;
                 }
-                _ => bail!(FxfsError::Inconsistent),
-            }
+            };
         }
     }
 

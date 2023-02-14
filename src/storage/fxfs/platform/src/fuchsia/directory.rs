@@ -293,11 +293,15 @@ impl MutableDirectory for FxDirectory {
     }
 
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
-        let (mut transaction, _object_id, object_descriptor) = self
+        let (mut transaction, object_id_and_descriptor) = self
             .directory
-            .acquire_transaction_for_unlink(&[], name, true)
+            .acquire_transaction_for_replace(&[], name, true)
             .await
             .map_err(map_to_status)?;
+        let object_descriptor = match object_id_and_descriptor {
+            Some((_, object_descriptor)) => object_descriptor,
+            None => return Err(Status::NOT_FOUND),
+        };
         if let ObjectDescriptor::Directory = object_descriptor {
         } else if must_be_directory {
             return Err(Status::NOT_DIR);
@@ -394,34 +398,15 @@ impl MutableDirectory for FxDirectory {
 
         // Acquire a transaction that locks |src_dir|, |self|, and |dst_name| if it exists.
         let store = self.store();
-        let fs = store.filesystem();
-        let (mut transaction, dst_id_and_descriptor) = match self
+        let (mut transaction, dst_id_and_descriptor) = self
             .directory
-            .acquire_transaction_for_unlink(
+            .acquire_transaction_for_replace(
                 &[LockKey::object(store.store_object_id(), src_dir.object_id())],
                 dst,
                 false,
             )
             .await
-        {
-            Ok((transaction, id, descriptor)) => (transaction, Some((id, descriptor))),
-            Err(e) if FxfsError::NotFound.matches(&e) => {
-                let transaction = fs
-                    .new_transaction(
-                        &[
-                            LockKey::object(store.store_object_id(), src_dir.object_id()),
-                            LockKey::object(store.store_object_id(), self.object_id()),
-                        ],
-                        // It's ok to borrow metadata space here since after compaction, it should
-                        // be a wash.
-                        Options { borrow_metadata_space: true, ..Default::default() },
-                    )
-                    .await
-                    .map_err(map_to_status)?;
-                (transaction, None)
-            }
-            Err(e) => return Err(map_to_status(e)),
-        };
+            .map_err(map_to_status)?;
 
         if self.is_deleted() {
             return Err(Status::NOT_FOUND);

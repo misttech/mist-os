@@ -100,8 +100,12 @@ impl FuseFs {
     async fn unlink_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        let (mut transaction, _, object_descriptor) =
-            dir.acquire_transaction_for_unlink(&[], name.osstr_to_str()?, true).await?;
+        let (mut transaction, object_id_and_descriptor) =
+            dir.acquire_transaction_for_replace(&[], name.osstr_to_str()?, true).await?;
+        let object_descriptor = match object_id_and_descriptor {
+            Some((_, object_descriptor)) => object_descriptor,
+            None => return Err(FxfsError::NotFound.into()),
+        };
         match object_descriptor {
             ObjectDescriptor::File => {
                 let replaced_child =
@@ -136,8 +140,12 @@ impl FuseFs {
     async fn rmdir_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        let (mut transaction, _, object_descriptor) =
-            dir.acquire_transaction_for_unlink(&[], name.osstr_to_str()?, true).await?;
+        let (mut transaction, object_id_and_descriptor) =
+            dir.acquire_transaction_for_replace(&[], name.osstr_to_str()?, true).await?;
+        let object_descriptor = match object_id_and_descriptor {
+            Some((_, object_descriptor)) => object_descriptor,
+            None => return Err(FxfsError::NotFound.into()),
+        };
         match object_descriptor {
             ObjectDescriptor::Directory => {
                 replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
@@ -163,37 +171,13 @@ impl FuseFs {
     ) -> FxfsResult<()> {
         let old_dir = self.open_dir(parent).await?;
         let new_dir = self.open_dir(new_parent).await?;
-        let mut transaction = match new_dir
-            .acquire_transaction_for_unlink(
+        let (mut transaction, _) = new_dir
+            .acquire_transaction_for_replace(
                 &[LockKey::object(self.default_store.store_object_id(), old_dir.object_id())],
                 new_name.osstr_to_str()?,
                 true,
             )
-            .await
-        {
-            Ok((transaction, _, _)) => Ok(transaction),
-            Err(e) => match e.downcast_ref::<FxfsError>() {
-                Some(FxfsError::NotFound) => {
-                    self.fs
-                        .clone()
-                        .new_transaction(
-                            &[
-                                LockKey::object(
-                                    self.default_store.store_object_id(),
-                                    new_dir.object_id(),
-                                ),
-                                LockKey::object(
-                                    self.default_store.store_object_id(),
-                                    old_dir.object_id(),
-                                ),
-                            ],
-                            Options::default(),
-                        )
-                        .await
-                }
-                _ => Err(e),
-            },
-        }?;
+            .await?;
 
         if old_dir.lookup(name.osstr_to_str()?).await?.is_some() {
             let replaced_child = replace_child(
