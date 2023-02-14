@@ -215,7 +215,7 @@ mod tests {
     use {
         anyhow::{Error, Result},
         diagnostics_data::LogsData,
-        fidl::{Socket, SocketOpts},
+        fidl::Socket,
         fidl_fuchsia_fuzzer as fuzz,
         fuchsia_fuzzctl::{Forwarder, SocketForwarder},
         fuchsia_fuzzctl_test::{send_log_entry, Test},
@@ -226,7 +226,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_forward_text() -> Result<()> {
         let mut test = Test::try_new()?;
-        let (tx, rx) = Socket::create(SocketOpts::STREAM)?;
+        let (tx, rx) = Socket::create_stream();
         let forwarder = SocketForwarder::try_new(rx, test.writer())?;
         let socket_fut = || async move {
             let mut tx = fidl::AsyncSocket::from_socket(tx)?;
@@ -244,7 +244,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_forward_json() -> Result<()> {
         let mut test = Test::try_new()?;
-        let (tx, rx) = Socket::create(SocketOpts::STREAM)?;
+        let (tx, rx) = Socket::create_stream();
         let forwarder = SocketForwarder::try_new(rx, test.writer())?;
         let socket_fut = || async move {
             let mut tx = fidl::AsyncSocket::from_socket(tx)?;
@@ -264,13 +264,13 @@ mod tests {
         let logs_dir = Some(logs_dir);
         let mut forwarder = Forwarder::new(test.writer());
 
-        let (stdout_tx, stdout_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (stdout_tx, stdout_rx) = Socket::create_stream();
         forwarder.set_output(stdout_rx, fuzz::TestOutput::Stdout, &logs_dir)?;
 
-        let (stderr_tx, stderr_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (stderr_tx, stderr_rx) = Socket::create_stream();
         forwarder.set_output(stderr_rx, fuzz::TestOutput::Stderr, &logs_dir)?;
 
-        let (syslog_tx, syslog_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (syslog_tx, syslog_rx) = Socket::create_stream();
         forwarder.set_output(syslog_rx, fuzz::TestOutput::Syslog, &logs_dir)?;
 
         let done_marker = format!("{}\n", fuzz::DONE_MARKER);
@@ -316,13 +316,13 @@ mod tests {
         let logs_dir = Some(logs_dir);
         let mut forwarder = Forwarder::new(test.writer());
 
-        let (stdout_tx, stdout_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (stdout_tx, stdout_rx) = Socket::create_stream();
         forwarder.set_output(stdout_rx, fuzz::TestOutput::Stdout, &logs_dir)?;
 
-        let (stderr_tx, stderr_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (stderr_tx, stderr_rx) = Socket::create_stream();
         forwarder.set_output(stderr_rx, fuzz::TestOutput::Stderr, &logs_dir)?;
 
-        let (syslog_tx, syslog_rx) = Socket::create(SocketOpts::STREAM)?;
+        let (syslog_tx, syslog_rx) = Socket::create_stream();
         forwarder.set_output(syslog_rx, fuzz::TestOutput::Syslog, &logs_dir)?;
 
         let sockets_fut = || async move {

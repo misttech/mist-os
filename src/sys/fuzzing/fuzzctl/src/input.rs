@@ -77,8 +77,7 @@ impl InputPair {
 
     /// Creates an input pair from a sequence of bytes.
     pub fn try_from_data(input_data: Vec<u8>) -> Result<Self> {
-        let (reader, writer) = fidl::Socket::create(fidl::SocketOpts::STREAM)
-            .context("failed to create socket for fuzz input")?;
+        let (reader, writer) = fidl::Socket::create_stream();
         let fidl_input = FidlInput { socket: reader, size: input_data.len() as u64 };
         let input = Input { socket: Some(writer), data: input_data };
         Ok(InputPair::from((fidl_input, input)))
@@ -246,7 +245,7 @@ mod tests {
         let test = Test::try_new()?;
         let saved_dir = test.create_dir("saved")?;
 
-        let (reader, writer) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+        let (reader, writer) = fidl::Socket::create_stream();
         let fidl_input = FidlInput { socket: reader, size: 0 };
         let input = Input { socket: Some(writer), data: Vec::new() };
         let send_fut = input.send();

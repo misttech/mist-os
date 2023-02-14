@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{bail, Context as _, Error, Result},
+    anyhow::{bail, Context as _, Result},
     fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx,
     url::Url,
@@ -47,9 +47,7 @@ impl Manager {
 
     /// Returns a socket that provides the given type of fuzzer output.
     pub async fn get_output(&self, url: &Url, output: fuzz::TestOutput) -> Result<fidl::Socket> {
-        let (rx, tx) = fidl::Socket::create(fidl::SocketOpts::STREAM)
-            .map_err(Error::msg)
-            .context("failed to create socket pair")?;
+        let (rx, tx) = fidl::Socket::create_stream();
         let raw = self
             .proxy
             .get_output(url.as_str(), output, tx)
