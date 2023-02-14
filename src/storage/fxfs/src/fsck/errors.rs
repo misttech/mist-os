@@ -497,7 +497,7 @@ impl FsckError {
                 error!(store_id, ?missing, "Project id with metadata for usage but no limits");
             }
             FsckError::RefCountMismatch(oid, expected, actual) => {
-                error!(oid, expected, actual, "Reference count mistmatch");
+                error!(oid, expected, actual, "Reference count mismatch");
             }
             FsckError::RootObjectHasParent(store_id, oid, apparent_parent_id) => {
                 error!(store_id, oid, apparent_parent_id, "Root object is a child");

@@ -926,12 +926,7 @@ impl ObjectStore {
         let refs = if let ObjectValue::Object { kind: ObjectKind::File { refs, .. }, .. } =
             &mut mutation.item.value
         {
-            *refs = if delta < 0 {
-                refs.checked_sub((-delta) as u64)
-            } else {
-                refs.checked_add(delta as u64)
-            }
-            .ok_or(anyhow!("refs underflow/overflow"))?;
+            *refs = refs.checked_add_signed(delta).ok_or(anyhow!("refs underflow/overflow"))?;
             refs
         } else {
             bail!(FxfsError::NotFile);

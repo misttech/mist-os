@@ -57,14 +57,70 @@ pub struct PagedObjectHandle {
 }
 
 struct Inner {
-    dirty_crtime: Option<Timestamp>,
-    dirty_mtime: Option<Timestamp>,
+    dirty_crtime: DirtyTimestamp,
+    dirty_mtime: DirtyTimestamp,
 
     /// The number of pages that have been marked dirty by the kernel and need to be cleaned.
     dirty_page_count: u64,
 
     /// The amount of extra space currently reserved. See `SPARE_SIZE`.
     spare: u64,
+}
+
+// DirtyTimestamp tracks a dirty timestamp and handles flushing. Whilst we're flushing, we need to
+// hang on to the timestamp in case anything queries it, but once we've finished, we can discard it
+// so long as it hasn't been written again.
+#[derive(Clone, Copy)]
+enum DirtyTimestamp {
+    None,
+    Some(Timestamp),
+    PendingFlush(Timestamp),
+}
+
+impl DirtyTimestamp {
+    // If we have a timestamp, move to the PendingFlush state.
+    fn begin_flush(&mut self, update_to_now: bool) -> Option<Timestamp> {
+        if update_to_now {
+            let now = Timestamp::now();
+            *self = DirtyTimestamp::PendingFlush(now);
+            Some(now)
+        } else {
+            match self {
+                DirtyTimestamp::None => None,
+                DirtyTimestamp::Some(t) => {
+                    let t = *t;
+                    *self = DirtyTimestamp::PendingFlush(t);
+                    Some(t)
+                }
+                DirtyTimestamp::PendingFlush(t) => Some(*t),
+            }
+        }
+    }
+
+    // We finished a flush, so discard it if no further update was made.
+    fn end_flush(&mut self) {
+        if let DirtyTimestamp::PendingFlush(_) = self {
+            *self = DirtyTimestamp::None;
+        }
+    }
+
+    fn timestamp(&self) -> Option<Timestamp> {
+        match self {
+            DirtyTimestamp::None => None,
+            DirtyTimestamp::Some(t) => Some(*t),
+            DirtyTimestamp::PendingFlush(t) => Some(*t),
+        }
+    }
+}
+
+impl std::convert::From<Option<Timestamp>> for DirtyTimestamp {
+    fn from(value: Option<Timestamp>) -> Self {
+        if let Some(t) = value {
+            DirtyTimestamp::Some(t)
+        } else {
+            DirtyTimestamp::None
+        }
+    }
 }
 
 /// Returns the amount of space that should be reserved to be able to flush `page_count` pages.
@@ -140,6 +196,11 @@ impl Inner {
             reservation.forget_some(needed + self.spare - before);
         }
     }
+
+    fn end_flush(&mut self) {
+        self.dirty_mtime.end_flush();
+        self.dirty_crtime.end_flush();
+    }
 }
 
 impl PagedObjectHandle {
@@ -149,8 +210,8 @@ impl PagedObjectHandle {
             buffer: handle.owner().create_data_buffer(handle.object_id(), size),
             handle,
             inner: Mutex::new(Inner {
-                dirty_crtime: None,
-                dirty_mtime: None,
+                dirty_crtime: DirtyTimestamp::None,
+                dirty_mtime: DirtyTimestamp::None,
                 dirty_page_count: 0,
                 spare: 0,
             }),
@@ -399,11 +460,10 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    async fn flush_data<T: FnOnce(u64), U: FnOnce(())>(
+    async fn flush_data<T: FnOnce(u64)>(
         &self,
         reservation: &Reservation,
         mut reservation_guard: ScopeGuard<u64, T>,
-        timestamp_guard: ScopeGuard<(), U>,
         content_size: u64,
         previous_content_size: u64,
         crtime: Option<Timestamp>,
@@ -413,7 +473,6 @@ impl PagedObjectHandle {
         let pager = self.pager();
         let vmo = self.vmo();
 
-        let mut timestamp_guard = Some(timestamp_guard);
         let mut is_first_transaction = true;
         for batch in flush_batches {
             let mut transaction = self.new_transaction(Some(&reservation)).await?;
@@ -439,7 +498,7 @@ impl PagedObjectHandle {
             transaction.commit().await.context("Failed to commit transaction")?;
             *reservation_guard -= batch.page_count();
             if is_first_transaction {
-                dismiss_scopeguard(timestamp_guard.take().unwrap());
+                self.inner.lock().unwrap().end_flush();
             }
 
             batch.writeback_end(vmo, pager);
@@ -472,11 +531,11 @@ impl PagedObjectHandle {
         // `query_dirty_ranges` then we wouldn't be able to tell the difference between pages there
         // dirtied between those 2 operations and dirty pages that were made irrelevant by the
         // truncate.
-        let (mut mtime, crtime, (dirty_pages, reservation)) = {
+        let (mtime, crtime, (dirty_pages, reservation)) = {
             let mut inner = self.inner.lock().unwrap();
             (
-                inner.dirty_mtime.take(),
-                inner.dirty_crtime.take(),
+                inner.dirty_mtime.begin_flush(self.was_file_modified_since_last_call()?),
+                inner.dirty_crtime.begin_flush(false),
                 inner.take(self.allocator(), self.store().store_object_id()),
             )
         };
@@ -492,19 +551,6 @@ impl PagedObjectHandle {
             dirty_page_count: pages_to_flush,
             skipped_dirty_page_count: mut pages_not_flushed,
         } = self.collect_flush_batches(content_size)?;
-
-        if self.was_file_modified_since_last_call()? {
-            mtime = Some(Timestamp::now());
-        }
-        let timestamp_guard = scopeguard::guard((), |_| {
-            let mut inner = self.inner.lock().unwrap();
-            if inner.dirty_crtime.is_none() {
-                inner.dirty_crtime = crtime;
-            }
-            if inner.dirty_mtime.is_none() {
-                inner.dirty_mtime = mtime;
-            }
-        });
 
         // If pages were dirtied between getting the reservation and collecting the dirty ranges
         // then we might need to update the reservation.
@@ -543,12 +589,11 @@ impl PagedObjectHandle {
             )
             .await?;
             dismiss_scopeguard(reservation_guard);
-            dismiss_scopeguard(timestamp_guard);
+            self.inner.lock().unwrap().end_flush();
         } else {
             self.flush_data(
                 &reservation,
                 reservation_guard,
-                timestamp_guard,
                 content_size,
                 previous_content_size,
                 crtime,
@@ -579,39 +624,19 @@ impl PagedObjectHandle {
 
         let needs_trim = self.handle.shrink(&mut transaction, new_size).await?.0;
 
-        // Truncating a file updates the file's mtime. `was_file_modified_since_last_call` is
-        // called to clear the VMO modified stats so if the VMO was modified and there are no
-        // more modifications between this truncate and the next flush then the next flush won't
-        // also update the mtime.
-        //
-        // If the truncate transaction fails then a value needs to be picked to restore the
-        // mtime to. If the VMO was not in the modified state then the mtime should be restored
-        // to the previously cached mtime. If the VMO was in the modified state then we can't
-        // restore that bit but it indicates that the mtime should be updated anyways so the
-        // stored mtime is set to the current time.
-        let (old_mtime, crtime) = {
+        let (mtime, crtime) = {
             let mut inner = self.inner.lock().unwrap();
-            (inner.dirty_mtime.take(), inner.dirty_crtime.take())
+            (
+                inner.dirty_mtime.begin_flush(self.was_file_modified_since_last_call()?),
+                inner.dirty_crtime.begin_flush(false),
+            )
         };
-        let was_file_modified = self.was_file_modified_since_last_call()?;
-        let now = Some(Timestamp::now());
-        let restore_mtime = if was_file_modified { now } else { old_mtime };
-        let timestamp_guard = scopeguard::guard((), |_| {
-            let mut inner = self.inner.lock().unwrap();
-            if inner.dirty_crtime.is_none() {
-                inner.dirty_crtime = crtime;
-            }
-            if inner.dirty_mtime.is_none() {
-                inner.dirty_mtime = restore_mtime;
-            }
-        });
-
         self.handle
-            .write_timestamps(&mut transaction, crtime, now)
+            .write_timestamps(&mut transaction, crtime, mtime)
             .await
             .context("write_timestamps failed")?;
         transaction.commit().await.context("Failed to commit transaction")?;
-        dismiss_scopeguard(timestamp_guard);
+        self.inner.lock().unwrap().end_flush();
 
         if needs_trim {
             self.store().trim(self.object_id()).await?;
@@ -627,6 +652,7 @@ impl PagedObjectHandle {
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
+        // Resizing the buffer will trigger an mtime change.
         self.buffer.resize(new_size).await;
 
         // Shrinking a large fragmented file can use lots of metadata space which isn't accounted
@@ -657,13 +683,15 @@ impl PagedObjectHandle {
             return Ok(());
         }
         let mut inner = self.inner.lock().unwrap();
-        inner.dirty_crtime = crtime.or(inner.dirty_crtime);
+        if let Some(crtime) = crtime {
+            inner.dirty_crtime = DirtyTimestamp::Some(crtime);
+        }
         if let Some(mtime) = mtime {
             // Reset the VMO stats so modifications to the contents of the file between now and the
             // next flush can be detected. The next flush should contain the explicitly set mtime
             // unless the contents of the file are modified between now and the next flush.
             let _ = self.was_file_modified_since_last_call()?;
-            inner.dirty_mtime = Some(mtime);
+            inner.dirty_mtime = DirtyTimestamp::Some(mtime);
         }
         Ok(())
     }
@@ -672,13 +700,16 @@ impl PagedObjectHandle {
         let mut props = self.handle.get_properties().await?;
         let mut inner = self.inner.lock().unwrap();
         if self.was_file_modified_since_last_call()? {
-            inner.dirty_mtime = Some(Timestamp::now());
+            inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
         }
         props.allocated_size += inner.dirty_page_count * zx::system_get_page_size() as u64;
         props.data_attribute_size = self.buffer.size();
-        props.creation_time = inner.dirty_crtime.as_ref().unwrap_or(&props.creation_time).clone();
-        props.modification_time =
-            inner.dirty_mtime.as_ref().unwrap_or(&props.modification_time).clone();
+        if let Some(t) = inner.dirty_crtime.timestamp() {
+            props.creation_time = t;
+        }
+        if let Some(t) = inner.dirty_mtime.timestamp() {
+            props.modification_time = t;
+        }
         Ok(props)
     }
 }
