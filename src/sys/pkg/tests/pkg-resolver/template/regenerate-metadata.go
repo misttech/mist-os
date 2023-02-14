@@ -14,7 +14,8 @@ import (
 	"time"
 
 	tuf "github.com/theupdateframework/go-tuf"
-	"github.com/theupdateframework/go-tuf/sign"
+	tufData "github.com/theupdateframework/go-tuf/data"
+	tufKeys "github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 var expirationDate = time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -26,8 +27,8 @@ func loadKeys(repo *tuf.Repo, role string, path string) {
 	}
 
 	var persistedKeys struct {
-		Encrypted bool               `json:"encrypted"`
-		Data      []*sign.PrivateKey `json:"data"`
+		Encrypted bool                  `json:"encrypted"`
+		Data      []*tufData.PrivateKey `json:"data"`
 	}
 
 	if err := json.NewDecoder(f).Decode(&persistedKeys); err != nil {
@@ -35,7 +36,12 @@ func loadKeys(repo *tuf.Repo, role string, path string) {
 	}
 
 	for _, key := range persistedKeys.Data {
-		if err := repo.AddPrivateKeyWithExpires(role, key, expirationDate); err != nil {
+		signer, err := tufKeys.GetSigner(key)
+		if err != nil {
+			log.Fatalf("failed to load private key: %s", err)
+		}
+
+		if err := repo.AddPrivateKeyWithExpires(role, signer, expirationDate); err != nil {
 			log.Fatalf("failed to add private key: %s", err)
 		}
 	}
@@ -66,7 +72,7 @@ func main() {
 		log.Fatalf("failed to create targets: %s", err)
 	}
 
-	if err := repo.SnapshotWithExpires(tuf.CompressionTypeNone, expirationDate); err != nil {
+	if err := repo.SnapshotWithExpires(expirationDate); err != nil {
 		log.Fatalf("failed to create snapshot: %s", err)
 	}
 
