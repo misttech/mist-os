@@ -247,8 +247,7 @@ mod socket_tests {
         let cases = vec![vec![], b"0123456789abcde".to_vec(), vec![0u8; 4096]];
 
         for case in cases.iter() {
-            let (client_socket, server_socket) =
-                fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+            let (client_socket, server_socket) = fidl::Socket::create_stream();
             let mut output = vec![];
             let write_fut = async move {
                 let mut async_socket =

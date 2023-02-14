@@ -817,10 +817,8 @@ mod test {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
-        let (stdout_write, stdout_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
-        let (stderr_write, stderr_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (stdout_write, stdout_read) = fidl::Socket::create_stream();
+        let (stderr_write, stderr_read) = fidl::Socket::create_stream();
         let all_events = vec![
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),
@@ -904,10 +902,8 @@ mod test {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
-        let (stdout_write, stdout_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
-        let (stderr_write, stderr_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (stdout_write, stdout_read) = fidl::Socket::create_stream();
+        let (stderr_write, stderr_read) = fidl::Socket::create_stream();
         let all_events = vec![
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),
@@ -992,10 +988,8 @@ mod test {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
-        let (stdout_write, stdout_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
-        let (stderr_write, stderr_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (stdout_write, stdout_read) = fidl::Socket::create_stream();
+        let (stderr_write, stderr_read) = fidl::Socket::create_stream();
         let all_events = vec![
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),
@@ -1077,10 +1071,8 @@ mod test {
     #[fuchsia::test]
     async fn collect_suite_events_timed_out_case_with_hanging_artifacts() {
         // create sockets and leave the server end open to simulate a hang.
-        let (_stdout_write, stdout_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
-        let (_stderr_write, stderr_read) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let (_stdout_write, stdout_read) = fidl::Socket::create_stream();
+        let (_stderr_write, stderr_read) = fidl::Socket::create_stream();
         let all_events = vec![
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),

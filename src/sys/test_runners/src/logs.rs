@@ -45,8 +45,7 @@ pub enum LogError {
 /// It also wraps the socket into stream and returns it back.
 pub fn create_std_combined_log_stream(
 ) -> Result<(LoggerStream, zx::Handle, zx::Handle), LoggerError> {
-    let (client, log) =
-        zx::Socket::create(zx::SocketOpts::STREAM).map_err(LoggerError::CreateSocket)?;
+    let (client, log) = zx::Socket::create_stream();
 
     let stream = LoggerStream::new(client).map_err(LoggerError::InvalidSocket)?;
     let clone =
@@ -58,8 +57,7 @@ pub fn create_std_combined_log_stream(
 /// Creates a socket handle for stdout/stderr and hooks it to a file handle.
 /// It also wraps the socket into stream and returns it back.
 pub fn create_log_stream() -> Result<(LoggerStream, zx::Handle), LoggerError> {
-    let (client, log) =
-        zx::Socket::create(zx::SocketOpts::STREAM).map_err(LoggerError::CreateSocket)?;
+    let (client, log) = zx::Socket::create_stream();
 
     let stream = LoggerStream::new(client).map_err(LoggerError::InvalidSocket)?;
 
@@ -177,7 +175,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn log_writer_reader_work() {
-        let (sock1, sock2) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+        let (sock1, sock2) = zx::Socket::create_stream();
         let mut log_writer = SocketLogWriter::new(fasync::Socket::from_socket(sock1).unwrap());
 
         let reader = LoggerStream::new(sock2).unwrap();
@@ -282,8 +280,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn buffer_and_drain_return_error_if_stream_polls_err() -> Result<(), Error> {
-        let (tx, rx) =
-            zx::Socket::create(zx::SocketOpts::STREAM).context("Failed to create socket")?;
+        let (tx, rx) = zx::Socket::create_stream();
         // A closed socket should yield an error when stream is polled.
         let () = rx.half_close()?;
         let () = tx.half_close()?;
@@ -322,8 +319,7 @@ mod tests {
     }
 
     fn create_datagram_logger() -> Result<(SocketLogWriter, fasync::Socket), Error> {
-        let (tx, rx) =
-            zx::Socket::create(zx::SocketOpts::DATAGRAM).context("Failed to create zx::Socket")?;
+        let (tx, rx) = zx::Socket::create_datagram();
         let logger = SocketLogWriter::new(
             fasync::Socket::from_socket(tx).context("Failed to create fasync::Socket")?,
         );
@@ -332,8 +328,7 @@ mod tests {
     }
 
     fn create_logger_stream() -> Result<(LoggerStream, zx::Socket), Error> {
-        let (tx, rx) =
-            zx::Socket::create(zx::SocketOpts::STREAM).context("Failed to create socket")?;
+        let (tx, rx) = zx::Socket::create_stream();
         let stream = LoggerStream::new(rx).context("Failed to create LoggerStream")?;
         Ok((stream, tx))
     }

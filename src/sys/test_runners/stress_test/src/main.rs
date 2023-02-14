@@ -89,8 +89,7 @@ async fn serve_test_suite(mut stream: ftest::SuiteRequestStream, test: StressTes
                     let (case_listener, server_end) = create_proxy::<ftest::CaseListenerMarker>()?;
 
                     // TODO(84852): Use stderr to print status of actors
-                    let (stderr_client, stderr_server) =
-                        zx::Socket::create(zx::SocketOpts::DATAGRAM)?;
+                    let (stderr_client, stderr_server) = zx::Socket::create_datagram();
                     let std_handles = ftest::StdHandles {
                         out: None,
                         err: Some(stderr_server),

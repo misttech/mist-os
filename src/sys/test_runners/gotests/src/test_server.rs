@@ -207,10 +207,8 @@ impl TestServer {
         debug!("Running test {}", test);
         let user_passed_args = test_args.unwrap_or(vec![]);
 
-        let (test_stdout, stdout_client) =
-            zx::Socket::create(zx::SocketOpts::STREAM).map_err(KernelError::CreateSocket).unwrap();
-        let (test_stderr, stderr_client) =
-            zx::Socket::create(zx::SocketOpts::STREAM).map_err(KernelError::CreateSocket).unwrap();
+        let (test_stdout, stdout_client) = zx::Socket::create_stream();
+        let (test_stderr, stderr_client) = zx::Socket::create_stream();
 
         let (case_listener_proxy, listener) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
@@ -410,8 +408,7 @@ where
 {
     // TODO(fxbug.dev/58076): Golang binary fails if it is not provided with a stdin.
     // Provide it till the issue is fixed.
-    let (client, log) =
-        zx::Socket::create(zx::SocketOpts::STREAM).map_err(launch::LaunchError::CreateSocket)?;
+    let (client, log) = zx::Socket::create_stream();
     let mut handle_infos = vec![];
 
     const STDIN: u16 = 0;

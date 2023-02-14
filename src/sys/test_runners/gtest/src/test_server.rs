@@ -280,10 +280,8 @@ impl TestServer {
             args.push(test_flag!("also_run_disabled_tests").to_owned());
         }
 
-        let (test_stdout, stdout_client) =
-            zx::Socket::create(zx::SocketOpts::STREAM).map_err(KernelError::CreateSocket).unwrap();
-        let (test_stderr, stderr_client) =
-            zx::Socket::create(zx::SocketOpts::STREAM).map_err(KernelError::CreateSocket).unwrap();
+        let (test_stdout, stdout_client) = zx::Socket::create_stream();
+        let (test_stderr, stderr_client) = zx::Socket::create_stream();
 
         let (case_listener_proxy, listener) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
