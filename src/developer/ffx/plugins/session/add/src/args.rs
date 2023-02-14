@@ -29,6 +29,7 @@ pub struct SessionAddCommand {
     #[argh(switch)]
     pub interactive: bool,
 
+    // TODO(https://fxbug.dev/120691) delete
     /// arguments passed to the element
     #[argh(positional)]
     pub args: Vec<String>,

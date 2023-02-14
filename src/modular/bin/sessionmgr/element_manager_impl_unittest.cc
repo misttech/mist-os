@@ -57,60 +57,6 @@ TEST_F(ElementManagerImplTest, ProposeElementMissingUrl) {
   RunLoopUntil([&]() { return is_proposed; });
 }
 
-// Tests that ProposeElement returns ProposeElementError::INVALID_ARGS if ElementSpec specifies
-// |additional_services| without a valid |host_directory| channel.
-TEST_F(ElementManagerImplTest, ProposeElementAdditionalServicesMissingHostDirectory) {
-  static constexpr auto kElementComponentUrl =
-      "fuchsia-pkg://fuchsia.com/test_element#meta/test_element.cmx";
-
-  fuchsia::sys::ServiceList service_list;
-
-  fuchsia::element::Spec element_spec;
-  element_spec.set_component_url(kElementComponentUrl);
-  element_spec.set_additional_services(std::move(service_list));
-
-  bool is_proposed = false;
-  element_manager()->ProposeElement(std::move(element_spec), /*controller=*/nullptr,
-                                    [&](fuchsia::element::Manager_ProposeElement_Result result) {
-                                      EXPECT_TRUE(result.is_err());
-                                      EXPECT_EQ(fuchsia::element::ProposeElementError::INVALID_ARGS,
-                                                result.err());
-                                      is_proposed = true;
-                                    });
-
-  RunLoopUntil([&]() { return is_proposed; });
-}
-
-// Tests that ProposeElement returns ProposeElementError::INVALID_ARGS if ElementSpec specifies
-// |additional_services| with a |provider|.
-TEST_F(ElementManagerImplTest, ProposeElementAdditionalServicesWithProvider) {
-  static constexpr auto kElementComponentUrl =
-      "fuchsia-pkg://fuchsia.com/test_element#meta/test_element.cmx";
-
-  fuchsia::sys::ServiceProviderHandle service_provider;
-
-  // Bind |service_provider| to a valid channel.
-  auto service_provider_request = service_provider.NewRequest();
-
-  fuchsia::sys::ServiceList service_list;
-  service_list.provider = std::move(service_provider);
-
-  fuchsia::element::Spec element_spec;
-  element_spec.set_component_url(kElementComponentUrl);
-  element_spec.set_additional_services(std::move(service_list));
-
-  bool is_proposed = false;
-  element_manager()->ProposeElement(std::move(element_spec), /*controller=*/nullptr,
-                                    [&](fuchsia::element::Manager_ProposeElement_Result result) {
-                                      EXPECT_TRUE(result.is_err());
-                                      EXPECT_EQ(fuchsia::element::ProposeElementError::INVALID_ARGS,
-                                                result.err());
-                                      is_proposed = true;
-                                    });
-
-  RunLoopUntil([&]() { return is_proposed; });
-}
-
 // Tests that ProposeElement creates a story with a single mod.
 TEST_F(ElementManagerImplTest, ProposeElementCreatesStoryAndMod) {
   static constexpr auto kElementComponentUrl =

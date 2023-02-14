@@ -35,34 +35,12 @@ protocol Manager {
     /// ## Spec
     ///
     /// * `spec.component_url` is required
-    ///
-    /// If `spec.additional_services` is specified,
-    ///
-    /// * `spec.component_url` must point to a CFv1 component
-    ///   (`additional_services` is not supported for CFv2 components)
-    ///
-    /// * The [`fuchsia.sys/ServiceList.host_directory`] field in
-    ///   `spec.additional_services` must be set to a channel to a directory hosting
-    ///   the services ([`fuchsia.sys/ServiceList.provider`] is not supported
-    ///   and must be null)
-    ///
-    /// If `spec.arguments` is specified,
-    ///
-    /// * `spec.component_url` must point to a CFv1 component
-    ///   (`arguments` is not supported for CFv2 components)
-    ///
     /// + `spec` describes the element to add
     /// + `controller` can be used to observe and affect the lifecycle of the
     ///   element, and to set and get annotations on the element
-    /// * error `ProposeElementError.NOT_FOUND` if `spec.component_url` is missing or
-    ///   could not be resolved
-    /// * error `ProposeElementError.INVALID_ARGS`
-    ///   if `spec.additional_services`:
-    ///   - is specified for a CFv2 `spec.component_url`, or
-    ///   - does not have a valid [`fuchsia.sys/ServiceList.host_directory`], or
-    ///   - contains a non-null [`fuchsia.sys/ServiceList.provider`]
-    ///   if `spec.arguments`:
-    ///   - is specified for a CFv2 `spec.component_url`
+    /// * error `ProposeElementError.NOT_FOUND` if `spec.component_url` could not be resolved
+    /// * error `ProposeElementError.INVALID_ARGS` if a required field is not present or annotations
+    ///   are invalid
     ProposeElement(resource struct {
         spec Spec;
         controller server_end:<Controller, optional>;
@@ -77,11 +55,15 @@ type Spec = resource table {
     /// Initial annotations on the element. Required, but can be an empty vector.
     2: annotations Annotations;
 
-    /// A list of services passed to the Element. Optional.
+    @available(removed=12)
     3: additional_services fuchsia.sys.ServiceList;
+    @available(added=12)
+    3: reserved;
 
-    /// Arguments provided to the component. Optional.
+    @available(removed=12)
     4: arguments vector<string:MAX>:MAX;
+    @available(added=12)
+    4: reserved;
 };
 
 /// Errors that can be returned when attempting to add elements to a session.

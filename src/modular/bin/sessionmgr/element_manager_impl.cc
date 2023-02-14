@@ -56,16 +56,6 @@ void ElementManagerImpl::ProposeElement(
     return;
   }
 
-  // When |spec.additional_services| is provided, it must have a valid |host_directory| channel,
-  // and must not have a valid |provider|.
-  if (spec.has_additional_services() && (!spec.additional_services().host_directory.is_valid() ||
-                                         spec.additional_services().provider.is_valid())) {
-    fuchsia::element::Manager_ProposeElement_Result result;
-    result.set_err(fuchsia::element::ProposeElementError::INVALID_ARGS);
-    callback(std::move(result));
-    return;
-  }
-
   std::vector<fuchsia::modular::Annotation> annotations;
   if (spec.has_annotations()) {
     annotations = element::annotations::ToModularAnnotations(spec.annotations());
@@ -116,9 +106,6 @@ fuchsia::modular::ModuleData ElementManagerImpl::CreateElementModuleData(
   module_data.set_module_source(fuchsia::modular::ModuleSource::EXTERNAL);
   module_data.set_module_deleted(false);
   module_data.set_is_embedded(false);
-  if (spec.has_additional_services()) {
-    module_data.set_additional_services(std::move(*spec.mutable_additional_services()));
-  }
 
   fuchsia::modular::Intent intent;
   intent.handler = spec.component_url();

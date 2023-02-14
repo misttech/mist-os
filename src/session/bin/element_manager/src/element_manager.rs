@@ -20,7 +20,7 @@ use {
     },
     fidl::AsHandleRef,
     fidl_connector::Connect,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
     fidl_fuchsia_sys as fsys, fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
     fuchsia_component, fuchsia_scenic as scenic, fuchsia_zircon as zx,
@@ -43,35 +43,6 @@ static ELEMENT_MANAGER_NS: &'static str = "element_manager";
 /// Errors returned by calls to [`ElementManager`].
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum ElementManagerError {
-    /// Returned when the element manager fails to create an element with additional services for
-    /// the given ServiceList. This may be because:
-    ///   - `host_directory` is not set
-    ///   - `provider` is set
-    #[error("Element spec for \"{}/{}\" contains an invalid ServiceList", name, collection)]
-    InvalidServiceList { name: String, collection: String },
-
-    /// Returned when the element manager fails to create an element that uses a CFv2 component
-    /// because the spec provides a ServiceList with additional services.
-    ///
-    /// `Spec.additional_services` is only supported for CFv1 components.
-    #[error(
-        "Element spec for \"{}/{}\" provides additional_services for a CFv2 component",
-        name,
-        collection
-    )]
-    AdditionalServicesNotSupported { name: String, collection: String },
-
-    /// Returned when the element manager fails to create an element that uses a CFv2 component
-    /// because the spec contains arguments.
-    ///
-    /// `Spec.arguments` is only supported for CFv1 components.
-    #[error(
-        "Element spec for \"{}/{}\" provides arguments for a CFv2 component",
-        name,
-        collection
-    )]
-    ArgumentsNotSupported { name: String, collection: String },
-
     /// Returned when the element manager fails to created the component instance associated with
     /// a given element.
     #[error("Element {} not created at \"{}/{}\": {:?}", url, collection, name, err)]
@@ -94,33 +65,6 @@ pub enum ElementManagerError {
 }
 
 impl ElementManagerError {
-    pub fn invalid_service_list(
-        name: impl Into<String>,
-        collection: impl Into<String>,
-    ) -> ElementManagerError {
-        ElementManagerError::InvalidServiceList { name: name.into(), collection: collection.into() }
-    }
-
-    pub fn additional_services_not_supported(
-        name: impl Into<String>,
-        collection: impl Into<String>,
-    ) -> ElementManagerError {
-        ElementManagerError::AdditionalServicesNotSupported {
-            name: name.into(),
-            collection: collection.into(),
-        }
-    }
-
-    pub fn arguments_not_supported(
-        name: impl Into<String>,
-        collection: impl Into<String>,
-    ) -> ElementManagerError {
-        ElementManagerError::ArgumentsNotSupported {
-            name: name.into(),
-            collection: collection.into(),
-        }
-    }
-
     pub fn not_created(
         name: impl Into<String>,
         collection: impl Into<String>,
@@ -174,18 +118,6 @@ impl ElementManagerError {
 /// - `component_url`: The component url.
 fn is_v2_component(component_url: &str) -> bool {
     component_url.ends_with(".cm")
-}
-
-/// A list of services passed to an Element created from a CFv1 component.
-///
-/// This is a subset of fuchsia::sys::ServiceList that only supports a host
-/// directory, not a ServiceProvider.
-struct AdditionalServices {
-    /// List of service names.
-    pub names: Vec<String>,
-
-    /// A channel to the directory hosting the services in `names`.
-    pub host_directory: fidl::endpoints::ClientEnd<fio::DirectoryMarker>,
 }
 
 pub type GraphicalPresenterConnector =
@@ -257,10 +189,6 @@ impl ElementManager {
     ///
     /// # Parameters
     /// - `url`: The component URL of the element to add as a child.
-    /// - `additional_services`: Additional services to add the new component's namespace under /svc,
-    ///                          in addition to those coming from the environment. Only applicable
-    ///                          for legacy (v1) components.
-    /// - `arguments`: Arguments passed to the component. Only applicable for legacy (v1) components.
     /// - `child_name`: The name of the element, must be unique within a session. The name must be
     ///                 non-empty, of the form [a-z0-9-_.].
     ///
@@ -272,38 +200,12 @@ impl ElementManager {
     pub async fn launch_element(
         &self,
         url: String,
-        additional_services: Option<fidl_fuchsia_sys::ServiceList>,
-        arguments: Option<Vec<String>>,
         child_name: &str,
     ) -> Result<Element, ElementManagerError> {
-        let collection = self.collection_config.for_url(&url);
-
-        let additional_services =
-            additional_services.map_or(Ok(None), |services| match services {
-                fsys::ServiceList {
-                    names,
-                    host_directory: Some(service_host_directory),
-                    provider: None,
-                } => Ok(Some(AdditionalServices { names, host_directory: service_host_directory })),
-                _ => Err(ElementManagerError::invalid_service_list(child_name, collection)),
-            })?;
-
         let element = if is_v2_component(&url) {
-            // `additional_services` is only supported for CFv1 components.
-            if additional_services.is_some() {
-                return Err(ElementManagerError::additional_services_not_supported(
-                    child_name, collection,
-                ));
-            }
-
-            // `arguments` is only supported for CFv1 components.
-            if arguments.is_some() {
-                return Err(ElementManagerError::arguments_not_supported(child_name, collection));
-            }
-
             self.launch_v2_element(&child_name, &url).await?
         } else {
-            self.launch_v1_element(&url, additional_services, arguments).await?
+            self.launch_v1_element(&url).await?
         };
 
         Ok(element)
@@ -332,6 +234,7 @@ impl ElementManager {
         Ok(())
     }
 
+    // TODO(https://fxbug.dev/120691) delete
     /// Launches a CFv1 component as an element.
     ///
     /// `sys_launcher` must not be None.
@@ -348,22 +251,12 @@ impl ElementManager {
     ///
     /// # Returns
     /// An Element backed by the CFv1 component, or an error if the element could not be launched.
-    async fn launch_v1_element(
-        &self,
-        child_url: &str,
-        additional_services: Option<AdditionalServices>,
-        arguments: Option<Vec<String>>,
-    ) -> Result<Element, ElementManagerError> {
-        let mut launch_options = fuchsia_component::client::LaunchOptions::new();
-        if let Some(services) = additional_services {
-            launch_options.set_additional_services(services.names, services.host_directory);
-        }
-
+    async fn launch_v1_element(&self, child_url: &str) -> Result<Element, ElementManagerError> {
         let app = fuchsia_component::client::launch_with_options(
             &self.sys_launcher,
             child_url.to_string(),
-            arguments,
-            launch_options,
+            None,
+            fuchsia_component::client::LaunchOptions::new(),
         )
         .map_err(|err: Error| ElementManagerError::not_launched(child_url, err.to_string()))?;
 
@@ -537,10 +430,8 @@ impl ElementManager {
         let mut child_name = Alphanumeric.sample_string(&mut thread_rng(), 16);
         child_name.make_ascii_lowercase();
 
-        let mut element = self
-            .launch_element(component_url, spec.additional_services, spec.arguments, &child_name)
-            .await
-            .map_err(|err| match err {
+        let mut element =
+            self.launch_element(component_url, &child_name).await.map_err(|err| match err {
                 ElementManagerError::NotCreated { .. } => felement::ProposeElementError::NotFound,
                 err => {
                     error!(?err, "ProposeElement() failed to launch element");
@@ -818,8 +709,7 @@ mod tests {
 
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
+        let result = element_manager.launch_element(component_url.to_string(), child_name).await;
         let element = result.unwrap();
         assert!(format!("{:?}", element).contains(component_url));
 
@@ -881,173 +771,16 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
         assert!(element_manager
-            .launch_element(a_component_url.to_string(), None, None, a_child_name)
+            .launch_element(a_component_url.to_string(), a_child_name)
             .await
             .is_ok());
         assert!(element_manager
-            .launch_element(b_component_url.to_string(), None, None, b_child_name)
+            .launch_element(b_component_url.to_string(), b_child_name)
             .await
             .is_ok());
 
         // Verify that the CreateComponent was actually called.
         receiver.into_future().await;
-        assert_eq!(CREATE_COMPONENT_CALL_COUNT.get(), ELEMENT_COUNT);
-    }
-
-    /// Tests that launching an element with a *.cmx URL and `additional_services` ServiceList
-    /// passes the services to the component Launcher.
-    #[fuchsia::test]
-    async fn launch_v1_element_with_additional_services() {
-        lazy_static! {
-            static ref CREATE_COMPONENT_CALL_COUNT: Counter = Counter::new(0);
-        }
-
-        let component_url = "test_url.cmx";
-        let child_name = "child";
-
-        const ELEMENT_COUNT: usize = 1;
-
-        let realm = spawn_stream_handler(move |_realm_request| async move {
-            panic!("Realm should not receive any requests as it's only used for v2 components")
-        })
-        .unwrap();
-
-        // Spawn a directory server from which the element can connect to services.
-        let (directory_open_sender, directory_open_receiver) = channel::<String>(1);
-        let directory_request_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path: capability_path, .. } => {
-                let mut result_sender = directory_open_sender.clone();
-                fasync::Task::spawn(async move {
-                    let _ = result_sender.send(capability_path).await;
-                })
-                .detach()
-            }
-            _ => panic!("Directory handler received an unexpected request"),
-        };
-
-        let (dir_client, dir_server) = fidl::endpoints::create_endpoints().unwrap();
-        spawn_directory_server(dir_server, directory_request_handler.clone());
-
-        // The element receives the client side handle to the directory
-        // through `additional_services.host_directory`.
-        let service_name = "myService";
-        let additional_services = fsys::ServiceList {
-            names: vec![service_name.to_string()],
-            host_directory: Some(dir_client),
-            provider: None,
-        };
-
-        let (create_component_sender, create_component_receiver) = channel::<()>(ELEMENT_COUNT);
-        let launcher = spawn_stream_handler(move |launcher_request| {
-            let mut result_sender = create_component_sender.clone();
-            async move {
-                match launcher_request {
-                    fsys::LauncherRequest::CreateComponent {
-                        launch_info: fsys::LaunchInfo { url, additional_services, .. },
-                        ..
-                    } => {
-                        assert_eq!(url, component_url);
-
-                        assert!(additional_services.is_some());
-                        let services = additional_services.unwrap();
-                        assert!(services.host_directory.is_some());
-                        let host_directory = services.host_directory.unwrap();
-
-                        assert_eq!(vec![service_name.to_string()], services.names);
-
-                        // Connect to the service hosted in `additional_services.host_directory`.
-                        let (_client_channel, server_channel) = zx::Channel::create();
-                        fdio::service_connect_at(
-                            host_directory.channel(),
-                            service_name,
-                            server_channel,
-                        )
-                        .expect("could not connect to service");
-
-                        fasync::Task::spawn(async move {
-                            CREATE_COMPONENT_CALL_COUNT.inc();
-                            let _ = result_sender.send(()).await;
-                        })
-                        .detach()
-                    }
-                }
-            }
-        })
-        .unwrap();
-
-        let element_manager =
-            ElementManager::new(realm, None, launcher, example_collection_config(), false);
-        let result = element_manager
-            .launch_element(component_url.to_string(), Some(additional_services), None, child_name)
-            .await;
-        let element = result.unwrap();
-        assert!(format!("{:?}", element).contains(component_url));
-
-        // Verify that the CreateComponent was actually called.
-        create_component_receiver.into_future().await;
-        assert_eq!(CREATE_COMPONENT_CALL_COUNT.get(), ELEMENT_COUNT);
-
-        // Verify that the element opened a path in `host_directory` that matches the
-        // service name as a result of connecting to the service.
-        let open_paths = directory_open_receiver.take(1).collect::<Vec<_>>().await;
-        assert_eq!(vec![service_name], open_paths);
-    }
-
-    /// Tests that launching an element with a *.cmx URL and `arguments` passes the arguments
-    /// to the component Launcher.
-    #[fuchsia::test]
-    async fn launch_v1_element_with_arguments() {
-        lazy_static! {
-            static ref CREATE_COMPONENT_CALL_COUNT: Counter = Counter::new(0);
-            static ref TEST_ARGS: Vec<String> = vec!["hello".to_string(), "world".to_string()];
-        }
-
-        let component_url = "test_url.cmx";
-        let child_name = "child";
-
-        const ELEMENT_COUNT: usize = 1;
-
-        let realm = spawn_stream_handler(move |_realm_request| async move {
-            panic!("Realm should not receive any requests as it's only used for v2 components")
-        })
-        .unwrap();
-
-        let (create_component_sender, create_component_receiver) = channel::<()>(ELEMENT_COUNT);
-        let launcher = spawn_stream_handler(move |launcher_request| {
-            let mut result_sender = create_component_sender.clone();
-            async move {
-                match launcher_request {
-                    fsys::LauncherRequest::CreateComponent {
-                        launch_info: fsys::LaunchInfo { url, arguments, .. },
-                        ..
-                    } => {
-                        assert_eq!(url, component_url);
-
-                        assert!(arguments.is_some());
-                        assert_eq!(arguments.unwrap(), *TEST_ARGS);
-
-                        fasync::Task::spawn(async move {
-                            CREATE_COMPONENT_CALL_COUNT.inc();
-                            let _ = result_sender.send(()).await;
-                        })
-                        .detach()
-                    }
-                }
-            }
-        })
-        .unwrap();
-
-        let element_manager =
-            ElementManager::new(realm, None, launcher, example_collection_config(), false);
-
-        let result = element_manager
-            .launch_element(component_url.to_string(), None, Some(TEST_ARGS.clone()), child_name)
-            .await;
-        let element = result.unwrap();
-        assert!(format!("{:?}", element).contains(component_url));
-
-        // Verify that the CreateComponent was actually called.
-        create_component_receiver.into_future().await;
         assert_eq!(CREATE_COMPONENT_CALL_COUNT.get(), ELEMENT_COUNT);
     }
 
@@ -1105,8 +838,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
+        let result = element_manager.launch_element(component_url.to_string(), child_name).await;
         let element = result.unwrap();
 
         // Now use the element api to open a service in the element's outgoing dir. Verify
@@ -1169,8 +901,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
+        let result = element_manager.launch_element(component_url.to_string(), child_name).await;
         let element = result.unwrap();
 
         // Now use the element api to open a service in the element's outgoing dir. Verify
@@ -1215,115 +946,9 @@ mod tests {
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         assert!(element_manager
-            .launch_element(component_url.to_string(), None, None, child_name)
+            .launch_element(component_url.to_string(), child_name)
             .await
             .is_ok());
-    }
-
-    /// Tests that launching a CFv1 element with a ServiceList that specifies a `provider`
-    /// returns `ElementManagerError::InvalidServiceList`.
-    #[fuchsia::test]
-    async fn launch_v1_element_with_service_list_provider() {
-        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cmx";
-
-        let (channel, _) = fidl::Channel::create();
-        let provider = fidl::endpoints::ClientEnd::<fsys::ServiceProviderMarker>::new(channel);
-
-        // This ServiceList is invalid because it specifies a `provider` that is not None.
-        let additional_services = fsys::ServiceList {
-            names: vec!["fuchsia.service.Foo".to_string()],
-            host_directory: None,
-            provider: Some(provider),
-        };
-
-        let launcher = spawn_stream_handler(move |_launcher_request| async move {
-            panic!("Launcher should not receive any requests as the spec is invalid")
-        })
-        .unwrap();
-
-        let realm = spawn_stream_handler(move |_realm_request| async move {
-            panic!("Realm should not receive any requests since the child won't be created")
-        })
-        .unwrap();
-
-        let element_manager =
-            ElementManager::new(realm, None, launcher, example_collection_config(), false);
-
-        let result = element_manager
-            .launch_element(component_url.to_string(), Some(additional_services), None, "")
-            .await;
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            ElementManagerError::invalid_service_list("", "elements")
-        );
-    }
-
-    /// Tests that launching a *.cm element with a spec that contains `additional_services`
-    /// returns `ProposeElementError::AdditionalServicesNotSupported`
-    #[fuchsia::test]
-    async fn launch_v2_element_with_additional_services() {
-        // This is a CFv2 component URL. `additional_services` is only supported for v1 components.
-        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
-
-        let (channel, _) = fidl::endpoints::create_endpoints().unwrap();
-        let additional_services = fsys::ServiceList {
-            names: vec!["fuchsia.service.Foo".to_string()],
-            host_directory: Some(channel),
-            provider: None,
-        };
-
-        let launcher = spawn_stream_handler(move |_launcher_request| async move {
-            panic!("Launcher should not receive any requests as it's only used for v1 components")
-        })
-        .unwrap();
-
-        let realm = spawn_stream_handler(move |_realm_request| async move {
-            panic!("Realm should not receive any requests since the child won't be created")
-        })
-        .unwrap();
-        let element_manager =
-            ElementManager::new(realm, None, launcher, example_collection_config(), false);
-
-        let result = element_manager
-            .launch_element(component_url.to_string(), Some(additional_services), None, "")
-            .await;
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            ElementManagerError::additional_services_not_supported("", "elements")
-        );
-    }
-
-    /// Tests that launching a *.cm element with a spec that contains `arguments`
-    /// returns `ProposeElementError::ArgumentsNotSupported`
-    #[fuchsia::test]
-    async fn launch_v2_element_with_arguments() {
-        // This is a CFv2 component URL. `arguments` is only supported for v1 components.
-        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
-
-        let arguments = vec!["hello".to_string(), "world".to_string()];
-
-        let launcher = spawn_stream_handler(move |_launcher_request| async move {
-            panic!("Launcher should not receive any requests as it's only used for v1 components")
-        })
-        .unwrap();
-
-        let realm = spawn_stream_handler(move |_realm_request| async move {
-            panic!("Realm should not receive any requests since the child won't be created")
-        })
-        .unwrap();
-        let element_manager =
-            ElementManager::new(realm, None, launcher, example_collection_config(), false);
-
-        let result = element_manager
-            .launch_element(component_url.to_string(), None, Some(arguments), "")
-            .await;
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            ElementManagerError::arguments_not_supported("", "elements")
-        );
     }
 
     /// Tests that launching an element which is not successfully created in the realm returns an
@@ -1356,8 +981,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, "").await;
+        let result = element_manager.launch_element(component_url.to_string(), "").await;
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap(),
@@ -1400,8 +1024,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, "").await;
+        let result = element_manager.launch_element(component_url.to_string(), "").await;
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap(),
@@ -1450,8 +1073,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, "").await;
+        let result = element_manager.launch_element(component_url.to_string(), "").await;
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap(),
@@ -1497,10 +1119,7 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let element = element_manager
-            .launch_element(component_url.to_string(), None, None, "")
-            .await
-            .unwrap();
+        let element = element_manager.launch_element(component_url.to_string(), "").await.unwrap();
         let exposed_dir = element.directory_channel();
 
         // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.

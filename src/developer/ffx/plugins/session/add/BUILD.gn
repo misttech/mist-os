@@ -16,10 +16,7 @@ ffx_plugin("ffx_session_add") {
     "//third_party/rust_crates:signal-hook",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:lazy_static",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   args_sources = [ "src/args.rs" ]
 

@@ -24,8 +24,6 @@ pub async fn add_impl<W: std::io::Write>(
     writer: &mut W,
 ) -> Result<()> {
     writeln!(writer, "Add {} to the current session", &cmd.url)?;
-    let arguments = if cmd.args.is_empty() { None } else { Some(cmd.args) };
-
     let (controller_client, controller_server) = if cmd.interactive {
         let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>()
             .context("creating element controller")?;
@@ -37,7 +35,7 @@ pub async fn add_impl<W: std::io::Write>(
 
     manager_proxy
         .propose_element(
-            Spec { component_url: Some(cmd.url.to_string()), arguments, ..Spec::EMPTY },
+            Spec { component_url: Some(cmd.url.to_string()), ..Spec::EMPTY },
             controller_server,
         )
         .await?
@@ -65,7 +63,7 @@ fn spawn_ctrl_c_listener() -> impl Future<Output = ()> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_element::ManagerRequest, futures::poll, lazy_static::lazy_static};
+    use {super::*, fidl_fuchsia_element::ManagerRequest, futures::poll};
 
     #[fuchsia::test]
     async fn test_add_element() {
@@ -90,21 +88,16 @@ mod test {
     #[fuchsia::test]
     async fn test_add_element_args() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
-        lazy_static! {
-            static ref TEST_ARGS: Vec<String> = vec!["hello".to_string(), "world".to_string()];
-        }
 
         let proxy = setup_fake_manager_proxy(|req| match req {
-            ManagerRequest::ProposeElement { spec, responder, .. } => {
-                let arguments = spec.arguments.expect("spec does not have annotations field set");
-                assert_eq!(arguments, *TEST_ARGS);
+            ManagerRequest::ProposeElement { responder, .. } => {
                 let _ = responder.send(&mut Ok(()));
             }
         });
 
         let add_cmd = SessionAddCommand {
             url: TEST_ELEMENT_URL.to_string(),
-            args: TEST_ARGS.clone(),
+            args: vec![],
             interactive: false,
         };
         let response = add(proxy, add_cmd).await;
@@ -114,9 +107,6 @@ mod test {
     #[fuchsia::test]
     async fn test_add_interactive_element_stop_with_ctrl_c() {
         const TEST_ELEMENT_URL: &str = "Test Element Url";
-        lazy_static! {
-            static ref TEST_ARGS: Vec<String> = vec!["hello".to_string(), "world".to_string()];
-        }
 
         let proxy = setup_fake_manager_proxy(move |req| match req {
             ManagerRequest::ProposeElement { responder, .. } => {
@@ -126,7 +116,7 @@ mod test {
 
         let add_cmd = SessionAddCommand {
             url: TEST_ELEMENT_URL.to_string(),
-            args: TEST_ARGS.clone(),
+            args: vec![],
             interactive: true,
         };
         let (ctrl_c_sender, ctrl_c_receiver) = oneshot::channel();
