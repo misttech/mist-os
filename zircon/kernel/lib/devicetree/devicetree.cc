@@ -216,7 +216,7 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& 
   ByteView unprocessed = subtree;
 
   // The node name follows the begin token.
-  size_t name_end = unprocessed.find_first_of('\0');
+  size_t name_end = unprocessed.find_first_of(uint8_t{0});
   ZX_ASSERT_MSG(name_end != ByteView::npos, "unterminated node name");
   std::string_view name{reinterpret_cast<const char*>(unprocessed.data()), name_end};
   Node node{name};
