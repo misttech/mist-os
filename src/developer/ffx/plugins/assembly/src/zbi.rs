@@ -51,7 +51,7 @@ pub fn construct_zbi(
 
         // Specify how to launch pkgfs: bin/pkgsvr <base-merkle>
         // This is still needed even though pkgfs has been removed because pkg-cache and
-        // pkg-cache-resolver use it to obtain the base_package hash.
+        // base-resolver use it to obtain the base_package hash.
         zbi_builder
             .add_boot_arg(&format!("zircon.system.pkgfs.cmd=bin/pkgsvr+{}", &base_package.merkle));
     }

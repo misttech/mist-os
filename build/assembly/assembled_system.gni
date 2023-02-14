@@ -626,7 +626,7 @@ template("assembled_system") {
       bootfs_labels += [ ":${labels.fshost}" ]
     }
 
-    # Only builds with an FVM need base-resolver/pkg-cache-resolver.
+    # Only builds with an FVM need base-resolver.
     if (generate_fvm) {
       bootfs_labels += [ "//src/sys/base-resolver:bootfs" ]
     }

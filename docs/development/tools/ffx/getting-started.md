@@ -207,7 +207,6 @@ Exposed:
   /bootstrap/fshost/blobfs/decompressor
   /bootstrap/fshost/minfs
   /bootstrap/pkg-cache
-  /bootstrap/pkg_cache_resolver
   /bootstrap/power_manager
   ...
 ```
