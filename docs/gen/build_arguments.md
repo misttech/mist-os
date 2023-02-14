@@ -2682,13 +2682,14 @@ From //third_party/perfetto/gn/perfetto.gni:198
 
 ### enable_perfetto_grpc
 
-Enables gRPC support. This is used as the RPC framework for cloud trace
-processor in open source but is disabled by default because of how
-heavyweight gRPC is.
+Enables gRPC in the Perfetto codebase. gRPC significantly increases build
+times and the general footprint of Perfetto. As it only required for
+cloud trace processor and even then only to build the final ready-to-ship
+binary, don't enable this by default.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:314
+From //third_party/perfetto/gn/perfetto.gni:315
 
 ### enable_perfetto_heapprofd
 
@@ -2729,7 +2730,7 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:331
+From //third_party/perfetto/gn/perfetto.gni:332
 
 ### enable_perfetto_stderr_crash_dump
 
@@ -2789,7 +2790,7 @@ From //third_party/perfetto/gn/perfetto.gni:275
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:320
+From //third_party/perfetto/gn/perfetto.gni:321
 
 ### enable_perfetto_traced_perf
 
@@ -2815,7 +2816,7 @@ From //third_party/perfetto/gn/perfetto.gni:267
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:324
+From //third_party/perfetto/gn/perfetto.gni:325
 
 ### enable_perfetto_unittests
 
@@ -5589,7 +5590,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:338
+From //third_party/perfetto/gn/perfetto.gni:339
 
 ### perfetto_use_system_sqlite
 
@@ -5598,13 +5599,13 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:342
+From //third_party/perfetto/gn/perfetto.gni:343
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:344
+From //third_party/perfetto/gn/perfetto.gni:345
 
 ### perfetto_verbose_logs_enabled
 
@@ -7613,7 +7614,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:334
+From //third_party/perfetto/gn/perfetto.gni:335
 
 ### smp_max_cpus
 
