@@ -113,3 +113,82 @@ Pros:
 
 Con:
 * A bit more complex than Options 1 and 2.
+
+## Exhaustively Listing Test Expectations
+
+Test expectations provide a natural way of tracking progress over time, but
+the use of glob matchers makes it hard to quantify the number of tests that
+are expected to [pass|fail|skip].
+
+To mitigate this challenge, we provide `fx list_test_expectations`, a command
+line tool that makes it easy to exhaustively list expectations as applied
+to a set of cases.
+
+### Limitation
+
+This tool converts `ExpectFailureWithErrLogs` and `ExpectPassWithErrLogs`
+to `Skip` when listing expected outcomes.
+
+TODO(https://fxbug.dev/112878): Support listing expects with error logs.
+
+### Usage
+
+* Arguments - a list of `.json5` expectation files.
+* Stdin - a list of test cases to which the expectations should be applied.
+* Stdout - a CSV table to stdout where the first column is the test name
+           and the subsequent columns are the expectations encoded in each
+           provided expectation file.
+
+### Example
+
+```
+// test_cases.txt
+test1
+test2
+
+// always_passes.json5
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+    ],
+}
+
+// always_fails.json5
+{
+    actions: [
+        {
+            type: "expect_failure",
+            matchers: [
+                "*",
+            ],
+        },
+    ],
+}
+
+// test1_pass_test2_fail.json5
+{
+    actions: [
+        {
+            type: "expect_failure",
+            matchers: [
+                "test2",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                "test1",
+            ],
+        },
+    ],
+}
+
+$ fx list_test_expectations always_passes.json5 always_fails.json5 test1_pass_test2_fail.json5 < test_cases.txt
+test1,Pass,Fail,Pass
+test2,Pass,Fail,Fail
+```
