@@ -94,6 +94,7 @@ source_set("data_provider") {
   public_deps = [
     ":fidl_server",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//src/developer/forensics/feedback_data:data_provider",
     "//src/lib/fxl",
@@ -264,17 +265,17 @@ source_set("reboot_methods_watcher_register") {
   ]
 }
 
-source_set("scenic") {
+source_set("screenshot") {
   testonly = true
 
   sources = [
-    "scenic.cc",
-    "scenic.h",
+    "screenshot.cc",
+    "screenshot.h",
   ]
 
   public_deps = [
     ":fidl_server",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
   ]
 
   deps = [

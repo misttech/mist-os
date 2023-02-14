@@ -7,6 +7,7 @@
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/syslog/cpp/macros.h>
@@ -15,6 +16,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <deque>
 #include <memory>
 #include <optional>
 #include <set>
@@ -32,7 +34,7 @@
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
-#include "src/developer/forensics/testing/stubs/scenic.h"
+#include "src/developer/forensics/testing/stubs/screenshot.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/archive.h"
 #include "src/lib/fostr/fidl/fuchsia/math/formatting.h"
@@ -57,9 +59,6 @@ using testing::UnorderedElementsAreArray;
 const std::set<std::string> kDefaultAnnotations = {
     feedback::kBuildBoardKey, feedback::kBuildLatestCommitDateKey, feedback::kBuildProductKey,
     feedback::kBuildVersionKey, feedback::kDeviceBoardNameKey};
-
-constexpr bool kSuccess = true;
-constexpr bool kFailure = false;
 
 constexpr zx::duration kDefaultSnapshotFlowDuration = zx::usec(5);
 
@@ -169,10 +168,10 @@ class DataProviderTest : public UnitTestFixture {
         attachment_manager_.get(), inspect_data_budget_.get());
   }
 
-  void SetUpScenicServer(std::unique_ptr<stubs::ScenicBase> server) {
-    scenic_server_ = std::move(server);
-    if (scenic_server_) {
-      InjectServiceProvider(scenic_server_.get());
+  void SetUpScreenshotServer(std::unique_ptr<stubs::ScreenshotBase> server) {
+    screenshot_server_ = std::move(server);
+    if (screenshot_server_) {
+      InjectServiceProvider(screenshot_server_.get());
     }
   }
 
@@ -254,18 +253,18 @@ class DataProviderTest : public UnitTestFixture {
   std::unique_ptr<DataProvider> data_provider_;
 
  private:
-  std::unique_ptr<stubs::ScenicBase> scenic_server_;
+  std::unique_ptr<stubs::ScreenshotBase> screenshot_server_;
   std::unique_ptr<InspectNodeManager> inspect_node_manager_;
   std::unique_ptr<InspectDataBudget> inspect_data_budget_;
 };
 
-TEST_F(DataProviderTest, GetScreenshot_SucceedOnScenicReturningSuccess) {
+TEST_F(DataProviderTest, GetScreenshot_SucceedOnScreenshotReturningSuccess) {
   const size_t image_dim_in_px = 100;
-  std::vector<stubs::TakeScreenshotResponse> scenic_responses;
-  scenic_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px), kSuccess);
-  auto scenic = std::make_unique<stubs::Scenic>();
-  scenic->set_take_screenshot_responses(std::move(scenic_responses));
-  SetUpScenicServer(std::move(scenic));
+  std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
+  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px));
+  auto screenshot = std::make_unique<stubs::Screenshot>();
+  screenshot->set_responses(std::move(screenshot_responses));
+  SetUpScreenshotServer(std::move(screenshot));
   SetUpDataProvider();
 
   GetScreenshotResponse feedback_response = GetScreenshot();
@@ -286,31 +285,7 @@ TEST_F(DataProviderTest, GetScreenshot_SucceedOnScenicReturningSuccess) {
   EXPECT_EQ(actual_pixels, expected_pixels);
 }
 
-TEST_F(DataProviderTest, GetScreenshot_FailOnScenicNotAvailable) {
-  SetUpDataProvider();
-
-  GetScreenshotResponse feedback_response = GetScreenshot();
-  EXPECT_EQ(feedback_response.screenshot, nullptr);
-}
-
-TEST_F(DataProviderTest, GetScreenshot_FailOnScenicReturningFailure) {
-  std::vector<stubs::TakeScreenshotResponse> scenic_responses;
-  scenic_responses.emplace_back(stubs::CreateEmptyScreenshot(), kFailure);
-  auto scenic = std::make_unique<stubs::Scenic>();
-  scenic->set_take_screenshot_responses(std::move(scenic_responses));
-  SetUpScenicServer(std::move(scenic));
-  SetUpDataProvider();
-
-  GetScreenshotResponse feedback_response = GetScreenshot();
-  EXPECT_EQ(feedback_response.screenshot, nullptr);
-}
-
-TEST_F(DataProviderTest, GetScreenshot_FailOnScenicReturningNonBGRA8Screenshot) {
-  std::vector<stubs::TakeScreenshotResponse> scenic_responses;
-  scenic_responses.emplace_back(stubs::CreateNonBGRA8Screenshot(), kSuccess);
-  auto scenic = std::make_unique<stubs::Scenic>();
-  scenic->set_take_screenshot_responses(std::move(scenic_responses));
-  SetUpScenicServer(std::move(scenic));
+TEST_F(DataProviderTest, GetScreenshot_FailOnScreenshotNotAvailable) {
   SetUpDataProvider();
 
   GetScreenshotResponse feedback_response = GetScreenshot();
@@ -318,19 +293,18 @@ TEST_F(DataProviderTest, GetScreenshot_FailOnScenicReturningNonBGRA8Screenshot) 
 }
 
 TEST_F(DataProviderTest, GetScreenshot_ParallelRequests) {
-  // We simulate three calls to DataProvider::GetScreenshot(): one for which the stub Scenic
-  // will return a checkerboard 10x10, one for a 20x20 and one failure.
-  const size_t num_calls = 3u;
+  // We simulate two calls to DataProvider::GetScreenshot(): one for which the stub Screenshot
+  // will return a checkerboard 10x10, and one for a 20x20.
+  const size_t num_calls = 2u;
   const size_t image_dim_in_px_0 = 10u;
   const size_t image_dim_in_px_1 = 20u;
-  std::vector<stubs::TakeScreenshotResponse> scenic_responses;
-  scenic_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_0), kSuccess);
-  scenic_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_1), kSuccess);
-  scenic_responses.emplace_back(stubs::CreateEmptyScreenshot(), kFailure);
-  ASSERT_EQ(scenic_responses.size(), num_calls);
-  auto scenic = std::make_unique<stubs::Scenic>();
-  scenic->set_take_screenshot_responses(std::move(scenic_responses));
-  SetUpScenicServer(std::move(scenic));
+  std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
+  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_0));
+  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_1));
+  ASSERT_EQ(screenshot_responses.size(), num_calls);
+  auto screenshot = std::make_unique<stubs::Screenshot>();
+  screenshot->set_responses(std::move(screenshot_responses));
+  SetUpScreenshotServer(std::move(screenshot));
   SetUpDataProvider();
 
   std::vector<GetScreenshotResponse> feedback_responses;
@@ -344,18 +318,16 @@ TEST_F(DataProviderTest, GetScreenshot_ParallelRequests) {
   EXPECT_EQ(feedback_responses.size(), num_calls);
 
   // We cannot assume that the order of the DataProvider::GetScreenshot() calls match the order
-  // of the Scenic::TakeScreenshot() callbacks because of the async message loop. Thus we need to
+  // of the Screenshot::Take() callbacks because of the async message loop. Thus we need to
   // match them as sets.
   //
   // We set the expectations in advance and then pass a reference to the gMock matcher using
   // testing::ByRef() because the underlying VMO is not copyable.
   const GetScreenshotResponse expected_0 = {MakeUniqueScreenshot(image_dim_in_px_0)};
   const GetScreenshotResponse expected_1 = {MakeUniqueScreenshot(image_dim_in_px_1)};
-  const GetScreenshotResponse expected_2 = {nullptr};
   EXPECT_THAT(feedback_responses, testing::UnorderedElementsAreArray({
                                       MatchesGetScreenshotResponse(testing::ByRef(expected_0)),
                                       MatchesGetScreenshotResponse(testing::ByRef(expected_1)),
-                                      MatchesGetScreenshotResponse(testing::ByRef(expected_2)),
                                   }));
 
   // Additionally, we check that in the non-empty responses, the VMO is valid.

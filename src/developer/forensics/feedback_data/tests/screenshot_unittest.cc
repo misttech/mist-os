@@ -4,39 +4,36 @@
 
 #include "src/developer/forensics/feedback_data/screenshot.h"
 
-#include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 
+#include <deque>
 #include <memory>
-#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/testing/stubs/scenic.h"
+#include "src/developer/forensics/testing/stubs/screenshot.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 
 namespace forensics {
 namespace feedback_data {
 namespace {
 
-using fuchsia::ui::scenic::ScreenshotData;
 using testing::UnorderedElementsAreArray;
-
-constexpr bool kSuccess = true;
 
 class TakeScreenshotTest : public UnitTestFixture {
  public:
   TakeScreenshotTest() : executor_(dispatcher()) {}
 
  protected:
-  void SetUpScenicServer(std::unique_ptr<stubs::ScenicBase> server) {
-    scenic_server_ = std::move(server);
-    if (scenic_server_) {
-      InjectServiceProvider(scenic_server_.get());
+  void SetUpScreenshotServer(std::unique_ptr<stubs::ScreenshotBase> server) {
+    screenshot_server_ = std::move(server);
+    if (screenshot_server_) {
+      InjectServiceProvider(screenshot_server_.get());
     }
   }
 
@@ -55,36 +52,26 @@ class TakeScreenshotTest : public UnitTestFixture {
   bool did_timeout_ = false;
 
  private:
-  std::unique_ptr<stubs::ScenicBase> scenic_server_;
+  std::unique_ptr<stubs::ScreenshotBase> screenshot_server_;
 };
 
 TEST_F(TakeScreenshotTest, Succeed_CheckerboardScreenshot) {
   const size_t image_dim_in_px = 100;
-  std::vector<stubs::TakeScreenshotResponse> scenic_server_responses;
-  scenic_server_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px),
-                                       kSuccess);
-  std::unique_ptr<stubs::Scenic> scenic = std::make_unique<stubs::Scenic>();
-  scenic->set_take_screenshot_responses(std::move(scenic_server_responses));
-  SetUpScenicServer(std::move(scenic));
+  std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_server_responses;
+  screenshot_server_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px));
+  std::unique_ptr<stubs::Screenshot> server = std::make_unique<stubs::Screenshot>();
+  server->set_responses(std::move(screenshot_server_responses));
+  SetUpScreenshotServer(std::move(server));
 
   const auto result = TakeScreenshot();
 
   ASSERT_TRUE(result.is_ok());
   const auto& screenshot = result.value();
-  EXPECT_TRUE(screenshot.data.vmo.is_valid());
+  EXPECT_TRUE(screenshot.data.vmo().is_valid());
   EXPECT_EQ(static_cast<size_t>(screenshot.info.height), image_dim_in_px);
   EXPECT_EQ(static_cast<size_t>(screenshot.info.width), image_dim_in_px);
   EXPECT_EQ(screenshot.info.stride, image_dim_in_px * 4u);
   EXPECT_EQ(screenshot.info.pixel_format, fuchsia::images::PixelFormat::BGRA_8);
-}
-
-TEST_F(TakeScreenshotTest, Fail_ScenicReturningFalse) {
-  SetUpScenicServer(std::make_unique<stubs::ScenicAlwaysReturnsFalse>());
-
-  const auto result = TakeScreenshot();
-
-  ASSERT_TRUE(result.is_error());
-  EXPECT_EQ(result.error(), Error::kDefault);
 }
 
 }  // namespace

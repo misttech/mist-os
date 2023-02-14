@@ -5,7 +5,7 @@
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SCREENSHOT_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SCREENSHOT_H_
 
-#include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <fuchsia/images/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/promise.h>
 #include <lib/sys/cpp/service_directory.h>
@@ -14,13 +14,19 @@
 #include <memory>
 
 #include "src/developer/forensics/utils/errors.h"
+#include "src/lib/fsl/vmo/sized_vmo.h"
 
 namespace forensics::feedback_data {
 
-// Asks Scenic to take the screenshot of the current view and return it.
+struct ScreenshotData {
+  fsl::SizedVmo data;
+  fuchsia::images::ImageInfo info;
+};
+
+// Asks for a screenshot of the display's current contents and returns it.
 //
-// fuchsia.ui.scenic.Scenic is expected to be in |services|.
-::fpromise::promise<fuchsia::ui::scenic::ScreenshotData, Error> TakeScreenshot(
+// fuchsia.ui.composition.Screenshot is expected to be in |services|.
+::fpromise::promise<ScreenshotData, Error> TakeScreenshot(
     async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
     zx::duration timeout);
 

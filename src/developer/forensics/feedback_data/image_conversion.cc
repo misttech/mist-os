@@ -17,10 +17,9 @@ namespace forensics {
 namespace feedback_data {
 namespace {
 
-bool RawToPng(const png_structp png_ptr, const png_infop info_ptr,
-              const fuchsia::mem::Buffer& raw_image, const size_t height, const size_t width,
-              const size_t stride, const fuchsia::images::PixelFormat pixel_format,
-              fuchsia::mem::Buffer* png_image) {
+bool RawToPng(const png_structp png_ptr, const png_infop info_ptr, const std::vector<uint8_t>& raw,
+              const size_t height, const size_t width, const size_t stride,
+              const fuchsia::images::PixelFormat pixel_format, fuchsia::mem::Buffer* png_image) {
   // This is libpng obscure syntax for setting up the error handler.
   if (setjmp(png_jmpbuf(png_ptr))) {
     FX_LOGS(ERROR) << "Something went wrong in libpng";
@@ -33,22 +32,17 @@ bool RawToPng(const png_structp png_ptr, const png_infop info_ptr,
   }
   const int bit_depth = 8;
 
-  // Set the headers: output is 8-bit depth, RGBA format like the input.
+  // Set the headers: output is 8-bit depth, RGBA format.
   png_set_IHDR(png_ptr, info_ptr, (uint32_t)width, (uint32_t)height, bit_depth, PNG_COLOR_TYPE_RGBA,
                PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
-  std::vector<uint8_t> imgdata;
-  if (!fsl::VectorFromVmo(raw_image, &imgdata)) {
-    FX_LOGS(ERROR) << "Cannot extract data from raw image VMO";
-    return false;
-  }
-
   // Give libpng a pointer to each pixel at the beginning of each row.
-  std::vector<uint8_t*> rows(height);
+  std::vector<const uint8_t*> rows(height);
   for (size_t y = 0; y < height; ++y) {
-    rows[y] = imgdata.data() + y * stride;
+    rows[y] = raw.data() + y * stride;
   }
-  png_set_rows(png_ptr, info_ptr, rows.data());
+  // Data is const type this far, but not further.
+  png_set_rows(png_ptr, info_ptr, const_cast<uint8_t**>(rows.data()));
 
   // Tell libpng how to process each row? libpng is so obscure.
   std::vector<uint8_t> pixels;
@@ -61,6 +55,7 @@ bool RawToPng(const png_structp png_ptr, const png_infop info_ptr,
       NULL);
 
   // This is actually the blocking call. At the end, the info and image will be written to |pixels|.
+  // Note the swizzle flag, which instructs the library to read from BGRA data.
   png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_BGR, NULL);
 
   fsl::SizedVmo sized_vmo;
@@ -74,7 +69,7 @@ bool RawToPng(const png_structp png_ptr, const png_infop info_ptr,
 
 }  // namespace
 
-bool RawToPng(const fuchsia::mem::Buffer& raw_image, const size_t height, const size_t width,
+bool RawToPng(const std::vector<uint8_t>& raw, const size_t height, const size_t width,
               const size_t stride, const fuchsia::images::PixelFormat pixel_format,
               fuchsia::mem::Buffer* png_image) {
   png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -87,8 +82,7 @@ bool RawToPng(const fuchsia::mem::Buffer& raw_image, const size_t height, const 
     return false;
   }
 
-  bool success =
-      RawToPng(png_ptr, info_ptr, raw_image, height, width, stride, pixel_format, png_image);
+  bool success = RawToPng(png_ptr, info_ptr, raw, height, width, stride, pixel_format, png_image);
   png_destroy_write_struct(&png_ptr, &info_ptr);
   return success;
 }

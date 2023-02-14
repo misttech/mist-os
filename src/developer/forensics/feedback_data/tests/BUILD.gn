@@ -37,6 +37,7 @@ executable("data_provider_unittest_exe") {
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
     "//sdk/lib/fidl/cpp",
@@ -49,7 +50,7 @@ executable("data_provider_unittest_exe") {
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
     "//src/developer/forensics/testing/stubs:cobalt",
-    "//src/developer/forensics/testing/stubs:scenic",
+    "//src/developer/forensics/testing/stubs:screenshot",
     "//src/developer/forensics/utils:archive",
     "//src/lib/fostr/fidl/fuchsia.math",
     "//src/lib/fsl",
@@ -149,11 +150,11 @@ executable("screenshot_unittest_exe") {
   sources = [ "screenshot_unittest.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
+    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//src/developer/forensics/feedback_data:screenshot",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
-    "//src/developer/forensics/testing/stubs:scenic",
+    "//src/developer/forensics/testing/stubs:screenshot",
     "//src/lib/fxl",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",

@@ -5,7 +5,6 @@
 #include "src/developer/forensics/feedback_data/data_provider.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
@@ -17,6 +16,7 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/feedback/annotations/encode.h"
@@ -28,6 +28,7 @@
 #include "src/developer/forensics/utils/archive.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
+#include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/uuid/uuid.h"
 
@@ -246,16 +247,20 @@ void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback c
             cobalt_->LogOccurrence(cobalt::TimedOutData::kScreenshot);
             return ::fpromise::error();
           })
-          .and_then([encoding](fuchsia::ui::scenic::ScreenshotData& raw_screenshot)
-                        -> ::fpromise::result<Screenshot> {
+          .and_then([encoding](ScreenshotData& raw_screenshot) -> ::fpromise::result<Screenshot> {
             Screenshot screenshot;
             screenshot.dimensions_in_px.height = raw_screenshot.info.height;
             screenshot.dimensions_in_px.width = raw_screenshot.info.width;
             switch (encoding) {
               case ImageEncoding::PNG:
-                if (!RawToPng(raw_screenshot.data, raw_screenshot.info.height,
-                              raw_screenshot.info.width, raw_screenshot.info.stride,
-                              raw_screenshot.info.pixel_format, &screenshot.image)) {
+                std::vector<uint8_t> raw;
+                if (!fsl::VectorFromVmo(raw_screenshot.data, &raw)) {
+                  FX_LOGS(ERROR) << "Failed to read raw screenshot VMO";
+                  return ::fpromise::error();
+                }
+                if (!RawToPng(raw, raw_screenshot.info.height, raw_screenshot.info.width,
+                              raw_screenshot.info.stride, raw_screenshot.info.pixel_format,
+                              &screenshot.image)) {
                   FX_LOGS(ERROR) << "Failed to convert raw screenshot to PNG";
                   return ::fpromise::error();
                 }
@@ -270,7 +275,6 @@ void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback c
               callback(std::make_unique<Screenshot>(result.take_value()));
             }
           });
-
   executor_.schedule_task(std::move(promise));
 }
 

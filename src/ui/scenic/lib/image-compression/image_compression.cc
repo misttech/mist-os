@@ -104,7 +104,7 @@ void ImageCompression::EncodePng(EncodePngRequest& request, EncodePngCompleter::
 
   static constexpr int bit_depth = 8;
 
-  // Set the headers: output is 8-bit depth, RGBA format like the input.
+  // Set the headers: output is 8-bit depth, RGBA format.
   png_set_IHDR(png_ptr, info_ptr, (uint32_t)width, (uint32_t)height, bit_depth, PNG_COLOR_TYPE_RGBA,
                PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
@@ -134,6 +134,7 @@ void ImageCompression::EncodePng(EncodePngRequest& request, EncodePngCompleter::
       nullptr);
 
   // This is actually the blocking call. At the end, the info and image will be written to |pixels|.
+  // Note the swizzle flag, which instructs the library to read from BGRA data.
   png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_BGR, nullptr);
 
   // This may fail if the client does not allow resizing - but that's okay as it's not necessary.

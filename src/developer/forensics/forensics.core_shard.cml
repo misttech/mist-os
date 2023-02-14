@@ -126,7 +126,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.ui.scenic.Scenic",
+            protocol: "fuchsia.ui.composition.Screenshot",
             from: "#ui",
             to: "#feedback",
             dependency: "weak",
