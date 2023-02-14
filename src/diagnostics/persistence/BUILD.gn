@@ -97,6 +97,11 @@ core_shard("core_shard") {
   shard_file = "meta/diagnostics-persistence.core_shard.cml"
 }
 
+# TODO(fxbug.dev/120916) Remove once we finished adding the diagnostics sub-realm.
+core_shard("core_shard_new") {
+  shard_file = "meta/diagnostics-persistence.core_shard_new.cml"
+}
+
 group("tests") {
   testonly = true
   deps = [
