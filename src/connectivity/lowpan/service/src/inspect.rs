@@ -234,7 +234,7 @@ pub async fn watch_device_changes<
     loop {
         match lookup_stream.next().await {
             None => {
-                fx_log_debug!("LoWPAN device lookup stream finished");
+                debug!("LoWPAN device lookup stream finished");
                 break;
             }
             Some(Ok(devices)) => {
@@ -250,7 +250,7 @@ pub async fn watch_device_changes<
                     .map(|x| match x {
                         Ok(()) => {}
                         Err(err) => {
-                            fx_log_warn!("Failed to monitor LoWPAN device: {:?}", err);
+                            warn!("Failed to monitor LoWPAN device: {:?}", err);
                         }
                     });
 
@@ -267,7 +267,7 @@ pub async fn watch_device_changes<
                 }
             }
             Some(Err(e)) => {
-                fx_log_warn!("LoWPAN device lookup stream returned err: {} ", e);
+                warn!("LoWPAN device lookup stream returned err: {} ", e);
                 break;
             }
         }
@@ -527,7 +527,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         });
                     }
                     Err(e) => {
-                        fx_log_warn!("Error in logging counters. Error: {}", e);
+                        warn!("Error in logging counters. Error: {}", e);
                     }
                 };
                 Ok(inspector)
@@ -628,7 +628,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         }
                     }
                     Err(e) => {
-                        fx_log_warn!("Error in logging neighbors. Error: {}", e);
+                        warn!("Error in logging neighbors. Error: {}", e);
                     }
                 };
                 Ok(inspector)
@@ -945,7 +945,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         }
                     }
                     Err(e) => {
-                        fx_log_warn!("Error in logging telemetry. Error: {}", e);
+                        warn!("Error in logging telemetry. Error: {}", e);
                     }
                 };
                 Ok(inspector)
@@ -1007,7 +1007,7 @@ mod tests {
 
         let _res = watch_device_changes(inspect_tree.clone(), look_up.clone())
             .on_timeout(Time::after(fuchsia_zircon::Duration::from_seconds(5)), || {
-                fx_log_info!("test_watch_device_changes: watch_device_changes timed out");
+                info!("test_watch_device_changes: watch_device_changes timed out");
             })
             .await;
 

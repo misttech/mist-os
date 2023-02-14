@@ -4,8 +4,8 @@
 
 //! LoWPAN Service for Fuchsia
 
-pub mod inspect;
-pub mod service;
+mod inspect;
+mod service;
 
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_factory_lowpan::{FactoryLookupRequestStream, FactoryRegisterRequestStream};
@@ -13,7 +13,6 @@ use fidl_fuchsia_lowpan_driver::RegisterRequestStream;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::Inspector;
-use fuchsia_syslog::macros::*;
 use futures::prelude::*;
 use futures::task::{FutureObj, Spawn, SpawnError};
 use lowpan_driver_common::lowpan_fidl::*;
@@ -21,6 +20,9 @@ use lowpan_driver_common::ServeTo;
 use service::*;
 use std::default::Default;
 use std::sync::Arc;
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 enum IncomingService {
     DeviceWatcher(DeviceWatcherRequestStream),
@@ -55,12 +57,9 @@ impl Spawn for FuchsiaGlobalExecutor {
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main()]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["lowpan"]).context("initialize logging")?;
-    fuchsia_syslog::set_severity(fuchsia_syslog::levels::INFO);
-
-    fx_log_info!("LoWPAN Service starting up");
+    info!("LoWPAN Service starting up");
 
     let service = LowpanService::with_spawner(FuchsiaGlobalExecutor);
 
@@ -72,7 +71,7 @@ async fn main() -> Result<(), Error> {
     inspect_runtime::serve(&inspector, &mut fs)?;
     let inspect_tree = Arc::new(inspect::LowpanServiceTree::new(inspector));
     let inspect_fut = inspect::start_inspect_process(inspect_tree).map(|ret| {
-        fx_log_err!("Inspect process terminated: {:?}", ret);
+        error!("Inspect process terminated: {:?}", ret);
     });
 
     fs.dir("svc")
@@ -120,13 +119,13 @@ async fn main() -> Result<(), Error> {
             IncomingService::TelemetryProviderConnector(stream) => service.serve_to(stream).await,
             IncomingService::FeatureConnector(stream) => service.serve_to(stream).await,
         } {
-            fx_log_err!("{:?}", err);
+            error!("{:?}", err);
         }
     });
 
     futures::future::select(fut.boxed_local(), inspect_fut.boxed_local()).await;
 
-    fx_log_info!("LoWPAN Service shut down");
+    info!("LoWPAN Service shut down");
 
     Ok(())
 }

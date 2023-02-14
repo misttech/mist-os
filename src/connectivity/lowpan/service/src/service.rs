@@ -13,7 +13,6 @@ use fidl_fuchsia_factory_lowpan::{
 use fidl_fuchsia_lowpan_driver::{
     DriverMarker, DriverProxy, Protocols, RegisterRequest, RegisterRequestStream,
 };
-use fuchsia_syslog::macros::*;
 use futures::prelude::*;
 use futures::task::{Spawn, SpawnExt};
 use lowpan_driver_common::lowpan_fidl::{
@@ -84,7 +83,7 @@ impl<S: Spawn> LowpanService<S> {
         let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
 
         if !DEVICE_NAME_REGEX.is_match(name) {
-            fx_log_err!("Attempted to register LoWPAN device with invalid name {:?}", name);
+            error!("Attempted to register LoWPAN device with invalid name {:?}", name);
             return Err(ZxStatus::INVALID_ARGS);
         }
 
@@ -122,7 +121,7 @@ impl<S: Spawn> LowpanService<S> {
             .take_event_stream()
             .for_each(|_| futures::future::ready(()))
             .inspect(move |_: &()| {
-                fx_log_info!("Removing device {:?}", &name);
+                info!("Removing device {:?}", &name);
 
                 devices.lock().remove(&name);
                 devices_factory.lock().remove(&name);
@@ -154,13 +153,13 @@ macro_rules! impl_serve_to_driver {
                                     }),
                                     Err(err) => server_end.close_with_epitaph(err.into()),
                                 } {
-                                    fx_log_warn!("{:?}", err);
+                                    warn!("{:?}", err);
                                 }
                             }
                         }
                         Result::<(), anyhow::Error>::Ok(())
                     })
-                    .inspect_err(|e| fx_log_err!("{:?}", e))
+                    .inspect_err(|e| error!("{:?}", e))
                     .await
             }
         }
@@ -302,7 +301,7 @@ impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {
                 }
                 Result::<(), anyhow::Error>::Ok(())
             })
-            .inspect_err(|e| fx_log_err!("{:?}", e))
+            .inspect_err(|e| error!("{:?}", e))
             .await
     }
 }
@@ -316,7 +315,7 @@ impl<S: Spawn + Sync> ServeTo<RegisterRequestStream> for LowpanService<S> {
             .try_for_each_concurrent(MAX_CONCURRENT, |command| async {
                 match command {
                     RegisterRequest::RegisterDevice { name, driver, .. } => {
-                        fx_log_info!("Received register request for {:?}", name);
+                        info!("Received register request for {:?}", name);
 
                         if let Err(err) = self.register(&name, driver) {
                             control_handle.shutdown_with_epitaph(err);
@@ -325,7 +324,7 @@ impl<S: Spawn + Sync> ServeTo<RegisterRequestStream> for LowpanService<S> {
                 }
                 Result::<(), anyhow::Error>::Ok(())
             })
-            .inspect_err(|e| fx_log_err!("{:?}", e))
+            .inspect_err(|e| error!("{:?}", e))
             .await
     }
 }
@@ -351,7 +350,7 @@ mod factory {
             let driver = driver.into_proxy().map_err(|_| ZxStatus::INVALID_ARGS)?;
 
             if !DEVICE_NAME_REGEX.is_match(name) {
-                fx_log_err!("Attempted to register LoWPAN device with invalid name {:?}", name);
+                error!("Attempted to register LoWPAN device with invalid name {:?}", name);
                 return Err(ZxStatus::INVALID_ARGS);
             }
 
@@ -385,19 +384,19 @@ mod factory {
                 .try_for_each_concurrent(MAX_CONCURRENT, |command| async {
                     match command {
                         FactoryLookupRequest::Lookup { name, device_factory, .. } => {
-                            fx_log_info!("Received lookup factory request for {:?}", name);
+                            info!("Received lookup factory request for {:?}", name);
 
                             if let Err(err) = match self.lookup_factory(&name) {
                                 Ok(dev) => dev.get_factory_device(device_factory),
                                 Err(err) => device_factory.close_with_epitaph(err.into()),
                             } {
-                                fx_log_err!("{:?}", err);
+                                error!("{:?}", err);
                             }
                         }
                     }
                     Result::<(), anyhow::Error>::Ok(())
                 })
-                .inspect_err(|e| fx_log_err!("{:?}", e))
+                .inspect_err(|e| error!("{:?}", e))
                 .await
         }
     }
@@ -414,7 +413,7 @@ mod factory {
                 .try_for_each_concurrent(MAX_CONCURRENT, |command| async {
                     match command {
                         FactoryRegisterRequest::Register { name, driver, .. } => {
-                            fx_log_info!("Received register factory request for {:?}", name);
+                            info!("Received register factory request for {:?}", name);
 
                             if let Err(err) = self.register_factory(&name, driver) {
                                 control_handle.shutdown_with_epitaph(err);
@@ -423,7 +422,7 @@ mod factory {
                     }
                     Result::<(), anyhow::Error>::Ok(())
                 })
-                .inspect_err(|e| fx_log_err!("{:?}", e))
+                .inspect_err(|e| error!("{:?}", e))
                 .await
         }
     }

@@ -118,10 +118,10 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
         <F as TryFuture>::Ok: Send,
     {
         future
-            .inspect_err(|e| fx_log_err!("apply_standard_combinators: error is \"{:?}\"", e))
+            .inspect_err(|e| error!("apply_standard_combinators: error is \"{:?}\"", e))
             .map_err(|e| ZxStatus::from(ErrorAdapter(e)))
             .on_timeout(fasync::Time::after(DEFAULT_TIMEOUT), || {
-                fx_log_err!("Timeout");
+                error!("Timeout");
                 Err(ZxStatus::TIMED_OUT)
             })
     }

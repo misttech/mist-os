@@ -10,7 +10,6 @@ use fidl_fuchsia_lowpan_driver::{
     DriverMarker, DriverRequest, DriverRequestStream, RegisterProxyInterface,
 };
 use futures::future::join_all;
-use log::warn;
 
 /// Registers a driver instance with the given LoWPAN service and returns
 /// a future which services requests for the driver.
@@ -30,7 +29,7 @@ where
 
     driver.serve_to(server_ep.into_stream()?).await?;
 
-    fx_log_info!("LoWPAN Driver {:?} Stopped.", name);
+    info!("LoWPAN Driver {:?} Stopped.", name);
 
     Ok(())
 }
@@ -81,18 +80,18 @@ impl<T: Driver> ServeTo<DriverRequestStream> for T {
                                     if !legacy_joining_protocol_in_use_flag
                                         .swap(true, Ordering::Relaxed)
                                     {
-                                        fx_log_info!("Mutually exclusive thread_legacy_joining channel requested and vended.");
+                                        info!("Mutually exclusive thread_legacy_joining channel requested and vended.");
                                         let flag = legacy_joining_protocol_in_use_flag.clone();
                                         futures.push(
                                             self.serve_to(stream)
                                                 .inspect(move |_| {
-                                                    fx_log_info!("thread_legacy_joining channel released.");
+                                                    info!("thread_legacy_joining channel released.");
                                                     flag.store(false, Ordering::Relaxed)
                                                 })
                                                 .boxed(),
                                         );
                                     } else {
-                                        fx_log_warn!("Cannot vend thread_legacy_joining, one instance already outstanding.");
+                                        warn!("Cannot vend thread_legacy_joining, one instance already outstanding.");
                                     }
                                 }
                                 Err(err) => warn!("into_stream() failed: {:?}", err),
@@ -142,7 +141,7 @@ where
         })
         .await?;
 
-    fx_log_info!("LoWPAN FactoryDriver {:?} Stopped.", name);
+    info!("LoWPAN FactoryDriver {:?} Stopped.", name);
 
     Ok(())
 }

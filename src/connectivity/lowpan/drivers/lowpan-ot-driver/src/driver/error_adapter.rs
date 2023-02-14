@@ -4,10 +4,12 @@
 
 use crate::prelude::ot::Error;
 use fidl_fuchsia_net_stack_ext::NetstackError;
-use fuchsia_syslog::macros::*;
 use fuchsia_zircon_status::Status as ZxStatus;
 use openthread::ot;
 use std::fmt::Debug;
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 /// Used for wrapping around error types so that they can be
 /// converted to [`::fuchsia_zircon_status::Status`] values
@@ -34,7 +36,7 @@ impl From<ErrorAdapter<anyhow::Error>> for ZxStatus {
         } else if let Some(err) = err.0.downcast_ref::<ot::Error>() {
             ZxStatus::from(*err)
         } else {
-            fx_log_err!("Unhandled error when casting to ZxStatus: {:?}", err);
+            error!("Unhandled error when casting to ZxStatus: {:?}", err);
             ZxStatus::INTERNAL
         }
     }

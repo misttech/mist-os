@@ -41,7 +41,7 @@ where
         let tasklets_stream = self
             .driver_state
             .tasklets_stream()
-            .inspect(|_| fx_log_trace!("Tasklets did run"))
+            .inspect(|_| trace!("Tasklets did run"))
             .map(Result::Ok)
             .chain(futures::future::ready(Err(anyhow::Error::from(ResetRequested))).into_stream());
 
@@ -63,16 +63,13 @@ where
                     .map(|x| match x {
                         Ok(region) => Some((Result::<_, Error>::Ok(region), Ok(watcher))),
                         Err(err) => {
-                            fx_log_warn!(
-                                "Unable to get RegulatoryRegionWatcher instance: {:?}",
-                                err
-                            );
+                            warn!("Unable to get RegulatoryRegionWatcher instance: {:?}", err);
                             None
                         }
                     })
                     .boxed(),
                 Err(err) => {
-                    fx_log_warn!("Unable to get RegulatoryRegionWatcher instance: {:?}", err);
+                    warn!("Unable to get RegulatoryRegionWatcher instance: {:?}", err);
                     futures::future::ready(None).boxed()
                 }
             },
@@ -81,7 +78,7 @@ where
         .map(|x| {
             // We just log errors and continue for now.
             if let Err(e) = x {
-                fx_log_warn!("regulatory_region_stream: Error: {:?}", e);
+                warn!("regulatory_region_stream: Error: {:?}", e);
             }
             Result::<_, Error>::Ok(())
         });
@@ -271,9 +268,9 @@ where
 
     /// A single iteration of the main task loop
     async fn state_machine_single(&self) -> Result<(), Error> {
-        fx_log_info!("main_task");
+        info!("main_task");
         if self.get_connectivity_state().is_active_and_ready() {
-            fx_log_info!("main_task: Initialized, active, and ready");
+            info!("main_task: Initialized, active, and ready");
 
             // Exit criteria is when we are no longer active nor ready.
             // When this future terminates, we are no longer online.
@@ -290,7 +287,7 @@ where
                 .map_err(|x| x.context("online_task"))
                 .await?;
 
-            fx_log_info!("main_task: online_task terminated");
+            info!("main_task: online_task terminated");
 
             self.online_task_cleanup()
                 .boxed()
@@ -299,7 +296,7 @@ where
         } else if self.get_connectivity_state().is_commissioning() {
             self.wait_for_state(|x| !x.is_commissioning()).await;
         } else {
-            fx_log_info!("main_task: Initialized, but either not active or not ready.");
+            info!("main_task: Initialized, but either not active or not ready.");
 
             // Exit criteria is when we are no longer active nor ready.
             // When this future terminates, we are no longer offline.
@@ -316,7 +313,7 @@ where
                 .map_err(|x| x.context("offline_task"))
                 .await?;
 
-            fx_log_info!("main_task: offline_task terminated");
+            info!("main_task: offline_task terminated");
         }
         Ok(())
     }
@@ -328,7 +325,7 @@ where
     ///
     /// The resulting future may be terminated at any time.
     async fn online_task(&self) -> Result<(), Error> {
-        fx_log_info!("online_loop: Entered");
+        info!("online_loop: Entered");
 
         {
             let driver_state = self.driver_state.lock();
@@ -340,7 +337,7 @@ where
             driver_state.ot_instance.thread_set_enabled(true).context("thread_set_enabled")?;
         }
 
-        fx_log_info!("online_loop: Waiting for us to become online. . .");
+        info!("online_loop: Waiting for us to become online. . .");
 
         self.wait_for_state(|x| x.connectivity_state != ConnectivityState::Attaching)
             .on_timeout(std::time::Duration::from_secs(10), || ())
@@ -370,7 +367,7 @@ where
             // Mark the network interface as online.
             self.net_if.set_online(true).await.context("Marking network interface as online")?;
 
-            fx_log_info!("online_loop: We are online, starting outbound packet pump");
+            info!("online_loop: We are online, starting outbound packet pump");
 
             // The pump that pulls outbound data from netstack to the NCP.
             let outbound_packet_pump = self
@@ -402,7 +399,7 @@ where
     ///
     /// The resulting future may be terminated at any time.
     async fn offline_task(&self) -> Result<(), Error> {
-        fx_log_info!("offline_loop: Entered");
+        info!("offline_loop: Entered");
 
         self.net_if
             .set_online(false)
@@ -419,7 +416,7 @@ where
             driver_state.ot_instance.ip6_set_enabled(false).context("ip6_set_enabled")?;
         } // Driver state lock goes out of scope here
 
-        fx_log_info!("offline_loop: Waiting");
+        info!("offline_loop: Waiting");
 
         #[allow(clippy::unit_arg)]
         Ok(futures::future::pending().await)

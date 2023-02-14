@@ -20,33 +20,33 @@ pub struct DummyDevice {}
 #[async_trait::async_trait]
 impl Driver for DummyDevice {
     async fn provision_network(&self, params: ProvisioningParams) -> ZxResult<()> {
-        fx_log_info!("Got provision command: {:?}", params);
+        info!("Got provision command: {:?}", params);
         Ok(())
     }
 
     async fn leave_network(&self) -> ZxResult<()> {
-        fx_log_info!("Got leave command");
+        info!("Got leave command");
         Ok(())
     }
 
     async fn reset(&self) -> ZxResult<()> {
-        fx_log_info!("Got reset command");
+        info!("Got reset command");
         Ok(())
     }
 
     async fn set_active(&self, active: bool) -> ZxResult<()> {
-        fx_log_info!("Got set active command: {:?}", active);
+        info!("Got set active command: {:?}", active);
         Ok(())
     }
 
     async fn get_supported_network_types(&self) -> ZxResult<Vec<String>> {
-        fx_log_info!("Got get_supported_network_types command");
+        info!("Got get_supported_network_types command");
 
         Ok(vec!["network_type_0".to_string(), "network_type_1".to_string()])
     }
 
     async fn get_supported_channels(&self) -> ZxResult<Vec<ChannelInfo>> {
-        fx_log_info!("Got get_supported_channels command");
+        info!("Got get_supported_channels command");
         let channel_info = ChannelInfo {
             id: Some("id".to_string()),
             index: Some(20),
@@ -63,7 +63,7 @@ impl Driver for DummyDevice {
         &self,
         params: ProvisioningParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        fx_log_info!("Got form command: {:?}", params);
+        info!("Got form command: {:?}", params);
 
         futures::stream::empty()
             .chain(ready(Ok(Ok(ProvisioningProgress::Progress(0.4)))).into_stream())
@@ -76,7 +76,7 @@ impl Driver for DummyDevice {
         &self,
         params: JoinParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        fx_log_info!("Got join command: {:?}", params);
+        info!("Got join command: {:?}", params);
 
         futures::stream::empty()
             .chain(ready(Ok(Ok(ProvisioningProgress::Progress(0.5)))).into_stream())
@@ -96,7 +96,7 @@ impl Driver for DummyDevice {
     }
 
     async fn get_credential(&self) -> ZxResult<Option<Credential>> {
-        fx_log_info!("Got get credential command");
+        info!("Got get credential command");
 
         let res: Vec<u8> = hex::decode("000102030405060708090a0b0c0d0f")
             .map_err(|_| zx_status::Status::INTERNAL)?
@@ -106,13 +106,13 @@ impl Driver for DummyDevice {
     }
 
     async fn get_factory_mac_address(&self) -> ZxResult<MacAddress> {
-        fx_log_info!("Got get_factory_mac_address command");
+        info!("Got get_factory_mac_address command");
 
         Ok(MacAddress { octets: [0, 1, 2, 3, 4, 5, 6, 7] })
     }
 
     async fn get_current_mac_address(&self) -> ZxResult<MacAddress> {
-        fx_log_info!("Got get_current_mac_address command");
+        info!("Got get_current_mac_address command");
 
         Ok(MacAddress { octets: [0, 1, 2, 3, 4, 5, 6, 7] })
     }
@@ -247,18 +247,18 @@ impl Driver for DummyDevice {
     }
 
     async fn get_ncp_version(&self) -> ZxResult<String> {
-        fx_log_info!("Got get_ncp_version command");
+        info!("Got get_ncp_version command");
         Ok("LowpanDummyDriver/0.0".to_string())
     }
 
     async fn get_current_channel(&self) -> ZxResult<u16> {
-        fx_log_info!("Got get_current_channel command");
+        info!("Got get_current_channel command");
 
         Ok(1)
     }
 
     async fn get_current_rssi(&self) -> ZxResult<i8> {
-        fx_log_info!("Got get_current_rssi command");
+        info!("Got get_current_rssi command");
 
         Ok(0)
     }
@@ -288,31 +288,31 @@ impl Driver for DummyDevice {
     }
 
     async fn get_partition_id(&self) -> ZxResult<u32> {
-        fx_log_info!("Got get_partition_id command");
+        info!("Got get_partition_id command");
 
         Ok(0)
     }
 
     async fn get_thread_rloc16(&self) -> ZxResult<u16> {
-        fx_log_info!("Got get_thread_rloc16 command");
+        info!("Got get_thread_rloc16 command");
 
         Ok(0xffff)
     }
 
     async fn get_thread_router_id(&self) -> ZxResult<u8> {
-        fx_log_info!("Got get_thread_router_id command");
+        info!("Got get_thread_router_id command");
 
         Ok(0)
     }
 
     async fn send_mfg_command(&self, command: &str) -> ZxResult<String> {
-        fx_log_info!("Got send_mfg_command command: {:?}", command);
+        info!("Got send_mfg_command command: {:?}", command);
 
         Ok("error: The dummy driver currently has no manufacturing commands.".to_string())
     }
 
     async fn setup_ot_cli(&self, _server_socket: fidl::Socket) -> ZxResult<()> {
-        fx_log_info!("Got setup_ot_cli request");
+        info!("Got setup_ot_cli request");
 
         Ok(())
     }

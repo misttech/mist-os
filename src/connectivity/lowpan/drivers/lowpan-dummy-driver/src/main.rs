@@ -9,12 +9,14 @@ use fidl_fuchsia_factory_lowpan::{FactoryRegisterMarker, FactoryRegisterProxyInt
 use fidl_fuchsia_lowpan_driver::{RegisterMarker, RegisterProxyInterface};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_syslog::macros::*;
 use futures::prelude::*;
 use lowpan_driver_common::{
     register_and_serve_driver, register_and_serve_driver_factory, DummyDevice,
 };
 use std::default::Default;
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 async fn run_driver<N, RP, RFP>(
     name: N,
@@ -32,18 +34,14 @@ where
 
     let lowpan_device_task = register_and_serve_driver(name, registry, driver_ref).boxed_local();
 
-    fx_log_info!("Registered Dummy LoWPAN device {:?}", name);
+    info!("Registered Dummy LoWPAN device {:?}", name);
 
     let lowpan_device_factory_task = async move {
         if let Some(factory_registry) = factory_registry {
             if let Err(err) =
                 register_and_serve_driver_factory(name, factory_registry, driver_ref).await
             {
-                fx_log_warn!(
-                    "Unable to register and serve factory commands for {:?}: {:?}",
-                    name,
-                    err
-                );
+                warn!("Unable to register and serve factory commands for {:?}: {:?}", name, err);
             }
         }
 
@@ -64,7 +62,7 @@ where
         _ = lowpan_device_factory_task.fuse() => unreachable!(),
     })?;
 
-    fx_log_info!("Dummy LoWPAN device {:?} has shutdown.", name);
+    info!("Dummy LoWPAN device {:?} has shutdown.", name);
 
     Ok(())
 }
@@ -77,7 +75,7 @@ async fn main() -> Result<(), Error> {
 
     let device = DummyDevice::default();
 
-    fx_log_info!("Connecting to LoWPAN service");
+    info!("Connecting to LoWPAN service");
 
     run_driver(
         name,
@@ -86,6 +84,6 @@ async fn main() -> Result<(), Error> {
         connect_to_protocol::<FactoryRegisterMarker>().ok(),
         device,
     )
-    .inspect(|_| fx_log_info!("Dummy LoWPAN device {:?} has shutdown.", name))
+    .inspect(|_| info!("Dummy LoWPAN device {:?} has shutdown.", name))
     .await
 }

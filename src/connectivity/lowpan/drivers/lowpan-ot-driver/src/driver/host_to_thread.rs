@@ -27,7 +27,7 @@ where
     BI: BackboneInterface,
 {
     pub(crate) async fn on_regulatory_region_changed(&self, region: String) -> Result<(), Error> {
-        fx_log_info!("Got region code {:?}", region);
+        info!("Got region code {:?}", region);
 
         Ok(self.driver_state.lock().ot_instance.set_region(region.try_into()?)?)
     }
@@ -81,7 +81,7 @@ where
         if let Err(err) =
             driver_state.ot_instance.ip6_join_multicast_group(&group).ignore_already_exists()
         {
-            fx_log_warn!("Unable to join multicast group {} on OpenThread: {:?}", group, err);
+            warn!("Unable to join multicast group {} on OpenThread: {:?}", group, err);
         }
 
         Ok(())
@@ -99,14 +99,14 @@ where
             .ignore_already_exists()
             .ignore_not_found()
         {
-            fx_log_warn!("Unable to leave multicast group {} on OpenThread: {:?}", group, err);
+            warn!("Unable to leave multicast group {} on OpenThread: {:?}", group, err);
         }
 
         Ok(())
     }
 
     pub(crate) async fn on_netstack_added_address(&self, subnet: Subnet) -> Result<(), Error> {
-        fx_log_debug!("Netstack added address: {:?}", subnet);
+        debug!("Netstack added address: {:?}", subnet);
 
         let should_skip = {
             let driver_state = self.driver_state.lock();
@@ -129,7 +129,7 @@ where
                 .ip6_add_unicast_address(&netif_addr)
                 .ignore_already_exists()
                 .or_else(move |err| {
-                    fx_log_warn!(
+                    warn!(
                         "OpenThread refused to add unicast address {:?}, will remove from netstack. (Error: {:?})",
                         netif_addr,
                         err
@@ -143,7 +143,7 @@ where
     }
 
     pub(crate) async fn on_netstack_removed_address(&self, subnet: Subnet) -> Result<(), Error> {
-        fx_log_debug!("Netstack removed address: {:?}", subnet);
+        debug!("Netstack removed address: {:?}", subnet);
 
         let driver_state = self.driver_state.lock();
 
@@ -159,7 +159,7 @@ where
     }
 
     pub(crate) async fn on_netstack_added_route(&self, subnet: Subnet) -> Result<(), Error> {
-        fx_log_debug!("Netstack added route: {:?} (ignored)", subnet);
+        debug!("Netstack added route: {:?} (ignored)", subnet);
 
         let erc = ot::ExternalRouteConfig::from_prefix(ot::Ip6Prefix::new(
             subnet.addr,
@@ -176,7 +176,7 @@ where
     }
 
     pub(crate) async fn on_netstack_removed_route(&self, subnet: Subnet) -> Result<(), Error> {
-        fx_log_debug!("Netstack removed route: {:?}", subnet);
+        debug!("Netstack removed route: {:?}", subnet);
 
         let driver_state = self.driver_state.lock();
 
@@ -189,30 +189,27 @@ where
 
     async fn on_netstack_packet_for_thread(&self, packet: Vec<u8>) -> Result<(), Error> {
         if !self.intercept_from_host(packet.as_slice()).await {
-            fx_log_trace!("Outbound packet handled internally, dropping.");
+            trace!("Outbound packet handled internally, dropping.");
             return Ok(());
         }
 
         let driver_state = self.driver_state.lock();
 
         if driver_state.ot_instance.is_active_scan_in_progress() {
-            fx_log_info!("OpenThread Send Failed: Active scan in progress.");
+            info!("OpenThread Send Failed: Active scan in progress.");
         } else if driver_state.ot_instance.is_energy_scan_in_progress() {
-            fx_log_info!("OpenThread Send Failed: Energy scan in progress.");
+            info!("OpenThread Send Failed: Energy scan in progress.");
         } else if let Err(err) = driver_state.ot_instance.ip6_send_data(packet.as_slice()) {
             match err {
                 ot::Error::MessageDropped => {
-                    fx_log_info!("OpenThread dropped a packet due to packet processing rules.");
+                    info!("OpenThread dropped a packet due to packet processing rules.");
                 }
                 ot::Error::NoRoute => {
-                    fx_log_info!("OpenThread dropped a packet because there was no route to host.");
+                    info!("OpenThread dropped a packet because there was no route to host.");
                 }
                 x => {
-                    fx_log_warn!("Send packet to OpenThread failed: \"{:?}\"", x);
-                    fx_log_debug!(
-                        "Message Buffer Info: {:?}",
-                        driver_state.ot_instance.get_buffer_info()
-                    );
+                    warn!("Send packet to OpenThread failed: \"{:?}\"", x);
+                    debug!("Message Buffer Info: {:?}", driver_state.ot_instance.get_buffer_info());
                 }
             }
         }

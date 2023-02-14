@@ -10,7 +10,6 @@ use anyhow::Error;
 use core::future::ready;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use log::warn;
 
 /// Trait for implementing a LoWPAN Device Driver.
 #[async_trait]
@@ -446,7 +445,7 @@ impl<T: Driver> ServeTo<DeviceRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceRequestStream: {:?}", err);
+                error!("Error serving DeviceRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -513,7 +512,7 @@ impl<T: Driver> ServeTo<DeviceExtraRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceExtraRequestStream: {:?}", err);
+                error!("Error serving DeviceExtraRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -556,7 +555,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving ExperimentalDeviceRequestStream: {:?}", err);
+                error!("Error serving ExperimentalDeviceRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -615,7 +614,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                             // These errors only affect the provisioning session, so
                             // we only report them to the logs rather than passing
                             // them up.
-                            fx_log_err!("Error during DeviceExtraRequest::JoinNetwork: {:?}", err);
+                            error!("Error during DeviceExtraRequest::JoinNetwork: {:?}", err);
                         }
                     }
                     ExperimentalDeviceExtraRequest::FormNetwork { params, progress, .. } => {
@@ -654,7 +653,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                             // These errors only affect the provisioning session, so
                             // we only report them to the logs rather than passing
                             // them up.
-                            fx_log_err!("Error during DeviceExtraRequest::FormNetwork: {:?}", err);
+                            error!("Error during DeviceExtraRequest::FormNetwork: {:?}", err);
                         }
                     }
                     ExperimentalDeviceExtraRequest::StartNetworkScan { params, stream, .. } => {
@@ -719,7 +718,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                             // These errors only affect the scan channel, so
                             // we only report them to the logs rather than passing
                             // them up.
-                            fx_log_err!("Error during network scan: {:?}", err);
+                            error!("Error during network scan: {:?}", err);
                         }
                     }
                 }
@@ -729,7 +728,7 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving ExperimentalDeviceExtraRequestStream: {:?}", err);
+                error!("Error serving ExperimentalDeviceExtraRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -762,7 +761,7 @@ impl<T: Driver> ServeTo<TelemetryProviderRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving TelemetryProviderRequestStream: {:?}", err);
+                error!("Error serving TelemetryProviderRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -844,7 +843,7 @@ impl<T: Driver> ServeTo<EnergyScanRequestStream> for T {
                             .await;
 
                         if let Err(err) = ret {
-                            fx_log_err!("Error during energy scan: {:?}", err);
+                            error!("Error during energy scan: {:?}", err);
                         }
                     }
                 }
@@ -854,7 +853,7 @@ impl<T: Driver> ServeTo<EnergyScanRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving EnergyScanRequestStream: {:?}", err);
+                error!("Error serving EnergyScanRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -996,7 +995,7 @@ impl<T: Driver> ServeTo<DeviceTestRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceTestRequestStream: {:?}", err);
+                error!("Error serving DeviceTestRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1054,7 +1053,7 @@ impl<T: Driver> ServeTo<DeviceRouteRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceRouteRequestStream: {:?}", err);
+                error!("Error serving DeviceRouteRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1099,7 +1098,7 @@ impl<T: Driver> ServeTo<DeviceRouteExtraRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceRouteExtraRequestStream: {:?}", err);
+                error!("Error serving DeviceRouteExtraRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1142,7 +1141,7 @@ impl<T: Driver> ServeTo<FactoryDeviceRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving DeviceTestRequestStream: {:?}", err);
+                error!("Error serving DeviceTestRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1183,7 +1182,7 @@ impl<T: Driver> ServeTo<CountersRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving CountersRequestStream: {:?}", err);
+                error!("Error serving CountersRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1224,7 +1223,7 @@ impl<T: Driver> ServeTo<FeatureRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving FeatureRequestStream: {:?}", err);
+                error!("Error serving FeatureRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1257,7 +1256,7 @@ impl<T: Driver> ServeTo<LegacyJoiningRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving LegacyJoiningRequestStream: {:?}", err);
+                error!("Error serving LegacyJoiningRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1310,7 +1309,7 @@ impl<T: Driver> ServeTo<DatasetRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_warn!("Error serving DatasetRequestStream: {:?}", err);
+                warn!("Error serving DatasetRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);
@@ -1344,7 +1343,7 @@ impl<T: Driver> ServeTo<MeshcopRequestStream> for T {
 
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
-                fx_log_err!("Error serving MeshcopRequestStream: {:?}", err);
+                error!("Error serving MeshcopRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);

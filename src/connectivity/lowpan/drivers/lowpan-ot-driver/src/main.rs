@@ -45,17 +45,16 @@ mod prelude {
     pub use fasync::TimeoutExt as _;
     pub use fidl_fuchsia_net_ext as fnet_ext;
     pub use fuchsia_async as fasync;
-    pub use fuchsia_syslog::macros::*;
     pub use fuchsia_zircon as fz;
     pub use fuchsia_zircon_status::Status as ZxStatus;
     pub use futures::future::BoxFuture;
     pub use futures::stream::BoxStream;
-    pub use log::{debug, error, info, trace, warn};
     pub use lowpan_driver_common::pii::MarkPii;
     pub use lowpan_driver_common::ZxResult;
     pub use net_declare::{fidl_ip, fidl_ip_v6};
     pub use std::convert::TryInto;
     pub use std::fmt::Debug;
+    pub use tracing::{debug, error, info, trace, warn};
 
     pub use futures::prelude::*;
     pub use openthread::prelude::*;
@@ -100,7 +99,7 @@ impl Config {
             found_device_path = found_device_path.join(last_device.name.clone());
         }
 
-        fx_log_info!("Attempting to use Spinel RCP at {:?}", found_device_path.to_str().unwrap());
+        info!("Attempting to use Spinel RCP at {:?}", found_device_path.to_str().unwrap());
 
         let file = File::open(found_device_path).context("Error opening Spinel RCP")?;
 
@@ -205,7 +204,7 @@ impl Config {
     /// Async method which returns the future that runs the driver.
     async fn prepare_to_run(&self) -> Result<impl Future<Output = Result<(), Error>>, Error> {
         let spinel_device_proxy = self.open_spinel_device_proxy().await?;
-        fx_log_debug!("Spinel device proxy initialized");
+        debug!("Spinel device proxy initialized");
 
         let spinel_sink = SpinelDeviceSink::new(spinel_device_proxy);
         let spinel_stream = spinel_sink.take_stream();
@@ -286,18 +285,14 @@ where
 
     let lowpan_device_task = register_and_serve_driver(name, registry, driver_ref);
 
-    fx_log_info!("Registered OpenThread LoWPAN device {:?}", name);
+    info!("Registered OpenThread LoWPAN device {:?}", name);
 
     let lowpan_device_factory_task = async move {
         if let Some(factory_registry) = factory_registry {
             if let Err(err) =
                 register_and_serve_driver_factory(name, factory_registry, driver_ref).await
             {
-                fx_log_warn!(
-                    "Unable to register and serve factory commands for {:?}: {:?}",
-                    name,
-                    err
-                );
+                warn!("Unable to register and serve factory commands for {:?}: {:?}", name, err);
             }
         }
 
@@ -319,33 +314,30 @@ where
     .try_collect::<()>()
     .await?;
 
-    fx_log_info!("OpenThread LoWPAN device {:?} has shutdown.", name);
+    info!("OpenThread LoWPAN device {:?} has shutdown.", name);
 
     Ok(())
 }
 
 // The OpenThread platform implementation currently requires a multithreaded executor.
-#[fasync::run(10)]
+#[fuchsia::main(threads = 10)]
 async fn main() -> Result<(), Error> {
     use std::path::Path;
-    fuchsia_syslog::init_with_tags(&["lowpan-ot-driver"]).context("main:initialize_logging")?;
 
     let config = Config::try_new().context("Config::try_new")?;
 
-    fuchsia_syslog::set_severity(config.log_level);
-
     if Path::new("/config/data/bootstrap_config.json").exists() {
-        fx_log_warn!("Bootstrapping thread. Skipping ot-driver loop.");
+        warn!("Bootstrapping thread. Skipping ot-driver loop.");
         return bootstrap::bootstrap_thread().await;
     }
 
     let mut attempt_count = 0;
     loop {
-        fx_log_info!("Starting LoWPAN OT Driver");
+        info!("Starting LoWPAN OT Driver");
 
         let driver_future = config
             .prepare_to_run()
-            .inspect_err(|e| fx_log_err!("main:prepare_to_run: {:?}", e))
+            .inspect_err(|e| error!("main:prepare_to_run: {:?}", e))
             .await
             .context("main:prepare_to_run")?
             .boxed();
@@ -376,16 +368,16 @@ async fn main() -> Result<(), Error> {
             .unwrap_or(false)
         {
             // This is an expected OpenThread reset.
-            fx_log_warn!("OpenThread Reset: {:?}", ret);
+            warn!("OpenThread Reset: {:?}", ret);
         } else {
-            fx_log_err!("Unexpected shutdown: {:?}", ret);
-            fx_log_warn!("Will attempt to restart in {} seconds.", delay);
+            error!("Unexpected shutdown: {:?}", ret);
+            warn!("Will attempt to restart in {} seconds.", delay);
 
             fasync::Timer::new(fasync::Time::after(fz::Duration::from_seconds(delay))).await;
 
             attempt_count += 1;
 
-            fx_log_info!("Restart attempt {} ({} max)", attempt_count, config.max_auto_restarts);
+            info!("Restart attempt {} ({} max)", attempt_count, config.max_auto_restarts);
         }
     }
 }

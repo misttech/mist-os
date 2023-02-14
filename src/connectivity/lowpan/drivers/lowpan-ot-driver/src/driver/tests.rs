@@ -50,15 +50,6 @@ where
     let _singleton_lock =
         TEST_HARNESS_SINGLETON_LOCK.lock().expect("TEST_HARNESS_SINGLETON_LOCK is poisoned");
 
-    static TEST_INIT: std::sync::Once = std::sync::Once::new();
-    TEST_INIT.call_once(|| {
-        // Sure all of our logging macros continue to work.
-        let _dont_care_if_fails = log::set_logger(&*fuchsia_syslog::LOGGER);
-
-        // Adjust our logging so that we don't get inundated with useless logs.
-        fuchsia_syslog::set_severity(fuchsia_syslog::levels::WARN);
-    });
-
     let (sink, stream, ncp_task) = new_fake_spinel_pair();
 
     // The following task must ultimately run in the background on
@@ -132,12 +123,12 @@ where
 
 /// This is just a simple test where we bring everything up and
 /// immediately tear it down. If this fails there are fundamental problems.
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_driver_setup_and_teardown() {
     test_harness(|_| async move {}).await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_initial_device_state() {
     test_harness(|driver| async move {
         let mut device_state_stream = driver.watch_device_state();
@@ -168,7 +159,7 @@ async fn test_initial_device_state() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[ignore] // TODO: Re-enable once scan support is added to test RCP
 async fn test_network_scan() {
     test_harness(|driver| async move {
@@ -179,7 +170,7 @@ async fn test_network_scan() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[ignore] // TODO: Re-enable once joiner support is added to test RCP
 async fn test_joiner() {
     use lowpan_driver_common::lowpan_fidl::JoinParams;
@@ -196,7 +187,7 @@ async fn test_joiner() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[ignore] // TODO: Re-enable once scan support is added to test RCP
 async fn test_energy_scan() {
     test_harness(|driver| async move {
@@ -207,7 +198,7 @@ async fn test_energy_scan() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_supported_channels() {
     test_harness(|driver| async move {
         let channels = driver.get_supported_channels().await;
@@ -216,7 +207,7 @@ async fn test_get_supported_channels() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_factory_mac_address() {
     test_harness(|driver| async move {
         let fact_mac = driver.get_factory_mac_address().await;
@@ -225,7 +216,7 @@ async fn test_get_factory_mac_address() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_current_mac_address() {
     test_harness(|driver| async move {
         let fact_mac = driver.get_current_mac_address().await;
@@ -234,7 +225,7 @@ async fn test_get_current_mac_address() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_supported_network_types() {
     test_harness(|driver| async move {
         let network_types = driver.get_supported_network_types().await;
@@ -246,7 +237,7 @@ async fn test_get_supported_network_types() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_current_channel() {
     test_harness(|driver| async move {
         let curr_chan = driver.get_current_channel().await;
@@ -255,7 +246,7 @@ async fn test_get_current_channel() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_partition_id() {
     test_harness(|driver| async move {
         let part_id = driver.get_partition_id().await;
@@ -264,7 +255,7 @@ async fn test_get_partition_id() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_current_rssi() {
     test_harness(|driver| async move {
         let curr_rssi = driver.get_current_rssi().await;
@@ -273,7 +264,7 @@ async fn test_get_current_rssi() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_thread_rloc16() {
     test_harness(|driver| async move {
         let thread_rloc16 = driver.get_thread_rloc16().await;
@@ -282,7 +273,7 @@ async fn test_get_thread_rloc16() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_thread_router_id() {
     test_harness(|driver| async move {
         let thread_router_id = driver.get_thread_router_id().await;
@@ -291,7 +282,7 @@ async fn test_get_thread_router_id() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_neighbor_table_offline() {
     test_harness(|driver| async move {
         let thread_neighbor_table = driver.get_neighbor_table().await;
@@ -300,7 +291,7 @@ async fn test_get_neighbor_table_offline() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_get_counters() {
     test_harness(|driver| async move {
         let thread_counters = driver.get_counters().await;
@@ -309,7 +300,7 @@ async fn test_get_counters() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_provision_network_offline() {
     test_harness(|driver| async move {
         let mut identity_stream = driver.watch_identity();
@@ -357,7 +348,7 @@ async fn test_provision_network_offline() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 async fn test_provision_network_online() {
     test_harness(|driver| async move {
         let mut device_state_stream = driver.watch_device_state();
@@ -427,7 +418,7 @@ async fn test_provision_network_online() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[allow(clippy::or_fun_call)]
 async fn test_add_on_mesh_prefix() {
     test_harness(|driver| async move {
@@ -473,7 +464,7 @@ async fn test_add_on_mesh_prefix() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[allow(clippy::or_fun_call)]
 async fn test_add_external_route() {
     test_harness(|driver| async move {
@@ -521,7 +512,7 @@ async fn test_add_external_route() {
     .await;
 }
 
-#[fasync::run(10, test)]
+#[fuchsia::test(threads = 10)]
 #[ignore] // TODO(fxrev.dev/92419): Remove this once <fxrev.dev/92419> is fixed.
 #[allow(clippy::or_fun_call)]
 async fn test_grind_lowpan_ot_driver() {
@@ -534,68 +525,68 @@ async fn test_grind_lowpan_ot_driver() {
             ConnectivityState::Offline
         );
 
-        fx_log_debug!("app_task: Making sure it only vends one state when nothing has changed.");
+        debug!("app_task: Making sure it only vends one state when nothing has changed.");
         assert!(device_state_stream.next().now_or_never().is_none());
 
         for i in 1u8..32 {
-            fx_log_debug!("app_task: Starting Iteration {}", i);
+            debug!("app_task: Starting Iteration {}", i);
 
-            fx_log_debug!("app_task: Setting disabled...");
+            debug!("app_task: Setting disabled...");
             assert_eq!(driver.set_active(false).await, Ok(()));
-            fx_log_debug!("app_task: Did disable!");
+            debug!("app_task: Did disable!");
 
             let channels = driver.get_supported_channels().await;
-            fx_log_debug!("app_task: Supported channels: {:?}", channels);
+            debug!("app_task: Supported channels: {:?}", channels);
             assert_eq!(channels.map(|_| ()), Ok(()));
 
             let fact_mac = driver.get_factory_mac_address().await;
-            fx_log_debug!("app_task: Factory MAC: {:?}", fact_mac);
+            debug!("app_task: Factory MAC: {:?}", fact_mac);
             assert_eq!(fact_mac.map(|_| ()), Ok(()));
 
             let curr_mac = driver.get_current_mac_address().await;
-            fx_log_debug!("app_task: Current MAC: {:?}", curr_mac);
+            debug!("app_task: Current MAC: {:?}", curr_mac);
             assert_eq!(curr_mac.map(|_| ()), Ok(()));
 
             let ncp_ver = driver.get_ncp_version().await;
-            fx_log_debug!("app_task: NCP Version: {:?}", ncp_ver);
+            debug!("app_task: NCP Version: {:?}", ncp_ver);
             assert_eq!(ncp_ver.map(|_| ()), Ok(()));
 
             let network_types = driver.get_supported_network_types().await;
-            fx_log_debug!("app_task: Supported Network Types: {:?}", network_types);
+            debug!("app_task: Supported Network Types: {:?}", network_types);
             assert_eq!(
                 network_types,
                 Ok(vec![lowpan_driver_common::lowpan_fidl::NET_TYPE_THREAD_1_X.to_string()])
             );
 
             let curr_chan = driver.get_current_channel().await;
-            fx_log_debug!("app_task: Current Channel: {:?}", curr_chan);
+            debug!("app_task: Current Channel: {:?}", curr_chan);
             assert_eq!(curr_chan.map(|_| ()), Ok(()));
 
             let curr_rssi = driver.get_current_rssi().await;
-            fx_log_debug!("app_task: Current RSSI: {:?}", curr_rssi);
+            debug!("app_task: Current RSSI: {:?}", curr_rssi);
             assert_eq!(curr_rssi.map(|_| ()), Ok(()));
 
             let part_id = driver.get_partition_id().await;
-            fx_log_debug!("app_task: partition id: {:?}", part_id);
+            debug!("app_task: partition id: {:?}", part_id);
             assert_eq!(part_id.map(|_| ()), Ok(()));
 
             let thread_rloc16 = driver.get_thread_rloc16().await;
-            fx_log_debug!("app_task: thread_rloc16: {:?}", thread_rloc16);
+            debug!("app_task: thread_rloc16: {:?}", thread_rloc16);
             assert_eq!(thread_rloc16.map(|_| ()), Ok(()));
 
             let thread_router_id = driver.get_thread_router_id().await;
-            fx_log_debug!("app_task: thread_router_id: {:?}", thread_router_id);
+            debug!("app_task: thread_router_id: {:?}", thread_router_id);
             assert_eq!(thread_router_id.map(|_| ()), Ok(()));
 
             let thread_neighbor_table = driver.get_neighbor_table().await;
-            fx_log_debug!("app_task: thread_neighbor_table: {:?}", thread_neighbor_table);
+            debug!("app_task: thread_neighbor_table: {:?}", thread_neighbor_table);
             let _thread_neighbor_entry_vec = thread_neighbor_table.unwrap();
 
-            fx_log_debug!("app_task: Attempting a reset...");
+            debug!("app_task: Attempting a reset...");
             assert_eq!(driver.reset().await, Ok(()));
-            fx_log_debug!("app_task: Did reset!");
+            debug!("app_task: Did reset!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Inactive) (1)");
+            debug!("app_task: Checking device state... (Should be Inactive) (1)");
             assert_eq!(
                 driver
                     .watch_device_state()
@@ -608,7 +599,7 @@ async fn test_grind_lowpan_ot_driver() {
                 ConnectivityState::Inactive
             );
 
-            fx_log_debug!("app_task: Setting identity...");
+            debug!("app_task: Setting identity...");
             assert_eq!(
                 driver
                     .provision_network(ProvisioningParams {
@@ -618,9 +609,9 @@ async fn test_grind_lowpan_ot_driver() {
                     .await,
                 Ok(())
             );
-            fx_log_debug!("app_task: Did provision!");
+            debug!("app_task: Did provision!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Ready)");
+            debug!("app_task: Checking device state... (Should be Ready)");
             assert_eq!(
                 driver
                     .watch_device_state()
@@ -633,7 +624,7 @@ async fn test_grind_lowpan_ot_driver() {
                 ConnectivityState::Ready
             );
 
-            fx_log_debug!("app_task: Checking identity...");
+            debug!("app_task: Checking identity...");
             let new_identity = identity_stream
                 .try_next()
                 .await
@@ -647,21 +638,21 @@ async fn test_grind_lowpan_ot_driver() {
             assert_eq!(new_identity.panid, TEST_IDENTITY.panid);
             assert_eq!(new_identity.channel, TEST_IDENTITY.channel);
             assert_eq!(new_identity.net_type, TEST_IDENTITY.net_type);
-            fx_log_debug!("app_task: Identity is correct!");
+            debug!("app_task: Identity is correct!");
 
-            fx_log_debug!("app_task: Checking credential...");
+            debug!("app_task: Checking credential...");
             assert_eq!(driver.get_credential().await, Ok(Some(TEST_CREDENTIAL.clone())));
-            fx_log_debug!("app_task: Credential is correct!");
+            debug!("app_task: Credential is correct!");
 
-            fx_log_debug!("app_task: Setting enabled...");
+            debug!("app_task: Setting enabled...");
             assert_eq!(driver.set_active(true).await, Ok(()));
-            fx_log_debug!("app_task: Did enable!");
+            debug!("app_task: Did enable!");
 
-            fx_log_debug!("app_task: Checking on-mesh prefixes to make sure it is empty...");
+            debug!("app_task: Checking on-mesh prefixes to make sure it is empty...");
             assert_eq!(driver.get_local_on_mesh_prefixes().await, Ok(vec![]));
-            fx_log_debug!("app_task: Is empty!");
+            debug!("app_task: Is empty!");
 
-            fx_log_debug!("app_task: Adding an on-mesh prefix...");
+            debug!("app_task: Adding an on-mesh prefix...");
             let on_mesh_prefix_subnet: lowpan_driver_common::lowpan_fidl::Ipv6Subnet = Subnet {
                 addr: std::net::Ipv6Addr::from_str("2001:DB8::").unwrap(),
                 prefix_len: 64,
@@ -674,9 +665,9 @@ async fn test_grind_lowpan_ot_driver() {
                 ..lowpan_driver_common::lowpan_fidl::OnMeshPrefix::EMPTY
             };
             assert_eq!(driver.register_on_mesh_prefix(x.clone()).await, Ok(()));
-            fx_log_debug!("app_task: Registered!");
+            debug!("app_task: Registered!");
 
-            fx_log_debug!("app_task: Checking on-mesh prefixes...");
+            debug!("app_task: Checking on-mesh prefixes...");
             assert_eq!(
                 driver
                     .get_local_on_mesh_prefixes()
@@ -688,17 +679,17 @@ async fn test_grind_lowpan_ot_driver() {
                     .unwrap(),
                 x.subnet
             );
-            fx_log_debug!("app_task: Populated!");
+            debug!("app_task: Populated!");
 
-            fx_log_debug!("app_task: Removing an on-mesh prefix...");
+            debug!("app_task: Removing an on-mesh prefix...");
             assert_eq!(driver.unregister_on_mesh_prefix(on_mesh_prefix_subnet).await, Ok(()));
-            fx_log_debug!("app_task: Unregistered!");
+            debug!("app_task: Unregistered!");
 
-            fx_log_debug!("app_task: Checking on-mesh prefixes to make sure it is empty...");
+            debug!("app_task: Checking on-mesh prefixes to make sure it is empty...");
             assert_eq!(driver.get_local_on_mesh_prefixes().await, Ok(vec![]));
-            fx_log_debug!("app_task: Is empty!");
+            debug!("app_task: Is empty!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Attaching)");
+            debug!("app_task: Checking device state... (Should be Attaching)");
             assert_eq!(
                 device_state_stream
                     .try_next()
@@ -710,11 +701,11 @@ async fn test_grind_lowpan_ot_driver() {
                 ConnectivityState::Attaching
             );
 
-            fx_log_debug!("app_task: Setting disabled...");
+            debug!("app_task: Setting disabled...");
             assert_eq!(driver.set_active(false).await, Ok(()));
-            fx_log_debug!("app_task: Did disable!");
+            debug!("app_task: Did disable!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Ready)");
+            debug!("app_task: Checking device state... (Should be Ready)");
             assert_eq!(
                 device_state_stream
                     .try_next()
@@ -726,37 +717,37 @@ async fn test_grind_lowpan_ot_driver() {
                 ConnectivityState::Ready
             );
 
-            fx_log_debug!("app_task: Leaving network...");
+            debug!("app_task: Leaving network...");
             assert_eq!(driver.leave_network().await, Ok(()));
-            fx_log_debug!("app_task: Did leave!");
+            debug!("app_task: Did leave!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Inactive)");
+            debug!("app_task: Checking device state... (Should be Inactive)");
             assert_eq!(
                 device_state_stream.try_next().await.unwrap().unwrap().connectivity_state.unwrap(),
                 ConnectivityState::Inactive
             );
 
-            fx_log_debug!("app_task: Setting enabled...");
+            debug!("app_task: Setting enabled...");
             assert_eq!(driver.set_active(true).await, Ok(()));
-            fx_log_debug!("app_task: Did enable!");
+            debug!("app_task: Did enable!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Offline)");
+            debug!("app_task: Checking device state... (Should be Offline)");
             assert_eq!(
                 device_state_stream.try_next().await.unwrap().unwrap().connectivity_state.unwrap(),
                 ConnectivityState::Offline
             );
 
-            fx_log_debug!("app_task: Setting disabled...");
+            debug!("app_task: Setting disabled...");
             assert_eq!(driver.set_active(false).await, Ok(()));
-            fx_log_debug!("app_task: Did disable!");
+            debug!("app_task: Did disable!");
 
-            fx_log_debug!("app_task: Checking device state... (Should be Inactive) (2)");
+            debug!("app_task: Checking device state... (Should be Inactive) (2)");
             assert_eq!(
                 device_state_stream.try_next().await.unwrap().unwrap().connectivity_state.unwrap(),
                 ConnectivityState::Inactive
             );
 
-            fx_log_debug!("app_task: Finished Iteration {}", i);
+            debug!("app_task: Finished Iteration {}", i);
         }
     })
     .await;

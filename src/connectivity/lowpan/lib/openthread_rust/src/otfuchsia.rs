@@ -20,10 +20,7 @@ impl From<ot::Error> for ZxStatus {
             ot::Error::NoBufs => ZxStatus::NO_MEMORY,
             ot::Error::NotFound => ZxStatus::NOT_FOUND,
             other => {
-                fx_log_warn!(
-                    "Unable to convert {:?} to fuchsia_zircon::Status, will use INTERNAL",
-                    other
-                );
+                warn!("Unable to convert {:?} to fuchsia_zircon::Status, will use INTERNAL", other);
                 ZxStatus::INTERNAL
             }
         }

@@ -162,7 +162,7 @@ where
     }
 
     async fn set_active(&self, enabled: bool) -> ZxResult<()> {
-        fx_log_info!("Got set active command: {:?}", enabled);
+        info!("Got set active command: {:?}", enabled);
 
         // Wait until we are not busy.
         self.wait_for_state(|x| !x.is_busy()).await;
@@ -315,14 +315,14 @@ where
         match params {
             JoinParams::JoinerParameter(joiner_params) => self.joiner_start(joiner_params),
             _ => {
-                fx_log_err!("join network: provision params not yet supported");
+                error!("join network: provision params not yet supported");
                 ready(Err(ZxStatus::INVALID_ARGS)).into_stream().boxed()
             }
         }
     }
 
     async fn get_credential(&self) -> ZxResult<Option<Credential>> {
-        fx_log_info!("Got get credential command");
+        info!("Got get credential command");
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
         let mut operational_dataset = Default::default();
@@ -339,7 +339,7 @@ where
         &self,
         params: &EnergyScanParameters,
     ) -> BoxStream<'_, ZxResult<Vec<fidl_fuchsia_lowpan_device::EnergyScanResult>>> {
-        fx_log_info!("Got energy scan command: {:?}", params);
+        info!("Got energy scan command: {:?}", params);
 
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
@@ -372,7 +372,7 @@ where
                 channels?,
                 dwell_time,
                 move |x| {
-                    fx_log_trace!("energy_scan_callback: Got result {:?}", x);
+                    trace!("energy_scan_callback: Got result {:?}", x);
                     if let Some(x) = x {
                         if sender.unbounded_send(x.clone()).is_err() {
                             // If this is an error then that just means the
@@ -380,7 +380,7 @@ where
                             // not even worth logging.
                         }
                     } else {
-                        fx_log_trace!("energy_scan_callback: Closing scan stream");
+                        trace!("energy_scan_callback: Closing scan stream");
                         sender.close_channel();
 
                         // Make sure the rest of the state machine knows we finished scanning.
@@ -410,7 +410,7 @@ where
         &self,
         params: &NetworkScanParameters,
     ) -> BoxStream<'_, ZxResult<Vec<BeaconInfo>>> {
-        fx_log_info!("Got network scan command: {:?}", params);
+        info!("Got network scan command: {:?}", params);
 
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
@@ -443,7 +443,7 @@ where
                 channels?,
                 dwell_time,
                 move |x| {
-                    fx_log_trace!("active_scan_callback: Got result {:?}", x);
+                    trace!("active_scan_callback: Got result {:?}", x);
                     if let Some(x) = x {
                         if sender.unbounded_send(x.clone()).is_err() {
                             // If this is an error then that just means the
@@ -451,7 +451,7 @@ where
                             // not even worth logging.
                         }
                     } else {
-                        fx_log_trace!("active_scan_callback: Closing scan stream");
+                        trace!("active_scan_callback: Closing scan stream");
                         sender.close_channel();
 
                         // Make sure the rest of the state machine knows we finished scanning.

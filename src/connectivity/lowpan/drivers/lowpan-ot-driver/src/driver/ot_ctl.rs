@@ -82,12 +82,12 @@ impl OtCtl {
                                         }
                                     }
                                 } else {
-                                    fx_log_warn!("failed to encode the CLI command string sent by client socket");
+                                    warn!("failed to encode the CLI command string sent by client socket");
                                 }
                             }
                         }
                         Poll::Ready(Err(err)) => {
-                            fx_log_err!("poll_read err {:?}", err);
+                            error!("poll_read err {:?}", err);
                             return Poll::Ready(Err(err).context("poll_read"));
                         }
                         Poll::Pending => {
@@ -101,7 +101,7 @@ impl OtCtl {
                     loop {
                         match openthread_conole_output_receiver.poll_next_unpin(cx) {
                             Poll::Ready(Some(cli_output_str)) => {
-                                fx_log_info!("CLI output: {}", MarkPii(&cli_output_str));
+                                info!("CLI output: {}", MarkPii(&cli_output_str));
                                 outbound_buffer.append(&mut cli_output_str.as_bytes().to_vec());
                             }
                             Poll::Ready(None) => {

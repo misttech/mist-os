@@ -8,12 +8,14 @@ use spinel_pack::prelude::*;
 
 use fuchsia_async as fasync;
 use futures::channel::mpsc as fmpsc;
-use log::*;
 use lowpan_driver_common::spinel::*;
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::time::Duration;
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 mod alarm;
 mod infra_if;

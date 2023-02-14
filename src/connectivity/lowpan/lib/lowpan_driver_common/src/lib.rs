@@ -13,7 +13,6 @@ mod register;
 mod serve_to;
 
 pub mod net;
-pub mod poll_debugger;
 pub mod spinel;
 
 #[cfg(test)]
@@ -22,7 +21,6 @@ mod tests;
 pub use async_condition::*;
 pub use dummy_device::DummyDevice;
 pub use lowpan_device::Driver;
-pub use poll_debugger::*;
 pub use register::*;
 pub use serve_to::*;
 
@@ -31,7 +29,7 @@ pub use serve_to::*;
 use spinel_pack::{self as spinel_pack};
 
 #[macro_export]
-macro_rules! traceln (($($args:tt)*) => { fuchsia_syslog::macros::fx_log_trace!($($args)*); }; );
+macro_rules! traceln (($($args:tt)*) => { tracing::trace!($($args)*); }; );
 
 #[macro_use]
 pub(crate) mod prelude_internal {
@@ -41,10 +39,9 @@ pub(crate) mod prelude_internal {
     pub use futures::prelude::*;
     pub use spinel_pack::prelude::*;
 
-    pub use fuchsia_syslog::macros::*;
+    #[allow(unused_imports)]
+    pub use tracing::{debug, error, info, trace, warn};
 
-    pub use crate::poll_debugger::FutureDebugExt as _;
-    pub use crate::poll_debugger::StreamDebugExt as _;
     pub use crate::ServeTo as _;
     pub use crate::{ZxResult, ZxStatus};
     pub use anyhow::{format_err, Context as _};

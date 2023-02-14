@@ -209,7 +209,7 @@ where
         new_state: ConnectivityState,
         old_state: ConnectivityState,
     ) {
-        fx_log_info!("State Change: {:?} -> {:?}", old_state, new_state);
+        info!("State Change: {:?} -> {:?}", old_state, new_state);
 
         self.driver_state_change.trigger();
 

@@ -30,17 +30,17 @@ where
 
             // For in-band joiner commissioning, pskd is required.
             if joiner_params.pskd.as_ref().map(|x| x.is_empty()).unwrap_or(true) {
-                fx_log_err!("join network: pskd is empty");
+                error!("join network: pskd is empty");
                 return Err(Error::from(ZxStatus::INVALID_ARGS));
             }
 
             if !self.get_connectivity_state().is_active() {
-                fx_log_err!("join network: interface not enabled/active");
+                error!("join network: interface not enabled/active");
                 return Err(Error::from(ZxStatus::BAD_STATE));
             }
 
             let cleanup_func = CleanupFunc(Some(move || {
-                fx_log_debug!("Running Join Cleanup Func");
+                debug!("Running Join Cleanup Func");
                 let driver_state = self.driver_state.lock();
                 driver_state.ot_instance.joiner_stop();
             }));

@@ -115,17 +115,17 @@ impl NetworkInterface for DummyNetworkInterface {
     }
 
     async fn inbound_packet_to_stack(&self, packet: &[u8]) -> Result<(), Error> {
-        fx_log_info!("Packet to Stack: {}", hex::encode(packet));
+        info!("Packet to Stack: {}", hex::encode(packet));
         Ok(())
     }
 
     async fn set_online(&self, online: bool) -> Result<(), Error> {
-        fx_log_info!("Interface online: {:?}", online);
+        info!("Interface online: {:?}", online);
         Ok(())
     }
 
     async fn set_enabled(&self, enabled: bool) -> Result<(), Error> {
-        fx_log_info!("Interface enabled: {:?}", enabled);
+        info!("Interface enabled: {:?}", enabled);
         self.event_sender
             .lock()
             .try_send(Ok(NetworkInterfaceEvent::InterfaceEnabledChanged(enabled)))?;
@@ -133,32 +133,32 @@ impl NetworkInterface for DummyNetworkInterface {
     }
 
     fn add_address(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("Address Added: {:?}", addr);
+        info!("Address Added: {:?}", addr);
         Ok(())
     }
 
     fn remove_address(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("Address Removed: {:?}", addr);
+        info!("Address Removed: {:?}", addr);
         Ok(())
     }
 
     fn add_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("External Route Added: {:?}", addr);
+        info!("External Route Added: {:?}", addr);
         Ok(())
     }
 
     fn remove_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("External Route Removed: {:?}", addr);
+        info!("External Route Removed: {:?}", addr);
         Ok(())
     }
 
     fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        fx_log_info!("Joining multicast group: {:?}", addr);
+        info!("Joining multicast group: {:?}", addr);
         Ok(())
     }
 
     fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        fx_log_info!("Leaving multicast group: {:?}", addr);
+        info!("Leaving multicast group: {:?}", addr);
         Ok(())
     }
 

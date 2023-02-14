@@ -176,10 +176,7 @@ impl NetworkInterface for TunNetworkInterface {
             .context("Error calling read_frame")?;
 
         if let Some(packet) = frame.data.as_ref() {
-            fx_log_trace!(
-                "TunNetworkInterface: Packet arrived from stack: {:?}",
-                Ipv6PacketDebug(packet)
-            );
+            trace!("TunNetworkInterface: Packet arrived from stack: {:?}", Ipv6PacketDebug(packet));
         }
 
         #[allow(clippy::or_fun_call)]
@@ -187,7 +184,7 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     async fn inbound_packet_to_stack(&self, packet: &[u8]) -> Result<(), Error> {
-        fx_log_trace!("TunNetworkInterface: Packet sent to stack: {:?}", Ipv6PacketDebug(packet));
+        trace!("TunNetworkInterface: Packet sent to stack: {:?}", Ipv6PacketDebug(packet));
 
         Ok(self
             .tun_dev
@@ -203,7 +200,7 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     async fn set_online(&self, online: bool) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Interface online: {:?}", online);
+        info!("TunNetworkInterface: Interface online: {:?}", online);
 
         if online {
             self.tun_port.set_online(true).await?;
@@ -221,7 +218,7 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     async fn set_enabled(&self, enabled: bool) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Interface enabled: {:?}", enabled);
+        info!("TunNetworkInterface: Interface enabled: {:?}", enabled);
         if enabled {
             let _was_disabled: bool = self
                 .control_sync
@@ -241,7 +238,7 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     fn add_address(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Adding Address: {:?}", addr);
+        info!("TunNetworkInterface: Adding Address: {:?}", addr);
         let mut device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
@@ -262,7 +259,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         let mut routes = self.routes.lock();
 
-        fx_log_info!("TunNetworkInterface: Successfully added address {:?}", addr);
+        info!("TunNetworkInterface: Successfully added address {:?}", addr);
 
         if let Some(addresses) = routes.get_mut(&subnet) {
             addresses.insert(addr.addr);
@@ -278,14 +275,14 @@ impl NetworkInterface for TunNetworkInterface {
                 .add_forwarding_entry(&mut forwarding_entry, zx::Time::INFINITE)?
                 .expect("add_forwarding_entry");
             routes.insert(subnet, HashSet::from([addr.addr]));
-            fx_log_info!("TunNetworkInterface: Successfully added forwarding entry for {:?}", addr);
+            info!("TunNetworkInterface: Successfully added forwarding entry for {:?}", addr);
         }
 
         Ok(())
     }
 
     fn remove_address(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Removing Address: {:?}", addr);
+        info!("TunNetworkInterface: Removing Address: {:?}", addr);
 
         let mut device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
@@ -299,7 +296,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         let subnet = fnetext::apply_subnet_mask(device_addr);
 
-        fx_log_info!("TunNetworkInterface: Successfully removed address {:?}", addr);
+        info!("TunNetworkInterface: Successfully removed address {:?}", addr);
 
         let mut routes = self.routes.lock();
 
@@ -319,10 +316,7 @@ impl NetworkInterface for TunNetworkInterface {
                     .lock()
                     .del_forwarding_entry(&mut forwarding_entry, zx::Time::INFINITE)
                     .squash_result()?;
-                fx_log_info!(
-                    "TunNetworkInterface: Successfully removed forwarding entry for {:?}",
-                    addr
-                );
+                info!("TunNetworkInterface: Successfully removed forwarding entry for {:?}", addr);
             }
         }
 
@@ -330,28 +324,25 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     fn add_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Adding external route: {:?} (CURRENTLY IGNORED)", addr);
+        info!("TunNetworkInterface: Adding external route: {:?} (CURRENTLY IGNORED)", addr);
         Ok(())
     }
 
     fn remove_external_route(&self, addr: &Subnet) -> Result<(), Error> {
-        fx_log_info!(
-            "TunNetworkInterface: Removing external route: {:?} (CURRENTLY IGNORED)",
-            addr
-        );
+        info!("TunNetworkInterface: Removing external route: {:?} (CURRENTLY IGNORED)", addr);
         Ok(())
     }
 
     /// Has the interface join the given multicast group.
     fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Joining multicast group: {:?}", addr);
+        info!("TunNetworkInterface: Joining multicast group: {:?}", addr);
         self.mcast_socket.as_ref().join_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }
 
     /// Has the interface leave the given multicast group.
     fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        fx_log_info!("TunNetworkInterface: Leaving multicast group: {:?}", addr);
+        info!("TunNetworkInterface: Leaving multicast group: {:?}", addr);
         self.mcast_socket.as_ref().leave_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }

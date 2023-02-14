@@ -22,12 +22,14 @@ use anyhow::Error;
 use fuchsia_async as fasync;
 use futures::channel::mpsc as fmpsc;
 use futures::Stream;
-use log::*;
 use lowpan_driver_common::spinel::*;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::task::{Context, Poll};
+
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 // Number of entries in the frame-ready channel.
 // This length doesn't need to be very large, as it

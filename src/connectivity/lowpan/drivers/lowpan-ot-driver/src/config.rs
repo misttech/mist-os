@@ -124,18 +124,18 @@ impl Config {
         let config_path = args.config_path.clone();
 
         let mut config = if Path::new(&config_path).exists() {
-            fx_log_info!("Config file {} exists, will load config data from it", config_path);
+            info!("Config file {} exists, will load config data from it", config_path);
             Config::load(config_path)?
         } else {
-            fx_log_info!("Config file {} doesn't exist, will use default values", config_path);
+            info!("Config file {} doesn't exist, will use default values", config_path);
             Config::default()
         };
 
-        fx_log_debug!("Config values before cmd-line-override {:?} ", config);
+        debug!("Config values before cmd-line-override {:?} ", config);
 
         config.cmd_line_override(args);
 
-        fx_log_debug!("Final config values are: {:?} ", config);
+        debug!("Final config values are: {:?} ", config);
 
         Ok(config)
     }
@@ -154,49 +154,36 @@ impl Config {
     /// Override the config value with command-line option if it is passed
     fn cmd_line_override(&mut self, args: DriverArgs) {
         if let Some(tmp) = args.service_prefix {
-            fx_log_info!(
-                "cmdline overriding service_prefix from {:?} to {:?}",
-                self.service_prefix,
-                tmp
-            );
+            info!("cmdline overriding service_prefix from {:?} to {:?}", self.service_prefix, tmp);
             self.service_prefix = tmp;
         }
 
         if let Some(tmp) = args.max_auto_restarts {
-            fx_log_info!(
+            info!(
                 "cmdline overriding max_auto_restarts from {} to {}",
-                self.max_auto_restarts,
-                tmp
+                self.max_auto_restarts, tmp
             );
             self.max_auto_restarts = tmp;
         }
 
         if let Some(tmp) = args.name {
-            fx_log_info!("cmdline overriding name from {:?} to {:?}", self.name, tmp);
+            info!("cmdline overriding name from {:?} to {:?}", self.name, tmp);
             self.name = tmp;
         }
 
         if let Some(tmp) = args.backbone_name {
-            fx_log_info!(
-                "cmdline overriding backbone_name from {:?} to {:?}",
-                self.backbone_name,
-                tmp
-            );
+            info!("cmdline overriding backbone_name from {:?} to {:?}", self.backbone_name, tmp);
             self.backbone_name = Some(tmp);
         }
 
         if let Some(x) = args.verbosity {
             let severity = fuchsia_syslog::get_severity_from_verbosity(x);
-            fx_log_info!("cmdline log verbosity set to {:?}", x);
+            info!("cmdline log verbosity set to {:?}", x);
             self.log_level = severity;
         }
 
         if let Some(tmp) = args.ot_radio_path {
-            fx_log_info!(
-                "cmdline overriding ot_radio_path from {:?} to {:?}",
-                self.ot_radio_path,
-                tmp
-            );
+            info!("cmdline overriding ot_radio_path from {:?} to {:?}", self.ot_radio_path, tmp);
             self.ot_radio_path = Some(tmp);
         }
     }
