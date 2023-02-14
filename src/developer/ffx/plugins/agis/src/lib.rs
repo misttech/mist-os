@@ -177,7 +177,7 @@ mod test {
                 }
                 ComponentRegistryRequest::GetVulkanSocket { responder, .. } => {
                     // Create an arbitrary, valid socket to test as a return value.
-                    let (s, _) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+                    let (s, _) = fidl::Socket::create_stream();
                     responder.send(&mut Ok(Some(s))).unwrap();
                 }
                 ComponentRegistryRequest::Unregister { responder, .. } => {

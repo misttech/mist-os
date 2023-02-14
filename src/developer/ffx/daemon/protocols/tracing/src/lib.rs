@@ -154,8 +154,7 @@ impl TraceTask {
         proxy: trace::ControllerProxy,
     ) -> Result<Self, TraceTaskStartError> {
         let duration = options.duration;
-        let (client, server) =
-            fidl::Socket::create(fidl::SocketOpts::STREAM).context("creating socket")?;
+        let (client, server) = fidl::Socket::create_stream();
         let client = fidl::AsyncSocket::from_socket(client).context("making async socket")?;
         let f = File::create(&output_file).await.context("opening file")?;
         proxy.initialize_tracing(config.clone(), server)?;

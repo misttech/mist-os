@@ -48,7 +48,7 @@ async fn get_raw_data(
     query_proxy: impl fidl_fuchsia_process_explorer::QueryProxyInterface,
 ) -> Result<Vec<u8>> {
     // Create a socket.
-    let (rx, tx) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (rx, tx) = fidl::Socket::create_stream();
 
     // Send one end of the socket to the remote device.
     query_proxy.write_json_processes_data(tx)?;

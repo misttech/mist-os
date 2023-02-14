@@ -47,9 +47,7 @@ pub async fn run_diagnostics_streaming(
                             }]))?;
                         } else {
                             let (socket, tx_socket) =
-                                fuchsia_async::emulated_handle::Socket::create(
-                                    fuchsia_async::emulated_handle::SocketOpts::STREAM,
-                                )?;
+                                fuchsia_async::emulated_handle::Socket::create_stream();
                             let mut tx_socket = fuchsia_async::Socket::from_socket(tx_socket)?;
                             // We send one end of the socket back to the caller.
                             // The receiver will need to read the socket content to

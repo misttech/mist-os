@@ -12,8 +12,7 @@ mod util;
 #[fuchsia::test]
 async fn test_stuff_socket(connector: LaunchedComponentConnector) {
     let proxy = connector.connect().await.expect("connect to stressor");
-    let (client_socket, server_socket) =
-        fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+    let (client_socket, server_socket) = fidl::Socket::create_stream();
     let bytes_written_fut = proxy.stuff_socket(server_socket);
     let bytes_written = bytes_written_fut.await.expect("stuff socket");
 

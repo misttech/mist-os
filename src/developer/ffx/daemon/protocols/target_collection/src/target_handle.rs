@@ -364,12 +364,12 @@ mod tests {
         const TEST_NODE_NAME: &'static str = "villete";
         let local_hoist = Hoist::new().unwrap();
         let hoist2 = Hoist::new().unwrap();
-        let (rx2, tx2) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (rx2, tx2) = fidl::Socket::create_stream();
         let (mut rx2, mut tx2) = (
             fidl::AsyncSocket::from_socket(rx2).unwrap(),
             fidl::AsyncSocket::from_socket(tx2).unwrap(),
         );
-        let (rx1, tx1) = fidl::Socket::create(fidl::SocketOpts::STREAM).unwrap();
+        let (rx1, tx1) = fidl::Socket::create_stream();
         let (mut rx1, mut tx1) = (
             fidl::AsyncSocket::from_socket(rx1).unwrap(),
             fidl::AsyncSocket::from_socket(tx1).unwrap(),

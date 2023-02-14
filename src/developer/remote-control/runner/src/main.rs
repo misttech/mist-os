@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
     }
 
     let rcs_proxy = connect_to_protocol::<RemoteControlMarker>()?;
-    let (local_socket, remote_socket) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (local_socket, remote_socket) = fidl::Socket::create_stream();
 
     if args.circuit {
         rcs_proxy.add_overnet_link(args.id.unwrap_or(0), remote_socket).await?;

@@ -286,13 +286,7 @@ impl RemoteControlService {
 
                 info!("reverse tunnel connection from {:?} to {:?}", addr, listen_addr);
 
-                let (local, remote) = match zx::Socket::create(zx::SocketOpts::STREAM) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        warn!("Error creating socket: {:?}", e);
-                        continue;
-                    }
-                };
+                let (local, remote) = zx::Socket::create_stream();
 
                 let local = match fasync::Socket::from_socket(local) {
                     Ok(x) => x,
@@ -1063,7 +1057,7 @@ mod tests {
         let forward_task = fasync::Task::local(async move {
             let (stream, _) = listener_stream.next().await.unwrap().unwrap();
 
-            let (local, remote) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+            let (local, remote) = zx::Socket::create_stream();
             let local = fasync::Socket::from_socket(local).unwrap();
             let remote = fasync::Socket::from_socket(remote).unwrap();
 

@@ -63,13 +63,7 @@ impl Forward {
                 }
             };
 
-            let (socket, remote) = match fidl::Socket::create(fidl::SocketOpts::STREAM) {
-                Ok(x) => x,
-                Err(e) => {
-                    tracing::error!("Error creating socket: {:?}", e);
-                    continue;
-                }
-            };
+            let (socket, remote) = fidl::Socket::create_stream();
 
             match target.forward_tcp(&mut target_address, remote).await {
                 Ok(Ok(())) => (),

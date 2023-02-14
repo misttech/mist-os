@@ -391,7 +391,7 @@ impl HostPipeConnection {
 }
 
 fn overnet_pipe(overnet_instance: &hoist::Hoist, circuit: bool) -> Result<fidl::AsyncSocket> {
-    let (local_socket, remote_socket) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
+    let (local_socket, remote_socket) = fidl::Socket::create_stream();
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
     if circuit {
         overnet_instance.start_client_socket(remote_socket).detach();

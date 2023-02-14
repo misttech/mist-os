@@ -68,8 +68,7 @@ pub trait ArchiveReaderManager {
                 }];
                 responder.send(&mut Ok(response))?;
             } else {
-                let sock_opts = fuchsia_zircon::SocketOpts::STREAM;
-                let (socket, tx_socket) = fuchsia_zircon::Socket::create(sock_opts)?;
+                let (socket, tx_socket) = fuchsia_zircon::Socket::create_stream();
                 let mut tx_socket = fasync::Socket::from_socket(tx_socket)?;
                 let response = vec![ArchiveIteratorEntry {
                     diagnostics_data: Some(DiagnosticsData::Socket(socket)),
@@ -140,8 +139,7 @@ pub trait ArchiveReaderManager {
                         } else {
                             // Long data => create a socket, send the socket in the message, then
                             // write all the data on the other side of the socket.
-                            let sock_opts = fuchsia_zircon::SocketOpts::STREAM;
-                            let (socket, tx_socket) = fuchsia_zircon::Socket::create(sock_opts)?;
+                            let (socket, tx_socket) = fuchsia_zircon::Socket::create_stream();
                             let mut tx_socket = fasync::Socket::from_socket(tx_socket)?;
                             let response = vec![ArchiveIteratorEntry {
                                 diagnostics_data: Some(DiagnosticsData::Socket(socket)),
