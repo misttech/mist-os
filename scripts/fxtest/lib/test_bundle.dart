@@ -93,7 +93,9 @@ class TestBundle {
       switch (e.testDefinition.testType) {
         case TestType.suite:
           String? target = 'updates';
-          if (testsConfig.fxEnv.isFeatureEnabled('incremental')) {
+          if (testsConfig.fxEnv.isFeatureEnabled('incremental') ||
+              testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
+              testsConfig.fxEnv.isFeatureEnabled('incremental_legacy')) {
             if (e.testDefinition.packageLabel?.isNotEmpty ?? false) {
               target = fxutils.getBuildTarget(e.testDefinition.packageLabel);
             } else if (e.testDefinition.label?.isNotEmpty ?? false) {
