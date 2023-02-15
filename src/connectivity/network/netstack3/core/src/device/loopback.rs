@@ -10,6 +10,7 @@ use core::{
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
 };
+use lock_order::{lock::LockFor, Locked};
 
 use derivative::Derivative;
 use net_types::{
@@ -74,8 +75,15 @@ pub(super) enum LoopbackDevice {}
 
 impl Device for LoopbackDevice {}
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> DeviceIdContext<LoopbackDevice> for &'_ SyncCtx<NonSyncCtx> {
     type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant>;
+}
+
+impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
+    for Locked<'a, SyncCtx<NonSyncCtx>, L>
+{
+    type DeviceId = <&'a SyncCtx<NonSyncCtx> as DeviceIdContext<LoopbackDevice>>::DeviceId;
 }
 
 pub(super) struct LoopbackDeviceState {
@@ -86,6 +94,28 @@ pub(super) struct LoopbackDeviceState {
 impl LoopbackDeviceState {
     pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
         LoopbackDeviceState { mtu, rx_queue: Default::default() }
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::LoopbackRxQueue>
+    for IpLinkDeviceState<I, LoopbackDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<IpVersion, Buf<Vec<u8>>>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.rx_queue.queue.lock()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::LoopbackRxDequeue>
+    for IpLinkDeviceState<I, LoopbackDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.rx_queue.deque.lock()
     }
 }
 
@@ -137,7 +167,9 @@ pub(super) fn get_mtu<NonSyncCtx: NonSyncContext>(
     ctx: &SyncCtx<NonSyncCtx>,
     device_id: &LoopbackDeviceId<NonSyncCtx::Instant>,
 ) -> Mtu {
-    with_loopback_state(ctx, device_id, |state| state.link.mtu)
+    with_loopback_state(&mut Locked::new(ctx), device_id, |mut state| {
+        state.cast_with(|s| &s.link.mtu).copied()
+    })
 }
 
 impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant>>
@@ -162,9 +194,9 @@ impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C
         device_id: &LoopbackDeviceId<C::Instant>,
         cb: F,
     ) -> O {
-        with_loopback_state(self, device_id, |state| {
-            let x = cb(&mut state.link.rx_queue.queue.lock());
-            x
+        with_loopback_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
+            cb(&mut x)
         })
     }
 
@@ -205,9 +237,9 @@ impl<C: NonSyncContext> ReceiveDequeContext<LoopbackDevice, C> for &'_ SyncCtx<C
         device_id: &LoopbackDeviceId<C::Instant>,
         cb: F,
     ) -> O {
-        with_loopback_state(self, device_id, |state| {
-            let x = cb(&mut state.link.rx_queue.deque.lock(), self);
-            x
+        with_loopback_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
+            cb(&mut x, self)
         })
     }
 }

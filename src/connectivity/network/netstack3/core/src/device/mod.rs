@@ -20,6 +20,7 @@ use core::{
 };
 
 use derivative::Derivative;
+use lock_order::{lock::UnlockedAccess, Locked};
 use log::{debug, trace};
 use net_types::{
     ethernet::Mac,
@@ -145,12 +146,22 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
     }
 }
 
+impl<NonSyncCtx: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
+    for SyncCtx<NonSyncCtx>
+{
+    type Data<'l> = &'l OriginTracker where Self: 'l;
+    fn access(&self) -> Self::Data<'_> {
+        &self.state.device.origin
+    }
+}
+
 fn with_ethernet_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(&IpLinkDeviceState<NonSyncCtx::Instant, EthernetDeviceState>) -> O,
+    F: FnOnce(Locked<'_, IpLinkDeviceState<NonSyncCtx::Instant, EthernetDeviceState>, L>) -> O,
+    L,
 >(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     EthernetDeviceId(_id, state_ref): &EthernetDeviceId<NonSyncCtx::Instant>,
     cb: F,
 ) -> O {
@@ -163,17 +174,24 @@ fn with_ethernet_state<
     let state = state_ref.upgrade().unwrap();
 
     // Make sure that the pointer belongs to this `sync_ctx`.
-    assert_eq!(sync_ctx.state.device.origin, state.origin);
+    assert_eq!(
+        *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
+        state.origin
+    );
 
-    cb(&state)
+    // Even though the device state is technically accessible outside of the
+    // `SyncCtx`, it is held inside `SyncCtx` so we propagate the same lock
+    // level as we were called with to avoid lock ordering issues.
+    cb(Locked::new_locked(&state))
 }
 
 fn with_loopback_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(&IpLinkDeviceState<NonSyncCtx::Instant, LoopbackDeviceState>) -> O,
+    F: FnOnce(Locked<'_, IpLinkDeviceState<NonSyncCtx::Instant, LoopbackDeviceState>, L>) -> O,
+    L,
 >(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     LoopbackDeviceId(state_ref): &LoopbackDeviceId<NonSyncCtx::Instant>,
     cb: F,
 ) -> O {
@@ -186,23 +204,30 @@ fn with_loopback_state<
     let state = state_ref.upgrade().unwrap();
 
     // Make sure that the pointer belongs to this `sync_ctx`.
-    assert_eq!(sync_ctx.state.device.origin, state.origin);
+    assert_eq!(
+        *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
+        state.origin
+    );
 
-    cb(&state)
+    // Even though the device state is technically accessible outside of the
+    // `SyncCtx`, it is held inside `SyncCtx` so we propagate the same lock
+    // level as we were called with to avoid lock ordering issues.
+    cb(Locked::new_locked(&state))
 }
 
 fn with_ip_device_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(&DualStackIpDeviceState<NonSyncCtx::Instant>) -> O,
+    F: FnOnce(Locked<'_, DualStackIpDeviceState<NonSyncCtx::Instant>, L>) -> O,
+    L,
 >(
-    ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     device: &DeviceId<NonSyncCtx::Instant>,
     cb: F,
 ) -> O {
     match device.inner() {
-        DeviceIdInner::Ethernet(id) => with_ethernet_state(ctx, id, |state| cb(&state.ip)),
-        DeviceIdInner::Loopback(id) => with_loopback_state(ctx, id, |state| cb(&state.ip)),
+        DeviceIdInner::Ethernet(id) => with_ethernet_state(ctx, id, |mut state| cb(state.cast())),
+        DeviceIdInner::Loopback(id) => with_loopback_state(ctx, id, |mut state| cb(state.cast())),
     }
 }
 
@@ -259,9 +284,10 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx> for &'_ Sync
         device_id: &Self::DualStackDeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |DualStackIpDeviceState { ipv4, ipv6 }| {
-            let ipv4 = ipv4.read();
-            let ipv6 = ipv6.read();
+        with_ip_device_state(&mut Locked::new(self), device_id, |mut state| {
+            let (ipv4, mut locked) =
+                state.read_lock_and::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
+            let ipv6 = locked.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
             cb(DualStackDeviceStateRef { ipv4: &ipv4, ipv6: &ipv6 })
         })
     }
@@ -301,7 +327,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |state| cb(&mut state.ipv4.write()))
+        with_ip_device_state(&mut Locked::new(self), device, |mut state| {
+            let mut state = state.write_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
+            cb(&mut state)
+        })
     }
 
     fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
@@ -360,7 +389,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant
         device: &DeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |state| cb(&state.ipv4.read()))
+        with_ip_device_state(&mut Locked::new(self), device, |mut state| {
+            let state = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
+            cb(&state)
+        })
     }
 }
 
@@ -486,7 +518,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |state| cb(&mut state.ipv6.write()))
+        with_ip_device_state(&mut Locked::new(self), device, |mut state| {
+            let mut state = state.write_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
+            cb(&mut state)
+        })
     }
 
     fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
@@ -545,7 +580,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv6, NonSyncCtx::Instant
         device: &DeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device, |state| cb(&state.ipv6.read()))
+        with_ip_device_state(&mut Locked::new(self), device, |mut state| {
+            let state = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
+            cb(&state)
+        })
     }
 }
 
@@ -694,8 +732,15 @@ impl<I: Instant> From<EthernetTimerId<EthernetDeviceId<I>>> for DeviceLayerTimer
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> DeviceIdContext<EthernetLinkDevice> for &'_ SyncCtx<NonSyncCtx> {
     type DeviceId = EthernetDeviceId<NonSyncCtx::Instant>;
+}
+
+impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
+    for Locked<'a, SyncCtx<NonSyncCtx>, L>
+{
+    type DeviceId = <&'a SyncCtx<NonSyncCtx> as DeviceIdContext<EthernetLinkDevice>>::DeviceId;
 }
 
 impl_timer_context!(
@@ -857,7 +902,7 @@ pub(crate) struct DeviceLayerState<I: Instant> {
 /// This is only enabled in debug builds; in non-debug builds, all
 /// `OriginTracker` instances are identical so all operations are no-ops.
 #[derive(Clone, Debug, PartialEq)]
-struct OriginTracker(#[cfg(debug_assertions)] u64);
+pub(crate) struct OriginTracker(#[cfg(debug_assertions)] u64);
 
 impl OriginTracker {
     /// Creates a new `OriginTracker` that isn't derived from any other
@@ -1176,14 +1221,29 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> DualStackDeviceIdContext for &'_ SyncCtx<NonSyncCtx> {
     type DualStackDeviceId = DeviceId<NonSyncCtx::Instant>;
 }
 
+impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
+    for Locked<'a, SyncCtx<NonSyncCtx>, L>
+{
+    type DualStackDeviceId =
+        <&'a SyncCtx<NonSyncCtx> as DualStackDeviceIdContext>::DualStackDeviceId;
+}
+
 // Temporary blanket impl until we switch over entirely to the traits defined in
 // the `context` module.
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<NonSyncCtx> {
     type DeviceId = DeviceId<NonSyncCtx::Instant>;
+}
+
+impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
+    for Locked<'a, SyncCtx<NonSyncCtx>, L>
+{
+    type DeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::DeviceId;
 }
 
 /// Insert a static entry into this device's ARP table.

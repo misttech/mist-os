@@ -8,11 +8,15 @@
 // exported from this module.
 
 #[cfg(feature = "instrumented")]
-pub use netstack3_sync_instrumented::{Mutex, RwLock};
+pub use netstack3_sync_instrumented::{
+    LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 
 // Don't perform recursive lock checks when benchmarking so that the benchmark
 // results are not affected by the extra bookkeeping.
 #[cfg(not(feature = "instrumented"))]
-pub use netstack3_sync_not_instrumented::{Mutex, RwLock};
+pub use netstack3_sync_not_instrumented::{
+    LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 
 pub use alloc::sync::{Arc as ReferenceCounted, Weak as WeakReferenceCounted};

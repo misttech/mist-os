@@ -38,6 +38,7 @@ pub mod error;
 #[cfg(fuzz)]
 mod fuzz;
 pub mod ip;
+mod lock_ordering;
 pub mod socket;
 pub mod sync;
 #[cfg(test)]

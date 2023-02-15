@@ -6,6 +6,10 @@
 
 use alloc::vec::Vec;
 use core::{fmt::Debug, num::NonZeroU32};
+use lock_order::{
+    lock::{LockFor, RwLockFor, UnlockedAccess},
+    Locked,
+};
 
 use log::trace;
 use net_types::{
@@ -40,16 +44,17 @@ use crate::{
             ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId, BufferArpContext,
         },
         link::LinkDevice,
+        state::IpLinkDeviceState,
         with_ethernet_state, Device, DeviceIdContext, EthernetDeviceId, FrameDestination, Mtu,
         RecvIpFrameMeta,
     },
     error::ExistsError,
     ip::device::{
         nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
-        state::AddrConfig,
+        state::{AddrConfig, DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
     },
     sync::{Mutex, RwLock},
-    BufferNonSyncContext, NonSyncContext, SyncCtx,
+    BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
 impl From<Mac> for FrameDestination {
@@ -152,7 +157,9 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| cb(&state.link.static_state))
+        with_ethernet_state(&mut Locked::new(self), device_id, |state| {
+            cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
+        })
     }
 
     fn with_ethernet_device_state<
@@ -163,10 +170,13 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| {
-            let state = &state.link;
-            let dynamic_state = state.dynamic_state.read();
-            cb(&state.static_state, &dynamic_state)
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let (dynamic_state, locked) =
+                state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
+            cb(
+                &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+                &dynamic_state,
+            )
         })
     }
 
@@ -178,10 +188,13 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| {
-            let state = &state.link;
-            let mut dynamic_state = state.dynamic_state.write();
-            cb(&state.static_state, &mut dynamic_state)
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let (mut dynamic_state, locked) =
+                state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
+            cb(
+                &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+                &mut dynamic_state,
+            )
         })
     }
 
@@ -261,8 +274,9 @@ impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx
         &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
     ) -> NonZeroDuration {
-        with_ethernet_state(self, device_id, |state| {
-            let ipv6 = state.ip.ipv6.read();
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut state = state.cast();
+            let ipv6 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
             ipv6.retrans_timer
         })
     }
@@ -272,8 +286,8 @@ impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| {
-            let mut nud = state.link.ipv6_nud.lock();
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut nud = state.lock::<crate::lock_ordering::EthernetIpv6Nud>();
             cb(&mut nud)
         })
     }
@@ -471,6 +485,91 @@ pub(crate) struct EthernetDeviceState {
     static_state: StaticEthernetDeviceState,
 
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
+}
+
+impl<I: Instant> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type Data<'l> = &'l StaticEthernetDeviceState
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Data<'_> {
+        &self.link.static_state
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DynamicEthernetDeviceState>
+        where
+            Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.link.dynamic_state.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.link.dynamic_state.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceState<I>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceState<I>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv4.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv4.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceState<I>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceState<I>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.write()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::EthernetIpv6Nud>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, Mac>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.ipv6_nud.lock()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::EthernetIpv4Arp>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.ipv4_arp.lock()
+    }
 }
 
 /// Should a packet with destination MAC address, `dst`, be accepted by this
@@ -874,8 +973,9 @@ impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
         _ctx: &mut C,
         device_id: &EthernetDeviceId<C::Instant>,
     ) -> Option<Ipv4Addr> {
-        with_ethernet_state(self, device_id, |state| {
-            let ipv4 = state.ip.ipv4.read();
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut state = state.cast();
+            let ipv4 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
             let ret = ipv4.ip_state.iter_addrs().next().cloned().map(|addr| addr.addr().get());
             ret
         })
@@ -894,8 +994,8 @@ impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
         device_id: &EthernetDeviceId<C::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| {
-            let mut arp = state.link.ipv4_arp.lock();
+        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+            let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
             cb(&mut arp)
         })
     }

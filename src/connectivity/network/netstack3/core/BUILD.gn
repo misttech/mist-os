@@ -52,6 +52,7 @@ lib_sources = [
   "src/ip/socket.rs",
   "src/ip/types.rs",
   "src/lib.rs",
+  "src/lock_ordering.rs",
   "src/macros.rs",
   "src/socket/address.rs",
   "src/socket/datagram.rs",
@@ -80,6 +81,7 @@ lib_deps = [
   # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
   # remove this module.
   "fakealloc",
+  "lock-order",
   "//src/connectivity/lib/net-declare",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/packet-formats",

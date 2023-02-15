@@ -82,6 +82,7 @@
 
 use core::time::Duration;
 
+use lock_order::Locked;
 use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
@@ -96,7 +97,9 @@ use crate::{Instant, NonSyncContext, SyncCtx};
 /// [this issue]: https://github.com/rust-lang/rust/issues/97811
 pub(crate) trait NonTestCtxMarker {}
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> NonTestCtxMarker for &'_ SyncCtx<NonSyncCtx> {}
+impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<'_, SyncCtx<NonSyncCtx>, L> {}
 
 /// A context that provides access to a monotonic clock.
 pub trait InstantContext {

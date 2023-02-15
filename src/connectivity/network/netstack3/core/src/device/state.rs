@@ -21,3 +21,10 @@ impl<I: Instant, D> IpLinkDeviceState<I, D> {
         Self { ip: DualStackIpDeviceState::default(), link, origin }
     }
 }
+
+impl<I: Instant, D> AsRef<DualStackIpDeviceState<I>> for IpLinkDeviceState<I, D> {
+    fn as_ref(&self) -> &DualStackIpDeviceState<I> {
+        let Self { ip, link: _, origin: _ } = self;
+        ip
+    }
+}
