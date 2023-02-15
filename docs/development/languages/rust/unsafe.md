@@ -79,10 +79,16 @@ For more discussion on encapsulating `unsafe` invariants, see
 
 ## Unsafe Reviews
 
-There is a list of reviewers who can review unsafe Rust code. To request an
-unsafe review, add "Fuchsia Rust Unsafe Reviews
-<fuchsia-rust-unsafe-reviews@google.com>" as a reviewer to your CL. A reviewer
-will then be chosen and assigned to your CL.
+To request an unsafe review for Rust code:
+
+1.  File a bug under the `Rust>Unsafe` component. Include a link to your review
+    in the bug description.
+1.  Add "Fuchsia Rust Unsafe Reviews <fuchsia-rust-unsafe-reviews@google.com>"
+    as a reviewer to your CL. A reviewer will be chosen at random and assigned
+    to your CL.
+
+If your review is time-sensitive, increase the priority on your bug and leave a
+comment explaining your situation.
 
 [scope-of-unsafe]: https://www.ralfj.de/blog/2016/01/09/the-scope-of-unsafe.html
 [tootsie-pop]: http://smallcultfollowing.com/babysteps/blog/2016/05/27/the-tootsie-pop-model-for-unsafe-code

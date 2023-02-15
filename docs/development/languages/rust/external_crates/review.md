@@ -282,9 +282,8 @@ Common risks present in external code include:
         preserved. Unsafe APIs should be very rare and must always document the
         invariants the caller needs to uphold.[^3]
 
-        It is common practice to ask someone more experienced in Rust to review
-        unsafe code. If you aren't completely comfortable reviewing unsafe,
-        please ask another reviewer.
+        Unsafe code in external crates must be reviewed by an unsafe Rust code
+        reviewer. See ["Request an unsafe code review"] for more details.
 *   Code that requires specialized domain expertise to understand
     *   If possible, find a domain expert to review this code. Examples include
         unsafe, low-level atomics and concurrency, cryptography, and network
@@ -303,6 +302,8 @@ As always, it's important to remember our alternatives. Assuming we need this
 functionality, would we be navigating the same risks if we wrote the code
 ourselves? Would doing so actually produce better results, and would it be worth
 the effort of writing and maintaining that code?
+
+["Request an unsafe code review"]: #request-an-unsafe-code-review
 
 #### Verify for correctness, but don't go overboard.
 
@@ -344,6 +345,31 @@ You don't need to review the following:
 
 Some of these are still relevant when assessing the quality of new crates,
 discussed above.
+
+#### Request an unsafe code review
+
+To make sure Fuchsia is built on external code that is sound, we do a thorough
+review of all unsafe code in external crates. Unsafe code usually requires
+special expertise to review, and so when a crate adds or updates unsafe code it
+must be approved by an unsafe reviewer.
+
+To request an unsafe code review:
+
+1.  File a bug using the "Unsafe review for external crate" template and fill
+    out:
+    -   The modified crates that are direct dependencies in the title.
+    -   The review link for your CL.
+    -   The date your CL was uploaded.
+    -   The total number of lines changed (located at the bottom of your files
+        list in Gerrit).
+    -   The constituent crates that have been added or updated.
+    -   Here's [an example](https://fxbug.dev/121497) for reference.
+1.  Add "Fuchsia Rust Unsafe Reviews <fuchsia-rust-unsafe-reviews@google.com>"
+    as a reviewer to your CL. A reviewer will be chosen at random and assigned
+    to your CL.
+
+If your review is time-sensitive, increase the priority on your bug and leave a
+comment explaining your situation.
 
 ## More reading
 
