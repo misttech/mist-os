@@ -119,8 +119,8 @@ impl FshostEnvironment {
         self.blobfs.root()
     }
 
-    /// Returns a proxy for the root of the data filesystem.  This can be called before Blobfs is
-    /// mounted and it will get routed once Blobfs is mounted.
+    /// Returns a proxy for the root of the data filesystem.  This can be called before "/data"
+    /// is mounted and it will get routed once the data partition is mounted.
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.root()
     }
