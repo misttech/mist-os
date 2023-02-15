@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use argh::FromArgs;
 use async_trait::async_trait;
-use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -18,7 +18,8 @@ pub struct EchoCommand {
 pub struct EchoTool {
     #[command]
     cmd: EchoCommand,
-    echo_proxy: fho::DaemonProtocol<ffx::EchoProxy>,
+    #[with(daemon_protocol())]
+    echo_proxy: ffx::EchoProxy,
 }
 
 #[async_trait(?Send)]
@@ -42,7 +43,7 @@ mod tests {
     use fho::macro_deps::ffx_writer::TestBuffer;
     use futures_lite::stream::StreamExt;
 
-    fn setup_fake_echo_proxy() -> fho::DaemonProtocol<ffx::EchoProxy> {
+    fn setup_fake_echo_proxy() -> ffx::EchoProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>().unwrap();
         fuchsia_async::Task::local(async move {
@@ -55,7 +56,7 @@ mod tests {
             }
         })
         .detach();
-        fho::DaemonProtocol::new(proxy)
+        proxy
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

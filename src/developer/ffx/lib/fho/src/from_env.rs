@@ -240,19 +240,20 @@ pub fn selector_timeout<P: Proxy>(selector: impl AsRef<str>, timeout_secs: u64) 
 }
 
 #[derive(Debug, Clone)]
-pub struct DaemonProtocol<P: Clone> {
-    proxy: P,
-}
+pub struct DaemonProtocol<P: Clone>(P);
+
+#[derive(Debug, Clone, Default)]
+pub struct WithDaemonProtocol<P>(PhantomData<fn() -> P>);
 
 impl<P: Clone> DaemonProtocol<P> {
     pub fn new(proxy: P) -> Self {
-        Self { proxy }
+        Self(proxy)
     }
 }
 
 impl<P: Clone> DaemonProtocol<P> {
     pub fn into_inner(self) -> P {
-        self.proxy
+        self.0
     }
 }
 
@@ -260,7 +261,7 @@ impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
     type Target = P;
 
     fn deref(&self) -> &Self::Target {
-        &self.proxy
+        &self.0
     }
 }
 
@@ -295,24 +296,60 @@ Please report it at http://fxbug.dev/new/ffx+User+Bug."
     .into()
 }
 
+async fn load_daemon_protocol<P>(env: &FhoEnvironment) -> Result<P>
+where
+    P: Proxy + Clone,
+    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+{
+    let svc_name = <P::Protocol as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME;
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
+        .with_user_message(|| format!("Failed creating proxy for service {}", svc_name))?;
+    let daemon = env.injector.daemon_factory().await?;
+
+    daemon
+        .connect_to_protocol(svc_name, server_end.into_channel())
+        .await
+        .bug_context("Connecting to protocol")?
+        .map_err(|err| map_daemon_error(svc_name, err))?;
+
+    Ok(proxy)
+}
+
 #[async_trait(?Send)]
 impl<P: Proxy + Clone> TryFromEnv for DaemonProtocol<P>
 where
     P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
 {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let svc_name = <P::Protocol as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
-            .with_user_message(|| format!("Failed creating proxy for service {}", svc_name))?;
-        let daemon = env.injector.daemon_factory().await?;
-
-        daemon
-            .connect_to_protocol(svc_name, server_end.into_channel())
-            .await
-            .bug_context("Connecting to protocol")?
-            .map_err(|err| map_daemon_error(svc_name, err))
-            .map(|_| DaemonProtocol { proxy })
+        load_daemon_protocol(env).await.map(DaemonProtocol)
     }
+}
+
+#[async_trait(?Send)]
+impl<P> TryFromEnvWith for WithDaemonProtocol<P>
+where
+    P: Proxy + Clone + 'static,
+    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+{
+    type Output = P;
+    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<P> {
+        load_daemon_protocol(env).await
+    }
+}
+
+/// A decorator for daemon proxies.
+///
+/// Example:
+///
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     #[with(fho::daemon_protocol())]
+///     foo_proxy: FooProxy,
+/// }
+/// ```
+pub fn daemon_protocol<P>() -> WithDaemonProtocol<P> {
+    WithDaemonProtocol(Default::default())
 }
 
 #[async_trait(?Send)]
