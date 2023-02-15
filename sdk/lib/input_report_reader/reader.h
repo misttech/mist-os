@@ -6,11 +6,11 @@
 #define LIB_INPUT_REPORT_READER_READER_H_
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <lib/input_report_reader/ring_buffer.h>
 #include <lib/trace/event.h>
 #include <zircon/compiler.h>
 
 #include <array>
+#include <deque>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -21,12 +21,17 @@ namespace input_report_reader {
 using ReadInputReportsCompleterBase =
     fidl::internal::WireCompleterBase<fuchsia_input_report::InputReportsReader::ReadInputReports>;
 
-template <class Report>
-class InputReportReader;
-
+// InputReportReaderManager is used to simplify implementation of input drivers. An input driver may
+// use InputReportReaderManager to keep track of all upstream readers that want to receive reports.
+// An upstream driver that wants to read input reports from this device may register with
+// InputReportReaderManager, which calls CreateReader. When an input report arrives, whether in the
+// form of HID reports or device readings by polling, etc., the report is pushed to all readers
+// registered by calling SendReportToAllReaders where it is then translated to
+// fuchsia_input_report::InputReport.
+//
 // This class creates and manages the InputReportReaders. It is able to send reports
 // to all existing InputReportReaders.
-// When this class is destructed, all of the InputReportReaders will be free.
+// When this class is destructed, all of the InputReportReaders will be freed.
 // This class is thread-safe.
 // Typical Usage:
 // An InputReport Driver should have one InputReportReaderManager member object.
@@ -41,19 +46,65 @@ class InputReportReader;
 //      int64_t x;
 //      int64_t y;
 //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
-//      input_report,
-//                             fidl::AnyArena& allocator);
+//                             input_report, fidl::AnyArena& allocator);
 //   };
 //
 //   InputReportReaderManager<TouchScreenReport> input_report_readers_;
 // };
+//
+// See
+// https://fuchsia.dev/fuchsia-src/development/drivers/concepts/driver_architectures/input_drivers/input?hl=en
 template <class Report>
 class InputReportReaderManager final {
+ private:
+  class InputReportReader;
+
  public:
+  InputReportReaderManager() = default;
+  // This object can't be moved, because InputReportReaders point to this object.
+  InputReportReaderManager(const InputReportReaderManager&) = delete;
+  InputReportReaderManager(InputReportReaderManager&&) = delete;
+  InputReportReaderManager& operator=(const InputReportReaderManager&) = delete;
+  InputReportReaderManager& operator=(InputReportReaderManager&&) = delete;
+
+  // Create a new InputReportReader that is managed by this InputReportReaderManager.
+  zx_status_t CreateReader(async_dispatcher_t* dispatcher,
+                           fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
+    ZX_ASSERT(dispatcher);
+    std::scoped_lock lock(lock_);
+    auto reader = InputReportReader::Create(this, next_reader_id_, dispatcher, std::move(server));
+    if (!reader) {
+      return ZX_ERR_INTERNAL;
+    }
+    next_reader_id_++;
+    readers_list_.push_back(std::move(reader));
+    return ZX_OK;
+  }
+
+  // Send a report to all InputReportReaders.
+  void SendReportToAllReaders(const Report& report) {
+    std::scoped_lock lock(lock_);
+    for (auto& reader : readers_list_) {
+      reader->ReceiveReport(report);
+    }
+  }
+
+  // Remove a given reader from the list. This is called by the InputReportReader itself
+  // when it wishes to be removed.
+  void RemoveReaderFromList(InputReportReader* reader) {
+    std::scoped_lock lock(lock_);
+    for (auto iter = readers_list_.begin(); iter != readers_list_.end(); ++iter) {
+      if (iter->get() == reader) {
+        readers_list_.erase(iter);
+        break;
+      }
+    }
+  }
+
+ private:
   // Assert that our template type `Report` has the following function:
   //      void ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>&
-  //      input_report,
-  //                             fidl::AnyArena& allocator);
+  //                             input_report, fidl::AnyArena& allocator);
   template <typename T>
   struct has_to_fidl_input_report {
    private:
@@ -74,51 +125,9 @@ class InputReportReaderManager final {
       "ToFidlInputReport(fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& "
       "input_report, fidl::AnyArena& allocator);");
 
-  InputReportReaderManager() = default;
-  // This class can't be moved because the InputReportReaders are pointing to the main class.
-  InputReportReaderManager(const InputReportReaderManager&) = delete;
-  InputReportReaderManager(InputReportReaderManager&&) = delete;
-  InputReportReaderManager& operator=(const InputReportReaderManager&) = delete;
-  InputReportReaderManager& operator=(InputReportReaderManager&&) = delete;
-
-  // Create a new InputReportReader that is managed by this InputReportReaderManager.
-  zx_status_t CreateReader(async_dispatcher_t* dispatcher,
-                           fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
-    std::scoped_lock lock(readers_lock_);
-    auto reader =
-        InputReportReader<Report>::Create(this, next_reader_id_, dispatcher, std::move(server));
-    if (!reader) {
-      return ZX_ERR_INTERNAL;
-    }
-    next_reader_id_++;
-    readers_list_.push_back(std::move(reader));
-    return ZX_OK;
-  }
-
-  // Send a report to all InputReportReaders.
-  void SendReportToAllReaders(const Report& report) {
-    std::scoped_lock lock(readers_lock_);
-    for (auto& reader : readers_list_) {
-      reader->ReceiveReport(report);
-    }
-  }
-
-  // Remove a given reader from the list. This is called by the InputReportReader itself
-  // when it wishes to be removed.
-  void RemoveReaderFromList(InputReportReader<Report>* reader) {
-    std::scoped_lock lock(readers_lock_);
-    for (auto iter = readers_list_.begin(); iter != readers_list_.end(); ++iter) {
-      if (iter->get() == reader) {
-        readers_list_.erase(iter);
-        break;
-      }
-    }
-  }
-
- private:
-  std::mutex readers_lock_;
-  size_t next_reader_id_ __TA_GUARDED(readers_lock_) = 1;
-  std::list<std::unique_ptr<InputReportReader<Report>>> readers_list_ __TA_GUARDED(readers_lock_);
+  std::mutex lock_;
+  size_t next_reader_id_ __TA_GUARDED(lock_) = 1;
+  std::list<std::shared_ptr<InputReportReader>> readers_list_ __TA_GUARDED(lock_);
 };
 
 // This class represents an InputReportReader that sends InputReports out to a specific client.
@@ -127,10 +136,11 @@ class InputReportReaderManager final {
 //  This class shouldn't be touched directly. An InputReport driver should only manipulate
 //  the InputReportReaderManager.
 template <class Report>
-class InputReportReader final : public fidl::WireServer<fuchsia_input_report::InputReportsReader> {
+class InputReportReaderManager<Report>::InputReportReader final
+    : public fidl::WireServer<fuchsia_input_report::InputReportsReader> {
  public:
   // Create the InputReportReader. `manager` and `dispatcher` must outlive this InputReportReader.
-  static std::unique_ptr<InputReportReader<Report>> Create(
+  static std::shared_ptr<InputReportReader> Create(
       InputReportReaderManager<Report>* manager, size_t reader_id, async_dispatcher_t* dispatcher,
       fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server);
 
@@ -151,37 +161,40 @@ class InputReportReader final : public fidl::WireServer<fuchsia_input_report::In
   std::mutex report_lock_;
   std::optional<ReadInputReportsCompleter::Async> completer_ __TA_GUARDED(&report_lock_);
   fidl::Arena<kInputReportBufferSize> report_allocator_ __TA_GUARDED(report_lock_);
-  RingBuffer<Report, fuchsia_input_report::wire::kMaxDeviceReportCount> reports_data_
-      __TA_GUARDED(report_lock_);
+  std::deque<Report> reports_data_ __TA_GUARDED(report_lock_);
 
   const size_t reader_id_;
-  InputReportReaderManager<Report>* manager_;
+  InputReportReaderManager<Report>* const manager_;
 };
 
 // Template Implementation.
 template <class Report>
-inline std::unique_ptr<InputReportReader<Report>> InputReportReader<Report>::Create(
+inline std::shared_ptr<typename InputReportReaderManager<Report>::InputReportReader>
+InputReportReaderManager<Report>::InputReportReader::Create(
     InputReportReaderManager<Report>* manager, size_t reader_id, async_dispatcher_t* dispatcher,
     fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
+  if (!manager || !dispatcher) {
+    return nullptr;
+  }
+
   fidl::OnUnboundFn<InputReportReader> unbound_fn(
       [](InputReportReader* reader, fidl::UnbindInfo info,
          fidl::ServerEnd<fuchsia_input_report::InputReportsReader> channel) {
-        reader->manager_->RemoveReaderFromList(reader);
+        if (reader && reader->manager_) {
+          reader->manager_->RemoveReaderFromList(reader);
+        }
       });
 
-  auto reader = std::make_unique<InputReportReader<Report>>(manager, reader_id);
-  fidl::BindServer(dispatcher, std::move(server), reader.get(), std::move(unbound_fn));
+  auto reader = std::make_shared<InputReportReader>(manager, reader_id);
+  fidl::BindServer(dispatcher, std::move(server), reader, std::move(unbound_fn));
   return reader;
 }
 
 template <class Report>
-inline void InputReportReader<Report>::ReceiveReport(const Report& report) {
+inline void InputReportReaderManager<Report>::InputReportReader::ReceiveReport(
+    const Report& report) {
   std::scoped_lock lock(report_lock_);
-  if (reports_data_.full()) {
-    reports_data_.pop();
-  }
-
-  reports_data_.push(report);
+  reports_data_.push_back(report);
 
   if (completer_) {
     ReplyWithReports(*completer_);
@@ -190,7 +203,7 @@ inline void InputReportReader<Report>::ReceiveReport(const Report& report) {
 }
 
 template <class Report>
-inline void InputReportReader<Report>::ReadInputReports(
+inline void InputReportReaderManager<Report>::InputReportReader::ReadInputReports(
     ReadInputReportsCompleter::Sync& completer) {
   std::scoped_lock lock(report_lock_);
   if (completer_) {
@@ -205,7 +218,8 @@ inline void InputReportReader<Report>::ReadInputReports(
 }
 
 template <class Report>
-inline void InputReportReader<Report>::ReplyWithReports(ReadInputReportsCompleterBase& completer) {
+inline void InputReportReaderManager<Report>::InputReportReader::ReplyWithReports(
+    ReadInputReportsCompleterBase& completer) {
   std::array<fuchsia_input_report::wire::InputReport,
              fuchsia_input_report::wire::kMaxDeviceReportCount>
       reports;
@@ -225,7 +239,7 @@ inline void InputReportReader<Report>::ReplyWithReports(ReadInputReportsComplete
     reports[num_reports] = input_report.Build();
 
     TRACE_FLOW_BEGIN("input", "input_report", reports[num_reports].trace_id());
-    reports_data_.pop();
+    reports_data_.pop_front();
   }
 
   completer.ReplySuccess(

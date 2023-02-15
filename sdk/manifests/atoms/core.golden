@@ -159,6 +159,7 @@
 //sdk/lib/fit-promise:fit-promise_sdk
 //sdk/lib/fit:fit_sdk
 //sdk/lib/images/cpp:cpp_sdk
+//sdk/lib/input_report_reader:input_report_reader_sdk
 //sdk/lib/inspect/service/cpp:cpp_sdk
 //sdk/lib/inspect:inspect
 //sdk/lib/media/cpp:cpp_sdk

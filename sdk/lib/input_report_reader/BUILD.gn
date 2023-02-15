@@ -7,7 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("input_report_reader") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "input_report_reader"
 
   include_base = "//sdk"
@@ -15,8 +15,6 @@ sdk_source_set("input_report_reader") {
   sources = [
     "reader.cc",
     "reader.h",
-    "ring_buffer.cc",
-    "ring_buffer.h",
   ]
 
   public_configs = [ "//sdk/config" ]

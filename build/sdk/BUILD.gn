@@ -47,6 +47,7 @@ _sdk_versioned_source_sets_list = [
   "//sdk/lib/fit",
   "//sdk/lib/fit-promise",
   "//sdk/lib/images/cpp",
+  "//sdk/lib/input_report_reader",
   "//sdk/lib/inspect/service/cpp",
   "//sdk/lib/media/cpp",
   "//sdk/lib/media/cpp:no_converters",
