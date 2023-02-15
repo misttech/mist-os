@@ -57,8 +57,8 @@ use {
 assert_eq_size!(u64, usize);
 
 pub struct Parser<T: Reader> {
-    reader: Arc<T>,
-    super_block: OnceCell<Arc<SuperBlock>>,
+    reader: T,
+    super_block: OnceCell<SuperBlock>,
 }
 
 /// EXT4 Parser
@@ -70,7 +70,7 @@ pub struct Parser<T: Reader> {
 /// let tree = parser.build_fuchsia_tree()
 impl<T: 'static + Reader> Parser<T> {
     pub fn new(reader: T) -> Self {
-        Parser { reader: Arc::new(reader), super_block: OnceCell::new() }
+        Parser { reader, super_block: OnceCell::new() }
     }
 
     /// Returns the Super Block.
@@ -80,8 +80,8 @@ impl<T: 'static + Reader> Parser<T> {
     ///
     /// We never need to re-parse the super block in this read-only
     /// implementation.
-    fn super_block(&self) -> Result<Arc<SuperBlock>, ParsingError> {
-        Ok(self.super_block.get_or_try_init(|| SuperBlock::parse(self.reader.clone()))?.clone())
+    fn super_block(&self) -> Result<&SuperBlock, ParsingError> {
+        self.super_block.get_or_try_init(|| SuperBlock::parse(&self.reader))
     }
 
     /// Reads block size from the Super Block.
@@ -110,7 +110,7 @@ impl<T: 'static + Reader> Parser<T> {
     }
 
     /// Reads the INode at the given inode number.
-    pub fn inode(&self, inode_number: u32) -> Result<Arc<INode>, ParsingError> {
+    pub fn inode(&self, inode_number: u32) -> Result<INode, ParsingError> {
         if inode_number < 1 {
             // INode number 0 is not allowed per ext4 spec.
             return Err(ParsingError::InvalidInode(inode_number));
@@ -140,11 +140,8 @@ impl<T: 'static + Reader> Parser<T> {
 
         let bgd_offset = (inode_number - 1) as u64 / sb.e2fs_ipg.get() as u64
             * size_of::<BlockGroupDesc32>() as u64;
-        let bgd = BlockGroupDesc32::from_reader_with_offset(
-            self.reader.clone(),
-            bgd_table_offset + bgd_offset,
-            ParsingError::InvalidBlockGroupDesc(block_size),
-        )?;
+        let bgd =
+            BlockGroupDesc32::from_reader_with_offset(&self.reader, bgd_table_offset + bgd_offset)?;
 
         // Offset could really be anywhere, and the Reader will enforce reading within the
         // filesystem size. Not much can be checked here.
@@ -159,15 +156,11 @@ impl<T: 'static + Reader> Parser<T> {
             ));
         }
 
-        INode::from_reader_with_offset(
-            self.reader.clone(),
-            inode_addr,
-            ParsingError::InvalidInode(inode_number),
-        )
+        INode::from_reader_with_offset(&self.reader, inode_addr)
     }
 
     /// Helper function to get the root directory INode.
-    pub fn root_inode(&self) -> Result<Arc<INode>, ParsingError> {
+    pub fn root_inode(&self) -> Result<INode, ParsingError> {
         self.inode(ROOT_INODE_NUM)
     }
 
@@ -223,7 +216,7 @@ impl<T: 'static + Reader> Parser<T> {
     fn read_dir_entries(
         &self,
         extent: &Extent,
-        entries: &mut Vec<Arc<DirEntry2>>,
+        entries: &mut Vec<DirEntry2>,
     ) -> Result<(), ParsingError> {
         let block_size = self.block_size()?;
         let target_block_offset = extent.target_block_num() * block_size;
@@ -236,11 +229,7 @@ impl<T: 'static + Reader> Parser<T> {
                 let offset =
                     dir_entry_offset + target_block_offset + (block_index as u64 * block_size);
 
-                let de_header = DirEntryHeader::from_reader_with_offset(
-                    self.reader.clone(),
-                    offset,
-                    ParsingError::InvalidDirEntry2(offset),
-                )?;
+                let de_header = DirEntryHeader::from_reader_with_offset(&self.reader, offset)?;
                 let mut de = DirEntry2 {
                     e2d_ino: de_header.e2d_ino,
                     e2d_reclen: de_header.e2d_reclen,
@@ -256,7 +245,7 @@ impl<T: 'static + Reader> Parser<T> {
                 dir_entry_offset += de.e2d_reclen.get() as u64;
 
                 if de.e2d_ino.get() != 0 {
-                    entries.push(Arc::new(de));
+                    entries.push(de);
                 }
             }
         }
@@ -306,11 +295,8 @@ impl<T: 'static + Reader> Parser<T> {
 
                     let next_level_offset = e.target_block_num() as u64 * block_size;
 
-                    let next_extent_header = ExtentHeader::from_reader_with_offset(
-                        self.reader.clone(),
-                        next_level_offset,
-                        ParsingError::InvalidExtent(next_level_offset),
-                    )?;
+                    let next_extent_header =
+                        ExtentHeader::from_reader_with_offset(&self.reader, next_level_offset)?;
 
                     let entry_count = next_extent_header.eh_ecount.get() as usize;
                     let entry_size = match next_extent_header.eh_depth.get() {
@@ -337,10 +323,7 @@ impl<T: 'static + Reader> Parser<T> {
     /// Lists directory entries from the directory that is the given Inode.
     ///
     /// Errors if the Inode does not map to a Directory.
-    pub fn entries_from_inode(
-        &self,
-        inode: &Arc<INode>,
-    ) -> Result<Vec<Arc<DirEntry2>>, ParsingError> {
+    pub fn entries_from_inode(&self, inode: &INode) -> Result<Vec<DirEntry2>, ParsingError> {
         let root_extent_tree_node = inode.extent_tree_node()?;
         let mut dir_entries = Vec::new();
 
@@ -356,7 +339,7 @@ impl<T: 'static + Reader> Parser<T> {
     /// Root doesn't have a DirEntry2.
     ///
     /// When dynamic loading of files is supported, this is the required mechanism.
-    pub fn entry_at_path(&self, path: &Path) -> Result<Arc<DirEntry2>, ParsingError> {
+    pub fn entry_at_path(&self, path: &Path) -> Result<DirEntry2, ParsingError> {
         let root_inode = self.root_inode()?;
         let root_entries = self.entries_from_inode(&root_inode)?;
         let mut entry_map = DirEntry2::as_hash_map(root_entries)?;
@@ -461,12 +444,12 @@ impl<T: 'static + Reader> Parser<T> {
     /// chooses to cancel indexing early, an Ok(false) is returned and propagated up.
     pub fn index<R>(
         &self,
-        inode: Arc<INode>,
+        inode: INode,
         prefix: Vec<&str>,
         receiver: &mut R,
     ) -> Result<bool, ParsingError>
     where
-        R: FnMut(&Parser<T>, Vec<&str>, Arc<DirEntry2>) -> Result<bool, ParsingError>,
+        R: FnMut(&Parser<T>, Vec<&str>, &DirEntry2) -> Result<bool, ParsingError>,
     {
         let entries = self.entries_from_inode(&inode)?;
         for entry in entries {
@@ -477,7 +460,7 @@ impl<T: 'static + Reader> Parser<T> {
             let mut name = Vec::new();
             name.append(&mut prefix.clone());
             name.push(entry_name);
-            if !receiver(self, name.clone(), entry.clone())? {
+            if !receiver(self, name.clone(), &entry)? {
                 return Ok(false);
             }
             if EntryType::from_u8(entry.e2d_type)? == EntryType::Directory {

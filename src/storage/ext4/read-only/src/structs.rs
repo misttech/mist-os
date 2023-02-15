@@ -34,7 +34,7 @@
 
 use {
     crate::readers::{Reader, ReaderError},
-    std::{collections::HashMap, fmt, mem::size_of, str, sync::Arc},
+    std::{collections::HashMap, fmt, mem::size_of, str},
     thiserror::Error,
     zerocopy::{
         byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64},
@@ -633,16 +633,7 @@ pub const BANNED_FEATURE_INCOMPAT: u32 = FeatureIncompat::Compression as u32 |
 // TODO(mbrunson): Update this trait to follow error conventions similar to ExtentTreeNode::parse.
 /// All functions to help parse data into respective structs.
 pub trait ParseToStruct: FromBytes + Unaligned + Sized {
-    fn from_reader_with_offset(
-        reader: Arc<dyn Reader>,
-        offset: u64,
-        error_type: ParsingError,
-    ) -> Result<Arc<Self>, ParsingError> {
-        let data = Self::read_from_offset(reader, offset)?;
-        Self::to_struct_arc(data, error_type)
-    }
-
-    fn read_from_offset(reader: Arc<dyn Reader>, offset: u64) -> Result<Box<[u8]>, ParsingError> {
+    fn from_reader_with_offset(reader: &dyn Reader, offset: u64) -> Result<Self, ParsingError> {
         if offset < FIRST_BG_PADDING {
             return Err(ParsingError::InvalidAddress(
                 InvalidAddressErrorType::Lower,
@@ -650,20 +641,16 @@ pub trait ParseToStruct: FromBytes + Unaligned + Sized {
                 FIRST_BG_PADDING,
             ));
         }
-        let mut data = vec![0u8; size_of::<Self>()];
-        reader.read(offset, data.as_mut_slice())?;
-        Ok(data.into_boxed_slice())
-    }
-
-    /// Transmutes from `Box<[u8]>` to `Arc<Self>`.
-    ///
-    /// `data` is consumed by this operation.
-    ///
-    /// `Self` is the ext4 struct that represents the given `data`.
-    fn to_struct_arc(data: Box<[u8]>, error: ParsingError) -> Result<Arc<Self>, ParsingError> {
-        Self::validate(&data, error)?;
-        let ptr = Box::into_raw(data);
-        unsafe { Ok(Arc::from(Box::from_raw(ptr as *mut Self))) }
+        let mut object = Self::new_zeroed();
+        // SAFETY: Convert buffer to a byte slice. It's safe to read from this slice because object
+        // was created with new_zeroed, so its bit pattern is entirely initialized. It's safe to
+        // write to this slice because Self implements FromBytes, meaning any bit pattern written
+        // to the slice is valid to interpret as Self.
+        let buffer = unsafe {
+            std::slice::from_raw_parts_mut(&mut object as *mut Self as *mut u8, size_of::<Self>())
+        };
+        reader.read(offset, buffer)?;
+        Ok(object)
     }
 
     /// Casts the &[u8] data to &Self.
@@ -671,10 +658,6 @@ pub trait ParseToStruct: FromBytes + Unaligned + Sized {
     /// `Self` is the ext4 struct that represents the given `data`.
     fn to_struct_ref(data: &[u8], error_type: ParsingError) -> Result<&Self, ParsingError> {
         LayoutVerified::<&[u8], Self>::new(data).map(|res| res.into_ref()).ok_or(error_type)
-    }
-
-    fn validate(data: &[u8], error_type: ParsingError) -> Result<(), ParsingError> {
-        Self::to_struct_ref(data, error_type).map(|_| ())
     }
 }
 
@@ -694,13 +677,11 @@ impl<B: ByteSlice> ExtentTreeNode<B> {
 
 impl SuperBlock {
     /// Parse the Super Block at its default location.
-    pub fn parse(reader: Arc<dyn Reader>) -> Result<Arc<SuperBlock>, ParsingError> {
+    pub fn parse(reader: &dyn Reader) -> Result<SuperBlock, ParsingError> {
         // Super Block in Block Group 0 is at offset 1024.
         // Assuming there is no corruption, there is no need to read any other
         // copy of the Super Block.
-        let data = SuperBlock::read_from_offset(reader, FIRST_BG_PADDING)?;
-        let sb =
-            SuperBlock::to_struct_arc(data, ParsingError::InvalidSuperBlock(FIRST_BG_PADDING))?;
+        let sb = SuperBlock::from_reader_with_offset(reader, FIRST_BG_PADDING)?;
         sb.check_magic()?;
         sb.feature_check()?;
         Ok(sb)
@@ -791,9 +772,9 @@ impl DirEntry2 {
     /// Key: name of entry
     /// Value: DirEntry2 struct
     pub fn as_hash_map(
-        entries: Vec<Arc<DirEntry2>>,
-    ) -> Result<HashMap<String, Arc<DirEntry2>>, ParsingError> {
-        let mut entry_map: HashMap<String, Arc<DirEntry2>> = HashMap::with_capacity(entries.len());
+        entries: Vec<DirEntry2>,
+    ) -> Result<HashMap<String, DirEntry2>, ParsingError> {
+        let mut entry_map: HashMap<String, DirEntry2> = HashMap::with_capacity(entries.len());
 
         for entry in entries {
             entry_map.insert(entry.name()?.to_string(), entry);
@@ -820,12 +801,11 @@ impl ExtentIndex {
 mod test {
     use {
         super::{
-            Extent, ExtentHeader, ExtentIndex, FeatureIncompat, ParseToStruct, ParsingError,
-            SuperBlock, EH_MAGIC, FIRST_BG_PADDING, LEU16, LEU32, LEU64, REQUIRED_FEATURE_INCOMPAT,
-            SB_MAGIC,
+            Extent, ExtentHeader, ExtentIndex, FeatureIncompat, ParseToStruct, SuperBlock,
+            EH_MAGIC, FIRST_BG_PADDING, LEU16, LEU32, LEU64, REQUIRED_FEATURE_INCOMPAT, SB_MAGIC,
         },
         crate::readers::VecReader,
-        std::{fs, sync::Arc},
+        std::fs,
     };
 
     impl Default for SuperBlock {
@@ -938,8 +918,8 @@ mod test {
     #[fuchsia::test]
     fn parse_superblock() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let reader = Arc::new(VecReader::new(data));
-        let sb = SuperBlock::parse(reader).expect("Parsed Super Block");
+        let reader = VecReader::new(data);
+        let sb = SuperBlock::parse(&reader).expect("Parsed Super Block");
         // Block size of the 1file.img is 1KiB.
         assert_eq!(sb.block_size().unwrap(), FIRST_BG_PADDING);
 
@@ -978,13 +958,9 @@ mod test {
     #[fuchsia::test]
     fn parse_to_struct_from_reader_with_offset() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let reader = Arc::new(VecReader::new(data));
-        let sb = SuperBlock::from_reader_with_offset(
-            reader,
-            FIRST_BG_PADDING,
-            ParsingError::InvalidSuperBlock(FIRST_BG_PADDING),
-        )
-        .expect("Parsed Super Block");
+        let reader = VecReader::new(data);
+        let sb = SuperBlock::from_reader_with_offset(&reader, FIRST_BG_PADDING)
+            .expect("Parsed Super Block");
         assert!(sb.check_magic().is_ok());
     }
 
@@ -992,8 +968,8 @@ mod test {
     #[fuchsia::test]
     fn incompatible_feature_flags() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let reader = Arc::new(VecReader::new(data));
-        let sb = SuperBlock::parse(reader).expect("Parsed Super Block");
+        let reader = VecReader::new(data);
+        let sb = SuperBlock::parse(&reader).expect("Parsed Super Block");
         assert_eq!(sb.e2fs_magic.get(), SB_MAGIC);
         assert!(sb.feature_check().is_ok());
 

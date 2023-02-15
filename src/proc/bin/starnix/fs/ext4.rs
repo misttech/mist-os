@@ -53,7 +53,7 @@ impl ExtFilesystem {
 
 impl ExtNode {
     fn new(fs: Arc<ExtFilesystem>, inode_num: u32) -> Result<ExtNode, Errno> {
-        let inode = fs.parser.inode(inode_num).map_err(ext_error)?;
+        let inode = Arc::new(fs.parser.inode(inode_num).map_err(ext_error)?);
         Ok(ExtNode { fs: Arc::downgrade(&fs), inode_num, inode })
     }
 
