@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <fuchsia/hardware/camera/cpp/fidl.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
+#include <lib/async-loop/cpp/loop.h>
 
 #include "src/camera/drivers/controller/controller_device.h"
 #include "src/camera/drivers/controller/controller_protocol.h"
 #include "src/camera/drivers/controller/test/constants.h"
 #include "src/camera/drivers/controller/test/fake_sysmem.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace camera {
@@ -18,29 +20,27 @@ namespace {
 class ControllerDeviceTest : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    ddk_ = std::make_unique<fake_ddk::Bind>();
-    static constexpr const uint32_t kNumSubDevices = 1;
-    fbl::Array<fake_ddk::FragmentEntry> fragments(new fake_ddk::FragmentEntry[kNumSubDevices],
-                                                  kNumSubDevices);
-    fragments[0].name = "sysmem";
-    fragments[0].protocols.emplace_back(fake_sysmem_.ProtocolEntry());
-    ddk_->SetFragments(std::move(fragments));
+    root_ = MockDevice::FakeRootParent();
 
-    auto result = ControllerDevice::Create(fake_ddk::kFakeParent);
+    root_->AddProtocol(ZX_PROTOCOL_SYSMEM, fake_sysmem_.proto().ops, fake_sysmem_.proto().ctx,
+                       "sysmem");
+
+    auto result = ControllerDevice::Create(root_.get());
     ASSERT_TRUE(result.is_ok());
-    controller_device_ = result.take_value();
+    controller_device_ = result.take_value().release();
+
+    ASSERT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
+    ASSERT_EQ(root_->child_count(), 1u);
+    controller_mock_ = root_->GetLatestChild();
+
+    ASSERT_EQ(loop_.StartThread(), ZX_OK);
   }
 
   void TearDown() override {
-    if (controller_device_) {
-      controller_device_->DdkAsyncRemove();
-    }
-    ASSERT_EQ(ddk_->WaitUntilRemove(), ZX_OK);
-    ASSERT_TRUE(ddk_->Ok());
-    ddk_ = nullptr;
-
     controller_protocol_ = nullptr;
     controller_device_ = nullptr;
+    controller_mock_ = nullptr;
+    loop_.Shutdown();
   }
 
   static void FailErrorHandler(zx_status_t status) {
@@ -75,32 +75,42 @@ class ControllerDeviceTest : public gtest::TestLoopFixture {
   }
 
   void BindControllerProtocol() {
-    ASSERT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
-    ASSERT_EQ(camera_protocol_.Bind(std::move(ddk_->FidlClient())), ZX_OK);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
+    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+
+    ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
     camera_protocol_.set_error_handler(FailErrorHandler);
     camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
     controller_protocol_.set_error_handler(FailErrorHandler);
     RunLoopUntilIdle();
   }
 
-  std::unique_ptr<fake_ddk::Bind> ddk_;
-  std::unique_ptr<ControllerDevice> controller_device_;
+  std::shared_ptr<MockDevice> root_;
+  ControllerDevice* controller_device_ = nullptr;
+  MockDevice* controller_mock_ = nullptr;
   fuchsia::hardware::camera::DevicePtr camera_protocol_;
   fuchsia::camera2::hal::ControllerPtr controller_protocol_;
   FakeSysmem fake_sysmem_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 // Verifies controller can start up and shut down.
 TEST_F(ControllerDeviceTest, DdkLifecycle) {
-  EXPECT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
+  controller_device_->DdkUnbind(ddk::UnbindTxn{controller_mock_});
   controller_device_->DdkAsyncRemove();
-  EXPECT_TRUE(ddk_->Ok());
+  controller_mock_->WaitUntilUnbindReplyCalled();
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+  EXPECT_EQ(root_->child_count(), 0u);
 }
 
 // Verifies GetChannel is not supported.
 TEST_F(ControllerDeviceTest, GetChannel) {
-  EXPECT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
-  ASSERT_EQ(camera_protocol_.Bind(std::move(ddk_->FidlClient())), ZX_OK);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
+  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+
+  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel(controller_protocol_.NewRequest().TakeChannel());
   RunLoopUntilIdle();
   WaitForChannelClosure(controller_protocol_.channel());
@@ -109,8 +119,11 @@ TEST_F(ControllerDeviceTest, GetChannel) {
 
 // Verifies that GetChannel2 works correctly.
 TEST_F(ControllerDeviceTest, GetChannel2) {
-  EXPECT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
-  ASSERT_EQ(camera_protocol_.Bind(std::move(ddk_->FidlClient())), ZX_OK);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
+  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+
+  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
   camera_protocol_.set_error_handler(FailErrorHandler);
   RunLoopUntilIdle();
@@ -118,8 +131,11 @@ TEST_F(ControllerDeviceTest, GetChannel2) {
 
 // Verifies that GetChannel2 can only have one binding.
 TEST_F(ControllerDeviceTest, GetChannel2InvokeTwice) {
-  EXPECT_EQ(controller_device_->DdkAdd("test-camera-controller"), ZX_OK);
-  ASSERT_EQ(camera_protocol_.Bind(std::move(ddk_->FidlClient())), ZX_OK);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
+  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+
+  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
   RunLoopUntilIdle();
   fuchsia::camera2::hal::ControllerPtr other_controller_protocol;

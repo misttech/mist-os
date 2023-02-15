@@ -7,7 +7,6 @@
 
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/sys/cpp/component_context.h>
 
 class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
@@ -19,10 +18,7 @@ class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
         connect_callback_{std::move(connect_callback)} {}
 
   ddk::SysmemProtocolClient client() { return ddk::SysmemProtocolClient(&sysmem_protocol_); }
-
-  fake_ddk::ProtocolEntry ProtocolEntry() const {
-    return {ZX_PROTOCOL_SYSMEM, *reinterpret_cast<const fake_ddk::Protocol*>(&sysmem_protocol_)};
-  }
+  sysmem_protocol_t proto() { return sysmem_protocol_; }
 
   // |ZX_PROTOCOL_SYSMEM|
   zx_status_t SysmemConnect(zx::channel allocator_request) {

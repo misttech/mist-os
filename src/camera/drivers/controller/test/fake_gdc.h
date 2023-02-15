@@ -6,7 +6,6 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_GDC_H_
 
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/sys/cpp/component_context.h>
 
 class FakeGdc {
@@ -23,10 +22,7 @@ class FakeGdc {
   }
 
   ddk::GdcProtocolClient client() { return ddk::GdcProtocolClient(&gdc_protocol_); }
-
-  fake_ddk::ProtocolEntry ProtocolEntry() const {
-    return {ZX_PROTOCOL_GDC, *reinterpret_cast<const fake_ddk::Protocol*>(&gdc_protocol_)};
-  }
+  gdc_protocol_t proto() { return gdc_protocol_; }
 
   // |ZX_PROTOCOL_GDC|
   zx_status_t GdcInitTask(const buffer_collection_info_2_t* /*input_buffer_collection*/,

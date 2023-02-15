@@ -6,7 +6,6 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_GE2D_H_
 
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/sys/cpp/component_context.h>
 class FakeGe2d;
 
@@ -28,10 +27,7 @@ class FakeGe2d {
   }
 
   ddk::Ge2dProtocolClient client() { return ddk::Ge2dProtocolClient(&ge2d_protocol_); }
-
-  fake_ddk::ProtocolEntry ProtocolEntry() const {
-    return {ZX_PROTOCOL_GE2D, *reinterpret_cast<const fake_ddk::Protocol*>(&ge2d_protocol_)};
-  }
+  ge2d_protocol_t proto() { return ge2d_protocol_; }
 
   // ZX_PROTOCOL_GE2DC (Refer to ge2d.banjo for documentation).
   zx_status_t Ge2dInitTaskResize(const buffer_collection_info_2_t* /*input_buffer_collection*/,

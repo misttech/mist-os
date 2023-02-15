@@ -6,7 +6,6 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_ISP_H_
 
 #include <fuchsia/hardware/isp/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/sys/cpp/component_context.h>
 
 class FakeIsp {
@@ -19,10 +18,7 @@ class FakeIsp {
   }
 
   ddk::IspProtocolClient client() { return ddk::IspProtocolClient(&isp_protocol_); }
-
-  fake_ddk::ProtocolEntry ProtocolEntry() const {
-    return {ZX_PROTOCOL_ISP, *reinterpret_cast<const fake_ddk::Protocol*>(&isp_protocol_)};
-  }
+  isp_protocol_t proto() { return isp_protocol_; }
 
   void PopulateStreamProtocol(output_stream_protocol_t* out_s) {
     out_s->ctx = this;
