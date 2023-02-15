@@ -402,7 +402,7 @@ EOF
 
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
-  FUCHSIA_DISABLED_incremental_new=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
+  FUCHSIA_DISABLED_incremental=0 "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -v -l "${serve_updates_port}" 1>stdout 2>stderr &
   local serve_updates_pid=$!
 
   BT_ASSERT _wait_for_serve_updates_to_start "${serve_updates_pid}" stdout

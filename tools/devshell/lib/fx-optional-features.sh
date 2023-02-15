@@ -28,14 +28,14 @@ _FX_INDENT="      "
 function help_optional_feature {
   local h=()
   case "$1" in
-  "incremental" | "incremental_legacy")
+  "incremental_legacy")
     h=(
       "Packages are published and served incrementally by 'fx serve-updates'"
       "as they are built using the legacy incremental publisher. Explicit"
       "'fx build' is not required for most operations."
       )
     ;;
-  "incremental_new")
+  "incremental" | "incremental_new")
     h=(
       "Packages are published and served incrementally by 'fx serve-updates'"
       "as they are built. Explicit 'fx build' is not required for most operations."

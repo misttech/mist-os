@@ -175,7 +175,8 @@ with-pinned-target() {
 repo_dir="${FUCHSIA_BUILD_DIR}/amber-files"
 
 if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || is_feature_enabled "incremental_legacy"; then
-  if is_feature_enabled "incremental" || is_feature_enabled "incremental_legacy"; then
+  if is_feature_enabled "incremental_legacy"; then
+    fx-info "Using incremental legacy fallback."
     # FIXME(http://fxbug.dev/79636): use `incremental_legacy` as a safety fallback.
     server_mode="pm"
   fi
@@ -226,8 +227,8 @@ if [[ "${server_mode}" = "pm" ]]; then
   # the manifest list file has relative paths and "pm serve" looks for them
   # from PWD, so pm command needs to be executed in "$FUCHSIA_BUILD_DIR"
   cd "${FUCHSIA_BUILD_DIR}"
-elif is_feature_enabled "incremental" || is_feature_enabled "incremental_legacy"; then
-  fx-error "The 'incremental' and 'incremental_legacy' features are not supported by ffx."
+elif is_feature_enabled "incremental_legacy"; then
+  fx-error "The 'incremental_legacy' is not supported by ffx."
   fx-error ""
   fx-error "See http://fxbug.dev/79636 for more details."
   exit 1
@@ -293,7 +294,7 @@ else
     pm_pid=$!
   fi
 
-  if is_feature_enabled "incremental_new"; then
+  if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
     fx-info "Incremental package auto-publishing is enabled for ffx."
     package_tool_flags=( --watch --package-list "all_package_manifests.list" --trusted-root "${repo_dir}/repository/9.root.json" )
     package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )
