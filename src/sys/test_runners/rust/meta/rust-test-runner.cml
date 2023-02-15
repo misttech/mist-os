@@ -18,10 +18,6 @@
     ],
     use: [
         {
-            storage: "data",
-            path: "/data",
-        },
-        {
             protocol: [ "fuchsia.process.Launcher" ],
         },
     ],
