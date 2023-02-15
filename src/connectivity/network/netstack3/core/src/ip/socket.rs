@@ -182,22 +182,16 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
 ///
 /// More details from https://www.rfc-editor.org/rfc/rfc1122#section-3.3.2.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Mms<I: IpExt>(NonZeroU32, core::marker::PhantomData<I>);
+pub(crate) struct Mms(NonZeroU32);
 
-impl<I: IpLayerIpExt> Mms<I> {
-    pub(crate) fn from_mtu(mtu: Mtu, options_size: u32) -> Option<Self> {
-        NonZeroU32::new(mtu.get().get().saturating_sub(I::IP_HEADER_LENGTH + options_size)).map(
-            |mms| {
-                Self(
-                    mms.min(NonZeroU32::new(I::IP_MAX_PAYLOAD_LENGTH).unwrap()),
-                    core::marker::PhantomData,
-                )
-            },
-        )
+impl Mms {
+    pub(crate) fn from_mtu<I: IpExt>(mtu: Mtu, options_size: u32) -> Option<Self> {
+        NonZeroU32::new(mtu.get().get().saturating_sub(I::IP_HEADER_LENGTH.get() + options_size))
+            .map(|mms| Self(mms.min(I::IP_MAX_PAYLOAD_LENGTH)))
     }
 
     pub(crate) fn get(&self) -> NonZeroU32 {
-        let Self(mms, _marker) = *self;
+        let Self(mms) = *self;
         mms
     }
 }
@@ -226,7 +220,7 @@ where
         &mut self,
         ctx: &mut C,
         ip_sock: &IpSock<I, Self::DeviceId, O>,
-    ) -> Result<Mms<I>, MmsError>;
+    ) -> Result<Mms, MmsError>;
 }
 
 /// An error encountered when creating an IP socket.
@@ -548,13 +542,15 @@ impl<
         &mut self,
         ctx: &mut C,
         ip_sock: &IpSock<I, Self::DeviceId, O>,
-    ) -> Result<Mms<I>, MmsError> {
+    ) -> Result<Mms, MmsError> {
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
         let IpSockRoute { destination: Destination { next_hop: _, device }, local_ip: _ } = self
             .lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
-        Mms::from_mtu(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))
+        // TODO(https://fxbug.dev/121911): Calculate the options size when they
+        // are supported.
+        Mms::from_mtu::<I>(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))
     }
 }
 

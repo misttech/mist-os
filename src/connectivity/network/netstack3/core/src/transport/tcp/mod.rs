@@ -20,7 +20,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::RngCore;
 
 use crate::{
-    ip::{socket::Mms, IpDeviceId, IpExt, IpLayerIpExt},
+    ip::{socket::Mms, IpDeviceId, IpExt},
     sync::Mutex,
     transport::tcp::{
         self,
@@ -80,7 +80,7 @@ pub(crate) struct Mss(NonZeroU16);
 
 impl Mss {
     /// Creates MSS from the maximum message size of the IP layer.
-    fn from_mms<I: IpLayerIpExt>(mms: Mms<I>) -> Option<Self> {
+    fn from_mms<I: IpExt>(mms: Mms) -> Option<Self> {
         NonZeroU16::new(
             u16::try_from(mms.get().get().saturating_sub(TCP_HEADER_LEN)).unwrap_or(u16::MAX),
         )

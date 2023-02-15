@@ -434,7 +434,7 @@ where
             }
         }
     };
-    let Some(device_mss) = Mss::from_mms(device_mms) else { return true };
+    let Some(device_mss) = Mss::from_mms::<I>(device_mms) else { return true };
 
     let mut state = State::Listen(Closed::<Initial>::listen(
         isn,

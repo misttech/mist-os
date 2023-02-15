@@ -2264,7 +2264,7 @@ fn connect_inner<I, SC, C>(
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
-    device_mms: Mms<I>,
+    device_mms: Mms,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpLayerIpExt,
@@ -2289,7 +2289,7 @@ where
         now,
         netstack_buffers,
         buffer_sizes,
-        Mss::from_mms(device_mms).ok_or(ConnectError::NoRoute)?,
+        Mss::from_mms::<I>(device_mms).ok_or(ConnectError::NoRoute)?,
         Mss::default::<I>(),
     );
     let state = State::SynSent(syn_sent);
@@ -2996,8 +2996,8 @@ mod tests {
             &mut self,
             _ctx: &mut TcpNonSyncCtx,
             _ip_sock: &IpSock<I, D, O>,
-        ) -> Result<Mms<I>, MmsError> {
-            Ok(Mms::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32)), 0).unwrap())
+        ) -> Result<Mms, MmsError> {
+            Ok(Mms::from_mtu::<I>(Mtu::new(nonzero_ext::nonzero!(1500_u32)), 0).unwrap())
         }
     }
 
