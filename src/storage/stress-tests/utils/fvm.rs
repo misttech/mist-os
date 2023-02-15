@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy},
-    fuchsia_component::client::connect_to_protocol_at_path,
+    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
+    fidl_fuchsia_io as fio,
     fuchsia_zircon::{AsHandleRef, Rights, Status, Vmo},
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-    std::path::{Path, PathBuf},
+    std::path::PathBuf,
     storage_isolated_driver_manager::{
         create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
     },
@@ -25,20 +24,6 @@ async fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
         .build()
         .await
         .unwrap()
-}
-
-async fn start_fvm_driver(ramdisk_path: &Path) -> VolumeManagerProxy {
-    let controller =
-        connect_to_protocol_at_path::<ControllerMarker>(ramdisk_path.to_str().unwrap()).unwrap();
-    fvm::bind_fvm_driver(&controller).await.unwrap();
-
-    // Wait until the FVM driver is available
-    let fvm_path = fvm::wait_for_fvm_driver(ramdisk_path).await.unwrap();
-
-    // Connect to the Volume Manager
-    let proxy =
-        connect_to_protocol_at_path::<VolumeManagerMarker>(fvm_path.to_str().unwrap()).unwrap();
-    proxy
 }
 
 /// This structs holds processes of component manager, isolated-devmgr
@@ -60,13 +45,21 @@ impl FvmInstance {
     /// If `init` is true, initialize the VMO with FVM layout first.
     pub async fn new(init: bool, vmo: &Vmo, fvm_slice_size: u64, ramdisk_block_size: u64) -> Self {
         let ramdisk = create_ramdisk(&vmo, ramdisk_block_size).await;
-        let ramdisk_path = Path::new(ramdisk.get_path());
 
         if init {
-            fvm::format_for_fvm(ramdisk_path, fvm_slice_size as usize).unwrap();
+            fvm::format_for_fvm(
+                ramdisk.as_dir().expect("invalid directory proxy"),
+                fvm_slice_size as usize,
+            )
+            .unwrap();
         }
 
-        let volume_manager = start_fvm_driver(ramdisk_path).await;
+        let volume_manager = fvm::start_fvm_driver(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+        )
+        .await
+        .expect("failed to start fvm driver");
 
         Self { ramdisk, volume_manager }
     }
@@ -104,8 +97,14 @@ impl FvmInstance {
         (info.slice_count - info.assigned_slice_count) * info.slice_size
     }
 
-    pub fn ramdisk_path(&self) -> PathBuf {
-        PathBuf::from(self.ramdisk.get_path())
+    /// Returns a reference to the ramdisk DirectoryProxy.
+    pub fn ramdisk_get_dir(&self) -> Option<&fio::DirectoryProxy> {
+        self.ramdisk.as_dir()
+    }
+
+    /// Takes the DirectoryProxy of the ramdisk.
+    pub fn ramdisk_take_dir(&mut self) -> Option<fio::DirectoryProxy> {
+        self.ramdisk.take_dir()
     }
 }
 

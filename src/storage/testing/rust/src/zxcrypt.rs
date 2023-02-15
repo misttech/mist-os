@@ -4,13 +4,12 @@
 
 use {
     anyhow::{Context as _, Result},
-    device_watcher::recursive_wait_and_open_node,
+    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_hardware_block_encrypted::DeviceManagerMarker,
     fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_path,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
-    std::path::{Path, PathBuf},
 };
 
 const ZXCRYPT_DRIVER_PATH: &str = "zxcrypt.so";
@@ -27,77 +26,35 @@ pub async fn bind_zxcrypt_driver(controller: &ControllerProxy) -> Result<()> {
     Ok(())
 }
 
-/// Waits for the zxcrypt device to appear under `block_device`. Returns a path to the zxcrypt
-/// device.
-pub async fn wait_for_zxcrypt_driver(block_device: &Path) -> Result<PathBuf> {
-    const ZXCRYPT_DEVICE_NAME: &str = "zxcrypt";
-    let device = fuchsia_fs::directory::open_in_namespace(
-        block_device.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("block device directory open")?;
-    recursive_wait_and_open_node(&device, ZXCRYPT_DEVICE_NAME)
-        .await
-        .context("zxcrypt device wait")?;
-    Ok(block_device.join(ZXCRYPT_DEVICE_NAME))
-}
-
 /// Sets up zxcrypt on top of `block_device` using an insecure key. Returns a path to the block
 /// device exposed by zxcrypt.
-pub async fn set_up_insecure_zxcrypt(block_device: &Path) -> Result<PathBuf> {
+pub async fn set_up_insecure_zxcrypt(
+    block_device: &fio::DirectoryProxy,
+) -> Result<fio::DirectoryProxy> {
     const UNSEALED_BLOCK_PATH: &str = "unsealed/block";
-    let controller =
-        connect_to_protocol_at_path::<ControllerMarker>(block_device.to_str().unwrap())
-            .context("block device controller connect")?;
-    bind_zxcrypt_driver(&controller).await.context("zxcrypt driver bind")?;
+    let device_controller =
+        connect_to_named_protocol_at_dir_root::<ControllerMarker>(block_device, ".")?;
+    bind_zxcrypt_driver(&device_controller).await.context("zxcrypt driver bind")?;
 
-    let zxcrypt_path =
-        wait_for_zxcrypt_driver(block_device).await.context("zxcrypt driver wait")?;
-    let zxcrypt =
-        connect_to_protocol_at_path::<DeviceManagerMarker>(zxcrypt_path.to_str().unwrap())
-            .context("zxcrypt device manager connect")?;
+    const ZXCRYPT_DEVICE_NAME: &str = "zxcrypt";
+    let zxcrypt = recursive_wait_and_open::<DeviceManagerMarker>(block_device, ZXCRYPT_DEVICE_NAME)
+        .await
+        .context("zxcrypt device wait")?;
+
     zx::ok(zxcrypt.format(&[0u8; 32], 0).await.context("zxcrypt format fidl failure")?)
         .context("zxcrypt format returned error")?;
     zx::ok(zxcrypt.unseal(&[0u8; 32], 0).await.context("zxcrypt unseal fidl failure")?)
         .context("zxcrypt unseal returned error")?;
 
-    let zxcrypt_dir = fuchsia_fs::directory::open_in_namespace(
-        zxcrypt_path.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("zxcrypt directory open")?;
-    recursive_wait_and_open_node(&zxcrypt_dir, UNSEALED_BLOCK_PATH)
+    let zxcrypt_dir = fuchsia_fs::directory::open_directory_no_describe(
+        block_device,
+        ZXCRYPT_DEVICE_NAME,
+        fio::OpenFlags::empty(),
+    )?;
+
+    recursive_wait_and_open_directory(&zxcrypt_dir, UNSEALED_BLOCK_PATH)
         .await
-        .context("zxcrypt unsealed dir wait")?;
-    Ok(zxcrypt_path.join(UNSEALED_BLOCK_PATH))
-}
-
-/// Unseals up zxcrypt on top of `block_device` using an insecure key. Returns a path to the block
-/// device exposed by zxcrypt.
-pub async fn unseal_insecure_zxcrypt(block_device: &Path) -> Result<PathBuf> {
-    const UNSEALED_BLOCK_PATH: &str = "unsealed/block";
-    let controller =
-        connect_to_protocol_at_path::<ControllerMarker>(block_device.to_str().unwrap())
-            .context("block device controller connect")?;
-    bind_zxcrypt_driver(&controller).await.context("zxcrypt driver bind")?;
-
-    let zxcrypt_path =
-        wait_for_zxcrypt_driver(block_device).await.context("zxcrypt driver wait")?;
-    let zxcrypt =
-        connect_to_protocol_at_path::<DeviceManagerMarker>(zxcrypt_path.to_str().unwrap())
-            .context("zxcrypt device manager connect")?;
-    zx::ok(zxcrypt.unseal(&[0u8; 32], 0).await.context("zxcrypt unseal fidl failure")?)
-        .context("zxcrypt unseal returned error")?;
-
-    let zxcrypt_dir = fuchsia_fs::directory::open_in_namespace(
-        zxcrypt_path.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("zxcrypt directory open")?;
-    recursive_wait_and_open_node(&zxcrypt_dir, UNSEALED_BLOCK_PATH)
-        .await
-        .context("zxcrypt unsealed dir wait")?;
-    Ok(zxcrypt_path.join(UNSEALED_BLOCK_PATH))
+        .context("zxcrypt unsealed dir wait")
 }
 
 #[cfg(test)]
@@ -113,14 +70,13 @@ mod tests {
     #[fuchsia::test]
     async fn set_up_insecure_zxcrypt_test() {
         let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
+        let ramdisk_dir = ramdisk.as_dir().expect("invalid directory proxy");
+        let zxcrypt_block_dir =
+            set_up_insecure_zxcrypt(ramdisk_dir).await.expect("Failed to set up zxcrypt");
 
-        let path = set_up_insecure_zxcrypt(Path::new(ramdisk.get_path()))
-            .await
-            .expect("Failed to set up zxcrypt");
-
-        let block_device =
-            connect_to_protocol_at_path::<BlockMarker>(path.to_str().unwrap()).unwrap();
-        let info = block_device.get_info().await.unwrap().unwrap();
+        let zxcrypt_block_device =
+            connect_to_named_protocol_at_dir_root::<BlockMarker>(&zxcrypt_block_dir, ".").unwrap();
+        let info = zxcrypt_block_device.get_info().await.unwrap().unwrap();
         assert_lt!(info.block_count, BLOCK_COUNT);
     }
 }

@@ -5,15 +5,15 @@
 use {
     crate::Guid,
     anyhow::{Context, Result},
-    device_watcher::recursive_wait_and_open_node,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    device_watcher::recursive_wait_and_open,
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::ControllerProxy,
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_hardware_block_partition::Guid as FidlGuid,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy},
     fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_path,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef},
-    std::path::{Path, PathBuf},
 };
 
 const FVM_DRIVER_PATH: &str = "fvm.so";
@@ -26,10 +26,11 @@ extern "C" {
 }
 
 /// Formats the block device at `block_device` to be an empty FVM instance.
-pub fn format_for_fvm(block_device: &Path, fvm_slice_size: usize) -> Result<()> {
-    let device = connect_to_protocol_at_path::<fidl_fuchsia_hardware_block::BlockMarker>(
-        block_device.to_str().unwrap(),
-    )?;
+pub fn format_for_fvm(block_device: &fio::DirectoryProxy, fvm_slice_size: usize) -> Result<()> {
+    // TODO(https://fxbug.dev/121896): In order to remove multiplexing, callers of this function
+    // should directly pass in a BlockProxy. Callers holding onto a ramdisk should replace as_dir()
+    // with a connect_to_device_fidl() call. This requires work downstream.
+    let device = connect_to_named_protocol_at_dir_root::<BlockMarker>(block_device, ".")?;
     let device_raw = device.as_channel().raw_handle();
     let status = unsafe { fvm_init(device_raw, fvm_slice_size) };
     zx::ok(status).context("fvm_init failed")
@@ -46,33 +47,27 @@ pub async fn bind_fvm_driver(controller: &ControllerProxy) -> Result<()> {
     Ok(())
 }
 
-/// Waits for an FVM device to appear under `block_device`. Returns a path to the FVM device.
-pub async fn wait_for_fvm_driver(block_device: &Path) -> Result<PathBuf> {
+/// Binds the fvm driver and returns a connection to the newly created FVM instance.
+pub async fn start_fvm_driver(
+    controller: &ControllerProxy,
+    block_device: &fio::DirectoryProxy,
+) -> Result<VolumeManagerProxy> {
+    bind_fvm_driver(controller).await?;
     const FVM_DEVICE_NAME: &str = "fvm";
-    let device = fuchsia_fs::directory::open_in_namespace(
-        block_device.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("wait_for_fvm_driver open failed")?;
-    recursive_wait_and_open_node(&device, FVM_DEVICE_NAME)
+    recursive_wait_and_open::<VolumeManagerMarker>(block_device, FVM_DEVICE_NAME)
         .await
-        .context("wait_for_fvm_driver wait failed")?;
-    Ok(block_device.join(FVM_DEVICE_NAME))
+        .context("wait_for_fvm_driver wait failed")
 }
 
 /// Sets up an FVM instance on `block_device`. Returns a connection to the newly created FVM
 /// instance.
-pub async fn set_up_fvm(block_device: &Path, fvm_slice_size: usize) -> Result<VolumeManagerProxy> {
+pub async fn set_up_fvm(
+    controller: &ControllerProxy,
+    block_device: &fio::DirectoryProxy,
+    fvm_slice_size: usize,
+) -> Result<VolumeManagerProxy> {
     format_for_fvm(block_device, fvm_slice_size)?;
-
-    let controller =
-        connect_to_protocol_at_path::<ControllerMarker>(block_device.to_str().unwrap())
-            .context("device_path controller connect failed")?;
-    bind_fvm_driver(&controller).await?;
-
-    let fvm_path = wait_for_fvm_driver(block_device).await?;
-    connect_to_protocol_at_path::<VolumeManagerMarker>(fvm_path.to_str().unwrap())
-        .context("fvm_path volume manager connect failed")
+    start_fvm_driver(controller, block_device).await
 }
 
 /// Creates an FVM volume in `volume_manager`.
@@ -118,6 +113,7 @@ mod tests {
         crate::{wait_for_block_device, BlockDeviceMatcher},
         fidl_fuchsia_hardware_block_volume::VolumeMarker,
         fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
+        fuchsia_component::client::connect_to_protocol_at_path,
         ramdevice_client::RamdiskClient,
     };
 
@@ -137,9 +133,13 @@ mod tests {
     #[fuchsia::test]
     async fn set_up_fvm_test() {
         let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
-        let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
-            .await
-            .expect("Failed to set up FVM");
+        let fvm = set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to set up FVM");
 
         let fvm_info = fvm.get_info().await.unwrap();
         zx::ok(fvm_info.0).unwrap();
@@ -151,9 +151,13 @@ mod tests {
     #[fuchsia::test]
     async fn create_fvm_volume_without_volume_size_has_one_slice() {
         let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
-        let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
-            .await
-            .expect("Failed to set up FVM");
+        let fvm = set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to set up FVM");
 
         create_fvm_volume(
             &fvm,
@@ -185,9 +189,13 @@ mod tests {
     #[fuchsia::test]
     async fn create_fvm_volume_with_unaligned_volume_size_rounds_up_to_slice_multiple() {
         let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
-        let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
-            .await
-            .expect("Failed to set up FVM");
+        let fvm = set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to set up FVM");
 
         create_fvm_volume(
             &fvm,

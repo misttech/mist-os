@@ -22,7 +22,7 @@ use {
 };
 
 pub use crate::{
-    block_device::{BlockDevice, BlockDeviceConfig, BlockDeviceFactory},
+    block_device::{BlockDeviceConfig, BlockDeviceFactory},
     filesystem::{Filesystem, FilesystemConfig},
 };
 

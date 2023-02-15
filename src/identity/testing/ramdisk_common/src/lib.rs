@@ -7,10 +7,10 @@
 
 use {
     fidl::{endpoints::Proxy as _, HandleBased as _},
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    fidl_fuchsia_hardware_block_encrypted::DeviceManagerMarker,
     fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
+    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
     fidl_fuchsia_io as fio,
     fuchsia_component_test::RealmInstance,
     fuchsia_driver_test as _,
@@ -76,9 +76,7 @@ pub async fn setup_ramdisk(
     realm_instance: &RealmInstance,
     mut type_guid: Guid,
     name: &str,
-) -> RamdiskClient {
-    let dev_root_proxy = get_dev_root(realm_instance);
-
+) -> (RamdiskClient, ControllerProxy) {
     // Create ramdisk
     let ramdisk = RamdiskClientBuilder::new(BLOCK_SIZE, BLOCK_COUNT)
         .dev_root(get_dev_root(realm_instance))
@@ -105,51 +103,32 @@ pub async fn setup_ramdisk(
     // Bind FVM to that ramdisk
     bind_fvm(&controller).await.expect("Could not bind FVM");
 
+    let ramdisk_dir = ramdisk.as_dir().expect("invalid directory proxy");
+
     // wait for /fvm child device to appear and open it
-    let fvm_path = ramdisk.get_path().to_string() + "/fvm";
-    let volume_manager_client =
-        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &fvm_path)
+    let volume_manager =
+        device_watcher::recursive_wait_and_open::<VolumeManagerMarker>(ramdisk_dir, "/fvm")
             .await
-            .expect("Could not wait for fvm from isolated-devmgr")
-            .into_channel()
-            .map(VolumeManagerProxy::from_channel)
-            .expect("Could not get fvm channel");
+            .expect("failed to open fvm child device");
 
     // create FVM child volume with desired GUID/label
     let mut rng = SmallRng::from_entropy();
     let mut instance_guid = Guid { value: rng.gen() };
-    let status = volume_manager_client
+    let status = volume_manager
         .allocate_partition(1, &mut type_guid, &mut instance_guid, name, 0)
         .await
         .expect("Could not request to create volume");
     Status::ok(status).expect("Could not create volume");
 
-    let fvm_inner_block_path = fvm_path + "/" + name + "-p-1/block";
-    let _: fio::NodeProxy =
-        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &fvm_inner_block_path)
-            .await
-            .expect("Could not wait for inner fvm block device");
+    let controller = device_watcher::recursive_wait_and_open::<ControllerMarker>(
+        ramdisk_dir,
+        &format!("/fvm/{name}-p-1/block"),
+    )
+    .await
+    .expect("Could not wait for inner fvm block device");
 
     // Return handle to ramdisk since RamdiskClient's Drop impl destroys the ramdisk.
-    ramdisk
-}
-
-/// Given a realm instance, opens /<ramdisk>/fvm/<name>-p-1/block/zxcrypt and
-/// returns a proxy to it.
-///
-/// NB: This method calls .expect() and panics rather than returning a result, so
-/// it is suitable only for use in tests.
-pub fn open_zxcrypt_manager(
-    realm_instance: &RealmInstance,
-    ramdisk: &RamdiskClient,
-    name: &str,
-) -> DeviceManagerProxy {
-    let mgr_path = format!("{}/fvm/{}-p-1/block/zxcrypt", ramdisk.get_path(), name);
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<DeviceManagerMarker>(
-        &get_dev_root(realm_instance),
-        &mgr_path,
-    )
-    .expect("Could not connect to zxcrypt manager")
+    (ramdisk, controller)
 }
 
 /// Given a realm instance and a ramdisk, formats that disk under
@@ -157,30 +136,22 @@ pub fn open_zxcrypt_manager(
 ///
 /// NB: This method calls .expect() and panics rather than returning a result, so
 /// it is suitable only for use in tests.
-pub async fn format_zxcrypt(realm_instance: &RealmInstance, ramdisk: &RamdiskClient, name: &str) {
-    let block_path = format!("{}/fvm/{}-p-1/block", ramdisk.get_path(), name);
-    let controller_client = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-        ControllerMarker,
-    >(&get_dev_root(realm_instance), &block_path)
-    .expect("Could not connect to fvm block device");
-
+pub async fn format_zxcrypt(ramdisk: &RamdiskClient, name: &str, controller: ControllerProxy) {
     // Bind the zxcrypt driver to the block device
-    controller_client
+    controller
         .bind("zxcrypt.so")
         .await
         .expect("Could not send request to bind zxcrypt driver")
         .expect("Could not bind zxcrypt driver");
 
     // Wait for zxcrypt device manager node to appear
-    let zxcrypt_path = block_path + "/zxcrypt";
-    let dev_root_proxy = get_dev_root(realm_instance);
-    let _: fio::NodeProxy =
-        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &zxcrypt_path)
-            .await
-            .expect("wait for zxcrypt from isolated-devmgr");
+    let manager = device_watcher::recursive_wait_and_open::<DeviceManagerMarker>(
+        ramdisk.as_dir().expect("invalid directory proxy"),
+        &format!("/fvm/{name}-p-1/block/zxcrypt"),
+    )
+    .await
+    .expect("wait for zxcrypt from isolated-devmgr");
 
-    // Open zxcrypt device manager node
-    let manager = open_zxcrypt_manager(realm_instance, ramdisk, name);
     let key: [u8; 32] = [0; 32];
     manager.format(&key, 0).await.expect("Could not format zxcrypt");
 }

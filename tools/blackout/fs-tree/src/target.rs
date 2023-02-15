@@ -10,7 +10,7 @@ use {
         Test, TestServer,
     },
     fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_io as fio,
     fs_management::{
@@ -37,6 +37,21 @@ const METADATA_KEY: [u8; 32] = [
     0x0f, 0x4d, 0xca, 0x6b, 0x35, 0x0e, 0x85, 0x6a, 0xb3, 0x8c, 0xdd, 0xe9, 0xda, 0x0e, 0xc8, 0x22,
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ];
+
+async fn find_partition_helper(
+    device_path: Option<String>,
+    device_label: String,
+) -> Result<ControllerProxy> {
+    let device_dir = match device_path {
+        Some(path) => {
+            let device_dir =
+                fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
+            Some(device_dir)
+        }
+        None => None,
+    };
+    blackout_target::find_partition(&device_label, device_dir.as_ref()).await
+}
 
 #[derive(Copy, Clone)]
 struct FsTree;
@@ -144,14 +159,20 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        let dev =
-            blackout_target::set_up_partition(&device_label, device_path.as_deref(), true).await?;
-        let path = dev.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        tracing::info!("using block device: {}", &path);
+        let device_dir = match device_path {
+            Some(path) => {
+                let device_dir =
+                    fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
+                Some(device_dir)
+            }
+            None => None,
+        };
+        let partition_controller =
+            blackout_target::set_up_partition(&device_label, device_dir.as_ref(), true).await?;
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.setup_fxfs(dev).await,
-            "minfs" => self.setup_minfs(dev).await,
+            "fxfs" => self.setup_fxfs(partition_controller).await,
+            "minfs" => self.setup_minfs(partition_controller).await,
             _ => panic!("Unsupported filesystem"),
         }
     }
@@ -162,14 +183,10 @@ impl Test for FsTree {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", &path);
-        let dev =
-            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
-
+        let partition_controller = find_partition_helper(device_path, device_label).await?;
         let fs = match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.serve_fxfs(dev).await?,
-            "minfs" => self.serve_minfs(dev).await?,
+            "fxfs" => self.serve_fxfs(partition_controller).await?,
+            "minfs" => self.serve_minfs(partition_controller).await?,
             _ => panic!("Unsupported filesystem"),
         };
 
@@ -203,14 +220,10 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", &path);
-        let dev =
-            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
-
+        let partition_controller = find_partition_helper(device_path, device_label).await?;
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.verify_fxfs(dev).await,
-            "minfs" => self.verify_minfs(dev).await,
+            "fxfs" => self.verify_fxfs(partition_controller).await,
+            "minfs" => self.verify_minfs(partition_controller).await,
             _ => panic!("Unsupported filesystem"),
         }
     }

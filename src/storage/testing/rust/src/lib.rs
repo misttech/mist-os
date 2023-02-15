@@ -120,9 +120,13 @@ mod tests {
     #[fuchsia::test]
     async fn wait_for_block_device_with_all_match_criteria() {
         let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
-        let fvm = fvm::set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
-            .await
-            .expect("Failed to format ramdisk with FVM");
+        let fvm = fvm::set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to format ramdisk with FVM");
         fvm::create_fvm_volume(
             &fvm,
             VOLUME_NAME,

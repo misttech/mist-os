@@ -46,18 +46,19 @@ async fn write_test_blob(directory: &fio::DirectoryProxy) {
 // the first block device with a GPT or FVM partition and bind those drivers. zxcrypt volumes are
 // also unsealed, unless `no_zxcrypt` is true.
 async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) {
-    let dev_root = fixture.dir("dev-topological");
-    let ramdisk_path = fixture.ramdisks.first().unwrap().get_path();
-    let gpt_path = format!("{}/part-000/block", ramdisk_path);
-    recursive_wait_and_open_node(&dev_root, &gpt_path).await.unwrap();
+    let ramdisk = fixture.ramdisks.first().unwrap();
+    let gpt_path = "/part-000/block";
+    let ramdisk_dir = ramdisk.as_dir().expect("invalid directory proxy");
+    recursive_wait_and_open_node(ramdisk_dir, &gpt_path).await.unwrap();
     if has_formatted_fvm {
+        // TODO(https://fxbug.dev/121274): Remove hardcoded paths
         let blobfs_path = format!("{}/fvm/blobfs-p-1/block", gpt_path);
-        recursive_wait_and_open_node(&dev_root, &blobfs_path).await.unwrap();
+        recursive_wait_and_open_node(ramdisk_dir, &blobfs_path).await.unwrap();
         let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
-        recursive_wait_and_open_node(&dev_root, &data_path).await.unwrap();
+        recursive_wait_and_open_node(ramdisk_dir, &data_path).await.unwrap();
         if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
             let zxcrypt_path = format!("{}/zxcrypt/unsealed/block", data_path);
-            recursive_wait_and_open_node(&dev_root, &zxcrypt_path).await.unwrap();
+            recursive_wait_and_open_node(ramdisk_dir, &zxcrypt_path).await.unwrap();
         }
     }
 }

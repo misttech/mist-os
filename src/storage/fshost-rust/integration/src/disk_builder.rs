@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_node},
+    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
     fidl::endpoints::Proxy as _,
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
@@ -13,6 +13,7 @@ use {
         format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC},
         Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR,
     },
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_runtime::vmar_root_self,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -20,7 +21,7 @@ use {
     key_bag::Aes256Key,
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     remote_block_device::BlockClient as _,
-    std::{io::Write, ops::Deref, path::Path},
+    std::{io::Write, ops::Deref},
     storage_isolated_driver_manager::{
         fvm::{create_fvm_volume, set_up_fvm},
         zxcrypt,
@@ -297,33 +298,36 @@ impl DiskBuilder {
         .await
         .unwrap();
 
-        let dev = fuchsia_fs::directory::open_in_namespace(
-            "/dev",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-
         // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
-        let base_path = if self.gpt {
+        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+        let block_path = "/part-000/block";
+        let device_dir = if self.gpt {
             bind_gpt_driver(&ramdisk).await;
-            let fvm_partition_path = format!("{}/part-000/block", ramdisk.get_path());
-            recursive_wait_and_open_node(&dev, &fvm_partition_path.strip_prefix("/dev/").unwrap())
-                .await
-                .expect("recursive_wait_and_open_node failed");
-            fvm_partition_path
+            let device_dir = recursive_wait_and_open_directory(
+                ramdisk.as_dir().expect("invalid directory proxy"),
+                block_path,
+            )
+            .await
+            .expect("failed to open device");
+            Some(device_dir)
         } else {
-            ramdisk.get_path().to_owned()
+            None
         };
 
+        let device_dir =
+            device_dir.as_ref().unwrap_or(ramdisk.as_dir().expect("invalid directory proxy"));
+        let device_controller =
+            connect_to_named_protocol_at_dir_root::<ControllerMarker>(device_dir, ".")
+                .expect("failed to connect to device controller");
+
         // Initialize/provision the FVM headers and bind the FVM driver.
-        let volume_manager_proxy =
-            set_up_fvm(Path::new(base_path.as_str()), FVM_SLICE_SIZE as usize)
-                .await
-                .expect("set_up_fvm failed");
+        let volume_manager = set_up_fvm(&device_controller, device_dir, FVM_SLICE_SIZE as usize)
+            .await
+            .expect("set_up_fvm failed");
 
         // Create and format the blobfs partition.
         create_fvm_volume(
-            &volume_manager_proxy,
+            &volume_manager,
             "blobfs",
             &BLOBFS_TYPE_GUID,
             Uuid::new_v4().as_bytes(),
@@ -332,19 +336,17 @@ impl DiskBuilder {
         )
         .await
         .expect("create_fvm_volume failed");
-        let blobfs_path = format!("{}/fvm/blobfs-p-1/block", base_path);
-        let controller = recursive_wait_and_open::<ControllerMarker>(
-            &dev,
-            &blobfs_path.strip_prefix("/dev/").unwrap(),
-        )
-        .await
-        .expect("recursive_wait_and_open_node failed");
-        let mut blobfs = Blobfs::new(controller);
+        let blobfs_controller =
+            recursive_wait_and_open::<ControllerMarker>(&device_dir, "/fvm/blobfs-p-1/block")
+                .await
+                .expect("failed to open controller");
+
+        let mut blobfs = Blobfs::new(blobfs_controller);
         blobfs.format().await.expect("format failed");
 
         // Create and format the data partition.
         create_fvm_volume(
-            &volume_manager_proxy,
+            &volume_manager,
             "data",
             &DATA_TYPE_GUID,
             Uuid::new_v4().as_bytes(),
@@ -354,33 +356,30 @@ impl DiskBuilder {
         .await
         .expect("create_fvm_volume failed");
 
-        let data_path = format!("{}/fvm/data-p-2/block", base_path);
-        let mut data_device = recursive_wait_and_open::<ControllerMarker>(
-            &dev,
-            &data_path.strip_prefix("/dev/").unwrap(),
-        )
-        .await
-        .expect("recursive_wait_and_open_node failed");
-
+        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+        let data_block_path = "/fvm/data-p-2/block";
+        let data_dir = recursive_wait_and_open_directory(&device_dir, data_block_path)
+            .await
+            .expect("failed to open data partition");
+        let data_controller =
+            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&data_dir, ".")
+                .expect("failed to connect to data device controller");
         // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
-        if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
-            let zxcrypt_path = zxcrypt::set_up_insecure_zxcrypt(Path::new(&data_path))
+        let data_controller = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
+            let zxcrypt_block_dir = zxcrypt::set_up_insecure_zxcrypt(&data_dir)
                 .await
                 .expect("failed to set up zxcrypt");
-            let zxcrypt_path = zxcrypt_path.as_os_str().to_str().unwrap();
-            data_device = recursive_wait_and_open::<ControllerMarker>(
-                &dev,
-                zxcrypt_path.strip_prefix("/dev/").unwrap(),
-            )
-            .await
-            .expect("recursive_wait_and_open_node failed");
-        }
+            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&zxcrypt_block_dir, ".")
+                .expect("failed to connect to the device")
+        } else {
+            data_controller
+        };
 
         if let Some(format) = self.data_spec.format {
             match format {
-                "fxfs" => self.init_data_fxfs(data_device).await,
-                "minfs" => self.init_data_minfs(data_device).await,
-                "f2fs" => self.init_data_f2fs(data_device).await,
+                "fxfs" => self.init_data_fxfs(data_controller).await,
+                "minfs" => self.init_data_minfs(data_controller).await,
+                "f2fs" => self.init_data_f2fs(data_controller).await,
                 _ => panic!("unsupported data filesystem format type"),
             }
         }

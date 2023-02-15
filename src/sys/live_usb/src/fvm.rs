@@ -7,6 +7,7 @@ use {
     anyhow::{Context, Error},
     fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy},
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fuchsia_zircon as zx,
     futures::future::try_join,
@@ -114,8 +115,11 @@ impl FvmRamdisk {
         let () = paver.use_block_device(client_end, remote)?;
 
         // Set up a PayloadStream to serve the data sink.
+        let fvm_block = fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(
+            &self.sparse_fvm_path,
+        )?;
         let streamer: Box<dyn PayloadStreamer> =
-            Box::new(BlockDevicePayloadStreamer::new(&self.sparse_fvm_path).await?);
+            Box::new(BlockDevicePayloadStreamer::new(fvm_block).await?);
         let (client, server) =
             fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>()?;
 

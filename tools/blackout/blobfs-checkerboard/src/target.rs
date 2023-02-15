@@ -7,9 +7,8 @@ use {
     async_trait::async_trait,
     blackout_target::{Test, TestServer},
     byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
-    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_io as fio,
-    fs_management::Blobfs,
+    fs_management::{filesystem::Filesystem, Blobfs},
     fuchsia_fs::directory::readdir,
     fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon as zx,
@@ -43,6 +42,19 @@ async fn write_blob(rng: &mut impl Rng, root: &fio::DirectoryProxy, i: u64) -> R
     Ok(path)
 }
 
+async fn setup_blobfs(device_path: Option<String>, device_label: String) -> Result<Filesystem> {
+    let device_dir = match device_path {
+        Some(path) => {
+            let device_dir =
+                fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
+            Some(device_dir)
+        }
+        None => None,
+    };
+    let block_device = blackout_target::find_partition(&device_label, device_dir.as_ref()).await?;
+    Ok(Blobfs::new(block_device))
+}
+
 #[derive(Copy, Clone)]
 struct BlobfsCheckerboard;
 
@@ -59,12 +71,18 @@ impl Test for BlobfsCheckerboard {
             device_label,
             device_path
         );
-        let block_device =
-            blackout_target::set_up_partition(&device_label, device_path.as_deref(), true).await?;
-        let path = block_device.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        tracing::info!("using block device: {}", path);
-        let mut blobfs = Blobfs::new(block_device);
+        let device_dir = match device_path {
+            Some(path) => {
+                let device_dir =
+                    fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
+                Some(device_dir)
+            }
+            None => None,
+        };
+        let blobfs_controller =
+            blackout_target::set_up_partition(&device_label, device_dir.as_ref(), true).await?;
 
+        let mut blobfs = Blobfs::new(blobfs_controller);
         let mut rng = StdRng::seed_from_u64(seed);
 
         tracing::info!("formatting provided block device with blobfs");
@@ -105,12 +123,7 @@ impl Test for BlobfsCheckerboard {
             device_label,
             device_path
         );
-        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", &path);
-        let block_device =
-            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
-        let mut blobfs = Blobfs::new(block_device);
-
+        let mut blobfs = setup_blobfs(device_path, device_label).await?;
         let mut rng = StdRng::seed_from_u64(seed);
 
         tracing::info!("running blobfs");
@@ -229,12 +242,7 @@ impl Test for BlobfsCheckerboard {
             device_label,
             device_path
         );
-        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", &path);
-        let block_device =
-            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
-        let mut blobfs = Blobfs::new(block_device);
-
+        let mut blobfs = setup_blobfs(device_path, device_label).await?;
         tracing::info!("verifying disk with fsck");
         blobfs.fsck().await.context("fsck failed")?;
 

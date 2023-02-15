@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    blackout_target::{dev, find_partition, set_up_partition},
+    blackout_target::{find_partition, set_up_partition},
     device_watcher::recursive_wait_and_open_node,
     fuchsia_async as fasync,
     ramdevice_client::RamdiskClient,
@@ -14,12 +14,14 @@ use {
 #[fasync::run_singlethreaded(test)]
 async fn setup_then_find_no_path() {
     let ramdisk = RamdiskClient::create(8192, 128).await.unwrap();
-    let ramdisk_path = ramdisk.get_path();
-
     {
-        let volume_manager_proxy = fvm::set_up_fvm(std::path::Path::new(ramdisk_path), 8192)
-            .await
-            .expect("failed to set up fvm");
+        let volume_manager_proxy = fvm::set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            8192,
+        )
+        .await
+        .expect("failed to set up fvm");
         fvm::create_fvm_volume(
             &volume_manager_proxy,
             "blobfs",
@@ -30,17 +32,28 @@ async fn setup_then_find_no_path() {
         )
         .await
         .expect("failed to create fvm volume");
-        let device_path = format!("{}/fvm/blobfs-p-1/block", ramdisk_path);
-        recursive_wait_and_open_node(&dev(), device_path.strip_prefix("/dev/").unwrap())
-            .await
-            .expect("failed to wait for device");
+        recursive_wait_and_open_node(
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            "/fvm/blobfs-p-1/block",
+        )
+        .await
+        .expect("failed to wait for device");
     }
 
-    let setup_device_controller =
+    let setup_controller =
         set_up_partition("test-label", None, false).await.expect("failed to set up device");
-    let setup_device_path = setup_device_controller.get_topological_path().await.unwrap().unwrap();
-    assert_eq!(setup_device_path, format!("{}/fvm/test-label-p-1/block", ramdisk_path));
+    let setup_topo_path = setup_controller
+        .get_topological_path()
+        .await
+        .expect("transport error on get_topological_path")
+        .expect("failed to get topological path");
 
-    let find_device_path = find_partition("test-label", None).await.expect("failed to find device");
-    assert_eq!(setup_device_path, find_device_path);
+    let find_controller = find_partition("test-label", None).await.expect("failed to find device");
+    let find_topo_path = find_controller
+        .get_topological_path()
+        .await
+        .expect("transport error on get_topological_path")
+        .expect("failed to get topological path");
+
+    assert_eq!(setup_topo_path, find_topo_path);
 }

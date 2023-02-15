@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_device::ControllerMarker,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_io as fio,
     fs_management::{
         filesystem::{Filesystem, ServingSingleVolumeFilesystem},
@@ -26,8 +26,6 @@ const RAMDISK_BLOCK_SIZE: u64 = 512;
 // brittle if the there was a library for waiting on this block device.
 const FVM_BLOBFS_BLOCK_SUBDIR: &str = "blobfs-p-1/block";
 
-const DEV_PATH: &str = "/dev/";
-
 /// Wrapper around `fs_management::Filesystem` that retains objects for
 /// instantiating blobfs loaded from an in-memory copy of an FVM image.
 pub struct BlobfsInstance {
@@ -46,27 +44,21 @@ impl BlobfsInstance {
         let fvm_vmo = Vmo::create(fvm_size.try_into().unwrap()).unwrap();
         fvm_vmo.write(&fvm_buf, 0).unwrap();
 
-        let dev_root =
-            fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
-                .unwrap();
-
         // Create a ramdisk; do not init FVM (init=false) as we are loading an
         // existing image.
-        let fvm = FvmInstance::new(&dev_root, &fvm_vmo, RAMDISK_BLOCK_SIZE).await;
-
-        let blobfs_block_path = format!("{}/{}", fvm.topological_path(), FVM_BLOBFS_BLOCK_SUBDIR);
+        let fvm = FvmInstance::new(&fvm_vmo, RAMDISK_BLOCK_SIZE).await;
 
         // Wait for device at blobfs block path before interacting with it.
-        let block = device_watcher::recursive_wait_and_open::<ControllerMarker>(
-            &dev_root,
-            &blobfs_block_path,
+        let blobfs_controller = device_watcher::recursive_wait_and_open::<ControllerMarker>(
+            &fvm.fvm_dir,
+            FVM_BLOBFS_BLOCK_SUBDIR,
         )
         .await
         .expect("blobfs block did not appear");
 
         // Instantiate blobfs.
         let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
-        let mut blobfs = Filesystem::new(block, config);
+        let mut blobfs = Filesystem::new(blobfs_controller, config);
 
         // Check blobfs consistency.
         blobfs.fsck().await.unwrap();
@@ -129,21 +121,15 @@ async fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
         .unwrap()
 }
 
-async fn start_fvm_driver(dev_root: &fio::DirectoryProxy, ramdisk_path: &str) -> String {
-    let controller = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-        ControllerMarker,
-    >(dev_root, ramdisk_path)
-    .unwrap();
-    let () = bind_fvm(&controller).await.unwrap();
-
+async fn start_fvm_driver(
+    ramdisk_controller: &ControllerProxy,
+    ramdisk_dir: &fio::DirectoryProxy,
+) -> fio::DirectoryProxy {
+    let () = bind_fvm(ramdisk_controller).await.unwrap();
     // Wait until the FVM driver is available
-    let fvm_path = format!("{}/{}", ramdisk_path, "fvm");
-
-    let _: fio::NodeProxy = device_watcher::recursive_wait_and_open_node(dev_root, &fvm_path)
+    device_watcher::recursive_wait_and_open_directory(ramdisk_dir, "/fvm")
         .await
-        .expect("Could not wait for fvm path");
-
-    fvm_path
+        .expect("Could not wait for fvm path")
 }
 
 /// This structs holds processes of component manager, isolated-devmgr
@@ -155,23 +141,20 @@ pub struct FvmInstance {
     /// Manages the ramdisk device that is backed by a VMO
     _ramdisk: RamdiskClient,
 
-    /// Topological path to FVM on ramdisk.
-    topological_path: String,
+    /// Directory proxy associated with the started fvm instance
+    fvm_dir: fio::DirectoryProxy,
 }
 
 impl FvmInstance {
     /// Start an isolated FVM driver against the given VMO.
     /// If `init` is true, initialize the VMO with FVM layout first.
-    pub async fn new(dev_root: &fio::DirectoryProxy, vmo: &Vmo, ramdisk_block_size: u64) -> Self {
+    pub async fn new(vmo: &Vmo, ramdisk_block_size: u64) -> Self {
         let ramdisk = create_ramdisk(&vmo, ramdisk_block_size).await;
-        let ramdisk_path = ramdisk.get_path();
-        let ramdisk_path = ramdisk_path.strip_prefix(DEV_PATH).unwrap();
-        let topological_path = start_fvm_driver(dev_root, ramdisk_path).await;
-
-        Self { _ramdisk: ramdisk, topological_path }
-    }
-
-    pub fn topological_path(&self) -> &str {
-        &self.topological_path
+        let fvm_dir = start_fvm_driver(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+        )
+        .await;
+        Self { _ramdisk: ramdisk, fvm_dir }
     }
 }

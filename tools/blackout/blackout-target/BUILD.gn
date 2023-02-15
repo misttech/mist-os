@@ -31,7 +31,6 @@ rustc_library("blackout-target") {
   ]
 
   test_deps = [
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
   ]

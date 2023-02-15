@@ -4,17 +4,22 @@
 
 use {
     async_trait::async_trait,
-    fidl_fuchsia_device::ControllerMarker,
+    fidl::endpoints::Proxy,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
     fidl_fuchsia_hardware_block_volume::{
         VolumeManagerMarker, VolumeManagerProxy, VolumeSynchronousProxy,
     },
+    fidl_fuchsia_io as fio,
     fs_management::BLOBFS_TYPE_GUID,
-    fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path},
+    fuchsia_component::client::{
+        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
+    },
     fuchsia_zircon::{self as zx},
     ramdevice_client::RamdiskClient,
-    std::path::{Path, PathBuf},
-    storage_benchmarks::{BlockDevice, BlockDeviceConfig, BlockDeviceFactory},
+    std::path::PathBuf,
+    storage_benchmarks::{block_device::BlockDevice, BlockDeviceConfig, BlockDeviceFactory},
     storage_isolated_driver_manager::{
         create_random_guid, fvm, wait_for_block_device, zxcrypt, BlockDeviceMatcher, Guid,
     },
@@ -46,7 +51,8 @@ impl BlockDeviceFactory for RamdiskFactory {
 /// A ramdisk backed block device.
 pub struct Ramdisk {
     _ramdisk: RamdiskClient,
-    path: PathBuf,
+    volume_dir: fio::DirectoryProxy,
+    volume_controller: Option<ControllerProxy>,
 }
 
 impl Ramdisk {
@@ -55,24 +61,39 @@ impl Ramdisk {
             .await
             .expect("Failed to create RamdiskClient");
 
-        let volume_manager = fvm::set_up_fvm(Path::new(ramdisk.get_path()), RAMDISK_FVM_SLICE_SIZE)
-            .await
-            .expect("Failed to set up FVM");
-        let volume_path = set_up_fvm_volume(&volume_manager, config.fvm_volume_size).await;
-
-        let path = if config.use_zxcrypt {
-            zxcrypt::set_up_insecure_zxcrypt(&volume_path).await.expect("Failed to set up zxcrypt")
+        let volume_manager = fvm::set_up_fvm(
+            ramdisk.as_controller().expect("invalid controller"),
+            ramdisk.as_dir().expect("invalid directory proxy"),
+            RAMDISK_FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to set up FVM");
+        let volume_dir = set_up_fvm_volume(&volume_manager, config.fvm_volume_size).await;
+        let volume_dir = if config.use_zxcrypt {
+            zxcrypt::set_up_insecure_zxcrypt(&volume_dir).await.expect("Failed to set up zxcrypt")
         } else {
-            volume_path
+            volume_dir
         };
 
-        Self { _ramdisk: ramdisk, path }
+        let volume_controller =
+            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
+                .expect("failed to connect to the device controller");
+
+        Self { _ramdisk: ramdisk, volume_dir, volume_controller: Some(volume_controller) }
     }
 }
 
 impl BlockDevice for Ramdisk {
-    fn get_path(&self) -> &Path {
-        self.path.as_path()
+    fn as_dir(&self) -> &fio::DirectoryProxy {
+        &self.volume_dir
+    }
+
+    fn as_controller(&self) -> Option<&ControllerProxy> {
+        self.volume_controller.as_ref()
+    }
+
+    fn take_controller(&mut self) -> Option<ControllerProxy> {
+        self.volume_controller.take()
     }
 }
 
@@ -127,29 +148,44 @@ impl BlockDeviceFactory for FvmVolumeFactory {
 /// A block device created on top of the system's FVM instance.
 pub struct FvmVolume {
     volume: VolumeSynchronousProxy,
-    path: PathBuf,
+    volume_dir: fio::DirectoryProxy,
+    volume_controller: Option<ControllerProxy>,
 }
 
 impl FvmVolume {
     async fn new(fvm: &VolumeManagerProxy, config: &BlockDeviceConfig) -> Self {
-        let volume_path = set_up_fvm_volume(fvm, config.fvm_volume_size).await;
-        let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol_at_path(server_end, volume_path.to_str().unwrap()).unwrap();
-        let volume = VolumeSynchronousProxy::new(client_end);
-
-        let path = if config.use_zxcrypt {
-            zxcrypt::set_up_insecure_zxcrypt(&volume_path).await.expect("Failed to set up zxcrypt")
+        let volume_dir = set_up_fvm_volume(fvm, config.fvm_volume_size).await;
+        // TODO(https://fxbug.dev/112484): In order to allow multiplexing to be removed, use
+        // connect_to_device_fidl to connect to the BlockProxy instead of connect_to_.._dir_root.
+        // Requires downstream work, i.e. set_up_fvm_volume() and set_up_insecure_zxcrypt should
+        // return controllers.
+        let block = connect_to_named_protocol_at_dir_root::<BlockMarker>(&volume_dir, ".").unwrap();
+        let volume = VolumeSynchronousProxy::new(block.into_channel().unwrap().into());
+        let volume_dir = if config.use_zxcrypt {
+            zxcrypt::set_up_insecure_zxcrypt(&volume_dir).await.expect("Failed to set up zxcrypt")
         } else {
-            volume_path
+            volume_dir
         };
 
-        Self { volume, path }
+        let volume_controller =
+            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
+                .expect("failed to connect to the device controller");
+
+        Self { volume, volume_dir, volume_controller: Some(volume_controller) }
     }
 }
 
 impl BlockDevice for FvmVolume {
-    fn get_path(&self) -> &Path {
-        self.path.as_path()
+    fn as_dir(&self) -> &fio::DirectoryProxy {
+        &self.volume_dir
+    }
+
+    fn as_controller(&self) -> Option<&ControllerProxy> {
+        self.volume_controller.as_ref()
+    }
+
+    fn take_controller(&mut self) -> Option<ControllerProxy> {
+        self.volume_controller.take()
     }
 }
 
@@ -164,7 +200,7 @@ impl Drop for FvmVolume {
 async fn set_up_fvm_volume(
     volume_manager: &VolumeManagerProxy,
     volume_size: Option<u64>,
-) -> PathBuf {
+) -> fio::DirectoryProxy {
     const BENCHMARK_TYPE_GUID: &Guid = &[
         0x67, 0x45, 0x23, 0x01, 0xab, 0x89, 0xef, 0xcd, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd,
         0xef,
@@ -191,30 +227,29 @@ async fn set_up_fvm_volume(
     .await
     .expect("Failed to find the FVM volume");
 
-    let controller =
-        connect_to_protocol_at_path::<ControllerMarker>(device_path.to_str().unwrap()).unwrap();
-    let topological_path = controller
+    // We need to connect to the volume's DirectoryProxy via its topological path in order to
+    // allow the caller to access its zxcrypt child. Hence, we use the controller to get access
+    // to the topological path and then call open().
+    // Connect to the controller and get the device's topological path.
+    let controller = connect_to_protocol_at_path::<ControllerMarker>(device_path.to_str().unwrap())
+        .expect("failed to connect to controller");
+    let topo_path = controller
         .get_topological_path()
         .await
-        .expect("Failed to get topological path")
-        .map_err(zx::Status::from_raw)
-        .expect("Failed to get topological path");
-    PathBuf::from(topological_path)
+        .expect("transport error on get_topological_path")
+        .expect("get_topological_path failed");
+
+    // Open the device via its topological path.
+    fuchsia_fs::directory::open_in_namespace(&topo_path, fuchsia_fs::OpenFlags::empty())
+        .expect("failed to open device")
 }
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::ProtocolMarker,
-        fidl_fuchsia_hardware_block_volume::VolumeMarker, test_util::assert_gt,
-    };
+    use {super::*, fidl_fuchsia_hardware_block_volume::VolumeMarker, test_util::assert_gt};
 
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = 1024;
-
-    fn open_connection_as<T: ProtocolMarker>(ramdisk: &dyn BlockDevice) -> T::Proxy {
-        connect_to_protocol_at_path::<T>(ramdisk.get_path().to_str().unwrap()).unwrap()
-    }
 
     #[fuchsia::test]
     async fn ramdisk_create_block_device_with_zxcrypt() {
@@ -222,7 +257,7 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
             .await;
-        let controller = open_connection_as::<ControllerMarker>(ramdisk.as_ref());
+        let controller = ramdisk.as_controller().expect("invalid device controller");
         let path = controller
             .get_topological_path()
             .await
@@ -238,7 +273,7 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        let controller = open_connection_as::<ControllerMarker>(ramdisk.as_ref());
+        let controller = ramdisk.as_controller().expect("invalid device controller");
         let path = controller
             .get_topological_path()
             .await
@@ -258,7 +293,12 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        let volume = open_connection_as::<VolumeMarker>(ramdisk.as_ref());
+        let ramdisk_controller = ramdisk.as_controller().expect("invalid ramdisk controller");
+        let (volume, server) =
+            fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
+        let () = ramdisk_controller
+            .connect_to_device_fidl(server.into_channel())
+            .expect("failed to connect to device fidl");
         let volume_info = volume.get_volume_info().await.unwrap();
         zx::ok(volume_info.0).unwrap();
         let volume_info = volume_info.2.unwrap();
@@ -274,7 +314,12 @@ mod tests {
                 fvm_volume_size: Some(RAMDISK_FVM_SLICE_SIZE as u64 * 3),
             })
             .await;
-        let volume = open_connection_as::<VolumeMarker>(ramdisk.as_ref());
+        let ramdisk_controller = ramdisk.as_controller().expect("invalid ramdisk controller");
+        let (volume, server) =
+            fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
+        let () = ramdisk_controller
+            .connect_to_device_fidl(server.into_channel())
+            .expect("failed to connect to device fidl");
         let volume_info = volume.get_volume_info().await.unwrap();
         zx::ok(volume_info.0).unwrap();
         let volume_info = volume_info.2.unwrap();
@@ -288,10 +333,13 @@ mod tests {
         let ramdisk_client = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT)
             .await
             .expect("Failed to create RamdiskClient");
-        let volume_manager =
-            fvm::set_up_fvm(Path::new(ramdisk_client.get_path()), RAMDISK_FVM_SLICE_SIZE)
-                .await
-                .expect("Failed to set up FVM");
+        let volume_manager = fvm::set_up_fvm(
+            ramdisk_client.as_controller().expect("invalid controller"),
+            ramdisk_client.as_dir().expect("invalid directory proxy"),
+            RAMDISK_FVM_SLICE_SIZE,
+        )
+        .await
+        .expect("Failed to set up FVM");
         fvm::create_fvm_volume(
             &volume_manager,
             BLOBFS_VOLUME_NAME,
@@ -348,7 +396,7 @@ mod tests {
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
             .await;
 
-        let controller = open_connection_as::<ControllerMarker>(volume.as_ref());
+        let controller = volume.as_controller().expect("invalid device controller");
         let path = controller
             .get_topological_path()
             .await
@@ -366,7 +414,7 @@ mod tests {
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
 
-        let controller = open_connection_as::<ControllerMarker>(volume.as_ref());
+        let controller = volume.as_controller().expect("invalid device controller");
         let path = controller
             .get_topological_path()
             .await

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {async_trait::async_trait, std::path::Path};
+use {async_trait::async_trait, fidl_fuchsia_device::ControllerProxy, fidl_fuchsia_io as fio};
 
 /// Block device configuration options.
 pub struct BlockDeviceConfig {
@@ -16,8 +16,11 @@ pub struct BlockDeviceConfig {
 
 /// A trait representing a block device.
 pub trait BlockDevice: Send {
-    /// Returns a `NodeProxy` to the block device.
-    fn get_path(&self) -> &Path;
+    fn as_dir(&self) -> &fio::DirectoryProxy;
+
+    fn as_controller(&self) -> Option<&ControllerProxy>;
+
+    fn take_controller(&mut self) -> Option<ControllerProxy>;
 }
 
 /// A trait for constructing block devices.

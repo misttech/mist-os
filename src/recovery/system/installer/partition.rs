@@ -248,8 +248,10 @@ impl Partition {
         progress_callback: Box<dyn Send + Sync + Fn(usize, usize) -> ()>,
     ) -> Result<(), Error> {
         // Set up a PayloadStream to serve the data sink.
+        let partition_block =
+            fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(&self.src)?;
         let streamer: Box<dyn PayloadStreamer> =
-            Box::new(BlockDevicePayloadStreamer::new(&self.src).await?);
+            Box::new(BlockDevicePayloadStreamer::new(partition_block).await?);
         let start_time = zx::Time::get_monotonic();
         let last_percent = Mutex::new(0 as i64);
         let status_callback = move |data_read, data_total| {

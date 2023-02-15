@@ -5,9 +5,9 @@
 use {
     async_trait::async_trait,
     either::Either,
+    fidl::endpoints::Proxy as _,
     fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
-    fuchsia_async as fasync,
-    std::time::Duration,
+    fuchsia_zircon as zx,
     storage_stress_test_utils::fvm::FvmInstance,
     stress_test::actor::{Actor, ActorError},
 };
@@ -30,18 +30,14 @@ impl InstanceActor {
 #[async_trait]
 impl Actor for InstanceActor {
     async fn perform(&mut self) -> Result<(), ActorError> {
-        if let Some((fvm_instance, fs)) = self.instance.take() {
+        if let Some((mut fvm_instance, fs)) = self.instance.take() {
             // We want to kill the ram-disk before the filesystem so that we test the filesystem in
             // a simulated power-fail.
-            let path = fvm_instance.ramdisk_path();
+            let dir_proxy = fvm_instance.ramdisk_take_dir().expect("invalid directory proxy");
             std::mem::drop(fvm_instance);
             // Wait for the device to go away.
-            let mut count = 0;
-            while let Ok(_) = std::fs::metadata(&path) {
-                count += 1;
-                assert!(count < 100);
-                fasync::Timer::new(Duration::from_millis(100)).await;
-            }
+            assert_eq!(dir_proxy.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
+
             // Ignore errors: we've yanked the underlying device, and filesystems have different
             // ways of handling that, and it doesn't really matter how they handle it i.e. crashing
             // is fine.

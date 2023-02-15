@@ -24,7 +24,8 @@ async fn get_account_ids_unprovisioned() {
 #[fuchsia::test]
 async fn deprecated_provision_new_null_password_account_while_null_disallowed() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let account_ids = account_manager.get_account_ids().await.expect("get account ids");
@@ -49,7 +50,8 @@ async fn deprecated_provision_new_null_password_account_while_null_disallowed() 
 #[fuchsia::test]
 async fn deprecated_provision_new_real_password_account_on_unformatted_partition() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let account_ids = account_manager.get_account_ids().await.expect("get account ids");
@@ -77,8 +79,9 @@ async fn deprecated_provision_new_real_password_account_on_formatted_partition()
     // accounts.
 
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
-    format_zxcrypt(&env.realm_instance, &ramdisk, ACCOUNT_LABEL).await;
+    let (ramdisk, controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    format_zxcrypt(&ramdisk, ACCOUNT_LABEL, controller).await;
     let account_manager = env.account_manager();
 
     // Provision the account.
@@ -100,8 +103,9 @@ async fn deprecated_provision_new_real_password_account_on_formatted_partition()
 #[fuchsia::test]
 async fn deprecated_provision_new_account_over_existing_account_fails() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
-    format_zxcrypt(&env.realm_instance, &ramdisk, ACCOUNT_LABEL).await;
+    let (ramdisk, controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    format_zxcrypt(&ramdisk, ACCOUNT_LABEL, controller).await;
     let account_manager = env.account_manager();
 
     let account_ids = account_manager.get_account_ids().await.expect("get account ids");
@@ -142,7 +146,8 @@ async fn deprecated_provision_new_account_over_existing_account_fails() {
 #[fuchsia::test]
 async fn deprecated_provision_new_account_formats_directory() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let account_ids = account_manager.get_account_ids().await.expect("get account ids");
@@ -210,7 +215,8 @@ async fn deprecated_provision_new_account_formats_directory() {
 #[fuchsia::test]
 async fn locked_account_can_be_unlocked_again() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let expected_content = b"some data";
@@ -301,7 +307,8 @@ async fn locked_account_can_be_unlocked_again() {
 #[fuchsia::test]
 async fn locking_account_terminates_all_clients() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let (account_proxy1, server_end) = fidl::endpoints::create_proxy().unwrap();
@@ -336,7 +343,8 @@ async fn locking_account_terminates_all_clients() {
 #[fuchsia::test]
 async fn remove_account_succeeds_and_terminates_clients() {
     let env = TestEnv::build(Config::ScryptOnly).await;
-    let _ramdisk = setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    let (_ramdisk, _controller) =
+        setup_ramdisk(&env.realm_instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
     let account_manager = env.account_manager();
 
     let (account_proxy, server_end) = fidl::endpoints::create_proxy().unwrap();

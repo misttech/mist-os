@@ -7,13 +7,16 @@
 #![deny(missing_docs)]
 
 use {
-    anyhow::{Context as _, Result},
+    anyhow::{anyhow, Context as _, Result},
     async_trait::async_trait,
     device_watcher::{recursive_wait_and_open, recursive_wait_and_open_node},
     fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_path,
+    fuchsia_component::client::{
+        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
+    },
     fuchsia_component::server::{ServiceFs, ServiceObj},
     fuchsia_fs::directory::readdir,
     fuchsia_zircon as zx,
@@ -186,17 +189,6 @@ fn dev_class_block() -> fio::DirectoryProxy {
     .expect("failed to open /dev/class/block")
 }
 
-async fn get_topological_path(path: &str) -> Result<String> {
-    let proxy = connect_to_protocol_at_path::<ControllerMarker>(path)
-        .context("get_topo controller connect failed")?;
-    proxy
-        .get_topological_path()
-        .await
-        .context("get_topo call failed")?
-        .map_err(zx::Status::from_raw)
-        .context("get_topo returned error")
-}
-
 const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/00:00:2d/ramctl";
 
 /// During the setup step, formats a device with fvm, creating a single partition named
@@ -205,40 +197,57 @@ const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/00:00:2d/ramctl";
 /// only once the device is enumerated, so it can be used immediately.
 pub async fn set_up_partition(
     partition_label: &str,
-    device_path: Option<&str>,
+    device_dir: Option<&fio::DirectoryProxy>,
     skip_ramdisk: bool,
 ) -> Result<ControllerProxy> {
-    let path = match device_path {
-        Some(path) => path.to_string(),
+    let mut device_controller = None;
+    let mut owned_device_dir = None;
+    let device_dir = match device_dir {
+        Some(device_dir) => {
+            device_controller = Some(
+                connect_to_named_protocol_at_dir_root::<ControllerMarker>(device_dir, ".")
+                    .context("new class path connect failed")?,
+            );
+            device_dir
+        }
         None => {
-            let mut path = None;
-            for entry in readdir(&dev_class_block()).await.context("readdir failed")? {
-                let class_path = format!("/dev/class/block/{}", entry.name);
-                let topo_path =
-                    get_topological_path(&class_path).await.context("class_path get_topo")?;
+            let dev_class_block_dir = dev_class_block();
+            for entry in readdir(&dev_class_block_dir).await.context("readdir failed")? {
+                let entry_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                    &dev_class_block_dir,
+                    &entry.name,
+                )
+                .context("get_topo controller connect failed")?;
+                let topo_path = entry_controller
+                    .get_topological_path()
+                    .await
+                    .context("transport error on get_topological_path")?
+                    .map_err(zx::Status::from_raw)
+                    .context("get_topo failed")?;
                 if skip_ramdisk && topo_path.starts_with(RAMDISK_PREFIX) {
                     continue;
                 }
                 if let Some(fvm_index) = topo_path.find("/block/fvm") {
                     let fvm_path = format!("{}/block", &topo_path[..fvm_index]);
-
-                    tracing::info!("finding device with path {} in /dev/class/block", fvm_path);
-                    let new_class_path = find_dev(&fvm_path).await.context("find new topo dev")?;
-                    let fvm_proxy =
-                        connect_to_protocol_at_path::<ControllerMarker>(&new_class_path)
-                            .context("new class path connect failed")?;
-                    fvm_proxy
+                    let fvm_controller = connect_to_protocol_at_path::<ControllerMarker>(&fvm_path)
+                        .context("new class path connect failed")?;
+                    fvm_controller
                         .unbind_children()
                         .await
                         .context("unbind children call failed")?
                         .map_err(zx::Status::from_raw)
                         .context("unbind children returned error")?;
-
-                    path = Some(fvm_path);
+                    device_controller = Some(fvm_controller);
+                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace(
+                        &fvm_path,
+                        fuchsia_fs::OpenFlags::empty(),
+                    )?);
                     break;
                 }
             }
-            path.ok_or(anyhow::anyhow!("couldn't find appropriate device to test on"))?
+            owned_device_dir
+                .as_ref()
+                .ok_or_else(|| anyhow!("failed to find a device with fvm on it"))?
         }
     };
 
@@ -249,10 +258,10 @@ pub async fn set_up_partition(
     // device to figure out what they can do, but getting the total used bytes from a filesystem
     // doesn't take into account possible expansion.
     let device_size_bytes = {
-        let fvm_device_proxy =
-            connect_to_protocol_at_path::<fidl_fuchsia_hardware_block::BlockMarker>(&path)
-                .context("fvm path block connect failed")?;
-        let info = fvm_device_proxy
+        let fvm_block = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            BlockMarker,
+        >(device_dir, ".")?;
+        let info = fvm_block
             .get_info()
             .await
             .context("fvm path get info call failed")?
@@ -266,7 +275,9 @@ pub async fn set_up_partition(
     let num_slices = device_size_bytes / fvm_slice_size as u64 / 2;
     let fvm_volume_size = num_slices * fvm_slice_size as u64;
 
-    let volume_manager = fvm::set_up_fvm(std::path::Path::new(&path), fvm_slice_size)
+    let device_controller =
+        device_controller.ok_or_else(|| anyhow!("invalid device controller"))?;
+    let volume_manager = fvm::set_up_fvm(&device_controller, device_dir, fvm_slice_size)
         .await
         .context("set_up_fvm failed")?;
     fvm::create_fvm_volume(
@@ -279,60 +290,69 @@ pub async fn set_up_partition(
     )
     .await
     .context("create_fvm_volume failed")?;
-    let fvm_block_path = format!("{}/fvm/{}-p-1/block", path, partition_label);
-    let controller = recursive_wait_and_open::<ControllerMarker>(
-        &dev(),
-        fvm_block_path.strip_prefix("/dev/").unwrap(),
+    recursive_wait_and_open::<ControllerMarker>(
+        device_dir,
+        &format!("/fvm/{}-p-1/block", partition_label),
     )
     .await
-    .context("recursive_wait for new fvm path failed")?;
-
-    Ok(controller)
+    .context("recursive_wait for new fvm path failed")
 }
 
 /// During the test or verify steps, finds a block device which represents an fvm partition named
 /// [`partition_label`]. If [`device_path`] is provided, this assumes the partition is on that
 /// device. Returns the topological path to the device, only returning once the device is
 /// enumerated, so it can be used immediately.
-pub async fn find_partition(partition_label: &str, device_path: Option<&str>) -> Result<String> {
-    if let Some(path) = device_path {
-        let fvm_block_path = format!("{}/fvm/{}-p-1/block", path, partition_label);
-        match fuchsia_fs::directory::open_node(
-            &dev(),
-            fvm_block_path.strip_prefix("/dev/").unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        {
-            Ok(fio::NodeProxy { .. }) => return Ok(fvm_block_path),
+pub async fn find_partition(
+    partition_label: &str,
+    device_dir: Option<&fio::DirectoryProxy>,
+) -> Result<ControllerProxy> {
+    if let Some(device_dir) = device_dir {
+        match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
+            device_dir,
+            &format!("/fvm/{}-p-1/block", partition_label),
+            fuchsia_fs::OpenFlags::empty(),
+        ) {
+            Ok(partition_controller) => {
+                return Ok(partition_controller);
+            }
             Err(fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)) => {
                 // If we failed to open that path, it might be because the fvm driver isn't bound yet.
-                let proxy = connect_to_protocol_at_path::<ControllerMarker>(&path)
-                    .context("device path connect failed")?;
-                fvm::bind_fvm_driver(&proxy).await?;
-                recursive_wait_and_open_node(&dev(), fvm_block_path.strip_prefix("/dev/").unwrap())
-                    .await
-                    .context("recursive_wait on expected fvm path failed")?;
+                let device_controller =
+                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                        ControllerMarker,
+                    >(device_dir, ".")?;
+                fvm::bind_fvm_driver(&device_controller).await?;
+                recursive_wait_and_open_node(
+                    device_dir,
+                    &format!("/fvm/{}-p-1/block", partition_label),
+                )
+                .await
+                .context("recursive_wait on expected fvm path failed")?;
             }
             Err(err) => return Err(err).context("failed to open fvm path"),
         }
     }
 
-    for entry in readdir(&dev_class_block()).await? {
+    let dev_class_block_dir = dev_class_block();
+    for entry in readdir(&dev_class_block_dir).await? {
         let class_path = format!("/dev/class/block/{}", entry.name);
-        let proxy = connect_to_protocol_at_path::<
+        let partition = connect_to_protocol_at_path::<
             fidl_fuchsia_hardware_block_partition::PartitionMarker,
         >(&class_path)
         .context("class path partition connect failed")?;
         // The device might not support the partition protocol, in which case we skip it. Also skip
         // it if an error is returned, or if no name is returned.
-        let entry_name = if let Ok((0, Some(entry_name))) = proxy.get_name().await {
+        let entry_name = if let Ok((0, Some(entry_name))) = partition.get_name().await {
             entry_name
         } else {
             continue;
         };
         if &entry_name == partition_label {
-            return get_topological_path(&class_path).await.context("class_path get_topo");
+            let controller_proxy = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                &dev_class_block_dir,
+                &entry.name,
+            )?;
+            return Ok(controller_proxy);
         }
     }
 

@@ -5,7 +5,7 @@
 use {
     anyhow::{Context as _, Error},
     async_trait::async_trait,
-    fidl_fuchsia_hardware_block::BlockMarker,
+    fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_paver::{PayloadStreamRequest, PayloadStreamRequestStream, ReadInfo, ReadResult},
     fuchsia_zircon as zx,
     futures::lock::Mutex,
@@ -174,11 +174,8 @@ pub struct BlockDevicePayloadStreamer {
 const DEVICE_VMO_SIZE: usize = 8192 * 16;
 
 impl BlockDevicePayloadStreamer {
-    pub async fn new(block_device_path: &str) -> Result<Self, Error> {
-        let proxy = fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(
-            block_device_path,
-        )?;
-        let client = RemoteBlockClient::new(proxy).await?;
+    pub async fn new(block_device: BlockProxy) -> Result<Self, Error> {
+        let client = RemoteBlockClient::new(block_device).await?;
 
         let device_vmo = zx::Vmo::create(DEVICE_VMO_SIZE as u64)?;
         let device_vmo_id = client.attach_vmo(&device_vmo).await?;
@@ -339,7 +336,8 @@ mod tests {
 
     use {
         super::*,
-        anyhow::Context,
+        anyhow::{anyhow, Context},
+        fidl_fuchsia_hardware_block::BlockMarker,
         fidl_fuchsia_paver::{PayloadStreamMarker, PayloadStreamProxy},
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, HandleBased},
@@ -474,7 +472,15 @@ mod tests {
 
         let streamer: Box<dyn PayloadStreamer> = if use_block_device_streamer {
             ramdisk_client = create_ramdisk(buf).await?;
-            Box::new(BlockDevicePayloadStreamer::new(ramdisk_client.get_path()).await?)
+            // TODO(https://fxbug.dev/112484): Once ramdisk.open() no longer provides a
+            // multiplexing channel, use open() to acquire the BlockProxy here.
+            let ramdisk_controller = ramdisk_client
+                .as_controller()
+                .ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
+            let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+            let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
+            let payload_streamer = BlockDevicePayloadStreamer::new(ramdisk_block).await?;
+            Box::new(payload_streamer)
         } else {
             Box::new(ReaderPayloadStreamer::new(Box::new(Cursor::new(buf)), src_size))
         };
@@ -553,8 +559,14 @@ mod tests {
         let byte: u8 = 0xab;
         let buf: Vec<u8> = vec![byte; src_size];
         let ramdisk_client = create_ramdisk(buf).await?;
+        // TODO(https://fxbug.dev/112484): Once ramdisk.open() no longer provides a multiplexing
+        // channel, use open() to acquire the BlockProxy here.
+        let ramdisk_controller =
+            ramdisk_client.as_controller().ok_or_else(|| anyhow!("invalid ramdisk controller"))?;
+        let (ramdisk_block, server) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+        let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
         let streamer: Box<dyn PayloadStreamer> =
-            Box::new(BlockDevicePayloadStreamer::new(ramdisk_client.get_path()).await?);
+            Box::new(BlockDevicePayloadStreamer::new(ramdisk_block).await?);
         let (proxy, _, server) = serve_payload(streamer).await?;
 
         try_join(

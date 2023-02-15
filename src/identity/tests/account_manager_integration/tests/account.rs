@@ -345,8 +345,8 @@ async fn create_account_manager() -> Result<Arc<Mutex<NestedAccountManagerProxy>
     };
     instance.driver_test_realm_start(args).await?;
 
-    let ramdisk = setup_ramdisk(&instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
-    format_zxcrypt(&instance, &ramdisk, ACCOUNT_LABEL).await;
+    let (ramdisk, controller) = setup_ramdisk(&instance, FUCHSIA_DATA_GUID, ACCOUNT_LABEL).await;
+    format_zxcrypt(&ramdisk, ACCOUNT_LABEL, controller).await;
 
     let account_manager_proxy =
         instance.root.connect_to_protocol_at_exposed_dir::<AccountManagerMarker>()?;
