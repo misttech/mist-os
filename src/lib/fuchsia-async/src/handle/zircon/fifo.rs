@@ -292,13 +292,16 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
 
     /// Test whether this fifo is ready to be written or not.
     ///
-    /// If the fifo is *not* writable then the current task is scheduled to
-    /// get a notification when the fifo does become writable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the fifo is writable again.
+    /// If the fifo is *not* writable then the current task is scheduled to get
+    /// a notification when the fifo does become writable. That is, this is only
+    /// suitable for calling in a `Future::poll` method and will automatically
+    /// handle ensuring a retry once the fifo is writable again.
     ///
-    /// Returns `true` if the CLOSED signal has been received.
-    pub fn poll_write(&self, cx: &mut Context<'_>) -> Poll<Result<bool, zx::Status>> {
+    /// Returns the cached signals, masked to `OBJECT_WRITABLE` and
+    /// `OBJECT_PEER_CLOSED`. If the write syscall returns `SHOULD_WAIT`, you
+    /// must call `need_write` to clear the cached state and wait for the fifo
+    /// to become writable again.
+    pub fn poll_write(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
         self.handle.poll_write(cx)
     }
 
@@ -311,7 +314,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         cx: &mut Context<'_>,
         entries: &B,
     ) -> Poll<Result<usize, zx::Status>> {
-        let clear_closed = ready!(self.poll_write(cx)?);
+        ready!(self.poll_write(cx)?);
 
         let elem_size = std::mem::size_of::<W>();
         let bytes = entries.as_bytes_ptr();
@@ -324,7 +327,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         match result {
             Err(e) => {
                 if e == zx::Status::SHOULD_WAIT {
-                    self.handle.need_write(cx, clear_closed)?;
+                    self.handle.need_write(cx)?;
                     Poll::Pending
                 } else {
                     Poll::Ready(Err(e))
@@ -336,13 +339,16 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
 
     /// Test whether this fifo is ready to be read or not.
     ///
-    /// If the fifo is *not* readable then the current task is scheduled to
-    /// get a notification when the fifo does become readable. That is, this
-    /// is only suitable for calling in a `Future::poll` method and will
-    /// automatically handle ensuring a retry once the fifo is readable again.
+    /// If the fifo is *not* readable then the current task is scheduled to get
+    /// a notification when the fifo does become readable. That is, this is only
+    /// suitable for calling in a `Future::poll` method and will automatically
+    /// handle ensuring a retry once the fifo is readable again.
     ///
-    /// Returns `true` if the CLOSED signal has been received.
-    pub fn poll_read(&self, cx: &mut Context<'_>) -> Poll<Result<bool, zx::Status>> {
+    /// Returns the cached signals, masked to `OBJECT_READABLE` and
+    /// `OBJECT_PEER_CLOSED`. If the read syscall returns `SHOULD_WAIT`, you
+    /// must call `need_read` to clear the cached state and wait for the fifo to
+    /// become readable again.
+    pub fn poll_read(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
         self.handle.poll_read(cx)
     }
 
@@ -353,7 +359,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         cx: &mut Context<'_>,
         entries: &mut B,
     ) -> Poll<Result<usize, zx::Status>> {
-        let clear_closed = ready!(self.handle.poll_read(cx)?);
+        ready!(self.handle.poll_read(cx)?);
 
         let elem_size = std::mem::size_of::<R>();
         let bytes = entries.as_bytes_ptr_mut();
@@ -367,7 +373,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
         match result {
             Err(e) => {
                 if e == zx::Status::SHOULD_WAIT {
-                    self.handle.need_read(cx, clear_closed)?;
+                    self.handle.need_read(cx)?;
                     return Poll::Pending;
                 }
                 return Poll::Ready(Err(e));

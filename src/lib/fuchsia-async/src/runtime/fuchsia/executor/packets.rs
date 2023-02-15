@@ -17,43 +17,27 @@ use std::{
 
 use super::common::EHandle;
 
+/// Clears `signal` on `atomic_signals`, then schedules a packet to wake `task`
+/// when the object referred to by `handle` asserts `signal` or
+/// `OBJECT_PEER_CLOSED`. If `atomic_signals` contains `OBJECT_PEER_CLOSED`
+/// already, wakes `task` immediately. To avoid unnecessary packets, does
+/// nothing if `signal` was already cleared.
 pub fn need_signal(
     cx: &mut Context<'_>,
     task: &AtomicWaker,
     atomic_signals: &AtomicU32,
     signal: zx::Signals,
-    clear_closed: bool,
     handle: zx::HandleRef<'_>,
     port: &zx::Port,
     key: u64,
 ) -> Result<(), zx::Status> {
-    const OBJECT_PEER_CLOSED: zx::Signals = zx::Signals::OBJECT_PEER_CLOSED;
-
     task.register(cx.waker());
-    let mut clear_signals = signal;
-    if clear_closed {
-        clear_signals |= OBJECT_PEER_CLOSED;
-    }
-    let old = zx::Signals::from_bits_truncate(
-        atomic_signals.fetch_and(!clear_signals.bits(), Ordering::SeqCst),
-    );
-    // We only need to schedule a new packet if one isn't already scheduled.
-    // If the bits were already false, a packet was already scheduled.
-    let was_signal = old.contains(signal);
-    let was_closed = old.contains(OBJECT_PEER_CLOSED);
-    if was_closed || was_signal {
-        let mut signals_to_schedule = zx::Signals::empty();
-        if was_signal {
-            signals_to_schedule |= signal;
-        }
-        if clear_closed && was_closed {
-            signals_to_schedule |= OBJECT_PEER_CLOSED
-        };
-        schedule_packet(handle, port, key, signals_to_schedule)?;
-    }
-    if was_closed && !clear_closed {
-        // We just missed a channel close-- go around again.
+    let old =
+        zx::Signals::from_bits_truncate(atomic_signals.fetch_and(!signal.bits(), Ordering::SeqCst));
+    if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
         cx.waker().wake_by_ref();
+    } else if old.contains(signal) {
+        schedule_packet(handle, port, key, signal)?;
     }
     Ok(())
 }

@@ -209,13 +209,13 @@ impl Stream for NewlineChunker {
                 this.socket.reacquire_read_signal()?;
 
                 // if the socket has no contents we need to wait for them or handle it being closed
-                let is_closed = futures::ready!(this.socket.poll_read_task(cx))?;
-                if is_closed {
+                let signals = futures::ready!(this.socket.poll_read_task(cx))?;
+                if !signals.contains(zx::Signals::OBJECT_READABLE) {
                     return this.end_of_stream();
                 } else {
                     // the socket got data in between our first call and poll_read_task,
                     // otherwise poll_read_task would either have returned Poll::Pending (no data)
-                    // or `is_closed` would be `true`
+                    // or `signals` would not have `OBJECT_READABLE`.
                     let outstanding = this.socket.as_ref().outstanding_read_bytes()?;
                     if outstanding == 0 {
                         return Poll::Ready(Some(Err(anyhow::format_err!(
@@ -263,7 +263,7 @@ impl Stream for NewlineChunker {
                 Poll::Ready(Some(Ok(chunk)))
             } else {
                 // it is not enough for a chunk, request notification when there's more
-                this.socket.need_read(cx, false /* clear_closed */)?;
+                this.socket.need_read(cx)?;
                 Poll::Pending
             }
         }

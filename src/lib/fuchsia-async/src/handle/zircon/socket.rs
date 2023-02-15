@@ -111,22 +111,21 @@ impl Socket {
     }
 
     /// Tests if the resource currently has either the provided `signal`
-    /// or the OBJECT_PEER_CLOSED signal set.
-    ///
-    /// Returns `true` if the CLOSED signal was set.
+    /// or the `OBJECT_PEER_CLOSED` signal set.
     fn poll_signal_or_closed(
         &self,
         cx: &mut Context<'_>,
         task: &AtomicWaker,
         signal: zx::Signals,
-    ) -> Poll<Result<bool, zx::Status>> {
+    ) -> Poll<Result<zx::Signals, zx::Status>> {
         let signals = zx::Signals::from_bits_truncate(self.receiver.signals.load(Ordering::SeqCst));
         let was_closed = signals.contains(zx::Signals::OBJECT_PEER_CLOSED);
         let was_signal = signals.contains(signal);
         if was_closed || was_signal {
-            Poll::Ready(Ok(was_closed))
+            let mask = signal | Signals::OBJECT_PEER_CLOSED;
+            Poll::Ready(Ok(signals & mask))
         } else {
-            self.need_signal(cx, task, signal, was_closed)?;
+            self.need_signal(cx, task, signal)?;
             Poll::Pending
         }
     }
@@ -147,8 +146,11 @@ impl Socket {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is readable again.
     ///
-    /// Returns `true` if the CLOSED signal was set.
-    pub fn poll_read_task(&self, cx: &mut Context<'_>) -> Poll<Result<bool, zx::Status>> {
+    /// Returns the cached signals, masked to `OBJECT_READABLE` and
+    /// `OBJECT_PEER_CLOSED`. If the read syscall returns `SHOULD_WAIT`, you
+    /// must call `need_read` to clear the cached state and wait for the socket
+    /// to become readable again.
+    pub fn poll_read_task(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
         self.poll_signal_or_closed(cx, &self.receiver.read_task, Signals::SOCKET_READABLE)
     }
 
@@ -168,8 +170,11 @@ impl Socket {
     /// is only suitable for calling in a `Future::poll` method and will
     /// automatically handle ensuring a retry once the socket is writable again.
     ///
-    /// Returns `true` if the CLOSED signal was set.
-    pub fn poll_write_task(&self, cx: &mut Context<'_>) -> Poll<Result<bool, zx::Status>> {
+    /// Returns the cached signals, masked to `OBJECT_WRITABLE` and
+    /// `OBJECT_PEER_CLOSED`. If the write syscall returns `SHOULD_WAIT`, you
+    /// must call `need_write` to clear the cached state and wait for the socket
+    /// to become writable again.
+    pub fn poll_write_task(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
         self.poll_signal_or_closed(cx, &self.receiver.write_task, Signals::SOCKET_WRITABLE)
     }
 
@@ -178,14 +183,12 @@ impl Socket {
         cx: &mut Context<'_>,
         task: &AtomicWaker,
         signal: zx::Signals,
-        clear_closed: bool,
     ) -> Result<(), zx::Status> {
         crate::runtime::need_signal(
             cx,
             task,
             &self.receiver.signals,
             signal,
-            clear_closed,
             self.handle.as_handle_ref(),
             self.receiver.port(),
             self.receiver.key(),
@@ -194,24 +197,14 @@ impl Socket {
 
     /// Arranges for the current task to receive a notification when a
     /// "readable" signal arrives.
-    ///
-    /// `clear_closed` indicates that we previously mistakenly thought
-    /// the channel was closed due to a false signal, and we should
-    /// now reset the CLOSED bit. This value should often be passed in directly
-    /// from the output of `poll_read`.
-    pub fn need_read(&self, cx: &mut Context<'_>, clear_closed: bool) -> Result<(), zx::Status> {
-        self.need_signal(cx, &self.receiver.read_task, Signals::SOCKET_READABLE, clear_closed)
+    pub fn need_read(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+        self.need_signal(cx, &self.receiver.read_task, Signals::SOCKET_READABLE)
     }
 
     /// Arranges for the current task to receive a notification when a
     /// "writable" signal arrives.
-    ///
-    /// `clear_closed` indicates that we previously mistakenly thought
-    /// the channel was closed due to a false signal, and we should
-    /// now reset the CLOSED bit. This value should often be passed in directly
-    /// from the output of `poll_write`.
-    pub fn need_write(&self, cx: &mut Context<'_>, clear_closed: bool) -> Result<(), zx::Status> {
-        self.need_signal(cx, &self.receiver.write_task, Signals::SOCKET_WRITABLE, clear_closed)
+    pub fn need_write(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+        self.need_signal(cx, &self.receiver.write_task, Signals::SOCKET_WRITABLE)
     }
 
     // Clears a signal, and schedules a packet requesting an updated signal. Does nothing if
@@ -246,10 +239,10 @@ impl Socket {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, zx::Status>> {
-        let clear_closed = ready!(self.poll_read_task(cx))?;
+        ready!(self.poll_read_task(cx))?;
         let res = self.handle.read(buf);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.need_read(cx, clear_closed)?;
+            self.need_read(cx)?;
             return Poll::Pending;
         }
         if res == Err(zx::Status::PEER_CLOSED) {
@@ -266,10 +259,10 @@ impl Socket {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, zx::Status>> {
-        let clear_closed = ready!(self.poll_write_task(cx))?;
+        ready!(self.poll_write_task(cx))?;
         let res = self.handle.write(buf);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.need_write(cx, clear_closed)?;
+            self.need_write(cx)?;
             Poll::Pending
         } else {
             Poll::Ready(res)
@@ -284,14 +277,14 @@ impl Socket {
         cx: &mut Context<'_>,
         out: &mut Vec<u8>,
     ) -> Poll<Result<usize, zx::Status>> {
-        let clear_closed = ready!(self.poll_read_task(cx))?;
+        ready!(self.poll_read_task(cx))?;
         let avail = self.handle.outstanding_read_bytes()?;
         let len = out.len();
         out.resize(len + avail, 0);
         let (_, mut tail) = out.split_at_mut(len);
         match self.handle.read(&mut tail) {
             Err(zx::Status::SHOULD_WAIT) => {
-                self.need_read(cx, clear_closed)?;
+                self.need_read(cx)?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
@@ -534,8 +527,8 @@ mod tests {
 
         // Dropping s1 raises a closed signal on s2 when the executor next polls the signal port.
         let mut rx_fut = poll_fn(|cx| async_s2.poll_read_task(cx));
-        if let Poll::Ready(Ok(closed)) = executor.run_until_stalled(&mut rx_fut) {
-            assert!(closed);
+        if let Poll::Ready(Ok(signals)) = executor.run_until_stalled(&mut rx_fut) {
+            assert!(signals.contains(zx::Signals::OBJECT_PEER_CLOSED));
         } else {
             panic!("Expected future to be ready and Ok");
         }

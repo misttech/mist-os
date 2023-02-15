@@ -60,11 +60,10 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::Handle>,
     ) -> Poll<Result<(), zx::Status>> {
-        let clear_closed = ready!(self.0.poll_read(cx))?;
-
+        ready!(self.0.poll_read(cx))?;
         let res = self.0.get_ref().read_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_read(cx, clear_closed)?;
+            self.0.need_read(cx)?;
             return Poll::Pending;
         }
         Poll::Ready(res)
@@ -81,11 +80,10 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::HandleInfo>,
     ) -> Poll<Result<(), zx::Status>> {
-        let clear_closed = ready!(self.0.poll_read(cx))?;
-
+        ready!(self.0.poll_read(cx))?;
         let res = self.0.get_ref().read_etc_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_read(cx, clear_closed)?;
+            self.0.need_read(cx)?;
             return Poll::Pending;
         }
         Poll::Ready(res)

@@ -430,8 +430,8 @@ impl ReadWrite {
         // device requires an accurate signal before sending the guest a credit update.
         self.socket.reacquire_write_signal()?;
         match poll_fn(move |cx| self.socket.poll_write_task(cx)).await {
-            Ok(closed) => {
-                if closed {
+            Ok(signals) => {
+                if signals.contains(zx::Signals::OBJECT_PEER_CLOSED) {
                     self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
                     self.send_half_shutdown_packet();
                     Ok(SocketState::Closed)
@@ -479,7 +479,7 @@ impl ReadWrite {
         }
 
         match poll_fn(move |cx| self.socket.poll_read_task(cx)).await {
-            Ok(closed) if !closed => {
+            Ok(signals) if !signals.contains(zx::Signals::OBJECT_PEER_CLOSED) => {
                 if self.socket.as_ref().outstanding_read_bytes().unwrap_or(0) == 0 {
                     SocketState::SpuriousWakeup
                 } else {
