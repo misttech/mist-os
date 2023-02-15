@@ -25,6 +25,7 @@ use core::{
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
+use lock_order::Locked;
 
 use derivative::Derivative;
 use log::{debug, trace};
@@ -718,6 +719,7 @@ impl<
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
@@ -728,10 +730,11 @@ impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
         &self,
         cb: F,
     ) -> O {
-        cb(&self.state.ipv4)
+        IpStateContext::<Ipv4, _>::with_ip_layer_state(&Locked::new(*self), cb)
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
@@ -742,7 +745,35 @@ impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
         &self,
         cb: F,
     ) -> O {
-        cb(&self.state.ipv6)
+        IpStateContext::<Ipv6, _>::with_ip_layer_state(&Locked::new(*self), cb)
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L> IpStateContext<Ipv4, NonSyncCtx::Instant>
+    for Locked<'_, SyncCtx<NonSyncCtx>, L>
+{
+    fn with_ip_layer_state<
+        O,
+        F: FnOnce(&Ipv4State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
+    >(
+        &self,
+        cb: F,
+    ) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::IpState<Ipv4>>())
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L> IpStateContext<Ipv6, NonSyncCtx::Instant>
+    for Locked<'_, SyncCtx<NonSyncCtx>, L>
+{
+    fn with_ip_layer_state<
+        O,
+        F: FnOnce(&Ipv6State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
+    >(
+        &self,
+        cb: F,
+    ) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::IpState<Ipv6>>())
     }
 }
 

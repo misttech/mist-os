@@ -47,6 +47,7 @@ pub mod transport;
 
 use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData, time};
+use lock_order::lock::UnlockedAccess;
 
 use derivative::Derivative;
 use log::trace;
@@ -181,6 +182,24 @@ pub struct StackState<C: NonSyncContext> {
 impl<C: NonSyncContext + Default> Default for StackState<C> {
     fn default() -> StackState<C> {
         StackStateBuilder::default().build_with_ctx(&mut Default::default())
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IpState<Ipv6>> for SyncCtx<C> {
+    type Data<'l> = &'l Ipv6State<C::Instant, DeviceId<C::Instant>>
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Data<'_> {
+        &self.state.ipv6
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IpState<Ipv4>> for SyncCtx<C> {
+    type Data<'l> = &'l Ipv4State<C::Instant, DeviceId<C::Instant>>
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Data<'_> {
+        &self.state.ipv4
     }
 }
 

@@ -8,6 +8,8 @@ use lock_order::Unlocked;
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
+pub(crate) struct IpState<I>(PhantomData<I>, Never);
+
 pub(crate) enum DeviceLayerStateOrigin {}
 pub(crate) enum DeviceLayerState {}
 pub(crate) struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
