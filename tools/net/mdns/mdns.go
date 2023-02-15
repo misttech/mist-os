@@ -408,6 +408,9 @@ func IpToDnsRecordType(ip net.IP) uint16 {
 	}
 }
 
+// Ensure the mDNS struct satisfies the MDNS interface
+var _ MDNS = &mDNS{}
+
 // MDNS is the central interface through which requests are sent and received.
 // This implementation is agnostic to use case and asynchronous.
 // To handle various responses add Handlers. To send a packet you may use
@@ -431,7 +434,7 @@ type MDNS interface {
 	SetMCastTTL(ttl int) error
 
 	// AddHandler calls f on every Packet received.
-	AddHandler(f func(net.Interface, net.Addr, Packet))
+	AddHandler(f func(net.Addr, Packet))
 
 	// AddWarningHandler calls f on every non-fatal error.
 	AddWarningHandler(f func(net.Addr, error))
