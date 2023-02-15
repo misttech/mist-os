@@ -1,4 +1,4 @@
-# Comparing C, new C++, and high-level C++ language bindings
+# Comparing new C++ and high-level C++ language bindings
 
 [TOC]
 
@@ -297,45 +297,24 @@ Refer to the [New C++ tutorial][cpp-tutorial] to get started.
 Refer to the [HLCPP tutorial][hlcpp-tutorial] to get started.
 
 <!-- TODO(fxbug.dev/NNNNN): Guide for migrating HLCPP to new C++. -->
-<!-- TODO(fxbug.dev/NNNNN): Guide for migrating C to new C++. -->
-
-## [DEPRECATED] C bindings
-
-The C bindings are deprecated in favor of [New C++ bindings](#cpp).
-
-*   Optimized to meet the needs of low-level systems programming, plus tight
-    constraints around dependencies and toolchains. The compiler, bindings
-    library, and code-generator are written in C++, while exposing a pure C
-    interface to clients.
-*   Represent data structures whose memory layout coincides with the wire
-    format.
-*   Support in-place access and construction of FIDL messages.
-*   Generated structures are views of an underlying buffer; they do not own
-    memory.
-*   Provide convenience wrappers for message construction and calling for
-    a limited subset of FIDL messages (see
-    [@for_deprecated_c_bindings][layout-attribute]).
-*   Client is synchronous only. Two-way method calls will block.
-*   As the New C++ bindings mature, there are plans to re-implement
-    the C bindings as a light-weight wrapper around the C++ bindings.
 
 ## Summary
 
-Category                           | [DEPRECATED] C                    | New C++ with wire types                   | New C++ with natural types             | High-level C++
------------------------------------|-----------------------------------|-----------------------------------------------|--------------------------------------------|--------------------
-**audience**                       | drivers                           | drivers and performance-critical applications | high-level services                        | high-level services
-**abstraction overhead**           | almost zero                       | RAII closing of handles [[1]](#footnote1)     | heap allocation, construction, destruction | heap allocation, construction, destruction
-**type safe types**                | enums, structs, unions            | enums, structs, unions, handles, protocols    | enums, structs, unions, handles, protocols | enums, structs, unions, handles, protocols
-**storage**                        | stack                             | stack, user-provided buffer, or heap          | heap                                       | heap
-**lifecycle**                      | manual free (POD)                 | manual or automatic free                      | automatic free (RAII)                      | automatic free (RAII)
-**receive behavior**               | copy                              | decode in-place                               | decode into heap                           | decode then move to heap
-**send behavior**                  | copy                              | copy or vectorize                             | copy                                       | copy
-**calling protocol methods**       | free functions                    | free functions or proxy                       | free functions or proxy                    | call through proxies, register callbacks
-**implementing protocol methods**  | manual dispatch or via ops table  | manual dispatch or implement stub interface   | implement stub interface                   | implement stub object, invoke callbacks
-**async client**                   | no                                | yes                                           | yes                                        | yes
-**async server**                   | limited [[2]](#footnote2)         | yes (unbounded) [[3]](#footnote3)             | yes (unbounded) [[3]](#footnote3)          | yes (unbounded)
-**parallel server dispatch**       | no                                | yes [[4]](#footnote4)                         | yes [[4]](#footnote4)                      | no
-**generated code footprint**       | small                             | large                                         | large                                      | large
+Category                           | New C++ with wire types                   | New C++ with natural types             | High-level C++
+-----------------------------------|-----------------------------------------------|--------------------------------------------|--------------------
+**audience**                       | drivers and performance-critical applications | high-level services                        | high-level services
+**abstraction overhead**           | RAII closing of handles [[1]](#footnote1)     | heap allocation, construction, destruction | heap allocation, construction, destruction
+**type safe types**                | enums, structs, unions, handles, protocols    | enums, structs, unions, handles, protocols | enums, structs, unions, handles, protocols
+**storage**                        | stack, user-provided buffer, or heap          | heap                                       | heap
+**lifecycle**                      | manual or automatic free                      | automatic free (RAII)                      | automatic free (RAII)
+**receive behavior**               | decode in-place                               | decode into heap                           | decode then move to heap
+**send behavior**                  | copy or vectorize                             | copy                                       | copy
+**calling protocol methods**       | free functions or proxy                       | free functions or proxy                    | call through proxies, register callbacks
+**implementing protocol methods**  | manual dispatch or implement stub interface   | implement stub interface                   | implement stub object, invoke callbacks
+**async client**                   | yes                                           | yes                                        | yes
+**async server**                   | yes (unbounded) [[2]](#footnote2)             | yes (unbounded) [[2]](#footnote2)          | yes (unbounded)
+**parallel server dispatch**       | yes [[3]](#footnote3)                         | yes [[3]](#footnote3)                      | no
+**generated code footprint**       | large                                         | large                                      | large
 
 --------------------------------------------------------------------------------
 
@@ -348,16 +327,12 @@ object to manage all handles associated with a call.
 
 ##### Footnote2
 
-The bindings library can dispatch at most one in-flight transaction.
-
-##### Footnote3
-
 The bindings library defined in [lib/fidl](/sdk/lib/fidl/cpp/wire) can
 dispatch an unbounded number of in-flight transactions via `fidl::BindServer`
 defined in
 [lib/fidl/cpp/wire/channel.h](/sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/channel.h).
 
-##### Footnote4
+##### Footnote3
 
 The bindings library [lib/fidl](/sdk/lib/fidl/cpp/wire) enables parallel
 dispatch using the `EnableNextDispatch()` API defined in
