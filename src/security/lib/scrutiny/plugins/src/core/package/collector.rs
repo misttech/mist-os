@@ -29,7 +29,6 @@ use {
     fidl::encoding::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fuchsia_merkle::Hash,
-    fuchsia_pkg_cache_url::{fuchsia_pkg_cache_component_url, pkg_cache_package_name_and_variant},
     fuchsia_url::{
         boot_url::BootUrl, AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant,
     },
@@ -858,7 +857,6 @@ impl PackageDataCollector {
         component_id: &mut i32,
         service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
-        manifests: &mut Vec<Manifest>,
     ) {
         for (service_name, pkg_url) in service_map.iter() {
             if !components.contains_key(pkg_url) {
@@ -880,74 +878,6 @@ impl PackageDataCollector {
                 );
             }
         }
-
-        Self::infer_fuchsia_pkg_cache_component(component_id, components, manifests);
-    }
-
-    /// Locate the `pkg-cache` component and duplicate it under the special
-    /// `fuchsia-pkg-cache`-scheme URL.
-    fn infer_fuchsia_pkg_cache_component(
-        component_id: &mut i32,
-        components: &mut HashMap<Url, Component>,
-        manifests: &mut Vec<Manifest>,
-    ) {
-        let mut matching_components = vec![];
-        for (url, component) in components.iter() {
-            let component_url_result: Result<AbsoluteComponentUrl, _> = url.as_str().parse();
-            if let Ok(component_url) = component_url_result {
-                let opt_variant = component_url.variant();
-                if let Some(variant) = opt_variant {
-                    let name_and_variant = pkg_cache_package_name_and_variant();
-                    if (component_url.name(), variant) == (&name_and_variant.0, &name_and_variant.1)
-                    {
-                        matching_components.push(component);
-                    }
-                }
-            }
-        }
-        if matching_components.len() == 0 {
-            warn!("Failed to locate pkg-cache component for fuchsia-pkg-cache scheme handling");
-            return;
-        }
-        if matching_components.len() > 1 {
-            warn!(
-                total = matching_components.len(),
-                "Located multiple pkg-cache components for fuchsia-pkg-cache scheme handling",
-            );
-        }
-        let matching_component = matching_components[0];
-
-        let matching_manifests: Vec<&Manifest> = manifests
-            .iter()
-            .filter(|manifest| manifest.component_id == matching_component.id)
-            .collect();
-        if matching_manifests.len() == 0 {
-            warn!("Failed to locate pkg-cache manifest for fuchsia-pkg-cache scheme handling");
-            return;
-        }
-        if matching_manifests.len() > 1 {
-            warn!(
-                total = matching_manifests.len(),
-                "Located multiple pkg-cache manifests for fuchsia-pkg-cache scheme handling",
-            );
-        }
-        let matching_manifest = matching_manifests[0];
-
-        *component_id += 1;
-        manifests.push(Manifest {
-            component_id: *component_id,
-            manifest: matching_manifest.manifest.clone(),
-            uses: matching_manifest.uses.clone(),
-        });
-        components.insert(
-            fuchsia_pkg_cache_component_url().clone(),
-            Component {
-                id: *component_id,
-                url: fuchsia_pkg_cache_component_url().clone(),
-                version: 2,
-                source: ComponentSource::Inferred,
-            },
-        );
     }
 
     /// Iterate through all nodes created thus far, creating edges between them based on the services they use.
@@ -1071,12 +1001,7 @@ impl PackageDataCollector {
             }
         };
 
-        Self::infer_components(
-            &mut component_id,
-            &mut service_map,
-            &mut components,
-            &mut manifests,
-        );
+        Self::infer_components(&mut component_id, &mut service_map, &mut components);
 
         Self::generate_routes(
             &mut component_id,
