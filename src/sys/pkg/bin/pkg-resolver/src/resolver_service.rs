@@ -24,7 +24,7 @@ use {
     fidl_fuchsia_pkg::{self as fpkg, PackageResolverRequest, PackageResolverRequestStream},
     fidl_fuchsia_pkg_ext::{self as pkg, BlobId},
     fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_pkg::{PackageDirectory, PackageName},
+    fuchsia_pkg::PackageDirectory,
     fuchsia_trace as ftrace,
     fuchsia_url::{AbsolutePackageUrl, ParseError},
     fuchsia_zircon::Status,
@@ -220,14 +220,6 @@ impl QueuedResolver {
         eager_package_manager: Option<&AsyncRwLock<EagerPackageManager<Self>>>,
         trace_id: ftrace::Id,
     ) -> Result<PackageWithSourceAndBlobId, pkg::ResolveError> {
-        if pkg_url.name().as_ref().starts_with(PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES) {
-            error!(
-                "'{}' is an invalid package URL. The package name prefix '{}' is reserved",
-                pkg_url,
-                PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES
-            );
-            return Err(pkg::ResolveError::InvalidUrl);
-        }
         // Base pin.
         let package_inspect = self.inspect.resolve(&pkg_url);
         if let Some(blob) = self.base_package_index.is_unpinned_base_package(&pkg_url) {
@@ -243,14 +235,6 @@ impl QueuedResolver {
         // Rewrite the url.
         let rewritten_url =
             rewrite_url(&self.rewriter, &pkg_url).await.map_err(|e| e.to_resolve_error())?;
-        if rewritten_url.name().as_ref().starts_with(PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES) {
-            error!(
-                "'{}' is an invalid rewritten URL. The package name prefix '{}' is reserved",
-                rewritten_url,
-                PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES
-            );
-            return Err(pkg::ResolveError::InvalidUrl);
-        }
         let _package_inspect = package_inspect.rewritten_url(&rewritten_url);
 
         // Attempt to use EagerPackageManager to resolve the package.

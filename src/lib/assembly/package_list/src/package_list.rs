@@ -5,7 +5,7 @@
 use {
     anyhow::{anyhow, Context, Result},
     fuchsia_hash::Hash,
-    fuchsia_pkg::{PackageManifest, PackageName, PackagePath},
+    fuchsia_pkg::{PackageManifest, PackagePath},
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
     serde_json::json,
     std::{collections::BTreeMap, fs::File, io::Write, path::Path, str::FromStr},
@@ -45,16 +45,6 @@ pub trait WritablePackageList {
             .find(|blob| blob.path == "meta/")
             .ok_or(anyhow!("Failed to add package {} to the list, unable to find meta blob", path))
             .and_then(|meta_blob| self.insert(package_repository, path, meta_blob.merkle))
-    }
-
-    /// Add a new subpackage with `merkle`, using a generated package name
-    /// and an implicit package variant `0`.
-    fn add_subpackage(&mut self, merkle: Hash) -> Result<()> {
-        self.insert(
-            None::<String>,
-            format!("{}{}/0", PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES, merkle),
-            merkle,
-        )
     }
 
     /// Helper fn to handle the (repeated) process of writing a list of packages

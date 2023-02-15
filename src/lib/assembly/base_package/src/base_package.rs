@@ -6,7 +6,6 @@ use {
     anyhow::Result,
     assembly_package_list::{PackageList, PackageUrlList, WritablePackageList},
     camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_merkle::Hash,
     fuchsia_pkg::{PackageBuilder, PackageManifest},
     std::collections::BTreeMap,
 };
@@ -38,13 +37,6 @@ impl BasePackageBuilder {
     /// base package as file `data/static_packages`.
     pub fn add_base_package(&mut self, package: PackageManifest) -> Result<()> {
         self.base_packages.add_package(package)
-    }
-
-    /// Add the `package_hash` to the list of base subpackage hashes, which will
-    /// be included in the base package file `data/static_packages` using the
-    /// name "{PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES}<merkle>".
-    pub fn add_base_subpackage(&mut self, package_hash: Hash) -> Result<()> {
-        self.base_packages.add_subpackage(package_hash)
     }
 
     /// Add the `package` to the list of cache packages, which is then added to

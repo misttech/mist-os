@@ -39,21 +39,6 @@ pub fn validate_package_path_segment(string: &str) -> Result<(), PackagePathSegm
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash, Serialize)]
 pub struct PackageName(String);
 
-impl PackageName {
-    // TODO(101492): Remove this constant and its use cases in assembly and
-    // base-resolver when base-resolver is updated to resolve base packages
-    // directly from blobfs.
-    //
-    // In the mean time, the directory names with this prefix will be visible to
-    // developers in the `/pkgfs/packages` directory, and should NOT be used
-    // other than by base-resolver.
-    //
-    // Each subpackage will get a name with this prefix followed by the package
-    // hash. The resulting name must still be a legal `PackageName` (see
-    // `validate_package_path_segment()`).
-    pub const PREFIX_FOR_INDEXED_SUBPACKAGES: &'static str = "_do_not_use_";
-}
-
 impl std::str::FromStr for PackageName {
     type Err = PackagePathSegmentError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
