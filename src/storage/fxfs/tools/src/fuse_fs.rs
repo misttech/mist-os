@@ -57,16 +57,17 @@ fn register_signal_handlers() {
     }
 }
 
-/// Handler for the SIGTERM signal.
+/// Handler for the kernel signal.
 extern "C" fn handle_sigterm(_signal: i32) {
     register_signal_handlers();
-    info!("SIGTERM Received");
+    info!("Kernel signal received");
     CLOSE_EVENT.get().unwrap().notify(usize::MAX);
 }
 
 pub struct FuseFs {
     pub fs: OpenFxFilesystem,
     pub default_store: Arc<ObjectStore>,
+    pub mount_path: String,
     // Each entry in object_handle_cache stores an object_handle and a counter that is incremented
     // on its open/create and decremented on its release.
     pub object_handle_cache: Arc<RwLock<HashMap<u64, (Arc<StoreObjectHandle<ObjectStore>>, u32)>>>,
@@ -74,29 +75,29 @@ pub struct FuseFs {
 
 impl FuseFs {
     /// Initialize the filesystem with a fake in-memory device.
-    pub async fn new_in_memory() -> Self {
+    pub async fn new_in_memory(mount_path: String) -> Self {
         let device = DeviceHolder::new(FakeDevice::new(
             IN_MEMORY_DEVICE_BLOCK_COUNT,
             DEFAULT_DEVICE_BLOCK_SIZE,
         ));
         let crypt = None;
-        FuseFs::new(device, crypt).await
+        FuseFs::new(device, crypt, mount_path).await
     }
 
     /// Initialize the filesystem by creating a new file-backed device.
-    pub async fn new_file_backed(path: &str) -> Self {
-        let file = FuseFs::create_file(path);
+    pub async fn new_file_backed(device_path: &str, mount_path: String) -> Self {
+        let file = FuseFs::create_file(device_path);
         let device = DeviceHolder::new(FileBackedDevice::new(file, DEFAULT_DEVICE_BLOCK_SIZE));
         let crypt = None;
-        FuseFs::new(device, crypt).await
+        FuseFs::new(device, crypt, mount_path).await
     }
 
     /// Initialize the filesystem by opening an existing file-backed device.
-    pub async fn open_file_backed(path: &str) -> Self {
-        let file = FuseFs::create_file(path);
+    pub async fn open_file_backed(device_path: &str, mount_path: String) -> Self {
+        let file = FuseFs::create_file(device_path);
         let device = DeviceHolder::new(FileBackedDevice::new(file, DEFAULT_DEVICE_BLOCK_SIZE));
         let crypt = None;
-        FuseFs::open(device, crypt).await
+        FuseFs::open(device, crypt, mount_path).await
     }
 
     /// Create a file on disk that is used for file-backed device.
@@ -113,7 +114,11 @@ impl FuseFs {
     }
 
     /// Create a new FxFilesystem using given device and cryption, with a root volume initialized.
-    pub async fn new(device: DeviceHolder, crypt: Option<Arc<dyn Crypt>>) -> Self {
+    pub async fn new(
+        device: DeviceHolder,
+        crypt: Option<Arc<dyn Crypt>>,
+        mount_path: String,
+    ) -> Self {
         let fs = FxFilesystem::new_empty(device).await.expect("fxfs new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         root_volume
@@ -125,11 +130,20 @@ impl FuseFs {
             .await
             .expect("failed to open default store");
 
-        Self { fs, default_store, object_handle_cache: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            fs,
+            default_store,
+            mount_path,
+            object_handle_cache: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     /// Open an existing FxFilesystem using given device and cryption
-    pub async fn open(device: DeviceHolder, crypt: Option<Arc<dyn Crypt>>) -> Self {
+    pub async fn open(
+        device: DeviceHolder,
+        crypt: Option<Arc<dyn Crypt>>,
+        mount_path: String,
+    ) -> Self {
         let fs = FxFilesystem::open(device).await.expect("new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let default_store = root_volume
@@ -137,7 +151,12 @@ impl FuseFs {
             .await
             .expect("failed to open default store");
 
-        Self { fs, default_store, object_handle_cache: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            fs,
+            default_store,
+            mount_path,
+            object_handle_cache: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     /// Listen to the signals to gracefully close the filesystem.
@@ -145,12 +164,20 @@ impl FuseFs {
         register_signal_handlers();
         CLOSE_EVENT.set(Event::new()).unwrap();
         let fs_clone = self.fs.clone();
+        let mount_path = self.mount_path.clone();
 
         let handle = tokio::spawn(async move {
             let listener = CLOSE_EVENT.get().unwrap().listen();
             listener.wait();
             fs_clone.close().await.expect("Close failed");
-            info!("Filesystem is gracefully closed");
+            info!("FUSE-Fxfs filesystem was gracefully closed");
+
+            info!("Trying to unmount directory: {:?} ...", mount_path.as_str());
+            process::Command::new("umount").args([mount_path.as_str()]).output().unwrap_or_else(
+                |e| panic!("failed to unmount directory {:?}: {:?}", mount_path.as_str(), e),
+            );
+            info!("{:?} is successfully unmounted", mount_path);
+
             process::exit(0);
         });
         handle
@@ -374,7 +401,7 @@ mod tests {
     /// Check the handle counter value after each release.
     #[fuchsia::test]
     async fn test_load_object_handle_and_release_object_handle() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
         let mut transaction = fs
             .fs

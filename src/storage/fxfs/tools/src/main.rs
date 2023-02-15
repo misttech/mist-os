@@ -322,7 +322,7 @@ fn run_in_memory_fuse(path: String) -> Result<(), Error> {
         let mut mount_options = MountOptions::default();
         mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(path.clone()).await;
 
         Session::new(mount_options).mount_with_unprivileged(fs, path).await.unwrap().await.unwrap();
     });
@@ -342,7 +342,7 @@ fn run_file_fuse_create(mount_path: String, device_path: String) -> Result<(), E
         let mut mount_options = MountOptions::default();
         mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let fs = FuseFs::new_file_backed(device_path.as_str()).await;
+        let fs = FuseFs::new_file_backed(device_path.as_str(), mount_path.clone()).await;
         let handle = fs.notify_destroy();
         handle.await;
 
@@ -369,7 +369,7 @@ fn run_file_fuse_open(mount_path: String, device_path: String) -> Result<(), Err
         let mut mount_options = MountOptions::default();
         mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let fs = FuseFs::open_file_backed(device_path.as_str()).await;
+        let fs = FuseFs::open_file_backed(device_path.as_str(), mount_path.clone()).await;
         let handle = fs.notify_destroy();
         handle.await;
 

@@ -1230,7 +1230,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_create_directory_tree() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_res = fs
@@ -1274,7 +1274,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_fails_when_directory_already_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
@@ -1290,7 +1290,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_fails_when_file_already_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let dir = fs.root_dir().await.expect("root_dir failed");
         fs.create(
@@ -1312,7 +1312,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rmdir_remove_directory_tree() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
@@ -1333,7 +1333,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rmdir_fails_when_directory_is_not_empty() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
@@ -1357,7 +1357,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rmdir_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let rmdir_res = fs.rmdir(new_fake_request(), INVALID_INODE, OsStr::new("foo")).await;
         assert_eq!(rmdir_res, Err(libc::ENOENT.into()));
@@ -1367,7 +1367,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rmdir_fails_when_object_is_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let dir = fs.root_dir().await.expect("root_dir failed");
         fs.create(
@@ -1387,7 +1387,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lookup_search_for_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1408,7 +1408,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lookup_search_for_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let file_reply = fs
@@ -1434,7 +1434,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lookup_search_for_symlink() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let symlink_reply = fs
@@ -1454,7 +1454,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lookup_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let lookup_res = fs.lookup(new_fake_request(), INVALID_INODE, OsStr::new("foo")).await;
         assert_eq!(lookup_res, Err(libc::ENOENT.into()));
         fs.fs.close().await.expect("failed to close filesystem");
@@ -1462,7 +1462,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lookup_fails_when_name_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
         let lookup_res = fs.lookup(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
         assert_eq!(lookup_res, Err(libc::ENOENT.into()));
@@ -1471,7 +1471,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_unlink_remove_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let file_reply = fs
@@ -1498,7 +1498,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_unlink_remove_symlink() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
         let symlin_reply = fs
             .symlink(new_fake_request(), dir.object_id(), OsStr::new("link"), OsStr::new("foo"))
@@ -1519,7 +1519,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_unlink_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
@@ -1533,7 +1533,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_unlink_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let unlink_res = fs.unlink(new_fake_request(), INVALID_INODE, OsStr::new("foo")).await;
         assert_eq!(unlink_res, Err(libc::ENOENT.into()));
@@ -1543,7 +1543,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create_new_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -1561,7 +1561,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_res = fs
@@ -1576,7 +1576,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create_fails_when_file_already_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         fs.create(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
@@ -1598,7 +1598,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create_fails_when_directory_already_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
@@ -1620,7 +1620,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_move_file_to_another_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let foo_mkdir_reply = fs
@@ -1660,7 +1660,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_rename_file_in_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1694,7 +1694,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_fails_when_old_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1719,7 +1719,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_fails_when_old_name_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1743,7 +1743,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_fails_when_new_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1771,7 +1771,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_move_file_to_another_directory_where_new_name_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let foo_mkdir_reply = fs
@@ -1814,7 +1814,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_rename_move_directory_to_under_another_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let foo_mkdir_reply = fs
@@ -1854,7 +1854,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -1875,7 +1875,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_fails_when_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let open_res = fs.open(new_fake_request(), INVALID_INODE, DEFAULT_FLAG).await;
         assert_eq!(open_res, Err(libc::ENOENT.into()));
@@ -1885,7 +1885,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_open_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -1900,7 +1900,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_same_length_as_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -1928,7 +1928,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_offset_smaller_than_block_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -1956,7 +1956,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_offset_equal_to_block_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -1996,7 +1996,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_offset_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2030,7 +2030,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_smaller_length_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2058,7 +2058,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_non_zero_offset_and_length_smaller_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2086,7 +2086,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_length_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2114,7 +2114,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_with_non_zero_offset_and_length_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2142,7 +2142,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_when_file_is_empty() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2166,7 +2166,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_fails_when_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let read_res = fs.read(new_fake_request(), INVALID_INODE, 0, 0, TEST_DATA.len() as _).await;
         assert_eq!(read_res.is_err(), true);
@@ -2178,7 +2178,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2196,7 +2196,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_to_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2226,7 +2226,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_with_offset_smaller_than_file_size_and_file_size_unchanged() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2263,7 +2263,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_with_offset_smaller_than_file_size_and_file_size_changed() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2300,7 +2300,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_with_offset_equal_to_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2337,7 +2337,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_with_offset_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2374,7 +2374,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_when_file_is_empty() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2404,7 +2404,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_fails_when_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let write_res =
             fs.write(new_fake_request(), INVALID_INODE, 0, 0, TEST_DATA, DEFAULT_FLAG).await;
@@ -2417,7 +2417,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2435,7 +2435,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getattr_on_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2454,7 +2454,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getattr_on_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2479,7 +2479,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getattr_on_symlink() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let symlink_reply = fs
@@ -2498,7 +2498,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getattr_fails_when_object_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let attr_res = fs.getattr(new_fake_request(), INVALID_INODE, Some(0), DEFAULT_FLAG).await;
         assert_eq!(attr_res, Err(libc::ENOENT.into()));
@@ -2508,7 +2508,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_directory_with_time() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2529,7 +2529,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_file_with_time() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2556,7 +2556,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_file_with_zero_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2596,7 +2596,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_file_with_shrinked_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2636,7 +2636,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_file_with_increased_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2676,7 +2676,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_on_symlink_with_time() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let symlink_reply = fs
@@ -2697,7 +2697,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_setattr_fails_when_object_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let mut set_attr = SetAttr::default();
         set_attr.atime = Some(DEFAULT_TIME);
@@ -2709,7 +2709,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_alllocate_space_to_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2731,7 +2731,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_allocate_zero_space_to_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2753,7 +2753,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_fails_when_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let fallocate_res =
             fs.fallocate(new_fake_request(), INVALID_INODE, 0, 0, 128, DEFAULT_FILE_MODE).await;
@@ -2764,7 +2764,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2781,7 +2781,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_with_offset_smaller_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2817,7 +2817,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_fallocate_with_offset_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2860,7 +2860,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_opendir_open_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2874,7 +2874,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_opendir_fails_when_directory_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let opendir_res = fs.opendir(new_fake_request(), INVALID_INODE, 0).await;
         assert_eq!(opendir_res, Err(libc::ENOENT.into()));
@@ -2884,7 +2884,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_opendir_fails_when_object_is_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -2905,7 +2905,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdir_read_directory_entries() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -2960,7 +2960,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdir_read_empty_directory_entries() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let readdir_reply =
@@ -2985,7 +2985,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdir_fails_when_directory_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let readdir_res = fs.readdir(new_fake_request(), INVALID_INODE, 0, 0).await;
         assert_eq!(readdir_res.is_err(), true);
@@ -2997,7 +2997,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdir_fails_when_object_is_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3020,7 +3020,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdirplus_read_directory_entries() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -3077,7 +3077,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdirplus_read_empty_directory_entries() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let readdir_reply = fs
@@ -3104,7 +3104,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdirplus_fails_when_directory_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let readdir_res = fs.readdirplus(new_fake_request(), INVALID_INODE, 0, 0, 0).await;
         assert_eq!(readdir_res.is_err(), true);
@@ -3116,7 +3116,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_readdirplus_fails_when_object_is_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3139,7 +3139,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lseek_seek_for_cur_in_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3168,7 +3168,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lseek_seek_for_cur_in_file_with_offset() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3197,7 +3197,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lseek_seek_for_end_with_offset_smaller_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3226,7 +3226,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lseek_seek_for_end_with_offset_larger_than_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3255,7 +3255,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_from_one_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3319,7 +3319,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_input_offset_smaller_than_input_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3383,7 +3383,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_input_offset_larger_than_input_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3447,7 +3447,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_output_offset_smaller_than_output_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3511,7 +3511,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_output_offset_larger_than_output_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3575,7 +3575,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_copied_length_smaller_than_input_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3639,7 +3639,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_with_copied_length_larger_than_input_file_size() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3703,7 +3703,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_fails_when_input_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply_new = fs
@@ -3742,7 +3742,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_copy_file_range_when_output_file_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3781,7 +3781,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_symlink_create_new_symlink() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let symlink_reply = fs
@@ -3808,7 +3808,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_symlink_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
 
         let symlink_res = fs
             .symlink(new_fake_request(), INVALID_INODE, OsStr::new("link"), OsStr::new("foo"))
@@ -3823,7 +3823,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_create_hardlink_on_file() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3857,7 +3857,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_fails_when_parent_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3884,7 +3884,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_fails_when_file_to_link_does_not_exist() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let hardlink_res =
@@ -3899,7 +3899,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_fails_when_name_already_exists() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3926,7 +3926,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_fails_when_object_is_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -3947,7 +3947,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hardlink_fails_when_parent_is_not_directory() {
-        let fs = FuseFs::new_in_memory().await;
+        let fs = FuseFs::new_in_memory(String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -3990,7 +3990,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_create_directory_tree_and_reopen() {
-        let fs = FuseFs::new_file_backed("/tmp/fuse_dir_test").await;
+        let fs = FuseFs::new_file_backed("/tmp/fuse_dir_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let mkdir_reply = fs
@@ -4005,7 +4005,7 @@ mod tests {
 
         fs.destroy(new_fake_request()).await;
 
-        let fs = FuseFs::open_file_backed("/tmp/fuse_dir_test").await;
+        let fs = FuseFs::open_file_backed("/tmp/fuse_dir_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let (_child_id, _child_descriptor) =
@@ -4017,7 +4017,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_mkdir_create_file_and_reopen() {
-        let fs = FuseFs::new_file_backed("/tmp/fuse_file_test").await;
+        let fs = FuseFs::new_file_backed("/tmp/fuse_file_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let create_reply = fs
@@ -4032,7 +4032,7 @@ mod tests {
 
         fs.destroy(new_fake_request()).await;
 
-        let fs = FuseFs::open_file_backed("/tmp/fuse_file_test").await;
+        let fs = FuseFs::open_file_backed("/tmp/fuse_file_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
         let (_child_id, _child_descriptor) =
