@@ -35,6 +35,7 @@ zx_library("vm") {
     "ppb_command.cc",
     "scanner.cc",
     "stack_owned_loaned_pages_interval.cc",
+    "tri_page_storage.cc",
     "vm.cc",
     "vm_address_region.cc",
     "vm_address_region_or_mapping.cc",

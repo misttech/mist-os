@@ -74,7 +74,6 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
     if (status != ZX_OK) {
       return FailTag{};
     }
-    buffer_page_->set_state(vm_page_state::ZRAM);
   }
 
   compression_attempts_.fetch_add(1);

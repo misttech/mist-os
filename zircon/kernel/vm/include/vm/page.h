@@ -327,6 +327,13 @@ struct vm_page {
       // system, or otherwise address the current usage of object.object_or_stack_owner outside
       // of OBJECT state.
     } alloc;  // allocated, but not yet put to any specific use
+    struct {
+      // Used by the VmTriPageStorage allocator to record the size of the item in each of the
+      // possible buckets. See it for more details.
+      uint16_t left_compress_size;
+      uint16_t mid_compress_size;
+      uint16_t right_compress_size;
+    } __PACKED zram;
   };
   using object_t = decltype(object);
 
