@@ -54,6 +54,7 @@ source_set("common_srcs") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
+    "//src/lib/fsl",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
@@ -73,7 +74,10 @@ source_set("common_srcs") {
 
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
-  deps = [ ":common_srcs" ]
+  deps = [
+    ":common_srcs",
+    "//sdk/lib/syslog/cpp:backend",
+  ]
 }
 
 fuchsia_driver_component("amlogic-display") {

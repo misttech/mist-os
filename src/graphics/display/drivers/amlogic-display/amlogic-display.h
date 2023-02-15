@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -80,9 +81,7 @@ class AmlogicDisplay
       const display_controller_interface_protocol_t* intf);
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
@@ -145,6 +144,11 @@ class AmlogicDisplay
 
   void SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient canvas) { canvas_ = canvas; }
 
+  void SetSysmemAllocatorForTesting(
+      fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
+    sysmem_allocator_client_ = std::move(sysmem_allocator_client);
+  }
+
  private:
   zx_status_t SetupDisplayInterface();
   int VSyncThread();
@@ -205,6 +209,13 @@ class AmlogicDisplay
 
   // The ID for currently active capture
   uint64_t capture_active_id_ TA_GUARDED(capture_lock_);
+
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+
+  // Imported sysmem buffer collections.
+  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+      buffer_collections_;
 
   // Imported Images
   fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_lock_);

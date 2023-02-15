@@ -35,6 +35,8 @@
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display-bind.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
 
@@ -127,21 +129,6 @@ zx_status_t AmlogicDisplay::DisplayInit() {
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
-    uint64_t collection_id, zx::channel collection_token) {
-  // Tell sysmem we're withdrawing from the negotiation, so it doesn't assume we
-  // crashed and won't cause other shared token to fail.
-  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
-                                           std::move(collection_token)))
-                            ->Close();
-  if (!status.ok()) {
-    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
-           status.status_string());
-  }
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock lock(&display_lock_);
@@ -149,6 +136,47 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
   added_display_args_t args;
   vout_->PopulateAddedDisplayArgs(&args, display_id_);
   dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
+    uint64_t collection_id, zx::channel collection_token) {
+  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+
+  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+
+  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
+      std::move(collection_server_endpoint));
+  if (!bind_result.ok()) {
+    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+           bind_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+  return ZX_OK;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  buffer_collections_.erase(collection_id);
+  return ZX_OK;
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
@@ -1037,6 +1065,32 @@ zx_status_t AmlogicDisplay::Bind() {
         DISP_ERROR("Failed to set deadline profile: %d\n", status);
       }
       zx_handle_close(profile);
+    }
+  }
+
+  // Set sysmem allocator client.
+  {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+    if (!endpoints.is_ok()) {
+      zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
+      return endpoints.status_value();
+    }
+    auto& [client, server] = endpoints.value();
+    auto status = sysmem_.Connect(server.TakeChannel());
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
+             zx_status_get_string(status));
+      return status;
+    }
+    sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+
+    std::string debug_name =
+        fxl::StringPrintf("amlogic-display[%lu]", fsl::GetCurrentProcessKoid());
+    auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
+        fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+    if (!set_debug_status.ok()) {
+      zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+      return set_debug_status.status();
     }
   }
 

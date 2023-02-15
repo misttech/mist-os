@@ -9,12 +9,16 @@
 #include <lib/async-loop/default.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <zircon/syscalls/object.h>
 
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
+#include "src/lib/fsl/handles/object_info.h"
 #include "zxtest/zxtest.h"
 
 namespace sysmem = fuchsia_sysmem;
 
+// TODO(fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// testing doubles instead of writing mocks for each display driver test.
 class MockBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
  public:
   MockBufferCollection(const std::vector<sysmem::wire::PixelFormatType>& pixel_format_types =
@@ -93,6 +97,79 @@ class MockBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::
   std::vector<sysmem::wire::PixelFormatType> supported_pixel_format_types_;
 };
 
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+ public:
+  explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+    ASSERT_TRUE(dispatcher_);
+  }
+
+  void BindSharedCollection(BindSharedCollectionRequestView request,
+                            BindSharedCollectionCompleter::Sync& completer) override {
+    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
+        sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
+
+    auto buffer_collection_id = next_buffer_collection_id_++;
+    active_buffer_collections_[buffer_collection_id] = {
+        .token_client = std::move(request->token),
+        .mock_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormatTypes),
+    };
+
+    fidl::BindServer(
+        dispatcher_, std::move(request->buffer_collection_request),
+        active_buffer_collections_[buffer_collection_id].mock_buffer_collection.get(),
+        [this, buffer_collection_id](MockBufferCollection*, fidl::UnbindInfo,
+                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+          inactive_buffer_collection_tokens_.push_back(
+              std::move(active_buffer_collections_[buffer_collection_id].token_client));
+          active_buffer_collections_.erase(buffer_collection_id);
+        });
+  }
+
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  GetActiveBufferCollectionTokenClients() const {
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+        unowned_token_clients;
+    unowned_token_clients.reserve(active_buffer_collections_.size());
+
+    for (const auto& kv : active_buffer_collections_) {
+      unowned_token_clients.push_back(kv.second.token_client);
+    }
+    return unowned_token_clients;
+  }
+
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  GetInactiveBufferCollectionTokenClients() const {
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+        unowned_token_clients;
+    unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
+
+    for (const auto& token : inactive_buffer_collection_tokens_) {
+      unowned_token_clients.push_back(token);
+    }
+    return unowned_token_clients;
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    EXPECT_TRUE(false);
+  }
+
+ private:
+  struct BufferCollection {
+    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
+    std::unique_ptr<MockBufferCollection> mock_buffer_collection;
+  };
+
+  using BufferCollectionId = int;
+
+  std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
+  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+      inactive_buffer_collection_tokens_;
+
+  BufferCollectionId next_buffer_collection_id_ = 0;
+
+  async_dispatcher_t* dispatcher_ = nullptr;
+};
+
 class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
  public:
   zx_status_t AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,
@@ -126,6 +203,94 @@ class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
   bool in_use_[kCanvasEntries] = {};
   amlogic_canvas_protocol_t protocol_ = {.ops = &amlogic_canvas_protocol_ops_, .ctx = this};
 };
+
+TEST(AmlogicDisplay, ImportBufferCollection) {
+  amlogic_display::AmlogicDisplay display(nullptr);
+  display.SetFormatSupportCheck([](auto) { return true; });
+
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+
+  zx::result allocator_endpoints = fidl::CreateEndpoints<sysmem::Allocator>();
+  ASSERT_OK(allocator_endpoints);
+  MockAllocator allocator(loop.dispatcher());
+  ASSERT_OK(fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(allocator_endpoints->server),
+                                         &allocator));
+  display.SetSysmemAllocatorForTesting(
+      fidl::WireSyncClient(std::move(allocator_endpoints->client)));
+
+  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token1_endpoints);
+  zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_OK(token2_endpoints);
+
+  // Test ImportBufferCollection().
+  constexpr uint64_t kValidBufferCollectionId = 1u;
+  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
+      kValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+
+  // `collection_id` must be unused.
+  EXPECT_EQ(display.DisplayControllerImplImportBufferCollection(
+                kValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
+            ZX_ERR_ALREADY_EXISTS);
+
+  loop.RunUntilIdle();
+
+  // Verify that the current buffer collection token is used (active).
+  {
+    auto active_buffer_token_clients = allocator.GetActiveBufferCollectionTokenClients();
+    EXPECT_EQ(active_buffer_token_clients.size(), 1u);
+
+    auto inactive_buffer_token_clients = allocator.GetInactiveBufferCollectionTokenClients();
+    EXPECT_EQ(inactive_buffer_token_clients.size(), 0u);
+
+    auto [client_koid, client_related_koid] =
+        fsl::GetKoids(active_buffer_token_clients[0].channel()->get());
+    auto [server_koid, server_related_koid] =
+        fsl::GetKoids(token1_endpoints->server.channel().get());
+
+    EXPECT_NE(client_koid, ZX_KOID_INVALID);
+    EXPECT_NE(client_related_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_related_koid, ZX_KOID_INVALID);
+
+    EXPECT_EQ(client_koid, server_related_koid);
+    EXPECT_EQ(server_koid, client_related_koid);
+  }
+
+  // Test ReleaseBufferCollection().
+  constexpr uint64_t kInvalidBufferCollectionId = 2u;
+  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
+            ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
+
+  loop.RunUntilIdle();
+
+  // Verify that the current buffer collection token is released (inactive).
+  {
+    auto active_buffer_token_clients = allocator.GetActiveBufferCollectionTokenClients();
+    EXPECT_EQ(active_buffer_token_clients.size(), 0u);
+
+    auto inactive_buffer_token_clients = allocator.GetInactiveBufferCollectionTokenClients();
+    EXPECT_EQ(inactive_buffer_token_clients.size(), 1u);
+
+    auto [client_koid, client_related_koid] =
+        fsl::GetKoids(inactive_buffer_token_clients[0].channel()->get());
+    auto [server_koid, server_related_koid] =
+        fsl::GetKoids(token1_endpoints->server.channel().get());
+
+    EXPECT_NE(client_koid, ZX_KOID_INVALID);
+    EXPECT_NE(client_related_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_related_koid, ZX_KOID_INVALID);
+
+    EXPECT_EQ(client_koid, server_related_koid);
+    EXPECT_EQ(server_koid, client_related_koid);
+  }
+
+  // Shutdown the loop before destroying the MockAllocator which may still have
+  // pending callbacks.
+  loop.Shutdown();
+}
 
 TEST(AmlogicDisplay, SysmemRequirements) {
   amlogic_display::AmlogicDisplay display(nullptr);
