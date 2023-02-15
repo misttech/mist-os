@@ -59,7 +59,7 @@ pub async fn exec() -> Result<()> {
             list_cmd_print(args.filter, args.verbose, realm_query, realm_explorer, writer).await
         }
         ComponentSubcommand::Graph(args) => {
-            graph_cmd(args.filter, args.orientation, realm_query, realm_explorer, writer).await
+            graph_cmd(args.filter, args.orientation, realm_query, writer).await
         }
         ComponentSubcommand::Run(args) => {
             run_cmd(args.moniker, args.url, args.recreate, lifecycle_controller, writer).await

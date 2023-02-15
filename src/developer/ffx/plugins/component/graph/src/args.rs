@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::{graph::GraphOrientation, list::ListFilter};
+use component_debug::cli::{GraphFilter, GraphOrientation};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
@@ -51,8 +51,8 @@ use ffx_core::ffx_command;
 
 pub struct ComponentGraphCommand {
     #[argh(option, long = "only", short = 'o')]
-    /// filter the instance list by a criteria: cmx, cml, running, stopped
-    pub filter: Option<ListFilter>,
+    /// filter the instance list by a criteria: ancestor, descendant, relative
+    pub filter: Option<GraphFilter>,
 
     #[argh(option, long = "orientation", short = 'r', default = "GraphOrientation::TopToBottom")]
     /// changes the visual orientation of the graph's nodes.

@@ -25,7 +25,7 @@ pub use {
     destroy::destroy_cmd,
     doctor::{doctor_cmd_print, doctor_cmd_serialized},
     explore::explore_cmd,
-    graph::graph_cmd,
+    graph::{graph_cmd, GraphFilter, GraphOrientation},
     list::{list_cmd_print, list_cmd_serialized},
     reload::reload_cmd,
     resolve::resolve_cmd,

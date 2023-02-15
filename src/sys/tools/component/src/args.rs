@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::{graph::GraphOrientation, list::ListFilter};
+use component_debug::{
+    cli::{GraphFilter, GraphOrientation},
+    list::ListFilter,
+};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(
@@ -123,8 +126,8 @@ pub struct ListArgs {
 #[argh(subcommand, name = "graph", description = "Same as `ffx component graph`")]
 pub struct GraphArgs {
     #[argh(option, long = "only", short = 'o')]
-    /// filter the instance list by a criteria: cmx, cml, running, stopped
-    pub filter: Option<ListFilter>,
+    /// filter the instance list by a criteria: ancestor, descendant, relative
+    pub filter: Option<GraphFilter>,
 
     #[argh(option, long = "orientation", short = 'r', default = "GraphOrientation::TopToBottom")]
     /// changes the visual orientation of the graph's nodes.

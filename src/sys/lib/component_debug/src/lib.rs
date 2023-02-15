@@ -9,7 +9,6 @@ pub mod cli;
 pub mod copy;
 pub mod doctor;
 pub mod explore;
-pub mod graph;
 pub mod io;
 pub mod lifecycle;
 pub mod list;

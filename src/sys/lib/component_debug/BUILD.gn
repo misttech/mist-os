@@ -77,7 +77,6 @@ rustc_library("component_debug") {
     "src/copy.rs",
     "src/doctor.rs",
     "src/explore.rs",
-    "src/graph.rs",
     "src/io.rs",
     "src/lib.rs",
     "src/lifecycle.rs",
