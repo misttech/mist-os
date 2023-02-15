@@ -24,6 +24,12 @@ assembly_bundle(
     files = "@legacy_ninja_build_outputs//:bringup.bazel_legacy_aib",
 )
 
+assembly_bundle(
+    name = "legacy_zedboot",
+    dir = "@legacy_ninja_build_outputs//:obj/build/images/zedboot/zedboot/zedboot.bazel_legacy_aib",
+    files = "@legacy_ninja_build_outputs//:zedboot.bazel_legacy_aib",
+)
+
 platform_aib(
     name = "bazel_migration",
     base_packages = [

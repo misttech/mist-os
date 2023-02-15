@@ -13,14 +13,21 @@ load(
     "fuchsia_product_configuration",
 )
 
-package(default_visibility = ["//build/bazel/assembly:__pkg__"])
+package(default_visibility = [
+    "//build/bazel/assembly:__pkg__",
+    "//vendor/google:__subpackages__",
+])
 
 py_binary(
     name = "diff_json",
     srcs = ["diff_json.py"],
 )
 
-fuchsia_product_configuration(name = "bringup")
+fuchsia_product_configuration(
+    name = "default",
+    additional_platform_flags_string = {"feature_set_level": "bringup"},
+    build_type = BUILD_TYPES.USER,
+)
 
 fuchsia_platform_input_configuration(
     name = "button_touchscreen",

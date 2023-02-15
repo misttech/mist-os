@@ -111,6 +111,9 @@ declare_args() {
   # The images config information used for zedboot images.
   zedboot_images_config_label = false
 
+  # The images config information used for recovery-fdr images.
+  recovery_fdr_images_config_label = false
+
   # The partitions config information used to create an update package and
   # product bundle.
   partitions_config_label = "//boards/partitions:default"

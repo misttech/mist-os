@@ -9,7 +9,7 @@ fuchsia_product_image(
     image = "//build/bazel/assembly/images_configurations:bringup",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_bringup",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = "//build/bazel/assembly/product_configurations:bringup",
+    product_config = "//build/bazel/assembly/product_configurations:default",
 )
 
 fuchsia_product_image(

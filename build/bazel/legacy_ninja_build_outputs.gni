@@ -41,7 +41,7 @@ gn_labels_for_bazel_inputs =
       "//sdk:core",
     ] + eng_platform_aib_labels
 
-_assembly_deps = []
+_assembly_deps = [ "//build/images/zedboot:zedboot.bazel_legacy_aib" ]
 if (use_bringup_assembly) {
   _assembly_deps += [
     "//build/images/bringup:bringup.bazel_images_config_inputs",
