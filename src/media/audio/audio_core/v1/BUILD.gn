@@ -51,7 +51,6 @@ source_set("audio_core_lib") {
     "idle_policy.h",
     "link_matrix.cc",
     "link_matrix.h",
-    "logging_flags.h",
     "mix_stage.cc",
     "mix_stage.h",
     "output_pipeline.cc",

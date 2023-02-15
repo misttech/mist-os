@@ -15,9 +15,9 @@
 #include <memory>
 
 #include "src/media/audio/audio_core/shared/audio_admin.h"
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/v1/audio_core_impl.h"
 #include "src/media/audio/audio_core/v1/audio_driver.h"
-#include "src/media/audio/audio_core/v1/logging_flags.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 #include "src/media/audio/lib/clock/utils.h"
 

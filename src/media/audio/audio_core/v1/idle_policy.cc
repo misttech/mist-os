@@ -10,9 +10,9 @@
 #include <unordered_set>
 
 #include "src/media/audio/audio_core/shared/active_stream_count_reporter.h"
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/v1/context.h"
-#include "src/media/audio/audio_core/v1/logging_flags.h"
 #include "src/media/audio/audio_core/v1/route_graph.h"
 
 namespace media::audio {

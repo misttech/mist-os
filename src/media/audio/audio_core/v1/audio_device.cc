@@ -8,11 +8,11 @@
 #include <lib/trace/event.h>
 
 #include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/select_best_format.h"
 #include "src/media/audio/audio_core/v1/audio_device_manager.h"
 #include "src/media/audio/audio_core/v1/audio_driver.h"
 #include "src/media/audio/audio_core/v1/audio_output.h"
-#include "src/media/audio/audio_core/v1/logging_flags.h"
 #include "src/media/audio/audio_core/v1/utils.h"
 
 namespace media::audio {

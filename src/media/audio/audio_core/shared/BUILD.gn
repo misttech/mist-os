@@ -44,6 +44,7 @@ source_set("shared") {
     "device_id.cc",
     "device_id.h",
     "device_lister.h",
+    "logging_flags.h",
     "loudness_transform.cc",
     "loudness_transform.h",
     "mix_profile_config.h",

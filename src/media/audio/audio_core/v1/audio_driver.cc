@@ -22,8 +22,8 @@
 #include <fbl/algorithm.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/select_best_format.h"
-#include "src/media/audio/audio_core/v1/logging_flags.h"
 #include "src/media/audio/lib/clock/audio_clock_coefficients.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 #include "src/media/audio/lib/clock/utils.h"
