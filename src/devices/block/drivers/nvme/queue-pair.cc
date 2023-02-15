@@ -27,12 +27,26 @@ zx::result<std::unique_ptr<QueuePair>> QueuePair::Create(zx::unowned_bti bti, ui
     return submission_queue.take_error();
   }
 
+  fbl::AllocChecker ac;
+  fbl::Vector<TransactionData> txns;
+  txns.resize(submission_queue->entry_count(), &ac);
+  if (!ac.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for %u transactions for queue pair with id %u.",
+           submission_queue->entry_count(), queue_id);
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   auto completion_doorbell = DoorbellReg::CompletionQueue(queue_id, caps).FromValue(0);
   auto submission_doorbell = DoorbellReg::SubmissionQueue(queue_id, caps).FromValue(0);
 
-  auto queue_pair =
-      std::make_unique<QueuePair>(std::move(*completion_queue), std::move(*submission_queue),
-                                  std::move(bti), mmio, completion_doorbell, submission_doorbell);
+  auto queue_pair = fbl::make_unique_checked<QueuePair>(
+      &ac, std::move(*completion_queue), std::move(*submission_queue), std::move(txns),
+      std::move(bti), mmio, completion_doorbell, submission_doorbell);
+  if (!ac.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for queue pair with id %u.", queue_id);
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   if (prealloc_prp) {
     zx_status_t status = queue_pair->PreallocatePrpBuffers();
     if (status != ZX_OK) {

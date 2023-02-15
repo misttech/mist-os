@@ -26,6 +26,7 @@
 
 #include "src/devices/block/drivers/nvme/commands/features.h"
 #include "src/devices/block/drivers/nvme/commands/identify.h"
+#include "src/devices/block/drivers/nvme/commands/nvme-io.h"
 #include "src/devices/block/drivers/nvme/commands/queue.h"
 #include "src/devices/block/drivers/nvme/namespace.h"
 #include "src/devices/block/drivers/nvme/nvme_bind.h"
@@ -39,6 +40,8 @@ constexpr size_t kMaxNamespacesToBind = 4;
 // c.f. NVMe Base Specification 2.0, section 3.1.3.8 "AQA - Admin Queue Attributes"
 constexpr size_t kAdminQueueMaxEntries = 4096;
 
+// TODO(fxbug.dev/102133): Consider using interrupt vector - dedicated interrupt (and IO thread) per
+// namespace/queue.
 int Nvme::IrqLoop() {
   while (true) {
     zx_status_t status = irq_.wait(nullptr);
@@ -63,11 +66,7 @@ int Nvme::IrqLoop() {
       admin_queue_->RingCompletionDb();
     }
 
-    // TODO(fxbug.dev/102133): Consider using interrupt vector (dedicated interrupt per
-    // namespace/queue).
-    for (Namespace* ns : namespaces_) {
-      ns->SignalIo();
-    }
+    sync_completion_signal(&io_signal_);
 
     if (irq_mode_ != PCI_INTERRUPT_MODE_MSI_X) {
       // Unmask the interrupt.
@@ -122,16 +121,143 @@ zx_status_t Nvme::DoAdminCommandSync(Submission& submission,
   return ZX_OK;
 }
 
+void Nvme::ProcessIoSubmissions() {
+  while (true) {
+    IoCommand* io_cmd;
+    {
+      fbl::AutoLock lock(&commands_lock_);
+      io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node);
+    }
+
+    if (io_cmd == nullptr) {
+      return;
+    }
+
+    zx_status_t status;
+    const auto opcode = io_cmd->op.command & BLOCK_OP_MASK;
+    if (opcode == BLOCK_OP_FLUSH) {
+      NvmIoFlushSubmission submission;
+      submission.namespace_id = io_cmd->namespace_id;
+
+      status = io_queue_->Submit(submission, std::nullopt, 0, 0, io_cmd);
+    } else {
+      NvmIoSubmission submission(opcode == BLOCK_OP_WRITE);
+      submission.namespace_id = io_cmd->namespace_id;
+      submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(io_cmd->op.rw.length - 1);
+      if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
+        submission.set_force_unit_access(true);
+      }
+
+      // Convert op.rw.offset_vmo and op.rw.length to bytes.
+      status = io_queue_->Submit(submission, zx::unowned_vmo(io_cmd->op.rw.vmo),
+                                 io_cmd->op.rw.offset_vmo * io_cmd->block_size_bytes,
+                                 io_cmd->op.rw.length * io_cmd->block_size_bytes, io_cmd);
+    }
+    switch (status) {
+      case ZX_OK:
+        break;
+      case ZX_ERR_SHOULD_WAIT:
+        // We can't proceed if there is no available space in the submission queue. Put command back
+        // at front of queue for further processing later.
+        {
+          fbl::AutoLock lock(&commands_lock_);
+          list_add_head(&pending_commands_, &io_cmd->node);
+        }
+        return;
+      default:
+        zxlogf(ERROR, "Failed to submit transaction (command %p): %s", io_cmd,
+               zx_status_get_string(status));
+        io_cmd->Complete(ZX_ERR_INTERNAL);
+        break;
+    }
+  }
+}
+
+void Nvme::ProcessIoCompletions() {
+  bool ring_doorbell = false;
+  Completion* completion = nullptr;
+  IoCommand* io_cmd = nullptr;
+  while (io_queue_->CheckForNewCompletion(&completion, &io_cmd) != ZX_ERR_SHOULD_WAIT) {
+    ring_doorbell = true;
+
+    if (io_cmd == nullptr) {
+      zxlogf(ERROR, "Completed transaction isn't associated with a command.");
+      continue;
+    }
+
+    if (completion->status_code_type() == StatusCodeType::kGeneric &&
+        completion->status_code() == 0) {
+      zxlogf(TRACE, "Completed transaction #%u command %p OK.", completion->command_id(), io_cmd);
+      io_cmd->Complete(ZX_OK);
+    } else {
+      zxlogf(ERROR, "Completed transaction #%u command %p ERROR: status type=%01x, status=%02x",
+             completion->command_id(), io_cmd, completion->status_code_type(),
+             completion->status_code());
+      io_cmd->Complete(ZX_ERR_IO);
+    }
+  }
+
+  if (ring_doorbell) {
+    io_queue_->RingCompletionDb();
+  }
+}
+
+int Nvme::IoLoop() {
+  while (true) {
+    if (driver_shutdown_) {  // Check this outside of io_signal_ wait-reset below to avoid deadlock.
+      zxlogf(DEBUG, "IO thread exiting.");
+      break;
+    }
+
+    zx_status_t status = sync_completion_wait(&io_signal_, ZX_TIME_INFINITE);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
+      break;
+    }
+    sync_completion_reset(&io_signal_);
+
+    // process completion messages
+    ProcessIoCompletions();
+
+    // process work queue
+    ProcessIoSubmissions();
+  }
+  return 0;
+}
+
+void Nvme::QueueIoCommand(IoCommand* io_cmd) {
+  {
+    fbl::AutoLock lock(&commands_lock_);
+    list_add_tail(&pending_commands_, &io_cmd->node);
+  }
+
+  sync_completion_signal(&io_signal_);
+}
+
 void Nvme::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
+  driver_shutdown_ = true;
   if (mmio_.get_vmo() != ZX_HANDLE_INVALID) {
     pci_set_bus_mastering(&pci_, false);
   }
   irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
   if (irq_thread_started_) {
-    int unused;
-    thrd_join(irq_thread_, &unused);
+    thrd_join(irq_thread_, nullptr);
   }
+  if (io_thread_started_) {
+    sync_completion_signal(&io_signal_);
+    thrd_join(io_thread_, nullptr);
+  }
+
+  // Error out any pending commands
+  {
+    fbl::AutoLock lock(&commands_lock_);
+    IoCommand* io_cmd;
+    while ((io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node)) != nullptr) {
+      io_cmd->Complete(ZX_ERR_PEER_CLOSED);
+    }
+  }
+
   delete this;
 }
 
@@ -281,6 +407,8 @@ static void PopulateControllerInspect(const IdentifyController& identify,
 }
 
 zx_status_t Nvme::Init() {
+  list_initialize(&pending_commands_);
+
   VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio_);
   CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio_);
 
@@ -375,6 +503,14 @@ zx_status_t Nvme::Init() {
     return ZX_ERR_INTERNAL;
   }
   irq_thread_started_ = true;
+
+  // Spin up IO thread so we can start issuing IO commands from namespace(s).
+  thrd_status = thrd_create_with_name(&io_thread_, IoThread, this, "nvme-io-thread");
+  if (thrd_status) {
+    zxlogf(ERROR, " Failed to create IO thread: %d", thrd_status);
+    return ZX_ERR_INTERNAL;
+  }
+  io_thread_started_ = true;
 
   zx::vmo admin_data;
   status = zx::vmo::create(kPageSize, 0, &admin_data);
@@ -498,23 +634,19 @@ zx_status_t Nvme::Init() {
   // Bind active namespaces.
   auto ns_list = static_cast<IdentifyActiveNamespaces*>(mapper.start());
   for (size_t i = 0; i < std::size(ns_list->nsid) && ns_list->nsid[i] != 0; i++) {
-    if (namespaces_.size() >= kMaxNamespacesToBind) {
-      zxlogf(WARNING, "Skipping additional namespaces after adding %zu.", namespaces_.size());
+    if (i >= kMaxNamespacesToBind) {
+      zxlogf(WARNING, "Skipping additional namespaces after adding %zu.", i);
       break;
     }
-    zx::result result = Namespace::Bind(this, ns_list->nsid[i]);
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to add namespace %u: %s", ns_list->nsid[i], result.status_string());
-      return result.status_value();
+    const uint32_t namespace_id = ns_list->nsid[i];
+    status = Namespace::Bind(this, namespace_id);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to add namespace %u: %s", namespace_id, zx_status_get_string(status));
+      return status;
     }
-    namespaces_.push_back(result.value());
   }
 
   return ZX_OK;
-}
-
-void Nvme::RemoveNamespace(Namespace* ns) {
-  namespaces_.erase(std::remove(namespaces_.begin(), namespaces_.end(), ns), namespaces_.end());
 }
 
 zx_status_t Nvme::AddDevice() {
@@ -577,8 +709,14 @@ zx_status_t Nvme::Bind(void* ctx, zx_device_t* dev) {
   }
   auto bti = zx::bti(bti_handle);
 
-  auto driver = std::make_unique<nvme::Nvme>(dev, pci, std::move(mmio), irq_mode, std::move(irq),
-                                             std::move(bti));
+  fbl::AllocChecker ac;
+  auto driver = fbl::make_unique_checked<nvme::Nvme>(&ac, dev, pci, std::move(mmio), irq_mode,
+                                                     std::move(irq), std::move(bti));
+  if (!ac.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for nvme driver.");
+    return ZX_ERR_NO_MEMORY;
+  }
+
   status = driver->AddDevice();
   if (status != ZX_OK) {
     return status;

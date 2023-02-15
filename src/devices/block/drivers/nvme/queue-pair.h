@@ -11,8 +11,8 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/status.h>
 
-#include <memory>
-#include <vector>
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/queue.h"
@@ -60,14 +60,15 @@ class QueuePair {
                                                        fdf::MmioBuffer& mmio, bool prealloc_prp);
 
   // Prefer |QueuePair::Create|.
-  QueuePair(Queue completion, Queue submission, zx::unowned_bti bti, fdf::MmioBuffer& mmio,
-            DoorbellReg completion_doorbell, DoorbellReg submission_doorbell)
+  QueuePair(Queue completion, Queue submission, fbl::Vector<TransactionData> txns,
+            zx::unowned_bti bti, fdf::MmioBuffer& mmio, DoorbellReg completion_doorbell,
+            DoorbellReg submission_doorbell)
       : kPageSize(zx_system_get_page_size()),
         kPageMask(zx_system_get_page_size() - 1),
         kPageShift(__builtin_ctzl(zx_system_get_page_size())),
         completion_(std::move(completion)),
         submission_(std::move(submission)),
-        txns_(submission_.entry_count()),
+        txns_(std::move(txns)),
         bti_(std::move(bti)),
         mmio_(mmio),
         completion_doorbell_(completion_doorbell),
@@ -75,7 +76,7 @@ class QueuePair {
 
   const Queue& completion() { return completion_; }
   const Queue& submission() { return submission_; }
-  const std::vector<TransactionData>& txn_data() { return txns_; }
+  const fbl::Vector<TransactionData>& txn_data() { return txns_; }
 
   // Preallocates PRP buffers to avoid repeatedly allocating and freeing them for every transaction.
   zx_status_t PreallocatePrpBuffers();
@@ -115,7 +116,7 @@ class QueuePair {
   Queue submission_;
   // This is an array of data associated with each transaction.
   // Each transaction's ID is equal to its index in the queue, and this array works the same way.
-  std::vector<TransactionData> txns_;
+  fbl::Vector<TransactionData> txns_;
   // Entries in the completion queue with phase equal to this are done.
   uint8_t completion_ready_phase_ = 1;
   // Last position the controller reported it was up to in the submission queue.
