@@ -4,7 +4,7 @@
 
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
@@ -57,10 +57,30 @@ fn attr_directory(task: &Arc<Task>, fs: &FileSystemHandle) -> Arc<FsNode> {
     StaticDirectoryBuilder::new(fs)
         // The `current` security context is, with selinux disabled, unconfined.
         .entry_creds(task.as_fscred())
-        .entry(b"current", BytesFile::new_node(b"unconfined\n".to_vec()), mode!(IFREG, 0o666))
+        .entry(b"current", AttrCurrentFile::new_node(), mode!(IFREG, 0o666))
         .entry(b"fscreate", SimpleFileNode::new(|| Ok(SeLinuxAttribute)), mode!(IFREG, 0o666))
         .dir_creds(task.as_fscred())
         .build()
+}
+
+struct AttrCurrentFile {
+    data: Mutex<Vec<u8>>,
+}
+
+impl AttrCurrentFile {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self { data: Mutex::new(b"user:role:type:level\0".to_vec()) })
+    }
+}
+
+impl BytesFileOps for AttrCurrentFile {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        *self.data.lock() = data;
+        Ok(())
+    }
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.data.lock().clone().into())
+    }
 }
 
 // TODO(tbodt): Make this more than a stub, use for all selinux attributes
