@@ -60,6 +60,8 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace i915 {
 
@@ -870,16 +872,41 @@ static bool ConvertPixelFormatToType(fuchsia_sysmem::wire::PixelFormat format, u
 
 zx_status_t Controller::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                                     zx::channel collection_token) {
-  // Tell sysmem we're withdrawing from the negotiation, so it doesn't assume we
-  // crashed and won't cause other shared token to fail.
-  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
-                                           std::move(collection_token)))
-                            ->Close();
-  if (!status.ok()) {
-    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
-           status.status_string());
+  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+    return ZX_ERR_ALREADY_EXISTS;
   }
-  return ZX_ERR_NOT_SUPPORTED;
+
+  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+
+  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
+      std::move(collection_server_endpoint));
+  if (!bind_result.ok()) {
+    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+           bind_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+  return ZX_OK;
+}
+
+zx_status_t Controller::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  buffer_collections_.erase(collection_id);
+  return ZX_OK;
 }
 
 zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
@@ -2260,6 +2287,32 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
   txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
 }
 
+zx_status_t Controller::InitSysmemAllocatorClient() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+  auto& [client, server] = endpoints.value();
+  auto connect_result = sysmem_->ConnectServer(std::move(server));
+  if (!connect_result.ok()) {
+    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
+           connect_result.status_string());
+    return connect_result.status();
+  }
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+
+  std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
+      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    return set_debug_status.status();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
@@ -2278,6 +2331,13 @@ zx_status_t Controller::Init() {
   }
 
   sysmem_.Bind(std::move(sysmem_endpoints->client));
+
+  zxlogf(TRACE, "Initializing sysmem allocator");
+  status = InitSysmemAllocatorClient();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot initialize sysmem allocator: %s", zx_status_get_string(status));
+    return status;
+  }
 
   pci_ = ddk::Pci(parent(), "pci");
   if (!pci_.is_valid()) {

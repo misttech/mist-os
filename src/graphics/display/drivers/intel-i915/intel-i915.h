@@ -93,9 +93,7 @@ class Controller : public DeviceType,
   }
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
@@ -185,6 +183,12 @@ class Controller : public DeviceType,
 
   void ResetMmioSpaceForTesting() { mmio_space_.reset(); }
 
+  zx_status_t SetAndInitSysmemForTesting(
+      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem) {
+    sysmem_ = std::move(sysmem);
+    return InitSysmemAllocatorClient();
+  }
+
   // For every frame, in order to use the imported image, it is required to set
   // up the image based on given rotation in GTT and use the handle offset in
   // GTT. Returns the Gtt region representing the image.
@@ -197,6 +201,13 @@ class Controller : public DeviceType,
   //
   // Long-running initialization is performed in the DdkInit hook.
   zx_status_t Init();
+
+  // Initializes the sysmem Allocator client used to import incoming buffer
+  // collection tokens.
+  //
+  // On success, returns ZX_OK and the sysmem allocator client will be open
+  // until the device is released.
+  zx_status_t InitSysmemAllocatorClient();
 
   const std::unique_ptr<GttRegionImpl>& GetGttRegionImpl(uint64_t handle);
   void InitDisplays();
@@ -269,6 +280,13 @@ class Controller : public DeviceType,
   bool display_released_ = false;
 
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+
+  // Imported sysmem buffer collections.
+  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+      buffer_collections_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
   bool ready_for_callback_ __TA_GUARDED(display_lock_) = false;

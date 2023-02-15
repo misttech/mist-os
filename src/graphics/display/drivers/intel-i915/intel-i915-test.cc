@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -26,6 +27,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
+#include "src/lib/fsl/handles/object_info.h"
 
 #define ASSERT_OK(x) ASSERT_EQ(ZX_OK, (x))
 #define EXPECT_OK(x) EXPECT_EQ(ZX_OK, (x))
@@ -64,6 +66,8 @@ namespace i915 {
 
 namespace {
 
+// TODO(fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// testing doubles instead of writing mocks for each display driver test.
 class MockNoCpuBufferCollection
     : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
  public:
@@ -109,18 +113,113 @@ class MockNoCpuBufferCollection
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_;
 };
 
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+ public:
+  explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+    EXPECT_TRUE(dispatcher_);
+  }
+
+  void BindSharedCollection(BindSharedCollectionRequestView request,
+                            BindSharedCollectionCompleter::Sync& completer) override {
+    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
+        sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
+
+    auto buffer_collection_id = next_buffer_collection_id_++;
+    active_buffer_collections_[buffer_collection_id] = {
+        .token_client = std::move(request->token),
+        .mock_buffer_collection = std::make_unique<MockNoCpuBufferCollection>(),
+    };
+
+    fidl::BindServer(
+        dispatcher_, std::move(request->buffer_collection_request),
+        active_buffer_collections_[buffer_collection_id].mock_buffer_collection.get(),
+        [this, buffer_collection_id](MockNoCpuBufferCollection*, fidl::UnbindInfo,
+                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+          inactive_buffer_collection_tokens_.push_back(
+              std::move(active_buffer_collections_[buffer_collection_id].token_client));
+          active_buffer_collections_.erase(buffer_collection_id);
+        });
+  }
+
+  void SetDebugClientInfo(SetDebugClientInfoRequestView request,
+                          SetDebugClientInfoCompleter::Sync& completer) override {
+    EXPECT_EQ(request->name.get().find("intel-i915"), 0u);
+  }
+
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  GetActiveBufferCollectionTokenClients() const {
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+        unowned_token_clients;
+    unowned_token_clients.reserve(active_buffer_collections_.size());
+
+    for (const auto& kv : active_buffer_collections_) {
+      unowned_token_clients.push_back(kv.second.token_client);
+    }
+    return unowned_token_clients;
+  }
+
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  GetInactiveBufferCollectionTokenClients() const {
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+        unowned_token_clients;
+    unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
+
+    for (const auto& token : inactive_buffer_collection_tokens_) {
+      unowned_token_clients.push_back(token);
+    }
+    return unowned_token_clients;
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    EXPECT_TRUE(false);
+  }
+
+ private:
+  struct BufferCollection {
+    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
+    std::unique_ptr<MockNoCpuBufferCollection> mock_buffer_collection;
+  };
+
+  using BufferCollectionId = int;
+
+  std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
+  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+      inactive_buffer_collection_tokens_;
+
+  BufferCollectionId next_buffer_collection_id_ = 0;
+
+  async_dispatcher_t* dispatcher_ = nullptr;
+};
+
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  FakeSysmem() = default;
+  explicit FakeSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+    EXPECT_TRUE(dispatcher_);
+  }
+
+  void ConnectServer(ConnectServerRequestView request,
+                     ConnectServerCompleter::Sync& completer) override {
+    mock_allocators_.emplace_front(dispatcher_);
+    auto it = mock_allocators_.begin();
+    fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
+  }
+
+  std::list<MockAllocator>& mock_allocators() { return mock_allocators_; }
 
   // FIDL methods
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
+
+ private:
+  std::list<MockAllocator> mock_allocators_;
+  async_dispatcher_t* dispatcher_ = nullptr;
 };
 
 class IntegrationTest : public ::testing::Test {
  protected:
+  IntegrationTest() : loop_(&kAsyncLoopConfigNeverAttachToThread), sysmem_(loop_.dispatcher()) {}
+
   void SetUp() final {
     SetFramebuffer({});
 
@@ -160,12 +259,15 @@ class IntegrationTest : public ::testing::Test {
     loop_.StartThread("pci-fidl-server-thread");
   }
 
-  void TearDown() override { parent_ = nullptr; }
+  void TearDown() override {
+    loop_.Shutdown();
+    parent_ = nullptr;
+  }
 
   MockDevice* parent() const { return parent_.get(); }
 
  private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async::Loop loop_;
   // Emulated parent protocols.
   pci::FakePciProtocol pci_;
   FakeSysmem sysmem_;
@@ -173,6 +275,97 @@ class IntegrationTest : public ::testing::Test {
   // mock-ddk parent device of the Controller under test.
   std::shared_ptr<MockDevice> parent_;
 };
+
+TEST(IntelI915Display, ImportBufferCollection) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  FakeSysmem fake_sysmem(loop.dispatcher());
+
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+  ASSERT_TRUE(sysmem_endpoints.is_ok());
+  auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+  fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
+
+  // Initialize display controller and sysmem allocator.
+  Controller display(nullptr);
+  ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+  EXPECT_OK(loop.RunUntilIdle());
+
+  EXPECT_EQ(fake_sysmem.mock_allocators().size(), 1u);
+  const MockAllocator& allocator = fake_sysmem.mock_allocators().front();
+
+  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token1_endpoints.is_ok());
+  zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token2_endpoints.is_ok());
+
+  // Test ImportBufferCollection().
+  constexpr uint64_t kValidBufferCollectionId = 1u;
+  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
+      kValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+
+  // `collection_id` must be unused.
+  EXPECT_EQ(display.DisplayControllerImplImportBufferCollection(
+                kValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
+            ZX_ERR_ALREADY_EXISTS);
+
+  loop.RunUntilIdle();
+
+  // Verify that the current buffer collection token is used.
+  {
+    auto active_buffer_token_clients = allocator.GetActiveBufferCollectionTokenClients();
+    EXPECT_EQ(active_buffer_token_clients.size(), 1u);
+
+    auto inactive_buffer_token_clients = allocator.GetInactiveBufferCollectionTokenClients();
+    EXPECT_EQ(inactive_buffer_token_clients.size(), 0u);
+
+    auto [client_koid, client_related_koid] =
+        fsl::GetKoids(active_buffer_token_clients[0].channel()->get());
+    auto [server_koid, server_related_koid] =
+        fsl::GetKoids(token1_endpoints->server.channel().get());
+
+    EXPECT_NE(client_koid, ZX_KOID_INVALID);
+    EXPECT_NE(client_related_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_related_koid, ZX_KOID_INVALID);
+
+    EXPECT_EQ(client_koid, server_related_koid);
+    EXPECT_EQ(server_koid, client_related_koid);
+  }
+
+  // Test ReleaseBufferCollection().
+  constexpr uint64_t kInvalidBufferCollectionId = 2u;
+  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
+            ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
+
+  loop.RunUntilIdle();
+
+  // Verify that the current buffer collection token is released.
+  {
+    auto active_buffer_token_clients = allocator.GetActiveBufferCollectionTokenClients();
+    EXPECT_EQ(active_buffer_token_clients.size(), 0u);
+
+    auto inactive_buffer_token_clients = allocator.GetInactiveBufferCollectionTokenClients();
+    EXPECT_EQ(inactive_buffer_token_clients.size(), 1u);
+
+    auto [client_koid, client_related_koid] =
+        fsl::GetKoids(inactive_buffer_token_clients[0].channel()->get());
+    auto [server_koid, server_related_koid] =
+        fsl::GetKoids(token1_endpoints->server.channel().get());
+
+    EXPECT_NE(client_koid, ZX_KOID_INVALID);
+    EXPECT_NE(client_related_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_koid, ZX_KOID_INVALID);
+    EXPECT_NE(server_related_koid, ZX_KOID_INVALID);
+
+    EXPECT_EQ(client_koid, server_related_koid);
+    EXPECT_EQ(server_koid, client_related_koid);
+  }
+
+  // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
+  // may still have pending callbacks.
+  loop.Shutdown();
+}
 
 TEST(IntelI915Display, SysmemRequirements) {
   Controller display(nullptr);

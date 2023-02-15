@@ -63,6 +63,7 @@ source_set("common_srcs") {
     "//src/devices/pci/lib/pci",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//src/lib/fsl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
@@ -75,7 +76,10 @@ source_set("common_srcs") {
 
 fuchsia_driver("intel-i915-driver") {
   output_name = "intel-i915"
-  deps = [ ":common_srcs" ]
+  deps = [
+    ":common_srcs",
+    "//sdk/lib/syslog/cpp:backend",
+  ]
 }
 
 fuchsia_driver_component("intel-i915") {
