@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2705,7 +2705,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2740,7 +2740,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3694,7 +3694,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5510,7 +5510,7 @@ From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:117
+From //build/board.gni:120
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5518,7 +5518,7 @@ From //boards/x64.gni:95
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:117
+From //build/board.gni:120
 
 ### partitions_config_label
 
@@ -5531,7 +5531,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
-From //build/board.gni:116
+From //build/board.gni:119
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5539,7 +5539,7 @@ From //boards/x64.gni:94
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
-From //build/board.gni:116
+From //build/board.gni:119
 
 ### perfetto_build_with_android
 
@@ -6912,6 +6912,14 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:84
 
 From //src/recovery/system/system_recovery_args.gni:11
 
+### recovery_fdr_images_config_label
+
+The images config information used for recovery-fdr images.
+
+**Current value (from the default):** `false`
+
+From //build/board.gni:115
+
 ### recovery_label
 
 Allows a product to specify the recovery image used in the zirconr slot.
@@ -7306,7 +7314,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"gZHXt6XxQzmy8kcQOgyHb8Ap8LLqGXsSNNmyjfuUDZcC"`
+**Current value (from the default):** `"PsHIUiIOlKO4vx4Ge0mimolpdBLw9tB6a8Og4JyX0VoC"`
 
 From //build/rust/config.gni:32
 
@@ -7890,7 +7898,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8247,7 +8255,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
