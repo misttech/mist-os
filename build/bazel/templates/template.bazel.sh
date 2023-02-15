@@ -78,12 +78,15 @@ done
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/112206#c9.
+# In developer environments, use the real username so that authentication
+# and credential helpers will work, e.g. go/bazel-google-sso.
 #
 # Explanation for flags:
 #  --nohome_rc: Ignore $HOME/.bazelrc to enforce hermiticity / reproducibility.
 #  --output_base: Ensure the output base is in the Ninja output directory, not under $HOME.
 #  --output_user_root: Ensure the output user root is in the Ninja output directory, not under $HOME.
-cd "${{_WORKSPACE_DIR}}" && USER=unused-bazel-build-user {bazel_bin_path} \
+_user="${{USER:-unused-bazel-build-user}}"
+cd "${{_WORKSPACE_DIR}}" && USER="$_user" {bazel_bin_path} \
       --nohome_rc \
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \

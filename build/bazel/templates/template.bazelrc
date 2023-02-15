@@ -63,6 +63,9 @@ build:quiet --show_result=0
 build --java_runtime_version=embedded_jdk
 build --tool_java_runtime_version=embedded_jdk
 
+# Enable gcert authentication. This will use gcert credentials instead of application default credentials.  Applicable to Google FTEs.
+build:gcertauth --experimental_credential_helper=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
+
 # Setup remote build
 build:remote --remote_instance_name={remote_instance_name}
 build:remote --define=EXECUTOR=remote

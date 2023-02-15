@@ -279,6 +279,11 @@ caching.
 
 - `--config=remote` enables remote build for many actions using RBE.
 
+## Authentication
+
+- `--config=gcertauth` uses your LOAS credentials to authenticate for using
+    the aforementioned build services.
+
 # TESTING
 
 You can invoke `build/bazel/scripts/test-all.py` to verify that everything
