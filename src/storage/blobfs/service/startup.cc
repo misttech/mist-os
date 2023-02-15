@@ -93,28 +93,13 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Could not initialize block device";
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
-    return configure_(std::move(device),
+    return configure_(std::move(device.value()),
                       MergeComponentConfigIntoMountOptions(component_config_,
                                                            ParseMountOptions(request->options)));
   }();
@@ -127,30 +112,16 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Could not initialize block device: " << zx_status_get_string(status);
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
-    status = FormatFilesystem(device.get(), ParseFormatOptions(request->options));
+    zx_status_t status =
+        FormatFilesystem(device.value().get(), ParseFormatOptions(request->options));
     if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to format blobfs: " << zx_status_get_string(status);
+      FX_PLOGS(ERROR, status) << "Failed to format blobfs";
       return zx::error(status);
     }
     return zx::ok();
@@ -164,30 +135,15 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Could not initialize block device";
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
     // Blobfs supports none of the check options.
     MountOptions options;
-    status = Fsck(std::move(device), options);
+    zx_status_t status = Fsck(std::move(device.value()), options);
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Consistency check failed for blobfs";
       return zx::error(status);

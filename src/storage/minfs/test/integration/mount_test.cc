@@ -49,16 +49,16 @@ class MountTestTemplate : public testing::Test {
                                   fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
               0);
 
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    zx::result block_channel = ramdisk_->channel();
-    ASSERT_TRUE(block_channel.is_ok()) << zx_status_get_string(block_channel.status_value());
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-    ASSERT_EQ(block_client::RemoteBlockDevice::Create(std::move(block_channel.value()), &device),
-              ZX_OK);
-    auto bcache_or = minfs::CreateBcache(std::move(device));
-    ASSERT_TRUE(bcache_or.is_ok());
-    ASSERT_FALSE(bcache_or->is_read_only);
-    bcache_ = std::move(bcache_or->bcache);
+    zx::result device_channel =
+        component::Connect<fuchsia_hardware_block_volume::Volume>(ramdisk_path_);
+    ASSERT_TRUE(device_channel.is_ok()) << device_channel.status_string();
+    zx::result device = block_client::RemoteBlockDevice::Create(std::move(device_channel.value()));
+    ASSERT_TRUE(device.is_ok()) << device.status_string();
+    zx::result bcache_res = minfs::CreateBcache(std::move(device.value()));
+    ASSERT_TRUE(bcache_res.is_ok()) << bcache_res.status_string();
+    auto [bcache, bcache_read_only] = *std::move(bcache_res);
+    ASSERT_FALSE(bcache_read_only);
+    bcache_ = std::move(bcache);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(endpoints.status_value(), ZX_OK);

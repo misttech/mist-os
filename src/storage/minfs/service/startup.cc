@@ -59,29 +59,14 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Could not initialize block device";
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
 
-    auto bcache_res = CreateBcache(std::move(device));
+    auto bcache_res = CreateBcache(std::move(device.value()));
     if (bcache_res.is_error()) {
       FX_PLOGS(ERROR, bcache_res.error_value()) << "Could not initialize bcache";
       return bcache_res.take_error();
@@ -99,28 +84,13 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Could not initialize block device";
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    auto bcache_res = CreateBcache(std::move(device));
+    auto bcache_res = CreateBcache(std::move(device.value()));
     if (bcache_res.is_error()) {
       FX_PLOGS(ERROR, bcache_res.error_value()) << "Could not initialize bcache";
       return bcache_res.take_error();
@@ -147,27 +117,13 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
   //
   // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
   zx::result<> result = [&]() -> zx::result<> {
-    std::unique_ptr<block_client::RemoteBlockDevice> device;
-// TODO(fxbug.dev/121465): Use  Volume instead of Block.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    zx_status_t status =
-        block_client::RemoteBlockDevice::Create(std::move(request->device), &device);
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Could not initialize block device";
-      return zx::error(status);
+    zx::result device = block_client::RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
+    if (device.is_error()) {
+      FX_PLOGS(ERROR, device.error_value()) << "Could not initialize block device";
+      return device.take_error();
     }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    auto bcache_res = CreateBcache(std::move(device));
+    auto bcache_res = CreateBcache(std::move(device.value()));
     if (bcache_res.is_error()) {
       FX_PLOGS(ERROR, bcache_res.error_value()) << "Could not initialize bcache";
       return bcache_res.take_error();

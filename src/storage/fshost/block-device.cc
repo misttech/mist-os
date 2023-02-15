@@ -637,25 +637,26 @@ zx_status_t BlockDevice::CheckFilesystem() {
     case fs_management::kDiskFormatMinfs: {
       // With minfs, we can run the library directly without needing to start a new process.
       uint64_t device_size = info->block_size * info->block_count / minfs::kMinfsBlockSize;
-      zx::result cloned = component::Clone(block_, component::AssumeProtocolComposesNode);
+      zx::result cloned = component::Clone(
+          fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume>(block_.channel().borrow()),
+          component::AssumeProtocolComposesNode);
       if (cloned.is_error()) {
         FX_PLOGS(ERROR, cloned.error_value()) << "Cannot clone block channel";
         return cloned.error_value();
       }
-      std::unique_ptr<block_client::RemoteBlockDevice> device;
-      if (zx_status_t status =
-              block_client::RemoteBlockDevice::Create(std::move(cloned.value()), &device);
-          status != ZX_OK) {
-        FX_PLOGS(ERROR, status) << "Cannot create block device";
-        return status;
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(cloned.value()));
+      if (device.is_error()) {
+        FX_PLOGS(ERROR, device.error_value()) << "Cannot create block device";
+        return device.error_value();
       }
-      auto bc_or = minfs::Bcache::Create(std::move(device), static_cast<uint32_t>(device_size));
-      if (bc_or.is_error()) {
-        FX_LOGS(ERROR) << "Could not initialize minfs bcache.";
-        return bc_or.error_value();
+      zx::result bc =
+          minfs::Bcache::Create(std::move(device.value()), static_cast<uint32_t>(device_size));
+      if (bc.is_error()) {
+        FX_PLOGS(ERROR, bc.error_value()) << "Could not initialize minfs bcache.";
+        return bc.error_value();
       }
       status =
-          minfs::Fsck(std::move(bc_or.value()), minfs::FsckOptions{.repair = true}).status_value();
+          minfs::Fsck(std::move(bc.value()), minfs::FsckOptions{.repair = true}).status_value();
       break;
     }
     default:
@@ -711,26 +712,27 @@ zx_status_t BlockDevice::FormatFilesystem() {
       // With minfs, we can run the library directly without needing to start a new process.
       FX_LOGS(INFO) << "Formatting minfs.";
       uint64_t blocks = info->block_size * info->block_count / minfs::kMinfsBlockSize;
-      zx::result cloned = component::Clone(block_, component::AssumeProtocolComposesNode);
+      zx::result cloned = component::Clone(
+          fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume>(block_.channel().borrow()),
+          component::AssumeProtocolComposesNode);
       if (cloned.is_error()) {
         return cloned.error_value();
       }
-      std::unique_ptr<block_client::RemoteBlockDevice> device;
-      if (zx_status_t status =
-              block_client::RemoteBlockDevice::Create(std::move(cloned.value()), &device);
-          status != ZX_OK) {
-        FX_PLOGS(ERROR, status) << "Cannot clone block channel";
-        return status;
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(cloned.value()));
+      if (device.is_error()) {
+        FX_PLOGS(ERROR, device.error_value()) << "Cannot clone block channel";
+        return device.error_value();
       }
-      auto bc_or = minfs::Bcache::Create(std::move(device), static_cast<uint32_t>(blocks));
-      if (bc_or.is_error()) {
-        FX_LOGS(ERROR) << "Could not initialize minfs bcache.";
-        return bc_or.error_value();
+      zx::result bc =
+          minfs::Bcache::Create(std::move(device.value()), static_cast<uint32_t>(blocks));
+      if (bc.is_error()) {
+        FX_PLOGS(ERROR, bc.error_value()) << "Could not initialize minfs bcache.";
+        return bc.error_value();
       }
       minfs::MountOptions options = {};
-      if (zx_status_t status = minfs::Mkfs(options, bc_or.value().get()).status_value();
+      if (zx_status_t status = minfs::Mkfs(options, bc.value().get()).status_value();
           status != ZX_OK) {
-        FX_LOGS(ERROR) << "Could not format minfs filesystem.";
+        FX_PLOGS(ERROR, status) << "Could not format minfs filesystem.";
         return status;
       }
       FX_LOGS(INFO) << "Minfs filesystem re-formatted. Expect data loss.";
