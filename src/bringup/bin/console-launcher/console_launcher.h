@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.ldsvc/cpp/wire.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
@@ -43,6 +44,7 @@ class ConsoleLauncher {
  public:
   static zx::result<ConsoleLauncher> Create();
   zx::result<zx::process> LaunchShell(fidl::ClientEnd<fuchsia_io::Directory> root,
+                                      fidl::ClientEnd<fuchsia_ldsvc::Loader> loader,
                                       fidl::ClientEnd<fuchsia_hardware_pty::Device> stdio,
                                       const std::string& term,
                                       const std::optional<std::string>& cmd) const;

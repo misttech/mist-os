@@ -170,7 +170,7 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
 }
 
 zx::result<zx::process> ConsoleLauncher::LaunchShell(
-    fidl::ClientEnd<fuchsia_io::Directory> root,
+    fidl::ClientEnd<fuchsia_io::Directory> root, fidl::ClientEnd<fuchsia_ldsvc::Loader> loader,
     fidl::ClientEnd<fuchsia_hardware_pty::Device> stdio, const std::string& term,
     const std::optional<std::string>& cmd) const {
   const char* argv[] = {ZX_SHELL_DEFAULT, nullptr, nullptr, nullptr};
@@ -208,10 +208,21 @@ zx::result<zx::process> ConsoleLauncher::LaunchShell(
                   .id = PA_HND(PA_FD, FDIO_FLAG_USE_FOR_STDIO),
                   .handle = stdio.TakeChannel().release(),
               },
-      }};
+      },
 
-  constexpr uint32_t flags =
-      FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_STDIO & ~FDIO_SPAWN_CLONE_NAMESPACE;
+      // Add an action to transfer the loader service handle.
+      {
+          .action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+          .h =
+              {
+                  .id = PA_HND(PA_LDSVC_LOADER, 0),
+                  .handle = loader.TakeChannel().release(),
+              },
+      },
+  };
+
+  constexpr uint32_t flags = FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_STDIO &
+                             ~FDIO_SPAWN_CLONE_NAMESPACE & ~FDIO_SPAWN_DEFAULT_LDSVC;
 
   FX_LOGS(INFO) << "launching " << argv[0] << " (" << actions[0].name.data << ")";
   char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];

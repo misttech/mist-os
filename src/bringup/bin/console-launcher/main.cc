@@ -35,6 +35,7 @@
 
 #include "src/bringup/bin/console-launcher/console_launcher.h"
 #include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/loader_service/loader_service.h"
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
@@ -43,6 +44,8 @@
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 namespace {
+
+namespace fio = fuchsia_io;
 
 template <typename FOnOpen, typename FOnRepresentation>
 class EventHandler : public fidl::WireSyncEventHandler<fuchsia_io::Directory> {
@@ -88,6 +91,7 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> CreateVirtualConsole(
 }
 
 std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& launcher,
+                                       std::shared_ptr<loader::LoaderService> ldsvc,
                                        fs::FuchsiaVfs& vfs, const fbl::RefPtr<fs::Vnode>& root,
                                        std::unordered_map<std::string_view, std::thread>& threads,
                                        const console_launcher::Arguments& args) {
@@ -117,12 +121,17 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
       FX_PLOGS(FATAL, status) << "failed to serve root directory";
     }
 
+    zx::result loader = ldsvc->Connect();
+    if (loader.is_error()) {
+      FX_PLOGS(FATAL, loader.status_value()) << "failed to connect to loader service";
+    }
+
     // Get the full commandline by splitting on '+'.
     std::vector argv = fxl::SplitStringCopy(args, "+", fxl::WhiteSpaceHandling::kTrimWhitespace,
                                             fxl::SplitResult::kSplitWantNonEmpty);
     autorun.emplace_back([paths = paths, &threads, args = std::move(argv), name = name,
-                          client_end = std::move(endpoints->client),
-                          &job = launcher.shell_job()]() {
+                          loader = std::move(*loader), client_end = std::move(endpoints->client),
+                          &job = launcher.shell_job()]() mutable {
       for (std::string_view path : paths) {
         if (auto it = threads.find(path); it != threads.end()) {
           it->second.join();
@@ -155,11 +164,20 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
                       .handle = client_end.channel().get(),
                   },
           },
+          {
+              .action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+              .h =
+                  {
+                      .id = PA_HND(PA_LDSVC_LOADER, 0),
+                      .handle = loader.TakeChannel().release(),
+                  },
+          },
       };
 
       zx::process process;
       char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-      constexpr uint32_t flags = FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_NAMESPACE;
+      constexpr uint32_t flags =
+          FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_NAMESPACE & ~FDIO_SPAWN_DEFAULT_LDSVC;
       FX_LOGS(INFO) << "starting '" << name << "': " << args;
       zx_status_t status =
           fdio_spawn_etc(job.get(), flags, argv[0], argv, nullptr, std::size(actions), actions,
@@ -181,6 +199,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
 }
 
 [[noreturn]] void RunSerialConsole(const console_launcher::ConsoleLauncher& launcher,
+                                   std::shared_ptr<loader::LoaderService> ldsvc,
                                    fs::FuchsiaVfs& vfs, const fbl::RefPtr<fs::Vnode>& root,
                                    fidl::ClientEnd<fuchsia_hardware_pty::Device> stdio,
                                    const std::string& term, const std::optional<std::string>& cmd) {
@@ -207,8 +226,13 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
       FX_PLOGS(FATAL, status) << "failed to serve root directory";
     }
 
-    zx::result process =
-        launcher.LaunchShell(std::move(directory->client), std::move(client), term, cmd);
+    zx::result loader = ldsvc->Connect();
+    if (loader.is_error()) {
+      FX_PLOGS(FATAL, loader.status_value()) << "failed to connect to loader service";
+    }
+
+    zx::result process = launcher.LaunchShell(std::move(directory->client), std::move(*loader),
+                                              std::move(client), term, cmd);
     if (process.is_error()) {
       FX_PLOGS(FATAL, process.status_value()) << "failed to launch shell";
     }
@@ -360,6 +384,18 @@ int main(int argv, char** argc) {
 
   fs::ManagedVfs vfs(dispatcher);
 
+  fbl::unique_fd lib_fd;
+  if (zx_status_t status =
+          fdio_open_fd("/boot/lib/",
+                       static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
+                                             fio::wire::OpenFlags::kRightReadable |
+                                             fio::wire::OpenFlags::kRightExecutable),
+                       lib_fd.reset_and_get_address());
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "VFS loop exited";
+  }
+  auto ldsvc = loader::LoaderService::Create(dispatcher, std::move(lib_fd), "console-launcher");
+
   zx::result result = console_launcher::ConsoleLauncher::Create();
   if (result.is_error()) {
     FX_PLOGS(FATAL, result.status_value()) << "failed to create console launcher";
@@ -386,7 +422,7 @@ int main(int argv, char** argc) {
         }
 
         workers.emplace_back([&, stdio = std::move(session.value())]() mutable {
-          RunSerialConsole(launcher, vfs, root, std::move(stdio), args.term, "dlog -f -t");
+          RunSerialConsole(launcher, ldsvc, vfs, root, std::move(stdio), args.term, "dlog -f -t");
         });
       }
 
@@ -395,7 +431,7 @@ int main(int argv, char** argc) {
         return session.status_value();
       }
       workers.emplace_back([&, stdio = std::move(session.value())]() mutable {
-        RunSerialConsole(launcher, vfs, root, std::move(stdio), "TERM=xterm-256color", {});
+        RunSerialConsole(launcher, ldsvc, vfs, root, std::move(stdio), "TERM=xterm-256color", {});
       });
       return ZX_OK;
     }();
@@ -410,7 +446,7 @@ int main(int argv, char** argc) {
     FX_LOGS(INFO) << "console.shell: enabled";
 
     {
-      std::vector<std::thread> autorun = LaunchAutorun(launcher, vfs, root, threads, args);
+      std::vector<std::thread> autorun = LaunchAutorun(launcher, ldsvc, vfs, root, threads, args);
       workers.insert(workers.end(), std::make_move_iterator(autorun.begin()),
                      std::make_move_iterator(autorun.end()));
     }
@@ -447,7 +483,7 @@ int main(int argv, char** argc) {
     }
 
     workers.emplace_back([&, stdio = std::move(stdio)]() mutable {
-      RunSerialConsole(launcher, vfs, root, std::move(stdio), args.term, {});
+      RunSerialConsole(launcher, ldsvc, vfs, root, std::move(stdio), args.term, {});
     });
   } else {
     if (!args.autorun_boot.empty()) {

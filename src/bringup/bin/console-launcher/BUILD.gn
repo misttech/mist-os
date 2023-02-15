@@ -2,18 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":bin",
-    ":meta",
-  ]
-}
 
 group("tests") {
   testonly = true
@@ -45,6 +37,9 @@ source_set("lib") {
     # console_launcher.h has #include <fidl/fuchsia.io/cpp/wire.h>
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
 
+    # console_launcher.h has #include <fidl/fuchsia.ldsvc/cpp/wire.h>
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp_wire",
+
     # console_launcher.h has #include <fbl/unique_fd.h>
     "//zircon/system/ulib/fbl",
   ]
@@ -63,6 +58,7 @@ executable("bin") {
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
+    "//src/lib/loader_service",
     "//src/lib/storage/vfs/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -72,8 +68,15 @@ executable("bin") {
   ]
 }
 
-component_manifest_resources("meta") {
-  sources = [ "meta/console-launcher.cml" ]
+fuchsia_component("component") {
+  component_name = "console-launcher"
+  manifest = "meta/console-launcher.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("package") {
+  package_name = "console-launcher"
+  deps = [ ":component" ]
 }
 
 executable("unittests") {

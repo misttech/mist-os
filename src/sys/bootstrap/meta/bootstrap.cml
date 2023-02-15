@@ -46,7 +46,7 @@
         },
         {
             name: "console-launcher",
-            url: "fuchsia-boot:///#meta/console-launcher.cm",
+            url: "fuchsia-boot:///console-launcher#meta/console-launcher.cm",
             startup: "eager",
         },
         {
