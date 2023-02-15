@@ -57,11 +57,11 @@ test_suite(
 
 filegroup(
     name = "build_only_tests",
+    testonly = True,
     srcs = [
         "//examples/hello_world_cpp:pkg",
         "//examples/hello_world_cpp:test_pkg",
     ],
-    testonly = True,
 )
 
 # The workstation product bundle for running the emulator

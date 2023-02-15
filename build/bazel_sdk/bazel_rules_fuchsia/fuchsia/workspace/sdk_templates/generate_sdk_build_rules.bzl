@@ -93,6 +93,7 @@ def _find_dep_paths(deps, root_for_relative, parent_sdk, parent_sdk_contents):
         for dep in deps
     ]
 
+# buildifier: disable=unused-variable
 def _generate_bind_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._bind_library_template)
     lib_base_path = meta["root"] + "/"
@@ -109,6 +110,7 @@ def _generate_bind_library_build_rules(ctx, meta, relative_dir, build_file, proc
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])
 
+# buildifier: disable=unused-variable
 def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     files = []
     for arch in meta["versions"]:
@@ -150,6 +152,7 @@ def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_c
             },
         )
 
+# buildifier: disable=unused-variable
 def _generate_host_tool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._host_tool_template)
 
@@ -176,6 +179,7 @@ def _generate_host_tool_build_rules(ctx, meta, relative_dir, build_file, process
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
 
+# buildifier: disable=unused-variable
 def _generate_companion_host_tool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._companion_host_tool_template)
 
@@ -216,6 +220,7 @@ def _generate_companion_host_tool_build_rules(ctx, meta, relative_dir, build_fil
 
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
 
+# buildifier: disable=unused-variable
 def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):  # @unused
     tmpl = ctx.path(ctx.attr._api_version_template)
     versions = []
@@ -256,6 +261,7 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
         },
     )
 
+# buildifier: disable=unused-variable
 def _generate_fidl_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._fidl_library_template)
     lib_base_path = meta["root"] + "/"
@@ -279,6 +285,7 @@ def _generate_fidl_library_build_rules(ctx, meta, relative_dir, build_file, proc
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])
 
+# buildifier: disable=unused-variable
 def _generate_component_manifest_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._component_manifest_template)
 
@@ -311,6 +318,7 @@ def _generate_component_manifest_rules(ctx, meta, relative_dir, build_file, proc
                 )
                 process_context.files_to_copy[meta["_meta_sdk_root"]].append(f)
 
+# buildifier: disable=unused-variable
 def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._cc_library_template)
     lib_base_path = meta["root"] + "/"
@@ -492,6 +500,8 @@ def _path_in_root(repo_ctx, root, rel_path):
     return repo_ctx.path("%s/%s" % (root, rel_path))
 
 def sdk_id_from_manifests(ctx, manifests):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """ Gets the SDK id from the given manifests.
 
     This assumes all of the manifests have the same id an thus only uses the first manifest
@@ -507,6 +517,7 @@ def sdk_id_from_manifests(ctx, manifests):
 
     return id
 
+# buildifier: disable=function-docstring
 def load_parent_sdk_metadata(ctx, parent_sdk_contents):
     if not ctx.attr.parent_sdk or not ctx.attr.parent_sdk_local_paths:
         return

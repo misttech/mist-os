@@ -26,52 +26,52 @@ def _fuchsia_virtual_device_impl(ctx):
     virtual_device = {
         "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
         "data": {
-           "type": "virtual_device",
-           "name": ctx.attr.device_name,
-           "description": ctx.attr.description,
-           "hardware": {
-              "cpu": {
-                  "arch": ctx.attr.arch,
-              },
-              "audio": {
-                  "model": "hda",
-              },
-              "inputs": {
-                  # Touch is the default to avoid issues with mouse capture
-                  # especially with cloudtops.
-                  "pointing_device": "touch",
-              },
-              "window_size": {
-                  "height": 800,
-                  "width": 1280,
-                  "units": "pixels",
-              },
-              "memory": {
-                  "quantity": 8192,
-                  "units": "megabytes",
-              },
-              "storage": {
-                  "quantity": 2,
-                  "units": "gigabytes",
-              },
-           },
-           "ports": {
-              "ssh": 22,
-              "mdns": 5353,
-              "debug": 2345,
-           },
+            "type": "virtual_device",
+            "name": ctx.attr.device_name,
+            "description": ctx.attr.description,
+            "hardware": {
+                "cpu": {
+                    "arch": ctx.attr.arch,
+                },
+                "audio": {
+                    "model": "hda",
+                },
+                "inputs": {
+                    # Touch is the default to avoid issues with mouse capture
+                    # especially with cloudtops.
+                    "pointing_device": "touch",
+                },
+                "window_size": {
+                    "height": 800,
+                    "width": 1280,
+                    "units": "pixels",
+                },
+                "memory": {
+                    "quantity": 8192,
+                    "units": "megabytes",
+                },
+                "storage": {
+                    "quantity": 2,
+                    "units": "gigabytes",
+                },
+            },
+            "ports": {
+                "ssh": 22,
+                "mdns": 5353,
+                "debug": 2345,
+            },
 
-           # TODO(fxbug.dev/94125): remove once solution is available.
-           "start_up_args_template": template_file_name,
+            # TODO(fxbug.dev/94125): remove once solution is available.
+            "start_up_args_template": template_file_name,
         },
     }
     ctx.actions.write(virtual_device_file, json.encode(virtual_device))
 
     return [
         FuchsiaVirtualDeviceInfo(
-          device_name = ctx.attr.device_name,
-          config = virtual_device_file,
-          template = template_file,
+            device_name = ctx.attr.device_name,
+            config = virtual_device_file,
+            template = template_file,
         ),
     ]
 

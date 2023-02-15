@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":providers.bzl", "FuchsiaStarnixConfigInfo")
 
 def _fuchsia_platform_starnix_configuration_impl(ctx):

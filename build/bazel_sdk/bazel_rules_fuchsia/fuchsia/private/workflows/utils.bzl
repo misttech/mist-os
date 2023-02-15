@@ -28,9 +28,15 @@ wrap_executable = _wrap_executable
 def full_product_bundle_url(ctx, pb_info):
     """ Returns the full url for the product bundle.
 
-    If the product does not
-    have a version associated with it the sdk version will be used. A valid
-    fuchsia toolchain must be registered in the context.
+    If the product does not have a version associated with it the sdk version
+    will be used. A valid fuchsia toolchain must be registered in the context.
+
+    Args:
+      ctx: rule context.
+      pb_info: product bundle info.
+
+    Returns:
+      URL string.
     """
     version = pb_info.version or ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].sdk_id
     if not version:

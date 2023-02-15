@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
@@ -148,7 +149,7 @@ def _fuchsia_product_configuration_impl(ctx):
                 "components": dep[FuchsiaPackageInfo].drivers,
             },
         )
-        pkg_files += [dep[FuchsiaPackageInfo].package_manifest]
+        pkg_files.append(dep[FuchsiaPackageInfo].package_manifest)
     product["drivers"] = driver_details
     product_config["product"] = product
 

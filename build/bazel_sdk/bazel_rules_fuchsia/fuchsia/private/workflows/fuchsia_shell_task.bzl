@@ -40,6 +40,7 @@ def shell_task_rule(*, implementation, attrs = {}, **kwargs):
 def _fuchsia_shell_task_impl(ctx, make_shell_task):
     return make_shell_task([ctx.attr.executable] if ctx.attr.executable else [])
 
+# buildifier: disable=unused-variable
 __fuchsia_shell_task, _fuchsia_shell_task_for_test, _fuchsia_shell_task = shell_task_rule(
     doc = """Task for running a shell command.""",
     implementation = _fuchsia_shell_task_impl,

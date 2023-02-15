@@ -7,6 +7,7 @@
 # avoid pulling in an extra dependency and to add some messaging that is
 # specific to the Fuchsia Bazel SDK.
 
+# buildifier: disable=module-docstring
 _MIN_VERSION_FAIL_MESSAGE = """
 **************************************************************************
 The version of bazel does not meet the minimum version requirements.

@@ -9,7 +9,17 @@ load(":utils.bzl", "flatten", "make_resource_struct")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 def strip_resources(ctx, resources):
-    """Strips resources and returns FuchsiaDebugSymbolInfo."""
+    """Strips resources and returns FuchsiaDebugSymbolInfo.
+
+    Args:
+      ctx: rule context.
+      resources: A list of unstripped input resource_struct() values.
+
+    Returns:
+      a pair whose first item is a list of stripped resource_struct() instances,
+      and the second item is a FuchsiaDebugSymbolInfo provider for the
+      corresponding .build-id directory.
+    """
     build_id_dir = ctx.actions.declare_directory(ctx.label.name + "/.build-id")
     stripped_resources = []
     all_maybe_elf_files = []

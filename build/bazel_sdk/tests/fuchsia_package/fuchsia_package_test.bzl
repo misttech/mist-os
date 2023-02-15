@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_package", "fuchsia_package_resource")
-load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackageResourcesInfo")
-load("@rules_fuchsia//fuchsia/private:utils.bzl", "make_resource_struct")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_package")
+load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
 
 ## Name Tests
 def _name_test_impl(ctx):

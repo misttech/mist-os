@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""CIPD repository rule and related functions."""
+
 load(":cipd_tool.bzl", "cipd_tool_repository")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe", "workspace_and_buildfile")
 

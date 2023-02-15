@@ -31,7 +31,7 @@ def if_fuchsia(value, if_not = [], _unused_rules_fuchsia_root = "@rules_fuchsia"
     Args:
         value: The value to select for if targeting Fuchsia.
         if_not: The value to select for if not targeting Fuchsia.
-        rules_fuchsia_root: The root label for rules_fuchsia (this repo).
+        _unused_rules_fuchsia_root: The root label for rules_fuchsia (this repo).
     Returns:
         Selected value depending on whether we're targeting Fuchsia.
     """

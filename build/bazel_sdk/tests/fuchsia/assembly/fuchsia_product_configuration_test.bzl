@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load("@rules_fuchsia//fuchsia/private/assembly:providers.bzl", "FuchsiaProductConfigInfo")
 load(":test_utils.bzl", "create_validation_script")
 

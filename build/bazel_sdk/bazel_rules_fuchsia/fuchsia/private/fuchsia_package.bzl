@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""fuchsia_package() rule."""
+
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -137,6 +139,7 @@ def fuchsia_unittest_package(
         resources = [],
         unit_tests,
         **kwargs):
+    # buildifier: disable=function-docstring-args
     """A variant of fuchsia_test_package containing unit tests.
 
     See _fuchsia_test_package for additional arguments."""

@@ -13,6 +13,7 @@ load(
     "fuchsia_workflow",
 )
 
+# buildifier: disable=function-docstring
 def fuchsia_task_start_emulator(name, emulator, product_bundle, **kwargs):
     start_name = name + "_emulator"
     register_name = name + "_register_product_bundle"
@@ -51,6 +52,7 @@ def _fuchsia_task_start_emulator_impl(ctx, _make_ffx_task):
         ] + ctx.attr.emulator[FuchsiaEmulatorInfo].launch_options,
     )
 
+# buildifier: disable=unused-variable
 (
     __fuchsia_task_start_emulator,
     _fuchsia_task_start_emulator_for_test,
@@ -81,6 +83,7 @@ def _fuchsia_task_stop_emulator_impl(ctx, _make_ffx_task):
         ],
     )
 
+# buildifier: disable=unused-variable
 (
     _fuchsia_task_stop_emulator,
     _fuchsia_task_stop_emulator_for_test,

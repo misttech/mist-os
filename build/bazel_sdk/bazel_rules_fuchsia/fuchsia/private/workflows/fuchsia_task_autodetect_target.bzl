@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load("//fuchsia/private/workflows:fuchsia_shell_task.bzl", "shell_task_rule")
 load(
     "//fuchsia/private:providers.bzl",
@@ -31,6 +32,7 @@ def _fuchsia_task_autodetect_target_impl(ctx, make_shell_task):
         command = command,
     )
 
+# buildifier: disable=unused-variable
 (
     _fuchsia_task_autodetect_target,
     _fuchsia_task_autodetect_target_for_test,

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
+# buildifier: disable=function-docstring
 def _sdk_host_tool_impl(ctx):
     sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
     file = getattr(sdk, ctx.label.name)

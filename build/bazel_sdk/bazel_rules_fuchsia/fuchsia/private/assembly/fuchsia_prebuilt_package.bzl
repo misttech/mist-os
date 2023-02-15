@@ -156,7 +156,7 @@ def _fuchsia_prebuilt_package_impl(ctx):
             far_file = ctx.files.archive,
             components = ctx.attr.components,
             drivers = ctx.attr.drivers,
-            files = output_files
+            files = output_files,
         ),
     ]
 

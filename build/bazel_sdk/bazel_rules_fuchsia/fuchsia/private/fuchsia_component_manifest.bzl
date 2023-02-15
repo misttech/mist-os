@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":providers.bzl", "FuchsiaComponentManifestShardCollectionInfo", "FuchsiaComponentManifestShardInfo")
 
 def _fuchsia_component_manifest_shard_collection_impl(ctx):

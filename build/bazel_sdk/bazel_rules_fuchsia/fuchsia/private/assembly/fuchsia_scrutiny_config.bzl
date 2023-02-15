@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":providers.bzl", "FuchsiaScrutinyConfigInfo")
 
 def _fuchsia_scrutiny_config_impl(ctx):

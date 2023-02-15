@@ -2,12 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 def _make_verb(verb = None):
     def _make(name):
         return name + "." + verb if verb else name
 
     return _make
 
+# buildifier: disable=function-docstring
 def make_help_executable(ctx, verbs, name = None):
     name = name or ctx.label.name
     exe = ctx.actions.declare_file(name + "_help_text.sh")

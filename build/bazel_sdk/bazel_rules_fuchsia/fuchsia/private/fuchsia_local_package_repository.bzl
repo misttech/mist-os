@@ -2,14 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Build rule for Fuchsia repository
+"""Build rule for Fuchsia repository."""
 
 load(
     ":providers.bzl",
     "FuchsiaLocalPackageRepositoryInfo",
-    "FuchsiaPackageGroupInfo",
-    "FuchsiaPackageInfo",
-    "FuchsiaPackageRepoInfo",
 )
 load(
     "//fuchsia/private/workflows:fuchsia_package_repository_tasks.bzl",

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load(
     "@bazel_tools//tools/build_defs/cc:action_names.bzl",
@@ -45,7 +46,7 @@ def _is_cpp_target(srcs):
         return True
     return False
 
-def _get_sources(ctx, target):
+def _get_sources(ctx):
     srcs = []
     if hasattr(ctx.rule.attr, "srcs"):
         srcs += [f for src in ctx.rule.attr.srcs for f in src.files.to_list()]
@@ -88,7 +89,7 @@ def _cc_compile_commands(ctx, target, feature_configuration, cc_toolchain):
     compile_flags = _get_compile_flags(target)
 
     #Assume C++ code
-    srcs = _get_sources(ctx, target)
+    srcs = _get_sources(ctx)
 
     if _is_cpp_target(srcs):
         compile_variables = cc_common.create_compile_variables(
@@ -206,7 +207,6 @@ def _compilation_db_rule_impl(ctx):
     content = json.encode(compilation_db.to_list())
     content = content.replace(_EXEC_ROOT_MARKER, exec_root)
 
-    out = ctx.actions.declare_file(ctx.attr.filename.name)
     ctx.actions.write(output = ctx.outputs.filename, content = content)
 
 _clangd_compilation_database = rule(

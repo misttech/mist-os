@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
 load(":utils.bzl", "make_resource_struct", "rule_variant", "rule_variants")

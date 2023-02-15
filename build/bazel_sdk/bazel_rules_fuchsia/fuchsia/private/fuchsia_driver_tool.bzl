@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":providers.bzl", "FuchsiaDriverToolInfo", "FuchsiaPackageResourcesInfo")
 
 def _find_binary_resource(resources, tool_entry_point):

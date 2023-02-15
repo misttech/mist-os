@@ -10,8 +10,11 @@ load(
     "//fuchsia/workspace:check_bazel_version.bzl",
     "assert_bazel_version",
 )
+
+# buildifier: disable=bzl-visibility
 load("//cipd/private:cipd_tool.bzl", "cipd_tool_repository")
 
+# buildifier: disable=function-docstring
 def rules_fuchsia_deps():
     assert_bazel_version(min = "5.1.0")
     maybe(

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":fuchsia_task_ffx.bzl", "fuchsia_task_ffx")
 load(
     "//fuchsia/private/workflows:fuchsia_workflow.bzl",
@@ -10,10 +11,6 @@ load(
 load(
     "@rules_fuchsia//fuchsia/private/workflows:fuchsia_task_autodetect_target.bzl",
     "fuchsia_task_autodetect_target",
-)
-load(
-    "@rules_fuchsia//fuchsia/private/workflows:fuchsia_package_repository_tasks.bzl",
-    "fuchsia_task_repository_register_with_default_target",
 )
 load(
     "//fuchsia/private/workflows:fuchsia_emulator_tasks.bzl",
@@ -198,6 +195,7 @@ def _summary_task_impl(ctx, make_shell_task):
         ],
     )
 
+# buildifier: disable=unused-variable
 (__summary_task, _summary_task_for_test, _summary_task) = shell_task_rule(
     implementation = _summary_task_impl,
     toolchains = [
@@ -336,6 +334,7 @@ def _start_server_if_needed_impl(ctx, make_shell_task):
         ],
     )
 
+# buildifier: disable=unused-variable
 (
     __start_server_if_needed,
     _start_server_if_needed_for_test,
@@ -385,6 +384,7 @@ def _status_check_task_impl(ctx, make_shell_task):
         ] + extra_args,
     )
 
+# buildifier: disable=unused-variable
 (
     __status_check_task,
     _status_check_task_for_test,

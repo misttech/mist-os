@@ -32,6 +32,8 @@ def get_target_execroot(ctx, target):
     return target[DefaultInfo].files_to_run.runfiles_manifest.dirname + "/" + ctx.workspace_name
 
 def stub_executable(ctx):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """Returns a stub executable that fails with a message."""
     executable_file = ctx.actions.declare_file(ctx.label.name + "_fail.sh")
     content = """#!/bin/bash
@@ -51,6 +53,8 @@ def stub_executable(ctx):
     return executable_file
 
 def flatten(elements):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """Flattens an arbitrarily nested list of lists to non-list elements while preserving order."""
     result = []
     unprocessed = list(elements)
@@ -65,6 +69,8 @@ def flatten(elements):
     fail("Unable to flatten list!")
 
 def collect_runfiles(ctx, *elements, ignore_types = []):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """Collects multiple types of elements (...files, ...targets, ...runfiles) into runfiles."""
 
     # Map to runfiles objects.
@@ -89,6 +95,8 @@ def collect_runfiles(ctx, *elements, ignore_types = []):
     return ctx.runfiles().merge_all(runfiles)
 
 def wrap_executable(ctx, executable, *arguments, script_name = None):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """Wraps an executable with predefined command line arguments.
 
     Creates a wrapper script that invokes an underlying executable with
@@ -171,6 +179,7 @@ def track_providers(providers):
         ],
     )]
 
+# buildifier: disable=function-docstring
 def forward_providers(ctx, target, *providers, rename_executable = None):
     default_info = target[DefaultInfo]
     if default_info.files_to_run and default_info.files_to_run.executable:
@@ -217,6 +226,7 @@ _alias, _alias_for_executable, _alias_for_test = rule_variants(
 )
 
 def alias(*, name, executable, testonly = False, **kwargs):
+    # buildifier: disable=function-docstring-header
     """
     We have to create our own alias macro because Bazel is unreasonable:
     https://github.com/bazelbuild/bazel/issues/10893
@@ -233,6 +243,8 @@ def alias(*, name, executable, testonly = False, **kwargs):
     )
 
 def filter(obj, value = None, exclude = True):
+    # buildifier: disable=function-docstring-args
+    # buildifier: disable=function-docstring-return
     """Recursively removes matching fields/elements from an object by mutating."""
     if type(obj) not in ("dict", "list"):
         fail("Unsupported data type.")
@@ -276,6 +288,7 @@ def get_runfiles(target):
 
 # Libs all end with .so or .so followed by a semantic version.
 # Examples: libname.so, libname.so.1, libname.so.1.1
+# buildifier: disable=function-docstring
 def is_lib(file):
     rparts = file.basename.rpartition(".so")
     if (rparts[1] != ".so"):

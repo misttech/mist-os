@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# buildifier: disable=module-docstring
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load(":fuchsia_task_ffx.bzl", "fuchsia_task_ffx")
 load(":fuchsia_task_publish.bzl", "fuchsia_task_publish")
@@ -32,6 +33,7 @@ def _fuchsia_package_help_impl(ctx, make_shell_task):
     ]), name = ctx.attr.top_level_name)
     return make_shell_task([help])
 
+# buildifier: disable=unused-variable
 (
     __fuchsia_package_help,
     _fuchsia_package_help_for_test,
@@ -102,6 +104,7 @@ def _fuchsia_package_default_task_impl(ctx, make_workflow):
         ),
     ]
 
+# buildifier: disable=unused-variable
 (
     __fuchsia_package_default_task,
     _fuchsia_package_default_task_for_test,
@@ -146,6 +149,7 @@ def _fuchsia_package_default_task_impl(ctx, make_workflow):
     },
 )
 
+# buildifier: disable=function-docstring
 def fuchsia_package_tasks(
         *,
         name,
