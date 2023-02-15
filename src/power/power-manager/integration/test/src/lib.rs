@@ -67,14 +67,9 @@ async fn shutdown_test() {
     // Verify the system controller service gets the shutdown request from Power Manager
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
 
-    // Verify the Driver Manager received the correct termination state request from Power Manager.
-    // The termination state should only be checked after we know the Power Manager has sent the
-    // request to Driver Manager. In this case, we know that to be true once the previous
-    // `wait_for_shutdown_request` completes.
-    assert_eq!(
-        env.mocks.driver_manager.current_termination_state(),
-        fidl_fuchsia_device_manager::SystemPowerState::Reboot
-    );
+    // TODO(http://fxbug.dev/119962): Update integration tests to ensure interaction between driver
+    // manager and shutdown shim works as intended. This likely requires using shutdown shim in
+    // this integration test.
 
     env.destroy().await;
 }

@@ -794,17 +794,8 @@
         },
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
-            from: "#driver_manager",
-            to: [ "#power_manager" ],
-            dependency: "weak",
-        },
-        {
-            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
-            from: "#driver_manager",
-            to: [ "#shutdown_shim" ],
-
-            // TODO(fxb/65708) When this bug is complete, this can be a strong dependency.
-            dependency: "weak_for_migration",
+            from: "#shutdown_shim",
+            to: "#driver_manager",
         },
         {
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
@@ -1131,7 +1122,6 @@
         },
         {
             protocol: [
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.hardware.usb.DeviceWatcher",
             ],

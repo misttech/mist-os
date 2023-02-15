@@ -20,11 +20,10 @@ use std::rc::Rc;
 // nodes
 use crate::{
     activity_handler, cpu_control_handler, cpu_device_handler, cpu_manager, cpu_stats_handler,
-    crash_report_handler, debug_service, dev_control_handler, driver_manager_handler,
-    input_settings_handler, lid_shutdown, platform_metrics, shutdown_watcher, syscall_handler,
-    system_power_mode_handler, system_profile_handler, system_shutdown_handler,
-    temperature_handler, thermal_load_driver, thermal_policy, thermal_shutdown,
-    thermal_state_handler,
+    crash_report_handler, debug_service, dev_control_handler, input_settings_handler, lid_shutdown,
+    platform_metrics, shutdown_watcher, syscall_handler, system_power_mode_handler,
+    system_profile_handler, system_shutdown_handler, temperature_handler, thermal_load_driver,
+    thermal_policy, thermal_shutdown, thermal_state_handler,
 };
 
 pub struct PowerManager {
@@ -169,7 +168,6 @@ impl PowerManager {
                 )
                 .build()?
             }
-            "DriverManagerHandler" => Rc::new(driver_manager_handler::DriverManagerHandler::new()?),
             "InputSettingsHandler" => {
                 input_settings_handler::InputSettingsHandlerBuilder::new_from_json(
                     json_data,

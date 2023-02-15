@@ -21,9 +21,6 @@
             url: "#meta/shutdown-shim.cm",
         },
     ],
-    capabilities: [
-        { protocol: "fuchsia.device.manager.SystemStateTransition" },
-    ],
     use: [
         {
             protocol: [ "fidl.test.components.Trigger" ],
@@ -43,13 +40,6 @@
         {
             protocol: "fuchsia.sys2.SystemController",
             from: "parent",
-            to: "#shutdown_shim",
-        },
-
-        // shutdown_shim expects to have this so we need to mock it
-        {
-            protocol: "fuchsia.device.manager.SystemStateTransition",
-            from: "self",
             to: "#shutdown_shim",
         },
     ],

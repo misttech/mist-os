@@ -218,16 +218,9 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let driver_manager_to_power_manager = Route::new()
-            .capability(
-                Capability::directory("dev-topological")
-                    .rights(fio::R_STAR_DIR)
-                    .path("/dev")
-                    .weak(),
-            )
-            .capability(Capability::protocol_by_name(
-                "fuchsia.device.manager.SystemStateTransition",
-            ));
+        let driver_manager_to_power_manager = Route::new().capability(
+            Capability::directory("dev-topological").rights(fio::R_STAR_DIR).path("/dev").weak(),
+        );
         realm_builder
             .add_route(
                 driver_manager_to_power_manager.from(&driver_manager_child).to(&power_manager),
@@ -362,10 +355,6 @@ pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperatur
     env.set_temperature(sensor_path, temperature);
     assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::HighTemperature);
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
-    assert_eq!(
-        env.mocks.driver_manager.current_termination_state(),
-        fidl_fuchsia_device_manager::SystemPowerState::Reboot
-    );
 
     env.destroy().await;
 }

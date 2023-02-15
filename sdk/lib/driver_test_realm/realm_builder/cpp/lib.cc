@@ -34,10 +34,6 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
   realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.driver.test.Realm"}},
                                .source = {ChildRef{"driver_test_realm"}},
                                .targets = {ParentRef()}});
-  realm_builder.AddRoute(
-      Route{.capabilities = {Protocol{"fuchsia.device.manager.SystemStateTransition"}},
-            .source = {ChildRef{"driver_test_realm"}},
-            .targets = {ParentRef()}});
   realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
                                .source = {ChildRef{"driver_test_realm"}},
                                .targets = {ParentRef()}});

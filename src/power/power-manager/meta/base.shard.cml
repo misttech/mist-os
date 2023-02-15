@@ -40,7 +40,6 @@
         },
         {
             protocol: [
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",

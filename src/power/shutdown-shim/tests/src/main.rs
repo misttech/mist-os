@@ -45,10 +45,9 @@ enum RealmVariant {
 // function on the mocks server the mocks server will emit a shutdown_mocks::Signal over the
 // channel.
 //
-// The shutdown-shim always receives logging from above the root, along with mock driver_manager
-// and component_manager protocols from the mocks-server (because these are always present in
-// prod). The `variant` field determines whether the shim receives a functional version of the
-// power_manager mocks.
+// The shutdown-shim always receives logging from above the root, along with mock component_manager
+// protocols from the mocks-server (because these are always present in prod). The `variant` field
+// determines whether the shim receives a functional version of the power_manager mocks.
 async fn new_realm(
     variant: RealmVariant,
 ) -> Result<(RealmInstance, mpsc::UnboundedReceiver<Signal>), Error> {
@@ -76,12 +75,10 @@ async fn new_realm(
                 .to(Ref::parent()),
         )
         .await?;
-    // Give the shim the driver_manager and component_manager mocks, as those are always available
-    // to the shim in prod
+    // Give the shim the component_manager mock, as it is always available to the shim in prod
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<fdevicemanager::SystemStateTransitionMarker>())
                 .capability(Capability::protocol::<fsys::SystemControllerMarker>())
                 .from(&mocks_server)
                 .to(&shutdown_shim),
@@ -238,10 +235,6 @@ async fn power_manager_missing_poweroff() -> Result<(), Error> {
             "the shutdown shim should close the channel when manual shutdown driving is complete",
         );
     });
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Poweroff))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -261,10 +254,6 @@ async fn power_manager_missing_reboot_system_update() -> Result<(), Error> {
         );
     });
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Reboot))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -286,10 +275,6 @@ async fn power_manager_missing_mexec() -> Result<(), Error> {
         );
     });
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Mexec))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -308,10 +293,6 @@ async fn power_manager_not_present_poweroff() -> Result<(), Error> {
     })
     .detach();
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Poweroff))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -330,10 +311,6 @@ async fn power_manager_not_present_reboot() -> Result<(), Error> {
     })
     .detach();
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Reboot))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -354,10 +331,6 @@ async fn power_manager_not_present_mexec() -> Result<(), Error> {
     })
     .detach();
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Mexec))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }
@@ -376,10 +349,6 @@ async fn power_manager_not_present_reboot_oom() -> Result<(), Error> {
     })
     .detach();
 
-    assert_matches!(
-        recv_signals.next().await,
-        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::RebootKernelInitiated))
-    );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
 }

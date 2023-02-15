@@ -314,27 +314,6 @@
             {
                 "properties": {
                     "type": {
-                        "pattern": "DriverManagerHandler"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "config": {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": false
-                    }
-                },
-                "additionalProperties": false,
-                "required": [
-                    "type",
-                    "name",
-                    "config"
-                ]
-            },
-            {
-                "properties": {
-                    "type": {
                         "pattern": "InputSettingsHandler"
                     },
                     "name": {
@@ -463,17 +442,11 @@
                     "dependencies": {
                         "type": "object",
                         "properties": {
-                            "driver_manager_handler_node": {
-                                "type": "string"
-                            },
                             "shutdown_watcher_node": {
                                 "type": "string"
                             }
                         },
-                        "additionalProperties": false,
-                        "required": [
-                            "driver_manager_handler_node"
-                        ]
+                        "additionalProperties": false
                     }
                 },
                 "additionalProperties": false,

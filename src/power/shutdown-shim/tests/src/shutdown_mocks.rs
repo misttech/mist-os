@@ -5,7 +5,6 @@
 use {
     anyhow::Error,
     fidl::{endpoints::create_proxy, prelude::*},
-    fidl_fuchsia_device_manager as fdevicemanager,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::server as fserver,
@@ -39,14 +38,6 @@ async fn run_mocks(
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::spawn(run_statecontrol_admin(send_admin_signals.clone(), stream)).detach();
     });
-    let send_system_state_transition_signals = send_signals.clone();
-    fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::spawn(run_device_manager_system_state_transition(
-            send_system_state_transition_signals.clone(),
-            stream,
-        ))
-        .detach();
-    });
     let send_sys2_signals = send_signals.clone();
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::spawn(run_sys2_system_controller(send_sys2_signals.clone(), stream)).detach();
@@ -77,7 +68,6 @@ pub enum Admin {
 #[derive(Debug)]
 pub enum Signal {
     Statecontrol(Admin),
-    DeviceManager(fdevicemanager::SystemPowerState),
     Sys2Shutdown(fsys::SystemControllerShutdownResponder),
 }
 
@@ -130,41 +120,6 @@ async fn run_statecontrol_admin(
         // Note: the shim checks liveness by writing garbage data on its first connection and
         // observing PEER_CLOSED, so we're expecting this warning to happen once.
         warn!("couldn't run {}: {:?}", fstatecontrol::AdminMarker::DEBUG_NAME, e);
-    })
-    .await
-}
-
-async fn run_device_manager_system_state_transition(
-    send_signals: mpsc::UnboundedSender<Signal>,
-    mut stream: fdevicemanager::SystemStateTransitionRequestStream,
-) {
-    info!("new connection to {}", fdevicemanager::SystemStateTransitionMarker::PROTOCOL_NAME);
-    async move {
-        match stream.try_next().await? {
-            Some(fdevicemanager::SystemStateTransitionRequest::SetTerminationSystemState {
-                state,
-                responder,
-            }) => {
-                info!("SetTerminationState called");
-                send_signals.unbounded_send(Signal::DeviceManager(state))?;
-                responder.send(&mut Ok(()))?;
-            }
-            Some(fdevicemanager::SystemStateTransitionRequest::SetMexecZbis {
-                responder, ..
-            }) => {
-                info!("SetMexecZbis called");
-                responder.send(&mut Ok(()))?;
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-    .unwrap_or_else(|e: anyhow::Error| {
-        panic!(
-            "couldn't run {}: {:?}",
-            fdevicemanager::SystemStateTransitionMarker::PROTOCOL_NAME,
-            e
-        );
     })
     .await
 }

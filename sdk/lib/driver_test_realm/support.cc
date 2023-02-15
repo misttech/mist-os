@@ -194,6 +194,16 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
   std::string board_name_;
 };
 
+class FakeSystemStateTransition final
+    : public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
+  void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
+    completer.Reply(fuchsia_device_manager::SystemPowerState::kReboot);
+  }
+  void GetMexecZbis(GetMexecZbisCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+};
+
 class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
   void MatchDriver(MatchDriverRequestView request, MatchDriverCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
@@ -453,6 +463,12 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
       return ZX_ERR_INTERNAL;
     }
 
+    status = AddProtocolWithWait<fuchsia_device_manager::SystemStateTransition>(
+        &system_state_transition_);
+    if (status != ZX_OK) {
+      return ZX_ERR_INTERNAL;
+    }
+
     status = AddProtocolWithWait<fuchsia_kernel::RootJob>(&root_job_);
     if (status != ZX_OK) {
       return ZX_ERR_INTERNAL;
@@ -609,6 +625,7 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
 
   mock_boot_arguments::Server boot_arguments_;
   FakeBootItems boot_items_;
+  FakeSystemStateTransition system_state_transition_;
   FakeRootJob root_job_;
   FakeBootResolver boot_resolver_;
   FakePackageResolver package_resolver_;

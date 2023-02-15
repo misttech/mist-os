@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_COORDINATOR_H_
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
@@ -47,13 +47,11 @@
 #include "src/devices/bin/driver_manager/driver_loader.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/package_resolver.h"
-#include "src/devices/bin/driver_manager/system_state_manager.h"
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 #include "src/devices/bin/driver_manager/v1/firmware_loader.h"
 #include "src/devices/bin/driver_manager/v1/suspend_resume_manager.h"
 #include "src/devices/bin/driver_manager/v2/driver_runner.h"
 
-using fuchsia_device_manager::wire::SystemPowerState;
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
@@ -107,7 +105,8 @@ struct CoordinatorConfig {
   zx::duration resume_timeout = kDefaultResumeTimeout;
   // System will be transitioned to this system power state during
   // component shutdown.
-  SystemPowerState default_shutdown_system_state = SystemPowerState::kReboot;
+  fuchsia_device_manager::SystemPowerState default_shutdown_system_state =
+      fuchsia_device_manager::SystemPowerState::kReboot;
   // Something to clone a handle from the environment to pass to a Devhost.
   FsProvider* fs_provider = nullptr;
   // The path prefix to find binaries, drivers, etc. Typically this is "/boot/", but in test
@@ -174,15 +173,10 @@ class Coordinator : public CompositeManagerBridge,
   void RegisterDriverHost(DriverHost* dh) { driver_hosts_.push_back(dh); }
   void UnregisterDriverHost(DriverHost* dh) { driver_hosts_.erase(*dh); }
 
-  zx_status_t SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi);
-
   uint32_t GetNextDfv2DeviceId() { return next_dfv2_device_id_++; }
 
   // Setter functions.
-  void set_shutdown_system_state(SystemPowerState state) { shutdown_system_state_ = state; }
   void set_running(bool running) { running_ = running; }
-  void set_power_manager_registered(bool registered) { power_manager_registered_ = registered; }
-  bool power_manager_registered() { return power_manager_registered_; }
   void set_loader_service_connector(LoaderServiceConnector loader_service_connector) {
     loader_service_connector_ = std::move(loader_service_connector);
   }
@@ -195,11 +189,7 @@ class Coordinator : public CompositeManagerBridge,
   const zx::resource& mexec_resource() const { return config_.mexec_resource; }
   zx::duration resume_timeout() const { return config_.resume_timeout; }
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args() const { return config_.boot_args; }
-  SystemPowerState shutdown_system_state() const { return shutdown_system_state_; }
-  SystemPowerState default_shutdown_system_state() const {
-    return config_.default_shutdown_system_state;
-  }
-  SystemStateManager& system_state_manager() { return system_state_manager_; }
+  fuchsia_device_manager::SystemPowerState shutdown_system_state() const;
   const fbl::RefPtr<Device>& root_device() { return root_device_; }
   Devfs& devfs() { return devfs_; }
   SuspendResumeManager& suspend_resume_manager() { return *suspend_resume_manager_; }
@@ -211,8 +201,7 @@ class Coordinator : public CompositeManagerBridge,
   }
   BindDriverManager& bind_driver_manager() const { return *bind_driver_manager_; }
   FirmwareLoader& firmware_loader() const { return *firmware_loader_; }
-  zx::vmo& mexec_kernel_zbi() { return mexec_kernel_zbi_; }
-  zx::vmo& mexec_data_zbi() { return mexec_data_zbi_; }
+
   component::OutgoingDirectory& outgoing() { return *outgoing_; }
   std::optional<Devnode>& root_devnode() { return root_devnode_; }
 
@@ -251,7 +240,6 @@ class Coordinator : public CompositeManagerBridge,
   async_dispatcher_t* const dispatcher_;
   bool running_ = false;
   bool launched_first_driver_host_ = false;
-  bool power_manager_registered_ = false;
   LoaderServiceConnector loader_service_connector_;
 
   internal::BasePackageResolver base_resolver_;
@@ -266,16 +254,10 @@ class Coordinator : public CompositeManagerBridge,
   std::optional<Devnode> root_devnode_;
   Devfs devfs_;
 
-  SystemStateManager system_state_manager_;
-  SystemPowerState shutdown_system_state_;
-
   internal::PackageResolver package_resolver_;
   DriverLoader driver_loader_;
 
   std::unique_ptr<FirmwareLoader> firmware_loader_;
-
-  // Stashed mexec inputs.
-  zx::vmo mexec_kernel_zbi_, mexec_data_zbi_;
 
   std::unique_ptr<SuspendResumeManager> suspend_resume_manager_;
 
@@ -288,7 +270,6 @@ class Coordinator : public CompositeManagerBridge,
   uint32_t next_dfv2_device_id_ = 0;
 
   fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
-  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> system_state_bindings_;
 
   // This needs to outlive `coordinator` but should be destroyed in the same
   // event loop iteration. Otherwise, we risk use-after-free issues if a client

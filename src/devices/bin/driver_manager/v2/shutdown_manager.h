@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_MANAGER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_MANAGER_H_
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -19,7 +19,7 @@
 #include "src/devices/bin/driver_manager/v2/node_remover.h"
 
 namespace dfv2 {
-using fuchsia_device_manager::wire::SystemPowerState;
+using fuchsia_device_manager::SystemPowerState;
 
 // Theory of operation of ShutdownManager:
 //  There are a number of ways shutdown can be initiated:
@@ -39,16 +39,14 @@ using fuchsia_device_manager::wire::SystemPowerState;
 //  Otherwise, the Shutdown Manager will wait for an invocation of SignalBootShutdown before
 //  shutting down boot drivers.
 //  Either way, when boot drivers are fully shutdown, the Shutdown Manager will signal the
-//  system to stop in some manner, dictated by what is set by SetTerminationSystemState.
+//  system to stop in some manner, dictated by what is returned by `GetSystemPowerState`.
 //  The default state, which is invoked if there is some error, is REBOOT.
 //  Any errors in the shutdown process are logged, but ulimately do not stop the shutdown.
-//  SetTerminationSystemState and SetMexecZbis are accepted in all stages except STOPPED
 //  The ShutdownManager is not thread safe. It assumes that all channels will be dispatched
 //  on the same single threaded dispatcher, and that all callbacks will also be called on
 //  that same thread.
 class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administrator>,
-                        public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle>,
-                        public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
+                        public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
  public:
   enum class State : uint32_t {
     // The system is running, nothing is being stopped.
@@ -95,11 +93,10 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
     fit::callback<void(fit::callback<void(zx_status_t)>)> on_stop_;
   };
 
-  // All external shutdown signals (except SetTerminationSystemState) ultimately
-  // call either SignalBootShutdown or SignalPackageShutdown.  These two functions
-  // interact with the ShutdownManager state machine and signal the node_remover
-  // to remove nodes.
-  //  SignalPackageShutdown interacts with the ShutdownManager state machine thusly:
+  // All external shutdown signals ultimately call either `SignalBootShutdown` or
+  // `SignalPackageShutdown`. These two functions interact with the `ShutdownManager` state
+  // machine and signal the node_remover to remove nodes.
+  //  SignalPackageShutdown interacts with the `ShutdownManager` state machine thusly:
   //  State:           |      Action
   //  ---------------------------------------------
   //  kRunning:        |  Transition to kPackageStopping.
@@ -149,35 +146,6 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   // before it closes the `Lifecycle` channel.
   void Stop(StopCompleter::Sync& completer) override;
 
-  // fuchsia.device.manager/SystemStateTransition interface
-  // Sets and updates the termination SystemPowerState of driver_manager.
-  // On Success, the system power state is cached. The next time
-  // driver_manager's stop event is triggered, driver_manager suspends
-  // the system to "state".
-  // Returns ZX_ERR_INVALID_ARGS if the system power state is not a shutdown/reboot
-  // state(POWEROFF, REBOOT, REBOOT_BOOTLOADER, REBOOT_RECOVERY, MEXEC)
-  // Returns ZX_ERR_BAD_STATE if driver_manager is unable to save the state.
-  // Each time the api is called the termination state is updated and cached.
-  void SetTerminationSystemState(SetTerminationSystemStateRequestView request,
-                                 SetTerminationSystemStateCompleter::Sync& completer) override;
-
-  // When the system termination state is MEXEC, in the course of shutting
-  // down, driver_manager will perform an mexec itself after suspending all
-  // drivers.
-  // This method prepares for an MEXEC shutdown, stashing the kernel and
-  // data ZBIs to later be passed to zx_system_mexec(). This method does
-  // not affect termination state itself.
-  // The ZBI items specified by `zx_system_mexec_payload_get()` will be appended
-  // to the provided data ZBI.
-  //
-  // Returns
-  // * ZX_ERR_INVALID_ARGS: if either VMO handle is invalid;
-  // * ZX_ERR_IO_DATA_INTEGRITY: if any ZBI format or storage access errors are
-  //   encountered;
-  // * any status returned by `zx_system_mexec_payload_get()`.
-  void SetMexecZbis(SetMexecZbisRequestView request,
-                    SetMexecZbisCompleter::Sync& completer) override;
-
   // Execute the shutdown strategy set in shutdown_system_state_.
   // This should be done after all attempts at shutting down drivers has been made.
   void SystemExecute();
@@ -198,17 +166,13 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
 
   fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
   fidl::ServerBindingGroup<fuchsia_process_lifecycle::Lifecycle> lifecycle_bindings_;
-  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> sys_state_bindings_;
   std::list<fit::callback<void(zx_status_t)>> package_shutdown_complete_callbacks_;
   std::list<fit::callback<void(zx_status_t)>> boot_shutdown_complete_callbacks_;
 
-  // The type of shutdown to perform.  Default to REBOOT, in the case of errors, channel closing
-  SystemPowerState shutdown_system_state_ = SystemPowerState::kReboot;
   State shutdown_state_ = State::kRunning;
   // After package shutdown completes, wait for separate boot shutdown signal
   bool received_boot_shutdown_signal_ = false;
 
-  zx::vmo mexec_kernel_zbi_, mexec_data_zbi_;
   async_dispatcher_t* dispatcher_;
   zx::resource mexec_resource_, power_resource_;
   // Tracks if we received a stop signal from the fuchsia_process_lifecycle::Lifecycle channel.

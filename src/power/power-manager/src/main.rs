@@ -20,7 +20,6 @@ mod cpu_stats_handler;
 mod crash_report_handler;
 mod debug_service;
 mod dev_control_handler;
-mod driver_manager_handler;
 mod input_settings_handler;
 mod lid_shutdown;
 mod platform_metrics;

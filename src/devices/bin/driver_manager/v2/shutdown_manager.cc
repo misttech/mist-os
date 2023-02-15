@@ -20,7 +20,108 @@
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/vector.h>
 
+namespace dfv2 {
 namespace {
+
+struct MexecVmos {
+  zx::vmo kernel_zbi;
+  zx::vmo data_zbi;
+};
+
+zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
+  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (client.is_error()) {
+    LOGF(ERROR, "Failed to connect to StateStateTransition: %s", client.status_string());
+    return client.take_error();
+  }
+
+  fidl::Result result = fidl::Call(*client)->GetMexecZbis();
+  if (result.is_error()) {
+    LOGF(ERROR, "Failed to get mexec zbis: %s", result.error_value().FormatDescription().c_str());
+    zx_status_t status = result.error_value().is_domain_error()
+                             ? result.error_value().domain_error()
+                             : result.error_value().framework_error().status();
+    return zx::error(status);
+  }
+  zx::vmo& kernel_zbi = result->kernel_zbi();
+  zx::vmo& data_zbi = result->data_zbi();
+
+  if (zx_status_t status = mexec::PrepareDataZbi(std::move(mexec_resource), data_zbi.borrow());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to prepare mexec data ZBI: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  zx::result connect_result = component::Connect<fuchsia_boot::Items>();
+  if (connect_result.is_error()) {
+    LOGF(ERROR, "Failed to connect to fuchsia.boot::Items: %s", connect_result.status_string());
+    return connect_result.take_error();
+  }
+  fidl::WireSyncClient<fuchsia_boot::Items> items(std::move(connect_result).value());
+
+  // Driver metadata that the driver framework generally expects to be present.
+  constexpr std::array kItemsToAppend{ZBI_TYPE_DRV_MAC_ADDRESS, ZBI_TYPE_DRV_PARTITION_MAP,
+                                      ZBI_TYPE_DRV_BOARD_PRIVATE, ZBI_TYPE_DRV_BOARD_INFO};
+  zbitl::Image data_image{data_zbi.borrow()};
+  for (uint32_t type : kItemsToAppend) {
+    std::string_view name = zbitl::TypeName(type);
+
+    // TODO(fxbug.dev/102804): Use a method that returns all matching items of
+    // a given type instead of guessing possible `extra` values.
+    for (uint32_t extra : std::array{0, 1, 2}) {
+      fidl::WireResult result = items->Get(type, extra);
+      if (!result.ok()) {
+        return zx::error(result.status());
+      }
+      if (!result.value().payload.is_valid()) {
+        // Absence is signified with an empty result value.
+        LOGF(INFO, "No %.*s item (%#xu) present to append to mexec data ZBI",
+             static_cast<int>(name.size()), name.data(), type);
+        continue;
+      }
+      fsl::SizedVmo payload(std::move(result.value().payload), result.value().length);
+
+      std::vector<char> contents;
+      if (!fsl::VectorFromVmo(payload, &contents)) {
+        LOGF(ERROR, "Failed to read contents of %.*s item (%#xu)", static_cast<int>(name.size()),
+             name.data(), type);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+
+      if (fit::result result = data_image.Append(zbi_header_t{.type = type, .extra = extra},
+                                                 zbitl::AsBytes(contents));
+          result.is_error()) {
+        LOGF(ERROR, "Failed to append %.*s item (%#xu) to mexec data ZBI: %s",
+             static_cast<int>(name.size()), name.data(), type,
+             zbitl::ViewErrorString(result.error_value()).c_str());
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+  }
+
+  return zx::ok(MexecVmos{
+      .kernel_zbi = std::move(kernel_zbi),
+      .data_zbi = std::move(data_zbi),
+  });
+}
+
+SystemPowerState GetSystemPowerState() {
+  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (client.is_error()) {
+    LOGF(ERROR, "Failed to connect to StateStateTransition: %s, falling back to default",
+         client.status_string());
+    return SystemPowerState::kReboot;
+  }
+
+  fidl::Result result = fidl::Call(*client)->GetTerminationSystemState();
+  if (result.is_error()) {
+    LOGF(ERROR, "Failed to get termination system state: %s, falling back to default",
+         result.error_value().FormatDescription().c_str());
+    return SystemPowerState::kReboot;
+  }
+
+  return result->state();
+}
 
 template <typename SyncCompleter>
 fit::callback<void(zx_status_t)> ToCallback(SyncCompleter& completer) {
@@ -58,8 +159,6 @@ zx::result<zx::resource> get_mexec_resource() {
 }
 
 }  // anonymous namespace
-
-namespace dfv2 {
 
 ShutdownManager::ShutdownManager(NodeRemover* node_remover, async_dispatcher_t* dispatcher)
     : node_remover_(node_remover),
@@ -112,12 +211,6 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing) {
                                         fidl::kIgnoreBindingClosure),
       "fuchsia.fshost.lifecycle.Lifecycle");
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-
-  // We advertise the SystemStateTransition protocol in case the shutdown shim needs
-  // to connect to us.
-  result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
-      sys_state_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT(result.is_ok());
 
   // Bind to lifecycle server
   fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle_server(
@@ -210,96 +303,9 @@ void ShutdownManager::SignalBootShutdown(fit::callback<void(zx_status_t)> cb) {
   }
 }
 
-void ShutdownManager::SetTerminationSystemState(
-    SetTerminationSystemStateRequestView request,
-    SetTerminationSystemStateCompleter::Sync& completer) {
-  if (request->state == fuchsia_device_manager::wire::SystemPowerState::kFullyOn) {
-    LOGF(INFO, "Invalid termination state");
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  LOGF(INFO, "Setting shutdown system state to %hhu", request->state);
-
-  shutdown_system_state_ = request->state;
-  completer.ReplySuccess();
-}
-
-void ShutdownManager::SetMexecZbis(SetMexecZbisRequestView request,
-                                   SetMexecZbisCompleter::Sync& completer) {
-  if (!request->kernel_zbi.is_valid() || !request->data_zbi.is_valid()) {
-    LOGF(ERROR, "Failed to prepare to mexec on shutdown: Invalid zbis");
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
-  if (zx_status_t status =
-          mexec::PrepareDataZbi(mexec_resource_.borrow(), request->data_zbi.borrow());
-      status != ZX_OK) {
-    LOGF(ERROR, "Failed to prepare mexec data ZBI: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-
-  fidl::WireSyncClient<fuchsia_boot::Items> items;
-  if (auto result = component::Connect<fuchsia_boot::Items>(); result.is_error()) {
-    LOGF(ERROR, "Failed to connect to fuchsia.boot::Items: %s", result.status_string());
-    completer.ReplyError(result.error_value());
-    return;
-  } else {
-    items = fidl::WireSyncClient(std::move(result).value());
-  }
-
-  // Driver metadata that the driver framework generally expects to be present.
-  constexpr std::array kItemsToAppend{ZBI_TYPE_DRV_MAC_ADDRESS, ZBI_TYPE_DRV_PARTITION_MAP,
-                                      ZBI_TYPE_DRV_BOARD_PRIVATE, ZBI_TYPE_DRV_BOARD_INFO};
-  zbitl::Image data_image{request->data_zbi.borrow()};
-  for (uint32_t type : kItemsToAppend) {
-    std::string_view name = zbitl::TypeName(type);
-
-    // TODO(fxbug.dev/102804): Use a method that returns all matching items of
-    // a given type instead of guessing possible `extra` values.
-    for (uint32_t extra : std::array{0, 1, 2}) {
-      fsl::SizedVmo payload;
-      if (auto result = items->Get(type, extra); !result.ok()) {
-        LOGF(ERROR, "Failed to prepare mexec data: Parsing error.");
-        completer.ReplyError(result.status());
-        return;
-      } else if (!result.value().payload.is_valid()) {
-        // Absence is signified with an empty result value.
-        LOGF(INFO, "No %.*s item (%#xu) present to append to mexec data ZBI",
-             static_cast<int>(name.size()), name.data(), type);
-        continue;
-      } else {
-        payload = {std::move(result.value().payload), result.value().length};
-      }
-
-      std::vector<char> contents;
-      if (!fsl::VectorFromVmo(payload, &contents)) {
-        LOGF(ERROR, "Failed to read contents of %.*s item (%#xu)", static_cast<int>(name.size()),
-             name.data(), type);
-        completer.ReplyError(ZX_ERR_INTERNAL);
-        return;
-      }
-
-      if (auto result = data_image.Append(zbi_header_t{.type = type, .extra = extra},
-                                          zbitl::AsBytes(contents));
-          result.is_error()) {
-        LOGF(ERROR, "Failed to append %.*s item (%#xu) to mexec data ZBI: %s",
-             static_cast<int>(name.size()), name.data(), type,
-             zbitl::ViewErrorString(result.error_value()).c_str());
-        completer.ReplyError(ZX_ERR_INTERNAL);
-        return;
-      }
-    }
-  }
-
-  mexec_kernel_zbi_ = std::move(request->kernel_zbi);
-  mexec_data_zbi_ = std::move(request->data_zbi);
-  completer.ReplySuccess();
-}
-
 void ShutdownManager::SystemExecute() {
-  LOGF(INFO, "Suspend fallback with flags %#08hhx", shutdown_system_state_);
+  auto shutdown_system_state = GetSystemPowerState();
+  LOGF(INFO, "Suspend fallback with flags %#08hhx", shutdown_system_state);
   const char* what = "zx_system_powerctl";
   zx_status_t status = ZX_OK;
   if (!mexec_resource_.is_valid() || !power_resource_.is_valid()) {
@@ -309,8 +315,7 @@ void ShutdownManager::SystemExecute() {
     }
     return;
   }
-
-  switch (shutdown_system_state_) {
+  switch (shutdown_system_state) {
     case SystemPowerState::kReboot:
       status = zx_system_powerctl(power_resource_.get(), ZX_SYSTEM_POWERCTL_REBOOT, nullptr);
       break;
@@ -343,14 +348,21 @@ void ShutdownManager::SystemExecute() {
     case SystemPowerState::kPoweroff:
       status = zx_system_powerctl(power_resource_.get(), ZX_SYSTEM_POWERCTL_SHUTDOWN, nullptr);
       break;
-    case SystemPowerState::kMexec:
+    case SystemPowerState::kMexec: {
       LOGF(INFO, "About to mexec...");
-      status = mexec::BootZbi(mexec_resource_.borrow(), std::move(mexec_kernel_zbi_),
-                              std::move(mexec_data_zbi_));
+      zx::result<MexecVmos> mexec_vmos = GetMexecZbis(mexec_resource_.borrow());
+      status = mexec_vmos.status_value();
+      if (status == ZX_OK) {
+        status = mexec::BootZbi(mexec_resource_.borrow(), std::move(mexec_vmos->kernel_zbi),
+                                std::move(mexec_vmos->data_zbi));
+      }
       what = "zx_system_mexec";
       break;
-    default:
-      LOGF(ERROR, "Unknown shutdown state requested.");
+    }
+    case SystemPowerState::kFullyOn:
+    case SystemPowerState::kSuspendRam:
+      LOGF(ERROR, "Unexpected shutdown state requested: %hhu", shutdown_system_state);
+      break;
   }
 
   // This is mainly for test dev:

@@ -21,10 +21,6 @@
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/zbitl/error-string.h>
-#include <lib/zbitl/image.h>
-#include <lib/zbitl/item.h>
-#include <lib/zbitl/vmo.h>
 #include <lib/zircon-internal/ktrace.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/job.h>
@@ -298,12 +294,9 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
                ZX_ASSERT_MSG(diagnostics_client.is_ok(), "%s", diagnostics_client.status_string());
                return std::move(diagnostics_client.value());
              }()),
-      system_state_manager_(this),
       package_resolver_(config_.boot_args),
       driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
                      dispatcher, config_.require_system, &package_resolver_) {
-  shutdown_system_state_ = config_.default_shutdown_system_state;
-
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
 
   device_manager_ = std::make_unique<DeviceManager>(this, config_.crash_policy);
@@ -705,68 +698,21 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   return status;
 }
 
-zx_status_t Coordinator::SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi) {
-  if (!kernel_zbi.is_valid() || !data_zbi.is_valid()) {
-    return ZX_ERR_INVALID_ARGS;
+fuchsia_device_manager::SystemPowerState Coordinator::shutdown_system_state() const {
+  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (client.is_error()) {
+    LOGF(ERROR, "Failed to connect to StateStateTransition: %s", client.status_string());
+    return config_.default_shutdown_system_state;
   }
 
-  if (zx_status_t status = mexec::PrepareDataZbi(mexec_resource().borrow(), data_zbi.borrow());
-      status != ZX_OK) {
-    LOGF(ERROR, "Failed to prepare mexec data ZBI: %s", zx_status_get_string(status));
-    return status;
+  fidl::Result result = fidl::Call(*client)->GetTerminationSystemState();
+  if (result.is_error()) {
+    LOGF(ERROR, "Failed to get termination system state: %s",
+         result.error_value().FormatDescription().c_str());
+    return config_.default_shutdown_system_state;
   }
 
-  fidl::WireSyncClient<fuchsia_boot::Items> items;
-  if (auto result = component::Connect<fuchsia_boot::Items>(); result.is_error()) {
-    LOGF(ERROR, "Failed to connect to fuchsia.boot::Items: %s", result.status_string());
-    return result.error_value();
-  } else {
-    items = fidl::WireSyncClient(std::move(result).value());
-  }
-
-  // Driver metadata that the driver framework generally expects to be present.
-  constexpr std::array kItemsToAppend{ZBI_TYPE_DRV_MAC_ADDRESS, ZBI_TYPE_DRV_PARTITION_MAP,
-                                      ZBI_TYPE_DRV_BOARD_PRIVATE, ZBI_TYPE_DRV_BOARD_INFO};
-  zbitl::Image data_image{data_zbi.borrow()};
-  for (uint32_t type : kItemsToAppend) {
-    std::string_view name = zbitl::TypeName(type);
-
-    // TODO(fxbug.dev/102804): Use a method that returns all matching items of
-    // a given type instead of guessing possible `extra` values.
-    for (uint32_t extra : std::array{0, 1, 2}) {
-      fsl::SizedVmo payload;
-      if (auto result = items->Get(type, extra); !result.ok()) {
-        return result.status();
-      } else if (!result.value().payload.is_valid()) {
-        // Absence is signified with an empty result value.
-        LOGF(INFO, "No %.*s item (%#xu) present to append to mexec data ZBI",
-             static_cast<int>(name.size()), name.data(), type);
-        continue;
-      } else {
-        payload = {std::move(result.value().payload), result.value().length};
-      }
-
-      std::vector<char> contents;
-      if (!fsl::VectorFromVmo(payload, &contents)) {
-        LOGF(ERROR, "Failed to read contents of %.*s item (%#xu)", static_cast<int>(name.size()),
-             name.data(), type);
-        return ZX_ERR_INTERNAL;
-      }
-
-      if (auto result = data_image.Append(zbi_header_t{.type = type, .extra = extra},
-                                          zbitl::AsBytes(contents));
-          result.is_error()) {
-        LOGF(ERROR, "Failed to append %.*s item (%#xu) to mexec data ZBI: %s",
-             static_cast<int>(name.size()), name.data(), type,
-             zbitl::ViewErrorString(result.error_value()).c_str());
-        return ZX_ERR_INTERNAL;
-      }
-    }
-  }
-
-  mexec_kernel_zbi_ = std::move(kernel_zbi);
-  mexec_data_zbi_ = std::move(data_zbi);
-  return ZX_OK;
+  return result->state();
 }
 
 zx_status_t Coordinator::AddCompositeNodeSpec(
@@ -958,11 +904,6 @@ void Coordinator::InitOutgoingServices(component::OutgoingDirectory& outgoing) {
   outgoing_ = &outgoing;
   auto result = outgoing.AddUnmanagedProtocol<fdm::Administrator>(
       admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT(result.is_ok());
-
-  result = outgoing.AddUnmanagedProtocol<fdm::SystemStateTransition>(
-      system_state_bindings_.CreateHandler(&system_state_manager_, dispatcher_,
-                                           fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

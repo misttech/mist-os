@@ -37,9 +37,6 @@ use std::rc::Rc;
 ///     - SetTerminationSystemState
 ///
 /// FIDL dependencies:
-///     - fuchsia.device.manager: this FIDL library provides the SystemPowerState enum that the
-///       Driver Manager expects as an argument to its fuchsia.device.manager.SystemStateTransition
-///       API.
 ///     - fuchsia.hardware.power.statecontrol.Admin: the node hosts a service of this protocol to
 ///       the rest of the system
 ///     - fuchsia.sys2.SystemController: the node uses this protocol to instruct the Component
@@ -47,7 +44,6 @@ use std::rc::Rc;
 
 /// A builder for constructing the SystemShutdownHandler node.
 pub struct SystemShutdownHandlerBuilder<'a, 'b> {
-    driver_manager_handler: Rc<dyn Node>,
     shutdown_watcher: Option<Rc<dyn Node>>,
     component_mgr_proxy: Option<fsys::SystemControllerProxy>,
     shutdown_timeout: Option<Seconds>,
@@ -57,9 +53,8 @@ pub struct SystemShutdownHandlerBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> SystemShutdownHandlerBuilder<'a, 'b> {
-    pub fn new(driver_manager_handler: Rc<dyn Node>) -> Self {
+    pub fn new() -> Self {
         Self {
-            driver_manager_handler,
             shutdown_watcher: None,
             component_mgr_proxy: None,
             shutdown_timeout: None,
@@ -81,26 +76,25 @@ impl<'a, 'b> SystemShutdownHandlerBuilder<'a, 'b> {
 
         #[derive(Deserialize)]
         struct Dependencies {
-            driver_manager_handler_node: String,
             shutdown_watcher_node: Option<String>,
         }
 
         #[derive(Deserialize)]
         struct JsonData {
             config: Config,
-            dependencies: Dependencies,
+            dependencies: Option<Dependencies>,
         }
 
         let data: JsonData = json::from_value(json_data).unwrap();
-        let mut builder = Self::new(nodes[&data.dependencies.driver_manager_handler_node].clone())
-            .with_service_fs(service_fs);
-
+        let mut builder = Self::new().with_service_fs(service_fs);
         if let Some(timeout) = data.config.shutdown_timeout_s {
             builder = builder.with_shutdown_timeout(Seconds(timeout))
         }
 
-        if let Some(watcher_name) = data.dependencies.shutdown_watcher_node {
-            builder = builder.with_shutdown_watcher(nodes[&watcher_name].clone())
+        if let Some(dependencies) = data.dependencies {
+            if let Some(watcher_name) = dependencies.shutdown_watcher_node {
+                builder = builder.with_shutdown_watcher(nodes[&watcher_name].clone())
+            }
         }
 
         builder
@@ -160,7 +154,6 @@ impl<'a, 'b> SystemShutdownHandlerBuilder<'a, 'b> {
             shutdown_timeout: self.shutdown_timeout,
             force_shutdown_func: self.force_shutdown_func,
             shutdown_pending: Cell::new(false),
-            driver_mgr_handler: self.driver_manager_handler,
             shutdown_watcher: self.shutdown_watcher,
             component_mgr_proxy,
             inspect: InspectData::new(inspect_root, "SystemShutdownHandler".to_string()),
@@ -192,10 +185,6 @@ pub struct SystemShutdownHandler {
     /// Tracks the current shutdown request state. Used to ignore shutdown requests while a current
     /// request is being processed.
     shutdown_pending: Cell<bool>,
-
-    /// Reference to the DriverManagerHandler node. It is expected that this node responds to the
-    /// SetTerminationSystemState message.
-    driver_mgr_handler: Rc<dyn Node>,
 
     /// Optional reference to a SystemShutdownWatcher instance. There is no requirement that a node
     /// be populated in this Option. If one exists, then it will be notified of system shutdown
@@ -373,8 +362,8 @@ impl SystemShutdownHandler {
     /// Wraps the node's `shutdown` function with a timeout value. If the `shutdown` call has not
     /// returned within the specified timeout, an error is returned. In the event of a timeout, the
     /// underlying channel that encountered the timeout may encounter issues with subsequent
-    /// transactions (fxbug.dev/53760). In this case, that means either the channel used by the
-    /// `driver_mgr_handler` node or the `component_mgr_proxy` channel encountered the timeout. In
+    /// transactions (fxbug.dev/53760). In this case, that means the channel used by the
+    /// `component_mgr_proxy` channel encountered the timeout. In
     /// all likelihood, because Driver Manager will not be doing any meaningful work in response to
     /// this FIDL call, we can presume that Component Manager, which will be performing a
     /// significant amount of work, is the channel that encountered the timeout. Therefore, care
@@ -391,16 +380,11 @@ impl SystemShutdownHandler {
     }
 
     /// Shut down the system into the specified state. The function works as follows:
-    ///     1. Update the Driver Manager's termination state to match the requested shutdown state
-    ///     2. Issue a shutdown to the Component Manager
-    ///     3. Once the Component Manager shutdown process reaches the Driver Manager component,
-    ///        the system will be put into the state that is specified by the termination state
-    async fn shutdown(&self, request: ShutdownRequest) -> Result<(), Error> {
-        self.send_message(
-            &self.driver_mgr_handler,
-            &Message::SetTerminationSystemState(request.into()),
-        )
-        .await?;
+    ///     1. Issue a shutdown to the Component Manager.
+    ///     2. Once the Component Manager shutdown process reaches the Driver Manager component,
+    ///        it will query power manager for the termination state.
+    ///     3. The system will be put into the state that is specified by the termination state.
+    async fn shutdown(&self, _: ShutdownRequest) -> Result<(), Error> {
         self.component_mgr_proxy.shutdown().await?;
         Ok(())
     }
@@ -482,15 +466,14 @@ impl InspectData {
 pub mod tests {
     use super::*;
     use crate::shutdown_request::RebootReason;
-    use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
+    use crate::test::mock_node::{MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
     use inspect::assert_data_tree;
 
     pub fn setup_test_node(shutdown_function: impl Fn() + 'static) -> Rc<SystemShutdownHandler> {
-        SystemShutdownHandlerBuilder::new(create_dummy_node())
+        SystemShutdownHandlerBuilder::new()
             .with_force_shutdown_function(Box::new(shutdown_function))
-            .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
             .build()
             .unwrap()
     }
@@ -525,17 +508,11 @@ pub mod tests {
             "type": "SystemShutdownHandler",
             "name": "system_shutdown_handler",
             "config": {},
-            "dependencies": {
-                "driver_manager_handler_node": "dev_mgr"
-            }
         });
-
-        let mut nodes: HashMap<String, Rc<dyn Node>> = HashMap::new();
-        nodes.insert("dev_mgr".to_string(), create_dummy_node());
 
         let _ = SystemShutdownHandlerBuilder::new_from_json(
             json_data,
-            &nodes,
+            &HashMap::new(),
             &mut ServiceFs::new_local(),
         );
     }
@@ -544,16 +521,15 @@ pub mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
         let inspector = inspect::Inspector::default();
-        let node = SystemShutdownHandlerBuilder::new(create_dummy_node())
-            .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
+        let node = SystemShutdownHandlerBuilder::new()
             .with_inspect_root(inspector.root())
             .with_force_shutdown_function(Box::new(|| {}))
             .with_shutdown_timeout(Seconds(100.0))
             .build()
             .unwrap();
 
-        // Issue a shutdown call that will fail (because the DriverManager dummy node will respond
-        // to SetTerminationSystemState with an error), which causes a force shutdown to be issued.
+        // Issue a shutdown call that will fail (because the Component Manager mock node will
+        // respond to Shutdown with an error), which causes a force shutdown to be issued.
         // This gives us something interesting to verify in Inspect.
         let _ = node.handle_shutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)).await;
 
@@ -575,8 +551,6 @@ pub mod tests {
     /// Driver Manager and calls the Component Manager shutdown API.
     #[fasync::run_singlethreaded(test)]
     async fn test_shutdown() {
-        let mut mock_maker = MockNodeMaker::new();
-
         // The test will call `shutdown` with each of these shutdown requests
         let shutdown_requests = vec![
             ShutdownRequest::Reboot(RebootReason::UserRequest),
@@ -591,31 +565,15 @@ pub mod tests {
         let shutdown_count = Rc::new(Cell::new(0));
         let shutdown_count_clone = shutdown_count.clone();
 
-        // Create the mock Driver Manager node that expects to receive the SetTerminationSystemState
-        // message for each state in `system_power_states`
-        let driver_mgr_node = mock_maker.make(
-            "DriverMgrNode",
-            shutdown_requests
-                .iter()
-                .map(|request| {
-                    (
-                        msg_eq!(SetTerminationSystemState((*request).into())),
-                        msg_ok_return!(SetTerminationSystemState),
-                    )
-                })
-                .collect(),
-        );
-
         // Create the node with a special Component Manager proxy
-        let node = SystemShutdownHandlerBuilder::new(driver_mgr_node)
+        let node = SystemShutdownHandlerBuilder::new()
             .with_component_mgr_proxy(setup_fake_component_mgr_service(move || {
                 shutdown_count_clone.set(shutdown_count_clone.get() + 1);
             }))
             .build()
             .unwrap();
 
-        // Call `suspend` for each power state. The mock Driver Manager node verifies that the
-        // SetTerminationSystemState messages are sent as expected.
+        // Call `suspend` for each power state.
         for request in &shutdown_requests {
             let _ = node.shutdown(*request).await;
         }
@@ -628,8 +586,6 @@ pub mod tests {
     /// expected timeout period.
     #[test]
     fn test_shutdown_timeout() {
-        let mut mock_maker = MockNodeMaker::new();
-
         // Need to use an TestExecutor with fake time to test the timeout value
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(Seconds(0.0).into());
@@ -646,16 +602,8 @@ pub mod tests {
             fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
 
         // Create the SystemShutdownHandler node
-        let node = SystemShutdownHandlerBuilder::new(mock_maker.make(
-            "DriverMgrNode",
-            vec![(
-                msg_eq!(SetTerminationSystemState(shutdown_request.into())),
-                msg_ok_return!(SetTerminationSystemState),
-            )],
-        ))
-        .with_component_mgr_proxy(proxy)
-        .build()
-        .unwrap();
+        let node =
+            SystemShutdownHandlerBuilder::new().with_component_mgr_proxy(proxy).build().unwrap();
 
         // Future that attempts a suspend with a timeout
         let mut shutdown_future = Box::pin(node.shutdown_with_timeout(shutdown_request, timeout));
@@ -678,7 +626,6 @@ pub mod tests {
     /// in progress.
     #[test]
     fn test_ignore_second_shutdown() {
-        let mut mock_maker = MockNodeMaker::new();
         let mut exec = fasync::TestExecutor::new();
 
         // Arbitrary shutdown request to be used in the test
@@ -688,16 +635,8 @@ pub mod tests {
         // doesn't respond to the request. This way we can properly exercise the timeout path.
         let (proxy, _stream) =
             fidl::endpoints::create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
-        let node = SystemShutdownHandlerBuilder::new(mock_maker.make(
-            "DriverMgrNode",
-            vec![(
-                msg_eq!(SetTerminationSystemState(shutdown_request.into())),
-                msg_ok_return!(SetTerminationSystemState),
-            )],
-        ))
-        .with_component_mgr_proxy(proxy)
-        .build()
-        .unwrap();
+        let node =
+            SystemShutdownHandlerBuilder::new().with_component_mgr_proxy(proxy).build().unwrap();
 
         // Run the first shutdown request. This is expected to stall because the fake Component
         // Manager proxy will not be responding to the request.
@@ -721,14 +660,13 @@ pub mod tests {
             force_shutdown_clone.set(true);
         });
 
-        let node = SystemShutdownHandlerBuilder::new(create_dummy_node())
-            .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
+        let node = SystemShutdownHandlerBuilder::new()
             .with_force_shutdown_function(force_shutdown_func)
             .build()
             .unwrap();
 
         // Call the normal shutdown function. The orderly shutdown will fail because the
-        // DriverManager dummy node will respond to the SetTerminationSystemState message with an
+        // Component manager mock node will respond to the Shutdown message with an
         // error. When the orderly shutdown fails, the forced shutdown method will be called.
         let _ = node.handle_shutdown(ShutdownRequest::PowerOff).await;
         assert_eq!(force_shutdown.get(), true);
@@ -743,16 +681,6 @@ pub mod tests {
         // Choose an arbitrary shutdown request for the test
         let shutdown_request = ShutdownRequest::Reboot(RebootReason::HighTemperature);
 
-        // A mock DriverManagerHandler node that expects the SetTerminationSystemState message
-        // corresponding to the above shutdown_request
-        let driver_mgr_node = mock_maker.make(
-            "DriverManagerHandler",
-            vec![(
-                msg_eq!(SetTerminationSystemState(shutdown_request.into())),
-                msg_ok_return!(SetTerminationSystemState),
-            )],
-        );
-
         // A mock ShutdownWatcher node that expects the SystemShutdown message containing the above
         // shutdown_request
         let shutdown_watcher = mock_maker.make(
@@ -761,7 +689,7 @@ pub mod tests {
         );
 
         // Create the SystemShutdownHandler node and send the shutdown request
-        let node = SystemShutdownHandlerBuilder::new(driver_mgr_node)
+        let node = SystemShutdownHandlerBuilder::new()
             .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
             .with_shutdown_watcher(shutdown_watcher)
             .build()
@@ -778,7 +706,7 @@ pub mod tests {
     async fn test_unsupported_shutdown_methods() {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fpowercontrol::AdminMarker>().unwrap();
-        let node = SystemShutdownHandlerBuilder::new(create_dummy_node())
+        let node = SystemShutdownHandlerBuilder::new()
             .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
             .build()
             .unwrap();
@@ -800,37 +728,13 @@ pub mod tests {
     /// Tests that the `shutdown` function correctly sets the shutdown_pending flag.
     #[fasync::run_singlethreaded(test)]
     async fn test_suspend() {
-        let mut mock_maker = MockNodeMaker::new();
-
-        // The test will call `shutdown` with each of these shutdown requests
-        let requests = vec![
-            ShutdownRequest::SuspendToRam,
-            ShutdownRequest::SuspendToRam,
-            ShutdownRequest::PowerOff,
-        ];
-
         // At the end of the test, verify the Component Manager's received shutdown count (expected
         // to be equal to the number of entries in the system_power_states vector)
         let shutdown_count = Rc::new(Cell::new(0));
         let shutdown_count_clone = shutdown_count.clone();
 
-        // Create the mock Driver Manager node that expects to receive the SetTerminationSystemState
-        // message for each state in `system_power_states`
-        let driver_mgr_node = mock_maker.make(
-            "DriverMgrNode",
-            requests
-                .iter()
-                .map(|request| {
-                    (
-                        msg_eq!(SetTerminationSystemState((*request).into())),
-                        msg_ok_return!(SetTerminationSystemState),
-                    )
-                })
-                .collect(),
-        );
-
         // Create the node with a special Component Manager proxy
-        let node = SystemShutdownHandlerBuilder::new(driver_mgr_node)
+        let node = SystemShutdownHandlerBuilder::new()
             .with_component_mgr_proxy(setup_fake_component_mgr_service(move || {
                 shutdown_count_clone.set(shutdown_count_clone.get() + 1);
             }))

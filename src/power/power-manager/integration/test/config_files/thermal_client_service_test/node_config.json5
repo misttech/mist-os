@@ -1,10 +1,5 @@
 [
     {
-        type: "DriverManagerHandler",
-        name: "driver_manager_handler",
-        config: {},
-    },
-    {
         type: "TemperatureHandler",
         name: "thermal_000",
         config: {
@@ -33,9 +28,6 @@
         name: "sys_shutdown",
         config: {
             shutdown_timeout_s: 3600,
-        },
-        dependencies: {
-            driver_manager_handler_node: "driver_manager_handler",
         },
     },
     {

@@ -381,90 +381,6 @@ TEST_F(MultipleDeviceTestCase, ComponentLifecycleStop) {
   ASSERT_FALSE(suspend_task_sys.is_pending());
 }
 
-TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl) {
-  ASSERT_OK(coordinator_loop()->StartThread("DevCoordLoop"));
-  set_coordinator_loop_thread_running(true);
-  auto endpoints = fidl::CreateEndpoints<fuchsia_device_manager::SystemStateTransition>();
-  ASSERT_OK(endpoints.status_value());
-
-  ASSERT_OK(coordinator().system_state_manager().BindPowerManagerInstance(
-      coordinator_loop()->dispatcher(), std::move(endpoints->server)));
-  auto response =
-      fidl::WireCall(endpoints->client)
-          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kPoweroff);
-
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-  ASSERT_OK(call_status);
-  ASSERT_EQ(coordinator().shutdown_system_state(),
-            fuchsia_device_manager::wire::SystemPowerState::kPoweroff);
-}
-
-TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_svchost_fidl) {
-  ASSERT_OK(coordinator_loop()->StartThread("DevCoordLoop"));
-  set_coordinator_loop_thread_running(true);
-
-  auto service_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(service_endpoints.status_value());
-
-  std::unique_ptr<component::OutgoingDirectory> outgoing;
-  RunOnCoordinatorLoop([&] {
-    outgoing = std::make_unique<component::OutgoingDirectory>(
-        component::OutgoingDirectory(coordinator_loop()->dispatcher()));
-    coordinator().InitOutgoingServices(*outgoing);
-    ASSERT_OK(outgoing->Serve(std::move(service_endpoints->server)).status_value());
-  });
-
-  auto client_end = component::ConnectAt<fuchsia_device_manager::SystemStateTransition>(
-      service_endpoints->client,
-      fidl::DiscoverableProtocolDefaultPath<fuchsia_device_manager::SystemStateTransition>);
-  ASSERT_OK(client_end.status_value());
-
-  auto response =
-      fidl::WireCall(*client_end)
-          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kMexec);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-  ASSERT_OK(call_status);
-
-  RunOnCoordinatorLoop([&] {
-    ASSERT_EQ(coordinator().shutdown_system_state(),
-              fuchsia_device_manager::wire::SystemPowerState::kMexec);
-  });
-  RunOnCoordinatorLoop([&] { outgoing.reset(); });
-}
-
-TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl_wrong_state) {
-  ASSERT_OK(coordinator_loop()->StartThread("DevCoordLoop"));
-  set_coordinator_loop_thread_running(true);
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_device_manager::SystemStateTransition>();
-  ASSERT_OK(endpoints.status_value());
-
-  ASSERT_OK(coordinator().system_state_manager().BindPowerManagerInstance(
-      coordinator_loop()->dispatcher(), std::move(endpoints->server)));
-
-  auto response =
-      fidl::WireCall(endpoints->client)
-          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kFullyOn);
-
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-  ASSERT_EQ(call_status, ZX_ERR_INVALID_ARGS);
-  // Default shutdown_system_state in test is MEXEC.
-  ASSERT_EQ(coordinator().shutdown_system_state(),
-            fuchsia_device_manager::wire::SystemPowerState::kMexec);
-}
-
 // This functor accepts a |fidl::WireUnownedResult<FidlMethod>&| and checks that
 // the call completed with an application error |s| of |ZX_ERR_NOT_SUPPORTED|.
 class UnsupportedEpitaphMatcher {
@@ -567,8 +483,6 @@ TEST_F(MultipleDeviceTestCase, UnregisterSystemStorageForShutdown_DevicesRemoveC
                                     &package_device_index));
   fbl::RefPtr<Device> package_device = device(package_device_index)->device;
 
-  coordinator().set_shutdown_system_state(SystemPowerState::kReboot);
-
   coordinator_loop()->RunUntilIdle();
 
   bool finished = false;
@@ -582,17 +496,17 @@ TEST_F(MultipleDeviceTestCase, UnregisterSystemStorageForShutdown_DevicesRemoveC
 
   // Respond to Suspends. Go children then parents.
   ASSERT_NO_FATAL_FAILURE(device(boot_child_system_device_index)
-                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_REBOOT, ZX_OK));
+                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK));
   ASSERT_NO_FATAL_FAILURE(device(child_system_device_index)
-                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_REBOOT, ZX_OK));
+                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK));
   ASSERT_NO_FATAL_FAILURE(device(child_boot_device_index)
-                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_REBOOT, ZX_OK));
+                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK));
   coordinator_loop()->RunUntilIdle();
 
   ASSERT_NO_FATAL_FAILURE(
-      device(system_device_index)->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_REBOOT, ZX_OK));
-  ASSERT_NO_FATAL_FAILURE(device(package_device_index)
-                              ->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_REBOOT, ZX_OK));
+      device(system_device_index)->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK));
+  ASSERT_NO_FATAL_FAILURE(
+      device(package_device_index)->CheckSuspendReceivedAndReply(DEVICE_SUSPEND_FLAG_MEXEC, ZX_OK));
   coordinator_loop()->RunUntilIdle();
 
   // Check that the callback was called.

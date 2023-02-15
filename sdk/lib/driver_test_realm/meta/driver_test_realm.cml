@@ -112,6 +112,7 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
             ],
             from: "#driver-manager-support",
@@ -177,7 +178,6 @@
             protocol: [
                 "fuchsia.device.fs.Exporter",
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.hardware.pci.DeviceWatcher",
                 "fuchsia.hardware.usb.DeviceWatcher",

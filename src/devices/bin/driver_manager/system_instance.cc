@@ -12,7 +12,6 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/service.h"
-#include "system_state_manager.h"
 
 DirectoryFilter::~DirectoryFilter() {
   sync_completion_t done;

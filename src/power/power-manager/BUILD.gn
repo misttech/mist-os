@@ -87,7 +87,6 @@ power_manager_sources = [
   "src/crash_report_handler.rs",
   "src/debug_service.rs",
   "src/dev_control_handler.rs",
-  "src/driver_manager_handler.rs",
   "src/error.rs",
   "src/input_settings_handler.rs",
   "src/lid_shutdown.rs",

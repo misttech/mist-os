@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.test.Realm",
                 "fuchsia.kernel.RootJob",
@@ -46,6 +47,7 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.test.Realm",
                 "fuchsia.kernel.RootJob",

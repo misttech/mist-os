@@ -4,8 +4,13 @@
 
 #include "suspend_handler.h"
 
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
+#include <lib/zbitl/error-string.h>
+#include <lib/zbitl/image.h>
+#include <lib/zbitl/item.h>
+#include <lib/zbitl/vmo.h>
 #include <zircon/syscalls/system.h>
 
 #include <inspector/inspector.h>
@@ -14,11 +19,94 @@
 #include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/lib/log/log.h"
+#include "src/lib/fsl/vmo/vector.h"
 
 namespace {
 
+struct MexecVmos {
+  zx::vmo kernel_zbi;
+  zx::vmo data_zbi;
+};
+
+zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
+  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (client.is_error()) {
+    LOGF(ERROR, "Failed to connect to StateStateTransition: %s", client.status_string());
+    return client.take_error();
+  }
+
+  fidl::Result result = fidl::Call(*client)->GetMexecZbis();
+  if (result.is_error()) {
+    LOGF(ERROR, "Failed to get mexec zbis: %s", result.error_value().FormatDescription().c_str());
+    zx_status_t status = result.error_value().is_domain_error()
+                             ? result.error_value().domain_error()
+                             : result.error_value().framework_error().status();
+    return zx::error(status);
+  }
+  zx::vmo& kernel_zbi = result->kernel_zbi();
+  zx::vmo& data_zbi = result->data_zbi();
+
+  if (zx_status_t status = mexec::PrepareDataZbi(std::move(mexec_resource), data_zbi.borrow());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to prepare mexec data ZBI: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  zx::result connect_result = component::Connect<fuchsia_boot::Items>();
+  if (connect_result.is_error()) {
+    LOGF(ERROR, "Failed to connect to fuchsia.boot::Items: %s", connect_result.status_string());
+    return connect_result.take_error();
+  }
+  fidl::WireSyncClient items(std::move(connect_result.value()));
+
+  // Driver metadata that the driver framework generally expects to be present.
+  constexpr std::array kItemsToAppend{ZBI_TYPE_DRV_MAC_ADDRESS, ZBI_TYPE_DRV_PARTITION_MAP,
+                                      ZBI_TYPE_DRV_BOARD_PRIVATE, ZBI_TYPE_DRV_BOARD_INFO};
+  zbitl::Image data_image{data_zbi.borrow()};
+  for (uint32_t type : kItemsToAppend) {
+    std::string_view name = zbitl::TypeName(type);
+
+    // TODO(fxbug.dev/102804): Use a method that returns all matching items of
+    // a given type instead of guessing possible `extra` values.
+    for (uint32_t extra : std::array{0, 1, 2}) {
+      fidl::WireResult result = items->Get(type, extra);
+      if (!result.ok()) {
+        return zx::error(result.status());
+      }
+      if (!result.value().payload.is_valid()) {
+        // Absence is signified with an empty result value.
+        LOGF(INFO, "No %.*s item (%#xu) present to append to mexec data ZBI",
+             static_cast<int>(name.size()), name.data(), type);
+        continue;
+      }
+      fsl::SizedVmo payload(std::move(result.value().payload), result.value().length);
+
+      std::vector<char> contents;
+      if (!fsl::VectorFromVmo(payload, &contents)) {
+        LOGF(ERROR, "Failed to read contents of %.*s item (%#xu)", static_cast<int>(name.size()),
+             name.data(), type);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+
+      if (fit::result result = data_image.Append(zbi_header_t{.type = type, .extra = extra},
+                                                 zbitl::AsBytes(contents));
+          result.is_error()) {
+        LOGF(ERROR, "Failed to append %.*s item (%#xu) to mexec data ZBI: %s",
+             static_cast<int>(name.size()), name.data(), type,
+             zbitl::ViewErrorString(result.error_value()).c_str());
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+  }
+
+  return zx::ok(MexecVmos{
+      .kernel_zbi = std::move(kernel_zbi),
+      .data_zbi = std::move(data_zbi),
+  });
+}
+
 void SuspendFallback(const zx::resource& root_resource, const zx::resource& mexec_resource,
-                     uint32_t flags, zx::vmo mexec_kernel_zbi, zx::vmo mexec_data_zbi) {
+                     uint32_t flags) {
   LOGF(INFO, "Suspend fallback with flags %#08x", flags);
   const char* what = "zx_system_powerctl";
   zx_status_t status = ZX_OK;
@@ -48,8 +136,12 @@ void SuspendFallback(const zx::resource& root_resource, const zx::resource& mexe
     status = zx_system_powerctl(root_resource.get(), ZX_SYSTEM_POWERCTL_SHUTDOWN, nullptr);
   } else if (flags == DEVICE_SUSPEND_FLAG_MEXEC) {
     LOGF(INFO, "About to mexec...");
-    status = mexec::BootZbi(mexec_resource.borrow(), std::move(mexec_kernel_zbi),
-                            std::move(mexec_data_zbi));
+    zx::result<MexecVmos> mexec_vmos = GetMexecZbis(mexec_resource.borrow());
+    status = mexec_vmos.status_value();
+    if (status == ZX_OK) {
+      status = mexec::BootZbi(mexec_resource.borrow(), std::move(mexec_vmos->kernel_zbi),
+                              std::move(mexec_vmos->data_zbi));
+    }
     what = "zx_system_mexec";
   }
   // Warning - and not an error - as a large number of tests unfortunately rely
@@ -139,9 +231,7 @@ void SuspendHandler::Suspend(uint32_t flags, SuspendCallback callback) {
       DumpSuspendTaskDependencies(suspend_task_.get());
     }
 
-    SuspendFallback(coordinator_->root_resource(), coordinator_->mexec_resource(), sflags_,
-                    std::move(coordinator_->mexec_kernel_zbi()),
-                    std::move(coordinator_->mexec_data_zbi()));
+    SuspendFallback(coordinator_->root_resource(), coordinator_->mexec_resource(), sflags_);
     // Unless in test env, we should not reach here.
     if (suspend_callback_) {
       suspend_callback_(ZX_ERR_TIMED_OUT);
@@ -172,9 +262,7 @@ void SuspendHandler::Suspend(uint32_t flags, SuspendCallback callback) {
     // Although this is called the SuspendFallback we expect to end up here for most operations
     // that execute a flavor of reboot because Zircon can handle most reboot operations on most
     // platforms.
-    SuspendFallback(coordinator_->root_resource(), coordinator_->mexec_resource(), sflags_,
-                    std::move(coordinator_->mexec_kernel_zbi()),
-                    std::move(coordinator_->mexec_data_zbi()));
+    SuspendFallback(coordinator_->root_resource(), coordinator_->mexec_resource(), sflags_);
     // if we get here the system did not suspend successfully
     flags_ = SuspendHandler::Flags::kRunning;
 

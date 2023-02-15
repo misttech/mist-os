@@ -8,19 +8,11 @@ using zx;
 /// The number of variants of `SystemPowerState`.
 const MAX_SYSTEM_POWER_STATES uint32 = 8;
 
-/// Provides protocol for managing driver manager and all the devices during a
-/// system state transition.
+/// Provides protocol for fetching relevant information during a system state transition.
 @discoverable
 protocol SystemStateTransition {
-    /// Sets and updates the termination SystemPowerState of driver_manager.
-    /// On Success, the system power state is cached. The next time
-    /// driver_manager's stop event is triggered, driver_manager suspends
-    /// the system to "state".
-    /// Returns ZX_ERR_INVALID_ARGS if the system power state is not a shutdown/reboot
-    /// state(POWEROFF, REBOOT, REBOOT_BOOTLOADER, REBOOT_RECOVERY, MEXEC)
-    /// Returns ZX_ERR_BAD_STATE if driver_manager is unable to save the state.
-    /// Each time the api is called the termination state is updated and cached.
-    SetTerminationSystemState(struct {
+    /// Gets the termination state.
+    GetTerminationSystemState() -> (struct {
         // TODO(ravoorir): When the system power states are properly defined,
         // remove the suspend flags. For now, treat each suspend flag as a system
         // power state.
@@ -34,28 +26,23 @@ protocol SystemStateTransition {
             SUSPEND_RAM = 7;
             REBOOT_KERNEL_INITIATED = 8;
         };
-    }) -> () error zx.status;
+    });
 
-    // When the system termination state is MEXEC, in the course of shutting
-    // down, driver_manager will perform an mexec itself after suspending all
-    // drivers. This method prepares for that event, stashing the kernel and
-    // data ZBIs to later be passed to zx_system_mexec().
-    //
-    // This method only prepares for the event of a MEXEC shutdown, but does
-    // not affect termination state itself (which is expected to be set
-    // separately).
-    //
-    // It is expected that the ZBI items specified by
-    // `zx_system_mexec_payload_get()` have not yet been appended to the
-    // provided data ZBI.
-    //
-    // Returns
-    // * ZX_ERR_INVALID_ARGS: if either VMO handle is invalid;
-    // * ZX_ERR_IO_DATA_INTEGRITY: if any ZBI format or storage access errors are
-    //   encountered;
-    // * any status returned by `zx_system_mexec_payload_get()`.
-    SetMexecZbis(resource struct {
+    /// When the system termination state is MEXEC, in the course of shutting
+    /// down, driver_manager will perform an mexec itself after suspending all
+    /// drivers. This method allows driver manager to fetch the kernel and
+    /// data ZBIs to be passed to zx_system_mexec().
+    ///
+    /// This method only should only be invoked in the case MEXEC shutdown.
+    ///
+    /// It is expected that the ZBI items specified by
+    /// `zx_system_mexec_payload_get()` have not yet been appended to the
+    /// provided data ZBI.
+    ///
+    /// Returns
+    /// * ZX_ERR_BAD_STATE: The termination system state is not set to MEXEC.
+    GetMexecZbis() -> (resource struct {
         kernel_zbi zx.handle:VMO;
         data_zbi zx.handle:VMO;
-    }) -> () error zx.status;
+    }) error zx.status;
 };

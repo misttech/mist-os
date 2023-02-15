@@ -17,7 +17,6 @@
                 "fuchsia.device.fs.Exporter",
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.hardware.pci.DeviceWatcher",
@@ -47,6 +46,7 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverIndex",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
@@ -86,7 +86,6 @@
                 "fuchsia.device.fs.Exporter",
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.hardware.pci.DeviceWatcher",

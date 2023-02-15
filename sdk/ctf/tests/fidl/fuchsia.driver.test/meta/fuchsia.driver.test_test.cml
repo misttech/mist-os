@@ -27,7 +27,6 @@
             protocol: [
                 "fuchsia.device.fs.Exporter",
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
