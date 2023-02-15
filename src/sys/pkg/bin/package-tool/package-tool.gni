@@ -165,6 +165,25 @@ template("package_tool_package_build") {
   }
 }
 
+declare_args() {
+  # Controls which mode to use when copying blobs into the repository.
+  # Supported modes are:
+  #
+  # * `copy`: copy the blob if the blob does not already exist in the
+  #   repository. This will use copy-on-write to efficiently copy the blob on
+  #   file systems that support it.
+  #
+  # * `copy-overwrite`: always copy the blob, overwriting any blob that
+  #   exists in the blob repository. This will use copy-on-write to efficiently
+  #   copy the blob on file systems that support it.
+  #
+  # * `hard-link`: hard link the blob into the repository, or copy if we cannot
+  #   create a hard link between the blob and the blob repository. Note that it
+  #   is possible to modify the blob through the hard link, which would result
+  #   in the blob not matching the blob's merkle.
+  repository_publish_blob_copy_mode = "copy"
+}
+
 # Publish package manifests to a repository.
 #
 # Parameters
@@ -182,6 +201,13 @@ template("package_tool_repository_publish") {
   assert(defined(invoker.output_repository_dir) &&
              invoker.output_repository_dir != "",
          "output_repository_dir must be defined")
+
+  assert(
+      repository_publish_blob_copy_mode == "copy" ||
+          repository_publish_blob_copy_mode == "copy-overwrite" ||
+          repository_publish_blob_copy_mode == "hard-link",
+      "`repository_publish_blob_copy_mode` can only be `copy`, `copy-overwrite`, or `hard-link`")
+
   _output_repository_dir = invoker.output_repository_dir
 
   assert(defined(invoker.package_list_manifests),
@@ -222,6 +248,8 @@ template("package_tool_repository_publish") {
       rebase_path(depfile, root_build_dir),
       "--clean",
       "--time-versioning",
+      "--copy-mode",
+      repository_publish_blob_copy_mode,
     ]
 
     if (defined(invoker.initial_trusted_root_metadata)) {
