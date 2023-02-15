@@ -41,7 +41,7 @@ zx_protocol_device_t HdaCodecConnection::CODEC_DEVICE_THUNKS = []() {
   ops.version = DEVICE_OPS_VERSION;
   ops.message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
     HdaCodecConnection* thiz = static_cast<HdaCodecConnection*>(ctx);
-    DdkTransaction transaction(txn);
+    ddk::Transaction transaction(txn);
     fidl::WireDispatch<fuchsia_hardware_intel_hda::CodecDevice>(
         thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
     return transaction.Status();

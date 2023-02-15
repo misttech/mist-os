@@ -195,7 +195,7 @@ class MessageableInternal : public fidl::WireServer<Protocol>, public base_mixin
 
  private:
   static zx_status_t Message(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-    DdkTransaction transaction(txn);
+    ddk::Transaction transaction(txn);
     fidl::WireDispatch<Protocol>(static_cast<D*>(ctx),
                                  fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
                                  &transaction);

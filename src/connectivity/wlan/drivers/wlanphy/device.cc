@@ -84,7 +84,7 @@ zx_status_t Device::Bind() {
 }
 
 zx_status_t Device::Message(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  DdkTransaction transaction(txn);
+  ddk::Transaction transaction(txn);
   DeviceConnector connector(this);
 
   fidl::WireDispatch<fuchsia_wlan_device::Connector>(

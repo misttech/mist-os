@@ -612,7 +612,7 @@ static zx_protocol_device_t usb_ums_proto = {
     .message =
         [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
           usb_ums_t* thiz = static_cast<usb_ums_t*>(ctx);
-          DdkTransaction transaction(txn);
+          ddk::Transaction transaction(txn);
           fidl::WireDispatch<fuchsia_hardware_usb_peripheral_block::Device>(
               thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
           return transaction.Status();

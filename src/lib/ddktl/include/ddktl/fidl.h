@@ -65,14 +65,10 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 
 }  // namespace internal
 
-}  // namespace ddk
-
-// TODO(surajmalhotra): Extend namespace to cover DdkTransaction.
-
 // An implementation of |fidl::Transaction| for using LLCPP bindings in drivers,
 // designed to work with ::DdkMessage.  If can be used to reply synchronously as in:
 // zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-//     DdkTransaction transaction(txn);
+//     ddk::Transaction transaction(txn);
 //     fidl::WireDispatch<fuchsia::hardware::serial::Device>(this, msg, &transaction);
 //     return transaction.Status();
 // }
@@ -83,7 +79,7 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 // And also can be used to reply asynchronously via ToAsync() call as in:
 //
 // zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-//   DdkTransaction transaction(txn);
+//   ddk::Transaction transaction(txn);
 //   fidl::WireDispatch<fuchsia::hardware::serial::Device>(this, msg, &transaction);
 //   return ZX_ERR_AYSNC; // Ownership of transaction was taken, can't use transaction.Status()
 //   here.
@@ -98,16 +94,15 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 // }
 //
 // Note that this class is not thread safe.
-class DdkTransaction : public fidl::Transaction {
+class Transaction final : public fidl::Transaction {
  public:
-  explicit DdkTransaction(fidl_txn_t* txn)
-      : connection_(ddk::internal::Transaction::MoveTxn(txn)) {}
+  explicit Transaction(fidl_txn_t* txn) : connection_(ddk::internal::Transaction::MoveTxn(txn)) {}
 
-  ~DdkTransaction() {
+  ~Transaction() override {
     ZX_ASSERT_MSG(ownership_taken_ || status_called_,
-                  "Sync DdkTransaction must have it's Status() method used.\n"
+                  "Sync Transaction must have it's Status() method used.\n"
                   "This provides ::DdkMessage with the correct status value.\n"
-                  "If ToAsync() was called, the DdkTransaction ownership was taken and\n"
+                  "If ToAsync() was called, the Transaction ownership was taken and\n"
                   "Status() must not be called in ::DdkMessage\n");
   }
 
@@ -139,12 +134,12 @@ class DdkTransaction : public fidl::Transaction {
     status_ = epitaph;
   }
 
-  std::unique_ptr<Transaction> TakeOwnership() final {
+  std::unique_ptr<fidl::Transaction> TakeOwnership() final {
     ownership_taken_ = true;
 
     device_fidl_txn_t new_fidl_txn;
     device_fidl_transaction_take_ownership(connection_.Txn(), &new_fidl_txn);
-    auto new_txn = std::make_unique<DdkTransaction>(std::move(*this));
+    auto new_txn = std::make_unique<Transaction>(std::move(*this));
     new_txn->connection_ = ddk::internal::Transaction(new_fidl_txn);
     return new_txn;
   }
@@ -156,5 +151,7 @@ class DdkTransaction : public fidl::Transaction {
   bool status_called_ = false;
   bool ownership_taken_ = false;
 };
+
+}  // namespace ddk
 
 #endif  // SRC_LIB_DDKTL_INCLUDE_DDKTL_FIDL_H_

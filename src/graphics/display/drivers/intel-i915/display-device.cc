@@ -27,7 +27,7 @@ namespace i915 {
 namespace {
 
 zx_status_t backlight_message(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-  DdkTransaction transaction(txn);
+  ddk::Transaction transaction(txn);
   DisplayDevice* ptr;
   {
     fbl::AutoLock lock(&static_cast<display_ref_t*>(ctx)->mtx);

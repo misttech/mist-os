@@ -45,7 +45,7 @@ static zx_protocol_device_t dev_proto = {
     .release = [](void* ctx) { return static_cast<Device*>(ctx)->DdkRelease(); },
     .message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
       Device* thiz = static_cast<Device*>(ctx);
-      DdkTransaction transaction(txn);
+      ddk::Transaction transaction(txn);
       fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
           thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
       return transaction.Status();
