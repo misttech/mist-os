@@ -27,9 +27,8 @@ source_set("src") {
   public_deps = [
     ":netdevice-migration-bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.network.device:fuchsia.hardware.network.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",
     "//src/devices/lib/dev-operation",
     "//src/lib/ddktl",

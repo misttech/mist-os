@@ -384,7 +384,7 @@ void NetdeviceMigration::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_lis
           // The error semantics of fuchsia.hardware.ethernet/EthernetImpl.QueueTx are unspecified
           // other than `ZX_OK` indicating success. However, ethernet driver usages of
           // `ZX_ERR_NO_RESOURCES` and `ZX_ERR_UNAVAILABLE` map to the meanings specified by
-          // fuchsia.hardware.network.device/TxResult. Accordingly, use `ZX_ERR_INTERNAL` for any
+          // fuchsia.hardware.network.driver/TxResult. Accordingly, use `ZX_ERR_INTERNAL` for any
           // other Ethernet error.
           switch (status) {
             case ZX_OK:

@@ -13,8 +13,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/wlan_interface.h"
 
-#include <fuchsia/hardware/network/device/c/banjo.h>
-#include <fuchsia/hardware/network/mac/c/banjo.h>
+#include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 

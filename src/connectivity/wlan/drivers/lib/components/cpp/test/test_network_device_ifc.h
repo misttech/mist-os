@@ -4,7 +4,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_TEST_TEST_NETWORK_DEVICE_IFC_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_TEST_TEST_NETWORK_DEVICE_IFC_H_
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <optional>

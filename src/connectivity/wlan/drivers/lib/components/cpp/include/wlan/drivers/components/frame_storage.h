@@ -4,7 +4,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_FRAME_STORAGE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_COMPONENTS_CPP_INCLUDE_WLAN_DRIVERS_COMPONENTS_FRAME_STORAGE_H_
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <string.h>
 #include <zircon/compiler.h>
 

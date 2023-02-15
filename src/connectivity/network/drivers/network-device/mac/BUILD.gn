@@ -15,8 +15,8 @@ ddk_source_split("mac") {
   ]
 
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",
   ]

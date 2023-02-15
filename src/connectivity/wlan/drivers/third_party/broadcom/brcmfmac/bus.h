@@ -16,7 +16,7 @@
 
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
-#include <fuchsia/hardware/network/device/c/banjo.h>
+#include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/stdcompat/span.h>

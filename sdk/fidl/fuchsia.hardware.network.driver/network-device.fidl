@@ -74,10 +74,9 @@
 /// - (4) When the data is successfully transmitted, `NetworkDeviceImpl` marks
 /// the transmission as complete referencing the buffer's identifier to
 /// [`NetworkDeviceIfc.CompleteTx`].
-library fuchsia.hardware.network.device;
+library fuchsia.hardware.network.driver;
 
 using zx;
-using fuchsia.hardware.network.mac;
 
 /// Disables automatic snooping for the device.
 ///
@@ -255,7 +254,7 @@ type TxResult = struct {
     status zx.status;
 };
 
-@transport("Banjo")
+@transport("Driver")
 @banjo_layout("ddk-interface")
 protocol NetworkPort {
     /// Gets information about the port.
@@ -300,7 +299,7 @@ protocol NetworkPort {
     // TODO(https://fxbug.dev/67196): Make this an optional interface return
     // once this is FIDL.
     GetMac() -> (resource struct {
-        mac_ifc client_end:fuchsia.hardware.network.mac.MacAddr;
+        mac_ifc client_end:MacAddr;
     });
     /// Notifies this port has been removed from the interface.
     ///
@@ -309,7 +308,7 @@ protocol NetworkPort {
     Removed();
 };
 
-@transport("Banjo")
+@transport("Driver")
 @banjo_layout("ddk-interface")
 protocol NetworkDeviceIfc {
     /// Notifies the interface of status changes on port with `id`.
@@ -512,7 +511,7 @@ type PortStatus = struct {
     flags uint32;
 };
 
-@transport("Banjo")
+@transport("Driver")
 @banjo_layout("ddk-protocol")
 protocol NetworkDeviceImpl {
     /// Initializes the network device.

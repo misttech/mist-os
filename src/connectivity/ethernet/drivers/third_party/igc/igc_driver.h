@@ -14,8 +14,7 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_THIRD_PARTY_IGC_IGC_DRIVER_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_THIRD_PARTY_IGC_IGC_DRIVER_H_
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
-#include <fuchsia/hardware/network/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <zircon/types.h>
 
 #include <mutex>

@@ -39,9 +39,8 @@ fuchsia_driver("gvnic-driver") {
   ]
   deps = [
     ":gvnic_bind",
-    "//sdk/banjo/fuchsia.hardware.network.device:fuchsia.hardware.network.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver",
@@ -78,9 +77,8 @@ test("gvnic-unit-tests") {
   ]
   deps = [
     ":gvnic_bind",
-    "//sdk/banjo/fuchsia.hardware.network.device:fuchsia.hardware.network.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",
     "//src/devices/lib/dma-buffer",

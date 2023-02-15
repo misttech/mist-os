@@ -10,7 +10,7 @@
 #include <fuchsia/net/virtualization/cpp/fidl.h>
 // clang-format on
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>

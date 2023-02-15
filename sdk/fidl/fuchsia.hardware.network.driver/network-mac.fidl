@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.network.mac;
+library fuchsia.hardware.network.driver;
 
 /// The length of an IEEE 802 MAC Address, in bytes.
 const MAC_SIZE uint64 = 6;
@@ -58,7 +58,7 @@ type Features = struct {
     supported_modes SupportedMacFilterMode;
 };
 
-@transport("Banjo")
+@transport("Driver")
 @banjo_layout("ddk-interface")
 protocol MacAddr {
     /// Gets this device's MAC address.

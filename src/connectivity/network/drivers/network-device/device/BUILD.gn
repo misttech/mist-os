@@ -37,9 +37,8 @@ ddk_source_split("device") {
 
   public_deps = [
     ":shared_lock",
-    "//sdk/banjo/fuchsia.hardware.network.device:fuchsia.hardware.network.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/lib/fidl",
     "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/lib/vmo_store",

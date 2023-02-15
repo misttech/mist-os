@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fzl/pinned-vmo.h>

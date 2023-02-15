@@ -4,7 +4,7 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_TUN_NETWORK_TUN_PORT_ADAPTER_H_
 #define SRC_CONNECTIVITY_NETWORK_TUN_NETWORK_TUN_PORT_ADAPTER_H_
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 
 #include <fbl/mutex.h>
 

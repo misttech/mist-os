@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_NETWORK_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
 

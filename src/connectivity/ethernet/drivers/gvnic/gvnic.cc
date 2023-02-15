@@ -718,7 +718,7 @@ void Gvnic::DdkRelease() { delete this; }
 
 // ------- NetworkDeviceImpl -------
 // The quotes in the comments in this section come from the documentation of these fields in
-// sdk/banjo/fuchsia.hardware.network.device/network-device.fidl
+// sdk/fidl/fuchsia.hardware.network.driver/network-device.fidl
 
 zx_status_t Gvnic::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
   // "`Init` is only called once during the lifetime of the device..."

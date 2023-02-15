@@ -11,8 +11,7 @@
 
 #include <fidl/fuchsia.hardware.network/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
-#include <fuchsia/hardware/network/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/dma-buffer/buffer.h>

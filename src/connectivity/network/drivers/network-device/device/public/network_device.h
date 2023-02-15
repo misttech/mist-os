@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_NETWORK_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 

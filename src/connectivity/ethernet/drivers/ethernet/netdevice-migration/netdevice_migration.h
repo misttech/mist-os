@@ -7,8 +7,7 @@
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
-#include <fuchsia/hardware/network/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <zircon/system/public/zircon/compiler.h>
 
 #include <queue>
@@ -107,7 +106,7 @@ class NetdeviceMigration
             .rx_threshold = kFifoDepth / 2,
             // Ensures clients do not use scatter-gather.
             .max_buffer_parts = 1,
-            // Per fuchsia.hardware.network.device banjo API:
+            // Per fuchsia.hardware.network.driver banjo API:
             // "Devices that do not support scatter-gather DMA may set this to a value smaller than
             // a page size to guarantee compatibility."
             .max_buffer_length = ZX_PAGE_SIZE / 2,

@@ -13,7 +13,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <lib/mock-function/mock-function.h>
 

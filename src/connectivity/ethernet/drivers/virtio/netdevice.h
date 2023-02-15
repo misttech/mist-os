@@ -6,8 +6,7 @@
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
-#include <fuchsia/hardware/network/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>

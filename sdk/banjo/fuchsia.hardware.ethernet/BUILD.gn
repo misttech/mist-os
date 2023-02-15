@@ -19,7 +19,7 @@ fidl("fuchsia.hardware.ethernet") {
   #    \|_________|
   #
   # New drivers should not use fuchsia.hardware.ethernet, but use
-  # fuchsia.hardware.network.device banjo instead.
+  # fuchsia.hardware.network.driver banjo instead.
   #
   # TODO(https://fxbug.dev/74532): Migrate all of these away from
   # fuchsia.hardware.ethernet.

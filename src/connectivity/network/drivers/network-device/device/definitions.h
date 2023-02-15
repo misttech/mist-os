@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEFINITIONS_H_
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/device/c/banjo.h>
+#include <fuchsia/hardware/network/driver/c/banjo.h>
 
 #include <array>
 

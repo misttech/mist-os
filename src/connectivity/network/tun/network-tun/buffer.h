@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_TUN_NETWORK_TUN_BUFFER_H_
 
 #include <fidl/fuchsia.net.tun/cpp/wire.h>
-#include <fuchsia/hardware/network/device/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 
 #include <array>
@@ -25,7 +25,7 @@ class RxBuffer;
 // `MAX_VMOS`). `VmoStore` can be used to allocate buffers backed by the VMOs it contains.
 //
 // This class is used to fulfill the VMO registration mechanism used by
-// `fuchsia.hardware.network.device`.
+// `fuchsia.hardware.network.driver`.
 class VmoStore {
  public:
   VmoStore()
