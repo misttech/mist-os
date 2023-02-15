@@ -62,14 +62,6 @@ impl DriverConnector {
             let (query_proxy, query_server) =
                 fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
                     .context("creating realm query proxy")?;
-            let (explorer_proxy, explorer_server) =
-                fidl::endpoints::create_proxy::<fsys::RealmExplorerMarker>()
-                    .context("creating realm explorer proxy")?;
-            rcs_proxy
-                .root_realm_explorer(explorer_server)
-                .await?
-                .map_err(|i| Status::ok(i).unwrap_err())
-                .context("opening explorer")?;
             rcs_proxy
                 .root_realm_query(query_server)
                 .await?
@@ -78,7 +70,6 @@ impl DriverConnector {
 
             Ok(capability::find_instances_that_expose_or_use_capability(
                 capability.to_string(),
-                &explorer_proxy,
                 &query_proxy,
             )
             .await?

@@ -11,15 +11,10 @@ use {
 pub async fn capability_cmd<W: std::io::Write>(
     capability_name: String,
     realm_query: fsys::RealmQueryProxy,
-    realm_explorer: fsys::RealmExplorerProxy,
     mut writer: W,
 ) -> Result<()> {
-    let MatchingInstances { exposed, used } = find_instances_that_expose_or_use_capability(
-        capability_name,
-        &realm_explorer,
-        &realm_query,
-    )
-    .await?;
+    let MatchingInstances { exposed, used } =
+        find_instances_that_expose_or_use_capability(capability_name, &realm_query).await?;
 
     if !exposed.is_empty() {
         writeln!(writer, "Exposed:")?;

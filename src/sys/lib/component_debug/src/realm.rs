@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    cm_rust::{ComponentDecl, FidlIntoNative},
     fidl_fuchsia_sys2 as fsys,
     moniker::{
         AbsoluteMoniker, AbsoluteMonikerBase, MonikerError, RelativeMoniker, RelativeMonikerBase,
@@ -38,6 +39,24 @@ pub enum GetAllInstancesError {
 
     #[error("FIDL error: {0}")]
     Fidl(#[from] fidl::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum GetManifestError {
+    #[error(transparent)]
+    Fidl(#[from] fidl::Error),
+
+    #[error("instance {0} could not be found")]
+    InstanceNotFound(AbsoluteMoniker),
+
+    #[error("instance {0} is not resolved")]
+    InstanceNotResolved(AbsoluteMoniker),
+
+    #[error("component manager could not parse {0}")]
+    BadMoniker(AbsoluteMoniker),
+
+    #[error("component manager responded with an unknown error code")]
+    UnknownError,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -142,6 +161,27 @@ pub async fn get_all_instances(
     let instances: Result<Vec<Instance>, ParseError> =
         instances.into_iter().map(|i| Instance::try_from(i)).collect();
     Ok(instances?)
+}
+
+pub async fn get_manifest(
+    moniker: &AbsoluteMoniker,
+    realm_query: &fsys::RealmQueryProxy,
+) -> Result<ComponentDecl, GetManifestError> {
+    // Parse the runtime directory and add it into the State object
+    let moniker_str = format!(".{}", moniker.to_string());
+    match realm_query.get_manifest(&moniker_str).await? {
+        Ok(decl) => Ok(decl.fidl_into_native()),
+        Err(fsys::GetManifestError::InstanceNotFound) => {
+            Err(GetManifestError::InstanceNotFound(moniker.clone()))
+        }
+        Err(fsys::GetManifestError::InstanceNotResolved) => {
+            Err(GetManifestError::InstanceNotResolved(moniker.clone()))
+        }
+        Err(fsys::GetManifestError::BadMoniker) => {
+            Err(GetManifestError::BadMoniker(moniker.clone()))
+        }
+        Err(_) => Err(GetManifestError::UnknownError),
+    }
 }
 
 #[cfg(test)]

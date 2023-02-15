@@ -95,15 +95,13 @@ async fn show() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn select() {
-    let explorer = connect_to_protocol::<fsys::RealmExplorerMarker>().unwrap();
-    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+async fn capability() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     let capability::MatchingInstances { mut exposed, mut used } =
         capability::find_instances_that_expose_or_use_capability(
             "fuchsia.foo.Bar".to_string(),
-            &explorer,
-            &query,
+            &realm_query,
         )
         .await
         .unwrap();
@@ -116,13 +114,9 @@ async fn select() {
     assert!(used_component.is_root());
 
     let capability::MatchingInstances { mut exposed, used } =
-        capability::find_instances_that_expose_or_use_capability(
-            "data".to_string(),
-            &explorer,
-            &query,
-        )
-        .await
-        .unwrap();
+        capability::find_instances_that_expose_or_use_capability("data".to_string(), &realm_query)
+            .await
+            .unwrap();
 
     assert_eq!(exposed.len(), 1);
     assert_eq!(used.len(), 0);

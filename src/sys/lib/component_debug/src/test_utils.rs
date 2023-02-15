@@ -5,7 +5,7 @@ use {
     crate::io::Directory,
     anyhow::Result,
     fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd, ServerEnd},
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio,
     fidl_fuchsia_io::DirectoryProxy,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_async::Task,
@@ -46,6 +46,13 @@ fn serve_instance_iterator(
 }
 
 pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::RealmQueryProxy {
+    serve_realm_query(instances, HashMap::new())
+}
+
+pub fn serve_realm_query(
+    instances: Vec<fsys::Instance>,
+    manifests: HashMap<String, fcdecl::Component>,
+) -> fsys::RealmQueryProxy {
     let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
     let mut instance_map = HashMap::new();
@@ -58,6 +65,14 @@ pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::Real
     Task::spawn(async move {
         loop {
             match stream.next().await.unwrap().unwrap() {
+                fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
+                    eprintln!("GetManifest call for {}", moniker);
+                    if let Some(manifest) = manifests.get(&moniker) {
+                        responder.send(&mut Ok(manifest.clone())).unwrap();
+                    } else {
+                        responder.send(&mut Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                    }
+                }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {
                     eprintln!("GetAllInstances call");
                     let instances = instance_map.values().cloned().collect();

@@ -53,7 +53,7 @@ pub async fn exec() -> Result<()> {
             doctor_cmd_print(args.query, route_validator, realm_query, writer).await
         }
         ComponentSubcommand::Capability(args) => {
-            capability_cmd(args.capability_name, realm_query, realm_explorer, writer).await
+            capability_cmd(args.capability_name, realm_query, writer).await
         }
         ComponentSubcommand::List(args) => {
             list_cmd_print(args.filter, args.verbose, realm_query, realm_explorer, writer).await
