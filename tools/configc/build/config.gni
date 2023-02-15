@@ -308,7 +308,7 @@ template("cpp_config_client_lib_source") {
 # Parameters
 #
 #   package_manifest (path)
-#     Path to the output of the `pm_build()` template.
+#     Path to the output of the `package_tool_package_build()` template.
 #
 #   deps (optional)
 #   metadata (optional)

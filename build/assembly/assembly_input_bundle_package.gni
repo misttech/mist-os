@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/python/python_action.gni")
-import("//src/sys/pkg/bin/pm/pm.gni")
+import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 
 # Creates a Fuchsia Package for an Assembly Input Bundle.  For the format
 # of the created package, see the AssemblyInputBundle documentation at:
@@ -62,7 +62,7 @@ template("assembly_input_bundle_package") {
     inputs = [ invoker.manifest ]
     outputs = [
       files.creation_manifest,  # must be the first output, for passing to
-                                # pm_build
+                                # package_tool_package_build
       files.meta_package_file,
     ]
     args = [
@@ -78,7 +78,7 @@ template("assembly_input_bundle_package") {
     ]
   }
 
-  pm_build(target_name) {
+  package_tool_package_build(target_name) {
     forward_variables_from(invoker,
                            [
                              "deps",
