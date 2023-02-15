@@ -52,7 +52,7 @@ impl SeLinuxFs {
                 mode!(IFREG, 0o444),
             )
             .entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777))
-            .entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o644))
+            .entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666))
             .entry_dev(b"null", DeviceFileNode {}, mode!(IFCHR, 0o666), DeviceType::NULL)
             .build_root();
 
