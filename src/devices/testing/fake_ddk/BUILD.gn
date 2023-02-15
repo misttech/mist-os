@@ -78,6 +78,5 @@ zx_library("fake_ddk") {
   visibility = [
     "//src/camera/drivers/controller/test/*",
     "//src/devices/testing/fake_ddk/test/*",
-    "//src/media/audio/drivers/usb-audio/tests/*",
   ]
 }

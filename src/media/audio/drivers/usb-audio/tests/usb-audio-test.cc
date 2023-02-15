@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/composite/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
+#include <lib/async-loop/cpp/loop.h>
 
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -15,6 +17,7 @@
 
 #include "../usb-audio-device.h"
 #include "../usb-audio-stream.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 namespace audio_fidl = fuchsia_hardware_audio;
@@ -34,11 +37,8 @@ audio_fidl::wire::PcmFormat GetDefaultPcmFormat() {
   return format;
 }
 
-// TODO(https://fxbug.dev/115087): Change the type of |client| to
-// fidl::ClientEnd<audio_fidl::StreamConfigConnector> when this target uses mock-ddk instead of
-// fake_ddk.
-fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(zx::channel channel) {
-  fidl::ClientEnd<audio_fidl::StreamConfigConnector> client{std::move(channel)};
+fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
+    fidl::ClientEnd<audio_fidl::StreamConfigConnector> client) {
   fidl::WireSyncClient client_wrap{std::move(client)};
   if (!client_wrap.is_valid()) {
     return {};
@@ -61,6 +61,7 @@ class FakeDevice : public FakeDeviceType,
                    public ddk::UsbCompositeProtocol<FakeDevice> {
  public:
   FakeDevice(zx_device_t* parent) : FakeDeviceType(parent) {}
+  virtual ~FakeDevice() = default;
   // dev() is used in Binder::DeviceGetProtocol below.
   zx_device_t* dev() { return reinterpret_cast<zx_device_t*>(this); }
   zx_status_t Bind() { return DdkAdd("usb-fake-device-test"); }
@@ -231,81 +232,37 @@ class FakeDevice : public FakeDeviceType,
 
 namespace audio::usb {
 
-class Binder : public fake_ddk::Bind {
+// The class here is templated on the type of device which the UsbAudioDevice should be a child of.
+template <class FakeDevType>
+class BaseUsbAudioTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
- private:
-  using Operation = void (*)(void* ctx);
-  struct Context {
-    Operation unbind;
-    Operation release;
-    void* ctx;
-  };
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id,
-                                void* protocol) override {
-    auto context = reinterpret_cast<const FakeDevice*>(device);
-    if (proto_id == ZX_PROTOCOL_USB) {
-      *reinterpret_cast<usb_protocol_t*>(protocol) = context->proto();
-      return ZX_OK;
-    }
-    if (proto_id == ZX_PROTOCOL_USB_COMPOSITE) {
-      *reinterpret_cast<usb_composite_protocol_t*>(protocol) = context->proto_composite();
-      return ZX_OK;
-    }
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+  void SetUp() override {
+    root_ = MockDevice::FakeRootParent();
+    fake_dev_ = std::make_shared<FakeDevType>(root_.get());
+    ASSERT_OK(fake_dev_->Bind());
+    ASSERT_EQ(root_->child_count(), 1);
+    auto* mock_dev = root_->GetLatestChild();
+
+    mock_dev->AddProtocol(ZX_PROTOCOL_USB, fake_dev_->proto().ops, fake_dev_->proto().ctx);
+    mock_dev->AddProtocol(ZX_PROTOCOL_USB_COMPOSITE, fake_dev_->proto_composite().ops,
+                          fake_dev_->proto_composite().ctx);
+    ASSERT_OK(loop_.StartThread());
   }
 
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    bad_parent_ = false;
-
-    if (args && args->ops) {
-      if (args->ops->message) {
-        if (zx_status_t status = fidl_.SetMessageOp(args->ctx, args->ops->message);
-            status != ZX_OK) {
-          return status;
-        }
-      }
-
-      if (args->ops->unbind || args->ops->release) {
-        devs_.push_back({args->ops->unbind, args->ops->release, args->ctx});
-        unbind_op_ = args->ops->unbind;  // Starts the unbind/release of devices.
-        op_ctx_ = args->ctx;
-      }
-    }
-
-    *out = fake_ddk::kFakeDevice;
-    add_called_ = true;
-    return ZX_OK;
+  void TearDown() override {
+    fake_dev_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(root_.get());
   }
-
-  zx_status_t DeviceRemove(zx_device_t* device) override {
-    for (auto i = devs_.begin(); i != devs_.end();) {
-      auto unbind = i->unbind;
-      auto release = i->release;
-      auto context = i->ctx;
-      i = devs_.erase(i);
-      if (unbind) {
-        unbind(context);
-      }
-      if (release) {
-        release(context);
-      }
-    }
-    remove_called_ = true;
-    return ZX_OK;
-  }
-
-  std::vector<Context> devs_;
+ protected:
+  std::shared_ptr<FakeDevType> fake_dev_;
+  std::shared_ptr<MockDevice> root_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
-class UsbAudioTest : public inspect::InspectTestHelper, public zxtest::Test {};
+using UsbAudioTest = BaseUsbAudioTest<FakeDevice>;
 
 TEST_F(UsbAudioTest, Inspect) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-
-  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_device.dev());
+  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_dev_->zxdev());
   ASSERT_TRUE(ret.is_ok());
   ASSERT_NO_FATAL_FAILURE(ReadInspect(ret.value()->streams().front().inspect().DuplicateVmo()));
 
@@ -337,20 +294,21 @@ TEST_F(UsbAudioTest, Inspect) {
   ASSERT_NO_FATAL_FAILURE(CheckProperty(
       inspect->node(), "supported_sample_formats",
       inspect::StringArrayValue({"PCM_signed", "PCM_signed"}, inspect::ArrayDisplayFormat::kFlat)));
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, GetStreamProperties) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, GetStreamProperties) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
-  ASSERT_TRUE(stream_client.is_valid());
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
 
   auto result = stream_client->GetProperties();
   ASSERT_OK(result.status());
@@ -363,19 +321,22 @@ TEST(UsbAudioTest, GetStreamProperties) {
   ASSERT_EQ(result.value().properties.can_agc(), false);
   ASSERT_EQ(result.value().properties.plug_detect_capabilities(),
             audio_fidl::wire::PlugDetectCapabilities::kHardwired);
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, MultipleStreamConfigClients) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, MultipleStreamConfigClients) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  fidl::WireSyncClient client_wrap{tester.FidlClient<audio_fidl::StreamConfigConnector>()};
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  fidl::WireSyncClient client_wrap{
+      fidl::ClientEnd<audio_fidl::StreamConfigConnector>{std::move(endpoints->client)}};
   {
     auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
     ASSERT_TRUE(endpoints.is_ok());
@@ -404,19 +365,21 @@ TEST(UsbAudioTest, MultipleStreamConfigClients) {
     auto result = stream_client->GetProperties();
     ASSERT_OK(result.status());
   }
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, SetAndGetGain) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, SetAndGetGain) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   constexpr float kTestGain = -12.f;
@@ -432,19 +395,21 @@ TEST(UsbAudioTest, SetAndGetGain) {
   ASSERT_OK(gain_state.status());
 
   ASSERT_EQ(kTestGain, gain_state.value().gain_state.gain_db());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, Enumerate) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, Enumerate) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto ret = stream_client->GetSupportedFormats();
@@ -474,10 +439,6 @@ TEST(UsbAudioTest, Enumerate) {
   ASSERT_EQ(2, formats2.bytes_per_sample()[0]);
   ASSERT_EQ(1, formats2.valid_bits_per_sample().count());
   ASSERT_EQ(16, formats2.valid_bits_per_sample()[0]);
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
 class FakeDeviceContinuousFrameRatesRange : public FakeDevice {
@@ -530,15 +491,23 @@ class FakeDeviceContinuousFrameRatesRange : public FakeDevice {
       0x00};
 };
 
-TEST_F(UsbAudioTest, EnumerateWithDescriptorIncludingContinuousFrameRatesRange) {
-  Binder tester;
-  FakeDeviceContinuousFrameRatesRange fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
+using UsbAudioContinuousFrameRatesTest = BaseUsbAudioTest<FakeDeviceContinuousFrameRatesRange>;
 
-  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_device.dev());
+TEST_F(UsbAudioContinuousFrameRatesTest,
+       EnumerateWithDescriptorIncludingContinuousFrameRatesRange) {
+  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_dev_->zxdev());
   ASSERT_TRUE(ret.is_ok());
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   // We get the formats from the first interface in the descriptor.
@@ -556,10 +525,6 @@ TEST_F(UsbAudioTest, EnumerateWithDescriptorIncludingContinuousFrameRatesRange) 
   ASSERT_EQ(16'000, supported_formats[1].pcm_supported_formats().frame_rates()[0]);
   ASSERT_EQ(32'000, supported_formats[2].pcm_supported_formats().frame_rates()[0]);
   ASSERT_EQ(48'000, supported_formats[3].pcm_supported_formats().frame_rates()[0]);
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
 class FakeDeviceBadContinuousFrameRatesRange : public FakeDevice {
@@ -612,90 +577,99 @@ class FakeDeviceBadContinuousFrameRatesRange : public FakeDevice {
       0x00};
 };
 
-TEST_F(UsbAudioTest, EnumerateBadContinuousFrameRatesRange) {
-  Binder tester;
-  FakeDeviceBadContinuousFrameRatesRange fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
+using UsbAudioBadContinuousFrameRatesTest =
+    BaseUsbAudioTest<FakeDeviceBadContinuousFrameRatesRange>;
 
-  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_device.dev());
+TEST_F(UsbAudioBadContinuousFrameRatesTest, EnumerateBadContinuousFrameRatesRange) {
+  zx::result<UsbAudioDevice*> ret = UsbAudioDevice::DriverBind(fake_dev_->zxdev());
   ASSERT_TRUE(ret.is_ok());
-
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
   // Both interfaces in the descriptor failed to produce valid formats.
-  ASSERT_FALSE(tester.FidlClient().is_valid());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 0);
 }
 
-TEST(UsbAudioTest, CreateRingBuffer) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, CreateRingBuffer) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(endpoints.value());
+  {
+    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+    ASSERT_OK(endpoints.status_value());
+    auto [local, remote] = std::move(endpoints.value());
 
-  fidl::Arena allocator;
-  audio_fidl::wire::Format format(allocator);
-  format.set_pcm_format(allocator, GetDefaultPcmFormat());
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+    fidl::Arena allocator;
+    audio_fidl::wire::Format format(allocator);
+    format.set_pcm_format(allocator, GetDefaultPcmFormat());
+    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
 
-  // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
-  // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
-  // StreamConfig synchronously.
-  auto result = stream_client->GetProperties();
-  ASSERT_OK(result.status());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
+    // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
+    // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
+    // StreamConfig synchronously.
+    auto result = stream_client->GetProperties();
+    ASSERT_OK(result.status());
+  }
 }
 
-TEST(UsbAudioTest, DelayInfo) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, DelayInfo) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(endpoints.value());
+  {
+    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+    ASSERT_OK(endpoints.status_value());
+    auto [local, remote] = std::move(endpoints.value());
 
-  fidl::Arena allocator;
-  audio_fidl::wire::Format format(allocator);
-  format.set_pcm_format(allocator, GetDefaultPcmFormat());
-  auto result = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
-  ASSERT_OK(result.status());
+    fidl::Arena allocator;
+    audio_fidl::wire::Format format(allocator);
+    format.set_pcm_format(allocator, GetDefaultPcmFormat());
+    auto result = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+    ASSERT_OK(result.status());
 
-  auto delay_info = fidl::WireCall(local)->WatchDelayInfo();
-  ASSERT_OK(delay_info.status());
-  // Internal delay of = 6 (MAX_OUTSTANDING_REQ) x 1 msecs per request.
-  ASSERT_EQ(delay_info.value().delay_info.internal_delay(), zx::msec(6).to_nsecs());
-  ASSERT_FALSE(delay_info.value().delay_info.has_external_delay());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
+    auto delay_info = fidl::WireCall<audio_fidl::RingBuffer>(local)->WatchDelayInfo();
+    ASSERT_OK(delay_info.status());
+    // Internal delay of = 6 (MAX_OUTSTANDING_REQ) x 1 msecs per request.
+    ASSERT_EQ(delay_info.value().delay_info.internal_delay(), zx::msec(6).to_nsecs());
+    ASSERT_FALSE(delay_info.value().delay_info.has_external_delay());
+  }
 }
 
 // TODO(fxbug.dev/84545): Fix flakes caused by this test.
-TEST(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -708,7 +682,7 @@ TEST(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto result = fidl::WireCall(local)->GetProperties();
+  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported fifo_depth (the minimum required lead time)
@@ -719,40 +693,43 @@ TEST(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
   constexpr uint32_t kMinFrames = 10;
-  auto vmo = fidl::WireCall(local)->GetVmo(kMinFrames, kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kMinFrames,
+                                                                   kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall(ring_buffer)->Start();
+    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
     ASSERT_OK(start.status());
-    auto stop = fidl::WireCall(ring_buffer)->Stop();
+    auto stop = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Stop();
     ASSERT_OK(stop.status());
     done.store(true);
   });
 
   // Reply until done.
   while (!done.load()) {
-    fake_device.ReplyToUsbRequestQueue(ZX_OK);
+    fake_dev_->ReplyToUsbRequestQueue(ZX_OK);
     // Delay a bit, so there is time for non-data handling, e.g. Stop().
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
   th.join();
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
 // TODO(fxbug.dev/85160): Disabled until flakes are fixed.
-TEST(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -766,22 +743,24 @@ TEST(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Start() before GetVmo() must result in channel closure
-  auto start = fidl::WireCall(local)->Start();
+  auto start = fidl::WireCall<audio_fidl::RingBuffer>(local)->Start();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());  // We get a channel close.
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-// TODO(fxbug.dev/85160): Disabled until flakes are fixed.
-TEST(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+//// TODO(fxbug.dev/85160): Disabled until flakes are fixed.
+TEST_F(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -794,45 +773,47 @@ TEST(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo = fidl::WireCall(local)->GetVmo(kTestFrameRate, 0);
+  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall(ring_buffer)->Start();
+    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
     ASSERT_OK(start.status());
-    auto restart = fidl::WireCall(ring_buffer)->Start();
+    auto restart = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, restart.status());  // We get a channel close.
-    auto stop = fidl::WireCall(ring_buffer)->Stop();
+    auto stop = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Stop();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, stop.status());  // We already got a channel closed.
     done.store(true);
   });
 
   // Reply until done.
   while (!done.load()) {
-    fake_device.ReplyToUsbRequestQueue(ZX_OK);
+    fake_dev_->ReplyToUsbRequestQueue(ZX_OK);
     // Delay a bit, so there is time for non-data handling, e.g. Stop().
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
   th.join();
   // Drain until no more requests are pending.
-  while (fake_device.ReplyToUsbRequestQueue(ZX_OK)) {
+  while (fake_dev_->ReplyToUsbRequestQueue(ZX_OK)) {
   }
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
 // TODO(fxbug.dev/85160): Disabled until flakes are fixed.
-TEST(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -846,21 +827,23 @@ TEST(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
   ASSERT_OK(rb.status());
 
   // Stop() before GetVmo() must result in channel closure
-  auto stop = fidl::WireCall(local)->Stop();
+  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, stop.status());  // We get a channel close.
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, RingBufferStopWhileStopped) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, RingBufferStopWhileStopped) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -873,28 +856,30 @@ TEST(UsbAudioTest, RingBufferStopWhileStopped) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto vmo = fidl::WireCall(local)->GetVmo(kTestFrameRate, 0);
+  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kTestFrameRate, 0);
   ASSERT_OK(vmo.status());
 
   // We are already stopped, but this should be harmless
-  auto stop = fidl::WireCall(local)->Stop();
+  auto stop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
   ASSERT_OK(stop.status());
   // Another stop immediately afterward should also be harmless
-  auto restop = fidl::WireCall(local)->Stop();
+  auto restop = fidl::WireCall<audio_fidl::RingBuffer>(local)->Stop();
   ASSERT_OK(restop.status());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
-TEST(UsbAudioTest, Unplug) {
-  Binder tester;
-  FakeDevice fake_device(fake_ddk::kFakeParent);
-  ASSERT_OK(fake_device.Bind());
-  ASSERT_OK(UsbAudioDevice::DriverBind(fake_device.dev()));
+TEST_F(UsbAudioTest, Unplug) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
 
-  auto stream_client = GetStreamClient(std::move(tester.FidlClient()));
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
@@ -907,7 +892,7 @@ TEST(UsbAudioTest, Unplug) {
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
 
-  auto result = fidl::WireCall(local)->GetProperties();
+  auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported fifo_depth (the minimum required lead time)
@@ -918,20 +903,21 @@ TEST(UsbAudioTest, Unplug) {
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
   constexpr uint32_t kMinFrames = 10;
-  auto vmo = fidl::WireCall(local)->GetVmo(kMinFrames, kNumberOfPositionNotifications);
+  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kMinFrames,
+                                                                   kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
 
   std::atomic<bool> done = {};
   auto& ring_buffer = local;
   auto th = std::thread([&ring_buffer, &done] {
-    auto start = fidl::WireCall(ring_buffer)->Start();
+    auto start = fidl::WireCall<audio_fidl::RingBuffer>(ring_buffer)->Start();
     ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());
     done.store(true);
   });
 
   // Reply until done.
   while (!done.load()) {
-    fake_device.ReplyToUsbRequestQueue(ZX_ERR_IO_NOT_PRESENT);
+    fake_dev_->ReplyToUsbRequestQueue(ZX_ERR_IO_NOT_PRESENT);
     // Delay a bit, so there is time for non-data handling, e.g. Stop().
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
@@ -939,10 +925,6 @@ TEST(UsbAudioTest, Unplug) {
 
   auto properties = stream_client->GetProperties();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, properties.status());
-
-  fake_device.DdkAsyncRemove();
-  EXPECT_TRUE(tester.Ok());
-  fake_device.DdkRelease();
 }
 
 }  // namespace audio::usb

@@ -12,9 +12,7 @@ executable("usb-audio-test-bin") {
   deps = [
     "../:shared",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-
-    # TODO(fxb/115087): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//zircon/system/ulib/zxtest",
   ]
@@ -29,5 +27,8 @@ fuchsia_unittest_package("usb-audio-test-package") {
   deps = [ ":usb-audio-test-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
