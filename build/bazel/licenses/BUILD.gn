@@ -31,7 +31,12 @@ license_data("licenses_data") {
   target = "//build/bazel/licenses:all_bazel_inputs"
   out_dir = "$target_out_dir/licenses_data"
   produce_spdx = true
+
+  # This is an intermediate input to the licenses pipeline, no need to upload to GCS.
   emit_metadata = false
+
+  # Analysis is not needed - it is assumed it is done elsewhere.
+  run_analysis = false
 }
 
 # Note: To make this target on the Bazel side, this target needs be added:
