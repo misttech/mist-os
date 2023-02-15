@@ -263,7 +263,7 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -271,7 +271,7 @@ From //BUILD.gn:46
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -870,7 +870,7 @@ Board configuration of the current build
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:3
+From //out/not-default/args.gn:5
 
 **Overridden from the default:** `"arm64"`
 
@@ -878,7 +878,7 @@ From //build/info/info.gni:12
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:3
+From //out/not-default/args.gn:5
 
 **Overridden from the default:** `"x64"`
 
@@ -890,7 +890,7 @@ Product configuration of the current build
 
 **Current value for `target_cpu = "arm64"`:** `"bringup"`
 
-From //out/not-default/args.gn:4
+From //out/not-default/args.gn:6
 
 **Overridden from the default:** `""`
 
@@ -898,7 +898,7 @@ From //build/info/info.gni:9
 
 **Current value for `target_cpu = "x64"`:** `"bringup"`
 
-From //out/not-default/args.gn:4
+From //out/not-default/args.gn:6
 
 **Overridden from the default:** `""`
 
@@ -996,7 +996,7 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -1004,7 +1004,7 @@ From //BUILD.gn:55
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -1362,7 +1362,7 @@ Enabling this takes precedence over `use_goma`.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:5
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
@@ -1370,7 +1370,7 @@ From //build/toolchain/rbe.gni:91
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:5
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
@@ -2705,7 +2705,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2740,7 +2740,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3694,7 +3694,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3840,7 +3840,7 @@ is produced by the build.
 
 **Current value for `target_cpu = "arm64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -3848,7 +3848,7 @@ From //BUILD.gn:78
 
 **Current value for `target_cpu = "x64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -4145,7 +4145,7 @@ Debug build.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:6
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `true`
 
@@ -4153,7 +4153,7 @@ From //build/config/BUILDCONFIG.gn:24
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:6
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `true`
 
@@ -7091,6 +7091,28 @@ From //build/security.gni:39
 
 From //third_party/pigweed/src/pw_build/defaults.gni:27
 
+### repository_publish_blob_copy_mode
+
+Controls which mode to use when copying blobs into the repository.
+Supported modes are:
+
+* `copy`: copy the blob if the blob does not already exist in the
+  repository. This will use copy-on-write to efficiently copy the blob on
+  file systems that support it.
+
+* `copy-overwrite`: always copy the blob, overwriting any blob that
+  exists in the blob repository. This will use copy-on-write to efficiently
+  copy the blob on file systems that support it.
+
+* `hard-link`: hard link the blob into the repository, or copy if we cannot
+  create a hard link between the blob and the blob repository. Note that it
+  is possible to modify the blob through the hard link, which would result
+  in the blob not matching the blob's merkle.
+
+**Current value (from the default):** `"copy"`
+
+From //src/sys/pkg/bin/package-tool/package-tool.gni:184
+
 ### restat_cc
 
 Set to true to make C++ compiles preserve timestamps of unchanged outputs.
@@ -7193,7 +7215,7 @@ Set to true to enable distributed compilation of Rust using RBE.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:7
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `false`
 
@@ -7201,7 +7223,7 @@ From //build/toolchain/rbe.gni:39
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:7
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `false`
 
@@ -7665,13 +7687,13 @@ From //src/proc/bin/starnix/BUILD.gn:14
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `""`
 
@@ -7868,7 +7890,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7970,7 +7992,7 @@ include those labels in this variable.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
@@ -7978,7 +8000,7 @@ From //BUILD.gn:64
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
@@ -8163,7 +8185,7 @@ This has lower precedence than `use_reclient_cxx` in
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
@@ -8171,7 +8193,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
@@ -8225,7 +8247,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
