@@ -11,7 +11,7 @@ use {
     std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         directory_benchmarks::{
-            DirectoryTreeStructure, OpenDeeplyNestedFile, OpenFile, StatPath,
+            DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
             WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
         },
         io_benchmarks::{
@@ -93,6 +93,7 @@ fn build_benchmark_set() -> BenchmarkSet {
     };
     benchmark_set.add_benchmark(WalkDirectoryTreeCold::new(dts, 20), &filesystems);
     benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), &filesystems);
+    benchmark_set.add_benchmark(GitStatus::new(), &filesystems);
 
     benchmark_set
 }

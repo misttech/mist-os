@@ -38,6 +38,13 @@ internally traverse directories.
 ### StatPath Benchmark
 The `StatPath` benchmark measure how long it takes to call `stat` on a path to a file.
 
+### GitStatus Benchmark
+The `GitStatus` benchmark mimics the filesystem usage pattern of running `git status`. The benchmark
+contains 2 phases:
+* Phase 1: Calling `fstatat` on all of the files in the index to see if any of them have changed.
+  All of the `fstatat` calls happen relative to the top level directory.
+* Phase 2: Walking the directory tree in a recursive DFS order to see if any new files were added.
+
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
 Simply closing all handles to those files doesn't guarantee that the filesystem will immediately

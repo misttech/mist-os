@@ -8,7 +8,8 @@ use {
     storage_benchmarks::{
         block_device::PanickingBlockDeviceFactory,
         directory_benchmarks::{
-            DirectoryTreeStructure, OpenDeeplyNestedFile, OpenFile, StatPath, WalkDirectoryTreeWarm,
+            DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
+            WalkDirectoryTreeWarm,
         },
         filesystem::MountedFilesystem,
         io_benchmarks::{
@@ -62,6 +63,7 @@ fn build_benchmark_set(dir: PathBuf) -> BenchmarkSet {
         max_depth: 5,
     };
     benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), &filesystems);
+    benchmark_set.add_benchmark(GitStatus::new(), &filesystems);
 
     benchmark_set
 }

@@ -1,3 +1,7 @@
+fuchsia.storage: GitStatus/f2fs
+fuchsia.storage: GitStatus/fxfs
+fuchsia.storage: GitStatus/memfs
+fuchsia.storage: GitStatus/minfs
 fuchsia.storage: OpenDeeplyNestedFile/f2fs
 fuchsia.storage: OpenDeeplyNestedFile/fxfs
 fuchsia.storage: OpenDeeplyNestedFile/memfs

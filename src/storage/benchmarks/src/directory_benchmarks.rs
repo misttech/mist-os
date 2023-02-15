@@ -9,8 +9,9 @@ use {
         collections::VecDeque,
         ffi::{CStr, CString},
         mem::MaybeUninit,
+        ops::Range,
         os::{fd::RawFd, unix::ffi::OsStringExt},
-        path::PathBuf,
+        path::{Path, PathBuf},
         vec::Vec,
     },
 };
@@ -57,6 +58,27 @@ impl DirectoryTreeStructure {
                 std::fs::create_dir(&path).unwrap();
                 pending.push_back(DirInfo { path, depth: dir.depth + 1 });
             }
+        }
+    }
+
+    /// Generates a list of paths that would be created by `create_directory_tree`.
+    fn enumerate_paths(&self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        self.enumerate_paths_impl(Path::new(""), &mut paths);
+        paths
+    }
+
+    fn enumerate_paths_impl(&self, base: &Path, paths: &mut Vec<PathBuf>) {
+        for i in 0..self.files_per_directory {
+            paths.push(base.join(file_name(i)));
+        }
+        if self.max_depth == 0 {
+            return;
+        }
+        for i in 0..self.directories_per_directory {
+            let path = base.join(dir_name(i));
+            paths.push(path.clone());
+            Self { max_depth: self.max_depth - 1, ..*self }.enumerate_paths_impl(&path, paths);
         }
     }
 }
@@ -161,6 +183,7 @@ fn walk_directory_tree(root: PathBuf, max_pending: usize) {
     pending.reserve(max_pending);
     pending.push_back(root);
     while let Some(dir) = pending.pop_front() {
+        trace_duration!("benchmark", "read_dir");
         for entry in std::fs::read_dir(&dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
@@ -316,6 +339,88 @@ impl Benchmark for OpenDeeplyNestedFile {
     }
 }
 
+/// A benchmark that mimics the filesystem usage pattern of `git status`.
+#[derive(Clone)]
+pub struct GitStatus {
+    dts: DirectoryTreeStructure,
+    iterations: u64,
+
+    /// The number of threads to use when stat'ing all of the files.
+    stat_threads: usize,
+}
+
+impl GitStatus {
+    pub fn new() -> Self {
+        // This will create 254 directories and 1020 files. A depth of 13 would create 16382
+        // directories and 65532 files which is close to the size of fuchsia.git.
+        let dts = DirectoryTreeStructure {
+            files_per_directory: 4,
+            directories_per_directory: 2,
+            max_depth: 7,
+        };
+
+        // Git uses many threads when stat'ing large repositories but using multiple threads in the
+        // benchmarks significantly increases the performance variation between runs.
+        Self { dts, iterations: 5, stat_threads: 1 }
+    }
+
+    /// Stat all of the paths in `paths`. This mimics git checking to see if any of the files in its
+    /// index have been modified.
+    fn stat_paths(&self, root: &OpenFd, paths: &Vec<CString>) {
+        trace_duration!("benchmark", "GitStatus::stat_paths");
+        std::thread::scope(|scope| {
+            for thread in 0..self.stat_threads {
+                scope.spawn(move || {
+                    let paths = &paths;
+                    for path in batch_range(paths.len(), self.stat_threads, thread) {
+                        trace_duration!("benchmark", "stat");
+                        stat_path_at(root, &paths[path]).unwrap();
+                    }
+                });
+            }
+        });
+    }
+
+    /// Performs a recursive depth first traversal of the directory tree.
+    fn walk_repo(&self, dir: &Path) {
+        trace_duration!("benchmark", "GitStatus::walk_repo");
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                self.walk_repo(&entry.path());
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl Benchmark for GitStatus {
+    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+        let root = &fs.benchmark_dir().to_path_buf();
+
+        self.dts.create_directory_tree(root.clone());
+        let paths = self.dts.enumerate_paths().into_iter().map(path_buf_to_c_string).collect();
+
+        let root_fd =
+            open_path(&path_buf_to_c_string(root.clone()), libc::O_DIRECTORY | libc::O_RDONLY)
+                .unwrap();
+
+        let mut durations = Vec::new();
+        for i in 0..self.iterations {
+            trace_duration!("benchmark", "GitStatus", "iteration" => i);
+            let timer = OperationTimer::start();
+            self.stat_paths(&root_fd, &paths);
+            self.walk_repo(&root);
+            durations.push(timer.stop());
+        }
+        durations
+    }
+
+    fn name(&self) -> String {
+        "GitStatus".to_owned()
+    }
+}
+
 pub fn file_name(n: u64) -> PathBuf {
     format!("file-{:03}.txt", n).into()
 }
@@ -342,6 +447,15 @@ pub fn stat_path_at(dir: &OpenFd, path: &CStr) -> Result<libc::stat, std::io::Er
             Err(std::io::Error::last_os_error())
         }
     }
+}
+
+/// Splits a collection of items into batches and returns the range of items that `batch_num`
+/// contains.
+fn batch_range(item_count: usize, batch_count: usize, batch_num: usize) -> Range<usize> {
+    let items_per_batch = (item_count + (batch_count - 1)) / batch_count;
+    let start = items_per_batch * batch_num;
+    let end = std::cmp::min(item_count, start + items_per_batch);
+    start..end
 }
 
 pub struct OpenFd(RawFd);
@@ -453,6 +567,49 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn enumerate_paths_test() {
+        let dts = DirectoryTreeStructure {
+            files_per_directory: 2,
+            directories_per_directory: 2,
+            max_depth: 0,
+        };
+        let paths = dts.enumerate_paths();
+        assert_eq!(paths, vec![PathBuf::from("file-000.txt"), PathBuf::from("file-001.txt")],);
+
+        let dts = DirectoryTreeStructure {
+            files_per_directory: 2,
+            directories_per_directory: 2,
+            max_depth: 1,
+        };
+        let paths = dts.enumerate_paths();
+        assert_eq!(
+            paths,
+            vec![
+                PathBuf::from("file-000.txt"),
+                PathBuf::from("file-001.txt"),
+                PathBuf::from("dir-000"),
+                PathBuf::from("dir-000/file-000.txt"),
+                PathBuf::from("dir-000/file-001.txt"),
+                PathBuf::from("dir-001"),
+                PathBuf::from("dir-001/file-000.txt"),
+                PathBuf::from("dir-001/file-001.txt"),
+            ],
+        );
+    }
+
+    #[fuchsia::test]
+    fn batch_range_test() {
+        assert_eq!(batch_range(10, 1, 0), 0..10);
+
+        assert_eq!(batch_range(10, 3, 0), 0..4);
+        assert_eq!(batch_range(10, 3, 1), 4..8);
+        assert_eq!(batch_range(10, 3, 2), 8..10);
+
+        assert_eq!(batch_range(10, 4, 3), 9..10);
+        assert_eq!(batch_range(12, 4, 3), 9..12);
+    }
+
+    #[fuchsia::test]
     async fn walk_directory_tree_cold_test() {
         let mut test_fs = Box::new(TestFilesystem::new());
         let dts = DirectoryTreeStructure {
@@ -508,6 +665,22 @@ mod tests {
         let benchmark = OpenDeeplyNestedFile { file_count: 5, depth: 3 };
         let results = benchmark.run(test_fs.as_mut()).await;
         assert_eq!(results.len(), 5);
+        assert_eq!(test_fs.clear_cache_count().await, 0);
+        test_fs.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn git_status_test() {
+        let mut test_fs = Box::new(TestFilesystem::new());
+        let dts = DirectoryTreeStructure {
+            files_per_directory: 2,
+            directories_per_directory: 2,
+            max_depth: 2,
+        };
+        let benchmark = GitStatus { dts, iterations: ITERATION_COUNT, stat_threads: 1 };
+        let results = benchmark.run(test_fs.as_mut()).await;
+
+        assert_eq!(results.len(), ITERATION_COUNT as usize);
         assert_eq!(test_fs.clear_cache_count().await, 0);
         test_fs.shutdown().await;
     }
