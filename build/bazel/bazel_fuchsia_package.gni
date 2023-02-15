@@ -30,6 +30,11 @@ import("//build/packages/prebuilt_package.gni")
 #     For instance: `bazel_fuchsia_package("foo") {}` in `//bar/BUILD.gn`
 #     will wrap the target `//bar:foo` defined in `//bar/BUILD.bazel`.
 #
+#   bazel_inputs: (optional)
+#     List of GN labels to bazel_input_xxx() targets required by the
+#     bazel_target.
+#     Type: list of strings (GN labels)
+#
 #   package_name: (optional)
 #     The `package_name` of the wrapped `fuchsia_test_package`.
 #     Default: target_name
@@ -62,6 +67,7 @@ template("bazel_fuchsia_package") {
   bazel_action(bazel_build_target) {
     forward_variables_from(invoker,
                            [
+                             "bazel_inputs",
                              "deps",
                              "metadata",
                              "testonly",

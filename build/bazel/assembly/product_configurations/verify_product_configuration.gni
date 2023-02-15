@@ -26,6 +26,11 @@ import("//build/bazel/bazel_workspace.gni")
 #    The Bazel target generating the product config used in comparison.
 #    Type: string (Bazel label)
 #
+#  bazel_inputs (optional)
+#    List of GN labels to bazel_input_xxx() targets required by
+#    bazel_product_config_target.
+#    Type: list of strings (GN labels).
+#
 #  config_data_to_ignore (optional)
 #    List of config_data to ignore in the comparison. Each entry
 #    should be of the following form: "[package_name]:[destination path]".
@@ -42,9 +47,17 @@ template("verify_product_configuration") {
 
   _bazel_product_config_target = "${target_name}.bazel_product_config"
   _bazel_product_config_file = "${target_name}/bazel_product_config.json"
+
+  _bazel_product_config_out_dir =
+      rebase_path(get_label_info(invoker.bazel_product_config_target, "dir"),
+                  "//")
+  _bazel_product_config_name =
+      get_label_info(invoker.bazel_product_config_target, "name")
+
   bazel_action(_bazel_product_config_target) {
     forward_variables_from(invoker,
                            [
+                             "bazel_inputs",
                              "deps",
                              "testonly",
                            ])
@@ -52,11 +65,6 @@ template("verify_product_configuration") {
     command = "build"
     bazel_targets = [ invoker.bazel_product_config_target ]
 
-    _bazel_product_config_out_dir =
-        rebase_path(get_label_info(invoker.bazel_product_config_target, "dir"),
-                    "//")
-    _bazel_product_config_name =
-        get_label_info(invoker.bazel_product_config_target, "name")
     bazel_outputs = [ "bazel-bin/${_bazel_product_config_out_dir}/${_bazel_product_config_name}_product_config.json" ]
     ninja_outputs = [ _bazel_product_config_file ]
   }

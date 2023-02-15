@@ -5,10 +5,14 @@
 import(
     "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
 
+# NOTE: None of the product_configurations:<name> bazel targets need
+# any bazel_inputs labels.
+
 verify_product_configuration("verify_minimal_product_configuration") {
   gn_product_config_target = "//products/minimal"
   bazel_product_config_target =
       "//build/bazel/assembly/product_configurations:minimal"
+  bazel_inputs = []
 }
 
 verify_product_configuration("verify_core_product_configuration") {
@@ -16,12 +20,14 @@ verify_product_configuration("verify_core_product_configuration") {
   gn_product_config_target = "//products/core"
   bazel_product_config_target =
       "//build/bazel/assembly/product_configurations:core"
+  bazel_inputs = []
 }
 
 verify_product_configuration("verify_workstation_eng_product_configuration") {
   gn_product_config_target = "//products/workstation"
   bazel_product_config_target =
       "//build/bazel/assembly/product_configurations:workstation_eng"
+  bazel_inputs = []
 }
 
 group("verifications") {

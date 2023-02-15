@@ -4,13 +4,30 @@
 
 import(
     "//build/bazel/assembly/images_configurations/verify_images_configuration.gni")
+import("//build/product.gni")
 
-verify_images_configuration("verify_fuchsia_images_configuration") {
-  gn_images_config_target = "//boards/images:x64"
+if (use_bringup_assembly) {
+  _gn_image_name = "default"
+  _bazel_image_target_name = "bringup"
+  _bazel_image_name = "bringup"
+} else {
+  _gn_image_name = "x64"
+  _bazel_image_target_name = "fuchsia_x64"
+  _bazel_image_name = "fuchsia"
+}
+
+verify_images_configuration("verify_images_configuration") {
+  gn_images_config_target = "//boards/images:${_gn_image_name}"
   bazel_images_config_target =
-      "//build/bazel/assembly/images_configurations:fuchsia_x64"
+      "//build/bazel/assembly/images_configurations:${_bazel_image_target_name}"
+
+  bazel_inputs = [ "//build/images/${_bazel_image_name}:${_bazel_image_name}.bazel_images_config_inputs" ]
+
+  # Required since ${_bazel_image_name}.bazel_images_config_inputs is testonly.
+  testonly = true
 }
 
 group("verifications") {
-  deps = [ ":verify_fuchsia_images_configuration" ]
+  testonly = true
+  deps = [ ":verify_images_configuration" ]
 }

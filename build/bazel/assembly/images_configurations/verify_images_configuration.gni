@@ -28,6 +28,11 @@ import("//build/bazel/bazel_workspace.gni")
 #    This should defined by a Bazel `fuchsia_images_configuration` rule.
 #    Type: string (Bazel label)
 #
+#  bazel_inputs (optional)
+#    List of GN labels to bazel_input_xxx() targets required by
+#    bazel_images_config_target.
+#    Type: list of strings (GN labels)
+#
 #  deps
 #  testonly
 #  visibility
@@ -40,9 +45,17 @@ template("verify_images_configuration") {
 
   _bazel_images_config_target = "${target_name}.bazel_images_config"
   _bazel_images_config_file = "${target_name}/bazel_images_config.json"
+
+  _bazel_images_config_out_dir =
+      rebase_path(get_label_info(invoker.bazel_images_config_target, "dir"),
+                  "//")
+  _bazel_images_config_name =
+      get_label_info(invoker.bazel_images_config_target, "name")
+
   bazel_action(_bazel_images_config_target) {
     forward_variables_from(invoker,
                            [
+                             "bazel_inputs",
                              "deps",
                              "testonly",
                            ])
@@ -50,11 +63,6 @@ template("verify_images_configuration") {
     command = "build"
     bazel_targets = [ invoker.bazel_images_config_target ]
 
-    _bazel_images_config_out_dir =
-        rebase_path(get_label_info(invoker.bazel_images_config_target, "dir"),
-                    "//")
-    _bazel_images_config_name =
-        get_label_info(invoker.bazel_images_config_target, "name")
     bazel_outputs = [ "bazel-bin/${_bazel_images_config_out_dir}/${_bazel_images_config_name}.json" ]
     ninja_outputs = [ _bazel_images_config_file ]
   }
