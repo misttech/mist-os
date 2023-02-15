@@ -229,8 +229,7 @@ where
     D: Diagnostics,
     N: Future<Output = Result<(), Error>> + Send,
 {
-    // TODO(fxb/113956): Change following line to `config.use_pull_api`.
-    if false {
+    if config.use_pull_api {
         let mut fs = ServiceFs::new();
         inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
