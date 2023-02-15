@@ -60,9 +60,7 @@ class Display : public DisplayType,
     return ZX_ERR_NOT_SUPPORTED;
   }
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                          zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }

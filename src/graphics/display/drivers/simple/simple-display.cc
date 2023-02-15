@@ -88,6 +88,20 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
 }
 
+zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
+    uint64_t collection_id, zx::channel collection_token) {
+  // Tell sysmem we're withdrawing from the negotiation, so it doesn't assume we
+  // crashed and won't cause other shared token to fail.
+  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+                                           std::move(collection_token)))
+                            ->Close();
+  if (!status.ok()) {
+    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
+           status.status_string());
+  }
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image,
                                                             zx_unowned_handle_t handle,
                                                             uint32_t index) {

@@ -127,6 +127,21 @@ zx_status_t AmlogicDisplay::DisplayInit() {
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
+    uint64_t collection_id, zx::channel collection_token) {
+  // Tell sysmem we're withdrawing from the negotiation, so it doesn't assume we
+  // crashed and won't cause other shared token to fail.
+  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+                                           std::move(collection_token)))
+                            ->Close();
+  if (!status.ok()) {
+    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
+           status.status_string());
+  }
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock lock(&display_lock_);

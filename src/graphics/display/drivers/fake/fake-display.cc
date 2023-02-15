@@ -102,6 +102,20 @@ static bool IsAcceptableImageType(uint32_t image_type) {
 static bool IsAcceptablePixelFormat(zx_pixel_format_t pixel_format) { return true; }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
+                                                                     zx::channel collection_token) {
+  // Close the BufferCollectionToken before discarding it.
+  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+                                           std::move(collection_token)))
+                            ->Close();
+  if (!status.ok()) {
+    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
+           status.status_string());
+  }
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
                                                           zx_unowned_handle_t handle,
                                                           uint32_t index) {

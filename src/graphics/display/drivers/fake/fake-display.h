@@ -57,9 +57,7 @@ class FakeDisplay : public DeviceType,
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                          zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }
