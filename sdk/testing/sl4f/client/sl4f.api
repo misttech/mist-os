@@ -4932,6 +4932,14 @@
               "name": "filename",
               "type": "VariableDeclarationImpl",
               "varType": "String"
+            },
+            "optionalMetrics": {
+              "isConst": false,
+              "isFinal": true,
+              "isLate": false,
+              "name": "optionalMetrics",
+              "type": "VariableDeclarationImpl",
+              "varType": "Set<String>"
             }
           },
           "name": "MetricsAllowlist",

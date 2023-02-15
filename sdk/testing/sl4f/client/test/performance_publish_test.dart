@@ -236,6 +236,7 @@ void main(List<String> args) {
     final allowlist = MetricsAllowlist(file);
     expect(allowlist.expectedMetrics,
         unorderedEquals(['fuchsia.suite1: foo', 'fuchsia.suite1: bar']));
+    expect(allowlist.optionalMetrics, Set());
 
     allowlist.check(Set.from(['fuchsia.suite1: foo', 'fuchsia.suite1: bar']));
 
@@ -254,6 +255,50 @@ void main(List<String> args) {
     expect(
         () => allowlist
             .check(Set.from(['fuchsia.suite1: foo', 'fuchsia.suite1: new'])),
+        throwsA(TypeMatcher<ArgumentError>()
+            .having((e) => e.toString(), 'exception text', expectedError)));
+  });
+
+  test('MetricsAllowlist class: optional metrics', () {
+    final File file = File(path.join(createTempDir().path, 'suite1'));
+    file.writeAsStringSync('# Comment line\n\n'
+        'fuchsia.suite1: foo\n'
+        'fuchsia.suite1: bar\n'
+        'fuchsia.suite1: opt1 [optional]\n'
+        'fuchsia.suite1: opt2 [optional]\n');
+    final allowlist = MetricsAllowlist(file);
+    expect(allowlist.expectedMetrics,
+        unorderedEquals(['fuchsia.suite1: foo', 'fuchsia.suite1: bar']));
+    expect(allowlist.optionalMetrics,
+        unorderedEquals(['fuchsia.suite1: opt1', 'fuchsia.suite1: opt2']));
+
+    allowlist.check(Set.from(['fuchsia.suite1: foo', 'fuchsia.suite1: bar']));
+    allowlist.check(Set.from([
+      'fuchsia.suite1: foo',
+      'fuchsia.suite1: bar',
+      'fuchsia.suite1: opt1'
+    ]));
+
+    final String expectedError =
+        'Invalid argument(s): Metric names produced by the test differ from'
+        ' the expectations in ${file.path}:\n'
+        '-fuchsia.suite1: bar\n'
+        ' fuchsia.suite1: foo\n'
+        '+fuchsia.suite1: new\n'
+        ' fuchsia.suite1: opt1 [optional]\n'
+        ' fuchsia.suite1: opt2 [optional]\n'
+        '\n'
+        'One way to update the expectation file is to run the test locally'
+        ' with this environment variable set:\n'
+        'FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR='
+        '\$(pwd)/src/tests/end_to_end/perf/expected_metric_names\n\n'
+        'See https://fuchsia.dev/fuchsia-src/development/performance/metric_name_expectations';
+    expect(
+        () => allowlist.check(Set.from([
+              'fuchsia.suite1: foo',
+              'fuchsia.suite1: new',
+              'fuchsia.suite1: opt2'
+            ])),
         throwsA(TypeMatcher<ArgumentError>()
             .having((e) => e.toString(), 'exception text', expectedError)));
   });

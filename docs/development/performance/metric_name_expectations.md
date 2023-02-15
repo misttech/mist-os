@@ -57,7 +57,8 @@ FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR=$(pwd)/src/tests/end_to_end/perf/expected
 
 When this environment variable is set, the test will write an updated
 expectation file into the directory specified by the environment
-variable.
+variable.  Note that this will not preserve optional metric names in
+the expectation file.
 
 When this environment variable is not set, the test will report an
 error if the metrics produced by the test don't match those listed in
@@ -80,3 +81,15 @@ file for it by doing the following, in order:
 
 It is possible to add the file to the `BUILD.gn` file first, but the
 GN build will fail if the file does not exist.
+
+## Optional metrics
+
+The expectation files may contain entries with the suffix
+"[optional]".  These metrics are allowed to be absent in the test's
+output.  This allows metrics to be architecture-specific or
+machine-specific.  These metrics should be commented to say why they
+are optional.  (Comment lines start with "#".)
+
+This also allows for metrics to be non-determistic in whether they are
+produced or not.  However, having a non-deterministic metric will
+usually be considered a bug that should be fixed.

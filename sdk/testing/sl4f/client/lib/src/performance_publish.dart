@@ -195,21 +195,53 @@ class PerformancePublish {
 class MetricsAllowlist {
   final String filename;
   final Set<String> expectedMetrics;
+  final Set<String> optionalMetrics;
 
   MetricsAllowlist(File file)
       : filename = file.path,
-        expectedMetrics = <String>{} {
+        expectedMetrics = <String>{},
+        optionalMetrics = <String>{} {
     final String data = file.readAsStringSync();
     for (String line in LineSplitter.split(data)) {
       // Skip comment lines and empty lines.
       if (line.trim().startsWith('#') || line.trim() == '') continue;
-      expectedMetrics.add(line);
+      const optionalSuffix = ' [optional]';
+      if (line.endsWith(optionalSuffix)) {
+        optionalMetrics
+            .add(line.substring(0, line.length - optionalSuffix.length));
+      } else {
+        expectedMetrics.add(line);
+      }
     }
   }
 
   void check(Set<String> actualMetrics) {
-    if (!SetEquality().equals(expectedMetrics, actualMetrics)) {
-      final String diff = _formatSetDiff(expectedMetrics, actualMetrics);
+    final actualMinusOptional = actualMetrics.difference(optionalMetrics);
+
+    if (!SetEquality().equals(expectedMetrics, actualMinusOptional)) {
+      // Build a diff listing all the metric names.
+      List<String> union =
+          List.from(actualMetrics.union(expectedMetrics).union(optionalMetrics))
+            ..sort();
+      final List<String> lines = [];
+      for (final String entry in union) {
+        String prefix = ' ';
+        String suffix = '';
+        if (optionalMetrics.contains(entry)) {
+          suffix = ' [optional]';
+        } else {
+          if (actualMetrics.contains(entry)) {
+            if (!expectedMetrics.contains(entry)) {
+              prefix = '+';
+            }
+          } else {
+            prefix = '-';
+          }
+        }
+        lines.add(prefix + entry + suffix);
+      }
+      final String diff = lines.join('\n');
+
       throw ArgumentError(
           'Metric names produced by the test differ from the expectations in'
           ' $filename:\n$diff\n\n'
@@ -220,15 +252,4 @@ class MetricsAllowlist {
           'See https://fuchsia.dev/fuchsia-src/development/performance/metric_name_expectations');
     }
   }
-}
-
-String _formatSetDiff(Set<String> set1, Set<String> set2) {
-  List<String> union = List.from(set1.union(set2))..sort();
-  final List<String> lines = [];
-  for (final String entry in union) {
-    final String tag =
-        set2.contains(entry) ? (set1.contains(entry) ? ' ' : '+') : '-';
-    lines.add(tag + entry);
-  }
-  return lines.join('\n');
 }
