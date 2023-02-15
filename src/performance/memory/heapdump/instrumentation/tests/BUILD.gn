@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+executable("stats") {
+  testonly = true
+  sources = [ "stats_test.cc" ]
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//src/performance/memory/heapdump/instrumentation",
+  ]
+}
+
+fuchsia_unittest_component("stats-test") {
+  deps = [ ":stats" ]
+}
+
+fuchsia_test_package("tests") {
+  package_name = "heapdump-instrumentation-tests"
+  test_components = [ ":stats-test" ]
+}

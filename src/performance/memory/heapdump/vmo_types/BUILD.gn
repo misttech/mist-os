@@ -1,0 +1,32 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+import("//build/test.gni")
+
+rustc_library("vmo_types") {
+  edition = "2021"
+  with_unit_tests = true
+
+  sources = [
+    "src/allocations_table_v1.rs",
+    "src/lib.rs",
+    "src/memory_mapped_vmo.rs",
+  ]
+
+  deps = [
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:thiserror",
+  ]
+
+  test_deps = [ "//third_party/rust_crates:assert_matches" ]
+}
+
+fuchsia_unittest_package("tests") {
+  package_name = "heapdump-vmo-types-tests"
+  deps = [ ":vmo_types_test" ]
+}

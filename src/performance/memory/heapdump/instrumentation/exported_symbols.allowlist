@@ -1,0 +1,3 @@
+__scudo_allocate_hook
+__scudo_deallocate_hook
+heapdump_get_stats
