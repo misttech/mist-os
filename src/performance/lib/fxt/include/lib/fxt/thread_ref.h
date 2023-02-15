@@ -37,34 +37,39 @@ class ThreadRef<RefType::kInline> {
 
  public:
   template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kInline> = true>
-  ThreadRef(const T& value) : ThreadRef{kConvert, value} {}
+  constexpr ThreadRef(const T& value) : ThreadRef{kConvert, value} {}
 
-  ThreadRef(zx_koid_t process, zx_koid_t thread) : process_(Koid(process)), thread_(Koid(thread)) {}
+  constexpr ThreadRef(zx_koid_t process, zx_koid_t thread)
+      : process_(Koid(process)), thread_(Koid(thread)) {}
 
-  ThreadRef(Koid process, Koid thread) : process_(process), thread_(thread) {}
+  constexpr ThreadRef(Koid process, Koid thread) : process_(process), thread_(thread) {}
 
-  ThreadRef(const ThreadRef&) = default;
-  ThreadRef& operator=(const ThreadRef&) = default;
+  constexpr ThreadRef(const ThreadRef&) = default;
+  constexpr ThreadRef& operator=(const ThreadRef&) = default;
 
-  static WordSize PayloadSize() { return WordSize(2); }
-  static uint64_t HeaderEntry() { return 0; }
+  constexpr WordSize PayloadSize() const { return WordSize(2); }
+  constexpr uint64_t HeaderEntry() const { return 0; }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(process_.koid);
     res.WriteWord(thread_.koid);
   }
 
+  constexpr Koid process() const { return process_; }
+  constexpr Koid thread() const { return thread_; }
+
  private:
-  ThreadRef(Convert, const ThreadRef& value) : process_{value.process_}, thread_{value.thread_} {}
+  constexpr ThreadRef(Convert, const ThreadRef& value)
+      : process_{value.process_}, thread_{value.thread_} {}
 
   Koid process_;
   Koid thread_;
 };
 #if __cplusplus >= 201703L
-ThreadRef(zx_koid_t, zx_koid_t)->ThreadRef<RefType::kInline>;
+ThreadRef(zx_koid_t, zx_koid_t) -> ThreadRef<RefType::kInline>;
 
-ThreadRef(Koid, Koid)->ThreadRef<RefType::kInline>;
+ThreadRef(Koid, Koid) -> ThreadRef<RefType::kInline>;
 
 template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kInline> = true>
 ThreadRef(const T&) -> ThreadRef<RefType::kInline>;
@@ -76,26 +81,28 @@ class ThreadRef<RefType::kId> {
 
  public:
   template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kId> = true>
-  ThreadRef(const T& value) : ThreadRef{kConvert, value} {}
+  constexpr ThreadRef(const T& value) : ThreadRef{kConvert, value} {}
 
-  explicit ThreadRef(uint8_t id) : id_(id) {}
+  explicit constexpr ThreadRef(uint8_t id) : id_(id) {}
 
-  ThreadRef(const ThreadRef&) = default;
-  ThreadRef& operator=(const ThreadRef&) = default;
+  constexpr ThreadRef(const ThreadRef&) = default;
+  constexpr ThreadRef& operator=(const ThreadRef&) = default;
 
-  static WordSize PayloadSize() { return WordSize(0); }
-  uint64_t HeaderEntry() const { return id_; }
+  constexpr WordSize PayloadSize() const { return WordSize(0); }
+  constexpr uint64_t HeaderEntry() const { return id_; }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {}
+  constexpr void Write(Reservation& res) const {}
+
+  constexpr uint8_t id() const { return id_; }
 
  private:
-  ThreadRef(Convert, const ThreadRef& value) : id_{value.id_} {}
+  constexpr ThreadRef(Convert, const ThreadRef& value) : id_{value.id_} {}
 
   uint8_t id_;
 };
 #if __cplusplus >= 201703L
-ThreadRef(uint8_t)->ThreadRef<RefType::kId>;
+ThreadRef(uint8_t) -> ThreadRef<RefType::kId>;
 
 template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kId> = true>
 ThreadRef(const T&) -> ThreadRef<RefType::kId>;
