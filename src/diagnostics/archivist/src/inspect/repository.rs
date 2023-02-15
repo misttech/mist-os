@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    error::Error,
     events::{
         router::EventConsumer,
         types::{DiagnosticsReadyPayload, Event, EventPayload, Moniker},
     },
     identity::ComponentIdentity,
-    inspect::container::{InspectArtifactsContainer, UnpopulatedInspectDataContainer},
+    inspect::container::{
+        InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
+    },
     pipeline::Pipeline,
     trie,
 };
@@ -17,10 +18,9 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
-use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
 use fuchsia_async as fasync;
-use fuchsia_fs;
+use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use std::{
@@ -46,7 +46,7 @@ impl InspectRepository {
         Self {
             pipelines,
             inner: RwLock::new(InspectRepositoryInner {
-                diagnostics_directories: trie::Trie::new(),
+                diagnostics_containers: trie::Trie::new(),
                 diagnostics_dir_closed_snd: snd,
                 _diagnostics_dir_closed_drain: fasync::Task::spawn(async move {
                     rcv.for_each_concurrent(None, |rx| async move { rx.await }).await
@@ -65,31 +65,36 @@ impl InspectRepository {
             .read()
             .await
             .fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
+            .await
     }
 
     async fn add_inspect_artifacts(
         self: &Arc<Self>,
         identity: Arc<ComponentIdentity>,
-        directory_proxy: fio::DirectoryProxy,
-    ) -> Result<(), Error> {
+        proxy_handle: impl Into<InspectHandle>,
+    ) {
         let mut guard = self.inner.write().await;
 
         if let Some(on_closed_fut) =
-            guard.insert_inspect_artifact_container(Arc::clone(&identity), directory_proxy).await?
+            guard.insert_inspect_artifact_container(Arc::clone(&identity), proxy_handle)
         {
             let this_weak = Arc::downgrade(self);
             guard
                 .diagnostics_dir_closed_snd
                 .send(fasync::Task::spawn(async move {
-                    if (on_closed_fut.await).is_ok() {
+                    if let Ok(koid_to_remove) = on_closed_fut.await {
                         match this_weak.upgrade() {
                             None => {}
                             Some(this) => {
-                                this.inner
-                                    .write()
-                                    .await
-                                    .diagnostics_directories
-                                    .remove(&identity.unique_key());
+                                let guard = &mut this.inner.write().await.diagnostics_containers;
+
+                                if let Some((_, container)) = guard.get(&identity.unique_key()) {
+                                    if container.remove_handle(koid_to_remove).await != 0 {
+                                        return;
+                                    }
+                                }
+
+                                guard.remove(&identity.unique_key());
 
                                 for pipeline_weak in &this.pipelines {
                                     if let Some(pipeline) = pipeline_weak.upgrade() {
@@ -103,20 +108,17 @@ impl InspectRepository {
                 .await
                 .unwrap(); // this can't fail unless `self` has been destroyed.
         }
-        Ok(())
     }
 
     async fn handle_diagnostics_ready(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
-        directory: Option<fio::DirectoryProxy>,
+        handle: Option<impl Into<InspectHandle>>,
     ) {
         debug!(identity = %component, "Diagnostics directory is ready.");
-        if let Some(directory) = directory {
+        if let Some(handle) = handle {
             // Update the central repository to reference the new diagnostics source.
-            self.add_inspect_artifacts(Arc::clone(&component), directory).await.unwrap_or_else(|err| {
-                warn!(identity = %component, ?err, "Failed to add inspect artifacts to repository");
-            });
+            self.add_inspect_artifacts(Arc::clone(&component), handle).await;
 
             // Let each pipeline know that a new component arrived, and allow the pipeline
             // to eagerly bucket static selectors based on that component's moniker.
@@ -137,7 +139,7 @@ impl InspectRepository {
 
     #[cfg(test)]
     pub(crate) async fn terminate_inspect(&self, identity: &ComponentIdentity) {
-        self.inner.write().await.diagnostics_directories.remove(&identity.unique_key());
+        self.inner.write().await.diagnostics_containers.remove(&identity.unique_key());
     }
 }
 
@@ -158,8 +160,7 @@ struct InspectRepositoryInner {
     // Once we don't have v1 components the key would represent the moniker. For now, for
     // simplciity, we maintain the ComponentIdentity inside as that one contains the instance id
     // which would make the identity unique in v1.
-    diagnostics_directories:
-        trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)>,
+    diagnostics_containers: trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)>,
 
     /// Tasks waiting for PEER_CLOSED signals on diagnostics directories are sent here.
     diagnostics_dir_closed_snd: mpsc::UnboundedSender<fasync::Task<()>>,
@@ -170,13 +171,13 @@ struct InspectRepositoryInner {
 
 impl InspectRepositoryInner {
     // Inserts an InspectArtifactsContainer into the data repository.
-    async fn insert_inspect_artifact_container(
+    fn insert_inspect_artifact_container(
         &mut self,
         identity: Arc<ComponentIdentity>,
-        diagnostics_proxy: fio::DirectoryProxy,
-    ) -> Result<Option<oneshot::Receiver<()>>, Error> {
+        proxy_handle: impl Into<InspectHandle>,
+    ) -> Option<oneshot::Receiver<Koid>> {
         let unique_key: Vec<_> = identity.unique_key().into();
-        let diag_repo_entry_opt = self.diagnostics_directories.get(&unique_key);
+        let diag_repo_entry_opt = self.diagnostics_containers.get(&unique_key);
 
         match diag_repo_entry_opt {
             None => {
@@ -185,65 +186,62 @@ impl InspectRepositoryInner {
                 // one. If this is the case, just instantiate as though it's our first
                 // time encountering this moniker segment.
                 let (inspect_container, on_closed_fut) =
-                    InspectArtifactsContainer::new(diagnostics_proxy);
-                self.diagnostics_directories.set(unique_key, (identity, inspect_container));
-                Ok(Some(on_closed_fut))
+                    InspectArtifactsContainer::new(proxy_handle);
+                self.diagnostics_containers.set(unique_key, (identity, inspect_container));
+                Some(on_closed_fut)
             }
-            Some(_) => Ok(None),
+            Some(_) => None,
         }
     }
 
-    fn fetch_inspect_data(
+    async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
         moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
-        self.diagnostics_directories
-            .iter()
-            .filter_map(|(_, diagnostics_artifacts_container_opt)| {
-                let (identity, container) = match &diagnostics_artifacts_container_opt {
-                    Some((identity, container)) => (identity, container),
-                    None => return None,
-                };
+        let mut containers = vec![];
+        for (_, diagnostics_artifacts_container_opt) in self.diagnostics_containers.iter() {
+            let (identity, container) = match &diagnostics_artifacts_container_opt {
+                Some((identity, container)) => (identity, container),
+                None => continue,
+            };
 
-                let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
-                    Some(map) => {
-                        match map.get(&identity.relative_moniker) {
-                            Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
-                            // Return early if there were static selectors, and none were for this
-                            // moniker.
-                            None => return None,
-                        }
+            let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
+                Some(map) => {
+                    match map.get(&identity.relative_moniker) {
+                        Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
+                        // Return early if there were static selectors, and none were for this
+                        // moniker.
+                        None => continue,
                     }
-                    None => None,
-                };
-
-                // Verify that the dynamic selectors contain an entry that applies to
-                // this moniker as well.
-                if !match component_selectors {
-                    Some(component_selectors) => component_selectors.iter().any(|s| {
-                        selectors::match_component_moniker_against_selector(
-                            &identity.relative_moniker,
-                            s,
-                        )
-                        .ok()
-                        .unwrap_or(false)
-                    }),
-                    None => true,
-                } {
-                    return None;
                 }
+                None => None,
+            };
 
-                // This artifact contains inspect and matches a passed selector.
-                fuchsia_fs::directory::clone_no_describe(container.diagnostics_directory(), None)
+            // Verify that the dynamic selectors contain an entry that applies to
+            // this moniker as well.
+            if !match component_selectors {
+                Some(component_selectors) => component_selectors.iter().any(|s| {
+                    selectors::match_component_moniker_against_selector(
+                        &identity.relative_moniker,
+                        s,
+                    )
                     .ok()
-                    .map(|directory| UnpopulatedInspectDataContainer {
-                        identity: Arc::clone(identity),
-                        component_diagnostics_proxy: directory,
-                        inspect_matcher: optional_hierarchy_matcher,
-                    })
-            })
-            .collect()
+                    .unwrap_or(false)
+                }),
+                None => true,
+            } {
+                continue;
+            }
+
+            // This artifact contains inspect and matches a passed selector.
+            if let Some(unpopulated) =
+                container.create_unpopulated(identity, optional_hierarchy_matcher).await
+            {
+                containers.push(unpopulated);
+            }
+        }
+        containers
     }
 
     #[cfg(test)]
@@ -251,7 +249,7 @@ impl InspectRepositoryInner {
         &self,
         identity: &ComponentIdentity,
     ) -> Option<&(Arc<ComponentIdentity>, InspectArtifactsContainer)> {
-        self.diagnostics_directories.get(&identity.unique_key())
+        self.diagnostics_containers.get(&identity.unique_key())
     }
 }
 
@@ -259,6 +257,7 @@ impl InspectRepositoryInner {
 mod tests {
     use super::*;
     use crate::events::types::ComponentIdentifier;
+    use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::DurationNum;
     use selectors::{self, FastError};
@@ -458,21 +457,30 @@ mod tests {
             })
             .await;
 
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).len());
+        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&None, None).await.len());
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/foo.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(1, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            1,
+            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
+        );
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/f*.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(2, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            2,
+            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
+        );
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("foo.cmx:root").expect("parse selector")
         ]);
-        assert_eq!(0, data_repo.inner.read().await.fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            0,
+            data_repo.inner.read().await.fetch_inspect_data(&selectors, None).await.len()
+        );
     }
 }
