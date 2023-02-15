@@ -222,7 +222,7 @@ protocol RingBuffer {
     /// By default all channels are active.
     /// If the driver does not support deactivating channels it must return `ZX_ERR_NOT_SUPPORTED`.
     /// If the mask is incorrect, i.e. enables channels outside the number of bits
-    /// to use for a given `number_of_channels`, then the driver may return `ZX_ERR_INVALID_ARGS`.
+    /// to use for a given `number_of_channels`, then the driver must return `ZX_ERR_INVALID_ARGS`.
     /// The `set_time` value (in the CLOCK_MONOTONIC timeline) indicates when configuring
     /// the hardware to activate or deactivate channels is completed. `set_time` does not include
     /// the potential `turn_on_delay`, the driver does not delay the reply waiting for the
