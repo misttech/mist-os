@@ -389,7 +389,7 @@ void zx_device::LogError(const char* error) {
 
 bool zx_device::IsUnbound() { return flags_ & DEV_FLAG_UNBINDING; }
 
-zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
   libsync::Completion completion;
   zx_status_t status;
 

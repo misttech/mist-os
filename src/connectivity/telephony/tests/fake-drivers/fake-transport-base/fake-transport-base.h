@@ -38,8 +38,8 @@ class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
   virtual void SnoopCtrlMsg(uint8_t* snoop_data, uint32_t snoop_data_len,
                             fuchsia_telephony_snoop::wire::Direction direction) = 0;
 
-  zx_status_t FidlDispatch(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
-  zx_status_t Message(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
+  zx_status_t FidlDispatch(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
+  zx_status_t Message(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
   void Unbind();
   void Release();
 
@@ -48,7 +48,7 @@ class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
   zx_status_t SetNetworkStatusToDevice(bool connected);
   zx_status_t SetSnoopChannelToDevice(
       ::fidl::ClientEnd<fuchsia_telephony_snoop::Publisher> channel);
-  zx_status_t DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
+  zx_status_t DdkMessage(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
   zx_status_t CloseCtrlChannel();
 
   zx_status_t SetAsyncWait();

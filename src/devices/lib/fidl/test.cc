@@ -16,7 +16,7 @@ class TestInterface : public devfs_fidl::DeviceInterface {
  public:
   void LogError(const char* error) override { printf("%s\n", error); }
   bool IsUnbound() override { return false; }
-  zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override {
+  zx_status_t MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

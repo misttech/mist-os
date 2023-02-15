@@ -26,7 +26,7 @@ namespace i915 {
 
 namespace {
 
-zx_status_t backlight_message(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+zx_status_t backlight_message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
   ddk::Transaction transaction(txn);
   DisplayDevice* ptr;
   {

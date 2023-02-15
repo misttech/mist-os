@@ -58,7 +58,7 @@ struct WlantapCtl : fidl::WireServer<fuchsia_wlan_tap::WlantapCtl> {
     }
   }
 
-  static zx_status_t DdkMessage(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+  static zx_status_t DdkMessage(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
     auto self = static_cast<WlantapCtl*>(ctx);
 
     ddk::Transaction transaction(txn);

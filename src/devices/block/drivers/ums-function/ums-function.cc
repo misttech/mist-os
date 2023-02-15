@@ -610,7 +610,7 @@ static zx_protocol_device_t usb_ums_proto = {
     .unbind = usb_ums_unbind,
     .release = usb_ums_release,
     .message =
-        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
           usb_ums_t* thiz = static_cast<usb_ums_t*>(ctx);
           ddk::Transaction transaction(txn);
           fidl::WireDispatch<fuchsia_hardware_usb_peripheral_block::Device>(

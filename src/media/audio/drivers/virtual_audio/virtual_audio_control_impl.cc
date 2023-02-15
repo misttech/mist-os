@@ -91,7 +91,7 @@ void VirtualAudioControlImpl::DdkRelease(void* ctx) {
 
 // static
 zx_status_t VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t* msg,
-                                                fidl_txn_t* txn) {
+                                                device_fidl_txn_t* txn) {
   VirtualAudioControlImpl* self = static_cast<VirtualAudioControlImpl*>(ctx);
   ddk::Transaction transaction(txn);
   fidl::WireDispatch<fuchsia_virtualaudio::Control>(

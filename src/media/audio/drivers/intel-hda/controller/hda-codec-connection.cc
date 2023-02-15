@@ -39,7 +39,7 @@ HdaCodecConnection::ProbeCommandListEntry HdaCodecConnection::PROBE_COMMANDS[] =
 zx_protocol_device_t HdaCodecConnection::CODEC_DEVICE_THUNKS = []() {
   zx_protocol_device_t ops = {};
   ops.version = DEVICE_OPS_VERSION;
-  ops.message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
+  ops.message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) -> zx_status_t {
     HdaCodecConnection* thiz = static_cast<HdaCodecConnection*>(ctx);
     ddk::Transaction transaction(txn);
     fidl::WireDispatch<fuchsia_hardware_intel_hda::CodecDevice>(

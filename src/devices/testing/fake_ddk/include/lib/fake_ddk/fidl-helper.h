@@ -44,7 +44,7 @@ class fidl::internal::WireWeakEventSender<fake_ddk::FidlProtocol> {
 
 namespace fake_ddk {
 
-using MessageOp = zx_status_t(void*, fidl_incoming_msg_t*, fidl_txn_t*);
+using MessageOp = zx_status_t(void*, fidl_incoming_msg_t*, device_fidl_txn_t*);
 
 // Helper class to call fidl handlers in unit tests
 // Use in conjunction with fake ddk
@@ -60,7 +60,7 @@ using MessageOp = zx_status_t(void*, fidl_incoming_msg_t*, fidl_txn_t*);
 //          DeviceX *dev;
 //          FidlMessenger fidl;
 //          fidl.SetMessageOp((void *)dev,
-//                            [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) ->
+//                            [](void* ctx, fidl_incoming_msg_t* msg,device_fidl_txn_t* txn) ->
 //                               zx_status_t {
 //                                 return static_cast<Device*>(ctx)->DdkMessage(msg, txn)});
 //          <fidl_client_function> ( <fake_ddk>.local().get(), <args>);

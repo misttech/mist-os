@@ -27,7 +27,7 @@ class Device : public fidl::WireServer<fuchsia_wlan_device::Phy> {
   ~Device() override;
 
   zx_status_t Bind();
-  zx_status_t Message(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
+  zx_status_t Message(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
   void Release();
   void Unbind();
 

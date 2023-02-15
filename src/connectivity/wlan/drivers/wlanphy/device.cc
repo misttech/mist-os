@@ -55,7 +55,7 @@ static zx_protocol_device_t wlanphy_device_ops = {
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
     .message = [](void* ctx, fidl_incoming_msg_t* msg,
-                  fidl_txn_t* txn) { return DEV(ctx)->Message(msg, txn); },
+                  device_fidl_txn_t* txn) { return DEV(ctx)->Message(msg, txn); },
 };
 #undef DEV
 
@@ -83,7 +83,7 @@ zx_status_t Device::Bind() {
   return status;
 }
 
-zx_status_t Device::Message(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+zx_status_t Device::Message(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
   ddk::Transaction transaction(txn);
   DeviceConnector connector(this);
 

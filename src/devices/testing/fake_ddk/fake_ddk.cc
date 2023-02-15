@@ -513,7 +513,7 @@ zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, 
 }
 
 __EXPORT
-void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* new_txn) {
+void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn, device_fidl_txn_t* new_txn) {
   auto fidl_txn = FromDdkInternalTransaction(ddk::internal::Transaction::FromTxn(txn));
 
   ZX_ASSERT_MSG(std::holds_alternative<fidl::Transaction*>(fidl_txn),
@@ -521,7 +521,7 @@ void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* 
 
   auto result = std::get<fidl::Transaction*>(fidl_txn)->TakeOwnership();
   auto new_ddk_txn = MakeDdkInternalTransaction(std::move(result));
-  *new_txn = *new_ddk_txn.DeviceFidlTxn();
+  *new_txn = *new_ddk_txn.Txn();
 }
 
 __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev,

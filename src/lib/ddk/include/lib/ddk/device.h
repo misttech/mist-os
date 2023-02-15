@@ -65,20 +65,23 @@ typedef struct zx_protocol_device zx_protocol_device_t;
 
 //@doc(docs/ddk/device-ops.md)
 
+typedef struct device_fidl_txn device_fidl_txn_t;
 // An outstanding FIDL transaction used when the driver host is managing
 // a FIDL channel.
-typedef struct fidl_txn fidl_txn_t;
-struct fidl_txn {
+struct device_fidl_txn {
   // Replies to the outstanding request and complete the FIDL transaction.
   //
-  // Pass the |fidl_txn_t| object itself as the first parameter. The |msg|
+  // Pass the |device_fidl_txn_t| object itself as the first parameter. The |msg|
   // should already be encoded. This function always consumes any handles
   // present in |msg|.
   //
   // Call |reply| only once for each |txn| object. After |reply| returns, the
   // |txn| object is considered invalid and might have been freed or reused
   // for another purpose.
-  zx_status_t (*reply)(fidl_txn_t* txn, const fidl_outgoing_msg_t* msg);
+  zx_status_t (*reply)(device_fidl_txn_t* txn, const fidl_outgoing_msg_t* msg);
+
+  // Internal value used for driver host bookkeeping.  Must not be mutated.
+  uintptr_t driver_host_context;
 };
 
 //@ # The Device Protocol
@@ -324,7 +327,7 @@ typedef struct zx_protocol_device {
   // ZX_ERR_ASYNC, the underlying connection is closed.
   //
   // This hook will only be executed on the devhost's main thread.
-  zx_status_t (*message)(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn);
+  zx_status_t (*message)(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
 
   //@ ## service_connect
   // Connect a runtime client to this device.
@@ -389,21 +392,13 @@ zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* ou
 // Adds metadata to a specific device.
 zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data, size_t length);
 
-// The true type of the fidl_txn_t* given by the message() operation.  Represents the necessary
-// information to construct a reply.
-typedef struct device_fidl_txn {
-  fidl_txn_t txn;
-  // Internal value used for driver host bookkeeping.  Must not be mutated.
-  uintptr_t driver_host_context;
-} device_fidl_txn_t;
-
 // Takes ownership of the given FIDL transaction.
 //
-// |txn| is expected to be a fidl_txn_t* given to a device's message callback.
+// |txn| is expected to be a device_fidl_txn_t* given to a device's message callback.
 // After calling this function, it is invalid to use |txn|.  On success, |*new_txn| will refer to a
 // new device_fidl_txn_t which is safe to use until after its reply method is invoked or the owning
 // device's unbind hook is completed, whichever is earlier.
-void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* new_txn);
+void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn, device_fidl_txn_t* new_txn);
 
 // Returns the number of fragments that can be returned by `device_get_fragments`.
 uint32_t device_get_fragment_count(zx_device_t* dev);

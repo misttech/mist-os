@@ -117,7 +117,7 @@ __EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t
                                    size_t comp_count, size_t* comp_actual) {}
 
 __EXPORT
-void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* new_txn) {}
+void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn, device_fidl_txn_t* new_txn) {}
 
 // Please do not use get_root_resource() in new code. See ZX-1467.
 __EXPORT

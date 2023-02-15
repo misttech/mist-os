@@ -216,7 +216,7 @@ zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, 
 }
 
 __EXPORT
-void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* new_txn) {
+void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn, device_fidl_txn_t* new_txn) {
   // auto fidl_txn = mock_ddk::FromDdkInternalTransaction(ddk::internal::Transaction::FromTxn(txn));
 
   // ZX_ASSERT_MSG(std::holds_alternative<fidl::Transaction*>(fidl_txn),

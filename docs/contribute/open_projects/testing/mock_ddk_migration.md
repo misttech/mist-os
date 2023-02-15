@@ -269,7 +269,7 @@ the device class over a fidl channel.
     fidl.SetMessageOp((void *)dev,
        [](void* ctx,
           fidl_incoming_msg_t* msg,
-          fidl_txn_t* txn) -> zx_status_t
+          device_fidl_txn_t* txn) -> zx_status_t
               { return static_cast<Device*>(ctx)->DdkMessage(msg, txn)});
     <fidl_client_function> (
         <fake_ddk>.local().get(), <args>);

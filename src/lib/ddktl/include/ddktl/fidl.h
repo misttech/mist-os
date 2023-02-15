@@ -22,39 +22,33 @@ class Transaction {
  public:
   explicit Transaction(device_fidl_txn_t txn) : txn_(txn) {}
 
-  fidl_txn_t* Txn() { return &txn_.txn; }
-  const fidl_txn_t* Txn() const { return &txn_.txn; }
+  device_fidl_txn_t* Txn() { return &txn_; }
+  const device_fidl_txn_t* Txn() const { return &txn_; }
 
   uintptr_t DriverHostCtx() const { return txn_.driver_host_context; }
 
-  device_fidl_txn_t* DeviceFidlTxn() { return &txn_; }
-
-  // Utilizes a |fidl_txn_t| object as a wrapped Transaction.
-  //
-  // Only safe to call if |txn| was previously returned by |Transaction.Txn()|.
-  static Transaction* FromTxn(fidl_txn_t* txn);
+  // Utilizes a |device_fidl_txn_t| object as a wrapped Transaction.
+  static Transaction* FromTxn(device_fidl_txn_t* txn);
 
   // Moves txn into a new Transaction.
   //
   // Only intended to be used by ddk::Transaction.
   // This is useful for copying a Transaction out of stack-allocated scope,
   // so a response may be generated asynchronously.
-  //
-  // Only safe to call if |txn| was previously returned by |Transaction.Txn()|.
-  static Transaction MoveTxn(fidl_txn_t* txn);
+  static Transaction MoveTxn(device_fidl_txn_t* txn);
 
  private:
   device_fidl_txn_t txn_;
 };
 
-inline Transaction* Transaction::FromTxn(fidl_txn_t* txn) {
+inline Transaction* Transaction::FromTxn(device_fidl_txn_t* txn) {
   static_assert(std::is_standard_layout<Transaction>::value,
                 "Cannot cast from non-standard layout class");
   static_assert(offsetof(Transaction, txn_) == 0, "Transaction must be convertable to txn");
   return reinterpret_cast<Transaction*>(txn);
 }
 
-inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
+inline Transaction Transaction::MoveTxn(device_fidl_txn_t* txn) {
   auto real_txn = FromTxn(txn);
 
   auto new_value = *real_txn;
@@ -67,8 +61,8 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 
 // An implementation of |fidl::Transaction| for using LLCPP bindings in drivers,
 // designed to work with ::DdkMessage.  If can be used to reply synchronously as in:
-// zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-//     ddk::Transaction transaction(txn);
+// zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+//     DdkTransaction transaction(txn);
 //     fidl::WireDispatch<fuchsia::hardware::serial::Device>(this, msg, &transaction);
 //     return transaction.Status();
 // }
@@ -78,7 +72,7 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 //
 // And also can be used to reply asynchronously via ToAsync() call as in:
 //
-// zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+// zx_status_t DdkFidlDevice::DdkMessage(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
 //   ddk::Transaction transaction(txn);
 //   fidl::WireDispatch<fuchsia::hardware::serial::Device>(this, msg, &transaction);
 //   return ZX_ERR_AYSNC; // Ownership of transaction was taken, can't use transaction.Status()
@@ -96,7 +90,8 @@ inline Transaction Transaction::MoveTxn(fidl_txn_t* txn) {
 // Note that this class is not thread safe.
 class Transaction final : public fidl::Transaction {
  public:
-  explicit Transaction(fidl_txn_t* txn) : connection_(ddk::internal::Transaction::MoveTxn(txn)) {}
+  explicit Transaction(device_fidl_txn_t* txn)
+      : connection_(ddk::internal::Transaction::MoveTxn(txn)) {}
 
   ~Transaction() override {
     ZX_ASSERT_MSG(ownership_taken_ || status_called_,
@@ -117,7 +112,7 @@ class Transaction final : public fidl::Transaction {
   }
 
   void set_status(zx_status_t status) { status_ = status; }
-  fidl_txn_t* fidl_txn() { return connection_.Txn(); }
+  device_fidl_txn_t* fidl_txn() { return connection_.Txn(); }
 
  protected:
   zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) final {
@@ -145,7 +140,7 @@ class Transaction final : public fidl::Transaction {
   }
 
  private:
-  ddk::internal::Transaction connection_;  // includes a fidl_txn_t.
+  ddk::internal::Transaction connection_;
   zx_status_t status_ = ZX_OK;
   bool closed_ = false;
   bool status_called_ = false;

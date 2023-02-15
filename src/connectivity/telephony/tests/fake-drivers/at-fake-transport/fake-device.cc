@@ -44,7 +44,7 @@ static zx_protocol_device_t at_fake_device_ops = {
     },
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
+    .message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) -> zx_status_t {
       return DEV(ctx)->DdkMessage(msg, txn);
     },
 };

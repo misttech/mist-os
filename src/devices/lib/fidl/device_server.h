@@ -20,7 +20,7 @@ class DeviceInterface : public fidl::WireServer<fuchsia_device::Controller> {
   virtual void LogError(const char* error) = 0;
 
   virtual bool IsUnbound() = 0;
-  virtual zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) = 0;
+  virtual zx_status_t MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) = 0;
 };
 
 class DeviceServer {

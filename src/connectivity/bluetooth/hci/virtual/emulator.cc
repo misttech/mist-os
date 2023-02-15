@@ -90,7 +90,7 @@ static zx_protocol_device_t bt_emulator_device_ops = {
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
     .message =
-        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
           logf(TRACE, "EmulatorMessage\n");
           EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
           ddk::Transaction transaction(txn);
@@ -110,7 +110,7 @@ static zx_protocol_device_t bt_hci_device_ops = {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
     },
     .message =
-        [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
           logf(TRACE, "HciMessage\n");
           EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
           ddk::Transaction transaction(txn);

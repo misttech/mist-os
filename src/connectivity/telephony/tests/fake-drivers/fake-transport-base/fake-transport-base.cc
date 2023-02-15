@@ -59,7 +59,7 @@ void Device::SetSnoopChannel(SetSnoopChannelRequestView request,
   }
 }
 
-zx_status_t Device::DdkMessage(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+zx_status_t Device::DdkMessage(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
   ddk::Transaction transaction(txn);
   fidl::WireDispatch<fidl_tel_transport::Qmi>(
       this, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);

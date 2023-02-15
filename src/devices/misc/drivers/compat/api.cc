@@ -145,7 +145,8 @@ __EXPORT void driver_logf_internal(const zx_driver_t* drv, fx_log_severity_t sev
   va_end(args);
 }
 
-__EXPORT void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fidl_txn_t* new_txn) {
+__EXPORT void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn,
+                                                     device_fidl_txn_t* new_txn) {
   auto fidl_txn = FromDdkInternalTransaction(ddk::internal::Transaction::FromTxn(txn));
 
   ZX_ASSERT_MSG(std::holds_alternative<fidl::Transaction*>(fidl_txn),
@@ -153,7 +154,7 @@ __EXPORT void device_fidl_transaction_take_ownership(fidl_txn_t* txn, device_fid
 
   auto result = std::get<fidl::Transaction*>(fidl_txn)->TakeOwnership();
   auto new_ddk_txn = MakeDdkInternalTransaction(std::move(result));
-  *new_txn = *new_ddk_txn.DeviceFidlTxn();
+  *new_txn = *new_ddk_txn.Txn();
 }
 
 __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
