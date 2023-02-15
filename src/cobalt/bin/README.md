@@ -3,6 +3,7 @@
 [TOC]
 
 ## Summary
+
 Cobalt is a system for collecting metrics from Fuchsia devices, sending
 metric observations to servers running in the cloud, aggregating and analyzing
 the collected observations and generating useful reports and visualizations.
@@ -23,6 +24,7 @@ transmitted from the client running Fuchsia to the Cobalt servers.
 encodings implement special privacy-preserving algorithms.
 
 ## FIDL Protocol
+
 Fuchsia code uses Cobalt through its FIDL protocol.
 See [`//sdk/fidl/fuchsia.cobalt/cobalt.fidl`](/sdk/fidl/fuchsia.cobalt/cobalt.fidl).
 
@@ -35,26 +37,27 @@ FIDL service.
 
 For example:
 
-```
-$ fx set x64
-$ fx full-build
+```sh
+fx set x64
+fx full-build
 ```
 
-### Running the test app:
+### Running the test app
 
 Start Fuchsia. For example:
 
-```
-$ fx emu -N
+```sh
+fx ffx emu start --net tap --console
 ```
 
 From within Fuchsia:
 
+```sh
+system/test/cobalt_testapp
 ```
-$ system/test/cobalt_testapp
-```
+
  or try
 
-```
-$ system/test/cobalt_testapp --verbose=3
+```sh
+system/test/cobalt_testapp --verbose=3
 ```

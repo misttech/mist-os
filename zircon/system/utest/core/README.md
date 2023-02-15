@@ -15,7 +15,7 @@ any userspace device manager, device drivers, io plumbing, etc.
 
 ### Example usage
 
-```
+```sh
 fx set bringup.x64 --with //bundles:boot_tests  # or any product or board.
 fx build
 fx core-tests [--gtest_filter=FILTER] [--gtest_repeat=REPEAT]
@@ -41,7 +41,7 @@ mode.  See `unified_only` in BUILD.gn for a list of such tests.
 
 ### Example usage
 
-```
+```sh
 fx set bringup.x64 --with-base //bundles/bringup:tests
 fx build
 fx qemu
@@ -49,13 +49,13 @@ fx qemu
 
 Then at the shell prompt,
 
-```
+```sh
 /boot/test/core-futex --gtest_filter='FutexTest.Wakeup' --gtest_repeat=10
 ```
 
 or
 
-```
+```sh
 runtests /boot/test/core-*
 ```
 
@@ -78,17 +78,17 @@ being available in the standalone mode in bringup builds. Refer to
 fxbug.dev/89597 for more context. See `requires_next_vdso` in BUILD.gn
 for a list of such tests.
 
-
 ### Example usage
 
-```
+```sh
 fx set core.x64 --with //zircon/system/utest/core:tests
 fx build
-fx emu ...
+fx ffx emu start --engine qemu --headless --net user
 ```
 
 Then on the host,
-```
+
+```sh
 fx test fuchsia-pkg://fuchsia.com/core-page-size-test-package
 ```
 
@@ -107,7 +107,6 @@ set and tests requiring this are skipped.
 
   If this policy is not available, the environment variable
 "NO_AMBIENT_MARK_VMO_EXEC=1" is set and tests requiring this are skipped.
-
 
 ## Notes
 

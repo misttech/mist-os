@@ -8,6 +8,6 @@ will use regex matching to parse all serial output piped in and will strip out e
 
 Pipe the FEMU serial output into `pretty-serial`:
 
-```
-fx emu | fx pretty-serial
+```sh
+fx ffx emu start --console | fx pretty-serial
 ```

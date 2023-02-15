@@ -6,7 +6,7 @@ This is the integration tests for a number of system tests.
 
 In order to build the system tests, add this to your `fx set`:
 
-```
+```sh
 % fx set ... --with //src/sys/pkg:e2e_tests
 % fx build
 ```
@@ -14,7 +14,7 @@ In order to build the system tests, add this to your `fx set`:
 Next, you need to authenticate against luci to be able to download build
 artifacts. First, authenticate against cipd with:
 
-```
+```sh
 % cipd auth-login
 ```
 
@@ -22,7 +22,7 @@ Next, install chromium's `depot_tools` by following
 [these instructions](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html).
 Then, login to luci by running:
 
-```
+```sh
 % cd depot_tools
 % ./luci-auth login -scopes "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/devstorage.read_write"
 ...
@@ -47,7 +47,7 @@ This tests Over the Air (OTA) updates. At a high level, it:
 
 You should be able to run the tests with:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
@@ -61,7 +61,7 @@ directory.
 The Upgrade Tests also support reproducing a specific build. To do this,
 determine the build ids from the downgrade and upgrade builds, then run:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-build-id 123456789... \
@@ -70,7 +70,7 @@ determine the build ids from the downgrade and upgrade builds, then run:
 
 Or you can combine these options:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-build-id 123456789... \
@@ -86,7 +86,7 @@ The system tests support running reboot tests, where a device is rebooted a
 configurable number of times, or errs out if a problem occurs. This
 can be done by running:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_reboot \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --fuchsia-build-dir $FUCHSIA_BUILD_DIR
@@ -104,7 +104,7 @@ The system tests support running tracking tests, where a device is
 continuously updated to the latest available version, or errs out if a problem
 occurs. This can be done by running:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_tracking \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
@@ -125,7 +125,7 @@ is especially handy when cycle testing. To simplify the setup, the system-tests
 come with a helper script `run-test` that can setup a `tmux` session
 for you. You can run it like this:
 
-```
+```sh
 % ${FUCHSIA_DIR}/src/sys/pkg/tests/system-tests/bin/run-test \
   -o ~/logs \
   --tty /dev/ttyUSB0 \
@@ -142,14 +142,14 @@ See the `run-test --help` for more options.
 
 ## Running the tests locally in the Fuchsia Emulator (experimental)
 
-At the moment, the builtin `fx emu` does not bring up a configuration that can be
+At the moment, the build script `fx qemu` does not bring up a configuration that can be
 OTA-ed. Until this is implemented, the `bin/` directory contains some helper
 scripts that bring up an OTA-able Fuchsia emulator. Follow these instructions to
 it.
 
 The `create-emu` script will create a Fuchsia EFI image:
 
-```
+```sh
 % ./bin/create-emu \
   --image-dir some/directory/to/store/the/vm/image \
   "$OTHER_ARGS[@]}"
@@ -157,7 +157,7 @@ The `create-emu` script will create a Fuchsia EFI image:
 
 This image can then be used by running `run-emu`:
 
-```
+```sh
 % ./bin/run-emu \
   --image-dir some/directory/to/store/the/vm/image \
   "$OTHER_ARGS[@]}"
@@ -166,7 +166,7 @@ This image can then be used by running `run-emu`:
 If you don't need to save the Fuchsia image, you can instead use
 `run-transient-emu` to avoid having to create an image:
 
-```
+```sh
 % ./bin/run-transient-emu "$OTHER_ARGS[@]}"
 ```
 
@@ -177,7 +177,7 @@ These scripts wrap `fx make-fuchsia-vol` to create the Fuchsia image, and
 
 Once the VM has finished paving, you can then use it with the upgrade tests:
 
-```
+```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/fuchsia/.ssh/pkey \
   --downgrade-builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
