@@ -209,9 +209,11 @@ void AudioCapturer::RealizeVolume(VolumeCommand volume_command) {
       if (gain_db != link.mixer->gain.GetGainDb()) {
         link.mixer->gain.SetDestGain(gain_db);
 
-        // TODO(fxbug.dev/51049) Logging should be removed upon creation of inspect tool or
-        // other real-time method for gain observation
-        FX_LOGS(INFO) << log_string;
+        if constexpr (kLogCaptureUsageVolumeGainActions) {
+          // TODO(fxbug.dev/51049) Logging should be removed upon creation of inspect tool or
+          // other real-time method for gain observation
+          FX_LOGS(INFO) << log_string;
+        }
       }
     });
   });

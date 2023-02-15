@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/media/audio/audio_core/shared/logging_flags.h"
+
 namespace media::audio {
 
 namespace {
@@ -44,7 +46,9 @@ void VolumeControl::SetVolume(float volume) {
   if (volume == current_volume_) {
     return;
   }
-  FX_LOGS(INFO) << name_ << " VolumeControl::SetVolume(" << volume << ")";
+  if constexpr (kLogVolumeCalls) {
+    FX_LOGS(INFO) << name_ << " VolumeControl::SetVolume(" << volume << ")";
+  }
 
   // TODO(fxbug.dev/35581): Generate event async after update from callback.
   current_volume_ = volume;

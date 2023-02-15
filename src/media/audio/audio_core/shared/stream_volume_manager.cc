@@ -6,6 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 
 namespace media::audio {
@@ -15,10 +16,6 @@ const auto kRendererVolumeRamp = Ramp{
     .duration = zx::msec(5),
     .ramp_type = fuchsia::media::audio::RampType::SCALE_LINEAR,
 };
-
-std::string ToString(const fuchsia::media::Usage& usage) {
-  return StreamUsageFromFidlUsage(usage).ToString();
-}
 
 }  // namespace
 
@@ -123,7 +120,9 @@ void StreamVolumeManager::RemoveStream(StreamVolume* stream_volume) {
 
 void StreamVolumeManager::SetUsageVolume(fuchsia::media::Usage usage, float volume) {
   if (volume != usage_volume_settings_.GetUsageVolume(std::move(usage))) {
-    FX_LOGS(INFO) << ToString(usage) << " volume=" << volume;
+    if constexpr (kLogVolumeCalls) {
+      FX_LOGS(INFO) << StreamUsageFromFidlUsage(usage).ToString() << " volume=" << volume;
+    }
     usage_volume_settings_.SetUsageVolume(fidl::Clone(usage), volume);
     UpdateStreamsWithUsage(std::move(usage));
   }

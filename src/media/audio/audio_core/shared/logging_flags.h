@@ -20,11 +20,6 @@ inline constexpr bool kLogAudioRendererSetUsageCalls = false;
 inline constexpr bool kLogRendererPlayCalls = false;
 inline constexpr bool kLogRendererPauseCalls = false;
 
-// Loudness calls and actions for AudioRenderers.
-inline constexpr bool kLogRenderUsageVolumeGainActions = true;
-inline constexpr bool kLogRendererSetGainMuteRampCalls = false;
-inline constexpr bool kLogRendererSetGainMuteRampActions = false;
-
 // In "client-side underflows", we discard data because its start timestamp has already passed. For
 // each packet queue, we log the first underflow, plus subsequent occurrences depending on the
 // audio_core logging level. We throttle how frequently these are displayed. If log_level is set to
@@ -57,11 +52,19 @@ inline constexpr uint16_t kCaptureOverflowWarningInterval = 100;
 // Relevant for both renderers and capturers
 inline constexpr bool kLogPresentationDelay = false;
 
+// Loudness-related logging
+//
+inline constexpr bool kLogVolumeCalls = true;
+inline constexpr bool kLogCaptureUsageVolumeGainActions = true;
+inline constexpr bool kLogRenderUsageVolumeGainActions = true;
+inline constexpr bool kLogRendererSetGainMuteRampCalls = false;
+inline constexpr bool kLogRendererSetGainMuteRampActions = false;
+inline constexpr bool kLogSetDeviceGainMuteActions = true;
+
 // Device- and driver-related logging
 //
 inline constexpr bool kLogAudioDevice = false;
 inline constexpr bool kLogDevicePlugUnplug = true;
-inline constexpr bool kLogSetDeviceGainMuteActions = true;
 
 // Values retrieved from the audio driver related to delay, and associated calculations.
 inline constexpr bool kLogDriverDelayProperties = false;
