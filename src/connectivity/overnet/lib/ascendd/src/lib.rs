@@ -87,6 +87,13 @@ impl Future for Ascendd {
     }
 }
 
+/// Error returned from [`run_stream`].
+#[derive(Debug)]
+pub enum RunStreamError {
+    Circuit(circuit::Error),
+    Other(Error),
+}
+
 /// Run an ascendd server on the given stream IOs identified by the given labels
 /// and paths, to completion.
 pub async fn run_stream<'a>(
@@ -95,7 +102,7 @@ pub async fn run_stream<'a>(
     tx: &'a mut (dyn AsyncWrite + Unpin + Send),
     label: Option<String>,
     path: Option<String>,
-) -> Result<(), Error> {
+) -> Result<(), RunStreamError> {
     let mut id = [0; 8];
     let mut read = 0;
 
@@ -127,7 +134,7 @@ pub async fn run_stream<'a>(
         )
         .map(|(result, ())| result)
         .await
-        .map_err(Error::from)
+        .map_err(RunStreamError::Circuit)
     } else {
         let config = Box::new(move || {
             Some(fidl_fuchsia_overnet_protocol::LinkConfig::AscenddServer(
@@ -141,7 +148,9 @@ pub async fn run_stream<'a>(
 
         let read = if read != 0 { Some(id[..read].to_vec()) } else { None };
 
-        run_stream_link(node, read, rx, tx, Default::default(), config).await
+        run_stream_link(node, read, rx, tx, Default::default(), config)
+            .await
+            .map_err(RunStreamError::Other)
     }
 }
 
@@ -250,12 +259,20 @@ async fn run_ascendd(
                             )
                             .await
                             {
-                                // A close of the remote side is not an error.
-                                // TODO: Use typed error instead of String
-                                if format!("{e:?}") == "Framer closed during read" {
-                                    tracing::debug!("Completed socket read: {:?}", e);
-                                } else {
-                                    tracing::warn!("Failed serving socket: {:?}", e);
+                                match e {
+                                    // A close of the remote side is not an error.
+                                    // TODO: Use typed error instead of String
+                                    RunStreamError::Other(e)
+                                        if format!("{e:?}") == "Framer closed during read" =>
+                                    {
+                                        tracing::debug!("Completed socket read: {:?}", e)
+                                    }
+                                    RunStreamError::Circuit(circuit::Error::ConnectionClosed(
+                                        reason,
+                                    )) => {
+                                        tracing::debug!("Circuit connection closed: {:?}", reason)
+                                    }
+                                    other => tracing::warn!("Failed serving socket: {:?}", other),
                                 }
                             }
                         }
