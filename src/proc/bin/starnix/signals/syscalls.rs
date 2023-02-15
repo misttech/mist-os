@@ -134,7 +134,7 @@ pub fn sys_sigaltstack(
         if (ss.ss_flags & !(SS_AUTODISARM | SS_DISABLE)) != 0 {
             return error!(EINVAL);
         }
-        if ss.ss_size < MINSIGSTKSZ {
+        if ss.ss_flags & SS_DISABLE == 0 && ss.ss_size < MINSIGSTKSZ {
             return error!(ENOMEM);
         }
     }
@@ -675,7 +675,7 @@ mod tests {
         assert_eq!(ss, another_ss);
 
         // Disable the sigaltstack and read it back out.
-        ss.ss_flags = SS_DISABLE;
+        let ss = sigaltstack_t { ss_flags: SS_DISABLE, ..sigaltstack_t::default() };
         current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
         sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
         current_task
