@@ -289,15 +289,16 @@ TEST_P(TCPSocketPairTest, ShutdownRdAllowsReadOfReceivedDataBeforeEOF) {
 // response.
 TEST_P(TCPSocketPairTest, ShutdownWrServerClientClose) {
   auto sockets = ASSERT_NO_ERRNO_AND_VALUE(NewSocketPair());
-  char buf[10] = {};
   ScopedThread t([&]() {
-    ASSERT_THAT(RetryEINTR(read)(sockets->first_fd(), buf, sizeof(buf)),
-                SyscallSucceedsWithValue(sizeof(buf)));
-    ASSERT_THAT(RetryEINTR(write)(sockets->first_fd(), buf, sizeof(buf)),
-                SyscallSucceedsWithValue(sizeof(buf)));
+    char sbuf[10] = {};
+    ASSERT_THAT(RetryEINTR(read)(sockets->first_fd(), sbuf, sizeof(sbuf)),
+                SyscallSucceedsWithValue(sizeof(sbuf)));
+    ASSERT_THAT(RetryEINTR(write)(sockets->first_fd(), sbuf, sizeof(sbuf)),
+                SyscallSucceedsWithValue(sizeof(sbuf)));
     ASSERT_THAT(close(sockets->release_first_fd()),
                 SyscallSucceedsWithValue(0));
   });
+  char buf[10] = {};
   ASSERT_THAT(RetryEINTR(write)(sockets->second_fd(), buf, sizeof(buf)),
               SyscallSucceedsWithValue(sizeof(buf)));
   ASSERT_THAT(RetryEINTR(shutdown)(sockets->second_fd(), SHUT_WR),
@@ -957,7 +958,7 @@ TEST_P(TCPSocketPairTest, SetTCPLingerTimeoutAboveMax) {
       getsockopt(sockets->first_fd(), IPPROTO_TCP, TCP_LINGER2, &get, &get_len),
       SyscallSucceedsWithValue(0));
   EXPECT_EQ(get_len, sizeof(get));
-  if (IsRunningOnGvisor()) {
+  if (IsRunningOnGvisor() && !IsRunningWithHostinet()) {
     EXPECT_EQ(get, kMaxTCPLingerTimeout);
   } else {
     EXPECT_THAT(get,
@@ -1273,7 +1274,7 @@ TEST_P(TCPSocketPairTest, SetAndGetLingerOption) {
   // Linux returns a different value as it uses HZ to convert the seconds to
   // jiffies which overflows for negative values. We want to be compatible with
   // linux for getsockopt return value.
-  if (IsRunningOnGvisor()) {
+  if (IsRunningOnGvisor() && !IsRunningWithHostinet()) {
     EXPECT_EQ(sl.l_linger, got_linger.l_linger);
   }
 
