@@ -104,7 +104,7 @@ pub async fn start_component(
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
     let binary_path = CString::new(binary_path.to_owned())?;
 
-    let mut current_task = galaxy.create_process(&binary_path)?;
+    let mut current_task = Task::create_init_child_process(&galaxy.kernel, &binary_path)?;
 
     let cwd = current_task
         .lookup_path(

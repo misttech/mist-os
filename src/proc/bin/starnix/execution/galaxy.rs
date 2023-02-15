@@ -154,24 +154,6 @@ pub struct Galaxy {
     _node: inspect::Node,
 }
 
-impl Galaxy {
-    pub fn create_process(&self, binary_path: &CString) -> Result<CurrentTask, Errno> {
-        let task = Task::create_process_without_parent(
-            &self.kernel,
-            binary_path.clone(),
-            Some(self.root_fs.fork()),
-        )?;
-        let init_task = self.kernel.pids.read().get_task(1);
-        if let Some(init_task) = init_task {
-            let mut init_writer = init_task.thread_group.write();
-            let mut new_process_writer = task.thread_group.write();
-            new_process_writer.parent = Some(init_task.thread_group.clone());
-            init_writer.children.insert(task.id, Arc::downgrade(&task.thread_group));
-        }
-        Ok(task)
-    }
-}
-
 /// The services that are exposed in the galaxy component's outgoing directory.
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),

@@ -270,6 +270,25 @@ impl Task {
         self.fs.set(fs).map_err(|_| "Cannot set fs multiple times").unwrap();
     }
 
+    pub fn create_init_child_process(
+        kernel: &Arc<Kernel>,
+        binary_path: &CString,
+    ) -> Result<CurrentTask, Errno> {
+        let init_task = kernel.pids.read().get_task(1).ok_or_else(|| errno!(EINVAL))?;
+        let task = Self::create_process_without_parent(
+            kernel,
+            binary_path.clone(),
+            Some(init_task.fs().fork()),
+        )?;
+        {
+            let mut init_writer = init_task.thread_group.write();
+            let mut new_process_writer = task.thread_group.write();
+            new_process_writer.parent = Some(init_task.thread_group.clone());
+            init_writer.children.insert(task.id, Arc::downgrade(&task.thread_group));
+        }
+        Ok(task)
+    }
+
     /// Create a task that is the leader of a new thread group.
     ///
     /// This function creates an underlying Zircon process to host the new
