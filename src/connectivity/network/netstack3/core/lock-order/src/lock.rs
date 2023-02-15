@@ -17,27 +17,6 @@ pub trait LockFor<L> {
     fn lock(&self) -> Self::Data<'_>;
 }
 
-/// Describes how to apply a fallible lock type to the implementing type.
-///
-/// An implementation of `TryLockFor<L>` for some `Self` means that `L` is a valid
-/// lock level for `T`, and defines how to attempt to access the state in `Self`
-/// that is under the lock indicated by `L`.
-pub trait TryLockFor<L> {
-    /// The type of errors returned on a failed lock attempt.
-    type Error;
-
-    /// Data produced by successfully locking the state for `L` in `Self`.
-    type Data<'l>
-    where
-        Self: 'l;
-
-    /// Tries to lock `Self` for `L`.
-    ///
-    /// If the locking is successful, returns the state behind the lock.
-    /// Otherwise an implementation-defined error is returned.
-    fn try_lock(&self) -> Result<Self::Data<'_>, Self::Error>;
-}
-
 /// Describes how to acquire reader and writer locks to the implementing type.
 ///
 /// An implementation of `RwLockFor<L>` for some `Self` means that `L` is a
