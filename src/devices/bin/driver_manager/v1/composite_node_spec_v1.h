@@ -35,11 +35,11 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
  private:
   // CompositeNodeSpec interface:
   zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
+      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) override;
 
   // Should only be called when |has_composite_device_| is false.
-  void SetupCompositeDevice(fuchsia_driver_index::wire::MatchedNodeGroupInfo info);
+  void SetupCompositeDevice(fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info);
 
   // Used to create the CompositeDevice object. Set to empty once the object is created.
   fbl::Array<std::unique_ptr<Metadata>> metadata_;

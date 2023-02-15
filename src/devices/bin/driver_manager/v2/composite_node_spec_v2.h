@@ -20,7 +20,7 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
 
  protected:
   zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
+      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) override;
 
  private:

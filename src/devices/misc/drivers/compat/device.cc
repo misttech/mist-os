@@ -877,7 +877,7 @@ zx_status_t Device::AddComposite(const char* name, const composite_device_desc_t
   return ZX_OK;
 }
 
-zx_status_t Device::AddNodeGroup(const char* name, const composite_node_spec_t* spec) {
+zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_spec_t* spec) {
   if (!name || !spec) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -907,9 +907,9 @@ zx_status_t Device::AddNodeGroup(const char* name, const composite_node_spec_t* 
     parents[i] = std::move(parents_result.value());
   }
 
-  // TODO(fxb/111891): Support metadata for AddComposite().
+  // TODO(fxb/111891): Support metadata for AddCompositeNodeSpec().
   if (spec->metadata_count > 0) {
-    FDF_LOG(WARNING, "AddNodeGroup() currently doesn't support metadata. See fxb/111891.");
+    FDF_LOG(WARNING, "AddCompositeNodeSpec() currently doesn't support metadata. See fxb/111891.");
   }
 
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)

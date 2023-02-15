@@ -61,7 +61,7 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
                       MatchDriversV1Completer::Sync& completer) override {
     fidl::Arena allocator;
     fidl::VectorView<fdi::wire::MatchedDriver> drivers(allocator,
-                                                       fake_drivers.size() + node_groups.size());
+                                                       fake_drivers.size() + specs.size());
     size_t index = 0;
     for (auto& driver : fake_drivers) {
       auto driver_info = fdi::wire::MatchedDriverInfo::Builder(allocator);
@@ -79,21 +79,21 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
       index++;
     }
 
-    for (auto& node_group : node_groups) {
-      drivers[index] = fdi::wire::MatchedDriver::WithNodeRepresentation(allocator, node_group);
+    for (auto& spec : specs) {
+      drivers[index] = fdi::wire::MatchedDriver::WithParentSpec(allocator, spec);
       index++;
     }
 
     completer.ReplySuccess(drivers);
   }
 
-  void AddNodeGroup(AddNodeGroupRequestView request,
-                    AddNodeGroupCompleter::Sync& completer) override {
+  void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                            AddCompositeNodeSpecCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
   std::vector<FakeDriver> fake_drivers;
-  std::vector<fdi::wire::MatchedNodeRepresentationInfo> node_groups;
+  std::vector<fdi::wire::MatchedCompositeNodeParentInfo> specs;
 };
 
 class DriverLoaderTest : public zxtest::Test {
@@ -375,31 +375,30 @@ TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
 TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
   fidl::Arena allocator;
 
-  // Add first node group.
-  auto node_group_1 = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group_1.node_index(1);
-  node_group_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "node_group_1"));
+  // Add first composite node spec.
+  auto spec_1 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec_1.node_index(1);
+  spec_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_1"));
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups_1(allocator, 1);
-  node_groups_1[0] = node_group_1.Build();
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs_1(allocator, 1);
+  specs_1[0] = spec_1.Build();
 
-  auto node_representation_1 = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation_1.node_groups(
-      fidl::ObjectView<fidl::VectorView<fdi::wire::MatchedNodeGroupInfo>>(allocator,
-                                                                          node_groups_1));
-  driver_index_server.node_groups.push_back(node_representation_1.Build());
+  auto parent_spec_1 = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec_1.specs(fidl::ObjectView<fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo>>(
+      allocator, specs_1));
+  driver_index_server.specs.push_back(parent_spec_1.Build());
 
-  // Add second node group.
-  auto node_group_2 = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group_2.node_index(0);
-  node_group_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "node_group_2"));
+  // Add second composite node spec.
+  auto spec_2 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec_2.node_index(0);
+  spec_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_2"));
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups_2(allocator, 1);
-  node_groups_2[0] = node_group_2.Build();
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs_2(allocator, 1);
+  specs_2[0] = spec_2.Build();
 
-  auto node_representation_2 = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation_2.node_groups(node_groups_2);
-  driver_index_server.node_groups.push_back(node_representation_2.Build());
+  auto parent_spec_2 = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec_2.specs(specs_2);
+  driver_index_server.specs.push_back(parent_spec_2.Build());
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
                              nullptr);
@@ -411,32 +410,32 @@ TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
 
   ASSERT_EQ(drivers.size(), 2);
 
-  auto node_group_result_1 = std::get<fdi::MatchedNodeRepresentationInfo>(drivers[0]);
-  ASSERT_EQ(1, node_group_result_1.node_groups().value().size());
-  ASSERT_STREQ("node_group_1", node_group_result_1.node_groups().value().at(0).name().value());
-  ASSERT_EQ(1, node_group_result_1.node_groups().value().at(0).node_index());
+  auto spec_result_1 = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[0]);
+  ASSERT_EQ(1, spec_result_1.specs().value().size());
+  ASSERT_STREQ("spec_1", spec_result_1.specs().value().at(0).name().value());
+  ASSERT_EQ(1, spec_result_1.specs().value().at(0).node_index());
 
-  auto node_group_result_2 = std::get<fdi::MatchedNodeRepresentationInfo>(drivers[1]);
-  ASSERT_EQ(1, node_group_result_2.node_groups().value().size());
-  ASSERT_STREQ("node_group_2", node_group_result_2.node_groups().value().at(0).name().value());
-  ASSERT_EQ(0, node_group_result_2.node_groups().value().at(0).node_index());
+  auto spec_result_2 = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[1]);
+  ASSERT_EQ(1, spec_result_2.specs().value().size());
+  ASSERT_STREQ("spec_2", spec_result_2.specs().value().at(0).name().value());
+  ASSERT_EQ(0, spec_result_2.specs().value().at(0).node_index());
 }
 
 TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   fidl::Arena allocator;
 
-  auto node_group = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group.node_index(1);
-  node_group.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "node_group"));
+  auto spec = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec.node_index(1);
+  spec.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec"));
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups(allocator, 1);
-  node_groups[0] = node_group.Build();
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 1);
+  specs[0] = spec.Build();
 
-  auto node_representation = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation.node_groups(node_groups);
+  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec.specs(specs);
 
   auto driver_name = "fuchsia_boot:///#driver.so";
-  driver_index_server.node_groups.push_back(node_representation.Build());
+  driver_index_server.specs.push_back(parent_spec.Build());
   driver_index_server.fake_drivers.emplace_back(driver_name, fdi::wire::DriverPackageType::kBoot);
 
   auto driver = std::make_unique<Driver>();
@@ -457,24 +456,24 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   ASSERT_EQ(driver_name, std::get<MatchedDriverInfo>(drivers[0]).v1()->libname);
 
   // Check composite node spec.
-  auto node_group_result = std::get<fdi::MatchedNodeRepresentationInfo>(drivers[1]);
-  ASSERT_EQ(1, node_group_result.node_groups().value().size());
-  ASSERT_STREQ("node_group", node_group_result.node_groups().value().at(0).name().value());
-  ASSERT_EQ(1, node_group_result.node_groups().value().at(0).node_index().value());
+  auto spec_result = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[1]);
+  ASSERT_EQ(1, spec_result.specs().value().size());
+  ASSERT_STREQ("spec", spec_result.specs().value().at(0).name().value());
+  ASSERT_EQ(1, spec_result.specs().value().at(0).node_index().value());
 }
 
 TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
   fidl::Arena allocator;
 
-  auto node_group = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group.node_index(1);
+  auto spec = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec.node_index(1);
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups(allocator, 1);
-  node_groups[0] = node_group.Build();
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 1);
+  specs[0] = spec.Build();
 
-  auto node_representation = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation.node_groups(node_groups);
-  driver_index_server.node_groups.push_back(node_representation.Build());
+  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec.specs(specs);
+  driver_index_server.specs.push_back(parent_spec.Build());
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
                              nullptr);
@@ -489,11 +488,11 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
 TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
   fidl::Arena allocator;
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups(allocator, 0);
-  auto node_representation = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation.node_groups(
-      fidl::ObjectView<fidl::VectorView<fdi::wire::MatchedNodeGroupInfo>>(allocator, node_groups));
-  driver_index_server.node_groups.push_back(node_representation.Build());
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 0);
+  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec.specs(fidl::ObjectView<fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo>>(
+      allocator, specs));
+  driver_index_server.specs.push_back(parent_spec.Build());
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
                              nullptr);
@@ -508,21 +507,21 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
 TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
   fidl::Arena allocator;
 
-  auto node_group_1 = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group_1.node_index(1);
-  node_group_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "node_group_1"));
+  auto spec_1 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec_1.node_index(1);
+  spec_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_1"));
 
-  auto node_group_2 = fdi::wire::MatchedNodeGroupInfo::Builder(allocator);
-  node_group_2.node_index(3);
-  node_group_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "node_group_2"));
+  auto spec_2 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
+  spec_2.node_index(3);
+  spec_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_2"));
 
-  fidl::VectorView<fdi::wire::MatchedNodeGroupInfo> node_groups(allocator, 2);
-  node_groups[0] = node_group_1.Build();
-  node_groups[1] = node_group_2.Build();
+  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 2);
+  specs[0] = spec_1.Build();
+  specs[1] = spec_2.Build();
 
-  auto node_representation = fdi::wire::MatchedNodeRepresentationInfo::Builder(allocator);
-  node_representation.node_groups(node_groups);
-  driver_index_server.node_groups.push_back(node_representation.Build());
+  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
+  parent_spec.specs(specs);
+  driver_index_server.specs.push_back(parent_spec.Build());
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
                              nullptr);
@@ -534,12 +533,12 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
 
   ASSERT_EQ(drivers.size(), 1);
 
-  auto node_group_result = std::get<fdi::MatchedNodeRepresentationInfo>(drivers[0]);
-  ASSERT_EQ(2, node_group_result.node_groups().value().size());
-  ASSERT_STREQ("node_group_1", node_group_result.node_groups().value().at(0).name().value());
-  ASSERT_EQ(1, node_group_result.node_groups().value().at(0).node_index().value());
-  ASSERT_STREQ("node_group_2", node_group_result.node_groups().value().at(1).name().value());
-  ASSERT_EQ(3, node_group_result.node_groups().value().at(1).node_index().value());
+  auto spec_result = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[0]);
+  ASSERT_EQ(2, spec_result.specs().value().size());
+  ASSERT_STREQ("spec_1", spec_result.specs().value().at(0).name().value());
+  ASSERT_EQ(1, spec_result.specs().value().at(0).node_index().value());
+  ASSERT_STREQ("spec_2", spec_result.specs().value().at(1).name().value());
+  ASSERT_EQ(3, spec_result.specs().value().at(1).node_index().value());
 }
 
 TEST_F(DriverLoaderTest, TestEphemeralDriver) {

@@ -39,10 +39,10 @@ class CompositeNodeSpecManager {
   // the implementation, this function either return the CompositeNodeAndDriver object for the
   // composite node or always return std::nullopt.
   zx::result<std::optional<CompositeNodeAndDriver>> BindParentSpec(
-      fuchsia_driver_index::wire::MatchedNodeRepresentationInfo match_info,
+      fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       const DeviceOrNode& device_or_node);
   zx::result<std::optional<CompositeNodeAndDriver>> BindParentSpec(
-      fuchsia_driver_index::MatchedNodeRepresentationInfo match_info,
+      fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
       const DeviceOrNode& device_or_node);
 
   // Exposed for testing only.

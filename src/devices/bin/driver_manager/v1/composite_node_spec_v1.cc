@@ -42,7 +42,8 @@ CompositeNodeSpecV1::CompositeNodeSpecV1(CompositeNodeSpecCreateInfo create_info
       device_manager_(device_manager) {}
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
-    fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node) {
+    fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+    const DeviceOrNode& device_or_node) {
   auto device_ptr = std::get_if<std::weak_ptr<DeviceV1Wrapper>>(&device_or_node);
   ZX_ASSERT(device_ptr);
   auto owned = device_ptr->lock();
@@ -78,7 +79,7 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
 }
 
 void CompositeNodeSpecV1::SetupCompositeDevice(
-    fuchsia_driver_index::wire::MatchedNodeGroupInfo info) {
+    fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info) {
   ZX_ASSERT(!has_composite_device_);
   ZX_ASSERT(info.has_composite() && info.composite().has_driver_info() &&
             info.composite().driver_info().has_url() && info.composite().has_composite_name());

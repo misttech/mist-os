@@ -35,7 +35,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   // Bind the first node.
   auto parent_1 =
       std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_1", {}, &node_manager, dispatcher()));
-  auto matched_parent_1 = fuchsia_driver_index::MatchedNodeGroupInfo({
+  auto matched_parent_1 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",
       .node_index = 0,
       .composite = matched_composite,
@@ -50,7 +50,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   // Bind the second node.
   auto parent_2 =
       std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_2", {}, &node_manager, dispatcher()));
-  auto matched_parent_2 = fuchsia_driver_index::MatchedNodeGroupInfo({
+  auto matched_parent_2 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",
       .node_index = 1,
       .composite = matched_composite,

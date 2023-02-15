@@ -18,7 +18,7 @@ BindDriverManager::~BindDriverManager() {}
 
 zx_status_t BindDriverManager::BindDriverToDevice(const MatchedDriver& driver,
                                                   const fbl::RefPtr<Device>& dev) {
-  if (auto info = std::get_if<fdi::MatchedNodeRepresentationInfo>(&driver); info) {
+  if (auto info = std::get_if<fdi::MatchedCompositeNodeParentInfo>(&driver); info) {
     auto device_ptr = std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{
         .device = dev,
     });
@@ -211,7 +211,7 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
 
   auto matched_drivers = std::move(result.value());
   for (auto driver : matched_drivers) {
-    if (!std::holds_alternative<fdi::MatchedNodeRepresentationInfo>(driver)) {
+    if (!std::holds_alternative<fdi::MatchedCompositeNodeParentInfo>(driver)) {
       continue;
     }
 
@@ -219,7 +219,7 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
         .device = dev,
     });
     auto bind_result = coordinator_->composite_node_spec_manager().BindParentSpec(
-        std::get<fdi::MatchedNodeRepresentationInfo>(driver), device_ptr);
+        std::get<fdi::MatchedCompositeNodeParentInfo>(driver), device_ptr);
     if (bind_result.is_error()) {
       LOGF(WARNING, "Failed to bind parent: %d", bind_result.status_value());
     }

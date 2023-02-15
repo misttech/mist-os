@@ -23,13 +23,13 @@
 
 namespace {
 
-bool VerifyMatchedNodeRepresentationInfo(fdi::wire::MatchedNodeRepresentationInfo info) {
-  if (!info.has_node_groups() || info.node_groups().empty()) {
+bool VerifyMatchedCompositeNodeParentInfo(fdi::wire::MatchedCompositeNodeParentInfo info) {
+  if (!info.has_specs() || info.specs().empty()) {
     return false;
   }
 
-  for (auto& node_group : info.node_groups()) {
-    if (!node_group.has_name() || node_group.name().empty() || !node_group.has_node_index()) {
+  for (auto& spec : info.specs()) {
+    if (!spec.has_name() || spec.name().empty() || !spec.has_node_index()) {
       return false;
     }
   }
@@ -146,9 +146,9 @@ bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,
 
 void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                         AddToIndexCallback callback) {
-  auto result = driver_index_.sync()->AddNodeGroup(spec);
+  auto result = driver_index_.sync()->AddCompositeNodeSpec(spec);
   if (!result.ok()) {
-    LOGF(ERROR, "DriverIndex::AddNodeGroup failed %d", result.status());
+    LOGF(ERROR, "DriverIndex::AddCompositeNodeSpec failed %d", result.status());
     callback(zx::error(result.status()));
     return;
   }
@@ -258,14 +258,15 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
       continue;
     }
 
-    if (driver.is_node_representation()) {
-      if (!VerifyMatchedNodeRepresentationInfo(driver.node_representation())) {
-        LOGF(ERROR,
-             "DriverIndex: MatchDriverV1 response is missing fields in MatchedNodeGroupInfo");
+    if (driver.is_parent_spec()) {
+      if (!VerifyMatchedCompositeNodeParentInfo(driver.parent_spec())) {
+        LOGF(
+            ERROR,
+            "DriverIndex: MatchDriverV1 response is missing fields in MatchedCompositeNodeSpecInfo");
         continue;
       }
 
-      matched_drivers.push_back(fidl::ToNatural(driver.node_representation()));
+      matched_drivers.push_back(fidl::ToNatural(driver.parent_spec()));
       continue;
     }
 

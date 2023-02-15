@@ -114,7 +114,7 @@ zx_status_t Imx8mmEvk::I2cInit() {
   }
 
   // TODO (fxbug.dev/121200): Add clock fragment, and replace the PlatformBus::NodeAdd() and
-  // DdkAddCompositeNodeSpec() calls with PlatformBus::AddNodeGroup().
+  // DdkAddCompositeNodeSpec() calls with PlatformBus::AddCompositeNodeSpec().
   auto status = DdkAddCompositeNodeSpec("i2c", ddk::CompositeNodeSpec(kPdevRules, kPdevProperties));
   if (status != ZX_OK) {
     zxlogf(INFO, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));

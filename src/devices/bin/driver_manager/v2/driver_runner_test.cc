@@ -301,7 +301,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
         });
       } else if (args.name().get() == "dev-group-0") {
         return zx::ok(FakeDriverIndex::MatchResult{
-            .node_group = fuchsia_driver_index::MatchedNodeGroupInfo({
+            .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
                 .name = "test-group",
                 .node_index = 0,
                 .composite = fuchsia_driver_index::MatchedCompositeInfo(
@@ -316,7 +316,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
             })});
       } else if (args.name().get() == "dev-group-1") {
         return zx::ok(FakeDriverIndex::MatchResult{
-            .node_group = fuchsia_driver_index::MatchedNodeGroupInfo({
+            .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
                 .name = "test-group",
                 .node_index = 1,
                 .composite = fuchsia_driver_index::MatchedCompositeInfo(
@@ -1694,7 +1694,7 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
 
   // Add a match for the composite node spec that we are creating.
   std::string name("test-group");
-  const fuchsia_driver_index::MatchedNodeGroupInfo match({
+  const fuchsia_driver_index::MatchedCompositeNodeSpecInfo match({
       .composite = fuchsia_driver_index::MatchedCompositeInfo(
           {.composite_name = "test-composite",
            .num_nodes = 2,
@@ -1704,7 +1704,7 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
       .node_names = {{"node-0", "node-1"}},
       .primary_index = 1,
   });
-  driver_index.AddNodeGroupMatch(name, match);
+  driver_index.AddCompositeNodeSpecMatch(name, match);
 
   const fuchsia_driver_framework::CompositeNodeSpec fidl_spec(
       {.name = name,

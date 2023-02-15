@@ -8,7 +8,7 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 
 using AddToIndexCallback =
-    fit::callback<void(zx::result<fuchsia_driver_index::DriverIndexAddNodeGroupResponse>)>;
+    fit::callback<void(zx::result<fuchsia_driver_index::DriverIndexAddCompositeNodeSpecResponse>)>;
 
 // Bridge class for the composite device handling in DFv1 and DFv2.
 // Implemented by the Coordinator in DFv1 and DriverRunner in DFv2.

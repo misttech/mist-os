@@ -20,7 +20,7 @@ class FakeCompositeNodeSpec : public CompositeNodeSpec {
       : CompositeNodeSpec(std::move(create_info)) {}
 
   zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
+      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) override {
     return zx::ok(std::nullopt);
   }
@@ -30,31 +30,32 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
  public:
   // CompositeManagerBridge:
   void BindNodesForCompositeNodeSpec() override {}
-  void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec group,
+  void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec spec,
                             AddToIndexCallback callback) override {
-    auto iter = node_group_matches_.find(std::string(group.name().get()));
-    zx::result<fdi::DriverIndexAddNodeGroupResponse> result;
-    if (iter == node_group_matches_.end()) {
+    auto iter = spec_matches_.find(std::string(spec.name().get()));
+    zx::result<fdi::DriverIndexAddCompositeNodeSpecResponse> result;
+    if (iter == spec_matches_.end()) {
       result = zx::error(ZX_ERR_NOT_FOUND);
     } else {
       auto composite = iter->second.composite();
       auto names = iter->second.node_names();
       ZX_ASSERT(composite.has_value());
       ZX_ASSERT(names.has_value());
-      result = zx::ok(fdi::DriverIndexAddNodeGroupResponse(composite.value(), names.value()));
+      result =
+          zx::ok(fdi::DriverIndexAddCompositeNodeSpecResponse(composite.value(), names.value()));
     }
     auto defer =
         fit::defer([callback = std::move(callback), result]() mutable { callback(result); });
   }
 
-  void AddSpecMatch(std::string_view name, fdi::MatchedNodeGroupInfo match) {
-    node_group_matches_[std::string(name)] = std::move(match);
+  void AddSpecMatch(std::string_view name, fdi::MatchedCompositeNodeSpecInfo match) {
+    spec_matches_[std::string(name)] = std::move(match);
   }
 
  private:
   // Stores matches for each composite node spec name, that get returned to the
   // AddToIndexCallback that is given in AddSpecToDriverIndex.
-  std::unordered_map<std::string, fdi::MatchedNodeGroupInfo> node_group_matches_;
+  std::unordered_map<std::string, fdi::MatchedCompositeNodeSpecInfo> spec_matches_;
 };
 
 class CompositeNodeSpecManagerTest : public zxtest::Test {
@@ -76,7 +77,7 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
   FakeDeviceManagerBridge bridge_;
 };
 
-TEST_F(CompositeNodeSpecManagerTest, TestAddMatchNodeGroup) {
+TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -123,7 +124,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddMatchNodeGroup) {
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "ovenbird",
   }};
-  fdi::MatchedNodeGroupInfo match{
+  fdi::MatchedCompositeNodeSpecInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
   bridge_.AddSpecMatch(spec_name, match);
@@ -136,11 +137,11 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddMatchNodeGroup) {
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind composite node spec node 2.
-  auto matched_node_2 = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  //  Bind parent spec 2.
+  auto matched_node_2 = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node_2.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node_2.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name,
       .node_index = 1,
       .composite = composite_match,
@@ -154,11 +155,11 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddMatchNodeGroup) {
                               .value());
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind composite node spec node 1.
-  auto matched_node_1 = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  //  Bind parent spec 1.
+  auto matched_node_1 = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node_1.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node_1.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name,
       .node_index = 0,
       .composite = composite_match,
@@ -218,7 +219,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "ovenbird",
   }};
-  fdi::MatchedNodeGroupInfo match{
+  fdi::MatchedCompositeNodeSpecInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
   bridge_.AddSpecMatch(spec_name, match);
@@ -232,11 +233,11 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind composite node spec node 1.
-  auto matched_node = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  //  Bind parent spec 1.
+  auto matched_node = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name,
       .node_index = 0,
       .composite = composite_match,
@@ -299,7 +300,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
   auto matched_info_1 = fdi::MatchedCompositeInfo{{
       .composite_name = "waxwing",
   }};
-  fdi::MatchedNodeGroupInfo match_1{
+  fdi::MatchedCompositeNodeSpecInfo match_1{
       {.composite = matched_info_1, .node_names = {{"node-0", "node-1"}}}};
 
   bridge_.AddSpecMatch(spec_name_1, match_1);
@@ -322,7 +323,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
   auto matched_info_2 = fdi::MatchedCompositeInfo{{
       .composite_name = "grosbeak",
   }};
-  fdi::MatchedNodeGroupInfo match_2{{.composite = matched_info_2, .node_names = {{"node-0"}}}};
+  fdi::MatchedCompositeNodeSpecInfo match_2{
+      {.composite = matched_info_2, .node_names = {{"node-0"}}}};
 
   bridge_.AddSpecMatch(spec_name_2, match_2);
   ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
@@ -332,19 +334,19 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
                   .is_ok());
   ASSERT_EQ(1, composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs().size());
 
-  // Bind the node that's in both device node_groups(). The node should only bind to one
+  // Bind the node that's in both device specs(). The node should only bind to one
   // composite node spec.
-  auto matched_node = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  auto matched_node = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name_1,
       .node_index = 1,
       .composite = matched_info_1,
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
   }});
-  matched_node.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name_2,
       .node_index = 0,
       .composite = matched_info_2,
@@ -415,11 +417,11 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
   ASSERT_TRUE(AddSpec(spec).is_ok());
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name));
 
-  //  Bind composite node spec node 1.
-  auto matched_node = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  //  Bind parent spec 1.
+  auto matched_node = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name,
       .node_index = 0,
       .num_nodes = 2,
@@ -431,7 +433,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
                 .status_value());
 
   // Add a composite match into the matched node info.
-  // Reattempt binding the composite node spec node 1. With a matched composite driver, it should
+  // Reattempt binding the parent spec 1. With a matched composite driver, it should
   // now bind successfully.
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "waxwing",
@@ -439,10 +441,10 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
   }};
-  auto matched_node_with_composite = fdi::MatchedNodeRepresentationInfo{{
-      .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
+  auto matched_node_with_composite = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
   }};
-  matched_node_with_composite.node_groups()->push_back(fdi::MatchedNodeGroupInfo{{
+  matched_node_with_composite.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
       .name = spec_name,
       .node_index = 0,
       .composite = composite_match,
@@ -487,10 +489,10 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddDuplicate) {
 
   auto spec_name = "test_name";
   bridge_.AddSpecMatch(spec_name,
-                       fdi::MatchedNodeGroupInfo{{.composite = fdi::MatchedCompositeInfo{{
-                                                      .composite_name = "grosbeak",
-                                                  }},
-                                                  .node_names = {{"node-0"}}}});
+                       fdi::MatchedCompositeNodeSpecInfo{{.composite = fdi::MatchedCompositeInfo{{
+                                                              .composite_name = "grosbeak",
+                                                          }},
+                                                          .node_names = {{"node-0"}}}});
 
   auto spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
                   .name(fidl::StringView(allocator, spec_name))
@@ -553,7 +555,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestRebindCompositeMatch) {
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "ovenbird",
   }};
-  fdi::MatchedNodeGroupInfo match{
+  fdi::MatchedCompositeNodeSpecInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
   bridge_.AddSpecMatch(spec_name, match);

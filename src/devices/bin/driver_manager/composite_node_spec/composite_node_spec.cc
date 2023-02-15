@@ -10,7 +10,8 @@ CompositeNodeSpec::CompositeNodeSpec(CompositeNodeSpecCreateInfo create_info)
 }
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
-    fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node) {
+    fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+    const DeviceOrNode& device_or_node) {
   ZX_ASSERT(info.has_node_index());
   auto node_index = info.node_index();
   if (node_index >= parent_specs_.size()) {

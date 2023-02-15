@@ -16,7 +16,8 @@ CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info
       node_manager_(node_manager) {}
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
-    fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node) {
+    fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+    const DeviceOrNode& device_or_node) {
   auto node_ptr = std::get_if<std::weak_ptr<dfv2::Node>>(&device_or_node);
   ZX_ASSERT(node_ptr);
   ZX_ASSERT(info.has_node_index() && info.has_node_index() && info.has_node_names() &&

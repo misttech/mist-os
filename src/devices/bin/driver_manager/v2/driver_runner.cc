@@ -200,11 +200,11 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
 
 void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
                                         AddToIndexCallback callback) {
-  driver_index_->AddNodeGroup(group).Then(
+  driver_index_->AddCompositeNodeSpec(group).Then(
       [callback = std::move(callback)](
-          fidl::WireUnownedResult<fdi::DriverIndex::AddNodeGroup>& result) mutable {
+          fidl::WireUnownedResult<fdi::DriverIndex::AddCompositeNodeSpec>& result) mutable {
         if (!result.ok()) {
-          LOGF(ERROR, "DriverIndex::AddNodeGroup failed %d", result.status());
+          LOGF(ERROR, "DriverIndex::AddCompositeNodeSpec failed %d", result.status());
           callback(zx::error(result.status()));
           return;
         }
@@ -445,7 +445,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
 
     auto& matched_driver = result->value()->driver;
     if (!matched_driver.is_driver() && !matched_driver.is_composite_driver() &&
-        !matched_driver.is_node_representation()) {
+        !matched_driver.is_parent_spec()) {
       orphaned();
       LOGF(WARNING,
            "Failed to match Node '%s', the MatchedDriver is not a normal/composite"
@@ -464,8 +464,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       return;
     }
 
-    if (matched_driver.is_node_representation() &&
-        !matched_driver.node_representation().has_node_groups()) {
+    if (matched_driver.is_parent_spec() && !matched_driver.parent_spec().has_specs()) {
       orphaned();
       LOGF(
           WARNING,
@@ -493,8 +492,8 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     // If this is a composite node spec match, bind the node into the spec. If the spec is
     // completed, use the returned node and driver to start the driver.
     fdi::wire::MatchedDriverInfo driver_info;
-    if (matched_driver.is_node_representation()) {
-      auto node_groups = matched_driver.node_representation();
+    if (matched_driver.is_parent_spec()) {
+      auto node_groups = matched_driver.parent_spec();
       auto result =
           composite_node_spec_manager_.BindParentSpec(node_groups, driver_node->weak_from_this());
       if (result.is_error()) {

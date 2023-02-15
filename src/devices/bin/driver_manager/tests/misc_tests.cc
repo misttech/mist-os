@@ -412,7 +412,7 @@ TEST(MiscTestCase, DeviceAlreadyBoundFromDriverIndex) {
   loop.RunUntilIdle();
 }
 
-TEST(MiscTestCase, AddNodeGroup) {
+TEST(MiscTestCase, AddCompositeNodeSpec) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async::Loop index_loop(&kAsyncLoopConfigNeverAttachToThread);
   ASSERT_OK(index_loop.StartThread("test-thread"));
@@ -489,18 +489,18 @@ TEST(MiscTestCase, AddNodeGroup) {
           .parents = parents,
           .metadata = metadata,
       };
-  const fdi::MatchedNodeGroupInfo match({
+  const fdi::MatchedCompositeNodeSpecInfo match({
       .composite = fdi::MatchedCompositeInfo(
           {.num_nodes = 1,
            .node_names = {{"shoveler"}},
            .driver_info = fdi::MatchedDriverInfo({.url = "#driver/mock-device.so"})}),
       .node_names = {{"shoveler"}},
   });
-  fake_driver_index.AddNodeGroupMatch("group", match);
+  fake_driver_index.AddCompositeNodeSpecMatch("spec", match);
 
-  ASSERT_OK(coordinator.AddCompositeNodeSpec(device, "group", spec));
+  ASSERT_OK(coordinator.AddCompositeNodeSpec(device, "spec", spec));
   loop.RunUntilIdle();
-  ZX_ASSERT(coordinator.composite_node_spec_manager().specs().count("group") != 0);
+  ZX_ASSERT(coordinator.composite_node_spec_manager().specs().count("spec") != 0);
 
   controller_endpoints->server.reset();
   coordinator_endpoints->client.reset();

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
+    crate::composite_node_spec_manager::CompositeNodeSpecManager,
     crate::match_common::node_to_device_property,
-    crate::node_group_manager::NodeGroupManager,
     crate::resolved_driver::{load_driver, DriverPackageType, ResolvedDriver},
     anyhow::{self, Context},
     bind::interpreter::decode_bind_rules::DecodedRules,
@@ -28,8 +28,8 @@ use {
     },
 };
 
+mod composite_node_spec_manager;
 mod match_common;
-mod node_group_manager;
 mod package_resolver;
 mod resolved_driver;
 
@@ -116,9 +116,9 @@ struct Indexer {
     // but will eventually resolve when base packages are available.
     base_repo: RefCell<BaseRepo>,
 
-    // Manages the node groups. This is wrapped in a RefCell since the
-    // node groups are added after the driver index server has started.
-    node_group_manager: RefCell<NodeGroupManager>,
+    // Manages the specs. This is wrapped in a RefCell since the
+    // specs are added after the driver index server has started.
+    composite_node_spec_manager: RefCell<CompositeNodeSpecManager>,
 
     // Whether /system is required. Used to determine if the indexer should
     // return fallback drivers that match.
@@ -135,7 +135,7 @@ impl Indexer {
         Indexer {
             boot_repo,
             base_repo: RefCell::new(base_repo),
-            node_group_manager: RefCell::new(NodeGroupManager::new()),
+            composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
             require_system,
             ephemeral_drivers: RefCell::new(HashMap::new()),
         }
@@ -168,11 +168,10 @@ impl Indexer {
         let properties = args.properties.unwrap();
         let properties = node_to_device_property(&properties)?;
 
-        // Prioritize node groups to avoid match conflicts with composite drivers.
-        let node_group_match =
-            self.node_group_manager.borrow().match_node_representations(&properties);
-        if let Some(node_group) = node_group_match {
-            return Ok(node_group);
+        // Prioritize specs to avoid match conflicts with composite drivers.
+        let spec_match = self.composite_node_spec_manager.borrow().match_parent_specs(&properties);
+        if let Some(spec) = spec_match {
+            return Ok(spec);
         }
 
         let base_repo = self.base_repo.borrow();
@@ -264,17 +263,19 @@ impl Indexer {
             .filter_map(|d| d)
             .collect();
 
-        // Prioritize node groups to avoid match conflicts with composite drivers.
-        let node_group_match =
-            self.node_group_manager.borrow().match_node_representations(&properties);
-        if let Some(node_group) = node_group_match {
-            matched_drivers.insert(0, node_group);
+        // Prioritize specs to avoid match conflicts with composite drivers.
+        let spec_match = self.composite_node_spec_manager.borrow().match_parent_specs(&properties);
+        if let Some(spec) = spec_match {
+            matched_drivers.insert(0, spec);
         }
 
         Ok(matched_drivers)
     }
 
-    fn add_node_group(&self, spec: fdf::CompositeNodeSpec) -> fdi::DriverIndexAddNodeGroupResult {
+    fn add_composite_node_spec(
+        &self,
+        spec: fdf::CompositeNodeSpec,
+    ) -> fdi::DriverIndexAddCompositeNodeSpecResult {
         let base_repo = self.base_repo.borrow();
         let base_repo_iter = match base_repo.deref() {
             BaseRepo::Resolved(drivers) => drivers.iter(),
@@ -300,8 +301,8 @@ impl Indexer {
             .filter(|&driver| matches!(driver.bind_rules, DecodedRules::Composite(_)))
             .collect::<Vec<_>>();
 
-        let mut node_group_manager = self.node_group_manager.borrow_mut();
-        node_group_manager.add_node_group(spec, composite_drivers)
+        let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
+        composite_node_spec_manager.add_composite_node_spec(spec, composite_drivers)
     }
 
     fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {
@@ -377,8 +378,8 @@ impl Indexer {
 
         let resolved_driver = resolve.unwrap();
 
-        let mut node_group_manager = self.node_group_manager.borrow_mut();
-        node_group_manager.new_driver_available(resolved_driver.clone());
+        let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
+        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
 
         let mut ephemeral_drivers = self.ephemeral_drivers.borrow_mut();
         let existing = ephemeral_drivers.insert(pkg_url.clone(), resolved_driver);
@@ -422,19 +423,19 @@ async fn run_driver_info_iterator_server(
 }
 
 async fn run_composite_node_specs_iterator_server(
-    node_groups: Arc<Mutex<Vec<fdd::CompositeNodeSpecInfo>>>,
+    specs: Arc<Mutex<Vec<fdd::CompositeNodeSpecInfo>>>,
     stream: fdd::CompositeNodeSpecIteratorRequestStream,
 ) -> Result<(), anyhow::Error> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
-            let node_groups_clone = node_groups.clone();
+            let specs_clone = specs.clone();
             match request {
                 fdd::CompositeNodeSpecIteratorRequest::GetNext { responder } => {
                     let result = {
-                        let mut node_groups = node_groups_clone.lock().unwrap();
-                        let len = node_groups.len();
-                        node_groups.split_off(len - std::cmp::min(10, len))
+                        let mut specs = specs_clone.lock().unwrap();
+                        let len = specs.len();
+                        specs.split_off(len - std::cmp::min(10, len))
                     };
 
                     responder
@@ -476,18 +477,18 @@ async fn run_driver_development_server(
                 fdd::DriverIndexRequest::GetCompositeNodeSpecs {
                     name_filter, iterator, ..
                 } => {
-                    let node_group_manager = indexer.node_group_manager.borrow();
-                    let node_groups = node_group_manager.get_node_groups(name_filter);
-                    if node_groups.is_empty() {
+                    let composite_node_spec_manager = indexer.composite_node_spec_manager.borrow();
+                    let specs = composite_node_spec_manager.get_specs(name_filter);
+                    if specs.is_empty() {
                         iterator.close_with_epitaph(Status::NOT_FOUND)?;
                         return Ok(());
                     }
-                    let node_groups = Arc::new(Mutex::new(node_groups));
+                    let specs = Arc::new(Mutex::new(specs));
                     let iterator = iterator.into_stream()?;
                     fasync::Task::spawn(async move {
-                        run_composite_node_specs_iterator_server(node_groups, iterator)
+                        run_composite_node_specs_iterator_server(specs, iterator)
                             .await
-                            .expect("Failed to run node groups iterator");
+                            .expect("Failed to run specs iterator");
                     })
                     .detach();
                 }
@@ -568,11 +569,11 @@ async fn run_index_server(
                         .or_else(ignore_peer_closed)
                         .context("error responding to MatchDriversV1")?;
                 }
-                DriverIndexRequest::AddNodeGroup { payload, responder } => {
+                DriverIndexRequest::AddCompositeNodeSpec { payload, responder } => {
                     responder
-                        .send(&mut indexer.add_node_group(payload))
+                        .send(&mut indexer.add_composite_node_spec(payload))
                         .or_else(ignore_peer_closed)
-                        .context("error responding to AddNodeGroup")?;
+                        .context("error responding to AddCompositeNodeSpec")?;
                 }
             }
             Ok(())
@@ -625,8 +626,8 @@ async fn load_base_drivers(
             resolved_driver.fallback = false;
         }
 
-        let mut node_group_manager = indexer.node_group_manager.borrow_mut();
-        node_group_manager.new_driver_available(resolved_driver.clone());
+        let mut composite_node_spec_manager = indexer.composite_node_spec_manager.borrow_mut();
+        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
         resolved_drivers.push(resolved_driver);
     }
     indexer.load_base_repo(BaseRepo::Resolved(resolved_drivers));
@@ -2475,7 +2476,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_node_representation_match() {
+    async fn test_parent_spec_match() {
         let base_repo = BaseRepo::Resolved(std::vec![]);
 
         let (proxy, stream) =
@@ -2508,7 +2509,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
@@ -2537,14 +2538,14 @@ mod tests {
 
             let result = proxy.match_driver(match_args).await.unwrap().unwrap();
             assert_eq!(
-                fdi::MatchedDriver::NodeRepresentation(fdi::MatchedNodeRepresentationInfo {
-                    node_groups: Some(vec![fdi::MatchedNodeGroupInfo {
+                fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
+                    specs: Some(vec![fdi::MatchedCompositeNodeSpecInfo {
                         name: Some("test_group".to_string()),
                         node_index: Some(0),
                         num_nodes: Some(1),
-                        ..fdi::MatchedNodeGroupInfo::EMPTY
+                        ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
                     }]),
-                    ..fdi::MatchedNodeRepresentationInfo::EMPTY
+                    ..fdi::MatchedCompositeNodeParentInfo::EMPTY
                 }),
                 result
             );
@@ -2579,7 +2580,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_node_representation_match_v1() {
+    async fn test_parent_spec_match_v1() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
             symbol_table: std::collections::HashMap::new(),
@@ -2634,7 +2635,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
@@ -2666,14 +2667,14 @@ mod tests {
 
             assert_eq!(
                 vec![
-                    fdi::MatchedDriver::NodeRepresentation(fdi::MatchedNodeRepresentationInfo {
-                        node_groups: Some(vec![fdi::MatchedNodeGroupInfo {
+                    fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
+                        specs: Some(vec![fdi::MatchedCompositeNodeSpecInfo {
                             name: Some("test_group".to_string()),
                             node_index: Some(0),
                             num_nodes: Some(1),
-                            ..fdi::MatchedNodeGroupInfo::EMPTY
+                            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
                         }]),
-                        ..fdi::MatchedNodeRepresentationInfo::EMPTY
+                        ..fdi::MatchedCompositeNodeParentInfo::EMPTY
                     }),
                     fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                         url: Some(
@@ -2730,7 +2731,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_matched_composite() {
+    async fn test_add_composite_node_spec_matched_composite() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -2837,8 +2838,8 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::CompositeNodeSpec {
-                    name: Some("group_match".to_string()),
+                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
@@ -2864,8 +2865,8 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
-                        name: Some("group_non_match_1".to_string()),
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                        name: Some("spec_non_match_1".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
@@ -2890,8 +2891,8 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
-                        name: Some("group_non_match_2".to_string()),
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                        name: Some("spec_non_match_2".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
@@ -2920,7 +2921,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_no_optional_matched_composite_with_optional() {
+    async fn test_add_composite_node_spec_no_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -3038,8 +3039,8 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::CompositeNodeSpec {
-                    name: Some("group_match".to_string()),
+                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
@@ -3065,8 +3066,8 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
-                        name: Some("group_non_match_1".to_string()),
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                        name: Some("spec_non_match_1".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
@@ -3091,8 +3092,8 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
-                        name: Some("group_non_match_2".to_string()),
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
+                        name: Some("spec_non_match_2".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
@@ -3121,7 +3122,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_with_optional_matched_composite_with_optional() {
+    async fn test_add_composite_node_spec_with_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -3250,8 +3251,8 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::CompositeNodeSpec {
-                    name: Some("group_match".to_string()),
+                .add_composite_node_spec(fdf::CompositeNodeSpec {
+                    name: Some("spec_match".to_string()),
                     parents: Some(vec![
                         fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
@@ -3285,7 +3286,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_then_driver() {
+    async fn test_add_composite_node_spec_then_driver() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -3381,11 +3382,11 @@ mod tests {
                 },
             ];
 
-            // When we add the node group it should get not found since there's no drivers.
+            // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -3418,18 +3419,19 @@ mod tests {
                 ..fdi::MatchDriverArgs::EMPTY
             };
 
-            // We can see the node group comes back without a matched composite.
+            // We can see the spec comes back without a matched composite.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
-                assert_eq!(None, info.node_groups.unwrap()[0].composite);
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+                assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
 
-            // Notify the node group manager of a new composite driver.
+            // Notify the spec manager of a new composite driver.
             {
-                let mut node_group_manager = index.node_group_manager.borrow_mut();
-                node_group_manager.new_driver_available(ResolvedDriver {
+                let mut composite_node_spec_manager =
+                    index.composite_node_spec_manager.borrow_mut();
+                composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
                     v1_driver_path: None,
                     bind_rules: rules,
@@ -3444,10 +3446,10 @@ mod tests {
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.node_groups.unwrap()[0]
+                    info.specs.unwrap()[0]
                         .composite
                         .as_ref()
                         .unwrap()
@@ -3456,7 +3458,7 @@ mod tests {
                         .unwrap()
                 );
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
         }
         .fuse();
@@ -3471,7 +3473,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_no_optional_then_driver_with_optional() {
+    async fn test_add_composite_node_spec_no_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -3578,11 +3580,11 @@ mod tests {
                 },
             ];
 
-            // When we add the node group it should get not found since there's no drivers.
+            // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -3615,18 +3617,19 @@ mod tests {
                 ..fdi::MatchDriverArgs::EMPTY
             };
 
-            // We can see the node group comes back without a matched composite.
+            // We can see the spec comes back without a matched composite.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
-                assert_eq!(None, info.node_groups.unwrap()[0].composite);
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+                assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
 
-            // Notify the node group manager of a new composite driver.
+            // Notify the spec manager of a new composite driver.
             {
-                let mut node_group_manager = index.node_group_manager.borrow_mut();
-                node_group_manager.new_driver_available(ResolvedDriver {
+                let mut composite_node_spec_manager =
+                    index.composite_node_spec_manager.borrow_mut();
+                composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
                     v1_driver_path: None,
                     bind_rules: rules,
@@ -3641,10 +3644,10 @@ mod tests {
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.node_groups.unwrap()[0]
+                    info.specs.unwrap()[0]
                         .composite
                         .as_ref()
                         .unwrap()
@@ -3653,7 +3656,7 @@ mod tests {
                         .unwrap()
                 );
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
         }
         .fuse();
@@ -3668,7 +3671,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_with_optional_then_driver_with_optional() {
+    async fn test_add_composite_node_spec_with_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -3786,11 +3789,11 @@ mod tests {
                 value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
-            // When we add the node group it should get not found since there's no drivers.
+            // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![
                             fdf::ParentSpec {
@@ -3821,18 +3824,19 @@ mod tests {
                 ..fdi::MatchDriverArgs::EMPTY
             };
 
-            // We can see the node group comes back without a matched composite.
+            // We can see the spec comes back without a matched composite.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
-                assert_eq!(None, info.node_groups.unwrap()[0].composite);
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+                assert_eq!(None, info.specs.unwrap()[0].composite);
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
 
-            // Notify the node group manager of a new composite driver.
+            // Notify the spec manager of a new composite driver.
             {
-                let mut node_group_manager = index.node_group_manager.borrow_mut();
-                node_group_manager.new_driver_available(ResolvedDriver {
+                let mut composite_node_spec_manager =
+                    index.composite_node_spec_manager.borrow_mut();
+                composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
                     v1_driver_path: None,
                     bind_rules: rules,
@@ -3847,10 +3851,10 @@ mod tests {
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(match_args.clone()).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::NodeRepresentation(info) = match_result {
+            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.node_groups.unwrap()[0]
+                    info.specs.unwrap()[0]
                         .composite
                         .as_ref()
                         .unwrap()
@@ -3859,7 +3863,7 @@ mod tests {
                         .unwrap()
                 );
             } else {
-                assert!(false, "Did not get back a node group.");
+                assert!(false, "Did not get back a spec.");
             }
         }
         .fuse();
@@ -3874,7 +3878,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_duplicate_path() {
+    async fn test_add_composite_node_spec_duplicate_path() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
             symbol_table: std::collections::HashMap::new(),
@@ -3924,7 +3928,7 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::CompositeNodeSpec {
+                    .add_composite_node_spec(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
                         parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
@@ -3951,7 +3955,7 @@ mod tests {
             }];
 
             let result = proxy
-                .add_node_group(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
                     parents: Some(vec![fdf::ParentSpec {
                         bind_rules: duplicate_bind_rules,
@@ -3975,7 +3979,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_add_node_group_duplicate_key() {
+    async fn test_add_composite_node_spec_duplicate_key() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
             symbol_table: std::collections::HashMap::new(),
@@ -4028,7 +4032,7 @@ mod tests {
             }];
 
             let result = proxy
-                .add_node_group(fdf::CompositeNodeSpec {
+                .add_composite_node_spec(fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
                     parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,

@@ -34,7 +34,8 @@ class CompositeNodeSpec {
   // Returns ZX_ERR_ALREADY_BOUND if it's already bound. See BindParentImpl() for return type
   // details.
   zx::result<std::optional<DeviceOrNode>> BindParent(
-      fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node);
+      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+      const DeviceOrNode& device_or_node);
 
   // Exposed for testing.
   const std::vector<bool>& parent_specs() const { return parent_specs_; }
@@ -46,7 +47,7 @@ class CompositeNodeSpec {
   // Otherwise, it returns std::nullopt. The lifetime of this node object is managed by
   // the parent nodes.
   virtual zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
+      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) = 0;
 
   const std::string& name() const { return name_; }

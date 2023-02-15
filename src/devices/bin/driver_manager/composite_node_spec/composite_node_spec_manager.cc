@@ -28,8 +28,9 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
 
   auto parent_count = fidl_spec.parents().count();
   AddToIndexCallback callback =
-      [this, spec_impl = std::move(spec), name, parent_count](
-          zx::result<fuchsia_driver_index::DriverIndexAddNodeGroupResponse> result) mutable {
+      [this, spec_impl = std::move(spec), name,
+       parent_count](zx::result<fuchsia_driver_index::DriverIndexAddCompositeNodeSpecResponse>
+                         result) mutable {
         if (!result.is_ok()) {
           if (result.status_value() == ZX_ERR_NOT_FOUND) {
             specs_[name] = std::move(spec_impl);
@@ -42,8 +43,9 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
         }
 
         if (result->node_names().size() != parent_count) {
-          LOGF(WARNING,
-               "DriverIndexAddNodeGroupResponse node_names count doesn't match node_count.");
+          LOGF(
+              WARNING,
+              "DriverIndexAddCompositeNodeSpecResponse node_names count doesn't match node_count.");
           return;
         }
 
@@ -59,17 +61,17 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
 }
 
 zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
-    fdi::wire::MatchedNodeRepresentationInfo match_info, const DeviceOrNode &device_or_node) {
-  if (!match_info.has_node_groups() || match_info.node_groups().empty()) {
-    LOGF(ERROR, "MatchedNodeRepresentationInfo needs to contain as least one composite node spec");
+    fdi::wire::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node) {
+  if (!match_info.has_specs() || match_info.specs().empty()) {
+    LOGF(ERROR, "MatchedCompositeNodeParentInfo needs to contain as least one composite node spec");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Go through each spec until we find an available one with an unbound parent.
-  for (auto spec_info : match_info.node_groups()) {
+  for (auto spec_info : match_info.specs()) {
     if (!spec_info.has_name() || !spec_info.has_node_index() || !spec_info.has_num_nodes() ||
         !spec_info.has_node_names() || !spec_info.has_composite()) {
-      LOGF(WARNING, "MatchedNodeGroupInfo missing field(s)");
+      LOGF(WARNING, "MatchedCompositeNodeSpecInfo missing field(s)");
       continue;
     }
 
@@ -80,12 +82,12 @@ zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::Bind
     auto &node_names = spec_info.node_names();
 
     if (node_index >= num_nodes) {
-      LOGF(WARNING, "MatchedNodeGroupInfo node_index is out of bounds.");
+      LOGF(WARNING, "MatchedCompositeNodeSpecInfo node_index is out of bounds.");
       continue;
     }
 
     if (node_names.count() != num_nodes) {
-      LOGF(WARNING, "MatchedNodeGroupInfo num_nodes doesn't match node_names count.");
+      LOGF(WARNING, "MatchedCompositeNodeSpecInfo num_nodes doesn't match node_names count.");
       continue;
     }
 
@@ -121,7 +123,7 @@ zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::Bind
 }
 
 zx::result<std::optional<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
-    fdi::MatchedNodeRepresentationInfo match_info, const DeviceOrNode &device_or_node) {
+    fdi::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node) {
   fidl::Arena<> arena;
   return BindParentSpec(fidl::ToWire(arena, std::move(match_info)), device_or_node);
 }

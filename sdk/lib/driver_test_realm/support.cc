@@ -206,8 +206,8 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
                       MatchDriversV1Completer::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
-  void AddNodeGroup(AddNodeGroupRequestView request,
-                    AddNodeGroupCompleter::Sync& completer) override {
+  void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                            AddCompositeNodeSpecCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 };
