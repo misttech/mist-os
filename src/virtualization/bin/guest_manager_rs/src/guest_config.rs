@@ -6,7 +6,7 @@
 #![allow(unused_variables, unused_imports, dead_code)]
 
 use {
-    anyhow::Error,
+    anyhow::{anyhow, Error},
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_virtualization::{
@@ -16,6 +16,7 @@ use {
     fuchsia_zircon as zx,
     serde::{de, Deserialize},
     static_assertions as sa,
+    std::path::Path,
 };
 
 // Memory is specified by a string containing either a plain u64 value in bytes, or a u64
@@ -94,6 +95,12 @@ fn open_as_client_end<M: ProtocolMarker>(path: &str) -> Result<ClientEnd<M>, Err
     Ok(ClientEnd::<M>::new(client_end))
 }
 
+fn open_at<M: ProtocolMarker>(dir: &Path, fpath: &str) -> Result<ClientEnd<M>, Error> {
+    open_as_client_end::<M>(
+        dir.join(fpath).to_str().ok_or(anyhow!("file path is not a valid UTF-8 string"))?,
+    )
+}
+
 // Blockid is the last MAX_BLOCK_DEVICE_ID bytes of the block filepath.
 // In the case this falls within a UTF8 codepoint we reduce the length of the id to the
 // nearest char boundary.
@@ -111,7 +118,7 @@ fn block_id(path: &str) -> &str {
 // options.
 // Supported options: rw,ro,volatile,file,qcow,block
 // Example: "data/filesystem.img,ro,volatile"
-fn parse_block_spec(spec: &str) -> Result<BlockSpec, Error> {
+fn parse_block_spec(spec: &str, dir: &Path) -> Result<BlockSpec, Error> {
     enum BlockFmt {
         File,
         Qcow,
@@ -136,11 +143,11 @@ fn parse_block_spec(spec: &str) -> Result<BlockSpec, Error> {
             id: block_id(fpath).to_string(),
             mode: block_mode,
             format: match block_format {
-                BlockFmt::File => BlockFormat::File(open_as_client_end(fpath)?),
+                BlockFmt::File => BlockFormat::File(open_at(dir, fpath)?),
                 BlockFmt::Qcow => {
-                    BlockFormat::Qcow(open_as_client_end::<fio::FileMarker>(fpath)?.into_channel())
+                    BlockFormat::Qcow(open_at::<fio::FileMarker>(dir, fpath)?.into_channel())
                 }
-                BlockFmt::Block => BlockFormat::Block(open_as_client_end(fpath)?),
+                BlockFmt::Block => BlockFormat::Block(open_at(dir, fpath)?),
             },
         })
     } else {
@@ -148,7 +155,7 @@ fn parse_block_spec(spec: &str) -> Result<BlockSpec, Error> {
     }
 }
 
-pub fn parse_config(data: &str) -> Result<GuestConfig, Error> {
+pub fn parse_config(data: &str, dir: &Path) -> Result<GuestConfig, Error> {
     let conf: JsonConfig<'_> = serde_json::from_str(data)?;
     let kernel = match (conf.zircon, conf.linux) {
         (Some(_), Some(_)) => Err(zx::Status::INVALID_ARGS),
@@ -159,15 +166,15 @@ pub fn parse_config(data: &str) -> Result<GuestConfig, Error> {
 
     Ok(GuestConfig {
         kernel_type: kernel.map(|(k, _)| k),
-        kernel: kernel.map(|(_, k)| open_as_client_end(k)).transpose()?,
-        ramdisk: conf.ramdisk.map(|s| open_as_client_end(s)).transpose()?,
-        dtb_overlay: conf.dtb_overlay.map(|s| open_as_client_end(s)).transpose()?,
+        kernel: kernel.map(|(_, k)| open_at(dir, k)).transpose()?,
+        ramdisk: conf.ramdisk.map(|s| open_at(dir, s)).transpose()?,
+        dtb_overlay: conf.dtb_overlay.map(|s| open_at(dir, s)).transpose()?,
         cmdline: conf.cmdline.map(|s| s.to_string()),
         cpus: conf.cpus,
         guest_memory: conf.memory,
         block_devices: conf
             .block
-            .map(|bs| bs.iter().map(|s| parse_block_spec(s)).collect::<Result<Vec<_>, _>>())
+            .map(|bs| bs.iter().map(|s| parse_block_spec(s, dir)).collect::<Result<Vec<_>, _>>())
             .transpose()?,
         default_net: conf.default_net,
         virtio_balloon: conf.virtio_balloon,
@@ -248,26 +255,44 @@ mod tests {
     // Empty strings are an error.
     #[fuchsia::test]
     async fn parse_empty_string() {
-        assert!(parse_config("").is_err());
+        assert!(parse_config("", Path::new("")).is_err());
     }
 
     // Parse empty but valid JSON.
     #[fuchsia::test]
     async fn parse_empty_config() {
-        assert_eq!(GuestConfig::EMPTY, parse_config("{}").unwrap());
+        assert_eq!(GuestConfig::EMPTY, parse_config("{}", Path::new("")).unwrap());
+    }
+
+    // Attempt to read files from incorrect guest directory.
+    #[fuchsia::test]
+    async fn parse_incorrect_guest_dir() {
+        let tmpdir = tempdir().unwrap();
+        let linux = tmpdir.path().join("kernel.img");
+        let kernel_content = "this is not a kernel";
+        let cfg = format!(r#"{{"linux": "kernel.img"}}"#,);
+        // Create file to ensure error comes from missing directory.
+        let flinux = file::open_in_namespace(
+            linux.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )
+        .unwrap();
+        flinux.write(kernel_content.as_bytes()).await.unwrap().unwrap();
+
+        assert!(parse_config(&cfg, Path::new("")).is_err());
     }
 
     // Empty blockspecs are an error.
     #[fuchsia::test]
     async fn parse_block_spec_empty() {
-        assert!(parse_block_spec("").is_err());
+        assert!(parse_block_spec("", Path::new("")).is_err());
     }
 
     // Blockspecs with invalid tokens result in an error.
     #[fuchsia::test]
     async fn parse_block_spec_error() {
         let invalid = "meow";
-        assert!(parse_block_spec(&format!("filesystem.img,ro,{invalid}")).is_err());
+        assert!(parse_block_spec(&format!("filesystem.img,ro,{invalid}"), Path::new("")).is_err());
     }
 
     // Read contents of file attached to blockspec to string.
@@ -289,14 +314,14 @@ mod tests {
         let args = "ro,file";
         let fcontent = "hello, this is a test";
         let tmpdir = tempdir().unwrap();
-        let fpath = tmpdir.path().join(fname);
+        let fpath = tmpdir.path().join(&fname);
         let tmpfile = file::open_in_namespace(
             fpath.to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )?;
         tmpfile.write(fcontent.as_bytes()).await?.unwrap();
 
-        let bs = parse_block_spec(&format!("{},{}", fpath.to_str().unwrap(), args)).unwrap();
+        let bs = parse_block_spec(&format!("{},{}", fname, args), tmpdir.path()).unwrap();
         assert_eq!(bs.id, block_id(fpath.to_str().unwrap()));
         assert_eq!(bs.mode, BlockMode::ReadOnly);
         assert_eq!(read_block_to_string(bs).await?, fcontent);
@@ -308,27 +333,26 @@ mod tests {
     async fn parse_simple_config() -> Result<(), Error> {
         let tmpdir = tempdir().unwrap();
         let cmdline = "root=/dev/vda rw systemd.log_target=kmsg";
-        let linux = tmpdir.path().join("kernel");
+        let linux = "kernel.img";
         let kernel_content = "this is not a kernel";
         let default_net = true;
         let cpus = 4;
         let cfg = format!(
             r#"{{
     "cmdline": "{cmdline}",
-    "linux": "{}",
+    "linux": "{linux}",
     "default-net": {default_net},
     "memory": "2G",
     "cpus": {cpus}}}"#,
-            linux.display()
         );
 
         let flinux = file::open_in_namespace(
-            linux.to_str().unwrap(),
+            tmpdir.path().join(linux).to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )?;
         flinux.write(kernel_content.as_bytes()).await?.unwrap();
 
-        let guest_cfg = parse_config(&cfg)?;
+        let guest_cfg = parse_config(&cfg, tmpdir.path())?;
         assert_eq!(guest_cfg.cpus, Some(4));
         assert_eq!(guest_cfg.default_net, Some(default_net));
         assert_eq!(&guest_cfg.cmdline.unwrap(), cmdline);
@@ -367,7 +391,7 @@ mod tests {
     ]}}"#,
         );
 
-        let guest_cfg = parse_config(&cfg)?;
+        let guest_cfg = parse_config(&cfg, Path::new(""))?;
         assert_eq!(guest_cfg.block_devices.unwrap().len(), 3);
         Ok(())
     }

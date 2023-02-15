@@ -28,6 +28,7 @@ use {
         FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
     },
     std::collections::HashSet,
+    std::path::{Path, PathBuf},
     std::{fmt, fs, rc::Rc},
 };
 
@@ -128,6 +129,9 @@ struct HostNetworkState {
 }
 
 pub struct GuestManager {
+    // Path under which guest files are served.
+    config_dir: PathBuf,
+
     // Path to the default guest config.
     config_path: String,
 
@@ -148,11 +152,12 @@ pub struct GuestManager {
 
 impl GuestManager {
     pub fn new_with_defaults() -> Self {
-        GuestManager::new("/guest_pkg/data/guest.cfg".to_string())
+        GuestManager::new(PathBuf::from("/guest_pkg/"), "data/guest.cfg".to_string())
     }
 
-    fn new(config_path: String) -> Self {
+    fn new(config_dir: PathBuf, config_path: String) -> Self {
         GuestManager {
+            config_dir,
             config_path,
             status: GuestStatus::NotStarted,
             last_error: None,
@@ -478,7 +483,10 @@ impl GuestManager {
     }
 
     fn get_default_guest_config(&self) -> Result<GuestConfig, Error> {
-        guest_config::parse_config(&fs::read_to_string(&self.config_path)?)
+        let config_path = self.config_dir.join(&self.config_path);
+        let config_path =
+            config_path.to_str().ok_or(anyhow!("file path is not a valid UTF-8 string"))?;
+        guest_config::parse_config(&fs::read_to_string(config_path)?, &self.config_dir)
     }
 
     fn snapshot_config(config: &GuestConfig) -> GuestDescriptor {
@@ -676,7 +684,7 @@ mod tests {
                     .expect("failed to create proxy/stream");
 
             ManagerFixture {
-                manager: RefCell::new(GuestManager::new(path)),
+                manager: RefCell::new(GuestManager::new(PathBuf::from(""), path)),
                 stream_tx,
                 state_rx: Cell::new(Some(state_rx)),
                 vmm: RefCell::new(MockVmm::new(lifecycle_stream)),
@@ -789,7 +797,8 @@ mod tests {
         let mut tmpfile = NamedTempFile::new().expect("failed to create tempfile");
         write!(tmpfile, "{{}}").expect("failed to write to tempfile");
 
-        let mut manager = GuestManager::new(tmpfile.path().to_str().unwrap().to_string());
+        let mut manager =
+            GuestManager::new(PathBuf::from(""), tmpfile.path().to_str().unwrap().to_string());
         let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
 
         let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>()
