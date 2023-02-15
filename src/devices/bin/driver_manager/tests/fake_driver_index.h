@@ -13,16 +13,8 @@
 
 class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
  public:
-  struct CompositeDriverInfo {
-    std::string composite_name;
-    uint32_t node_index;
-    uint32_t num_nodes;
-    std::vector<std::string> node_names;
-  };
-
   struct MatchResult {
     std::string url;
-    std::optional<CompositeDriverInfo> composite;
     std::optional<fuchsia_driver_index::MatchedCompositeNodeSpecInfo> spec;
     bool is_fallback = false;
     bool colocate = false;
@@ -113,15 +105,8 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     }
 
     auto driver_info = GetDriverInfo(arena, match);
-
-    if (!match.composite) {
-      return fuchsia_driver_index::wire::MatchedDriver::WithDriver(
-          fidl::ObjectView<fuchsia_driver_index::wire::MatchedDriverInfo>(arena, driver_info));
-    }
-
-    auto composite_info = GetMatchedCompositeInfo(arena, driver_info, match.composite.value());
-    return fuchsia_driver_index::wire::MatchedDriver::WithCompositeDriver(
-        fidl::ObjectView<fuchsia_driver_index::wire::MatchedCompositeInfo>(arena, composite_info));
+    return fuchsia_driver_index::wire::MatchedDriver::WithDriver(
+        fidl::ObjectView<fuchsia_driver_index::wire::MatchedDriverInfo>(arena, driver_info));
   }
 
   static fuchsia_driver_index::wire::MatchedDriverInfo GetDriverInfo(fidl::AnyArena& arena,
@@ -131,24 +116,6 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
         .url(fidl::ObjectView<fidl::StringView>(arena, arena, match.url))
         .is_fallback(match.is_fallback)
         .colocate(match.colocate)
-        .Build();
-  }
-
-  static fuchsia_driver_index::wire::MatchedCompositeInfo GetMatchedCompositeInfo(
-      fidl::AnyArena& arena, fuchsia_driver_index::wire::MatchedDriverInfo driver_info,
-      CompositeDriverInfo composite) {
-    auto node_names = fidl::VectorView<fidl::StringView>(arena, composite.node_names.size());
-    for (size_t i = 0; i < composite.node_names.size(); i++) {
-      node_names[i] = fidl::StringView(arena, composite.node_names[i]);
-    }
-
-    return fuchsia_driver_index::wire::MatchedCompositeInfo::Builder(arena)
-        .node_index(composite.node_index)
-        .num_nodes(composite.num_nodes)
-        .composite_name(composite.composite_name)
-        .driver_info(
-            fidl::ObjectView<fuchsia_driver_index::wire::MatchedDriverInfo>(arena, driver_info))
-        .node_names(std::move(node_names))
         .Build();
   }
 

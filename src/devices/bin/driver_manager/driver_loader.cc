@@ -252,12 +252,6 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   const auto& drivers = result->value()->drivers;
 
   for (auto driver : drivers) {
-    // TODO(fxb/119111): Remove the old composite driver matching logic entirely.
-    if (driver.is_composite_driver()) {
-      LOGF(WARNING, "DFv1 only supports matching composite drivers through composite node specs");
-      continue;
-    }
-
     if (driver.is_parent_spec()) {
       if (!VerifyMatchedCompositeNodeParentInfo(driver.parent_spec())) {
         LOGF(

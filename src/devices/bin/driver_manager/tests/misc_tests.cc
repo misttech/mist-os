@@ -491,8 +491,7 @@ TEST(MiscTestCase, AddCompositeNodeSpec) {
       };
   const fdi::MatchedCompositeNodeSpecInfo match({
       .composite = fdi::MatchedCompositeInfo(
-          {.num_nodes = 1,
-           .node_names = {{"shoveler"}},
+          {.composite_name = "composite_name",
            .driver_info = fdi::MatchedDriverInfo({.url = "#driver/mock-device.so"})}),
       .node_names = {{"shoveler"}},
   });

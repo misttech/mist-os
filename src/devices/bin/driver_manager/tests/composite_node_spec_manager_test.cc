@@ -437,9 +437,6 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
   // now bind successfully.
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "waxwing",
-      .node_index = 1,
-      .num_nodes = 2,
-      .node_names = {{"node-0", "node-1"}},
   }};
   auto matched_node_with_composite = fdi::MatchedCompositeNodeParentInfo{{
       .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),

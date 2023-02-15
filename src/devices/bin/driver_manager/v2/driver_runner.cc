@@ -163,7 +163,6 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       dispatcher_(dispatcher),
       root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
       composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphansUntracked(); }),
-      composite_node_manager_(dispatcher_, this),
       composite_node_spec_manager_(this) {
   inspector.GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspector);
@@ -218,6 +217,7 @@ void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::Composit
       });
 }
 
+// TODO(fxb/121999): Add information for composite node specs.
 fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   // Create our inspector.
   // The default maximum size was too small, and so this is double the default size.
@@ -231,11 +231,6 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   InspectNode(inspector, stack);
   device_tree.Record(std::move(root));
   inspector.GetRoot().Record(std::move(device_tree));
-
-  // Make the unbound composite devices inspect nodes.
-  auto composite = inspector.GetRoot().CreateChild("unbound_composites");
-  composite_node_manager_.Inspect(composite);
-  inspector.GetRoot().Record(std::move(composite));
 
   // Make the orphaned devices inspect nodes.
   auto orphans = inspector.GetRoot().CreateChild("orphan_nodes");
@@ -444,22 +439,11 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     }
 
     auto& matched_driver = result->value()->driver;
-    if (!matched_driver.is_driver() && !matched_driver.is_composite_driver() &&
-        !matched_driver.is_parent_spec()) {
+    if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
       orphaned();
       LOGF(WARNING,
-           "Failed to match Node '%s', the MatchedDriver is not a normal/composite"
-           "driver or a composite node spec's parent.",
-           driver_node->name().c_str());
-      return;
-    }
-
-    if (matched_driver.is_composite_driver() &&
-        !matched_driver.composite_driver().has_driver_info()) {
-      orphaned();
-      LOGF(WARNING,
-           "Failed to match Node '%s', the MatchedDriver is missing driver info for a composite "
-           "driver.",
+           "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
+           "parent spec.",
            driver_node->name().c_str());
       return;
     }
@@ -468,25 +452,10 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       orphaned();
       LOGF(
           WARNING,
-          "Failed to match Node '%s', the MatchedDriver is missing composite node specs for a device "
-          "group node.",
+          "Failed to match Node '%s', the MatchedDriver is missing the composite node specs in the "
+          "parent spec.",
           driver_node->name().c_str());
       return;
-    }
-
-    // If this is a composite driver, create a composite node for it.
-    if (matched_driver.is_composite_driver()) {
-      auto composite = composite_node_manager_.HandleMatchedCompositeInfo(
-          node, matched_driver.composite_driver());
-      if (composite.is_error()) {
-        // Orphan the node if it is not part of a valid composite.
-        if (composite.error_value() == ZX_ERR_INVALID_ARGS) {
-          orphaned();
-        }
-
-        return;
-      }
-      driver_node = *composite;
     }
 
     // If this is a composite node spec match, bind the node into the spec. If the spec is
@@ -498,7 +467,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
           composite_node_spec_manager_.BindParentSpec(node_groups, driver_node->weak_from_this());
       if (result.is_error()) {
         orphaned();
-        LOGF(ERROR, "Failed to bind node '%s' to any of the matched composite node spec parents.",
+        LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
              driver_node->name().c_str());
         return;
       }
@@ -517,8 +486,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       driver_node = locked_composite_node.get();
       driver_info = composite_node_and_driver->driver;
     } else {
-      driver_info = matched_driver.is_driver() ? matched_driver.driver()
-                                               : matched_driver.composite_driver().driver_info();
+      driver_info = matched_driver.driver();
     }
 
     if (!driver_info.has_url()) {

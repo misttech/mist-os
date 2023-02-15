@@ -53,18 +53,8 @@ type MatchedCompositeInfo = table {
     /// The name of the composite device.
     1: composite_name string:MAX;
 
-    /// Node index for a composite driver.
-    2: node_index uint32;
-
-    /// Total number of nodes for a composite driver.
-    3: num_nodes uint32;
-
-    /// A list of all the node names for this composite driver.
-    /// These are ordered according to index.
-    4: node_names vector<string:MAX>:MAX;
-
     /// Information of the driver info.
-    5: driver_info MatchedDriverInfo;
+    2: driver_info MatchedDriverInfo;
 };
 
 /// Information for a composite node spec that contains a matched node.
@@ -100,11 +90,8 @@ type MatchedDriver = flexible union {
     /// Information for a normal driver.
     1: driver MatchedDriverInfo;
 
-    /// Information for a composite driver.
-    2: composite_driver MatchedCompositeInfo;
-
     /// Information for a parent spec.
-    3: parent_spec MatchedCompositeNodeParentInfo;
+    2: parent_spec MatchedCompositeNodeParentInfo;
 };
 
 type MatchDriverArgs = table {

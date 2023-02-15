@@ -9,8 +9,6 @@ source_set("driver_runner") {
   sources = [
     "composite_assembler.cc",
     "composite_assembler.h",
-    "composite_manager.cc",
-    "composite_manager.h",
     "composite_node_spec_v2.cc",
     "composite_node_spec_v2.h",
     "driver_host.cc",

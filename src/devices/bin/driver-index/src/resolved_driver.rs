@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::match_common::collect_node_names_from_composite_rules,
     anyhow::{anyhow, Context, Error},
     bind::interpreter::{
-        common::BytecodeError,
-        decode_bind_rules::{DecodedCompositeBindRules, DecodedRules},
+        decode_bind_rules::DecodedRules,
         match_bind::{match_bind, DeviceProperties, MatchBindData},
     },
     cm_rust::FidlIntoNative,
@@ -107,48 +105,27 @@ impl ResolvedDriver {
         &self,
         properties: &DeviceProperties,
     ) -> Result<Option<fdi::MatchedDriver>, bind::interpreter::common::BytecodeError> {
-        match &self.bind_rules {
-            DecodedRules::Normal(rules) => {
-                let matches = match_bind(
-                    MatchBindData {
-                        symbol_table: &rules.symbol_table,
-                        instructions: &rules.instructions,
-                    },
-                    properties,
-                )
-                .map_err(|e| {
-                    log::error!("Driver {}: bind error: {}", self, e);
-                    e
-                })?;
+        if let DecodedRules::Normal(rules) = &self.bind_rules {
+            let matches = match_bind(
+                MatchBindData {
+                    symbol_table: &rules.symbol_table,
+                    instructions: &rules.instructions,
+                },
+                properties,
+            )
+            .map_err(|e| {
+                log::error!("Driver {}: bind error: {}", self, e);
+                e
+            })?;
 
-                if !matches {
-                    return Ok(None);
-                }
-
-                Ok(Some(fdi::MatchedDriver::Driver(self.create_matched_driver_info())))
+            if !matches {
+                return Ok(None);
             }
-            DecodedRules::Composite(composite) => {
-                let result = matches_composite_device(composite, properties).map_err(|e| {
-                    log::error!("Driver {}: bind error: {}", self, e);
-                    e
-                })?;
 
-                if result.is_none() {
-                    return Ok(None);
-                }
-
-                let node_index = result.unwrap();
-                let node_names = collect_node_names_from_composite_rules(composite);
-                Ok(Some(fdi::MatchedDriver::CompositeDriver(fdi::MatchedCompositeInfo {
-                    node_index: Some(node_index),
-                    num_nodes: Some((composite.additional_nodes.len() + 1) as u32),
-                    composite_name: Some(composite.symbol_table[&composite.device_name_id].clone()),
-                    node_names: Some(node_names),
-                    driver_info: Some(self.create_matched_driver_info()),
-                    ..fdi::MatchedCompositeInfo::EMPTY
-                })))
-            }
+            return Ok(Some(fdi::MatchedDriver::Driver(self.create_matched_driver_info())));
         }
+
+        Ok(None)
     }
 
     fn get_driver_url(&self) -> Option<String> {
@@ -184,34 +161,6 @@ impl ResolvedDriver {
             ..fdd::DriverInfo::EMPTY
         }
     }
-}
-
-fn matches_composite_device(
-    rules: &DecodedCompositeBindRules,
-    properties: &DeviceProperties,
-) -> Result<Option<u32>, BytecodeError> {
-    let matches = match_bind(
-        MatchBindData {
-            symbol_table: &rules.symbol_table,
-            instructions: &rules.primary_node.instructions,
-        },
-        properties,
-    )?;
-
-    if matches {
-        return Ok(Some(0));
-    }
-
-    for (i, node) in rules.additional_nodes.iter().enumerate() {
-        let matches = match_bind(
-            MatchBindData { symbol_table: &rules.symbol_table, instructions: &node.instructions },
-            properties,
-        )?;
-        if matches {
-            return Ok(Some((i + 1) as u32));
-        }
-    }
-    Ok(None)
 }
 
 // Load the `component_url` driver out of `dir` which should be the root

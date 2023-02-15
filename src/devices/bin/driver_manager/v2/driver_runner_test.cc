@@ -280,25 +280,6 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
         return zx::ok(FakeDriverIndex::MatchResult{
             .url = "fuchsia-boot:///#meta/second-driver.cm",
         });
-      } else if (args.name().get() == "part-1") {
-        return zx::ok(FakeDriverIndex::MatchResult{
-            .url = "fuchsia-boot:///#meta/composite-driver.cm",
-            .composite = std::make_optional(FakeDriverIndex::CompositeDriverInfo{
-                .composite_name = "my-composite",
-                .node_index = 0u,
-                .num_nodes = 2u,
-                .node_names = {"one", "two"},
-            })});
-      } else if (args.name().get() == "part-2") {
-        return zx::ok(FakeDriverIndex::MatchResult{
-            .url = "fuchsia-boot:///#meta/composite-driver.cm",
-            .composite = std::make_optional(FakeDriverIndex::CompositeDriverInfo{
-                .composite_name = "my-composite",
-                .node_index = 1u,
-                .num_nodes = 2u,
-                .node_names = {"one", "two"},
-            }),
-        });
       } else if (args.name().get() == "dev-group-0") {
         return zx::ok(FakeDriverIndex::MatchResult{
             .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
@@ -306,8 +287,6 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
                 .node_index = 0,
                 .composite = fuchsia_driver_index::MatchedCompositeInfo(
                     {.composite_name = "test-composite",
-                     .num_nodes = 2,
-                     .node_names = {{"node-0", "node-1"}},
                      .driver_info = fuchsia_driver_index::MatchedDriverInfo(
                          {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
                 .num_nodes = 2,
@@ -321,8 +300,6 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
                 .node_index = 1,
                 .composite = fuchsia_driver_index::MatchedCompositeInfo(
                     {.composite_name = "test-composite",
-                     .num_nodes = 2,
-                     .node_names = {{"node-0", "node-1"}},
                      .driver_info = fuchsia_driver_index::MatchedDriverInfo(
                          {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
                 .num_nodes = 2,
@@ -1622,68 +1599,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BlockOnSecondDriver) {
   EXPECT_THAT(indices, ElementsAre(1, 0));
 }
 
-// Start a composite driver.
-TEST_F(DriverRunnerTest, StartCompositeDriver) {
-  auto driver_index = CreateDriverIndex();
-  auto driver_index_client = driver_index.Connect();
-  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
-                             &LoaderFactory, dispatcher());
-  auto defer = fit::defer([this] { Unbind(); });
-
-  fdf::NodeControllerPtr node_controller;
-  driver_host().SetStartHandler(
-      [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
-        realm().SetCreateChildHandler(
-            [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
-        realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
-          driver_dir().Bind(std::move(exposed_dir));
-        });
-
-        fdf::NodePtr root_node;
-        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
-        fdf::NodeAddArgs args;
-        args.set_name("part-1");
-        args.mutable_offers()->emplace_back().set_protocol(
-            std::move(fdecl::OfferProtocol()
-                          .set_source_name("fuchsia.package.ProtocolA")
-                          .set_target_name("fuchsia.package.RenamedA")));
-        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
-                            [](auto result) { EXPECT_FALSE(result.is_err()); });
-        args.set_name("part-2");
-        args.mutable_offers()->emplace_back().set_protocol(
-            std::move(fdecl::OfferProtocol()
-                          .set_source_name("fuchsia.package.ProtocolB")
-                          .set_target_name("fuchsia.package.RenamedB")));
-        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
-                            [](auto result) { EXPECT_FALSE(result.is_err()); });
-        BindDriver(std::move(request), std::move(root_node));
-      });
-  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
-  ASSERT_EQ(ZX_OK, root_driver.status_value());
-
-  driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
-    auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
-    EXPECT_EQ("binary", entries[0].key);
-    EXPECT_EQ("driver/composite-driver.so", entries[0].value->str());
-    EXPECT_EQ("colocate", entries[1].key);
-    EXPECT_EQ("true", entries[1].value->str());
-
-    fdf::NodePtr node;
-    ASSERT_EQ(ZX_OK, node.Bind(start_args.mutable_node()->TakeChannel()));
-    BindDriver(std::move(request), std::move(node));
-  });
-  auto composite_driver =
-      StartDriver(driver_runner, {
-                                     .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                                     .binary = "driver/composite-driver.so",
-                                     .colocate = true,
-                                 });
-  StopDriverComponent(std::move(root_driver.value()));
-}
-
-TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
+TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   auto driver_index = CreateDriverIndex();
   auto driver_index_client = driver_index.Connect();
   ASSERT_EQ(ZX_OK, driver_index_client.status_value());
@@ -1697,8 +1613,6 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
   const fuchsia_driver_index::MatchedCompositeNodeSpecInfo match({
       .composite = fuchsia_driver_index::MatchedCompositeInfo(
           {.composite_name = "test-composite",
-           .num_nodes = 2,
-           .node_names = {{"node-0", "node-1"}},
            .driver_info = fuchsia_driver_index::MatchedDriverInfo(
                {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
       .node_names = {{"node-0", "node-1"}},
@@ -1856,7 +1770,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
 
   auto hierarchy = Inspect(driver_runner);
   ASSERT_EQ("root", hierarchy.node().name());
-  ASSERT_EQ(4ul, hierarchy.children().size());
+  ASSERT_EQ(3ul, hierarchy.children().size());
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
@@ -1880,123 +1794,9 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
                             }}));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"unbound_composites"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"orphan_nodes"},
                                                }));
 
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"dfv1_composites"},
-                                               }));
-
-  StopDriverComponent(std::move(root_driver.value()));
-}
-
-// Start a composite driver and inspect the driver runner.
-TEST_F(DriverRunnerTest, StartAndInspect_CompositeDriver) {
-  auto driver_index = CreateDriverIndex();
-  auto driver_index_client = driver_index.Connect();
-  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
-                             &LoaderFactory, dispatcher());
-  auto defer = fit::defer([this] { Unbind(); });
-
-  fdf::NodeControllerPtr node_controller;
-  driver_host().SetStartHandler(
-      [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
-        realm().SetCreateChildHandler(
-            [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
-        realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
-          driver_dir().Bind(std::move(exposed_dir));
-        });
-
-        fdf::NodePtr root_node;
-        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
-        fdf::NodeAddArgs args;
-        args.set_name("part-1");
-        args.mutable_offers()->emplace_back().set_protocol(
-            std::move(fdecl::OfferProtocol()
-                          .set_source_name("fuchsia.package.ProtocolA")
-                          .set_target_name("fuchsia.package.RenamedA")));
-        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
-                            [](auto result) { EXPECT_FALSE(result.is_err()); });
-        args.set_name("part-2");
-        args.mutable_offers()->emplace_back().set_protocol(
-            std::move(fdecl::OfferProtocol()
-                          .set_source_name("fuchsia.package.ProtocolB")
-                          .set_target_name("fuchsia.package.RenamedB")));
-        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
-                            [](auto result) { EXPECT_FALSE(result.is_err()); });
-        BindDriver(std::move(request), std::move(root_node));
-      });
-  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
-  ASSERT_EQ(ZX_OK, root_driver.status_value());
-
-  driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
-    fdf::NodePtr composite_node;
-    EXPECT_EQ(ZX_OK, composite_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
-    fdf::NodeAddArgs args;
-    args.set_name("child");
-    fdf::NodeControllerPtr node_controller;
-    composite_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
-                             [](auto result) { EXPECT_FALSE(result.is_err()); });
-    BindDriver(std::move(request), std::move(composite_node));
-  });
-  auto composite_driver =
-      StartDriver(driver_runner, {
-                                     .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                                     .binary = "driver/composite-driver.so",
-                                     .colocate = true,
-                                 });
-
-  auto hierarchy = Inspect(driver_runner);
-  ASSERT_EQ("root", hierarchy.node().name());
-  ASSERT_EQ(4ul, hierarchy.children().size());
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"node_topology"},
-                                                   .child_names = {"dev"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
-                            .child_names = {"part-1", "part-2"},
-                            .str_properties = {
-                                {"driver", "fuchsia-boot:///#meta/root-driver.cm"},
-                            }}));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "part-1"},
-                                                .child_names = {"my-composite"},
-                                                .str_properties = {
-                                                    {"offers", "fuchsia.package.RenamedA"},
-                                                    {"driver", "unbound"},
-                                                }}));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(
-      hierarchy,
-      {.node_name = {"node_topology", "dev", "part-1", "my-composite"}, .child_names = {"child"}}));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(
-      hierarchy, {
-                     .node_name = {"node_topology", "dev", "part-1", "my-composite", "child"},
-                 }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "part-2"},
-                                                .child_names = {"my-composite"},
-                                                .str_properties = {
-                                                    {"offers", "fuchsia.package.RenamedB"},
-                                                    {"driver", "unbound"},
-                                                }}));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"unbound_composites"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"orphan_nodes"},
-                                               }));
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"dfv1_composites"},
                                                }));

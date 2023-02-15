@@ -474,10 +474,7 @@ fn match_composite_properties<'a>(
     }
 
     let info = fdi::MatchedCompositeInfo {
-        node_index: None,
-        num_nodes: None,
         composite_name: Some(composite.symbol_table[&composite.device_name_id].clone()),
-        node_names: None,
         driver_info: Some(composite_driver.create_matched_driver_info()),
         ..fdi::MatchedCompositeInfo::EMPTY
     };
@@ -1538,10 +1535,7 @@ mod tests {
         assert_eq!(
             Ok((
                 fdi::MatchedCompositeInfo {
-                    node_index: None,
-                    num_nodes: None,
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
@@ -1596,10 +1590,7 @@ mod tests {
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
-                node_index: None,
-                num_nodes: None,
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
             }),
@@ -1713,10 +1704,7 @@ mod tests {
         assert_eq!(
             Ok((
                 fdi::MatchedCompositeInfo {
-                    node_index: None,
-                    num_nodes: None,
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
@@ -1771,10 +1759,7 @@ mod tests {
                 TEST_PRIMARY_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
-                node_index: None,
-                num_nodes: None,
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
             }),
@@ -1905,10 +1890,7 @@ mod tests {
         assert_eq!(
             Ok((
                 fdi::MatchedCompositeInfo {
-                    node_index: None,
-                    num_nodes: None,
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
@@ -1947,10 +1929,7 @@ mod tests {
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
-                node_index: None,
-                num_nodes: None,
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
             }),
@@ -2094,10 +2073,7 @@ mod tests {
         assert_eq!(
             Ok((
                 fdi::MatchedCompositeInfo {
-                    node_index: None,
-                    num_nodes: None,
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
@@ -2139,10 +2115,7 @@ mod tests {
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
-                node_index: None,
-                num_nodes: None,
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
             }),
@@ -2172,10 +2145,7 @@ mod tests {
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
-                node_index: None,
-                num_nodes: None,
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
             }),

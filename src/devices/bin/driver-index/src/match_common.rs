@@ -58,18 +58,6 @@ pub fn node_to_device_property(
     Ok(device_properties)
 }
 
-pub fn collect_node_names_from_composite_rules(
-    composite_rules: &DecodedCompositeBindRules,
-) -> Vec<String> {
-    let mut node_names = vec![];
-    node_names.push(composite_rules.symbol_table[&composite_rules.primary_node.name_id].clone());
-    for node in &composite_rules.additional_nodes {
-        node_names.push(composite_rules.symbol_table[&node.name_id].clone());
-    }
-
-    return node_names;
-}
-
 pub fn get_composite_rules_from_composite_driver<'a>(
     composite_driver: &'a ResolvedDriver,
 ) -> Result<&'a DecodedCompositeBindRules, i32> {

@@ -28,7 +28,6 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/v2/composite_assembler.h"
-#include "src/devices/bin/driver_manager/v2/composite_manager.h"
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 #include "src/devices/bin/driver_manager/v2/node.h"
@@ -127,9 +126,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   // This is for dfv1 composite devices.
   CompositeDeviceManager composite_device_manager_;
-
-  // This is for dfv2 composites.
-  CompositeNodeManager composite_node_manager_;
 
   // This is for dfv2 composite node specs.
   CompositeNodeSpecManager composite_node_spec_manager_;
