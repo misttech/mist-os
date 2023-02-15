@@ -4,12 +4,14 @@
 
 mod device_info;
 mod handlebars_utils;
+mod partition_reader;
 mod responder;
 mod storage_info;
 mod webserver;
 
 use crate::device_info::DeviceInfoImpl;
 use crate::handlebars_utils::TemplateEngine;
+use crate::partition_reader::PartitionReader;
 use crate::responder::ResponderImpl;
 use crate::storage_info::StorageInfo;
 use crate::webserver::{WebServer, WebServerImpl};
@@ -109,15 +111,23 @@ async fn stakeout(
     let boxed_device_info =
         Box::new(DeviceInfoImpl::new(board_info, device_info, product_info, storage_info));
 
+    let partition_reader = PartitionReader::new(
+        fuchsia_component::client::connect_to_protocol_at_path::<
+            fidl_fuchsia_hardware_block::BlockMarker,
+        >,
+    )
+    .await?;
+    let partition_reader = Box::new(partition_reader);
+
     // Construct a responder for generating HTTP responses from HTTP requests.
-    let responder_impl = ResponderImpl::new(template_engine, boxed_device_info);
+    let responder_impl = ResponderImpl::new(template_engine, partition_reader, boxed_device_info);
     let responder = Arc::new(Mutex::new(responder_impl));
 
     // Start handling incoming web requests using the responder.
     web_server.run(LISTENING_PORT, responder).await
 }
 
-#[fuchsia::main]
+#[fuchsia::main(threads = 10)]
 async fn main() {
     let web_server_impl = WebServerImpl {};
     let template_engine = Box::new(Handlebars::new());

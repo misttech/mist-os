@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 #[automock]
 #[async_trait]
-pub trait WebServer {
+pub trait WebServer: Sync + Send {
     async fn run(
         &self,
         port: u16,

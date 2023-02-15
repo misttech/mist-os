@@ -4,6 +4,8 @@
 
 use crate::device_info::DeviceInfoImpl;
 use crate::handlebars_utils::TemplateEngine;
+use crate::partition_reader::PartitionReader;
+use fuchsia_async::Task;
 use mockall::automock;
 use std::fs;
 use std::path::Path;
@@ -18,12 +20,55 @@ pub trait Responder: Send + Sync {
 
 pub struct ResponderImpl {
     pub template_engine: Box<dyn TemplateEngine>,
+    pub partition_reader: Box<PartitionReader>,
     pub device_info: Box<DeviceInfoImpl>,
 }
 
 impl ResponderImpl {
-    pub fn new(template_engine: Box<dyn TemplateEngine>, device_info: Box<DeviceInfoImpl>) -> Self {
-        ResponderImpl { template_engine, device_info }
+    pub fn new(
+        template_engine: Box<dyn TemplateEngine>,
+        partition_reader: Box<PartitionReader>,
+        device_info: Box<DeviceInfoImpl>,
+    ) -> Self {
+        ResponderImpl { template_engine, partition_reader, device_info }
+    }
+
+    pub fn get_stream_content(&self, request: &str) -> Option<ResponderResult> {
+        if !request.starts_with("/download/") {
+            return None;
+        }
+
+        let (sender, body) = hyper::body::Body::channel();
+
+        let name = String::from(&request[10..]);
+
+        let Ok((block_count, block_size)) = self.partition_reader.size(&name) else {
+            println!("Unable to get sizes for {:?}", &name);
+            return None;
+        };
+
+        let Ok(reader) = self.partition_reader.allocate_reader(name.clone(), sender) else {
+            println!("Unable to allocate reader for {:?}", &name);
+            return None;
+        };
+
+        Task::spawn(async move {
+            match reader.await {
+                Ok(()) => println!("Streaming completed."),
+                Err(e) => {
+                    println!("Streaming died with: {:?}", e);
+                }
+            }
+        })
+        .detach();
+
+        Some(
+            hyper::Response::builder()
+                .status(hyper::StatusCode::OK)
+                .header("Content-Type", "application/octet-stream")
+                .header("Content-Length", block_count * block_size as u64)
+                .body(body),
+        )
     }
 
     // If available, returns static content associated with requested path.
@@ -83,6 +128,8 @@ impl Responder for ResponderImpl {
 
         if let Some(static_content) = self.get_static_content(path) {
             static_content
+        } else if let Some(stream_content) = self.get_stream_content(path) {
+            stream_content
         } else {
             self.template_content(path)
         }
@@ -91,11 +138,9 @@ impl Responder for ResponderImpl {
 
 #[cfg(test)]
 mod tests {
-    use crate::device_info::DeviceInfoImpl;
+    use super::*;
     use crate::handlebars_utils::MockTemplateEngine;
-    use crate::responder::{Responder, ResponderImpl};
     use mockall::predicate::{always, eq};
-    use std::path::Path;
 
     const TEMPLATE_NAME_FOR_404_RESPONSE: &str = "404";
     const TEMPLATE_NAME_FOR_INDEX_RESPONSE: &str = "index";
@@ -123,8 +168,11 @@ mod tests {
             .returning(|_, _| Ok(RENDERED_TEMPLATE_CONTENT.to_string()));
 
         // Instance our responder-under-test.
-        let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::default()));
+        let responder = ResponderImpl::new(
+            Box::new(template_engine),
+            Box::new(PartitionReader::default()),
+            Box::new(DeviceInfoImpl::default()),
+        );
 
         // Create a "garbage" test request for our responder-under-test to handle.
         let garbage_request = hyper::Request::builder()
@@ -153,8 +201,11 @@ mod tests {
             .returning(|_, _| Ok(RENDERED_TEMPLATE_CONTENT.to_string()));
 
         // Instance our responder-under-test.
-        let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::default()));
+        let responder = ResponderImpl::new(
+            Box::new(template_engine),
+            Box::new(PartitionReader::default()),
+            Box::new(DeviceInfoImpl::default()),
+        );
 
         // Create a "index" test request for our responder-under-test to handle.
         let index_request = hyper::Request::builder()
@@ -183,8 +234,11 @@ mod tests {
             .returning(|_, _| Ok(RENDERED_TEMPLATE_CONTENT.to_string()));
 
         // Create responder-under-test with mocked handlebars and empty DeviceInfo.
-        let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::default()));
+        let responder = ResponderImpl::new(
+            Box::new(template_engine),
+            Box::new(PartitionReader::default()),
+            Box::new(DeviceInfoImpl::default()),
+        );
 
         // Create a "info" test request for our responder-under-test to handle.
         let info_request = hyper::Request::builder()
@@ -206,6 +260,7 @@ mod tests {
     fn accessible_static_resource_found() -> std::result::Result<(), anyhow::Error> {
         let responder = ResponderImpl::new(
             Box::new(MockTemplateEngine::new()),
+            Box::new(PartitionReader::default()),
             Box::new(DeviceInfoImpl::default()),
         );
 
@@ -237,8 +292,11 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(RENDERED_TEMPLATE_CONTENT.to_string()));
 
-        let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::default()));
+        let responder = ResponderImpl::new(
+            Box::new(template_engine),
+            Box::new(PartitionReader::default()),
+            Box::new(DeviceInfoImpl::default()),
+        );
 
         let info_request = hyper::Request::builder()
             .uri(ILLEGAL_STATIC_URI)
