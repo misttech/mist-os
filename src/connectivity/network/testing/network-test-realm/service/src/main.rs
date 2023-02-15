@@ -252,8 +252,9 @@ async fn wait_for_any_ip_address(
 /// returned.
 async fn find_interface_id_and_status(
     expected_mac_address: fnet_ext::MacAddress,
+    connector: &impl Connector,
 ) -> Result<(u64, bool), fntr::Error> {
-    let state_proxy = SystemConnector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
+    let state_proxy = connector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
     let stream = fnet_interfaces_ext::event_stream_from_state(&state_proxy).map_err(|e| {
         error!("failed to read interface stream: {:?}", e);
         fntr::Error::Internal
@@ -264,8 +265,7 @@ async fn find_interface_id_and_status(
         fntr::Error::Internal
     })?;
 
-    let debug_interfaces_proxy =
-        SystemConnector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
+    let debug_interfaces_proxy = connector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
 
     let interfaces_stream = futures::stream::iter(interfaces.into_values());
 
@@ -1278,7 +1278,8 @@ impl Controller {
             .as_ref()
             .ok_or(fntr::Error::HermeticNetworkRealmNotRunning)?;
 
-        let (interface_id, enabled) = find_interface_id_and_status(mac_address).await?;
+        let (interface_id, enabled) =
+            find_interface_id_and_status(mac_address, &SystemConnector).await?;
         install_interface(name, interface_id, wait_any_ip_address, hermetic_network_connector)
             .await?;
 
@@ -1316,7 +1317,7 @@ impl Controller {
         futures::stream::iter(self.mutated_interface_ids.drain(..))
             .for_each_concurrent(None, |id| async move {
                 enable_interface(id, &SystemConnector).await.unwrap_or_else(|e| {
-                    warn!("failed to re-enable interface id: {} with erorr: {:?}", id, e)
+                    warn!("failed to re-enable interface id: {} with error: {:?}", id, e)
                 })
             })
             .await;
