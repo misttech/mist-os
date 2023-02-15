@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 use argh::FromArgs;
 use async_trait::async_trait;
-use ffx_writer::Writer;
-use fho::{FfxContext, FfxMain, FfxTool, Result};
+use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -24,15 +23,15 @@ pub struct EchoTool {
 
 #[async_trait(?Send)]
 impl FfxMain for EchoTool {
-    type Writer = Writer;
-    async fn main(self, writer: &Writer) -> Result<()> {
+    type Writer = MachineWriter<String>;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
         let text = self.cmd.text.as_deref().unwrap_or("FFX");
         let echo_out = self
             .echo_proxy
             .echo_string(text)
             .await
             .user_message("Error returned from echo service")?;
-        writer.line(echo_out)?;
+        writer.item(&echo_out)?;
         Ok(())
     }
 }
@@ -40,6 +39,7 @@ impl FfxMain for EchoTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fho::macro_deps::ffx_writer::TestBuffer;
     use futures_lite::stream::StreamExt;
 
     fn setup_fake_echo_proxy() -> fho::DaemonProtocol<ffx::EchoProxy> {
@@ -63,9 +63,10 @@ mod tests {
         const ECHO: &'static str = "foo";
         let cmd = EchoCommand { text: Some(ECHO.to_owned()) };
         let echo_proxy = setup_fake_echo_proxy();
-        let writer = Writer::new_test(None);
+        let test_stdout = TestBuffer::default();
+        let writer = MachineWriter::new_buffers(None, test_stdout.clone(), Vec::new());
         let tool = EchoTool { cmd, echo_proxy };
-        tool.main(&writer).await.unwrap();
-        assert_eq!(format!("{ECHO}\n"), writer.test_output().unwrap());
+        tool.main(writer).await.unwrap();
+        assert_eq!(format!("{ECHO}\n"), test_stdout.into_string());
     }
 }

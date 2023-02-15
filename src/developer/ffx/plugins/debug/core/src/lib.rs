@@ -36,7 +36,7 @@ fho::embedded_plugin!(CoreTool);
 #[async_trait(?Send)]
 impl FfxMain for CoreTool {
     type Writer = SimpleWriter;
-    async fn main(self, _writer: &SimpleWriter) -> fho::Result<()> {
+    async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
         if let Err(e) = symbol_index::ensure_symbol_index_registered(&self.sdk).await {
             eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }

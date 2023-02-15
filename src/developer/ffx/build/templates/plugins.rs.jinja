@@ -93,7 +93,7 @@ impl fho::FfxTool for SuiteAdapterTool {
 #[fho::macro_deps::async_trait(?Send)]
 impl fho::FfxMain for SuiteAdapter {
     type Writer = fho::SimpleWriter;
-    async fn main(self, _writer: &Self::Writer) -> fho::Result<()> {
+    async fn main(self, _writer:  Self::Writer) -> fho::Result<()> {
         ffx_plugin_impl(&self.injector, self.cmd).await
     }
 }

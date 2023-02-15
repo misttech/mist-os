@@ -72,6 +72,12 @@ impl From<FfxError> for Error {
     }
 }
 
+impl From<ffx_writer::Error> for Error {
+    fn from(error: ffx_writer::Error) -> Self {
+        Error::Unexpected(error.into())
+    }
+}
+
 impl Error {
     /// Map an argh early exit to our kind of error
     pub fn from_early_exit(command: &[impl AsRef<str>], early_exit: argh::EarlyExit) -> Self {

@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_command::{Error, FfxContext, Result};
 use ffx_fidl::DaemonError;
+use ffx_writer::ToolIO;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use selectors::{self, VerboseError};
@@ -362,6 +363,32 @@ impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
 impl TryFromEnv for ffx_writer::Writer {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.writer().await.user_message("Failed to create writer")
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for ffx_writer::SimpleWriter {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        if env.ffx.global.machine.is_some() {
+            Err(Error::User(anyhow::anyhow!(
+                "The machine flag is not supported for this subcommand"
+            )))
+        } else {
+            Ok(ffx_writer::SimpleWriter::new())
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: serde::Serialize> TryFromEnv for ffx_writer::MachineWriter<T> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        if env.ffx.global.machine.is_some() && !Self::is_machine_supported() {
+            Err(Error::User(anyhow::anyhow!(
+                "The machine flag is not supported for this subcommand"
+            )))
+        } else {
+            Ok(ffx_writer::MachineWriter::new(env.ffx.global.machine))
+        }
     }
 }
 

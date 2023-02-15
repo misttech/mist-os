@@ -19,7 +19,7 @@ pub use fho_metadata::*;
 pub use ffx_command::{Error, FfxContext, Result};
 
 // Re-expose the ffx_writer::Writer as the 'simple writer'
-pub use ffx_writer::Writer as SimpleWriter;
+pub use ffx_writer::{MachineWriter, SimpleWriter, ToolIO};
 
 #[doc(hidden)]
 pub mod macro_deps {
@@ -29,6 +29,7 @@ pub mod macro_deps {
     pub use ffx_command::{Ffx, FfxCommandLine, ToolRunner};
     pub use ffx_config::{global_env_context, EnvironmentContext};
     pub use ffx_core::Injector;
+    pub use ffx_writer;
     pub use futures;
     pub use serde;
 }

@@ -61,7 +61,7 @@ fho::embedded_plugin!(FidlTool);
 impl FfxMain for FidlTool {
     type Writer = SimpleWriter;
 
-    async fn main(self, _writer: &SimpleWriter) -> fho::Result<()> {
+    async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
         let Self { cmd, sdk, debugger_proxy } = self;
 
         if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {

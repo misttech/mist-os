@@ -24,7 +24,7 @@ macro_rules! embedded_plugin {
 
             let writer = $crate::TryFromEnv::try_from_env(&env).await?;
             let tool = <$tool as $crate::FfxTool>::from_env(env, cmd).await?;
-            match $crate::FfxMain::main(tool, &writer).await {
+            match $crate::FfxMain::main(tool, writer).await {
                 Ok(ok) => Ok(ok),
                 Err($crate::Error::User(err)) => Err(err),
                 Err($crate::Error::Unexpected(err)) => Err(err),
@@ -33,8 +33,8 @@ macro_rules! embedded_plugin {
         }
 
         pub fn ffx_plugin_is_machine_supported() -> bool {
-            use $crate::FfxToolIo;
-            <$tool as $crate::FfxMain>::Writer::is_machine_supported()
+            use $crate::macro_deps::ffx_writer::ToolIO;
+            <<$tool as $crate::FfxMain>::Writer as ToolIO>::is_machine_supported()
         }
     };
 }

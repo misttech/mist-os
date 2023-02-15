@@ -10,9 +10,11 @@ use ffx_command::{
 };
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use std::{
-    fs::File, os::unix::process::ExitStatusExt, path::PathBuf, process::ExitStatus, sync::Arc,
-};
+use ffx_writer::ToolIO;
+use std::os::unix::process::ExitStatusExt;
+use std::process::ExitStatus;
+use std::sync::Arc;
+use std::{fs::File, path::PathBuf};
 
 use crate::{FhoToolMetadata, TryFromEnv};
 
@@ -35,19 +37,12 @@ pub trait FfxTool: Sized {
 
 #[async_trait(?Send)]
 pub trait FfxMain: Sized {
-    type Writer: FfxToolIo + TryFromEnv;
+    type Writer: ToolIO + TryFromEnv;
 
     /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
     /// invoked. Should not be invoked directly unless for testing.
-    async fn main(self, writer: &Self::Writer) -> Result<()>;
+    async fn main(self, writer: Self::Writer) -> Result<()>;
 }
-
-pub trait FfxToolIo {
-    fn is_machine_supported() -> bool {
-        false
-    }
-}
-impl FfxToolIo for ffx_writer::Writer {}
 
 #[derive(FromArgs)]
 #[argh(subcommand)]
@@ -157,7 +152,7 @@ async fn run_main<T: FfxTool>(
     let env = FhoEnvironment { ffx: cmd, context: suite.context, injector: Arc::new(injector) };
     let writer = TryFromEnv::try_from_env(&env).await?;
     let main = T::from_env(env, tool).await?;
-    main.main(&writer).await.map(|_| ExitStatus::from_raw(0))
+    main.main(writer).await.map(|_| ExitStatus::from_raw(0))
 }
 
 #[async_trait::async_trait(?Send)]
@@ -201,14 +196,14 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let tool_env = fho::testing::ToolEnv::new()
             .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
-        let writer = SimpleWriter::new_test(None);
+        let writer = SimpleWriter::new_buffers(Vec::new(), Vec::new());
         let fake_tool = tool_env.build_tool::<FakeTool>(config_env.context.clone()).await.unwrap();
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
             1,
             "tool pre-check should have been called once"
         );
-        fake_tool.main(&writer).await.unwrap();
+        fake_tool.main(writer).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -221,8 +216,8 @@ mod tests {
         }
         #[async_trait(?Send)]
         impl FfxMain for FakeToolWillFail {
-            type Writer = ffx_writer::Writer;
-            async fn main(self, _writer: &Self::Writer) -> Result<()> {
+            type Writer = SimpleWriter;
+            async fn main(self, _writer: Self::Writer) -> Result<()> {
                 panic!("This should never get called")
             }
         }

@@ -6,7 +6,7 @@
 use anyhow as _;
 use async_trait::async_trait;
 use ffx_daemon_stop_args::StopCommand;
-use fho::{FfxContext, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{FfxContext, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
 
 #[derive(FfxTool)]
@@ -21,7 +21,7 @@ fho::embedded_plugin!(StopTool);
 #[async_trait(?Send)]
 impl FfxMain for StopTool {
     type Writer = SimpleWriter;
-    async fn main(self, writer: &SimpleWriter) -> Result<()> {
+    async fn main(self, mut writer: SimpleWriter) -> Result<()> {
         if let Some(d) = self.daemon_proxy {
             d.quit().await.bug()?;
         }
@@ -37,6 +37,7 @@ impl FfxMain for StopTool {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::macro_deps::ffx_writer::TestBuffer;
     use futures_lite::StreamExt;
 
     fn setup_fake_daemon_server() -> ffx::DaemonProxy {
@@ -63,14 +64,15 @@ mod test {
         let config_env = ffx_config::test_init().await.unwrap();
         let tool_env = fho::testing::ToolEnv::new()
             .try_daemon_closure(|| async { Ok(Some(setup_fake_daemon_server())) });
-        let writer = SimpleWriter::new_test(None);
+        let test_stdout = TestBuffer::default();
+        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
         let tool = tool_env
             .build_tool_from_cmd::<StopTool>(StopCommand {}, config_env.context.clone())
             .await
             .unwrap();
-        let result = tool.main(&writer).await;
+        let result = tool.main(writer).await;
         assert!(result.is_ok());
-        let output = writer.test_output().unwrap();
+        let output = test_stdout.into_string();
         assert_eq!(output, "Stopped daemon.\n");
     }
 }

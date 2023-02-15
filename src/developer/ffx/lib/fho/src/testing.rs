@@ -169,7 +169,7 @@ impl Injector for FakeInjector {
 #[cfg(test)]
 mod internal {
     use super::*;
-    use crate::{self as fho, CheckEnv, FfxMain, FhoEnvironment, Result, TryFromEnv};
+    use crate::{self as fho, CheckEnv, FfxMain, FhoEnvironment, Result, ToolIO, TryFromEnv};
     use argh::FromArgs;
     use std::cell::RefCell;
 
@@ -220,8 +220,8 @@ mod internal {
 
     #[async_trait(?Send)]
     impl FfxMain for FakeTool {
-        type Writer = ffx_writer::Writer;
-        async fn main(self, writer: &Self::Writer) -> Result<()> {
+        type Writer = ffx_writer::SimpleWriter;
+        async fn main(self, mut writer: Self::Writer) -> Result<()> {
             assert_eq!(self.from_env_string.0, "foobar");
             assert_eq!(self.fake_command.stuff, "stuff");
             writer.line("junk-line").unwrap();
