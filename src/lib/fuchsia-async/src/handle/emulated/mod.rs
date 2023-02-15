@@ -297,6 +297,7 @@ pub trait HandleBased: AsHandleRef + From<Handle> + Into<Handle> {
 
 /// Representation of a handle-like object
 #[derive(PartialEq, Eq, Debug, Ord, PartialOrd, Hash)]
+#[repr(transparent)]
 pub struct Handle(u32);
 
 impl Drop for Handle {
