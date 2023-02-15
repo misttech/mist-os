@@ -11,7 +11,7 @@ use {
         object_store::{
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
-            object_record::{ObjectItem, ObjectItemV5, ObjectKey, ObjectValue},
+            object_record::{ObjectItem, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue},
         },
         serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
@@ -530,6 +530,10 @@ pub struct Transaction<'a> {
 
     /// The reservation for the metadata for this transaction.
     pub metadata_reservation: MetadataReservation,
+
+    // Keep track of objects explicitly created by this transaction. No locks are required for them.
+    // Addressed by (owner_object_id, object_id).
+    new_objects: BTreeSet<(u64, u64)>,
 }
 
 impl<'a> Transaction<'a> {
@@ -555,6 +559,7 @@ impl<'a> Transaction<'a> {
             read_locks,
             allocator_reservation: None,
             metadata_reservation,
+            new_objects: BTreeSet::new(),
         }
     }
 
@@ -563,36 +568,82 @@ impl<'a> Transaction<'a> {
     }
 
     pub fn take_mutations(&mut self) -> BTreeSet<TxnMutation<'a>> {
+        self.new_objects.clear();
         mem::take(&mut self.mutations)
     }
 
     /// Adds a mutation to this transaction.  If the mutation already exists, it is replaced and the
     /// old mutation is returned.
     pub fn add(&mut self, object_id: u64, mutation: Mutation) -> Option<Mutation> {
-        assert!(object_id != INVALID_OBJECT_ID);
-        self.mutations
-            .replace(TxnMutation { object_id, mutation, associated_object: AssocObj::None })
-            .map(|m| m.mutation)
+        self.add_with_object(object_id, mutation, AssocObj::None)
     }
 
     /// Removes a mutation that matches `mutation`.
     pub fn remove(&mut self, object_id: u64, mutation: Mutation) {
-        self.mutations.remove(&TxnMutation {
-            object_id,
-            mutation,
-            associated_object: AssocObj::None,
-        });
+        let txn_mutation = TxnMutation { object_id, mutation, associated_object: AssocObj::None };
+        if self.mutations.remove(&txn_mutation) {
+            if let Mutation::ObjectStore {
+                0: ObjectStoreMutation { item: ObjectItem { key, .. }, op: Operation::Insert },
+            } = txn_mutation.mutation
+            {
+                self.new_objects.remove(&(object_id, key.object_id));
+            }
+        }
     }
 
-    /// Adds a mutation with an associated object.
+    /// Adds a mutation with an associated object. If the mutation already exists, it is replaced
+    /// and the old mutation is returned.
     pub fn add_with_object(
         &mut self,
         object_id: u64,
         mutation: Mutation,
         associated_object: AssocObj<'a>,
-    ) {
+    ) -> Option<Mutation> {
         assert!(object_id != INVALID_OBJECT_ID);
-        self.mutations.replace(TxnMutation { object_id, mutation, associated_object });
+        let txn_mutation = TxnMutation { object_id, mutation, associated_object };
+        self.verify_locks(&txn_mutation);
+        self.mutations.replace(txn_mutation).map(|m| m.mutation)
+    }
+
+    fn verify_locks(&mut self, mutation: &TxnMutation<'_>) {
+        // It was considered to change the locks from Vec to BTreeSet since we'll now be searching
+        // through it, but given the small set that these locks usually comprise, it probably isn't
+        // worth it.
+        if let TxnMutation {
+            mutation:
+                Mutation::ObjectStore { 0: ObjectStoreMutation { item: ObjectItem { key, .. }, op } },
+            object_id: store_object_id,
+            ..
+        } = mutation
+        {
+            // Insert implies the caller expects no object with which to race
+            match op {
+                Operation::Insert => {
+                    self.new_objects.insert((*store_object_id, key.object_id));
+                }
+                Operation::Merge | Operation::ReplaceOrInsert => {
+                    let id = key.object_id;
+                    match &key.data {
+                        ObjectKeyData::Object => {
+                            if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
+                                && !self.new_objects.contains(&(*store_object_id, id))
+                            {
+                                debug_assert!(
+                                    false,
+                                    "Not holding required lock for object {id} \
+                                    in store {store_object_id}"
+                                );
+                                error!(
+                                    "Not holding required lock for object {id} in store \
+                                    {store_object_id}"
+                                )
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 
     /// Returns true if this transaction has no mutations.
@@ -647,7 +698,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Commits the transaction, but allows the transaction to be used again.  The locks are not
-    /// dropped (but write locks will get downgraded to transaction locks).
+    /// dropped (but transaction locks will get downgraded to read locks).
     pub async fn commit_and_continue(&mut self) -> Result<(), Error> {
         debug!(txn = ?self, "Commit");
         self.handler.clone().commit_transaction(self, &mut |_| {}).await?;
