@@ -16,14 +16,14 @@ use {
 const INDENT_SIZE: usize = 2;
 
 trait DeviceInfoPrinter {
-    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()>;
+    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()>;
 
-    fn print_graph_node(&self, writer: &mut impl Write) -> Result<()>;
-    fn print_graph_edge(&self, writer: &mut impl Write, child: &fdd::DeviceInfo) -> Result<()>;
+    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()>;
+    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::DeviceInfo) -> Result<()>;
 }
 
 impl DeviceInfoPrinter for DFv1Device {
-    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
+    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
         writeln!(
             writer,
             "{:indent$}[{}] pid={} {}",
@@ -36,7 +36,7 @@ impl DeviceInfoPrinter for DFv1Device {
         Ok(())
     }
 
-    fn print_graph_node(&self, writer: &mut impl Write) -> Result<()> {
+    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()> {
         writeln!(
             writer,
             "     \"{}\" [label=\"{}\"]",
@@ -46,7 +46,7 @@ impl DeviceInfoPrinter for DFv1Device {
         Ok(())
     }
 
-    fn print_graph_edge(&self, writer: &mut impl Write, child: &fdd::DeviceInfo) -> Result<()> {
+    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::DeviceInfo) -> Result<()> {
         writeln!(
             writer,
             "     \"{}\" -> \"{}\"",
@@ -58,7 +58,7 @@ impl DeviceInfoPrinter for DFv1Device {
 }
 
 impl DeviceInfoPrinter for DFv2Node {
-    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
+    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
         writeln!(
             writer,
             "{:indent$}[{}] pid={} {}",
@@ -71,7 +71,7 @@ impl DeviceInfoPrinter for DFv2Node {
         Ok(())
     }
 
-    fn print_graph_node(&self, writer: &mut impl Write) -> Result<()> {
+    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()> {
         writeln!(
             writer,
             "     \"{}\" [label=\"{}\"]",
@@ -81,7 +81,7 @@ impl DeviceInfoPrinter for DFv2Node {
         Ok(())
     }
 
-    fn print_graph_edge(&self, writer: &mut impl Write, child: &fdd::DeviceInfo) -> Result<()> {
+    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::DeviceInfo) -> Result<()> {
         writeln!(
             writer,
             "     \"{}\" -> \"{}\"",
@@ -93,21 +93,21 @@ impl DeviceInfoPrinter for DFv2Node {
 }
 
 impl DeviceInfoPrinter for Device {
-    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
+    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
         match self {
             Device::V1(device) => device.print(writer, indent_level),
             Device::V2(device) => device.print(writer, indent_level),
         }
     }
 
-    fn print_graph_node(&self, writer: &mut impl Write) -> Result<()> {
+    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()> {
         match self {
             Device::V1(device) => device.print_graph_node(writer),
             Device::V2(node) => node.print_graph_node(writer),
         }
     }
 
-    fn print_graph_edge(&self, writer: &mut impl Write, child: &fdd::DeviceInfo) -> Result<()> {
+    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::DeviceInfo) -> Result<()> {
         match self {
             Device::V1(device) => device.print_graph_edge(writer, child),
             Device::V2(node) => node.print_graph_edge(writer, child),
@@ -116,7 +116,7 @@ impl DeviceInfoPrinter for Device {
 }
 
 fn print_tree(
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     root: &Device,
     device_map: &BTreeMap<u64, &Device>,
 ) -> Result<()> {
@@ -137,7 +137,7 @@ fn print_tree(
 
 pub async fn dump(
     cmd: DumpCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     let devices: Vec<Device> = fuchsia_driver_dev::get_device_info(

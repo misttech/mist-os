@@ -40,7 +40,7 @@ pub fn node_property_value_to_string(value: &fdf::NodePropertyValue) -> String {
 
 pub fn write_node_properties(
     properties: &Vec<fdf::NodeProperty>,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
 ) -> Result<()> {
     let props_len = properties.len();
     writeln!(writer, "  {0} {1}", props_len, "Properties")?;

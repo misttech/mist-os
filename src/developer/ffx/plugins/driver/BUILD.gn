@@ -18,6 +18,7 @@ ffx_plugin("ffx_driver") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/devices/bin/driver_tools:lib",
     "//src/devices/bin/driver_tools/connector:lib",
     "//src/lib/diagnostics/selectors",

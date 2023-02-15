@@ -13,7 +13,7 @@ use {
 
 pub async fn restart(
     cmd: RestartCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     writeln!(writer, "Restarting driver hosts containing {}", cmd.driver_path)?;

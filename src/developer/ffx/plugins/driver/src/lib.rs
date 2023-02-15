@@ -7,6 +7,7 @@ use {
     component_debug::capability,
     ffx_core::ffx_plugin,
     ffx_driver_args::DriverCommand,
+    ffx_writer::Writer,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_device_manager as fdm,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
@@ -199,7 +200,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 #[ffx_plugin()]
 pub async fn driver(
     remote_control: Option<rc::RemoteControlProxy>,
+    mut writer: Writer,
     cmd: DriverCommand,
 ) -> Result<()> {
-    driver_tools::driver(cmd.into(), DriverConnector::new(remote_control)).await
+    driver_tools::driver(cmd.into(), DriverConnector::new(remote_control), &mut writer).await
 }

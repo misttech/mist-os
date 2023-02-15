@@ -16,7 +16,7 @@ use {
 
 pub async fn list_composite_node_specs(
     cmd: ListCompositeNodeSpecsCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     let specs = fuchsia_driver_dev::get_composite_node_specs(&driver_development_proxy, cmd.name)

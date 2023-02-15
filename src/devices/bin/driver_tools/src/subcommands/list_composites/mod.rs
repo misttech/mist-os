@@ -14,7 +14,7 @@ use {
 
 pub async fn list_composites(
     cmd: ListCompositesCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
     let (iterator, iterator_server) =
@@ -43,7 +43,7 @@ pub async fn list_composites(
 }
 
 fn write_composite(
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     composite: fdd::CompositeInfo,
     verbose: bool,
 ) -> Result<()> {
@@ -76,7 +76,7 @@ fn write_composite(
 }
 
 fn write_legacy_composite_node_info(
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     primary_index: Option<u32>,
     composite: fdd::LegacyCompositeNodeInfo,
 ) -> Result<()> {
@@ -113,7 +113,7 @@ fn write_legacy_composite_node_info(
 }
 
 fn write_parent_nodes_info(
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     primary_index: Option<u32>,
     parents: Vec<fdd::CompositeParentNodeInfo>,
 ) -> Result<()> {

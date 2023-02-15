@@ -20,7 +20,11 @@ use {
 #[cfg(not(target_os = "fuchsia"))]
 use {futures::lock::Mutex, std::sync::Arc};
 
-pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) -> Result<()> {
+pub async fn driver(
+    cmd: DriverCommand,
+    driver_connector: impl DriverConnector,
+    writer: &mut dyn io::Write,
+) -> Result<()> {
     match cmd.subcommand {
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Conformance(_subcmd) => {
@@ -33,13 +37,9 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::debug_bind::debug_bind(
-                subcmd,
-                &mut io::stdout(),
-                driver_development_proxy,
-            )
-            .await
-            .context("Debug-bind subcommand failed")?;
+            subcommands::debug_bind::debug_bind(subcmd, writer, driver_development_proxy)
+                .await
+                .context("Debug-bind subcommand failed")?;
         }
         DriverSubCommand::Device(subcmd) => {
             let dev = driver_connector
@@ -53,7 +53,7 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::dump::dump(subcmd, &mut io::stdout(), driver_development_proxy)
+            subcommands::dump::dump(subcmd, writer, driver_development_proxy)
                 .await
                 .context("Dump subcommand failed")?;
         }
@@ -61,33 +61,25 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
         DriverSubCommand::I2c(ref subcmd) => {
             let dev =
                 driver_connector.get_dev_proxy(false).await.context("Failed to get dev proxy")?;
-            subcommands::i2c::i2c(subcmd, &mut io::stdout(), &dev)
-                .await
-                .context("I2C subcommand failed")?;
+            subcommands::i2c::i2c(subcmd, writer, &dev).await.context("I2C subcommand failed")?;
         }
         DriverSubCommand::List(subcmd) => {
-            let mut writer = io::stdout();
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::list::list(subcmd, &mut writer, driver_development_proxy)
+            subcommands::list::list(subcmd, writer, driver_development_proxy)
                 .await
                 .context("List subcommand failed")?;
         }
         DriverSubCommand::ListComposites(subcmd) => {
-            let mut writer = io::stdout();
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(false)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::list_composites::list_composites(
-                subcmd,
-                &mut writer,
-                driver_development_proxy,
-            )
-            .await
-            .context("List composites subcommand failed")?;
+            subcommands::list_composites::list_composites(subcmd, writer, driver_development_proxy)
+                .await
+                .context("List composites subcommand failed")?;
         }
         DriverSubCommand::ListDevices(subcmd) => {
             let driver_development_proxy = driver_connector
@@ -108,14 +100,13 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .context("List-hosts subcommand failed")?;
         }
         DriverSubCommand::ListCompositeNodeSpecs(subcmd) => {
-            let mut writer = io::stdout();
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
             subcommands::list_composite_node_specs::list_composite_node_specs(
                 subcmd,
-                &mut writer,
+                writer,
                 driver_development_proxy,
             )
             .await
@@ -167,7 +158,7 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .context("Failed to get driver development proxy")?;
             subcommands::register::register(
                 subcmd,
-                &mut io::stdout(),
+                writer,
                 driver_registrar_proxy,
                 driver_development_proxy,
             )
@@ -179,7 +170,7 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::restart::restart(subcmd, &mut io::stdout(), driver_development_proxy)
+            subcommands::restart::restart(subcmd, writer, driver_development_proxy)
                 .await
                 .context("Restart subcommand failed")?;
         }
@@ -189,13 +180,13 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .get_tool_runner_proxy(false)
                 .await
                 .context("Failed to get tool runner proxy")?;
-            subcommands::runtool::run_tool(subcmd, &mut io::stdout(), tool_runner_proxy)
+            subcommands::runtool::run_tool(subcmd, writer, tool_runner_proxy)
                 .await
                 .context("RunTool subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::StaticChecks(subcmd) => {
-            static_checks_lib::static_checks(subcmd, &mut io::stdout())
+            static_checks_lib::static_checks(subcmd, writer)
                 .await
                 .context("StaticChecks subcommand failed")?;
         }

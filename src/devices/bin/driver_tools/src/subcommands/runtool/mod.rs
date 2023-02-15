@@ -17,7 +17,7 @@ use {
 
 pub async fn run_tool(
     cmd: RunToolCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     tool_runner_proxy: fdp::ToolRunnerProxy,
 ) -> Result<()> {
     let (controller_proxy, controller_server_end) = create_proxy::<fdp::CloseControllerMarker>()?;

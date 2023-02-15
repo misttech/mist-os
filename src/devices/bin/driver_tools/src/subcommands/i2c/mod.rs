@@ -15,7 +15,7 @@ use {
 
 pub async fn i2c(
     cmd: &I2cCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     dev: &fio::DirectoryProxy,
 ) -> Result<()> {
     match cmd.subcommand {

@@ -13,7 +13,7 @@ use {
 
 pub async fn write(
     cmd: &WriteCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     dev: &fio::DirectoryProxy,
 ) -> Result<()> {
     let device = super::connect_to_i2c_device(&cmd.device_path, dev)

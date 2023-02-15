@@ -14,7 +14,7 @@ use {
 
 pub async fn register(
     cmd: RegisterCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     driver_registrar_proxy: fdr::DriverRegistrarProxy,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {

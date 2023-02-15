@@ -76,5 +76,5 @@ impl driver_connector::DriverConnector for DriverConnector {
 #[fasync::run_singlethreaded]
 async fn main() -> Result<()> {
     let cmd: DriverCommand = argh::from_env();
-    driver_tools::driver(cmd, DriverConnector::new()).await
+    driver_tools::driver(cmd, DriverConnector::new(), &mut std::io::stdout()).await
 }

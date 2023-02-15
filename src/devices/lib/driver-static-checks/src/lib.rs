@@ -13,7 +13,7 @@ use fuchsia_archive::Utf8Reader;
 use std::io::{Cursor, Write};
 
 /// Entry-point for the command `ffx driver static-checks`.
-pub async fn static_checks(cmd: StaticChecksCommand, writer: &mut impl Write) -> Result<()> {
+pub async fn static_checks(cmd: StaticChecksCommand, writer: &mut dyn Write) -> Result<()> {
     let cursor = Cursor::new(std::fs::read(&cmd.driver)?);
     let mut far_reader = Utf8Reader::new(cursor)?;
 
@@ -90,7 +90,7 @@ impl<'a> StaticChecker<'a> {
 
     fn run_check(
         &mut self,
-        writer: &mut impl Write,
+        writer: &mut dyn Write,
         name: &str,
         f: checks::CheckFunction,
     ) -> Result<()> {

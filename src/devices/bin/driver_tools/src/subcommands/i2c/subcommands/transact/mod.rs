@@ -59,7 +59,7 @@ fn parse_transactions<T: AsRef<str> + Display>(
 
 pub async fn transact(
     cmd: &TransactCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     dev: &fio::DirectoryProxy,
 ) -> Result<()> {
     let transactions =

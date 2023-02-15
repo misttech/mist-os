@@ -13,7 +13,7 @@ use {
 
 pub async fn ping(
     _cmd: &PingCommand,
-    writer: &mut impl Write,
+    writer: &mut dyn Write,
     dev: &fio::DirectoryProxy,
 ) -> Result<()> {
     async fn ping_device(device_name: &str, dir: &fio::DirectoryProxy) -> Result<()> {
