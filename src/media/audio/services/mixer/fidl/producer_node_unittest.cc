@@ -44,7 +44,8 @@ enum class TestDataSource {
 };
 
 struct TestHarness {
-  TestHarness(TestHarness&& rhs) = default;
+  explicit TestHarness(FakeGraph& graph);
+  TestHarness(TestHarness&&) = default;
   ~TestHarness();
 
   FakeGraph& graph;
@@ -57,6 +58,8 @@ struct TestHarness {
   std::shared_ptr<ProducerNode> producer;
 };
 
+TestHarness::TestHarness(FakeGraph& graph) : graph(graph) {}
+
 TestHarness::~TestHarness() {
   // Cleanup references.
   const auto& ctx = graph.ctx();
@@ -65,7 +68,7 @@ TestHarness::~TestHarness() {
 }
 
 TestHarness MakeTestHarness(FakeGraph& graph, TestDataSource source) {
-  TestHarness h{.graph = graph};
+  TestHarness h{graph};
   h.clock = RealClock::CreateFromMonotonic("ReferenceClock", Clock::kExternalDomain, true);
   h.clock_snapshots.AddClock(h.clock);
   h.clock_snapshots.Update(zx::clock::get_monotonic());
