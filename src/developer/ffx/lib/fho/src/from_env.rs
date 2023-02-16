@@ -133,6 +133,13 @@ where
     }
 }
 
+impl<T: 'static> Deferred<T> {
+    /// Use the value provided to create a test-able Deferred value.
+    pub fn from_output(output: Result<T>) -> Self {
+        Self(Box::pin(async move { output }))
+    }
+}
+
 /// The implementation of the decorator returned by [`deferred`]
 pub struct WithDeferred<T>(T);
 #[async_trait(?Send)]
