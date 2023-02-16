@@ -150,6 +150,15 @@ where
     VmoFile::new(init_vmo, true, true, false)
 }
 
+/// DEPRECATED - DO NOT USE. Same as `read_write` but supports out-of-tree migrations.
+pub fn read_write_deprecated<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
+where
+    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
+    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+{
+    VmoFile::new(init_vmo, true, true, false)
+}
+
 /// Implementation of a VMO-backed file in a virtual file system. Supports both synchronous (from
 /// existing Vmo) and asynchronous (from async callback) construction of the backing Vmo.
 ///
