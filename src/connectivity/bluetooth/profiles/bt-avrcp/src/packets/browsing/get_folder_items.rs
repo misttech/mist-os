@@ -456,6 +456,9 @@ impl Decodable for MediaPlayerItem {
         let player_sub_type = u32::from_be_bytes(buf[3..7].try_into().unwrap());
         let play_status = PlaybackStatus::try_from(buf[7])?;
 
+        // These aren't actually numbers but a giant 128-bit bitfield that we interpret
+        // as two 64-bit big-endian numbers.
+        // Bits 69-127 are reserved (values valid up to Octet 8 Bit 4 see AVRCP v1.6.2 section 6.10.2.1 for details).
         let feature_bit_mask = [
             u64::from_be_bytes(buf[8..16].try_into().unwrap()),
             u64::from_be_bytes(buf[16..24].try_into().unwrap()),
@@ -728,14 +731,12 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::MediaPlayerItem {
                 sub_type: fidl_avrcp::PlayerSubType::from_bits(p.player_sub_type),
                 playback_status: Some(p.play_status.into()),
                 displayable_name: Some(p.name),
-                feature_bits: Some(
-                    fidl_avrcp::PlayerFeatureBits::from_bits(p.feature_bit_mask[0])
-                        .ok_or(Error::ParameterEncodingError)?,
-                ),
-                feature_bits_ext: Some(
-                    fidl_avrcp::PlayerFeatureBitsExt::from_bits(p.feature_bit_mask[1])
-                        .ok_or(Error::ParameterEncodingError)?,
-                ),
+                feature_bits: Some(fidl_avrcp::PlayerFeatureBits::from_bits_truncate(
+                    p.feature_bit_mask[0],
+                )),
+                feature_bits_ext: Some(fidl_avrcp::PlayerFeatureBitsExt::from_bits_truncate(
+                    p.feature_bit_mask[1],
+                )),
                 ..fidl_avrcp::MediaPlayerItem::EMPTY
             }),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
@@ -1328,22 +1329,51 @@ mod tests {
         );
     }
 
+    // Test values as seen in AVRCP v1.6.2 Appendix D 25.19 Get Folder Items.
+    const TEST_PLAYER_FEATURE_BITS: fidl_avrcp::PlayerFeatureBits =
+        fidl_avrcp::PlayerFeatureBits::from_bits_truncate(
+            fidl_avrcp::PlayerFeatureBits::PLAY.bits()
+                | fidl_avrcp::PlayerFeatureBits::STOP.bits()
+                | fidl_avrcp::PlayerFeatureBits::PAUSE.bits()
+                | fidl_avrcp::PlayerFeatureBits::REWIND.bits()
+                | fidl_avrcp::PlayerFeatureBits::FAST_FORWARD.bits()
+                | fidl_avrcp::PlayerFeatureBits::FORWARD.bits()
+                | fidl_avrcp::PlayerFeatureBits::BACKWARD.bits()
+                | fidl_avrcp::PlayerFeatureBits::VENDOR_UNIQUE.bits()
+                | fidl_avrcp::PlayerFeatureBits::BASIC_GROUP_NAVIGATION.bits()
+                | fidl_avrcp::PlayerFeatureBits::ADVANCED_CONTROL_PLAYER.bits()
+                | fidl_avrcp::PlayerFeatureBits::BROWSING.bits()
+                | fidl_avrcp::PlayerFeatureBits::ADD_TO_NOW_PLAYING.bits()
+                | fidl_avrcp::PlayerFeatureBits::UIDS_UNIQUE_IN_PLAYER_BROWSE_TREE.bits()
+                | fidl_avrcp::PlayerFeatureBits::ONLY_BROWSABLE_WHEN_ADDRESSED.bits(),
+        );
+    const TEST_PLAYER_FEATURE_BITS_EXT: fidl_avrcp::PlayerFeatureBitsExt =
+        fidl_avrcp::PlayerFeatureBitsExt::from_bits_truncate(
+            fidl_avrcp::PlayerFeatureBitsExt::NOW_PLAYING.bits(),
+        );
+
     #[fuchsia::test]
     /// Tests decoding a MediaPlayerItem succeeds.
     fn test_media_player_item_decode_success() {
         // With utf8 name.
         let buf = [
-            0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 0, 106, 0, 4,
-            0x74, 0x65, 0x73, 0x74,
+            0, 127, 1, 0, 0, 0, 1, 2, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB7, 0x01, 0xEF, 0x02, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0, 106, 0, 11, 77, 101, 100, 105, 97, 80, 108, 97,
+            121, 101, 114,
         ];
+        assert_eq!(TEST_PLAYER_FEATURE_BITS.bits().to_be_bytes(), &buf[8..16]);
+        assert_eq!(TEST_PLAYER_FEATURE_BITS_EXT.bits().to_be_bytes(), &buf[16..24]);
 
         let item = MediaPlayerItem::decode(&buf[..]).expect("Just checked");
-        assert_eq!(item.player_id, 1);
-        assert_eq!(item.major_player_type, 0);
+        assert_eq!(item.player_id, 127);
+        assert_eq!(item.major_player_type, 1);
         assert_eq!(item.player_sub_type, 1);
-        assert_eq!(item.play_status, PlaybackStatus::Playing);
-        assert_eq!(item.feature_bit_mask, [0, 8193]);
-        assert_eq!(item.name, "test".to_string());
+        assert_eq!(item.play_status, PlaybackStatus::Paused);
+        assert_eq!(
+            item.feature_bit_mask,
+            [TEST_PLAYER_FEATURE_BITS.bits(), TEST_PLAYER_FEATURE_BITS_EXT.bits()]
+        );
+        assert_eq!(item.name, "MediaPlayer".to_string());
 
         // Without utf8 name.
         let buf = [
@@ -1551,5 +1581,77 @@ mod tests {
             }
             _ => panic!("expected MediaPlayer item"),
         }
+    }
+
+    /// Tests converting from a FIDL MediaPlayerItem to a local MediaPlayerItem
+    /// works as intended.
+    #[fuchsia::test]
+    fn test_media_player_item_to_fidl() {
+        let buf = [
+            0, 127, 1, 0, 0, 0, 1, 2, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB7, 0x01, 0xEF, 0x02, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0, 106, 0, 11, 77, 101, 100, 105, 97, 80, 108, 97,
+            121, 101, 114,
+        ];
+
+        assert_eq!(TEST_PLAYER_FEATURE_BITS.bits().to_be_bytes(), &buf[8..16]);
+        assert_eq!(TEST_PLAYER_FEATURE_BITS_EXT.bits().to_be_bytes(), &buf[16..24]);
+
+        let item = BrowseableItem::MediaPlayer(MediaPlayerItem {
+            player_id: 127,
+            major_player_type: 1,
+            player_sub_type: 1,
+            play_status: PlaybackStatus::Paused,
+            feature_bit_mask: [
+                TEST_PLAYER_FEATURE_BITS.bits(),
+                TEST_PLAYER_FEATURE_BITS_EXT.bits(),
+            ],
+            name: "Media Player".to_string(),
+        });
+
+        let converted: fidl_avrcp::MediaPlayerItem =
+            item.try_into().expect("should have converted");
+        assert_eq!(
+            converted,
+            fidl_avrcp::MediaPlayerItem {
+                player_id: Some(127),
+                major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
+                sub_type: Some(fidl_avrcp::PlayerSubType::AUDIO_BOOK),
+                playback_status: Some(fidl_avrcp::PlaybackStatus::Paused),
+                displayable_name: Some("Media Player".to_string()),
+                feature_bits: Some(TEST_PLAYER_FEATURE_BITS),
+                feature_bits_ext: Some(TEST_PLAYER_FEATURE_BITS_EXT),
+                ..fidl_avrcp::MediaPlayerItem::EMPTY
+            }
+        );
+    }
+
+    /// Tests converting to a FIDL MediaPlayerItem from a local MediaPlayerItem
+    /// works as intended.
+    #[fuchsia::test]
+    fn test_media_filesystem_item_to_fidl() {
+        let item = BrowseableItem::MediaElement(MediaElementItem {
+            element_uid: 1,
+            media_type: MediaType::Audio,
+            name: "test".to_string(),
+            attributes: vec![AttributeValueEntry {
+                attribute_id: MediaAttributeId::Title,
+                value: "test".to_string(),
+            }],
+        });
+
+        let converted: fidl_avrcp::FileSystemItem = item.try_into().expect("should have converted");
+        assert_eq!(
+            converted,
+            fidl_avrcp::FileSystemItem::MediaElement(fidl_avrcp::MediaElementItem {
+                media_element_uid: Some(1),
+                media_type: Some(fidl_avrcp::MediaType::Audio),
+                displayable_name: Some("test".to_string()),
+                attributes: Some(fidl_avrcp::MediaAttributes {
+                    title: Some("test".to_string()),
+                    ..fidl_avrcp::MediaAttributes::EMPTY
+                }),
+                ..fidl_avrcp::MediaElementItem::EMPTY
+            })
+        );
     }
 }
