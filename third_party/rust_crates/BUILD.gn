@@ -570,12 +570,6 @@ group("p256") {
   public_deps = [ ":p256-v0_10_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("parking") {
-    public_deps = [ ":parking-v2_0_0" ]
-  }
-}
-
 group("parking_lot") {
   public_deps = [ ":parking_lot-v0_9_0" ]
 }
