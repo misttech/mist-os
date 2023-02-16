@@ -334,7 +334,7 @@ mod tests {
 
         let opts = vec![
             DhcpOption::SubnetMask(ip_v4!("255.255.255.0")),
-            DhcpOption::DomainNameServer(vec![ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")]),
+            DhcpOption::DomainNameServer([ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")].into()),
         ];
         let () = stash.store_options(&opts).expect("failed to store options in stash");
         let value = accessor_client
@@ -421,7 +421,7 @@ mod tests {
 
         let opts = vec![
             DhcpOption::SubnetMask(ip_v4!("255.255.255.0")),
-            DhcpOption::DomainNameServer(vec![ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")]),
+            DhcpOption::DomainNameServer([ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")].into()),
         ];
         let serialized_opts = serde_json::to_string(&opts).expect("serialization failed");
         let opts = opts.into_iter().map(|o| (o.code(), o)).collect();

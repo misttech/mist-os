@@ -11,13 +11,18 @@ use std::{
     iter::Iterator,
     net::Ipv4Addr,
     num::NonZeroU8,
-    ops::Deref,
 };
 use thiserror::Error;
 use tracing::debug;
 
 #[cfg(target_os = "fuchsia")]
 use std::convert::Infallible as Never;
+
+mod size_constrained;
+pub use crate::size_constrained::{AtLeast, AtMostBytes, U8_MAX_AS_USIZE};
+
+mod size_of_contents;
+use crate::size_of_contents::SizeOfContents as _;
 
 pub const SERVER_PORT: u16 = 67;
 pub const CLIENT_PORT: u16 = 68;
@@ -358,12 +363,12 @@ pub mod identifier {
             msg.options
                 .iter()
                 .find_map(|opt| match opt {
-                    DhcpOption::ClientIdentifier(v) => {
-                        Some(ClientIdentifier { inner: ClientIdentifierInner::Id(v.clone()) })
-                    }
+                    DhcpOption::ClientIdentifier(v) => Some(ClientIdentifier {
+                        inner: ClientIdentifierInner::Id(v.clone().into()),
+                    }),
                     _ => None,
                 })
-                .unwrap_or_else(|| ClientIdentifier::from(msg.chaddr.clone()))
+                .unwrap_or_else(|| ClientIdentifier::from(msg.chaddr))
         }
     }
 
@@ -573,15 +578,35 @@ pub enum DhcpOption {
     End(),
     SubnetMask(Ipv4Addr),
     TimeOffset(i32),
-    Router(Vec<Ipv4Addr>),
-    TimeServer(Vec<Ipv4Addr>),
-    NameServer(Vec<Ipv4Addr>),
-    DomainNameServer(Vec<Ipv4Addr>),
-    LogServer(Vec<Ipv4Addr>),
-    CookieServer(Vec<Ipv4Addr>),
-    LprServer(Vec<Ipv4Addr>),
-    ImpressServer(Vec<Ipv4Addr>),
-    ResourceLocationServer(Vec<Ipv4Addr>),
+    // Router must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.5
+    Router(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Time Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.6
+    TimeServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Name Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.7
+    NameServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Domain Name Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.8
+    DomainNameServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Log Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.9
+    LogServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Cookie Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.10
+    CookieServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // LPR Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.11
+    LprServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Impress Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.12
+    ImpressServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Resource Location Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-3.13
+    ResourceLocationServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
     HostName(String),
     BootFileSize(u16),
     MeritDumpFile(String),
@@ -591,12 +616,16 @@ pub enum DhcpOption {
     ExtensionsPath(String),
     IpForwarding(bool),
     NonLocalSourceRouting(bool),
-    PolicyFilter(Vec<Ipv4Addr>),
+    // Policy Filter must have at least **2** elements and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-4.3
+    PolicyFilter(AtLeast<2, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
     MaxDatagramReassemblySize(u16),
     // DefaultIpTtl cannot be zero: https://datatracker.ietf.org/doc/html/rfc2132#section-4.5
     DefaultIpTtl(NonZeroU8),
     PathMtuAgingTimeout(u32),
-    PathMtuPlateauTable(Vec<u16>),
+    // Path MTU Plateau Table must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-4.7
+    PathMtuPlateauTable(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u16>>>),
     InterfaceMtu(u16),
     AllSubnetsLocal(bool),
     BroadcastAddress(Ipv4Addr),
@@ -604,7 +633,9 @@ pub enum DhcpOption {
     MaskSupplier(bool),
     PerformRouterDiscovery(bool),
     RouterSolicitationAddress(Ipv4Addr),
-    StaticRoute(Vec<Ipv4Addr>),
+    // Static Route must have at least **2** elements and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-5.8
+    StaticRoute(AtLeast<2, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
     TrailerEncapsulation(bool),
     ArpCacheTimeout(u32),
     EthernetEncapsulation(bool),
@@ -613,26 +644,82 @@ pub enum DhcpOption {
     TcpKeepaliveInterval(u32),
     TcpKeepaliveGarbage(bool),
     NetworkInformationServiceDomain(String),
-    NetworkInformationServers(Vec<Ipv4Addr>),
-    NetworkTimeProtocolServers(Vec<Ipv4Addr>),
-    VendorSpecificInformation(Vec<u8>),
-    NetBiosOverTcpipNameServer(Vec<Ipv4Addr>),
-    NetBiosOverTcpipDatagramDistributionServer(Vec<Ipv4Addr>),
+    // Network Information Servers must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.2
+    NetworkInformationServers(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // Network Time Protocol Servers must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.3
+    NetworkTimeProtocolServers(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // Vendor Specific Information must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.4
+    VendorSpecificInformation(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>>,
+    ),
+    // NetBIOS over TCP/IP Name Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.5
+    NetBiosOverTcpipNameServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // NetBIOS over TCP/IP Datagram Distribution Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.6
+    NetBiosOverTcpipDatagramDistributionServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
     NetBiosOverTcpipNodeType(NodeType),
     NetBiosOverTcpipScope(String),
-    XWindowSystemFontServer(Vec<Ipv4Addr>),
-    XWindowSystemDisplayManager(Vec<Ipv4Addr>),
+    // X Window System Font Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.9
+    XWindowSystemFontServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // X Window System Display Manager must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.10
+    XWindowSystemDisplayManager(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
     NetworkInformationServicePlusDomain(String),
-    NetworkInformationServicePlusServers(Vec<Ipv4Addr>),
-    MobileIpHomeAgent(Vec<Ipv4Addr>),
-    SmtpServer(Vec<Ipv4Addr>),
-    Pop3Server(Vec<Ipv4Addr>),
-    NntpServer(Vec<Ipv4Addr>),
-    DefaultWwwServer(Vec<Ipv4Addr>),
-    DefaultFingerServer(Vec<Ipv4Addr>),
-    DefaultIrcServer(Vec<Ipv4Addr>),
-    StreetTalkServer(Vec<Ipv4Addr>),
-    StreetTalkDirectoryAssistanceServer(Vec<Ipv4Addr>),
+    // Network Information Service+ Servers must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.12
+    NetworkInformationServicePlusServers(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // Mobile IP Home Agent has an 8-bit length field, but is allowed to have 0 elements:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.13
+    MobileIpHomeAgent(
+        AtLeast<0, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // SMTP Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.14
+    SmtpServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // POP3 Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.15
+    Pop3Server(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // NNTP Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.16
+    NntpServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Default WWW Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.17
+    DefaultWwwServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // Default Finger Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.18
+    DefaultFingerServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
+    // Default IRC Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.19
+    DefaultIrcServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // StreetTalk Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.20
+    StreetTalkServer(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>),
+    // StreetTalk Directory Assistance Server must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-8.21
+    StreetTalkDirectoryAssistanceServer(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    ),
     RequestedIpAddress(Ipv4Addr),
     IpAddressLeaseTime(u32),
     OptionOverload(Overload),
@@ -640,13 +727,21 @@ pub enum DhcpOption {
     BootfileName(String),
     DhcpMessageType(MessageType),
     ServerIdentifier(Ipv4Addr),
-    ParameterRequestList(Vec<OptionCode>),
+    // Parameter Request List must have at least 1 element and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-9.8
+    ParameterRequestList(
+        AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<OptionCode>>>,
+    ),
     Message(String),
     MaxDhcpMessageSize(u16),
     RenewalTimeValue(u32),
     RebindingTimeValue(u32),
-    VendorClassIdentifier(Vec<u8>),
-    ClientIdentifier(Vec<u8>),
+    // Vendor Class Identifier must be at least 1 byte long and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-9.13
+    VendorClassIdentifier(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>>),
+    // Client Identifier must be at least **2** bytes long and has an 8-bit length field:
+    // https://datatracker.ietf.org/doc/html/rfc2132#section-9.14
+    ClientIdentifier(AtLeast<2, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>>),
 }
 
 /// Generates a match expression on `$option` which maps each of the supplied `DhcpOption` variants
@@ -657,19 +752,6 @@ macro_rules! option_to_code {
             $(DhcpOption::$variant($($v)*) => OptionCode::$variant,)*
         }
     };
-}
-
-trait SizeOfContents {
-    fn size_of_contents_in_bytes(&self) -> usize;
-}
-
-impl<T, U> SizeOfContents for T
-where
-    T: Deref<Target = [U]>,
-{
-    fn size_of_contents_in_bytes(&self) -> usize {
-        self.deref().len() * std::mem::size_of::<U>()
-    }
 }
 
 impl DhcpOption {
@@ -738,7 +820,6 @@ impl DhcpOption {
                 Ok(DhcpOption::PathMtuAgingTimeout(timeout))
             }
             OptionCode::PathMtuPlateauTable => {
-                let val = nonempty(val)?;
                 let mtus = val
                     .chunks(2)
                     .map(|chunk| get_byte_array::<2>(chunk).map(u16::from_be_bytes))
@@ -746,7 +827,11 @@ impl DhcpOption {
                     .map_err(|InvalidBufferLengthError(_)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     })?;
-                Ok(DhcpOption::PathMtuPlateauTable(mtus))
+                Ok(DhcpOption::PathMtuPlateauTable(mtus.try_into().map_err(
+                    |size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(val.len())
+                    },
+                )?))
             }
             OptionCode::InterfaceMtu => {
                 let mtu = get_byte_array::<2>(val).map(u16::from_be_bytes)?;
@@ -819,8 +904,11 @@ impl DhcpOption {
                 Ok(DhcpOption::NetworkTimeProtocolServers(bytes_to_addrs(val)?))
             }
             OptionCode::VendorSpecificInformation => {
-                let val = nonempty(val)?;
-                Ok(DhcpOption::VendorSpecificInformation(val.to_owned()))
+                Ok(DhcpOption::VendorSpecificInformation(val.to_owned().try_into().map_err(
+                    |size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(val.len())
+                    },
+                )?))
             }
             OptionCode::NetBiosOverTcpipNameServer => {
                 Ok(DhcpOption::NetBiosOverTcpipNameServer(bytes_to_addrs(val)?))
@@ -848,11 +936,6 @@ impl DhcpOption {
                 Ok(DhcpOption::NetworkInformationServicePlusServers(bytes_to_addrs(val)?))
             }
             OptionCode::MobileIpHomeAgent => {
-                // Mobile IP Home Agent is allowed to be empty indicating no home agents are
-                // available: https://datatracker.ietf.org/doc/html/rfc2132#section-8.13
-                if val.len() == 0 {
-                    return Ok(DhcpOption::MobileIpHomeAgent(Vec::new()));
-                }
                 Ok(DhcpOption::MobileIpHomeAgent(bytes_to_addrs(val)?))
             }
             OptionCode::SmtpServer => Ok(DhcpOption::SmtpServer(bytes_to_addrs(val)?)),
@@ -896,10 +979,22 @@ impl DhcpOption {
             }
             OptionCode::ServerIdentifier => Ok(DhcpOption::ServerIdentifier(bytes_to_addr(val)?)),
             OptionCode::ParameterRequestList => {
-                let val = nonempty(val)?;
-                let opcodes =
-                    val.into_iter().filter_map(|code| OptionCode::try_from(*code).ok()).collect();
-                Ok(DhcpOption::ParameterRequestList(opcodes))
+                let opcodes = val
+                    .iter()
+                    .filter_map(|code| OptionCode::try_from(*code).ok())
+                    .collect::<Vec<_>>();
+                // Note that if we don't recognize any of the OptionCodes, we'll return Err rather
+                // than Ok(empty parameter request list) here. This isn't strictly correct, as the
+                // raw Parameter Request List is indeed nonempty as required by
+                // https://www.rfc-editor.org/rfc/rfc2132#section-9.8, even though we don't
+                // recognize any of the option codes in it. However, our usages of this fn
+                // interpret an invalid option the same way they interpret the absence of that
+                // option, so this is not an issue.
+                Ok(DhcpOption::ParameterRequestList(opcodes.try_into().map_err(
+                    |size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(val.len())
+                    },
+                )?))
             }
             OptionCode::Message => Ok(DhcpOption::Message(bytes_to_nonempty_str(val)?)),
             OptionCode::MaxDhcpMessageSize => {
@@ -918,8 +1013,11 @@ impl DhcpOption {
                 Ok(DhcpOption::RebindingTimeValue(rebinding_time))
             }
             OptionCode::VendorClassIdentifier => {
-                let val = nonempty(val)?;
-                Ok(DhcpOption::VendorClassIdentifier(val.to_owned()))
+                Ok(DhcpOption::VendorClassIdentifier(val.to_owned().try_into().map_err(
+                    |size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(val.len())
+                    },
+                )?))
             }
             OptionCode::ClientIdentifier => {
                 // Client Identifier must be at least two bytes.
@@ -927,7 +1025,11 @@ impl DhcpOption {
                 if val.len() < 2 {
                     return Err(ProtocolError::InvalidBufferLength(val.len()));
                 }
-                Ok(DhcpOption::ClientIdentifier(val.to_owned()))
+                Ok(DhcpOption::ClientIdentifier(val.to_owned().try_into().map_err(
+                    |size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(val.len())
+                    },
+                )?))
             }
         }
     }
@@ -1023,6 +1125,7 @@ impl DhcpOption {
             DhcpOption::DhcpMessageType(v) => serialize_enum(code, v, buf),
             DhcpOption::ServerIdentifier(v) => serialize_address(code, v, buf),
             DhcpOption::ParameterRequestList(v) => {
+                let v = Vec::from(v);
                 let size = v.size_of_contents_in_bytes();
                 buf.push(code.into());
                 buf.push(u8::try_from(size).expect("size did not fit in u8"));
@@ -1269,30 +1372,32 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(fidl_fuchsia_net_dhcp::Option_::SubnetMask(v.into_fidl()))
             }
             DhcpOption::TimeOffset(v) => Ok(fidl_fuchsia_net_dhcp::Option_::TimeOffset(v)),
-            DhcpOption::Router(v) => Ok(fidl_fuchsia_net_dhcp::Option_::Router(v.into_fidl())),
+            DhcpOption::Router(v) => {
+                Ok(fidl_fuchsia_net_dhcp::Option_::Router(Vec::from(v).into_fidl()))
+            }
             DhcpOption::TimeServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::TimeServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::TimeServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::NameServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::NameServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::NameServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::DomainNameServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::DomainNameServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::DomainNameServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::LogServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::LogServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::LogServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::CookieServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::CookieServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::CookieServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::LprServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::LprServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::LprServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::ImpressServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::ImpressServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::ImpressServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::ResourceLocationServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::ResourceLocationServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::ResourceLocationServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::HostName(v) => Ok(fidl_fuchsia_net_dhcp::Option_::HostName(v)),
             DhcpOption::BootFileSize(v) => Ok(fidl_fuchsia_net_dhcp::Option_::BootFileSize(v)),
@@ -1308,7 +1413,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(fidl_fuchsia_net_dhcp::Option_::NonLocalSourceRouting(v))
             }
             DhcpOption::PolicyFilter(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::PolicyFilter(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::PolicyFilter(Vec::from(v).into_fidl()))
             }
             DhcpOption::MaxDatagramReassemblySize(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::MaxDatagramReassemblySize(v))
@@ -1320,7 +1425,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(fidl_fuchsia_net_dhcp::Option_::PathMtuAgingTimeout(v))
             }
             DhcpOption::PathMtuPlateauTable(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::PathMtuPlateauTable(v))
+                Ok(fidl_fuchsia_net_dhcp::Option_::PathMtuPlateauTable(v.into()))
             }
             DhcpOption::InterfaceMtu(v) => Ok(fidl_fuchsia_net_dhcp::Option_::InterfaceMtu(v)),
             DhcpOption::AllSubnetsLocal(v) => {
@@ -1340,7 +1445,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(fidl_fuchsia_net_dhcp::Option_::RouterSolicitationAddress(v.into_fidl()))
             }
             DhcpOption::StaticRoute(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::StaticRoute(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::StaticRoute(Vec::from(v).into_fidl()))
             }
             DhcpOption::TrailerEncapsulation(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::TrailerEncapsulation(v))
@@ -1363,21 +1468,25 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             DhcpOption::NetworkInformationServiceDomain(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::NetworkInformationServiceDomain(v))
             }
-            DhcpOption::NetworkInformationServers(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::NetworkInformationServers(v.into_fidl()))
-            }
+            DhcpOption::NetworkInformationServers(v) => Ok(
+                fidl_fuchsia_net_dhcp::Option_::NetworkInformationServers(Vec::from(v).into_fidl()),
+            ),
             DhcpOption::NetworkTimeProtocolServers(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::NetworkTimeProtocolServers(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::NetworkTimeProtocolServers(
+                    Vec::from(v).into_fidl(),
+                ))
             }
             DhcpOption::VendorSpecificInformation(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::VendorSpecificInformation(v))
+                Ok(fidl_fuchsia_net_dhcp::Option_::VendorSpecificInformation(v.into()))
             }
             DhcpOption::NetBiosOverTcpipNameServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNameServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNameServer(
+                    Vec::from(v).into_fidl(),
+                ))
             }
             DhcpOption::NetBiosOverTcpipDatagramDistributionServer(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipDatagramDistributionServer(
-                    v.into_fidl(),
+                    Vec::from(v).into_fidl(),
                 ))
             }
             DhcpOption::NetBiosOverTcpipNodeType(v) => {
@@ -1386,45 +1495,51 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             DhcpOption::NetBiosOverTcpipScope(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipScope(v))
             }
-            DhcpOption::XWindowSystemFontServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::XWindowSystemFontServer(v.into_fidl()))
-            }
+            DhcpOption::XWindowSystemFontServer(v) => Ok(
+                fidl_fuchsia_net_dhcp::Option_::XWindowSystemFontServer(Vec::from(v).into_fidl()),
+            ),
             DhcpOption::XWindowSystemDisplayManager(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::XWindowSystemDisplayManager(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::XWindowSystemDisplayManager(
+                    Vec::from(v).into_fidl(),
+                ))
             }
             DhcpOption::NetworkInformationServicePlusDomain(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusDomain(v))
             }
-            DhcpOption::NetworkInformationServicePlusServers(v) => Ok(
-                fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusServers(v.into_fidl()),
-            ),
+            DhcpOption::NetworkInformationServicePlusServers(v) => {
+                Ok(fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusServers(
+                    Vec::from(v).into_fidl(),
+                ))
+            }
             DhcpOption::MobileIpHomeAgent(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::MobileIpHomeAgent(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::MobileIpHomeAgent(Vec::from(v).into_fidl()))
             }
             DhcpOption::SmtpServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::SmtpServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::SmtpServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::Pop3Server(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::Pop3Server(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::Pop3Server(Vec::from(v).into_fidl()))
             }
             DhcpOption::NntpServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::NntpServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::NntpServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::DefaultWwwServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultWwwServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultWwwServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::DefaultFingerServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultFingerServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultFingerServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::DefaultIrcServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultIrcServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::DefaultIrcServer(Vec::from(v).into_fidl()))
             }
             DhcpOption::StreetTalkServer(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::StreettalkServer(v.into_fidl()))
+                Ok(fidl_fuchsia_net_dhcp::Option_::StreettalkServer(Vec::from(v).into_fidl()))
             }
-            DhcpOption::StreetTalkDirectoryAssistanceServer(v) => Ok(
-                fidl_fuchsia_net_dhcp::Option_::StreettalkDirectoryAssistanceServer(v.into_fidl()),
-            ),
+            DhcpOption::StreetTalkDirectoryAssistanceServer(v) => {
+                Ok(fidl_fuchsia_net_dhcp::Option_::StreettalkDirectoryAssistanceServer(
+                    Vec::from(v).into_fidl(),
+                ))
+            }
             DhcpOption::RequestedIpAddress(_) => Err(ProtocolError::InvalidFidlOption(self)),
             DhcpOption::IpAddressLeaseTime(_) => Err(ProtocolError::InvalidFidlOption(self)),
             DhcpOption::OptionOverload(v) => {
@@ -1456,32 +1571,72 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::SubnetMask(Ipv4Addr::from_fidl(v)))
             }
             fidl_fuchsia_net_dhcp::Option_::TimeOffset(v) => Ok(DhcpOption::TimeOffset(v)),
-            fidl_fuchsia_net_dhcp::Option_::Router(v) => {
-                Ok(DhcpOption::Router(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::TimeServer(v) => {
-                Ok(DhcpOption::TimeServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::NameServer(v) => {
-                Ok(DhcpOption::NameServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
+            fidl_fuchsia_net_dhcp::Option_::Router(v) => Ok(DhcpOption::Router({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::TimeServer(v) => Ok(DhcpOption::TimeServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::NameServer(v) => Ok(DhcpOption::NameServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
             fidl_fuchsia_net_dhcp::Option_::DomainNameServer(v) => {
-                Ok(DhcpOption::DomainNameServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::DomainNameServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
-            fidl_fuchsia_net_dhcp::Option_::LogServer(v) => {
-                Ok(DhcpOption::LogServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::CookieServer(v) => {
-                Ok(DhcpOption::CookieServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::LprServer(v) => {
-                Ok(DhcpOption::LprServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::ImpressServer(v) => {
-                Ok(DhcpOption::ImpressServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
+            fidl_fuchsia_net_dhcp::Option_::LogServer(v) => Ok(DhcpOption::LogServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::CookieServer(v) => Ok(DhcpOption::CookieServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::LprServer(v) => Ok(DhcpOption::LprServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::ImpressServer(v) => Ok(DhcpOption::ImpressServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
             fidl_fuchsia_net_dhcp::Option_::ResourceLocationServer(v) => {
-                Ok(DhcpOption::ResourceLocationServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::ResourceLocationServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::HostName(v) => Ok(DhcpOption::HostName(v)),
             fidl_fuchsia_net_dhcp::Option_::BootFileSize(v) => Ok(DhcpOption::BootFileSize(v)),
@@ -1496,9 +1651,13 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::NonLocalSourceRouting(v) => {
                 Ok(DhcpOption::NonLocalSourceRouting(v))
             }
-            fidl_fuchsia_net_dhcp::Option_::PolicyFilter(v) => {
-                Ok(DhcpOption::PolicyFilter(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
+            fidl_fuchsia_net_dhcp::Option_::PolicyFilter(v) => Ok(DhcpOption::PolicyFilter({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
             fidl_fuchsia_net_dhcp::Option_::MaxDatagramReassemblySize(v) => {
                 Ok(DhcpOption::MaxDatagramReassemblySize(v))
             }
@@ -1511,7 +1670,12 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::PathMtuAgingTimeout(v))
             }
             fidl_fuchsia_net_dhcp::Option_::PathMtuPlateauTable(v) => {
-                Ok(DhcpOption::PathMtuPlateauTable(v))
+                Ok(DhcpOption::PathMtuPlateauTable({
+                    let size = v.size_of_contents_in_bytes();
+                    v.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::InterfaceMtu(v) => Ok(DhcpOption::InterfaceMtu(v)),
             fidl_fuchsia_net_dhcp::Option_::AllSubnetsLocal(v) => {
@@ -1530,9 +1694,13 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::RouterSolicitationAddress(v) => {
                 Ok(DhcpOption::RouterSolicitationAddress(Ipv4Addr::from_fidl(v)))
             }
-            fidl_fuchsia_net_dhcp::Option_::StaticRoute(v) => {
-                Ok(DhcpOption::StaticRoute(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
+            fidl_fuchsia_net_dhcp::Option_::StaticRoute(v) => Ok(DhcpOption::StaticRoute({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
             fidl_fuchsia_net_dhcp::Option_::TrailerEncapsulation(v) => {
                 Ok(DhcpOption::TrailerEncapsulation(v))
             }
@@ -1557,21 +1725,48 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::NetworkInformationServiceDomain(v))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkInformationServers(v) => {
-                Ok(DhcpOption::NetworkInformationServers(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::NetworkInformationServers({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkTimeProtocolServers(v) => {
-                Ok(DhcpOption::NetworkTimeProtocolServers(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::NetworkTimeProtocolServers({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::VendorSpecificInformation(v) => {
-                Ok(DhcpOption::VendorSpecificInformation(v))
+                Ok(DhcpOption::VendorSpecificInformation({
+                    let size = v.size_of_contents_in_bytes();
+                    v.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNameServer(v) => {
-                Ok(DhcpOption::NetBiosOverTcpipNameServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::NetBiosOverTcpipNameServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipDatagramDistributionServer(v) => {
-                Ok(DhcpOption::NetBiosOverTcpipDatagramDistributionServer(
-                    Vec::<Ipv4Addr>::from_fidl(v),
-                ))
+                Ok(DhcpOption::NetBiosOverTcpipDatagramDistributionServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNodeType(v) => {
                 Ok(DhcpOption::NetBiosOverTcpipNodeType(NodeType::try_from_fidl(v)?))
@@ -1580,43 +1775,109 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::NetBiosOverTcpipScope(v))
             }
             fidl_fuchsia_net_dhcp::Option_::XWindowSystemFontServer(v) => {
-                Ok(DhcpOption::XWindowSystemFontServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::XWindowSystemFontServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::XWindowSystemDisplayManager(v) => {
-                Ok(DhcpOption::XWindowSystemDisplayManager(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::XWindowSystemDisplayManager({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusDomain(v) => {
                 Ok(DhcpOption::NetworkInformationServicePlusDomain(v))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusServers(v) => {
-                Ok(DhcpOption::NetworkInformationServicePlusServers(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::NetworkInformationServicePlusServers({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::MobileIpHomeAgent(v) => {
-                Ok(DhcpOption::MobileIpHomeAgent(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::MobileIpHomeAgent({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(size)
+                    })?
+                }))
             }
-            fidl_fuchsia_net_dhcp::Option_::SmtpServer(v) => {
-                Ok(DhcpOption::SmtpServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::Pop3Server(v) => {
-                Ok(DhcpOption::Pop3Server(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
-            fidl_fuchsia_net_dhcp::Option_::NntpServer(v) => {
-                Ok(DhcpOption::NntpServer(Vec::<Ipv4Addr>::from_fidl(v)))
-            }
+            fidl_fuchsia_net_dhcp::Option_::SmtpServer(v) => Ok(DhcpOption::SmtpServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::Pop3Server(v) => Ok(DhcpOption::Pop3Server({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
+            fidl_fuchsia_net_dhcp::Option_::NntpServer(v) => Ok(DhcpOption::NntpServer({
+                let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                let size = vec.size_of_contents_in_bytes();
+                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                    ProtocolError::InvalidBufferLength(size)
+                })?
+            })),
             fidl_fuchsia_net_dhcp::Option_::DefaultWwwServer(v) => {
-                Ok(DhcpOption::DefaultWwwServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::DefaultWwwServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::DefaultFingerServer(v) => {
-                Ok(DhcpOption::DefaultFingerServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::DefaultFingerServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::DefaultIrcServer(v) => {
-                Ok(DhcpOption::DefaultIrcServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::DefaultIrcServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::StreettalkServer(v) => {
-                Ok(DhcpOption::StreetTalkServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::StreetTalkServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::StreettalkDirectoryAssistanceServer(v) => {
-                Ok(DhcpOption::StreetTalkDirectoryAssistanceServer(Vec::<Ipv4Addr>::from_fidl(v)))
+                Ok(DhcpOption::StreetTalkDirectoryAssistanceServer({
+                    let vec = Vec::<Ipv4Addr>::from_fidl(v);
+                    let vec_size = vec.size_of_contents_in_bytes();
+                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                        ProtocolError::InvalidBufferLength(vec_size)
+                    })?
+                }))
             }
             fidl_fuchsia_net_dhcp::Option_::OptionOverload(v) => {
                 Ok(DhcpOption::OptionOverload(Overload::from_fidl(v)))
@@ -1895,13 +2156,21 @@ fn bytes_to_addr(bytes: &[u8]) -> Result<Ipv4Addr, InvalidBufferLengthError> {
     Ok(Ipv4Addr::from(get_byte_array::<4>(bytes)?))
 }
 
-// Converts a nonempty input byte slice into a list of Ipv4Addr.
-fn bytes_to_addrs(bytes: &[u8]) -> Result<Vec<Ipv4Addr>, InvalidBufferLengthError> {
-    nonempty(bytes)?
+// Converts an input byte slice into a list of Ipv4Addr.
+fn bytes_to_addrs<const LOWER_BOUND: usize>(
+    bytes: &[u8],
+) -> Result<
+    AtLeast<LOWER_BOUND, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+    InvalidBufferLengthError,
+> {
+    let vec = bytes
         .chunks(IPV4_ADDR_LEN)
         .map(bytes_to_addr)
         .collect::<Result<Vec<Ipv4Addr>, InvalidBufferLengthError>>()
-        .map_err(|InvalidBufferLengthError(_)| InvalidBufferLengthError(bytes.len()))
+        .map_err(|InvalidBufferLengthError(_)| InvalidBufferLengthError(bytes.len()))?;
+    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+        InvalidBufferLengthError(bytes.len())
+    })
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -2094,10 +2363,10 @@ mod tests {
         let msg = || {
             let mut msg = new_test_msg();
             msg.options.push(DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK));
-            msg.options.push(DhcpOption::NameServer(vec![ip_v4!("1.2.3.4")]));
+            msg.options.push(DhcpOption::NameServer([ip_v4!("1.2.3.4")].into()));
             msg.options.push(DhcpOption::DhcpMessageType(MessageType::DHCPDISCOVER));
-            msg.options.push(DhcpOption::ParameterRequestList(vec![OptionCode::SubnetMask]));
-            msg.options.push(DhcpOption::PathMtuPlateauTable(vec![1480u16]));
+            msg.options.push(DhcpOption::ParameterRequestList([OptionCode::SubnetMask].into()));
+            msg.options.push(DhcpOption::PathMtuPlateauTable([1480u16].into()));
             msg
         };
 
@@ -2226,7 +2495,7 @@ mod tests {
         let msg = || {
             let mut msg = new_test_msg();
             msg.options.push(DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK));
-            msg.options.push(DhcpOption::Router(vec![ip_v4!("192.168.1.1")]));
+            msg.options.push(DhcpOption::Router([ip_v4!("192.168.1.1")].into()));
             msg.options.push(DhcpOption::DhcpMessageType(MessageType::DHCPDISCOVER));
             msg
         };
@@ -2335,18 +2604,21 @@ mod tests {
                     252, /* unrecognized */
                 ]
             ),
-            Ok(DhcpOption::ParameterRequestList(vec![
-                OptionCode::SubnetMask,
-                OptionCode::Router,
-                OptionCode::DomainNameServer,
-                OptionCode::DomainName,
-                OptionCode::PerformRouterDiscovery,
-                OptionCode::StaticRoute,
-                OptionCode::VendorSpecificInformation,
-                OptionCode::NetBiosOverTcpipNameServer,
-                OptionCode::NetBiosOverTcpipNodeType,
-                OptionCode::NetBiosOverTcpipScope,
-            ]))
+            Ok(DhcpOption::ParameterRequestList(
+                [
+                    OptionCode::SubnetMask,
+                    OptionCode::Router,
+                    OptionCode::DomainNameServer,
+                    OptionCode::DomainName,
+                    OptionCode::PerformRouterDiscovery,
+                    OptionCode::StaticRoute,
+                    OptionCode::VendorSpecificInformation,
+                    OptionCode::NetBiosOverTcpipNameServer,
+                    OptionCode::NetBiosOverTcpipNodeType,
+                    OptionCode::NetBiosOverTcpipScope,
+                ]
+                .into()
+            ))
         );
     }
 

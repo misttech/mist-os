@@ -1455,6 +1455,7 @@ pub mod tests {
     };
     use anyhow::Error;
     use datastore::{ActionRecordingDataStore, DataStoreAction};
+    use dhcp_protocol::{AtLeast, AtMostBytes};
     use fuchsia_zircon::Status;
     use net_declare::{fidl_ip_v4, std_ip_v4};
     use net_types::ethernet::Mac as MacAddr;
@@ -1634,7 +1635,12 @@ pub mod tests {
         }
     }
 
-    fn get_router<DS: DataStore>(server: &Server<DS>) -> Result<Vec<Ipv4Addr>, ProtocolError> {
+    fn get_router<DS: DataStore>(
+        server: &Server<DS>,
+    ) -> Result<
+        AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+        ProtocolError,
+    > {
         let code = OptionCode::Router;
         match server.options_repo.get(&code) {
             Some(DhcpOption::Router(router)) => Some(router.clone()),
@@ -1643,7 +1649,12 @@ pub mod tests {
         .ok_or(ProtocolError::MissingOption(code))
     }
 
-    fn get_dns_server<DS: DataStore>(server: &Server<DS>) -> Result<Vec<Ipv4Addr>, ProtocolError> {
+    fn get_dns_server<DS: DataStore>(
+        server: &Server<DS>,
+    ) -> Result<
+        AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<Ipv4Addr>>>,
+        ProtocolError,
+    > {
         let code = OptionCode::DomainNameServer;
         match server.options_repo.get(&code) {
             Some(DhcpOption::DomainNameServer(dns_server)) => Some(dns_server.clone()),
@@ -1666,13 +1677,12 @@ pub mod tests {
                 params,
                 store: Some(ActionRecordingDataStore::new()),
                 options_repo: HashMap::from_iter(vec![
-                    (OptionCode::Router, DhcpOption::Router(vec![random_ipv4_generator()])),
+                    (OptionCode::Router, DhcpOption::Router([random_ipv4_generator()].into())),
                     (
                         OptionCode::DomainNameServer,
-                        DhcpOption::DomainNameServer(vec![
-                            std_ip_v4!("1.2.3.4"),
-                            std_ip_v4!("4.3.2.1"),
-                        ]),
+                        DhcpOption::DomainNameServer(
+                            [std_ip_v4!("1.2.3.4"), std_ip_v4!("4.3.2.1")].into(),
+                        ),
                     ),
                 ]),
                 time_source: time_source.clone(),
@@ -1697,11 +1707,10 @@ pub mod tests {
         new_client_message_with_options(
             [
                 DhcpOption::DhcpMessageType(message_type),
-                DhcpOption::ParameterRequestList(vec![
-                    OptionCode::SubnetMask,
-                    OptionCode::Router,
-                    OptionCode::DomainNameServer,
-                ]),
+                DhcpOption::ParameterRequestList(
+                    [OptionCode::SubnetMask, OptionCode::Router, OptionCode::DomainNameServer]
+                        .into(),
+                ),
             ]
             .into_iter()
             .chain(options),
@@ -2082,7 +2091,7 @@ pub mod tests {
     #[test]
     fn dispatch_with_discover_with_client_id_updates_stash() {
         dispatch_with_discover_updates_stash_helper(std::iter::once(DhcpOption::ClientIdentifier(
-            vec![1, 2, 3, 4, 5],
+            [1, 2, 3, 4, 5].into(),
         )))
     }
 
@@ -3315,7 +3324,7 @@ pub mod tests {
         release.ciaddr = release_ip;
 
         let dns = random_ipv4_generator();
-        let opts = vec![DhcpOption::DomainNameServer(vec![dns])];
+        let opts = vec![DhcpOption::DomainNameServer([dns].into())];
         let test_client_record = |client_addr: Option<Ipv4Addr>, opts: Vec<DhcpOption>| {
             LeaseRecord::new(client_addr, opts, time_source.now(), u32::MAX).unwrap()
         };
@@ -3385,21 +3394,27 @@ pub mod tests {
     }
 
     #[test_case(
-        vec![OptionCode::DomainNameServer, OptionCode::SubnetMask, OptionCode::Router],
-        vec![OptionCode::DomainNameServer, OptionCode::SubnetMask, OptionCode::Router];
+        [OptionCode::DomainNameServer, OptionCode::SubnetMask, OptionCode::Router].into(),
+        [OptionCode::DomainNameServer, OptionCode::SubnetMask, OptionCode::Router].into();
         "Valid order should be unmodified"
     )]
     #[test_case(
-        vec![OptionCode::Router, OptionCode::SubnetMask],
-        vec![OptionCode::SubnetMask, OptionCode::Router];
+        [OptionCode::Router, OptionCode::SubnetMask].into(),
+        [OptionCode::SubnetMask, OptionCode::Router].into();
         "SubnetMask should be moved to before Router"
     )]
     #[test_case(
-        vec![OptionCode::Router, OptionCode::DomainNameServer, OptionCode::SubnetMask],
-        vec![OptionCode::SubnetMask, OptionCode::Router, OptionCode::DomainNameServer];
+        [OptionCode::Router, OptionCode::DomainNameServer, OptionCode::SubnetMask].into(),
+        [OptionCode::SubnetMask, OptionCode::Router, OptionCode::DomainNameServer].into();
         "When SubnetMask is moved, Router should maintain its relative position"
     )]
-    fn enforce_subnet_option_order(req_order: Vec<OptionCode>, expected_order: Vec<OptionCode>) {
+    fn enforce_subnet_option_order(
+        req_order: AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<OptionCode>>>,
+        expected_order: AtLeast<
+            1,
+            AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<OptionCode>>,
+        >,
+    ) {
         // According to spec, subnet mask must be provided before the Router.
         // This test creates various PRLs and expects the server to move the
         // subnet mask when necessary.
