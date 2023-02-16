@@ -196,10 +196,6 @@ group("darling") {
   public_deps = [ ":darling-v0_12_4" ]
 }
 
-group("dashmap") {
-  public_deps = [ ":dashmap-v4_0_2" ]
-}
-
 group("data-encoding") {
   public_deps = [ ":data-encoding-v2_3_2" ]
 }
@@ -3286,29 +3282,6 @@ rust_proc_macro("darling_macro-v0_12_4") {
     "--edition=2015",
     "-Cmetadata=eb126b2cf9a334f7",
     "-Cextra-filename=-eb126b2cf9a334f7",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("dashmap-v4_0_2") {
-  crate_name = "dashmap"
-  crate_root = "//third_party/rust_crates/vendor/dashmap-4.0.2/src/lib.rs"
-  output_name = "dashmap-3cd01d2a224a57b"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":num_cpus-v1_13_0" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=3cd01d2a224a57b",
-    "-Cextra-filename=-3cd01d2a224a57b",
-    "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
