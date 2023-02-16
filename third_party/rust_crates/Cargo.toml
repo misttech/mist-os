@@ -77,7 +77,6 @@ chacha20 = "0.8.1"
 csv = "1.0.7"
 darling = "0.12.0"
 data-encoding = "2.1.2"
-deepsize = { version = "0.2.0", features = ["chrono", "slab", "smallvec"] }
 derivative = { version = "2.2.0", features = ["use_core"] }
 derive_builder = "0.11.1"
 derp = "0.0.14"
