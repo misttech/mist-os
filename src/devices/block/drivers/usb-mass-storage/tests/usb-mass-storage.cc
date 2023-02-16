@@ -14,7 +14,6 @@
 #include <fbl/string.h>
 #include <zxtest/zxtest.h>
 
-#include "../block.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -512,16 +511,22 @@ TEST_F(UmsTest, TestRead) {
   // Perform read transactions
   uint32_t i = 0;
   for (auto const& it : ums_->children()) {
-    ums::Transaction transaction;
-    transaction.op.command = BLOCK_OP_READ;
-    transaction.op.rw.offset_dev = i;
-    transaction.op.rw.length = (i + 1) * 65534;
-    transaction.op.rw.offset_vmo = 0;
-    transaction.op.rw.vmo = vmo;
-    transaction.cookie = &context_;
-    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
-    transaction.completion_cb = CompletionCallback;
-    dev_->QueueTransaction(&transaction);
+    scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
+    ZX_ASSERT(block_dev);
+    block_info_t info;
+    size_t block_op_size;
+    block_dev->BlockImplQuery(&info, &block_op_size);
+
+    auto block_op = std::make_unique<uint8_t[]>(block_op_size);
+    block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
+    op = {};
+    op.command = BLOCK_OP_READ;
+    op.rw.offset_dev = i;
+    op.rw.length = (i + 1) * 65534;
+    op.rw.offset_vmo = 0;
+    op.rw.vmo = vmo;
+
+    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::READ_10
@@ -557,16 +562,22 @@ TEST_F(UmsTest, TestWrite) {
   // Perform write transactions
   uint32_t i = 0;
   for (auto const& it : ums_->children()) {
-    ums::Transaction transaction;
-    transaction.op.command = BLOCK_OP_WRITE;
-    transaction.op.rw.offset_dev = i;
-    transaction.op.rw.length = (i + 1) * 65534;
-    transaction.op.rw.offset_vmo = 0;
-    transaction.op.rw.vmo = vmo;
-    transaction.cookie = &context_;
-    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
-    transaction.completion_cb = CompletionCallback;
-    dev_->QueueTransaction(&transaction);
+    scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
+    ZX_ASSERT(block_dev);
+    block_info_t info;
+    size_t block_op_size;
+    block_dev->BlockImplQuery(&info, &block_op_size);
+
+    auto block_op = std::make_unique<uint8_t[]>(block_op_size);
+    block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
+    op = {};
+    op.command = BLOCK_OP_WRITE;
+    op.rw.offset_dev = i;
+    op.rw.length = (i + 1) * 65534;
+    op.rw.offset_vmo = 0;
+    op.rw.vmo = vmo;
+
+    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::WRITE_10
@@ -575,7 +586,7 @@ TEST_F(UmsTest, TestWrite) {
     EXPECT_EQ(i, context_.transfer_lun);
     EXPECT_EQ(xfer_type, context_.transfer_type);
     EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
-                        transaction.op.rw.length * kBlockSize));
+                        op.rw.length * kBlockSize));
     i++;
   }
 }
@@ -588,12 +599,18 @@ TEST_F(UmsTest, TestFlush) {
   // Perform flush transactions
   uint32_t i = 0;
   for (auto const& it : ums_->children()) {
-    ums::Transaction transaction;
-    transaction.op.command = BLOCK_OP_FLUSH;
-    transaction.cookie = &context_;
-    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
-    transaction.completion_cb = CompletionCallback;
-    dev_->QueueTransaction(&transaction);
+    scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
+    ZX_ASSERT(block_dev);
+    block_info_t info;
+    size_t block_op_size;
+    block_dev->BlockImplQuery(&info, &block_op_size);
+
+    auto block_op = std::make_unique<uint8_t[]>(block_op_size);
+    block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
+    op = {};
+    op.command = BLOCK_OP_FLUSH;
+
+    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = scsi::Opcode::SYNCHRONIZE_CACHE_10;

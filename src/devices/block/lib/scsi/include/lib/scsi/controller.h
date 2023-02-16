@@ -80,14 +80,15 @@ struct InquiryData {
   uint8_t additional_length;
   // Various control bits, unused currently.
   uint8_t control[3];
-  uint8_t t10_vendor_id[8];
-  uint8_t product_id[16];
-  uint8_t product_revision[4];
-  uint8_t drive_serial_number[8];
+  char t10_vendor_id[8];
+  char product_id[16];
+  char product_revision[4];
+  // Vendor specific after 36 bytes.
 
   DEF_SUBBIT(removable, 7, removable_media);
 } __PACKED;
 
+static_assert(sizeof(InquiryData) == 36, "Inquiry data must be 36 bytes");
 static_assert(offsetof(InquiryData, t10_vendor_id) == 8, "T10 Vendor ID is at offset 8");
 static_assert(offsetof(InquiryData, product_id) == 16, "Product ID is at offset 16");
 
@@ -384,6 +385,9 @@ class Controller {
 
   // Test whether the target-lun is ready.
   zx_status_t TestUnitReady(uint8_t target, uint16_t lun);
+
+  // Read Sense data to |data|.
+  zx_status_t RequestSense(uint8_t target, uint16_t lun, iovec data);
 
   // Return InquiryData for the specified lun.
   zx::result<InquiryData> Inquiry(uint8_t target, uint16_t lun);

@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -17,28 +18,20 @@
 #include <usb/ums.h>
 #include <usb/usb.h>
 
-#include "block.h"
 #include "src/devices/block/drivers/usb-mass-storage/usb_mass_storage_bind.h"
 
-// comment the next line if you don't want debug messages
-#define DEBUG 0
-#ifdef DEBUG
-#define DEBUG_PRINT(x) printf x
-#else
-#define DEBUG_PRINT(x) \
-  do {                 \
-  } while (0)
-#endif
-
+namespace ums {
 namespace {
+
+constexpr uint8_t kPlaceholderTarget = 0;
+
 void ReqComplete(void* ctx, usb_request_t* req) {
   if (ctx) {
     sync_completion_signal(static_cast<sync_completion_t*>(ctx));
   }
 }
-}  // namespace
 
-namespace ums {
+}  // namespace
 
 class WaiterImpl : public WaiterInterface {
  public:
@@ -47,7 +40,26 @@ class WaiterImpl : public WaiterInterface {
   }
 };
 
-void UsbMassStorageDevice::QueueTransaction(Transaction* txn) {
+void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb,
+                                               bool is_write, uint32_t block_size_bytes,
+                                               scsi::DiskOp* disk_op) {
+  Transaction* txn = containerof(disk_op, Transaction, disk_op);
+
+  if (lun > UINT8_MAX) {
+    disk_op->Complete(ZX_ERR_OUT_OF_RANGE);
+    return;
+  }
+  if (cdb.iov_len > sizeof(txn->cdb_buffer)) {
+    disk_op->Complete(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  memcpy(txn->cdb_buffer, cdb.iov_base, cdb.iov_len);
+  txn->cdb_length = static_cast<uint8_t>(cdb.iov_len);
+  txn->lun = static_cast<uint8_t>(lun);
+  txn->block_size_bytes = block_size_bytes;
+
+  // Queue transaction.
   {
     fbl::AutoLock l(&txn_lock_);
     list_add_tail(&queued_txns_, &txn->node);
@@ -133,6 +145,7 @@ zx_status_t UsbMassStorageDevice::Init(bool is_test_mode) {
   }
   return status;
 }
+
 void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
   usb::UsbDevice usb(parent());
   if (!usb.is_valid()) {
@@ -163,7 +176,7 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
   size_t bulk_out_max_packet = 0;
 
   if (interface_descriptor->b_num_endpoints < 2) {
-    zxlogf(DEBUG, "UMS:ums_bind wrong number of endpoints: %d",
+    zxlogf(DEBUG, "UMS: ums_bind wrong number of endpoints: %d",
            interface_descriptor->b_num_endpoints);
     txn.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
@@ -185,7 +198,7 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   if (!is_test_mode_ && (!bulk_in_max_packet || !bulk_out_max_packet)) {
-    zxlogf(DEBUG, "UMS:ums_bind could not find endpoints");
+    zxlogf(DEBUG, "UMS: ums_bind could not find endpoints");
     txn.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -209,24 +222,15 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
     return;
   }
   fbl::AllocChecker checker;
-  fbl::RefPtr<UmsBlockDevice>* raw_array;
-  raw_array = new (&checker) fbl::RefPtr<UmsBlockDevice>[max_lun + 1];
+  fbl::RefPtr<scsi::Disk>* raw_array;
+  raw_array = new (&checker) fbl::RefPtr<scsi::Disk>[max_lun + 1];
   if (!checker.check()) {
     txn.Reply(ZX_ERR_NO_MEMORY);
     return;
   }
   block_devs_ = fbl::Array(raw_array, max_lun + 1);
-  zxlogf(DEBUG, "UMS:Max lun is: %u", max_lun);
+  zxlogf(DEBUG, "UMS: Max lun is: %u", max_lun);
   max_lun_ = max_lun;
-  for (uint8_t lun = 0; lun <= max_lun; lun++) {
-    auto dev = fbl::MakeRefCountedChecked<UmsBlockDevice>(
-        &checker, zxdev(), lun, [this](ums::Transaction* txn) { QueueTransaction(txn); });
-    if (!checker.check()) {
-      txn.Reply(ZX_ERR_NO_MEMORY);
-      return;
-    }
-    block_devs_[lun] = dev;
-  }
 
   list_initialize(&queued_txns_);
   sync_completion_reset(&txn_completion_);
@@ -240,7 +244,8 @@ void UsbMassStorageDevice::DdkInit(ddk::InitTxn txn) {
 
   size_t max_in = usb.GetMaxTransferSize(bulk_in_addr);
   size_t max_out = usb.GetMaxTransferSize(bulk_out_addr);
-  max_transfer_ = (max_in < max_out ? max_in : max_out);
+  // SendCbw() accepts max transfer length of UINT32_MAX.
+  max_transfer_bytes_ = static_cast<uint32_t>((max_in < max_out ? max_in : max_out));
   parent_req_size_ = usb.GetRequestSize();
   ZX_DEBUG_ASSERT(parent_req_size_ != 0);
   size_t usb_request_size = parent_req_size_ + sizeof(UsbRequestContext);
@@ -366,13 +371,13 @@ csw_status_t UsbMassStorageDevice::VerifyCsw(usb_request_t* csw_request, uint32_
 
   // check signature is "USBS"
   if (letoh32(csw.dCSWSignature) != CSW_SIGNATURE) {
-    zxlogf(DEBUG, "UMS:invalid csw sig: %08x", letoh32(csw.dCSWSignature));
+    zxlogf(DEBUG, "UMS: invalid CSW sig: %08x", letoh32(csw.dCSWSignature));
     return CSW_INVALID;
   }
 
   // check if tag matches the tag of last CBW
   if (letoh32(csw.dCSWTag) != tag_receive_++) {
-    zxlogf(DEBUG, "UMS:csw tag mismatch, expected:%08x got in csw:%08x", tag_receive_ - 1,
+    zxlogf(DEBUG, "UMS: CSW tag mismatch, expected:%08x got in CSW:%08x", tag_receive_ - 1,
            letoh32(csw.dCSWTag));
     return CSW_TAG_MISMATCH;
   }
@@ -403,77 +408,12 @@ zx_status_t UsbMassStorageDevice::ReadSync(size_t transfer_length) {
   return read_request->response.status;
 }
 
-zx_status_t UsbMassStorageDevice::Inquiry(uint8_t lun, uint8_t* out_data) {
-  // CBW Configuration
-  scsi::InquiryCDB command = {};
-  command.opcode = scsi::Opcode::INQUIRY;
-  command.allocation_length = htobe16(UMS_INQUIRY_TRANSFER_LENGTH);
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {out_data, UMS_INQUIRY_TRANSFER_LENGTH});
-}
-
-zx_status_t UsbMassStorageDevice::TestUnitReady(uint8_t lun) {
-  // CBW Configuration
-  scsi::TestUnitReadyCDB command = {};
-  command.opcode = scsi::Opcode::TEST_UNIT_READY;
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false, {nullptr, 0});
-}
-
-zx_status_t UsbMassStorageDevice::RequestSense(uint8_t lun, uint8_t* out_data) {
-  // CBW Configuration
-  scsi::RequestSenseCDB command = {};
-  command.opcode = scsi::Opcode::REQUEST_SENSE;
-  command.allocation_length = UMS_REQUEST_SENSE_TRANSFER_LENGTH;
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {out_data, UMS_REQUEST_SENSE_TRANSFER_LENGTH});
-}
-
-zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
-                                               scsi::ReadCapacity10ParameterData* out_data) {
-  // CBW Configuration
-  scsi::ReadCapacity10CDB command = {};
-  command.opcode = scsi::Opcode::READ_CAPACITY_10;
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {out_data, sizeof(*out_data)});
-}
-
-zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
-                                               scsi::ReadCapacity16ParameterData* out_data) {
-  // CBW Configuration
-  scsi::ReadCapacity16CDB command = {};
-  command.opcode = scsi::Opcode::READ_CAPACITY_16;
-  // service action = 10, not sure what that means
-  command.service_action = 0x10;
-  command.allocation_length = htobe32(sizeof(*out_data));
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {out_data, sizeof(*out_data)});
-}
-
-zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, uint8_t page, void* data,
-                                            uint8_t transfer_length) {
-  // CBW Configuration
-  scsi::ModeSense6CDB command = {};
-  command.opcode = scsi::Opcode::MODE_SENSE_6;
-  command.page_code = page;  // all pages, current values
-  command.allocation_length = transfer_length;
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {data, transfer_length});
-}
-
-zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun,
-                                            scsi::ModeSense6ParameterHeader* out_data) {
-  // CBW Configuration
-  scsi::ModeSense6CDB command = {};
-  command.opcode = scsi::Opcode::MODE_SENSE_6;
-  command.page_code = 0x3F;  // all pages, current values
-  command.allocation_length = sizeof(*out_data);
-  return ExecuteCommandSync(lun, {&command, sizeof(command)}, /*is_write=*/false,
-                            {out_data, sizeof(*out_data)});
-}
-
-zx_status_t UsbMassStorageDevice::ExecuteCommandSync(uint8_t lun, iovec cdb, bool is_write,
-                                                     iovec data) {
-  if (data.iov_len > max_transfer_) {
+zx_status_t UsbMassStorageDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb,
+                                                     bool is_write, iovec data) {
+  if (lun > UINT8_MAX) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (data.iov_len > max_transfer_bytes_) {
     zxlogf(ERROR, "Request exceeding max transfer size.");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -485,8 +425,8 @@ zx_status_t UsbMassStorageDevice::ExecuteCommandSync(uint8_t lun, iovec cdb, boo
   // so to accommodate those devices we consider the transfer to have ended (with an error)
   // when we receive a stall condition from the device.
   zx_status_t status =
-      SendCbw(lun, static_cast<uint32_t>(data.iov_len), is_write ? USB_DIR_OUT : USB_DIR_IN,
-              static_cast<uint8_t>(cdb.iov_len), cdb.iov_base);
+      SendCbw(static_cast<uint8_t>(lun), static_cast<uint32_t>(data.iov_len),
+              is_write ? USB_DIR_OUT : USB_DIR_IN, static_cast<uint8_t>(cdb.iov_len), cdb.iov_base);
   if (status != ZX_OK) {
     zxlogf(WARNING, "UMS: SendCbw failed with status %s", zx_status_get_string(status));
     return status;
@@ -511,11 +451,11 @@ zx_status_t UsbMassStorageDevice::ExecuteCommandSync(uint8_t lun, iovec cdb, boo
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::DataTransfer(Transaction* txn, zx_off_t offset, size_t length,
-                                               uint8_t ep_address) {
+zx_status_t UsbMassStorageDevice::DataTransfer(zx_handle_t vmo_handle, zx_off_t offset,
+                                               size_t length, uint8_t ep_address) {
   usb_request_t* req = data_transfer_req_;
 
-  zx_status_t status = usb_request_init(req, txn->op.rw.vmo, offset, length, ep_address);
+  zx_status_t status = usb_request_init(req, vmo_handle, offset, length, ep_address);
   if (status != ZX_OK) {
     return status;
   }
@@ -537,152 +477,55 @@ zx_status_t UsbMassStorageDevice::DataTransfer(Transaction* txn, zx_off_t offset
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::ReadOrWrite(bool is_write, UmsBlockDevice* dev,
-                                              Transaction* txn) {
-  const auto& params = dev->GetBlockDeviceParameters();
-  const zx_off_t block_offset = txn->op.rw.offset_dev;
-  const uint32_t num_blocks = txn->op.rw.length;
-  if ((block_offset >= params.total_blocks) ||
-      ((params.total_blocks - block_offset) < num_blocks)) {
+zx_status_t UsbMassStorageDevice::DoTransaction(Transaction* txn, uint8_t flags, uint8_t ep_address,
+                                                const std::string& action) {
+  // TODO(fxbug.dev/121404): Consider moving this logic to scsi::Disk::BlockImplQueue().
+  const block_op_t& op = txn->disk_op.op;
+  const zx_off_t block_offset = op.rw.offset_dev;
+  const uint32_t num_blocks = op.rw.length;
+  scsi::Disk* dev = block_devs_[txn->lun].get();
+  if ((block_offset >= dev->block_count()) || ((dev->block_count() - block_offset) < num_blocks)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  const size_t num_bytes = num_blocks * params.block_size;
-  if (num_bytes > params.max_transfer) {
+  const size_t num_bytes = num_blocks * txn->block_size_bytes;
+  if (num_bytes > max_transfer_bytes_) {
     zxlogf(ERROR, "Request exceeding max transfer size.");
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint8_t flags;
-  uint8_t ep_address;
-  if (is_write) {
-    flags = USB_DIR_OUT;
-    ep_address = bulk_out_addr_;
-  } else {
-    flags = USB_DIR_IN;
-    ep_address = bulk_in_addr_;
-  }
-
-  // CBW Configuration
-  // Need to use READ_16/WRITE_16 if block addresses are greater than 32 bit
-  zx_status_t status;
-  if (params.total_blocks > UINT32_MAX) {
-    scsi::Read16CDB command = {};  // Struct-wise equivalent to scsi::Write16CDB here.
-    command.opcode = is_write ? scsi::Opcode::WRITE_16 : scsi::Opcode::READ_16;
-    command.logical_block_address = htobe64(block_offset);
-    command.transfer_length = htobe32(static_cast<uint32_t>(num_blocks));
-    status =
-        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
-  } else if (num_blocks <= UINT16_MAX) {
-    scsi::Read10CDB command = {};  // Struct-wise equivalent to scsi::Write10CDB here.
-    command.opcode = is_write ? scsi::Opcode::WRITE_10 : scsi::Opcode::READ_10;
-    command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-    command.transfer_length = htobe16(static_cast<uint16_t>(num_blocks));
-    status =
-        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
-  } else {
-    scsi::Read12CDB command = {};  // Struct-wise equivalent to scsi::Write12CDB here.
-    command.opcode = is_write ? scsi::Opcode::WRITE_12 : scsi::Opcode::READ_12;
-    command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
-    command.transfer_length = htobe32(static_cast<uint32_t>(num_blocks));
-    status =
-        SendCbw(params.lun, static_cast<uint32_t>(num_bytes), flags, sizeof(command), &command);
-  }
+  zx_status_t status =
+      SendCbw(txn->lun, static_cast<uint32_t>(num_bytes), flags, txn->cdb_length, txn->cdb_buffer);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "UMS: SendCbw during %s failed with status %s", is_write ? "Write" : "Read",
+    zxlogf(WARNING, "UMS: SendCbw during %s failed with status %s", action.c_str(),
            zx_status_get_string(status));
     return status;
   }
 
-  zx_off_t vmo_offset = txn->op.rw.offset_vmo * params.block_size;
-  status = DataTransfer(txn, vmo_offset, num_bytes, ep_address);
-  if (status != ZX_OK) {
-    return status;
+  if (num_bytes) {
+    zx_off_t vmo_offset = op.rw.offset_vmo * txn->block_size_bytes;
+    status = DataTransfer(op.rw.vmo, vmo_offset, num_bytes, ep_address);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
   // receive CSW
   uint32_t residue;
   status = ReadCsw(&residue);
   if (status == ZX_OK && residue) {
-    zxlogf(ERROR, "unexpected residue in %s", is_write ? "Write" : "Read");
+    zxlogf(ERROR, "unexpected residue in %s", action.c_str());
     status = ZX_ERR_IO;
   }
 
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev) {
-  BlockDeviceParameters params = dev->GetBlockDeviceParameters();
-  uint8_t lun = params.lun;
-
-  scsi::ReadCapacity10ParameterData data;
-  zx_status_t status = ReadCapacity(lun, &data);
-  if (status < 0) {
-    zxlogf(ERROR, "read_capacity10 failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  params.total_blocks = betoh32(data.returned_logical_block_address);
-  params.block_size = betoh32(data.block_length_in_bytes);
-
-  if (params.total_blocks == 0xFFFFFFFF) {
-    scsi::ReadCapacity16ParameterData data;
-    status = ReadCapacity(lun, &data);
-    if (status < 0) {
-      zxlogf(ERROR, "read_capacity16 failed: %s", zx_status_get_string(status));
-      return status;
-    }
-
-    params.total_blocks = betoh64(data.returned_logical_block_address);
-    params.block_size = betoh32(data.block_length_in_bytes);
-  }
-  if (params.block_size == 0) {
-    zxlogf(ERROR, "UMS zero block size");
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // +1 because this returns the address of the final block, and blocks are zero indexed
-  params.total_blocks++;
-  params.max_transfer = static_cast<uint32_t>(max_transfer_);
-  dev->SetBlockDeviceParameters(params);
-  // determine if LUN is read-only
-  scsi::ModeSense6ParameterHeader ms_data;
-  status = ModeSense(lun, &ms_data);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ModeSense failed: %s", zx_status_get_string(status));
-    return status;
-  }
-  unsigned char cache_sense[20];
-  status = ModeSense(lun, 0x08, cache_sense, sizeof(cache_sense));
-  params = dev->GetBlockDeviceParameters();
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "CacheSense failed: %s", zx_status_get_string(status));
-    params.cache_enabled = true;
-  } else {
-    params.cache_enabled = cache_sense[6] & (1 << 2);
-  }
-
-  if (ms_data.write_protected()) {
-    params.flags |= BLOCK_FLAG_READONLY;
-  } else {
-    params.flags &= ~BLOCK_FLAG_READONLY;
-  }
-
-  zxlogf(DEBUG, "UMS: block size is: 0x%08x", params.block_size);
-  zxlogf(DEBUG, "UMS: total blocks is: %lu", params.total_blocks);
-  zxlogf(DEBUG, "UMS: total size is: %lu", params.total_blocks * params.block_size);
-  zxlogf(DEBUG, "UMS: read-only: %d removable: %d", !!(params.flags & BLOCK_FLAG_READONLY),
-         !!(params.flags & BLOCK_FLAG_REMOVABLE));
-  dev->SetBlockDeviceParameters(params);
-  return dev->Add();
-}
-
 zx_status_t UsbMassStorageDevice::CheckLunsReady() {
   zx_status_t status = ZX_OK;
   for (uint8_t lun = 0; lun <= max_lun_ && status == ZX_OK; lun++) {
-    auto dev = block_devs_[lun];
     bool ready = false;
 
-    status = TestUnitReady(lun);
+    status = TestUnitReady(kPlaceholderTarget, lun);
     if (status == ZX_OK) {
       ready = true;
     }
@@ -690,27 +533,34 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
       ready = false;
       // command returned CSW_FAILED. device is there but media is not ready.
       uint8_t request_sense_data[UMS_REQUEST_SENSE_TRANSFER_LENGTH];
-      status = RequestSense(lun, request_sense_data);
+      status = RequestSense(kPlaceholderTarget, lun,
+                            {request_sense_data, UMS_REQUEST_SENSE_TRANSFER_LENGTH});
     }
     if (status != ZX_OK) {
       break;
     }
-    BlockDeviceParameters params = dev->GetBlockDeviceParameters();
-    if (ready && !params.device_added) {
-      // this will set UmsBlockDevice.device_added if it succeeds
-      status = AddBlockDevice(dev);
-      params = dev->GetBlockDeviceParameters();
-      if (status == ZX_OK) {
-        params.device_added = true;
+    if (ready && !block_devs_[lun]) {
+      zx::result disk =
+          scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_);
+      if (disk.is_ok() && disk->block_size_bytes() != 0) {
+        block_devs_[lun] = disk.value();
+        scsi::Disk* dev = block_devs_[lun].get();
+        zxlogf(DEBUG, "UMS: block size is: 0x%08x", dev->block_size_bytes());
+        zxlogf(DEBUG, "UMS: total blocks is: %lu", dev->block_count());
+        zxlogf(DEBUG, "UMS: total size is: %lu", dev->block_count() * dev->block_size_bytes());
+        zxlogf(DEBUG, "UMS: read-only: %d removable: %d", dev->write_protected(), dev->removable());
       } else {
-        zxlogf(ERROR, "UMS: device_add for block device failed: %s", zx_status_get_string(status));
+        zx_status_t error = disk.status_value();
+        if (error == ZX_OK) {
+          zxlogf(ERROR, "UMS zero block size");
+          error = ZX_ERR_INVALID_ARGS;
+        }
+        zxlogf(ERROR, "UMS: device_add for block device failed: %s", zx_status_get_string(error));
       }
-    } else if (!ready && params.device_added) {
-      dev->DdkAsyncRemove();
-      params = dev->GetBlockDeviceParameters();
-      params.device_added = false;
+    } else if (!ready && block_devs_[lun]) {
+      block_devs_[lun]->DdkAsyncRemove();
+      block_devs_[lun] = nullptr;
     }
-    dev->SetBlockDeviceParameters(params);
   }
 
   return status;
@@ -719,18 +569,10 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
 int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
   zx_status_t status = ZX_OK;
   for (uint8_t lun = 0; lun <= max_lun_; lun++) {
-    uint8_t inquiry_data[UMS_INQUIRY_TRANSFER_LENGTH];
-    status = Inquiry(lun, inquiry_data);
-    if (status < 0) {
-      zxlogf(ERROR, "Inquiry failed for lun %d status: %s", lun, zx_status_get_string(status));
+    zx::result inquiry_data = Inquiry(kPlaceholderTarget, lun);
+    if (inquiry_data.is_error()) {
       init_txn.Reply(status);
       return 0;
-    }
-    uint8_t rmb = inquiry_data[1] & 0x80;  // Removable Media Bit
-    if (rmb) {
-      BlockDeviceParameters params = block_devs_[lun]->GetBlockDeviceParameters();
-      params.flags |= BLOCK_FLAG_REMOVABLE;
-      block_devs_[lun]->SetBlockDeviceParameters(params);
     }
   }
 
@@ -767,53 +609,43 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
       }
       current_txn = txn;
     }
-    zxlogf(DEBUG, "UMS PROCESS (%p)", &txn->op);
+    const block_op_t& op = txn->disk_op.op;
+    zxlogf(DEBUG, "UMS PROCESS (%p)", &op);
 
-    UmsBlockDevice* dev = txn->dev;
-    const auto& params = dev->GetBlockDeviceParameters();
+    scsi::Disk* dev = block_devs_[txn->lun].get();
     zx_status_t status;
-    switch (txn->op.command & BLOCK_OP_MASK) {
-      case BLOCK_OP_READ:
-        if ((status = ReadOrWrite(/*is_write=*/false, dev, txn)) != ZX_OK) {
-          zxlogf(ERROR, "ums: read of %u @ %zu failed: %s", txn->op.rw.length,
-                 txn->op.rw.offset_dev, zx_status_get_string(status));
-        }
-        break;
-      case BLOCK_OP_WRITE:
-        if ((status = ReadOrWrite(/*is_write=*/true, dev, txn)) != ZX_OK) {
-          zxlogf(ERROR, "ums: write of %u @ %zu failed: %s", txn->op.rw.length,
-                 txn->op.rw.offset_dev, zx_status_get_string(status));
-        }
-        break;
-      case BLOCK_OP_FLUSH:
-        if (params.cache_enabled) {
-          scsi::SynchronizeCache10CDB command = {};
-          command.opcode = scsi::Opcode::SYNCHRONIZE_CACHE_10;
-          command.syncnv_immed = 0;
-          zx_status_t status = SendCbw(params.lun, 0, USB_DIR_OUT, sizeof(command), &command);
-          if (status != ZX_OK) {
-            zxlogf(WARNING, "UMS: SendCbw during SynchronizeCache10 failed with status %s",
+    if (dev == nullptr) {
+      // Device is absent (likely been removed).
+      status = ZX_ERR_PEER_CLOSED;
+    } else {
+      switch (op.command & BLOCK_OP_MASK) {
+        case BLOCK_OP_READ:
+          if ((status = DoTransaction(txn, USB_DIR_IN, bulk_in_addr_, "Read")) != ZX_OK) {
+            zxlogf(ERROR, "UMS: Read of %u @ %zu failed: %s", op.rw.length, op.rw.offset_dev,
                    zx_status_get_string(status));
-            return status;
           }
-          uint32_t residue;
-          status = ReadCsw(&residue);
-          if (status == ZX_OK && residue) {
-            zxlogf(ERROR, "unexpected residue in Write");
-            status = ZX_ERR_IO;
+          break;
+        case BLOCK_OP_WRITE:
+          if ((status = DoTransaction(txn, USB_DIR_OUT, bulk_out_addr_, "Write")) != ZX_OK) {
+            zxlogf(ERROR, "UMS: Write of %u @ %zu failed: %s", op.rw.length, op.rw.offset_dev,
+                   zx_status_get_string(status));
           }
-        } else {
-          status = ZX_OK;
-        }
-        break;
-      default:
-        status = ZX_ERR_INVALID_ARGS;
-        break;
+          break;
+        case BLOCK_OP_FLUSH:
+          if ((status = DoTransaction(txn, USB_DIR_OUT, 0, "Flush")) != ZX_OK) {
+            zxlogf(ERROR, "UMS: Flush failed: %s", zx_status_get_string(status));
+          }
+          break;
+        default:
+          status = ZX_ERR_INVALID_ARGS;
+          break;
+      }
     }
     {
       fbl::AutoLock l(&txn_lock_);
       if (current_txn == txn) {
-        txn->Complete(status);
+        zxlogf(DEBUG, "UMS DONE %d (%p)", status, &op);
+        txn->disk_op.Complete(status);
         current_txn = nullptr;
       }
     }
@@ -828,17 +660,18 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
 
   Transaction* txn;
   while ((txn = list_remove_head_type(&queued_txns_, Transaction, node)) != NULL) {
-    switch (txn->op.command & BLOCK_OP_MASK) {
+    const block_op_t& op = txn->disk_op.op;
+    switch (op.command & BLOCK_OP_MASK) {
       case BLOCK_OP_READ:
-        zxlogf(ERROR, "ums: read of %u @ %zu discarded during unbind", txn->op.rw.length,
-               txn->op.rw.offset_dev);
+        zxlogf(ERROR, "UMS: read of %u @ %zu discarded during unbind", op.rw.length,
+               op.rw.offset_dev);
         break;
       case BLOCK_OP_WRITE:
-        zxlogf(ERROR, "ums: write of %u @ %zu discarded during unbind", txn->op.rw.length,
-               txn->op.rw.offset_dev);
+        zxlogf(ERROR, "UMS: write of %u @ %zu discarded during unbind", op.rw.length,
+               op.rw.offset_dev);
         break;
     }
-    txn->Complete(ZX_ERR_IO_NOT_PRESENT);
+    txn->disk_op.Complete(ZX_ERR_IO_NOT_PRESENT);
   }
 
   return ZX_OK;

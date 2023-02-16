@@ -9,11 +9,10 @@
 #include <fuchsia/hardware/block/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
-#include <lib/async-loop/default.h>
-#include <lib/async-loop/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 #include <zircon/assert.h>
@@ -35,8 +34,6 @@
 
 namespace ums {
 
-class UmsBlockDevice;
-
 // Abstract waiter class for waiting on a sync_completion_t.
 // This is necessary to allow injection of a timer by a test
 // into the UsbMassStorageDevice class, allowing for a simulated clock.
@@ -48,20 +45,16 @@ class WaiterInterface : public fbl::RefCounted<WaiterInterface> {
 
 // struct representing a block device for a logical unit
 struct Transaction {
-  void Complete(zx_status_t status) {
-    zxlogf(DEBUG, "UMS DONE %d (%p)", status, &op);
-    completion_cb(cookie, status, &op);
-  }
+  scsi::DiskOp disk_op;
 
-  block_op_t op;
-
-  block_impl_queue_callback completion_cb;
-
-  void* cookie;
+  // UsbMassStorageDevice::ExecuteCommandAsync() checks that the incoming CDB's size does not exceed
+  // this buffer's.
+  uint8_t cdb_buffer[16];
+  uint8_t cdb_length;
+  uint8_t lun;
+  uint32_t block_size_bytes;
 
   list_node_t node;
-
-  ums::UmsBlockDevice* dev;
 };
 
 class UsbMassStorageDevice;
@@ -72,19 +65,24 @@ struct UsbRequestContext {
 
 using MassStorageDeviceType =
     ddk::Device<UsbMassStorageDevice, ddk::Unbindable, ddk::Initializable>;
-class UsbMassStorageDevice : public MassStorageDeviceType {
+class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceType {
  public:
   explicit UsbMassStorageDevice(fbl::RefPtr<WaiterInterface> waiter, zx_device_t* parent = nullptr)
       : MassStorageDeviceType(parent), waiter_(waiter) {}
 
-  ~UsbMassStorageDevice() {}
-
-  void QueueTransaction(Transaction* txn);
+  ~UsbMassStorageDevice() override = default;
 
   void DdkRelease();
   void DdkInit(ddk::InitTxn txn);
 
   void DdkUnbind(ddk::UnbindTxn txn);
+
+  // scsi::Controller
+  size_t BlockOpSize() override { return sizeof(Transaction); }
+  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                 iovec data) override;
+  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                           uint32_t block_size_bytes, scsi::DiskOp* disk_op) override;
 
   // Performs the object initialization.
   zx_status_t Init(bool is_test_mode);
@@ -93,8 +91,6 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbMassStorageDevice);
 
  private:
-  zx_status_t ExecuteCommandSync(uint8_t lun, iovec cdb, bool is_write, iovec data);
-
   zx_status_t Reset();
 
   // Sends a Command Block Wrapper (command portion of request)
@@ -112,25 +108,11 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
 
   zx_status_t ReadSync(size_t transfer_length);
 
-  zx_status_t Inquiry(uint8_t lun, uint8_t* out_data);
+  zx_status_t DataTransfer(zx_handle_t vmo_handle, zx_off_t offset, size_t length,
+                           uint8_t ep_address);
 
-  zx_status_t TestUnitReady(uint8_t lun);
-
-  zx_status_t RequestSense(uint8_t lun, uint8_t* out_data);
-
-  zx_status_t ReadCapacity(uint8_t lun, scsi::ReadCapacity10ParameterData* out_data);
-
-  zx_status_t ReadCapacity(uint8_t lun, scsi::ReadCapacity16ParameterData* out_data);
-
-  zx_status_t ModeSense(uint8_t lun, scsi::ModeSense6ParameterHeader* out_data);
-
-  zx_status_t ModeSense(uint8_t lun, uint8_t page, void* data, uint8_t transfer_length);
-
-  zx_status_t DataTransfer(Transaction* txn, zx_off_t offset, size_t length, uint8_t ep_address);
-
-  zx_status_t ReadOrWrite(bool is_write, ums::UmsBlockDevice* dev, Transaction* txn);
-
-  zx_status_t AddBlockDevice(fbl::RefPtr<ums::UmsBlockDevice> dev);
+  zx_status_t DoTransaction(Transaction* txn, uint8_t flags, uint8_t ep_address,
+                            const std::string& action);
 
   zx_status_t CheckLunsReady();
 
@@ -146,7 +128,7 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
 
   uint8_t max_lun_;  // index of last logical unit
 
-  size_t max_transfer_;  // maximum transfer size reported by usb_get_max_transfer_size()
+  uint32_t max_transfer_bytes_;  // maximum transfer size reported by usb_get_max_transfer_size()
 
   uint8_t interface_number_;
   std::optional<std::thread> worker_thread_;
@@ -181,7 +163,7 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
                                       // and when device is dead
   fbl::Mutex txn_lock_;               // protects queued_txns, txn_completion and dead
 
-  fbl::Array<fbl::RefPtr<ums::UmsBlockDevice>> block_devs_;
+  fbl::Array<fbl::RefPtr<scsi::Disk>> block_devs_;
 
   bool is_test_mode_ = false;
 };

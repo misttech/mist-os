@@ -40,15 +40,16 @@ zx_status_t Disk::AddDisk() {
   }
 
   // Print T10 Vendor ID/Product ID
-  zxlogf(INFO, "%d:%d ", target_, lun_);
-  for (int i = 0; i < 8; i++) {
-    zxlogf(INFO, "%c", inquiry_data.value().t10_vendor_id[i]);
-  }
-  zxlogf(INFO, " ");
-  for (int i = 0; i < 16; i++) {
-    zxlogf(INFO, "%c", inquiry_data.value().product_id[i]);
-  }
-  zxlogf(INFO, "");
+  auto vendor_id =
+      std::string(inquiry_data.value().t10_vendor_id, sizeof(inquiry_data.value().t10_vendor_id));
+  auto product_id =
+      std::string(inquiry_data.value().product_id, sizeof(inquiry_data.value().product_id));
+  // Some vendors don't pad the strings with spaces (0x20). Null-terminate strings to avoid printing
+  // illegal characters.
+  vendor_id = std::string(vendor_id.c_str());
+  product_id = std::string(product_id.c_str());
+  zxlogf(INFO, "Target %u LUN %u: Vendor ID = %s, Product ID = %s", target_, lun_,
+         vendor_id.c_str(), product_id.c_str());
 
   removable_ = inquiry_data.value().removable_media();
 
@@ -60,9 +61,13 @@ zx_status_t Disk::AddDisk() {
 
   zx::result write_cache_enabled = controller_->ModeSenseWriteCacheEnabled(target_, lun_);
   if (write_cache_enabled.is_error()) {
-    return write_cache_enabled.status_value();
+    zxlogf(WARNING, "Failed to get write cache status for target %u, lun %u: %s.", target_, lun_,
+           zx_status_get_string(write_cache_enabled.status_value()));
+    // Assume write cache is enabled so that flush operations are not ignored.
+    write_cache_enabled_ = true;
+  } else {
+    write_cache_enabled_ = write_cache_enabled.value();
   }
-  write_cache_enabled_ = write_cache_enabled.value();
 
   zx_status_t status = controller_->ReadCapacity(target_, lun_, &block_count_, &block_size_bytes_);
   if (status != ZX_OK) {
@@ -98,28 +103,40 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
   disk_op->completion_cb = completion_cb;
   disk_op->cookie = cookie;
 
-  auto op_type = op->command & BLOCK_OP_MASK;
+  const auto op_type = op->command & BLOCK_OP_MASK;
   switch (op_type) {
-    case BLOCK_OP_READ: {
-      Read16CDB cdb = {};
-      cdb.opcode = Opcode::READ_16;
-      cdb.logical_block_address = htobe64(op->rw.offset_dev);
-      cdb.transfer_length = htonl(op->rw.length);
-      controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
-                                       /*is_write=*/false, block_size_bytes_, disk_op);
-      break;
-    }
+    case BLOCK_OP_READ:
     case BLOCK_OP_WRITE: {
-      Write16CDB cdb = {};
-      cdb.opcode = Opcode::WRITE_16;
-      if (op->command & BLOCK_FL_FORCE_ACCESS) {
-        cdb.set_force_unit_access(true);
+      const bool is_write = op_type == BLOCK_OP_WRITE;
+      const bool is_fua = op->command & BLOCK_FL_FORCE_ACCESS;
+      uint8_t cdb_buffer[16] = {};
+      uint8_t cdb_length;
+      if (block_count_ > UINT32_MAX) {
+        auto cdb = reinterpret_cast<Read16CDB*>(cdb_buffer);  // Struct-wise equiv. to Write16CDB.
+        cdb_length = 16;
+        cdb->opcode = is_write ? Opcode::WRITE_16 : Opcode::READ_16;
+        cdb->logical_block_address = htobe64(op->rw.offset_dev);
+        cdb->transfer_length = htobe32(op->rw.length);
+        cdb->set_force_unit_access(is_fua);
+      } else if (op->rw.length <= UINT16_MAX) {
+        auto cdb = reinterpret_cast<Read10CDB*>(cdb_buffer);  // Struct-wise equiv. to Write10CDB.
+        cdb_length = 10;
+        cdb->opcode = is_write ? Opcode::WRITE_10 : Opcode::READ_10;
+        cdb->logical_block_address = htobe32(static_cast<uint32_t>(op->rw.offset_dev));
+        cdb->transfer_length = htobe16(static_cast<uint16_t>(op->rw.length));
+        cdb->set_force_unit_access(is_fua);
+      } else {
+        auto cdb = reinterpret_cast<Read12CDB*>(cdb_buffer);  // Struct-wise equiv. to Write12CDB.
+        cdb_length = 12;
+        cdb->opcode = is_write ? Opcode::WRITE_12 : Opcode::READ_12;
+        cdb->logical_block_address = htobe32(static_cast<uint32_t>(op->rw.offset_dev));
+        cdb->transfer_length = htobe32(op->rw.length);
+        cdb->set_force_unit_access(is_fua);
       }
-      cdb.logical_block_address = htobe64(op->rw.offset_dev);
-      cdb.transfer_length = htonl(op->rw.length);
-      controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
-                                       /*is_write=*/true, block_size_bytes_, disk_op);
-      break;
+      ZX_ASSERT(cdb_length <= sizeof(cdb_buffer));
+      controller_->ExecuteCommandAsync(target_, lun_, {cdb_buffer, cdb_length}, is_write,
+                                       block_size_bytes_, disk_op);
+      return;
     }
     case BLOCK_OP_FLUSH: {
       if (!write_cache_enabled_) {
@@ -137,7 +154,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       cdb.num_blocks = 0;
       controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
                                        /*is_write=*/false, block_size_bytes_, disk_op);
-      break;
+      return;
     }
     default:
       completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);

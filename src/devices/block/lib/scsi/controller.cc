@@ -20,6 +20,19 @@ zx_status_t Controller::TestUnitReady(uint8_t target, uint16_t lun) {
   return status;
 }
 
+zx_status_t Controller::RequestSense(uint8_t target, uint16_t lun, iovec data) {
+  RequestSenseCDB cdb = {};
+  cdb.opcode = Opcode::REQUEST_SENSE;
+  cdb.allocation_length = static_cast<uint8_t>(data.iov_len);
+  zx_status_t status =
+      ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, data);
+  if (status != ZX_OK) {
+    zxlogf(DEBUG, "REQUEST_SENSE failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+  }
+  return status;
+}
+
 zx::result<InquiryData> Controller::Inquiry(uint8_t target, uint16_t lun) {
   InquiryCDB cdb = {};
   cdb.opcode = Opcode::INQUIRY;
