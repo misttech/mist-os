@@ -38,9 +38,6 @@ impl StackFidlWorker {
         stream
             .try_fold(Self { netstack }, |worker, req| async {
                 match req {
-                    StackRequest::DelEthernetInterface { id: _, responder } => {
-                        responder_send!(responder, &mut Err(fidl_net_stack::Error::NotSupported));
-                    }
                     StackRequest::GetForwardingTable { responder } => {
                         responder_send!(
                             responder,

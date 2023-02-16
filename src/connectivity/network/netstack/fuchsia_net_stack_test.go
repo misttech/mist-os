@@ -284,34 +284,6 @@ func TestFuchsiaNetStack(t *testing.T) {
 		setInterfaceForwarding(ifs1.nicid, net.IpVersionV4, false)
 		checkAllForwardingExcept(true, ifs1.nicid, net.IpVersionV4)
 	})
-
-	t.Run("Remove loopback interface", func(t *testing.T) {
-		addGoleakCheck(t)
-		ns, _ := newNetstack(t, netstackTestOptions{})
-		if err := ns.addLoopback(); err != nil {
-			t.Fatalf("ns.addLoopback() = %s", err)
-		}
-		ni := stackImpl{ns: ns}
-
-		nicId, ok := func() (uint64, bool) {
-			for nicId, info := range ns.stack.NICInfo() {
-				if info.Flags.Loopback {
-					return uint64(nicId), true
-				}
-			}
-			return 0, false
-		}()
-
-		if !ok {
-			t.Fatalf("failed to find loopback interface")
-		}
-
-		delResult, err := ni.DelEthernetInterface(context.Background(), nicId)
-		AssertNoError(t, err)
-		if delResult != stack.StackDelEthernetInterfaceResultWithErr(stack.ErrorNotSupported) {
-			t.Errorf("got ni.DelEthernetInterface(%d) = %#v, want = Err(ErrorNotSupported)", nicId, delResult)
-		}
-	})
 }
 
 func TestDnsServerWatcher(t *testing.T) {

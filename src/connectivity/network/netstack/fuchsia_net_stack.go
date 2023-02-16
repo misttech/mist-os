@@ -32,23 +32,6 @@ type stackImpl struct {
 	dnsWatchers *dnsServerWatcherCollection
 }
 
-func (ns *Netstack) delInterface(id uint64) stack.StackDelEthernetInterfaceResult {
-	var result stack.StackDelEthernetInterfaceResult
-
-	if nicInfo, ok := ns.stack.NICInfo()[tcpip.NICID(id)]; ok {
-		if nicInfo.Flags.Loopback {
-			result.SetErr(stack.ErrorNotSupported)
-		} else {
-			nicInfo.Context.(*ifState).RemoveByUser()
-			result.SetResponse(stack.StackDelEthernetInterfaceResponse{})
-		}
-	} else {
-		result.SetErr(stack.ErrorNotFound)
-	}
-
-	return result
-}
-
 func (ns *Netstack) getForwardingTable() []stack.ForwardingEntry {
 	ert := ns.GetExtendedRouteTable()
 	entries := make([]stack.ForwardingEntry, 0, len(ert))
@@ -122,10 +105,6 @@ func (ns *Netstack) delForwardingEntry(entry stack.ForwardingEntry) stack.StackD
 		return stack.StackDelForwardingEntryResultWithErr(stack.ErrorNotFound)
 	}
 	return stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{})
-}
-
-func (ni *stackImpl) DelEthernetInterface(_ fidl.Context, id uint64) (stack.StackDelEthernetInterfaceResult, error) {
-	return ni.ns.delInterface(id), nil
 }
 
 func (ni *stackImpl) GetForwardingTable(fidl.Context) ([]stack.ForwardingEntry, error) {

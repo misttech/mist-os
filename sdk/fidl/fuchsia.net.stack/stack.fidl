@@ -42,13 +42,6 @@ type Error = strict enum {
 
 @discoverable
 protocol Stack {
-    // TODO(https://fxbug.dev/118758): Delete once no longer load-bearing for
-    // fuchsia.net.virtualizatin implementation in netcfg.
-    /// Remove an Ethernet interface from the network stack.
-    DelEthernetInterface(struct {
-        id fuchsia.net.InterfaceId;
-    }) -> () error Error;
-
     /// List all the entries in the forwarding table for the network stack.
     // TODO(https://fxbug.dev/38528): This is unbounded for now, until we change
     // the API to allow for pagination.
