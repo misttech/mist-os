@@ -714,10 +714,6 @@ if (current_os == "fuchsia") {
   }
 }
 
-group("rustc-demangle") {
-  public_deps = [ ":rustc-demangle-v0_1_21" ]
-}
-
 group("rustc-hash") {
   public_deps = [ ":rustc-hash-v1_0_1" ]
 }
@@ -9132,27 +9128,6 @@ rust_library("rust_icu_ustring-v3_0_0") {
     "--cfg=feature=\"icu_version_67_plus\"",
     "--cfg=feature=\"icu_version_in_env\"",
     "--cfg=feature=\"renaming\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("rustc-demangle-v0_1_21") {
-  crate_name = "rustc_demangle"
-  crate_root =
-      "//third_party/rust_crates/vendor/rustc-demangle-0.1.21/src/lib.rs"
-  output_name = "rustc_demangle-d315357e91f12bfd"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=d315357e91f12bfd",
-    "-Cextra-filename=-d315357e91f12bfd",
   ]
 
   visibility = [ ":*" ]

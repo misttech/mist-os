@@ -1381,7 +1381,6 @@ dependencies = [
  "rust_icu_uloc",
  "rust_icu_unorm2",
  "rust_icu_ustring",
- "rustc-demangle",
  "rustc-hash",
  "rustfix",
  "rustls",
@@ -3466,12 +3465,6 @@ dependencies = [
  "rust_icu_common",
  "rust_icu_sys",
 ]
-
-[[package]]
-name = "rustc-demangle"
-version = "0.1.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
 
 [[package]]
 name = "rustc-hash"
