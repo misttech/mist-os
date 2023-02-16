@@ -630,12 +630,6 @@ group("png") {
   public_deps = [ ":png-v0_14_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("polling") {
-    public_deps = [ ":polling-v2_0_2" ]
-  }
-}
-
 if (current_os == "fuchsia") {
   group("pretty") {
     public_deps = [ ":pretty-v0_5_2" ]
