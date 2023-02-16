@@ -83,6 +83,16 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// Print out a log periodically to give an estimate of the timestamp at which
+	// logs are getting read from the socket.
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	go func() {
+		for range ticker.C {
+			logger.Debugf(ctx, "still running test...")
+		}
+	}()
+
 	if _, err := iomisc.ReadUntilMatchString(ctx, socketTee, successString); err != nil {
 		if ctx.Err() != nil {
 			return fmt.Errorf("timed out before success string %q was read from serial", successString)
