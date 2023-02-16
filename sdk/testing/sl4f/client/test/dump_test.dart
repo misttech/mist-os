@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:io';
 
@@ -14,8 +13,8 @@ import 'package:sl4f/sl4f.dart' as sl4f;
 import 'package:test/test.dart';
 
 void main() {
-  sl4f.Dump dump;
-  Directory dumpDir;
+  late sl4f.Dump dump;
+  late Directory dumpDir;
 
   group(sl4f.Dump, () {
     setUp(() {
@@ -28,8 +27,8 @@ void main() {
     });
 
     test('writeAsBytes creates expected file', () async {
-      File file = await dump.writeAsBytes(
-          'write-as-bytes', 'tmp', [0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+      File file = (await dump.writeAsBytes(
+          'write-as-bytes', 'tmp', [0x68, 0x65, 0x6c, 0x6c, 0x6f]))!;
 
       expect(file.path, startsWith(dumpDir.path));
       expect(
@@ -40,7 +39,7 @@ void main() {
       expect(file.readAsStringSync(), 'hello');
     });
     test('openForWrite creates expected file', () async {
-      IOSink sink = dump.openForWrite('open-for-write', 'tmp');
+      IOSink sink = dump.openForWrite('open-for-write', 'tmp')!;
 
       // Can't do cascaded invocations together with await, silly rabbit.
       // ignore: cascade_invocations

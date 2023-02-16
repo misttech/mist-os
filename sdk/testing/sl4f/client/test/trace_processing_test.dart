@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
+
 import 'dart:io' show Platform;
 
 import 'package:sl4f/trace_processing.dart';
@@ -169,7 +169,7 @@ Map<String, dynamic> _toDictionary(Event e) {
       result['id'] = id;
     }
   } else if (e is DurationEvent) {
-    result['duration.toNanoseconds()'] = e.duration.toNanoseconds();
+    result['duration.toNanoseconds()'] = e.duration!.toNanoseconds();
     result['!!parent'] = e.parent != null;
     result['childDurations.length'] = e.childDurations.length;
     result['childFlows.length'] = e.childFlows.length;
@@ -214,13 +214,15 @@ void _checkEventsEqual(Event a, Event b) {
   } else if (a is CounterEvent && b is CounterEvent) {
     result &= a.id == b.id;
   } else if (a is DurationEvent && b is DurationEvent) {
-    expect(a.duration.toMicroseconds(), _closeTo(b.duration.toMicroseconds()));
+    expect(
+        a.duration!.toMicroseconds(), _closeTo(b.duration!.toMicroseconds()));
     result &= (a.parent == null) == (b.parent == null);
     result &= a.childDurations.length == b.childDurations.length;
     result &= a.childFlows.length == b.childFlows.length;
   } else if (a is AsyncEvent && b is AsyncEvent) {
     result &= a.id == b.id;
-    expect(a.duration.toMicroseconds(), _closeTo(b.duration.toMicroseconds()));
+    expect(
+        a.duration!.toMicroseconds(), _closeTo(b.duration!.toMicroseconds()));
   } else if (a is FlowEvent && b is FlowEvent) {
     result &= a.id == b.id;
     result &= a.phase == b.phase;
@@ -829,22 +831,22 @@ void main(List<String> args) {
     final flowEvents = filterEventsTyped<FlowEvent>(thread.events).toList();
     expect(flowEvents.length, 6);
     expect(
-        flowEvents[0].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[0].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         10.0);
     expect(
-        flowEvents[1].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[1].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         20.0);
     expect(
-        flowEvents[2].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[2].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         40.0);
     expect(
-        flowEvents[3].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[3].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         50.0);
     expect(
-        flowEvents[4].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[4].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         60.0);
     expect(
-        flowEvents[5].enclosingDuration.start.toEpochDelta().toMillisecondsF(),
+        flowEvents[5].enclosingDuration!.start.toEpochDelta().toMillisecondsF(),
         70.0);
   });
 
