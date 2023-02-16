@@ -14,7 +14,7 @@ use lock_order::{
 use log::trace;
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     BroadcastAddress, MulticastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, UnicastAddress,
     Witness,
 };
@@ -48,10 +48,9 @@ use crate::{
         with_ethernet_state, Device, DeviceIdContext, EthernetDeviceId, FrameDestination, Mtu,
         RecvIpFrameMeta,
     },
-    error::ExistsError,
     ip::device::{
         nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
-        state::{AddrConfig, DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
+        state::{DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
     },
     sync::{Mutex, RwLock},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -116,37 +115,6 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
-
-    /// Adds an IPv6 address to the device.
-    // TODO(https://fxbug.dev/72378): Remove this method once NDP operates at
-    // L3.
-    fn add_ipv6_addr_subnet(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        addr_sub: AddrSubnet<Ipv6Addr>,
-        config: AddrConfig<C::Instant>,
-    ) -> Result<(), ExistsError>;
-
-    /// Joins an IPv6 multicast group.
-    // TODO(https://fxbug.dev/72378): Remove this method once NDP operates at
-    // L3.
-    fn join_ipv6_multicast(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    );
-
-    /// Leaves an IPv6 multicast group.
-    // TODO(https://fxbug.dev/72378): Remove this method once NDP operates at
-    // L3.
-    fn leave_ipv6_multicast(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    );
 }
 
 impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
@@ -196,50 +164,6 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
                 &mut dynamic_state,
             )
         })
-    }
-
-    fn add_ipv6_addr_subnet(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
-        addr_sub: AddrSubnet<Ipv6Addr>,
-        config: AddrConfig<NonSyncCtx::Instant>,
-    ) -> Result<(), ExistsError> {
-        crate::ip::device::add_ipv6_addr_subnet(
-            self,
-            ctx,
-            &device_id.clone().into(),
-            addr_sub,
-            config,
-        )
-    }
-
-    fn join_ipv6_multicast(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    ) {
-        crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-            self,
-            ctx,
-            &device_id.clone().into(),
-            multicast_addr,
-        )
-    }
-
-    fn leave_ipv6_multicast(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    ) {
-        crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-            self,
-            ctx,
-            &device_id.clone().into(),
-            multicast_addr,
-        )
     }
 }
 
@@ -1064,7 +988,7 @@ mod tests {
     use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
 
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, IpVersion};
+    use net_types::ip::{AddrSubnet, Ip, IpVersion};
     use packet::Buf;
     use packet_formats::{
         icmp::IcmpDestUnreachable,
@@ -1081,7 +1005,7 @@ mod tests {
     use crate::{
         context::testutil::FakeInstant,
         device::DeviceId,
-        error::NotFoundError,
+        error::{ExistsError, NotFoundError},
         ip::{
             device::{
                 is_ip_routing_enabled, nud::DynamicNeighborUpdateSource, set_routing_enabled,
@@ -1150,34 +1074,6 @@ mod tests {
         ) -> O {
             let state = self.get_mut();
             cb(&state.static_state, &mut state.dynamic_state)
-        }
-
-        fn add_ipv6_addr_subnet(
-            &mut self,
-            _ctx: &mut FakeNonSyncCtx,
-            _device_id: &FakeDeviceId,
-            _addr_sub: AddrSubnet<Ipv6Addr>,
-            _config: AddrConfig<FakeInstant>,
-        ) -> Result<(), ExistsError> {
-            unimplemented!()
-        }
-
-        fn join_ipv6_multicast(
-            &mut self,
-            _ctx: &mut FakeNonSyncCtx,
-            _device_id: &FakeDeviceId,
-            _multicast_addr: MulticastAddr<Ipv6Addr>,
-        ) {
-            unimplemented!()
-        }
-
-        fn leave_ipv6_multicast(
-            &mut self,
-            _ctx: &mut FakeNonSyncCtx,
-            _device_id: &FakeDeviceId,
-            _multicast_addr: MulticastAddr<Ipv6Addr>,
-        ) {
-            unimplemented!()
         }
     }
 
