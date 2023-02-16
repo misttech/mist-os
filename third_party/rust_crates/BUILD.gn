@@ -954,10 +954,6 @@ group("tracing-subscriber") {
   public_deps = [ ":tracing-subscriber-v0_3_1" ]
 }
 
-group("trait_enum") {
-  public_deps = [ ":trait_enum-v0_5_0" ]
-}
-
 if (current_os == "fuchsia") {
   group("trust-dns-proto") {
     public_deps = [ ":trust-dns-proto-v0_22_0" ]
@@ -11180,28 +11176,6 @@ rust_library("tracing-subscriber-v0_3_1") {
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"thread_local\"",
     "--cfg=feature=\"tracing-log\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("trait_enum-v0_5_0") {
-  crate_name = "trait_enum"
-  crate_root = "//third_party/rust_crates/vendor/trait_enum-0.5.0/src/lib.rs"
-  output_name = "trait_enum-6fe8ec4f12b9019b"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=6fe8ec4f12b9019b",
-    "-Cextra-filename=-6fe8ec4f12b9019b",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
