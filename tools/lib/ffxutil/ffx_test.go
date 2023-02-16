@@ -45,7 +45,7 @@ func TestFFXInstance(t *testing.T) {
 	assertRunsExpectedCmd(ffx.TargetWait(ctx), stdout, "--target target target wait")
 
 	// Create a new instance that uses the same ffx config but runs against a different target.
-	ffx2, _ := NewFFXInstance(ctx, ffxPath, tmpDir, []string{}, "target2", filepath.Join(tmpDir, "sshKey"), filepath.Join(tmpDir, "out"))
+	ffx2 := FFXWithTarget(ffx, "target2")
 	var buf2 []byte
 	stdout2 := bytes.NewBuffer(buf2)
 	ffx2.SetStdoutStderr(stdout2, stdout2)

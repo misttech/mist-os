@@ -67,6 +67,22 @@ type FFXInstance struct {
 	isolateDir string
 }
 
+// FFXWithTarget returns a copy of the provided ffx instance associated with
+// the provided target. This copy should use the same ffx daemon but run
+// commands with the new target.
+func FFXWithTarget(ffx *FFXInstance, target string) *FFXInstance {
+	return &FFXInstance{
+		ctx:        ffx.ctx,
+		ffxPath:    ffx.ffxPath,
+		runner:     ffx.runner,
+		stdout:     ffx.stdout,
+		stderr:     ffx.stderr,
+		target:     target,
+		env:        ffx.env,
+		isolateDir: ffx.isolateDir,
+	}
+}
+
 // NewFFXInstance creates an isolated FFXInstance.
 func NewFFXInstance(
 	ctx context.Context,

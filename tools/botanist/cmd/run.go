@@ -226,34 +226,6 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 		defer flush()
 		ffx.SetStdoutStderr(stdout, stderr)
-		cmd := ffx.Command("daemon", "start")
-		daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
-		if err != nil {
-			return err
-		}
-		cmd.Stdout = daemonLog
-		logger.Debugf(ctx, "%s", cmd.Args)
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		defer func() {
-			// TODO(fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
-			// process once that is supported.
-			if err := ffx.Stop(); err != nil {
-				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
-			}
-			if err := cmd.Wait(); err != nil {
-				logger.Errorf(ctx, "daemon process finished with err: %s", err)
-			} else {
-				logger.Debugf(ctx, "ffx daemon process finished")
-			}
-			if err := daemonLog.Close(); err != nil {
-				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
-			}
-			if removeFFXOutputsDir {
-				os.RemoveAll(ffxOutputsDir)
-			}
-		}()
 		if r.ffxExperimentLevel > 0 {
 			if err := ffx.SetLogLevel(ctx, ffxutil.Trace); err != nil {
 				return err
@@ -273,6 +245,44 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 				return err
 			}
 		}
+
+		cmd := ffx.Command("daemon", "start")
+		daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
+		if err != nil {
+			return err
+		}
+		cmd.Stdout = daemonLog
+		logger.Debugf(ctx, "%s", cmd.Args)
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+		// Wait for the daemon process to terminate in a separate goroutine
+		// and log when it finishes in order to detect if the process gets
+		// terminated earlier than expected.
+		cmdWait := make(chan error)
+		go func() {
+			if err := cmd.Wait(); err != nil {
+				logger.Errorf(ctx, "daemon process finished with err: %s", err)
+			} else {
+				logger.Debugf(ctx, "ffx daemon process finished")
+			}
+			cmdWait <- err
+		}()
+		defer func() {
+			// TODO(fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
+			// process once that is supported.
+			if err := ffx.Stop(); err != nil {
+				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
+			}
+			// Wait for the daemon process to finish before closing the log.
+			<-cmdWait
+			if err := daemonLog.Close(); err != nil {
+				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
+			}
+			if removeFFXOutputsDir {
+				os.RemoveAll(ffxOutputsDir)
+			}
+		}()
 	}
 
 	for _, t := range targetSlice {
@@ -284,10 +294,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		// Attach an ffx instance for all targets. All ffx instances will use the same
 		// config and daemon, but run commands against its own specified target.
 		if ffx != nil {
-			ffxForTarget, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, t.Nodename(), t.SSHKey(), ffxOutputsDir)
-			if err != nil {
-				return err
-			}
+			ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
 			t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
 		}
 		t.SetImageOverrides(build.ImageOverrides(r.imageOverrides))
