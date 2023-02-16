@@ -3,18 +3,15 @@
 // found in the LICENSE file.
 
 use std::collections::HashSet;
-use std::convert::TryFrom as _;
 use std::pin::Pin;
 
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_zircon as zx;
 
 use anyhow::{anyhow, Context as _};
@@ -73,7 +70,7 @@ enum BridgeState {
         guests: HashSet<u64>,
     },
     Bridged {
-        bridge_id: u64,
+        handle: BridgeHandle,
         // Invariant: `upstream` is not present in `upstream_candidates`.
         //
         // Note that `upstream` going offline does not cause a state transition unlike
@@ -325,11 +322,11 @@ impl<B: BridgeHandler> Bridge<B> {
             // create the bridge.
             BridgeState::WaitingForGuests { upstream, upstream_candidates } => {
                 let guests = HashSet::from([id]);
-                let bridge_id = bridge_handler
+                let handle = bridge_handler
                     .build_bridge(guests.iter().copied(), upstream)
                     .await
                     .context("building bridge")?;
-                BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
             }
             // If a bridge doesn't exist, and we don't yet have an interface with upstream
             // connectivity, just keep track of the interface to be bridged, so we can eventually
@@ -342,14 +339,14 @@ impl<B: BridgeHandler> Bridge<B> {
             // If a bridge already exists, tear it down and create a new one, re-using the interface
             // that has upstream connectivity and including all the interfaces that were bridged
             // previously.
-            BridgeState::Bridged { bridge_id, upstream, upstream_candidates, mut guests } => {
-                bridge_handler.destroy_bridge(bridge_id).await.context("destroying bridge")?;
+            BridgeState::Bridged { handle, upstream, upstream_candidates, mut guests } => {
+                bridge_handler.destroy_bridge(handle).await.context("destroying bridge")?;
                 assert!(guests.insert(id));
-                let bridge_id = bridge_handler
+                let handle = bridge_handler
                     .build_bridge(guests.iter().copied(), upstream)
                     .await
                     .context("building bridge")?;
-                BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
             }
         };
         Ok(())
@@ -371,17 +368,17 @@ impl<B: BridgeHandler> Bridge<B> {
                     BridgeState::WaitingForUpstream { guests }
                 }
             }
-            BridgeState::Bridged { bridge_id, upstream, upstream_candidates, mut guests } => {
-                bridge_handler.destroy_bridge(bridge_id).await.context("destroying bridge")?;
+            BridgeState::Bridged { handle, upstream, upstream_candidates, mut guests } => {
+                bridge_handler.destroy_bridge(handle).await.context("destroying bridge")?;
                 assert!(guests.remove(&id));
                 if guests.is_empty() {
                     BridgeState::WaitingForGuests { upstream, upstream_candidates }
                 } else {
-                    let bridge_id = bridge_handler
+                    let handle = bridge_handler
                         .build_bridge(guests.iter().copied(), upstream)
                         .await
                         .context("building bridge")?;
-                    BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                    BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
                 }
             }
         };
@@ -425,12 +422,12 @@ impl<B: BridgeHandler> Bridge<B> {
                 if allowed_for_bridge_upstream && !guests.contains(&id) {
                     // We don't already have an upstream interface that provides connectivity. Build
                     // a bridge with this one.
-                    let bridge_id = bridge_handler
+                    let handle = bridge_handler
                         .build_bridge(guests.iter().copied(), id)
                         .await
                         .context("building bridge")?;
                     BridgeState::Bridged {
-                        bridge_id,
+                        handle,
                         upstream: id,
                         upstream_candidates: Default::default(),
                         guests,
@@ -442,11 +439,11 @@ impl<B: BridgeHandler> Bridge<B> {
             // If a bridge already exists, tear it down and create a new one, using this new
             // interface to provide upstream connectivity, and including all the interfaces that
             // were bridged previously.
-            BridgeState::Bridged { bridge_id, upstream, mut upstream_candidates, guests } => {
+            BridgeState::Bridged { handle, upstream, mut upstream_candidates, guests } => {
                 if id == upstream {
                     info!("upstream-providing interface {} went online", id);
-                } else if id == bridge_id {
-                    info!("bridge interface {} went online", bridge_id);
+                } else if id == handle.id {
+                    info!("bridge interface {} went online", handle.id);
                 } else if !guests.contains(&id) && allowed_for_bridge_upstream {
                     assert!(
                         upstream_candidates.insert(id),
@@ -454,7 +451,7 @@ impl<B: BridgeHandler> Bridge<B> {
                         id
                     );
                 }
-                BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
             }
         };
         Ok(())
@@ -476,8 +473,8 @@ impl<B: BridgeHandler> Bridge<B> {
             BridgeState::WaitingForUpstream { guests } => {
                 BridgeState::WaitingForUpstream { guests }
             }
-            BridgeState::Bridged { bridge_id, upstream, mut upstream_candidates, guests } => {
-                if id == bridge_id {
+            BridgeState::Bridged { handle, upstream, mut upstream_candidates, guests } => {
+                if id == handle.id {
                     warn!("bridge interface {} went offline", id);
                 } else if id == upstream {
                     // We currently ignore the situation where an interface that is providing
@@ -488,7 +485,7 @@ impl<B: BridgeHandler> Bridge<B> {
                 } else if !guests.contains(&id) && allowed_for_bridge_upstream {
                     assert!(upstream_candidates.remove(&id), "upstream candidate {} not found", id);
                 }
-                BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
             }
             BridgeState::WaitingForGuests { upstream, mut upstream_candidates } => {
                 if id == upstream {
@@ -540,31 +537,31 @@ impl<B: BridgeHandler> Bridge<B> {
                     BridgeState::WaitingForGuests { upstream, upstream_candidates }
                 }
             }
-            BridgeState::Bridged { bridge_id, upstream, mut upstream_candidates, guests } => {
+            BridgeState::Bridged { handle, upstream, mut upstream_candidates, guests } => {
                 if guests.contains(&removed_id) {
                     // Removal from the `guests` map will occur when the guest removal is
                     // actually handled in `remove_guest_from_bridge`.
                     info!("guest interface {} removed", removed_id);
                 }
-                if bridge_id == removed_id {
+                if handle.id == removed_id {
                     // The bridge interface installed by netcfg should not be removed by any other
                     // entity.
-                    error!("bridge interface {} removed; rebuilding", bridge_id);
-                    let bridge_id = bridge_handler
+                    error!("bridge interface {} removed; rebuilding", handle.id);
+                    let handle = bridge_handler
                         .build_bridge(guests.iter().copied(), upstream)
                         .await
                         .context("building bridge")?;
-                    BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                    BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
                 } else if upstream == removed_id {
-                    bridge_handler.destroy_bridge(bridge_id).await.context("destroying bridge")?;
+                    bridge_handler.destroy_bridge(handle).await.context("destroying bridge")?;
                     match take_any(&mut upstream_candidates) {
                         Some(new_upstream_id) => {
-                            let bridge_id = bridge_handler
+                            let handle = bridge_handler
                                 .build_bridge(guests.iter().copied(), new_upstream_id)
                                 .await
                                 .context("building bridge")?;
                             BridgeState::Bridged {
-                                bridge_id,
+                                handle,
                                 upstream: new_upstream_id,
                                 upstream_candidates,
                                 guests,
@@ -574,7 +571,7 @@ impl<B: BridgeHandler> Bridge<B> {
                     }
                 } else {
                     let _: bool = upstream_candidates.remove(&removed_id);
-                    BridgeState::Bridged { bridge_id, upstream, upstream_candidates, guests }
+                    BridgeState::Bridged { handle, upstream, upstream_candidates, guests }
                 }
             }
         };
@@ -747,6 +744,11 @@ impl Handler for Stub {
     }
 }
 
+pub(super) struct BridgeHandle {
+    id: u64,
+    control: fnet_interfaces_ext::admin::Control,
+}
+
 /// An abstraction over the logic involved to instruct the netstack to create or destroy a bridge.
 ///
 /// Allows for testing the virtualization handler by providing an instrumented implementation of
@@ -757,24 +759,18 @@ pub(super) trait BridgeHandler {
         &self,
         interfaces: impl Iterator<Item = u64> + 'async_trait,
         upstream_interface: u64,
-    ) -> Result<u64, errors::Error>;
+    ) -> Result<BridgeHandle, errors::Error>;
 
-    async fn destroy_bridge(&self, id: u64) -> Result<(), errors::Error>;
+    async fn destroy_bridge(&self, handle: BridgeHandle) -> Result<(), errors::Error>;
 }
 
 pub(super) struct BridgeHandlerImpl {
     stack: fnet_stack::StackProxy,
-    netstack: fnetstack::NetstackProxy,
-    debug: fnet_debug::InterfacesProxy,
 }
 
 impl BridgeHandlerImpl {
-    pub fn new(
-        stack: fnet_stack::StackProxy,
-        netstack: fnetstack::NetstackProxy,
-        debug: fnet_debug::InterfacesProxy,
-    ) -> Self {
-        Self { stack, netstack, debug }
+    pub fn new(stack: fnet_stack::StackProxy) -> Self {
+        Self { stack }
     }
 
     // Starts a DHCPv4 client.
@@ -794,40 +790,29 @@ impl BridgeHandler for BridgeHandlerImpl {
         &self,
         interfaces: impl Iterator<Item = u64> + 'async_trait,
         upstream_interface: u64,
-    ) -> Result<u64, errors::Error> {
-        let bridge_id = {
-            let interfaces: Vec<u32> = interfaces
-                .chain(std::iter::once(upstream_interface))
-                .map(u32::try_from)
-                .collect::<Result<Vec<_>, _>>()
-                .context("convert NIC IDs to u32")
-                .map_err(errors::Error::Fatal)?;
-
+    ) -> Result<BridgeHandle, errors::Error> {
+        let bridge = {
+            let interfaces: Vec<_> =
+                interfaces.chain(std::iter::once(upstream_interface)).collect();
             info!(
                 "building bridge with upstream={}, interfaces={:?}",
                 upstream_interface, interfaces
             );
 
-            let result = self
-                .netstack
-                .bridge_interfaces(&interfaces)
-                .await
-                .unwrap_or_else(|err| exit_with_fidl_error(err));
-
-            match result {
-                fnetstack::Result_::Nicid(id) => id,
-                fnetstack::Result_::Message(message) => {
-                    return Err(anyhow!("{message}"))
-                        .with_context(|| format!("could not bridge interfaces ({:?})", interfaces))
-                        .map_err(errors::Error::Fatal);
-                }
-            }
+            let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
+                .context("create bridge endpoints")
+                .map_err(errors::Error::Fatal)?;
+            self.stack
+                .bridge_interfaces(&interfaces[..], server_end)
+                .context("calling bridge interfaces")
+                .map_err(errors::Error::Fatal)?;
+            let id =
+                control.get_id().await.context("get bridge id").map_err(errors::Error::Fatal)?;
+            BridgeHandle { id, control }
         };
 
-        let bridge_id = u64::from(bridge_id);
-
         // Start a DHCPv4 client.
-        match self.start_dhcpv4_client(bridge_id).await {
+        match self.start_dhcpv4_client(bridge.id).await {
             Ok(()) => {}
             Err(errors::Error::NonFatal(e)) => {
                 error!("failed to start DHCPv4 client on bridge: {}", e)
@@ -836,11 +821,8 @@ impl BridgeHandler for BridgeHandlerImpl {
         }
 
         // Enable the bridge we just created.
-        let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
-            .context("create Control endpoints")
-            .map_err(errors::Error::NonFatal)?;
-        self.debug.get_admin(bridge_id, server_end).unwrap_or_else(|err| exit_with_fidl_error(err));
-        let did_enable = control
+        let did_enable = bridge
+            .control
             .enable()
             .await
             .context("call enable")
@@ -854,23 +836,24 @@ impl BridgeHandler for BridgeHandlerImpl {
             did_enable,
             "the bridge should have been disabled on creation and then enabled by Control.Enable",
         );
-        debug!("enabled bridge interface {}", bridge_id);
-        Ok(bridge_id)
+        debug!("enabled bridge interface {}", bridge.id);
+        Ok(bridge)
     }
 
-    async fn destroy_bridge(&self, id: u64) -> Result<(), errors::Error> {
-        debug!("tearing down bridge with id {}", id);
-        self.stack
-            .del_ethernet_interface(id)
+    async fn destroy_bridge(&self, handle: BridgeHandle) -> Result<(), errors::Error> {
+        let BridgeHandle { id: _, control } = handle;
+        control
+            .remove()
             .await
-            .unwrap_or_else(|err| exit_with_fidl_error(err))
-            // If the netstack failed to destroy the bridge, the bridging state machine has become
-            // inconsistent with the netstack, so we return an unrecoverable error.
-            //
-            // NB: This does mean that if the bridge interface was manually removed out from under
-            // netcfg, we'll panic.
-            .map_err(|e| anyhow!("failed to delete ethernet interface: {:?}", e))
-            .map_err(errors::Error::Fatal)
+            .context("calling remove bridge")
+            .map_err(errors::Error::Fatal)?
+            .map_err(|err: fnet_interfaces_admin::ControlRemoveError| {
+                errors::Error::Fatal(anyhow::anyhow!("failed to remove bridge: {:?}", err))
+            })?;
+        // We don't really care the reason the stack gives us here, only that
+        // the termination completes.
+        let _: fnet_interfaces_ext::admin::TerminalError<_> = control.wait_termination().await;
+        Ok(())
     }
 }
 
@@ -930,8 +913,22 @@ mod tests {
         }
     }
 
+    struct BridgeServer {
+        id: u64,
+        _request_stream: fnet_interfaces_admin::ControlRequestStream,
+    }
+
+    impl std::fmt::Debug for BridgeServer {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("BridgeServer")
+                .field("id", &self.id)
+                .field("request_stream", &"_")
+                .finish()
+        }
+    }
+
     struct BridgeHandlerTestImplInner {
-        bridge: Option<u64>,
+        bridge: Option<BridgeServer>,
         events: mpsc::Sender<BridgeEvent>,
     }
 
@@ -949,10 +946,17 @@ mod tests {
 
     #[async_trait(?Send)]
     impl BridgeHandler for BridgeHandlerTestImpl {
-        async fn destroy_bridge(&self, id: u64) -> Result<(), errors::Error> {
+        async fn destroy_bridge(
+            &self,
+            BridgeHandle { id, control: _ }: BridgeHandle,
+        ) -> Result<(), errors::Error> {
             let BridgeHandlerTestImplInner { bridge, events } = &mut *self.inner.borrow_mut();
-            assert_eq!(*bridge, Some(id), "cannot destroy a non-existent bridge");
-            *bridge = None;
+            let bridge = bridge.take();
+            assert_eq!(
+                bridge.map(|BridgeServer { id, _request_stream: _ }| id),
+                Some(id),
+                "cannot destroy a non-existent bridge"
+            );
             events.send(BridgeEvent::Destroyed).await.expect("send event");
             Ok(())
         }
@@ -961,19 +965,25 @@ mod tests {
             &self,
             interfaces: impl Iterator<Item = u64> + 'async_trait,
             upstream_interface: u64,
-        ) -> Result<u64, errors::Error> {
+        ) -> Result<BridgeHandle, errors::Error> {
             let BridgeHandlerTestImplInner { bridge, events } = &mut *self.inner.borrow_mut();
-            assert_eq!(
-                *bridge, None,
+            assert_matches::assert_matches!(
+                *bridge,
+                None,
                 "cannot create a bridge since there is already an existing bridge",
             );
             const BRIDGE_IF: u64 = 99;
-            *bridge = Some(BRIDGE_IF);
+            let (control, server) =
+                fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
+            *bridge = Some(BridgeServer {
+                id: BRIDGE_IF,
+                _request_stream: server.into_stream().expect("get request stream"),
+            });
             events
                 .send(BridgeEvent::Created { interfaces: interfaces.collect(), upstream_interface })
                 .await
                 .expect("send event");
-            Ok(BRIDGE_IF)
+            Ok(BridgeHandle { id: BRIDGE_IF, control })
         }
     }
 

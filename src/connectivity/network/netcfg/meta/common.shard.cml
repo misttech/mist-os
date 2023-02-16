@@ -13,9 +13,6 @@
     use: [
         {
             protocol: [
-                // TODO(https://fxbug.dev/118758): We won't need to reach out to
-                // debug once we move bridging APIs to issue Control handles.
-                "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.dhcp.Server",
                 "fuchsia.net.dhcpv6.ClientProvider",
                 "fuchsia.net.filter.Filter",
@@ -23,7 +20,6 @@
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.name.LookupAdmin",
                 "fuchsia.net.stack.Stack",
-                "fuchsia.netstack.Netstack",
             ],
         },
         {

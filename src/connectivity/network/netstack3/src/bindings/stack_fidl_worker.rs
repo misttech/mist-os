@@ -93,6 +93,13 @@ impl StackFidlWorker {
                         }
                         responder_send!(responder, &mut Ok(()));
                     }
+                    StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
+                        error!("TODO(https://fxbug.dev/86661): Support bridging in NS3, probably via a new API");
+                        bridge.close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
+                        .unwrap_or_else(|e| {
+                            debug!("failed to close bridge control {:?}", e)
+                        });
+                    }
                 }
                 Ok(worker)
             })

@@ -4,16 +4,4 @@
 library fuchsia.netstack;
 
 @discoverable
-protocol Netstack {
-    /// Creates a bridge and returns the newly created nicid or an
-    /// error if the creation fails.
-    // TODO(https://fxbug.dev/86661): Redesign and re-home this.
-    BridgeInterfaces(struct {
-        nicids vector<uint32>:MAX;
-    }) -> (struct {
-        result strict union {
-            1: message string:<MAX>;
-            2: nicid uint32;
-        };
-    });
-};
+protocol Netstack {};

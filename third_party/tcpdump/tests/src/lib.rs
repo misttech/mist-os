@@ -10,7 +10,6 @@ use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_netstack as fnetstack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fuchsia_async as fasync;
@@ -39,7 +38,7 @@ use packet_formats::{
 };
 use regex::Regex;
 use std::{
-    convert::{TryFrom as _, TryInto as _},
+    convert::TryInto as _,
     ffi::{CStr, CString},
     num::NonZeroU16,
 };
@@ -306,40 +305,20 @@ async fn bridged_packet_test(name: &str) {
     };
     let local_addr = increment_and_get_addr(NETWORK_ADDR);
     let remote_addr = increment_and_get_addr(local_addr);
-    let local_mac = {
-        let netstack = realm
-            .connect_to_protocol::<fnetstack::NetstackMarker>()
-            .expect("failed to connect to netstack in switch realm");
-        let bridge_id = match netstack
-            .bridge_interfaces(
-                &[u32::try_from(iface.id()).expect("interface ID should fit in u32")][..],
-            )
-            .await
-            .expect("create bridge")
-        {
-            fnetstack::Result_::Message(message) => panic!("{}", message),
-            fnetstack::Result_::Nicid(id) => id,
-        };
-
-        let debug = realm
-            .connect_to_protocol::<fnet_debug::InterfacesMarker>()
-            .expect("failed to connect to debug interfaces protocol");
-        let bridge_interface_control = {
-            let (client_end, server_end) =
-                fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-                    .expect("failed to create fuchsia.net.interfaces.admin/Control proxy");
-            let () = debug
-                .get_admin(bridge_id.into(), server_end)
-                .expect("error getting bridge interface control");
-            fnet_interfaces_ext::admin::Control::new(client_end)
-        };
-        let did_enable =
-            bridge_interface_control.enable().await.expect("send enable").expect("enable");
+    let (local_mac, _bridge_ctl) = {
+        let stack = realm
+            .connect_to_protocol::<fnet_stack::StackMarker>()
+            .expect("failed to connect to stack in realm");
+        let (control, server_end) =
+            fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
+        stack.bridge_interfaces(&[iface.id()][..], server_end).expect("bridge interfaces");
+        let bridge_id = control.get_id().await.expect("get bridge id");
+        let did_enable = control.enable().await.expect("send enable").expect("enable");
         assert!(did_enable);
         let address_state_provider = interfaces::add_address_wait_assigned(
-            &bridge_interface_control,
+            &control,
             fnet::Subnet { addr: fnet::IpAddress::Ipv4(local_addr), prefix_len: PREFIX_LEN },
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            fnet_interfaces_admin::AddressParameters::EMPTY,
         )
         .await
         .expect("add IPv4 address to bridge failed");
@@ -369,12 +348,16 @@ async fn bridged_packet_test(name: &str) {
             .await
             .expect("error adding neighbor entry");
 
-        debug
-            .get_mac(bridge_id.into())
+        let debug = realm
+            .connect_to_protocol::<fnet_debug::InterfacesMarker>()
+            .expect("failed to connect to debug interfaces protocol");
+        let mac = debug
+            .get_mac(bridge_id)
             .await
             .expect("error calling get_mac")
             .expect("error getting bridge's MAC address")
-            .expect("expected bridge to have a MAC address")
+            .expect("expected bridge to have a MAC address");
+        (mac, control)
     };
 
     start_tcpdump_and_wait_for_patterns(

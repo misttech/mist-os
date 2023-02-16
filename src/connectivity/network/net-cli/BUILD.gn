@@ -22,7 +22,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_rust",
     "//src/connectivity/lib/fidl_fuchsia_net_neighbor_ext",
     "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
     "//src/connectivity/network/lib/netfilter",

@@ -31,7 +31,6 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//src/connectivity/lib/net-declare",

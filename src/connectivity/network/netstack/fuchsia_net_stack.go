@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 
 	"fidl/fuchsia/net"
+	"fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/name"
 	"fidl/fuchsia/net/stack"
 
@@ -190,6 +191,28 @@ func (ni *stackImpl) SetDhcpClientEnabled(ctx_ fidl.Context, id uint64, enable b
 
 	r.SetResponse(stack.StackSetDhcpClientEnabledResponse{})
 	return r, nil
+}
+
+func (ni *stackImpl) BridgeInterfaces(_ fidl.Context, interfaces []uint64, bridge admin.ControlWithCtxInterfaceRequest) error {
+	_ = syslog.Infof("received request to bridge %v", interfaces)
+	nics := make([]tcpip.NICID, len(interfaces))
+	for i, n := range interfaces {
+		nics[i] = tcpip.NICID(n)
+	}
+	ifs, err := ni.ns.Bridge(nics)
+	if err != nil {
+		_ = syslog.Warnf("failed to bridge interfaces %s", err)
+		proxy := admin.ControlEventProxy{
+			Channel: bridge.Channel,
+		}
+		if err := proxy.OnInterfaceRemoved(admin.InterfaceRemovedReasonBadPort); err != nil {
+			_ = syslog.Warnf("failed to write terminal event: %s", err)
+		}
+		_ = bridge.Close()
+		return nil
+	}
+	ifs.addAdminConnection(bridge, true /* strong */)
+	return nil
 }
 
 var _ stack.LogWithCtx = (*logImpl)(nil)

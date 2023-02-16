@@ -9,6 +9,7 @@ fidl("fuchsia.net.stack") {
   sources = [ "stack.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",
+    "//sdk/fidl/fuchsia.net.interfaces.admin",
     "//sdk/fidl/fuchsia.net.name",
   ]
   enable_hlcpp = true

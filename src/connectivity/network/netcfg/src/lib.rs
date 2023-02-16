@@ -22,7 +22,6 @@ use std::{
 use fidl::endpoints::{RequestStream as _, Responder as _};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_ext::{self as fnet_ext, DisplayExt as _, IpExt as _};
@@ -33,7 +32,6 @@ use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_async::DurationExt as _;
 use fuchsia_component::client::{clone_namespace_svc, new_protocol_connector_in_dir};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
@@ -459,14 +457,10 @@ impl InterfaceState {
 /// Network Configuration state.
 pub struct NetCfg<'a> {
     stack: fnet_stack::StackProxy,
-    netstack: fnetstack::NetstackProxy,
     lookup_admin: fnet_name::LookupAdminProxy,
     filter: fnet_filter::FilterProxy,
     interface_state: fnet_interfaces::StateProxy,
     installer: fidl_fuchsia_net_interfaces_admin::InstallerProxy,
-    // TODO(https://fxbug.dev/74532): We won't need to reach out to debug once
-    // we don't have Ethernet interfaces anymore.
-    debug: fidl_fuchsia_net_debug::InterfacesProxy,
     dhcp_server: Option<fnet_dhcp::Server_Proxy>,
     dhcpv6_client_provider: Option<fnet_dhcpv6::ClientProviderProxy>,
 
@@ -641,9 +635,6 @@ impl<'a> NetCfg<'a> {
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
             .await
             .context("could not connect to stack")?;
-        let netstack = svc_connect::<fnetstack::NetstackMarker>(&svc_dir)
-            .await
-            .context("could not connect to netstack")?;
         let lookup_admin = svc_connect::<fnet_name::LookupAdminMarker>(&svc_dir)
             .await
             .context("could not connect to lookup admin")?;
@@ -667,22 +658,17 @@ impl<'a> NetCfg<'a> {
         let installer = svc_connect::<fnet_interfaces_admin::InstallerMarker>(&svc_dir)
             .await
             .context("could not connect to installer")?;
-        let debug = svc_connect::<fnet_debug::InterfacesMarker>(&svc_dir)
-            .await
-            .context("could not connect to debug")?;
         let persisted_interface_config =
             interface::FileBackedConfig::load(&PERSISTED_INTERFACE_CONFIG_FILEPATH)
                 .context("error loading persistent interface configurations")?;
 
         Ok(NetCfg {
             stack,
-            netstack,
             lookup_admin,
             filter,
             interface_state,
             dhcp_server,
             installer,
-            debug,
             dhcpv6_client_provider,
             persisted_interface_config,
             filter_enabled_interface_types,
@@ -2443,11 +2429,7 @@ impl Mode for VirtualizationEnabled {
         let handler = virtualization::Virtualization::new(
             netcfg.allowed_upstream_device_classes,
             allowed_bridge_upstream_device_classes,
-            virtualization::BridgeHandlerImpl::new(
-                netcfg.stack.clone(),
-                netcfg.netstack.clone(),
-                netcfg.debug.clone(),
-            ),
+            virtualization::BridgeHandlerImpl::new(netcfg.stack.clone()),
             netcfg.installer.clone(),
         );
         netcfg.run(handler).await.context("event loop")
@@ -2581,9 +2563,6 @@ mod tests {
     fn test_netcfg() -> Result<(NetCfg<'static>, ServerEnds), anyhow::Error> {
         let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>()
             .context("error creating stack endpoints")?;
-        let (netstack, _netstack_server) =
-            fidl::endpoints::create_proxy::<fnetstack::NetstackMarker>()
-                .context("error creating netstack endpoints")?;
         let (lookup_admin, lookup_admin_server) =
             fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>()
                 .context("error creating lookup_admin endpoints")?;
@@ -2601,9 +2580,6 @@ mod tests {
         let (installer, _installer_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
                 .context("error creating installer endpoints")?;
-        let (debug, _debug_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_net_debug::InterfacesMarker>()
-                .context("error creating installer endpoints")?;
         let persisted_interface_config =
             interface::FileBackedConfig::load(&PERSISTED_INTERFACE_CONFIG_FILEPATH)
                 .context("error loading persistent interface configurations")?;
@@ -2611,12 +2587,10 @@ mod tests {
         Ok((
             NetCfg {
                 stack,
-                netstack,
                 lookup_admin,
                 filter,
                 interface_state,
                 installer,
-                debug,
                 dhcp_server: Some(dhcp_server),
                 dhcpv6_client_provider: Some(dhcpv6_client_provider),
                 persisted_interface_config,

@@ -9,17 +9,14 @@ rustc_test("bridge") {
   output_name = "netstack_bridge_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/ping",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",

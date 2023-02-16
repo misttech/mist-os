@@ -143,31 +143,34 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
         switch_if: netemul::TestInterface<'a>,
         host_if: netemul::TestInterface<'a>,
     }
-    let switch_netstack = switch_realm
-        .connect_to_protocol::<fidl_fuchsia_netstack::NetstackMarker>()
-        .expect("failed to connect to netstack in switch realm");
     let switch_stack = switch_realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to stack in switch realm");
-    let switch_debug = switch_realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
-        .expect("failed to connect to fuchsia.net.debug/Interfaces in switch realm");
     let switch_interfaces_state = switch_realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State in switch realm");
+    struct Bridge {
+        id: u64,
+        control: fidl_fuchsia_net_interfaces_ext::admin::Control,
+    }
     let mut bridge = None;
 
     for step in steps {
         match step {
             Step::Bridge(links) => {
                 match bridge.take() {
-                    Some(bridge_id) => {
-                        let () = switch_stack
-                            .del_ethernet_interface(u64::from(bridge_id))
+                    Some(Bridge { id: _, control }) => {
+                        control
+                            .remove()
                             .await
-                            .expect("FIDL error deleting bridge")
-                            .expect("failed to delete bridge");
-
+                            .expect("calling remove bridge")
+                            .expect("remove succeeds");
+                        assert_matches!(
+                            control.wait_termination().await,
+                            fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(
+                                fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User
+                            )
+                        );
                         let switch_node = ping_helper::Node::new_with_v4_and_v6_link_local(
                             &switch_realm,
                             &switch_if,
@@ -229,45 +232,32 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
                             .values()
                             .map(|Host { switch_if, realm: _, _net, host_if: _ }| switch_if.id()),
                     )
-                    .map(|id| u32::try_from(id).expect("interface ID does not fit into u32"))
                     .collect::<Vec<_>>();
 
                 // Create the bridge.
-                let bridge_id = switch_netstack
-                    .bridge_interfaces(bridge_interface_ids.as_ref())
-                    .await
-                    .map_err(anyhow::Error::new)
-                    .and_then(|result| match result {
-                        fidl_fuchsia_netstack::Result_::Message(message) => {
-                            Err(anyhow::Error::msg(message))
-                        }
-                        fidl_fuchsia_netstack::Result_::Nicid(id) => Ok(id),
-                    })
-                    .expect("failed to create bridge");
-                bridge = Some(bridge_id);
-                let (switch_interface_control, server_end) = fidl::endpoints::create_proxy::<
-                    fidl_fuchsia_net_interfaces_admin::ControlMarker,
-                >()
-                .expect("failed to create fuchsia.net.interfaces.admin/Control proxy");
-                let () = switch_debug
-                    .get_admin(u64::from(bridge_id), server_end)
-                    .expect("FIDL error initializing bridge interface control");
-                let switch_interface_control =
-                    fidl_fuchsia_net_interfaces_ext::admin::Control::new(switch_interface_control);
+                let (control, server_end) =
+                    fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                        .expect("create endpoints");
+                switch_stack
+                    .bridge_interfaces(&bridge_interface_ids[..], server_end)
+                    .expect("bridge interfaces");
+                let id = control.get_id().await.expect("get bridge id");
+                let bridge_ref = bridge.insert(Bridge { id, control });
                 let did_enable =
-                    switch_interface_control.enable().await.expect("send enable").expect("enable");
+                    bridge_ref.control.enable().await.expect("send enable").expect("enable");
                 assert!(did_enable);
                 let addr = fidl_fuchsia_net::Ipv4Address {
                     addr: [
                         192,
                         168,
                         254,
-                        u8::try_from(bridge_id).expect("bridge interface ID does not fit into u8"),
+                        u8::try_from(bridge_ref.id)
+                            .expect("bridge interface ID does not fit into u8"),
                     ],
                 };
                 let prefix_len = 16;
                 let address_state_provider = interfaces::add_address_wait_assigned(
-                    &switch_interface_control,
+                    &bridge_ref.control,
                     fidl_fuchsia_net::Subnet {
                         addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
                         prefix_len,
@@ -286,7 +276,7 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
                             addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
                             prefix_len,
                         }),
-                        device_id: bridge_id.into(),
+                        device_id: bridge_ref.id,
                         next_hop: None,
                         metric: 0,
                     })
@@ -317,19 +307,17 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
                     .expect("failed to set link to up on bridged port");
             }
         }
-        let bridge_id = bridge.expect("bridge ID not present");
+        let Bridge { id: bridge_id, control: _ } = bridge.as_ref().expect("bridge ID not present");
         let nodes = futures::stream::once({
             async {
                 // NB: Waiting for addresses on the bridge cannot use the
                 // methods on `TestInterface` because the bridge interface
                 // was created manually.
-                let (v4, v6) = interfaces::wait_for_v4_and_v6_ll(
-                    &switch_interfaces_state,
-                    u64::from(bridge_id),
-                )
-                .await
-                .expect("failed to wait for IPv4 and IPv6 link-local addresses");
-                ping_helper::Node::new(&switch_realm, u64::from(bridge_id), vec![v4], vec![v6])
+                let (v4, v6) =
+                    interfaces::wait_for_v4_and_v6_ll(&switch_interfaces_state, *bridge_id)
+                        .await
+                        .expect("failed to wait for IPv4 and IPv6 link-local addresses");
+                ping_helper::Node::new(&switch_realm, *bridge_id, vec![v4], vec![v6])
             }
         })
         .chain(futures::stream::iter(ports.values()).then(
@@ -398,35 +386,28 @@ async fn test_remove_bridge_interface_disabled(name: &str) {
         .expect("failed to ping between switch and gateway");
 
     // Create the bridge.
-    let switch_netstack = switch_realm
-        .connect_to_protocol::<fidl_fuchsia_netstack::NetstackMarker>()
-        .expect("failed to connect to netstack in switch realm");
     let switch_stack = switch_realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to stack in switch realm");
-    let bridge_id = switch_netstack
-        .bridge_interfaces(&[
-            u32::try_from(switch_if.id()).expect("switch interface ID doesn't fit into u32")
-        ])
-        .await
-        .map_err(anyhow::Error::new)
-        .and_then(|result| match result {
-            fidl_fuchsia_netstack::Result_::Message(message) => Err(anyhow::Error::msg(message)),
-            fidl_fuchsia_netstack::Result_::Nicid(id) => Ok(id),
-        })
-        .expect("failed to create bridge");
+
+    let (control, server_end) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+        .expect("create endpoints");
+    switch_stack.bridge_interfaces(&[switch_if.id()][..], server_end).expect("bridge interfaces");
+    // Get the ID to ensure the bridge is installed correctly.
+    let _bridge_id: u64 = control.get_id().await.expect("get bridge id");
 
     // Disable the attached interface.
     let did_disable = switch_if.control().disable().await.expect("send disable").expect("disable");
     assert!(did_disable);
 
     // Destroy the bridge.
-    let () = switch_stack
-        .del_ethernet_interface(u64::from(bridge_id))
-        .await
-        .expect("FIDL error deleting bridge")
-        .expect("failed to delete bridge");
-
+    control.remove().await.expect("calling remove bridge").expect("remove succeeds");
+    assert_matches!(
+        control.wait_termination().await,
+        fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(
+            fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User
+        )
+    );
     // Ensure that attempting to ping the switch results in a non-response.
     let () = gateway_realm
         .ping_once::<ping::Ipv4>(std_socket_addr_v4!("192.168.254.1:0"), gen_seq())

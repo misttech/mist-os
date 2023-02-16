@@ -16,7 +16,6 @@ use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_neighbor_ext as fneighbor_ext;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::info;
@@ -61,7 +60,6 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<finterfaces::StateMarker>
     + ServiceConnector<fneighbor::ControllerMarker>
     + ServiceConnector<fneighbor::ViewMarker>
-    + ServiceConnector<fnetstack::NetstackMarker>
     + ServiceConnector<fstack::LogMarker>
     + ServiceConnector<fstack::StackMarker>
     + ServiceConnector<fname::LookupMarker>
@@ -75,7 +73,6 @@ impl<O> NetCliDepsConnector for O where
         + ServiceConnector<finterfaces::StateMarker>
         + ServiceConnector<fneighbor::ControllerMarker>
         + ServiceConnector<fneighbor::ViewMarker>
-        + ServiceConnector<fnetstack::NetstackMarker>
         + ServiceConnector<fstack::LogMarker>
         + ServiceConnector<fstack::StackMarker>
         + ServiceConnector<fname::LookupMarker>
@@ -503,9 +500,7 @@ async fn do_if<C: NetCliDepsConnector>(
             }
         },
         opts::IfEnum::Bridge(opts::IfBridge { interfaces }) => {
-            let netstack: fnetstack::NetstackProxy =
-                connect_with_context::<fnetstack::NetstackMarker, _>(connector).await?;
-
+            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let build_name_to_id_map = || async {
                 let interface_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
@@ -534,7 +529,7 @@ async fn do_if<C: NetCliDepsConnector>(
 
             let num_interfaces = interfaces.len();
 
-            let (_name_to_id, ids): (Option<HashMap<String, u64>>, Vec<u32>) =
+            let (_name_to_id, ids): (Option<HashMap<String, u64>>, Vec<u64>) =
                 futures::stream::iter(interfaces)
                     .map(Ok::<_, Error>)
                     .try_fold(
@@ -553,24 +548,17 @@ async fn do_if<C: NetCliDepsConnector>(
                                     (Some(name_to_id), id)
                                 }
                             };
-                            ids.push(
-                                u32::try_from(id)
-                                    .with_context(|| format!("nicid {} does not fit in u32", id))?,
-                            );
+                            ids.push(id);
                             Ok((name_to_id, ids))
                         },
                     )
                     .await?;
 
-            let bridge_id = netstack
-                .bridge_interfaces(&ids)
-                .await
-                .map_err(anyhow::Error::new)
-                .and_then(|result| match result {
-                    fnetstack::Result_::Message(message) => Err(anyhow::Error::msg(message)),
-                    fnetstack::Result_::Nicid(id) => Ok(id),
-                })
-                .with_context(|| format!("bridge_interfaces({:?}", ids))?;
+            let (bridge, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+            stack.bridge_interfaces(&ids, server_end).context("bridge interfaces")?;
+            let bridge_id = bridge.get_id().await.context("get bridge id")?;
+            // Detach the channel so it won't cause bridge destruction on exit.
+            bridge.detach().context("detach bridge")?;
             info!("network bridge created with id {}", bridge_id);
         }
     }
@@ -1225,7 +1213,6 @@ mod tests {
         debug_interfaces: Option<fdebug::InterfacesProxy>,
         dhcpd: Option<fdhcp::Server_Proxy>,
         interfaces_state: Option<finterfaces::StateProxy>,
-        netstack: Option<fnetstack::NetstackProxy>,
         stack: Option<fstack::StackProxy>,
         name_lookup: Option<fname::LookupProxy>,
     }
@@ -1284,18 +1271,6 @@ mod tests {
     impl ServiceConnector<fneighbor::ViewMarker> for TestConnector {
         async fn connect(&self) -> Result<<fneighbor::ViewMarker as ProtocolMarker>::Proxy, Error> {
             Err(anyhow::anyhow!("connect neighbor view unimplemented for test connector"))
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl ServiceConnector<fnetstack::NetstackMarker> for TestConnector {
-        async fn connect(
-            &self,
-        ) -> Result<<fnetstack::NetstackMarker as ProtocolMarker>::Proxy, Error> {
-            self.netstack
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no netstack instance"))
         }
     }
 
@@ -2266,13 +2241,13 @@ mac             -
     #[test_case(true ; "providing interface names")]
     #[fasync::run_singlethreaded(test)]
     async fn bridge(use_ifname: bool) {
-        let (netstack, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fnetstack::NetstackMarker>().unwrap();
+        let (stack, mut stack_requests) =
+            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
         let (interfaces_state, interfaces_state_requests) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
         let connector = TestConnector {
-            netstack: Some(netstack),
             interfaces_state: Some(interfaces_state),
+            stack: Some(stack),
             ..Default::default()
         };
 
@@ -2312,26 +2287,33 @@ mac             -
         );
 
         let bridge_succeeds = async move {
-            let (requested_ifs, netstack_responder) = requests
+            let (requested_ifs, bridge_server_end, _control_handle) = stack_requests
                 .try_next()
                 .await
-                .expect("bridge_interfaces FIDL error")
+                .expect("stack requests FIDL error")
                 .expect("request stream should not have ended")
                 .into_bridge_interfaces()
                 .expect("request should be of type BridgeInterfaces");
             assert_eq!(
                 requested_ifs,
-                bridge_ifs
-                    .iter()
-                    .map(|interface| u32::try_from(interface.nicid).unwrap_or_else(|_| panic!(
-                        "nicid {} does not fit in u32",
-                        interface.nicid
-                    )))
-                    .collect::<Vec<_>>()
+                bridge_ifs.iter().map(|interface| interface.nicid).collect::<Vec<_>>()
             );
-            let () = netstack_responder
-                .send(&mut fnetstack::Result_::Nicid(bridge_id))
-                .expect("responder.send should succeed");
+            let mut bridge_requests = bridge_server_end.into_stream().expect("bridge stream");
+            let responder = bridge_requests
+                .try_next()
+                .await
+                .expect("bridge requests FIDL error")
+                .expect("request stream should not have ended")
+                .into_get_id()
+                .expect("request should be get_id");
+            responder.send(bridge_id).expect("responding with bridge ID should succeed");
+            let _control_handle = bridge_requests
+                .try_next()
+                .await
+                .expect("bridge requests FIDL error")
+                .expect("request stream should not have ended")
+                .into_detach()
+                .expect("request should be detach");
             Ok(())
         };
         futures::select! {
