@@ -2,16 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
+use crate::lock::Mutex;
 use crate::task::*;
 use crate::types::*;
+use std::borrow::Cow;
 
 pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
     StaticDirectoryBuilder::new(fs)
         .subdir(b"kernel", 0o555, |dir| {
-            dir.entry(b"unprivileged_bpf_disable", StubSysctl::new_node(), mode)
+            dir.entry(b"unprivileged_bpf_disable", StubSysctl::new_node(), mode).entry(
+                b"kptr_restrict",
+                StubSysctl::new_node(),
+                mode,
+            )
         })
         .subdir(b"net", 0o555, |dir| {
             dir.subdir(b"core", 0o555, |dir| {
@@ -22,40 +27,26 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
                 )
             })
         })
+        .subdir(b"vm", 0o555, |dir| dir.entry(b"mmap_rnd_bits", StubSysctl::new_node(), mode))
         .build()
 }
 
-struct StubSysctl;
+struct StubSysctl {
+    data: Mutex<Vec<u8>>,
+}
 
 impl StubSysctl {
     fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(|| Ok(Self))
+        BytesFile::new_node(Self { data: Mutex::default() })
     }
 }
 
-impl FileOps for StubSysctl {
-    fileops_impl_seekable!();
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        if offset != 0 {
-            return error!(EINVAL);
-        }
-        Ok(data.drain())
+impl BytesFileOps for StubSysctl {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        *self.data.lock() = data;
+        Ok(())
     }
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _buffer: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        Ok(0)
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.data.lock().clone().into())
     }
 }
