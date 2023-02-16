@@ -38,8 +38,6 @@ toc:
     path: /docs/contribute/open_projects/drivers/fidl_multiplexing.md
 - title: "Testing"
   section:
-  - title: "Migrate driver unit tests to mock-ddk"
-    path: /docs/contribute/open_projects/testing/mock_ddk_migration.md
 - title: "Graduated projects"
   section:
   - title: "Overview"
@@ -52,3 +50,5 @@ toc:
     path: /docs/contribute/open_projects/graduated/package_migration.md
   - title: "Low-level C++ typed channel migration"
     path: /docs/contribute/open_projects/graduated/typed_channels.md
+  - title: "Migrate driver unit tests to mock-ddk"
+    path: /docs/contribute/open_projects/graduated/mock_ddk_migration.md
