@@ -836,10 +836,6 @@ group("static_assertions") {
   public_deps = [ ":static_assertions-v1_1_0" ]
 }
 
-group("streaming-stats") {
-  public_deps = [ ":streaming-stats-v0_2_3" ]
-}
-
 group("strsim") {
   public_deps = [ ":strsim-v0_10_0" ]
 }
@@ -10313,27 +10309,6 @@ rust_library("static_assertions-v1_1_0") {
     "--edition=2015",
     "-Cmetadata=5fff9c36214c34b7",
     "-Cextra-filename=-5fff9c36214c34b7",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("streaming-stats-v0_2_3") {
-  crate_name = "stats"
-  crate_root = "//third_party/rust_crates/ask2patch/streaming-stats/src/lib.rs"
-  output_name = "stats-2c02c5c2e153793"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":num-traits-v0_2_14" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=2c02c5c2e153793",
-    "-Cextra-filename=-2c02c5c2e153793",
   ]
 
   visibility = [ ":*" ]
