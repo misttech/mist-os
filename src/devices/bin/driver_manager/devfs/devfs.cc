@@ -382,6 +382,18 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
     return ZX_ERR_ALREADY_EXISTS;
   }
 
+  // Set the FIDL multiplexing of the node based on the class name.
+  if (Devnode::Remote* remote = std::get_if<Devnode::Remote>(&target); remote) {
+    if (class_name.has_value()) {
+      remote->multiplex_node = AllowMultiplexingNode(class_name.value());
+      remote->multiplex_controller = AllowMultiplexingController(class_name.value());
+    } else {
+      // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
+      remote->multiplex_node = true;
+      remote->multiplex_controller = true;
+    }
+  }
+
   // Export the device to its class directory.
   if (class_name.has_value()) {
     std::optional proto_dir = devfs_.proto_node(class_name.value());
@@ -401,10 +413,6 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
       zx::result target_clone = clone_target(target);
       if (target_clone.is_error()) {
         return target_clone.error_value();
-      }
-      if (Devnode::Remote* remote = std::get_if<Devnode::Remote>(&target_clone.value()); remote) {
-        remote->multiplex_node = AllowMultiplexingNode(class_name.value());
-        remote->multiplex_controller = AllowMultiplexingController(class_name.value());
       }
       out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(),
                                         std::move(target_clone.value()), instance_name);
