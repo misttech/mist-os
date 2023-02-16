@@ -603,6 +603,32 @@ class TestKTraceState : public ::internal::KTraceState {
     END_TEST;
   }
 
+  // Begin a write (Reserve), but disable writes before the PendingCommit is
+  // committed or destroy.  Make sure we don't fail any asserts.  See
+  // fxbug.dev/122043.
+  static bool ReserveDisableTest() {
+    BEGIN_TEST;
+
+    TestKTraceState state;
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
+    constexpr uint64_t fxt_header = 0x0;
+
+    {
+      zx::result<PendingCommit> reservation = state.Reserve(fxt_header);
+      ASSERT_OK(reservation.status_value());
+      reservation->WriteBytes("0123456789ABCDEF", 16);
+
+      ASSERT_EQ(1u, state.inflight_writes());
+      state.ClearMaskDisableWrites();
+      reservation->Commit();
+    }
+    ASSERT_EQ(0u, state.inflight_writes());
+
+    ASSERT_OK(state.Stop());
+
+    END_TEST;
+  }
+
  private:
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -779,4 +805,5 @@ UNITTEST("rewind", ktrace_tests::TestKTraceState::RewindTest)
 UNITTEST("state check", ktrace_tests::TestKTraceState::StateCheckTest)
 UNITTEST("circular", ktrace_tests::TestKTraceState::CircularWriteTest)
 UNITTEST("fxt compat writer", ktrace_tests::TestKTraceState::FxtCompatWriterTest)
+UNITTEST("reserve/disable", ktrace_tests::TestKTraceState::ReserveDisableTest)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")
