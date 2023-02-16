@@ -9,10 +9,8 @@ import (
 )
 
 var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	// TODO(https://fxbug.dev/120281): Run the IGMPv3 suite instead.
-	{1, 1}: Fail,
-	// TODO(https://fxbug.dev/120281): Run the IGMPv3 suite instead.
-	{2, 9}:  Fail,
+	{1, 1}:  Pass,
+	{2, 9}:  Pass,
 	{2, 10}: Pass,
 	{2, 11}: Pass,
 	{3, 1}:  Pass,
