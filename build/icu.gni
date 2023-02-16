@@ -29,6 +29,13 @@ declare_args() {
   # If set, the built libraries will live in their respective default output
   # directories, not the root_build_dir.
   icu_use_target_out_dir = true
+
+  # Fuchsia sometimes requires extra compilation flags for ICU to adapt it to
+  # its current toolchain. Since it takes a while for ICU to roll through
+  # Fuchsia, it can take a long time from an ICU commit to a fix rolling into
+  # Fuchsia. This flag allows us to define the flag ahead of time in
+  # //build/icu.gni, and remove the rollout issues.
+  icu_fuchsia_extra_compile_flags = []
 }
 
 # Set to true if icu is being built from the Fuchsia tree.
