@@ -8,7 +8,9 @@
 #include <lib/abr/data.h>
 #include <lib/abr/util.h>
 #include <lib/fastboot/test/test-transport.h>
+#include <lib/zbitl/view.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
+#include <lib/zircon_boot/zbi_utils.h>
 
 #include <algorithm>
 #include <vector>
@@ -16,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "backends.h"
+#include "boot_zbi_items.h"
 #include "gpt.h"
 #include "mock_boot_service.h"
 #include "partition.h"
@@ -100,7 +103,7 @@ class TestTcpTransport : public TcpTransportInterface {
   std::vector<uint8_t> out_data_;
 };
 
-constexpr size_t kDownloadBufferSize = 1024;
+constexpr size_t kDownloadBufferSize = 8192;
 uint8_t download_buffer[kDownloadBufferSize];
 
 void CheckPacketsEqual(const fastboot::Packets& lhs, const fastboot::Packets& rhs) {
@@ -150,7 +153,7 @@ INSTANTIATE_TEST_SUITE_P(FastbootGetVarsTests, BasicVarTest,
                          testing::ValuesIn<BasicVarTest::ParamType>({
                              {"slot_count", "slot-count", "2"},
                              {"slot_suffixes", "slot-suffixes", "a,b"},
-                             {"max_download_size", "max-download-size", "0x00000400"},
+                             {"max_download_size", "max-download-size", "0x00002000"},
                          }),
                          [](testing::TestParamInfo<BasicVarTest::ParamType> const& info) {
                            return info.param.name;
@@ -284,7 +287,6 @@ class FastbootFlashTest : public ::testing::Test {
     transport.AddInPacket(std::string(download_command));
     zx::result ret = fastboot.ProcessPacket(&transport);
     ASSERT_TRUE(ret.is_ok());
-
     // Download
     transport.AddInPacket(download_content);
     ret = fastboot.ProcessPacket(&transport);
@@ -658,6 +660,22 @@ TEST_F(FastbootFlashTest, FlashPartition) {
   ASSERT_TRUE(memcmp(read_buf, download_content.data(), download_content.size()) == 0);
 }
 
+TEST_F(FastbootFlashTest, DownloadTooLarge) {
+  Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
+
+  char download_command[fastboot::kMaxCommandPacketSize];
+  snprintf(download_command, fastboot::kMaxCommandPacketSize, "download:%08zx",
+           kDownloadBufferSize + 1);
+
+  fastboot::TestTransport transport;
+  transport.AddInPacket(std::string(download_command));
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_error());
+  auto sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
+}
+
 TEST_F(FastbootFlashTest, FlashPartitionFailedToWritePartition) {
   // Do NOT add any partitions. Write should fail.
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
@@ -685,7 +703,11 @@ EFIAPI efi_status ResetSystemSucceed(efi_reset_type, efi_status, size_t, void*) 
 
 class EfiBootbyteOwner {
  public:
-  EfiBootbyteOwner() = default;
+  EfiBootbyteOwner() {
+    EFI_RETVAL = 0;
+    DATA = 0;
+  }
+
   EfiBootbyteOwner(efi_status status, RebootMode mode) {
     EFI_RETVAL = status;
     DATA = static_cast<uint8_t>(mode);
@@ -1040,6 +1062,82 @@ TEST_F(FastbootFlashTest, GptReinitializeMaxNotLastFailure) {
   transport.AddInPacket(std::string("oem gpt-init"));
   zx::result ret = fastboot.ProcessPacket(&transport);
   ASSERT_TRUE(ret.is_error());
+}
+
+TEST_F(FastbootFlashTest, AddBootloaderFile) {
+  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
+  ClearBootloaderFiles();
+
+  MockZirconBootOps mock_zb_ops;
+  Fastboot fastboot(download_buffer, mock_zb_ops.GetZirconBootOps());
+
+  // Download some data to use as file content.
+  constexpr char kFileContent[] = "file content";
+  std::vector<uint8_t> download_content(kFileContent, kFileContent + sizeof(kFileContent));
+  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, download_content));
+
+  std::string file_name = "ssh.authorized_keys";
+  std::string command = "oem add-staged-bootloader-file " + file_name;
+  fastboot::TestTransport transport;
+  transport.AddInPacket(command);
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  std::vector<std::string> expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+
+  // Extract the bootloader file content.
+  std::vector<zbitl::ByteView> items = FindItems(GetZbiFiles().data(), ZBI_TYPE_BOOTLOADER_FILE);
+  ASSERT_EQ(items.size(), 1ULL);
+
+  // Validate file content.
+  std::string_view expected("\x13ssh.authorized_keysfile content");
+  ASSERT_EQ(expected.size() + 1, items[0].size());
+  ASSERT_EQ(memcmp(expected.data(), items[0].data(), expected.size()), 0);
+}
+
+TEST_F(FastbootFlashTest, AddBootloaderFileNotEnoughtArguments) {
+  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
+  ClearBootloaderFiles();
+
+  MockZirconBootOps mock_zb_ops;
+  Fastboot fastboot(download_buffer, mock_zb_ops.GetZirconBootOps());
+
+  // Download some data to use as file content.
+  constexpr char kFileContent[] = "file content";
+  std::vector<uint8_t> download_content(kFileContent, kFileContent + sizeof(kFileContent));
+  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, download_content));
+
+  std::string command = "oem add-staged-bootloader-file";
+  fastboot::TestTransport transport;
+  transport.AddInPacket(command);
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+
+  auto sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
+}
+
+TEST_F(FastbootFlashTest, AddBootloaderFileTooLarge) {
+  auto cleanup = SetupEfiGlobalState(stub_service(), image_device());
+  ClearBootloaderFiles();
+
+  MockZirconBootOps mock_zb_ops;
+  Fastboot fastboot(download_buffer, mock_zb_ops.GetZirconBootOps());
+
+  // Download some data to use as file content.
+  const std::string kFileContent(kDownloadBufferSize, 'a');
+  std::vector<uint8_t> download_content(kFileContent.begin(), kFileContent.end());
+  ASSERT_NO_FATAL_FAILURE(DownloadData(fastboot, download_content));
+
+  std::string command = "oem add-staged-bootloader-file ssh.authorized_keys";
+  fastboot::TestTransport transport;
+  transport.AddInPacket(command);
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_error());
+  auto sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
 }
 
 }  // namespace

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/abr/abr.h>
-#include <lib/zbitl/view.h>
 #include <zircon/limits.h>
 
 #include <array>
@@ -22,20 +21,6 @@
 
 namespace gigaboot {
 namespace {
-
-std::vector<zbitl::ByteView> FindItems(const void *zbi, uint32_t type) {
-  std::vector<zbitl::ByteView> ret;
-  zbitl::View<zbitl::ByteView> view{
-      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t *>(zbi))};
-  for (auto [header, payload] : view) {
-    if (header->type == type) {
-      ret.push_back(payload);
-    }
-  }
-
-  ZX_ASSERT(view.take_error().is_ok());
-  return ret;
-}
 
 class BootZbiItemTest : public ::testing::Test {
  public:

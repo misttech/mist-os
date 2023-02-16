@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "boot_zbi_items.h"
+
 #include <lib/stdcompat/span.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
@@ -238,7 +240,30 @@ bool AddSystemTable(zbi_header_t* image, size_t capacity) {
                                        &gEfiSystemTable, sizeof(gEfiSystemTable)) == ZBI_RESULT_OK;
 }
 
+// Bootloader file item for ssh key provisioning
+// TODO(b/239088231): Consider using dynamic allocation.
+constexpr size_t kZbiFileLength = 4096;
+bool zbi_file_is_initialized = false;
+uint8_t zbi_files[kZbiFileLength] __attribute__((aligned(ZBI_ALIGNMENT)));
+
 }  // namespace
+
+zbi_result_t AddBootloaderFiles(const char* name, const void* data, size_t len) {
+  if (!zbi_file_is_initialized) {
+    zbi_result_t result = zbi_init(zbi_files, kZbiFileLength);
+    if (result != ZBI_RESULT_OK) {
+      printf("Failed to initialize zbi_files: %d\n", result);
+      return result;
+    }
+    zbi_file_is_initialized = true;
+  }
+
+  return AppendZbiFile(reinterpret_cast<zbi_header_t*>(zbi_files), kZbiFileLength, name, data, len);
+}
+
+void ClearBootloaderFiles() { zbi_file_is_initialized = false; }
+
+cpp20::span<uint8_t> GetZbiFiles() { return zbi_files; }
 
 bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
   if (!AddMemoryRanges(image, capacity)) {
@@ -262,6 +287,10 @@ bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotInde
   }
 
   if (!AppendSmbiosPtr(image, capacity)) {
+    return false;
+  }
+
+  if (zbi_file_is_initialized && zbi_extend(image, capacity, zbi_files) != ZBI_RESULT_OK) {
     return false;
   }
 

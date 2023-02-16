@@ -8,6 +8,7 @@
 #include <lib/efi/testing/fake_disk_io_protocol.h>
 #include <lib/efi/testing/stub_boot_services.h>
 #include <lib/fit/defer.h>
+#include <lib/zbitl/view.h>
 #include <zircon/hw/gpt.h>
 
 #include <numeric>
@@ -201,6 +202,8 @@ inline auto SetupEfiGlobalState(MockStubService& stub, Device& image,
 }
 
 void SetGptEntryName(const char* name, gpt_entry_t& entry);
+
+std::vector<zbitl::ByteView> FindItems(const void* zbi, uint32_t type);
 
 }  // namespace gigaboot
 #endif  // SRC_FIRMWARE_GIGABOOT_CPP_TESTS_MOCK_BOOT_SERVICE_H_

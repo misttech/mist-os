@@ -68,6 +68,7 @@ class Fastboot : public fastboot::FastbootBase {
   zx::result<> RebootBootloader(std::string_view cmd, fastboot::Transport *transport);
   zx::result<> RebootRecovery(std::string_view cmd, fastboot::Transport *transport);
   zx::result<> SetActive(std::string_view cmd, fastboot::Transport *transport);
+  zx::result<> OemAddStagedBootloaderFile(std::string_view cmd, fastboot::Transport *transport);
 
   // OEM commands
   zx::result<> GptInit(std::string_view cmd, fastboot::Transport *transport);

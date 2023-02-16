@@ -334,4 +334,18 @@ EfiConfigTable::EfiConfigTable(uint8_t acpi_revision, SmbiosRev smbios_revision)
 const fbl::NoDestructor<EfiConfigTable> kDefaultEfiConfigTable(static_cast<uint8_t>(2),
                                                                EfiConfigTable::SmbiosRev::kV3);
 
+std::vector<zbitl::ByteView> FindItems(const void* zbi, uint32_t type) {
+  std::vector<zbitl::ByteView> ret;
+  zbitl::View<zbitl::ByteView> view{
+      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi))};
+  for (auto [header, payload] : view) {
+    if (header->type == type) {
+      ret.push_back(payload);
+    }
+  }
+
+  ZX_ASSERT(view.take_error().is_ok());
+  return ret;
+}
+
 }  // namespace gigaboot

@@ -16,6 +16,7 @@
 #include <fbl/vector.h>
 #include <phys/efi/main.h>
 
+#include "boot_zbi_items.h"
 #include "gpt.h"
 #include "utils.h"
 
@@ -46,6 +47,9 @@ zx::result<> Fastboot::ProcessCommand(std::string_view cmd, fastboot::Transport 
 void Fastboot::DoClearDownload() {}
 
 zx::result<void *> Fastboot::GetDownloadBuffer(size_t total_download_size) {
+  if (total_download_size > download_buffer_.size()) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
+  }
   return zx::ok(download_buffer_.data());
 }
 
@@ -76,6 +80,7 @@ cpp20::span<Fastboot::CommandCallbackEntry> Fastboot::GetCommandCallbackTable() 
       {"reboot-recovery", &Fastboot::RebootRecovery},
       {"set_active", &Fastboot::SetActive},
       {"oem gpt-init", &Fastboot::GptInit},
+      {"oem add-staged-bootloader-file", &Fastboot::OemAddStagedBootloaderFile},
   };
 
   return cmd_entries;
@@ -320,6 +325,25 @@ zx::result<> Fastboot::GptInit(std::string_view cmd, fastboot::Transport *transp
 
 zx::result<> Fastboot::Continue(std::string_view cmd, fastboot::Transport *transport) {
   continue_ = true;
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+zx::result<> Fastboot::OemAddStagedBootloaderFile(std::string_view cmd,
+                                                  fastboot::Transport *transport) {
+  CommandArgs args;
+  ExtractCommandArgs(cmd, " ", args);
+  if (args.num_args != 3) {
+    return SendResponse(ResponseType::kFail, "Not enough argument", transport);
+  }
+
+  zbi_result_t res =
+      AddBootloaderFiles(args.args[2].data(), download_buffer_.data(), total_download_size());
+  if (res != ZBI_RESULT_OK) {
+    printf("Failed to append zbi_files: %d\n", res);
+    return SendResponse(ResponseType::kFail, "Failed to initialize zbi file", transport,
+                        zx::error(ZX_ERR_INTERNAL));
+  }
+
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
