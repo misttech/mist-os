@@ -461,6 +461,10 @@ fuchsia_test_package("sample-setui-config-test") {
   deps = [ ":sample-setui-config-test-resources" ]
 }
 
+group("setui_service_with_camera_package") {
+  deps = [ ":setui_service" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
