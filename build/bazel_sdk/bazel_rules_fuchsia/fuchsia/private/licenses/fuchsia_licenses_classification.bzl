@@ -78,6 +78,7 @@ or a program with a similar I/O. Different organizations should configure
 and build identify_license to match their organization OSS compliance policies.
 """,
             executable = True,
+            allow_single_file = True,
             cfg = "exec",
             mandatory = True,
         ),

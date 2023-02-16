@@ -7,13 +7,13 @@
 import argparse
 import os
 import subprocess
+import sys
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
-from sys import stderr
 
 
 def _log(*kwargs):
-    print(*kwargs, file=stderr)
+    print(*kwargs, file=sys.stderr)
 
 
 def _prepare_license_files(license_files_dir: str,
@@ -241,7 +241,7 @@ def main():
         if classification.failed_verifications_count() > 0:
             _log("ERROR: Licenses verification failed.")
             _print_verification_errors(classification)
-            exit(-1)
+            sys.exit(-1)
 
 
 # The text below is not a real license text.
