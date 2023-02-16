@@ -18,21 +18,17 @@ impl FileSystemOps for SysFs {
 impl SysFs {
     fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, SysFs);
-        StaticDirectoryBuilder::new(&fs)
-            .subdir(b"fs", 0o755, |dir| {
-                dir.subdir(b"selinux", 0o755, |dir| dir)
-                    .subdir(b"bpf", 0o755, |dir| dir)
-                    .node(
-                        b"cgroup",
-                        fs.create_node(
-                            CgroupDirectoryNode::new(),
-                            mode!(IFDIR, 0o755),
-                            FsCred::root(),
-                        ),
-                    )
-                    .subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |dir| dir))
-            })
-            .build_root();
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+        dir.subdir(b"fs", 0o755, |dir| {
+            dir.subdir(b"selinux", 0o755, |_| ());
+            dir.subdir(b"bpf", 0o755, |_| ());
+            dir.node(
+                b"cgroup",
+                fs.create_node(CgroupDirectoryNode::new(), mode!(IFDIR, 0o755), FsCred::root()),
+            );
+            dir.subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |_| ()));
+        });
+        dir.build_root();
         Ok(fs)
     }
 }

@@ -237,9 +237,9 @@ impl FsNodeOps for ThreadSelfSymlink {
 
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
 fn pressure_directory(fs: &FileSystemHandle) -> FsNodeHandle {
-    StaticDirectoryBuilder::new(fs)
-        .entry(b"memory", PressureFile::new_node(), mode!(IFREG, 0o666))
-        .build()
+    let mut dir = StaticDirectoryBuilder::new(fs);
+    dir.entry(b"memory", PressureFile::new_node(), mode!(IFREG, 0o666));
+    dir.build()
 }
 
 #[derive(Default)]

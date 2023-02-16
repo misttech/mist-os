@@ -15,14 +15,14 @@ use crate::types::*;
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
 pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
-    static_directory_builder_with_common_task_entries(fs, task)
-        .entry_creds(task.as_fscred())
-        .entry(
-            b"task",
-            TaskListDirectory { thread_group: task.thread_group.clone() },
-            mode!(IFDIR, 0o777),
-        )
-        .build()
+    let mut dir = static_directory_builder_with_common_task_entries(fs, task);
+    dir.entry_creds(task.as_fscred());
+    dir.entry(
+        b"task",
+        TaskListDirectory { thread_group: task.thread_group.clone() },
+        mode!(IFDIR, 0o777),
+    );
+    dir.build()
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.
@@ -36,31 +36,32 @@ fn static_directory_builder_with_common_task_entries<'a>(
     fs: &'a FileSystemHandle,
     task: &Arc<Task>,
 ) -> StaticDirectoryBuilder<'a> {
-    StaticDirectoryBuilder::new(fs)
-        .entry_creds(task.as_fscred())
-        .entry(b"exe", ExeSymlink::new(task), mode!(IFLNK, 0o777))
-        .entry(b"fd", FdDirectory::new(task), mode!(IFDIR, 0o777))
-        .entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777))
-        .entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444))
-        .entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444))
-        .entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444))
-        .entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444))
-        .entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o444))
-        .node(b"attr", attr_directory(task, fs))
-        .entry(b"ns", NsDirectory { task: task.clone() }, mode!(IFDIR, 0o777))
-        .entry(b"mountinfo", ProcMountinfoFile::new_node(task), mode!(IFREG, 0o444))
-        .dir_creds(task.as_fscred())
+    let mut dir = StaticDirectoryBuilder::new(fs);
+    dir.entry_creds(task.as_fscred());
+    dir.entry(b"exe", ExeSymlink::new(task), mode!(IFLNK, 0o777));
+    dir.entry(b"fd", FdDirectory::new(task), mode!(IFDIR, 0o777));
+    dir.entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777));
+    dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
+    dir.entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o444));
+    dir.node(b"attr", attr_directory(task, fs));
+    dir.entry(b"ns", NsDirectory { task: task.clone() }, mode!(IFDIR, 0o777));
+    dir.entry(b"mountinfo", ProcMountinfoFile::new_node(task), mode!(IFREG, 0o444));
+    dir.dir_creds(task.as_fscred());
+    dir
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/attr` directory.
 fn attr_directory(task: &Arc<Task>, fs: &FileSystemHandle) -> Arc<FsNode> {
-    StaticDirectoryBuilder::new(fs)
-        // The `current` security context is, with selinux disabled, unconfined.
-        .entry_creds(task.as_fscred())
-        .entry(b"current", AttrCurrentFile::new_node(), mode!(IFREG, 0o666))
-        .entry(b"fscreate", SimpleFileNode::new(|| Ok(SeLinuxAttribute)), mode!(IFREG, 0o666))
-        .dir_creds(task.as_fscred())
-        .build()
+    let mut dir = StaticDirectoryBuilder::new(fs);
+    // The `current` security context is, with selinux disabled, unconfined.
+    dir.entry_creds(task.as_fscred());
+    dir.entry(b"current", AttrCurrentFile::new_node(), mode!(IFREG, 0o666));
+    dir.entry(b"fscreate", SimpleFileNode::new(|| Ok(SeLinuxAttribute)), mode!(IFREG, 0o666));
+    dir.dir_creds(task.as_fscred());
+    dir.build()
 }
 
 struct AttrCurrentFile {

@@ -28,33 +28,33 @@ impl FileSystemOps for SeLinuxFs {
 impl SeLinuxFs {
     fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, SeLinuxFs);
-        StaticDirectoryBuilder::new(&fs)
-            .entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600))
-            .entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644))
-            .entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644))
-            .entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666))
-            .entry(
-                b"deny_unknown",
-                // Allow all unknown object classes/permissions.
-                BytesFile::new_node(b"0:0\n".to_vec()),
-                mode!(IFREG, 0o444),
-            )
-            .entry(
-                b"status",
-                // The status file needs to be mmap-able, so use a VMO-backed file.
-                // When the selinux state changes in the future, the way to update this data (and
-                // communicate updates with userspace) is to use the
-                // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-                VmoFileNode::from_bytes(
-                    selinux_status_t { version: SELINUX_STATUS_VERSION, ..Default::default() }
-                        .as_bytes(),
-                )?,
-                mode!(IFREG, 0o444),
-            )
-            .entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777))
-            .entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666))
-            .entry_dev(b"null", DeviceFileNode {}, mode!(IFCHR, 0o666), DeviceType::NULL)
-            .build_root();
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+        dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
+        dir.entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644));
+        dir.entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644));
+        dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
+        dir.entry(
+            b"deny_unknown",
+            // Allow all unknown object classes/permissions.
+            BytesFile::new_node(b"0:0\n".to_vec()),
+            mode!(IFREG, 0o444),
+        );
+        dir.entry(
+            b"status",
+            // The status file needs to be mmap-able, so use a VMO-backed file.
+            // When the selinux state changes in the future, the way to update this data (and
+            // communicate updates with userspace) is to use the
+            // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
+            VmoFileNode::from_bytes(
+                selinux_status_t { version: SELINUX_STATUS_VERSION, ..Default::default() }
+                    .as_bytes(),
+            )?,
+            mode!(IFREG, 0o444),
+        );
+        dir.entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
+        dir.entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
+        dir.entry_dev(b"null", DeviceFileNode {}, mode!(IFCHR, 0o666), DeviceType::NULL);
+        dir.build_root();
 
         Ok(fs)
     }
@@ -227,18 +227,17 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
             .entry(name.to_vec())
             .or_insert_with(|| {
                 let index = format!("{next_index}\n").into_bytes();
-                StaticDirectoryBuilder::new(&node.fs())
-                    .entry(b"index", BytesFile::new_node(index), mode!(IFREG, 0o444))
-                    .subdir(b"perms", 0o555, |mut perms| {
-                        for (i, perm) in SELINUX_PERMS.iter().enumerate() {
-                            let node =
-                                BytesFile::new_node(format!("{}\n", i + 1).as_bytes().to_vec());
-                            perms = perms.entry(perm, node, mode!(IFREG, 0o444));
-                        }
-                        perms
-                    })
-                    .set_mode(mode!(IFDIR, 0o555))
-                    .build()
+                let fs = node.fs();
+                let mut dir = StaticDirectoryBuilder::new(&fs);
+                dir.entry(b"index", BytesFile::new_node(index), mode!(IFREG, 0o444));
+                dir.subdir(b"perms", 0o555, |perms| {
+                    for (i, perm) in SELINUX_PERMS.iter().enumerate() {
+                        let node = BytesFile::new_node(format!("{}\n", i + 1).as_bytes().to_vec());
+                        perms.entry(perm, node, mode!(IFREG, 0o444));
+                    }
+                });
+                dir.set_mode(mode!(IFDIR, 0o555));
+                dir.build()
             })
             .clone())
     }

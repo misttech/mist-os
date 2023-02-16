@@ -35,62 +35,55 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Set the creds used for future entries.
-    pub fn entry_creds(mut self, creds: FsCred) -> Self {
+    pub fn entry_creds(&mut self, creds: FsCred) {
         self.entry_creds = creds;
-        self
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
-    pub fn entry(self, name: &'static FsStr, ops: impl FsNodeOps, mode: FileMode) -> Self {
-        self.entry_dev(name, ops, mode, DeviceType::NONE)
+    pub fn entry(&mut self, name: &'static FsStr, ops: impl FsNodeOps, mode: FileMode) {
+        self.entry_dev(name, ops, mode, DeviceType::NONE);
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry_dev(
-        self,
+        &mut self,
         name: &'static FsStr,
         ops: impl FsNodeOps,
         mode: FileMode,
         dev: DeviceType,
-    ) -> Self {
+    ) {
         let node = self.fs.create_node(ops, mode, self.entry_creds.clone());
         {
             let mut info = node.info_write();
             info.rdev = dev;
         }
-        self.node(name, node)
+        self.node(name, node);
     }
 
-    pub fn subdir(
-        self,
-        name: &'static FsStr,
-        mode: u32,
-        build_subdir: impl Fn(Self) -> Self,
-    ) -> Self {
-        let subdir = build_subdir(Self::new(self.fs));
-        self.node(name, subdir.set_mode(mode!(IFDIR, mode)).build())
+    pub fn subdir(&mut self, name: &'static FsStr, mode: u32, build_subdir: impl Fn(&mut Self)) {
+        let mut subdir = Self::new(self.fs);
+        build_subdir(&mut subdir);
+        subdir.set_mode(mode!(IFDIR, mode));
+        self.node(name, subdir.build());
     }
 
     /// Adds an [`FsNode`] entry to the directory, which already has an inode number and file mode.
     /// Panics if an entry with the same name was already added.
-    pub fn node(mut self, name: &'static FsStr, node: Arc<FsNode>) -> Self {
+    pub fn node(&mut self, name: &'static FsStr, node: Arc<FsNode>) {
         assert!(
             self.entries.insert(name, node).is_none(),
             "adding a duplicate entry into a StaticDirectory",
         );
-        self
     }
 
     /// Set the mode of the directory. The type must always be IFDIR.
-    pub fn set_mode(mut self, mode: FileMode) -> Self {
+    pub fn set_mode(&mut self, mode: FileMode) {
         assert!(mode.is_dir());
         self.mode = mode;
-        self
     }
 
-    pub fn dir_creds(mut self, creds: FsCred) -> Self {
+    pub fn dir_creds(&mut self, creds: FsCred) {
         self.creds = creds;
-        self
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
