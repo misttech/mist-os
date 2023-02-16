@@ -106,8 +106,6 @@ pub struct RamdiskClient {
     block_dir: Option<fio::DirectoryProxy>,
     block_controller: Option<ControllerProxy>,
     ramdisk_controller: Option<ControllerProxy>,
-    // TODO(nikitajindal): Remove this after soft transition in v/g.
-    path: String,
 }
 
 impl RamdiskClient {
@@ -129,18 +127,10 @@ impl RamdiskClient {
         let block_controller =
             connect_to_named_protocol_at_dir_root::<ControllerMarker>(&block_dir, ".")?;
 
-        let path = block_controller
-            .get_topological_path()
-            .await
-            .context("transport error on get_topological_path")?
-            .map_err(zx::Status::from_raw)
-            .context("get_topological_path failed")?;
-
         Ok(RamdiskClient {
             block_dir: Some(block_dir),
             block_controller: Some(block_controller),
             ramdisk_controller: Some(ramdisk_controller),
-            path,
         })
     }
 
@@ -162,11 +152,6 @@ impl RamdiskClient {
     /// Take the block controller.
     pub fn take_controller(&mut self) -> Option<ControllerProxy> {
         self.block_controller.take()
-    }
-
-    /// Get the topological path of the block device backed by the ramdisk.
-    pub fn get_path(&self) -> &str {
-        &self.path
     }
 
     /// Get a reference to the block directory proxy.
