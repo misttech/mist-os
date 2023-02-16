@@ -11,7 +11,7 @@ use {
         self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
     },
     fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon as zx,
     futures::prelude::*,
     std::sync::Arc,
     tracing::error,
@@ -38,13 +38,9 @@ const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs
 /// The VMO backing the buffer is duplicated so that tests can ensure the same VMO is returned by
 /// subsequent GetBackingMemory calls.
 fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<dyn DirectoryEntry>, Error> {
-    let init_vmo = move || {
-        // Need to clone VMO as this might be invoked multiple times.
-        let vmo =
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed to duplicate VMO!").into();
-        async move { Ok(vmo) }
-    };
-    Ok(vmo::read_write(init_vmo))
+    Ok(vmo::VmoFile::new(
+        vmo, /*readable*/ true, /*writable*/ true, /*executable*/ false,
+    ))
 }
 
 /// Creates and returns a Rust VFS VmoFile-backed executable file using the contents of the
@@ -55,7 +51,7 @@ fn new_executable_file() -> Result<Arc<dyn DirectoryEntry>, Error> {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )?;
     let exec_vmo = fdio::get_vmo_exec_from_file(&file)?;
-    let exec_file = vmo::VmoFile::new_from_vmo(
+    let exec_file = vmo::VmoFile::new(
         exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,
     );
     Ok(exec_file)
@@ -90,7 +86,7 @@ fn add_entry(
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
             let name = name.expect("File must have name");
             let contents = contents.expect("File must have contents");
-            let new_file = vmo::read_write(vmo::simple_init_vmo_with_capacity(&contents, 100));
+            let new_file = vmo::read_write(contents, /*capacity*/ Some(100));
             dest.add_entry(name, new_file)?;
         }
         io_test::DirectoryEntry::VmoFile(io_test::VmoFile { name, vmo, .. }) => {
@@ -154,8 +150,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
 
         let scope = ExecutionScope::build()
             .entry_constructor(simple::tree_constructor(|_parent, _filename| {
-                let entry = vmo::read_write(vmo::simple_init_vmo_with_capacity(&[], 100));
-                Ok(entry)
+                Ok(vmo::read_write("", /*capacity*/ Some(100)))
             }))
             .new();
 

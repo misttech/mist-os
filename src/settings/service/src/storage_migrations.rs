@@ -43,7 +43,6 @@ mod tests {
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::test_utils::simple_init_vmo_with_capacity;
     use vfs::file::vmo::read_write;
 
     // Run migration registration with all settings and policies turned on so we can ensure there's
@@ -80,7 +79,7 @@ mod tests {
         let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, _| {
-                Ok(read_write(simple_init_vmo_with_capacity(b"", 1024)))
+                Ok(read_write(b"", /*capacity*/ Some(1024)))
             }))
             .new();
         let (client, server) = create_proxy::<DirectoryMarker>().unwrap();

@@ -540,7 +540,7 @@ mod tests {
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::{read_write, simple_init_vmo_with_capacity};
+    use vfs::file::vmo::read_write;
     use vfs::mut_pseudo_directory;
 
     #[async_trait]
@@ -561,12 +561,13 @@ mod tests {
         }
     }
 
-    const ID_LEN: u64 = 15;
+    const ID_FILE_SIZE: Option<u64> = Some(15);
     const ID: u64 = 20_220_130_120_000;
     const COBALT_ID: u32 = 99;
     const ID2: u64 = 20_220_523_120_000;
     const COBALT_ID2: u32 = 100;
     const DATA_FILE_NAME: &str = "test_20220130120000.pfidl";
+    const DATA_FILE_SIZE: Option<u64> = Some(1);
 
     #[fuchsia::test]
     fn cannot_register_same_id_twice() {
@@ -603,7 +604,7 @@ mod tests {
         let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, _| {
-                Ok(read_write(simple_init_vmo_with_capacity(b"", 100)))
+                Ok(read_write(b"", /*capacity*/ Some(100)))
             }))
             .new();
         let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
@@ -793,12 +794,8 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn if_migration_file_and_up_to_date_no_migrations_run() {
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(ID.to_string().as_bytes(), ID_LEN)
-            ),
-            DATA_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(b"", 1)
-            ),
+            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
+            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();
@@ -836,9 +833,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn migration_file_exists_but_missing_data() {
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(ID.to_string().as_bytes(), ID_LEN)
-            ),
+            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();
@@ -897,12 +892,8 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn migration_file_exists_and_newer_migrations_should_update() {
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(ID.to_string().as_bytes(), ID_LEN)
-            ),
-            DATA_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(b"", 1)
-            ),
+            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
+            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();
@@ -989,12 +980,8 @@ mod tests {
         const UNKNOWN_ID: u64 = u64::MAX;
         let unknown_id_str = UNKNOWN_ID.to_string();
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(unknown_id_str.as_bytes(), unknown_id_str.len() as u64)
-            ),
-            DATA_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(b"", 1)
-            ),
+            MIGRATION_FILE_NAME => read_write(unknown_id_str, /*capacity*/ None),
+            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();
@@ -1083,12 +1070,8 @@ mod tests {
         );
 
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(ID.to_string().as_bytes(), ID_LEN)
-            ),
-            DATA_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(b"", 1)
-            ),
+            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
+            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();
@@ -1172,12 +1155,8 @@ mod tests {
         );
 
         let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(ID.to_string().as_bytes(), ID_LEN)
-            ),
-            DATA_FILE_NAME => read_write(
-                simple_init_vmo_with_capacity(b"", 1)
-            ),
+            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
+            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
         };
         let (directory, _vmo_map) = serve_vfs_dir(fs);
         let mut builder = MigrationManagerBuilder::new();

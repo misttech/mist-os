@@ -696,7 +696,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             execution_scope::ExecutionScope,
-            file::vmo::{read_only, read_write, simple_init_vmo_with_capacity},
+            file::vmo::{read_only, read_write},
             pseudo_directory,
         },
     };
@@ -924,9 +924,7 @@ mod tests {
     async fn open_file_flags() {
         let example_dir = pseudo_directory! {
             "read_only" => read_only("read_only"),
-            "read_write" => read_write(
-                simple_init_vmo_with_capacity("read_write".as_bytes(), 100)
-            ),
+            "read_write" => read_write("read_write", /*capacity*/ None),
         };
         let (example_dir_proxy, example_dir_service) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

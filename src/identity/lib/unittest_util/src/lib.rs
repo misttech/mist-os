@@ -63,10 +63,7 @@ impl Default for MockDiskManager {
         let scope = ExecutionScope::build()
             .entry_constructor(vfs::directory::mutable::simple::tree_constructor(
                 |_parent, _name| {
-                    Ok(vfs::file::vmo::read_write(vfs::file::vmo::simple_init_vmo_with_capacity(
-                        &[],
-                        100,
-                    )))
+                    Ok(vfs::file::vmo::read_write("", /*capacity*/ Some(100)))
                 },
             ))
             .new();

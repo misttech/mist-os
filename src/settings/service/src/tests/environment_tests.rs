@@ -36,7 +36,7 @@ use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::mutable::simple::tree_constructor;
 use vfs::execution_scope::ExecutionScope;
-use vfs::file::vmo::{read_write, simple_init_vmo_with_capacity};
+use vfs::file::vmo::read_write;
 use vfs::mut_pseudo_directory;
 
 const ENV_NAME: &str = "settings_service_environment_test";
@@ -214,7 +214,7 @@ fn serve_vfs_dir(
     let vmo_map = Arc::new(Mutex::new(HashMap::new()));
     let fs_scope = ExecutionScope::build()
         .entry_constructor(tree_constructor(move |_, _| {
-            Ok(read_write(simple_init_vmo_with_capacity(b"", 100)))
+            Ok(read_write(b"", /*capacity*/ Some(100)))
         }))
         .new();
     let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
@@ -232,9 +232,7 @@ async fn migration_error_does_not_cause_early_exit() {
     const UNKNOWN_ID: u64 = u64::MAX;
     let unknown_id_str = UNKNOWN_ID.to_string();
     let fs = mut_pseudo_directory! {
-        MIGRATION_FILE_NAME => read_write(
-            simple_init_vmo_with_capacity(unknown_id_str.as_bytes(), unknown_id_str.len() as u64)
-        ),
+        MIGRATION_FILE_NAME => read_write(unknown_id_str, /*capacity*/ None),
     };
     let (directory, _vmo_map) = serve_vfs_dir(fs);
     let (store_proxy, mut request_stream) =

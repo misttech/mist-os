@@ -417,7 +417,6 @@ mod tests {
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::test_utils::simple_init_vmo_with_capacity;
     use vfs::file::vmo::read_write;
     use vfs::mut_pseudo_directory;
 
@@ -472,7 +471,7 @@ mod tests {
         let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, _| {
-                Ok(read_write(simple_init_vmo_with_capacity(b"", 100)))
+                Ok(read_write(b"", /*capacity*/ Some(100)))
             }))
             .new();
         let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
@@ -489,12 +488,8 @@ mod tests {
     async fn test_get() {
         let value_to_get = TestStruct { value: VALUE1 };
         let content = persist(&mut value_to_get.to_storable()).unwrap();
-        let content_len = content.len();
         let fs = mut_pseudo_directory! {
-            "xyz.pfidl" => read_write(simple_init_vmo_with_capacity(
-                &content,
-                content_len as u64
-            ))
+            "xyz.pfidl" => read_write(content, /*capacity*/ None),
         };
         let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
         let (storage, sync_tasks) =
@@ -946,7 +941,7 @@ mod tests {
                     println!("Force failing attempt {}", *attempts_guard);
                     Err(fidl::Status::NO_SPACE)
                 } else {
-                    Ok(read_write(simple_init_vmo_with_capacity(b"", 100)))
+                    Ok(read_write("", /*capacity*/ Some(100)))
                 }
             }))
             .new();

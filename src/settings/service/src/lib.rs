@@ -53,7 +53,7 @@ use vfs::directory::mutable::simple::tree_constructor;
 #[cfg(test)]
 use vfs::execution_scope::ExecutionScope;
 #[cfg(test)]
-use vfs::file::vmo::{read_write, simple_init_vmo_with_capacity};
+use vfs::file::vmo::read_write;
 #[cfg(test)]
 use vfs::mut_pseudo_directory;
 
@@ -248,7 +248,7 @@ impl Environment {
 fn init_storage_dir() -> DirectoryProxy {
     let fs_scope = ExecutionScope::build()
         .entry_constructor(tree_constructor(move |_, _| {
-            Ok(read_write(simple_init_vmo_with_capacity(b"", 100)))
+            Ok(read_write(b"", /*capacity*/ Some(100)))
         }))
         .new();
     let (directory, server) = create_proxy::<DirectoryMarker>().unwrap();

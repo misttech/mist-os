@@ -23,7 +23,7 @@ use crate::{
         test_utils::{run_server_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
-    file::vmo::{read_only, read_write, simple_init_vmo_with_capacity},
+    file::vmo::{read_only, read_write},
     path::Path,
     test_utils::node::open_get_proxy,
     test_utils::{build_flag_combinations, run_client},
@@ -341,9 +341,7 @@ fn open_writable_in_subdir() {
         pseudo_directory! {
             "etc" => pseudo_directory! {
                 "ssh" => pseudo_directory! {
-                    "sshd_config" => read_write(
-                        simple_init_vmo_with_capacity(&b"# Empty".to_vec(), 100)
-                    )
+                    "sshd_config" => read_write(b"# Empty", /*capacity*/ None),
                 }
             }
         }
@@ -691,7 +689,7 @@ fn directories_restrict_nested_read_permissions() {
 fn directories_restrict_nested_write_permissions() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file" => read_write(simple_init_vmo_with_capacity(&[], 100))
+            "file" => read_write("content", /*capacity*/ None),
         },
     };
 
@@ -729,9 +727,7 @@ fn flag_posix_means_writable() {
     let root = {
         pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => read_write(
-                    simple_init_vmo_with_capacity(&b"Content".to_vec(), 20)
-                )
+            "file" => read_write(b"Content", /*capacity*/ None),
             }
         }
     };
@@ -778,8 +774,7 @@ fn flag_posix_means_writable() {
 fn flag_posix_does_not_add_writable_to_read_only() {
     let root = pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => read_write(
-                        simple_init_vmo_with_capacity(&b"Content".to_vec(), 100))
+            "file" => read_write(b"Content", /*capacity*/ None),
         },
     };
 

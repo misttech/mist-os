@@ -113,7 +113,7 @@ impl BootfsSvc {
         parent: &zx::Vmo,
         offset: u64,
         size: u64,
-        is_exec: bool,
+        executable: bool,
         inode: u64,
     ) -> Result<Arc<dyn DirectoryEntry>, Error> {
         // If this is a VMO with execution rights, passing zx::VmoChildOptions::NO_WRITE will
@@ -132,22 +132,17 @@ impl BootfsSvc {
                 )
             })?;
 
-        BootfsSvc::create_dir_entry(child, is_exec, inode)
+        BootfsSvc::create_dir_entry(child, executable, inode)
     }
 
     fn create_dir_entry(
         vmo: zx::Vmo,
-        is_exec: bool,
+        executable: bool,
         inode: u64,
     ) -> Result<Arc<dyn DirectoryEntry>, Error> {
-        let init_vmo = move || {
-            // This lambda is not FnOnce, so the handle must be duplicated before use so that this
-            // can be invoked multiple times.
-            let vmo_dup =
-                vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed to duplicate VMO.");
-            async move { Ok(vmo_dup) }
-        };
-        Ok(vmo::VmoFile::new_with_inode(init_vmo, true, false, is_exec, inode))
+        Ok(vmo::VmoFile::new_with_inode(
+            vmo, /*readable*/ true, /*writable*/ false, executable, inode,
+        ))
     }
 
     /// Read configs from the parsed bootfs image before the filesystem has been fully initialized.

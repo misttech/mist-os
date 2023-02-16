@@ -492,7 +492,7 @@ macro_rules! add_functions {
         pub fn add_vmo_file_at(&mut self, path: impl Into<String>, vmo: zx::Vmo) -> &mut Self {
             self.add_entry_at(
                 path.into(),
-                VmoFile::new_from_vmo(
+                VmoFile::new(
                     vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
                 ),
             )

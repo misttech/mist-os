@@ -6,14 +6,12 @@
 
 use crate::{
     directory::entry::DirectoryEntry,
-    file::vmo::*,
     test_utils::run::{self, AsyncServerClientTestParams},
 };
 
 use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{Status, Vmo},
-    futures::future::BoxFuture,
     futures::Future,
     std::{convert::Infallible, sync::Arc},
 };
@@ -45,59 +43,6 @@ where
     GetClientRes: Future<Output = ()> + 'test_refs,
 {
     run::test_server_client::<fio::FileMarker, _, _>(flags, server, get_client)
-}
-
-/// `simple_init_*` family of functions will set the capacity of the generated file to the larger
-/// of this value or the provided initial content size.  It removes some of the repetition from the
-/// tests as all the existing tests are actually quite happy with this default.
-const DEFAULT_MIN_CAPACITY: u64 = 100;
-
-/// Creates a simple `init_vmo` callback that will allocate a VMO of at least 100 bytes, but no
-/// less than the size of `content` and will fill it with the specified `content` immediately,
-/// before returning it.  If you want to control the `capacity` of the created VMOs, use
-/// [`simple_init_vmo_with_capacity`].  The VMO is sized to be the maximum of the `content` length
-/// and the specified `capacity`.
-///
-/// The returned VMOs are non-resizable, see [`simple_init_vmo_resizable`] for that.
-pub fn simple_init_vmo(
-    content: &[u8],
-) -> impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static {
-    let capacity = std::cmp::max(content.len() as u64, DEFAULT_MIN_CAPACITY);
-    simple_init_vmo_with_capacity(content, capacity)
-}
-
-/// Just like [`simple_init_vmo`], but allows one to specify the capacity explicitly, instead of
-/// setting it to be the max of 100 and the content size.  The VMO is sized to be the
-/// maximum of the `content` length and the specified `capacity`.
-pub fn simple_init_vmo_with_capacity(
-    content: &[u8],
-    capacity: u64,
-) -> impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static {
-    let content = content.to_vec();
-    move || {
-        // In "production" code we would instead wrap `content` in a smart pointer to be able to
-        // share it with the async block, but for tests it is fine to just clone it.
-        let content = content.clone();
-        Box::pin(async move {
-            let size = content.len() as u64;
-            let vmo_size = std::cmp::max(size, capacity);
-            let vmo = Vmo::create(vmo_size)?;
-            vmo.write(&content, 0)?;
-            vmo.set_content_size(&size)?;
-            Ok(vmo)
-        })
-    }
-}
-
-/// It is very common in tests to create a read-only file that backed by a non-resizable VMO.  This
-/// function does just that.
-pub fn simple_read_only(content: &[u8]) -> Arc<VmoFile> {
-    VmoFile::new(simple_init_vmo(content), true, false, false)
-}
-
-/// Similar to [`simple_read_only()`], but allows specifying an inode.
-pub fn simple_read_only_with_inode(content: &[u8], inode: u64) -> Arc<VmoFile> {
-    VmoFile::new_with_inode(simple_init_vmo(content), true, false, false, inode)
 }
 
 /// Possible errors for the [`assert_vmo_content()`] function.
@@ -184,9 +129,4 @@ macro_rules! report_invalid_vmo_content {
             }
         }
     }};
-}
-
-/// Constructs a read-write files with the specified `initial_content`.
-pub fn simple_read_write(initial_content: &[u8]) -> Arc<VmoFile> {
-    read_write(simple_init_vmo(initial_content))
 }

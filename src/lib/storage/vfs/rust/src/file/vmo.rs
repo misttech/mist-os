@@ -21,8 +21,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
-    futures::future::BoxFuture,
-    futures::lock::Mutex,
+    futures::{future::BoxFuture, lock::Mutex},
     std::{future::Future, sync::Arc},
 };
 
@@ -69,7 +68,7 @@ where
     Bytes: 'static + AsRef<[u8]> + Send + Sync,
 {
     let bytes = Arc::new(bytes);
-    VmoFile::new(
+    VmoFile::new_async(
         move || {
             let bytes = bytes.clone();
             Box::pin(async move {
@@ -107,9 +106,11 @@ pub fn read_only_const(bytes: impl AsRef<[u8]>) -> Arc<VmoFile> {
     read_only(bytes.as_ref().to_vec())
 }
 
+/// DEPRECATED - DO NOT USE. Use [`read_write`] instead.
 /// Just like `simple_init_vmo`, but allows one to specify the capacity explicitly, instead of
 /// setting it to be the max of 100 and the content size.  The VMO is sized to be the
 /// maximum of the `content` length and the specified `capacity`.
+// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_write`.
 pub fn simple_init_vmo_with_capacity(
     content: &[u8],
     capacity: u64,
@@ -132,22 +133,44 @@ pub fn simple_init_vmo_with_capacity(
     }
 }
 
-/// Creates new `VmoFile` backed by the specified `init_vmo` handler.
+/// Create new read-write `VmoFile` with the specified `content` and `capacity`. If `capacity` is
+/// smaller than `content.as_ref().len()`, `content` will be truncated. If `capacity` is `None`,
+/// the file's size and capacity will both be equal to `content.as_ref().len()`.
 ///
-/// The `init_vmo` handler is called to initialize a VMO for the very first connection to the file.
-///
-/// New connections may specify any kind of access to the file content.
-///
-/// For more details on these interaction, see the module documentation.
-// TODO(http://fxbug.dev/99448): Every call to this function is combined with
-// `simple_init_vmo_with_capacity` using some kind of owned data or empty strings. The signature
-// should match that of `read_only` but with optional data/capacity fields.
-pub fn read_write<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
+/// ## Examples
+/// ```
+/// // Empty file with a capacity of 100 bytes:
+/// let empty = read_write("", Some(100));
+/// // Initialized file with capacity of 12 bytes:
+/// let sized = read_write("Hello world!", None);
+/// // File with capacity of 5 bytes containing "Hello":
+/// let truncated = read_write("Hello, world!", Some(5));
+/// ```
+pub fn read_write<Bytes>(content: Bytes, capacity: Option<u64>) -> Arc<VmoFile>
 where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+    Bytes: 'static + AsRef<[u8]> + Send + Sync,
 {
-    VmoFile::new(init_vmo, true, true, false)
+    let content_size: u64 = content.as_ref().len().try_into().unwrap();
+    let capacity: u64 = capacity.unwrap_or(content_size);
+    let content_size: u64 = std::cmp::min(capacity, content_size);
+
+    let content = Arc::new(content);
+    VmoFile::new_async(
+        move || {
+            let content = content.clone();
+            Box::pin(async move {
+                let vmo = Vmo::create(capacity)?;
+                // Write up to `content_size` bytes from `content`, and set the VMO's content size.
+                let content: &[u8] = &(*content).as_ref()[..content_size.try_into().unwrap()];
+                vmo.write(&content, 0)?;
+                vmo.set_content_size(&content_size)?;
+                Ok(vmo)
+            })
+        },
+        /*readable*/ true,
+        /*writable*/ true,
+        /*executable*/ false,
+    )
 }
 
 /// DEPRECATED - DO NOT USE. Same as `read_write` but supports out-of-tree migrations.
@@ -156,7 +179,7 @@ where
     InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
     InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
 {
-    VmoFile::new(init_vmo, true, true, false)
+    VmoFile::new_async(init_vmo, true, true, false)
 }
 
 /// Implementation of a VMO-backed file in a virtual file system. Supports both synchronous (from
@@ -189,6 +212,44 @@ pub struct VmoFile {
 }
 
 impl VmoFile {
+    /// Create a new VmoFile which is backed by an existing Vmo.
+    ///
+    /// # Arguments
+    ///
+    /// * `vmo` - Vmo backing this file object.
+    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
+    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
+    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
+    pub fn new(vmo: Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
+        Self::new_with_inode(vmo, readable, writable, executable, fio::INO_UNKNOWN)
+    }
+
+    /// Create a new VmoFile with the specified options and inode value.
+    ///
+    /// # Arguments
+    ///
+    /// * `vmo` - Vmo backing this file object.
+    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
+    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
+    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
+    /// * `inode` - Inode value to report when getting the VmoFile's attributes.
+    pub fn new_with_inode(
+        vmo: Vmo,
+        readable: bool,
+        writable: bool,
+        executable: bool,
+        inode: u64,
+    ) -> Arc<Self> {
+        Arc::new(VmoFile {
+            readable,
+            writable,
+            executable,
+            inode,
+            vmo: Mutex::new(Some(vmo)),
+            init_vmo: None,
+        })
+    }
+
     /// Create a new VmoFile which will be asynchronously initialized. The reported inode value will
     /// be [`fio::INO_UNKNOWN`]. See [`VmoFile::new_with_inode()`] to construct a VmoFile with an
     /// explicit inode value.
@@ -199,7 +260,7 @@ impl VmoFile {
     /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    pub fn new<InitVmo, InitVmoFuture>(
+    pub fn new_async<InitVmo, InitVmoFuture>(
         init_vmo: InitVmo,
         readable: bool,
         writable: bool,
@@ -209,55 +270,13 @@ impl VmoFile {
         InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
         InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
     {
-        Self::new_with_inode(init_vmo, readable, writable, executable, fio::INO_UNKNOWN)
-    }
-
-    /// Create a new VmoFile with the specified options and inode value.
-    ///
-    /// # Arguments
-    ///
-    /// * `init_vmo` - Async callback to create the Vmo backing this file upon first connection.
-    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
-    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
-    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    /// * `inode` - Inode value to report when getting the VmoFile's attributes.
-    pub fn new_with_inode<InitVmo, InitVmoFuture>(
-        init_vmo: InitVmo,
-        readable: bool,
-        writable: bool,
-        executable: bool,
-        inode: u64,
-    ) -> Arc<Self>
-    where
-        InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-        InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-    {
-        Arc::new(VmoFile {
-            readable,
-            writable,
-            executable,
-            inode,
-            vmo: Mutex::new(None),
-            init_vmo: Some(Box::new(AsyncInitVmoFileImpl { callback: init_vmo })),
-        })
-    }
-
-    /// Create a new VmoFile which is backed by an existing Vmo.
-    ///
-    /// # Arguments
-    ///
-    /// * `vmo` - Vmo backing this file object.
-    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
-    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
-    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    pub fn new_from_vmo(vmo: Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
         Arc::new(VmoFile {
             readable,
             writable,
             executable,
             inode: fio::INO_UNKNOWN,
-            vmo: Mutex::new(Some(vmo)),
-            init_vmo: None,
+            vmo: Mutex::new(None),
+            init_vmo: Some(Box::new(AsyncInitVmoFileImpl { callback: init_vmo })),
         })
     }
 }
