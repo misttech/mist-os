@@ -13,6 +13,9 @@
 
 .macro m_syscall name, num, nargs, public
 syscall_entry_begin \name
+.if \nargs > 8
+.error "maximum 8 syscall arguments"
+.endif
     zircon_syscall \num, \name, \name
     ret
 syscall_entry_end \name \public

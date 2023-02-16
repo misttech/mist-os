@@ -52,6 +52,8 @@ syscall_entry_begin \name
     pop_reg  %r13
     pop_reg  %r12
     ret
+.else
+.error "maximum 8 syscall arguments"
 .endif
 syscall_entry_end \name \public
 .endm
