@@ -7,6 +7,7 @@ use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_binder as fbinder;
+use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
@@ -158,6 +159,7 @@ pub struct Galaxy {
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     Binder(fbinder::DevBinderRequestStream),
+    Galaxy(fstargalaxy::ControllerRequestStream),
 }
 
 /// Creates a new galaxy.
@@ -229,6 +231,7 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
         let mut outgoing_directory = ServiceFs::new_local();
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Binder);
+        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Galaxy);
         outgoing_directory
             .serve_connection(outgoing_dir_channel.into())
             .map_err(|_| errno!(EINVAL))?;
@@ -259,6 +262,14 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
                             })
                             .detach();
                         }
+                    }
+                    ExposedServices::Galaxy(request_stream) => {
+                        fasync::Task::local(async move {
+                            serve_galaxy_controller(request_stream, galaxy_clone.clone())
+                                .await
+                                .expect("failed to start manager.")
+                        })
+                        .detach();
                     }
                 }
             }
