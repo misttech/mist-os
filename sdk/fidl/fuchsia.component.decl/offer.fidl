@@ -45,10 +45,39 @@ type NameMapping = struct {
 };
 
 /// Describes the expected availability of the capability.
+///
+/// Some capabilities may not be present on all system configurations. In those
+/// cases, the availability will be declared as `OPTIONAL` along the chains of
+/// exposes/offers/uses, and the capability would be routed from `void` on
+/// system configurations where it does not make sense to route or provide a
+/// particular capability (e.g. graphical capabilities on a headless system).
 type Availability = strict enum {
+    /// The capability must be available. Failure to route the capability is an
+    /// error.
     REQUIRED = 1;
+
+    /// Inside a use declaration: the component can function if it fails to
+    /// obtain the capability.
+    ///
+    /// Inside an offer/expose declaration: the capability may not be available
+    /// in some system configurations. As a corollary, the target component must
+    /// not have a required dependency on the capability.
     OPTIONAL = 2;
+
+    /// If the target of the corresponding offer declaration requires the
+    /// capability, then the behavior is equivalent to required. If the target
+    /// has an optional dependency on the capability, then the behavior is
+    /// equivalent to optional. This is useful for container components that
+    /// would like to change their routing availability based on ones inside.
+    ///
+    /// This value is not allowed inside a use or expose declaration.
     SAME_AS_TARGET = 3;
+
+    /// The source may omit the route completely without even having to route
+    /// from `void`.
+    ///
+    /// [`TRANSITIONAL`] is used for soft transitions that introduce new
+    /// capabilities.
     @available(added=9)
     TRANSITIONAL = 4;
 };
@@ -76,7 +105,7 @@ type OfferService = table {
 
     /// The list of allow listed instances to be offered. Instances of the service
     /// not in this list will not be accessible by the target component.
-    /// If this is not set that means all instances from the source service are 
+    /// If this is not set that means all instances from the source service are
     /// offered.
     5: source_instance_filter vector<string:MAX_NAME_LENGTH>:MAX;
 

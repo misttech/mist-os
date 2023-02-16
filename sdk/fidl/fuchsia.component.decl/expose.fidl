@@ -36,6 +36,10 @@ type ExposeService = table {
 
     /// The name by which the capability is being exposed.
     4: target_name name;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    5: availability Availability;
 };
 
 /// Declares a protocol exposed to a component's containing realm, such as
@@ -58,6 +62,10 @@ type ExposeProtocol = table {
 
     /// The name by which the capability is being exposed.
     4: target_name name;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    5: availability Availability;
 };
 
 /// Declares a directory exposed to a component's containing realm, such as a
@@ -84,6 +92,10 @@ type ExposeDirectory = table {
 
     /// The subdirectory of this directory to expose instead of the root. Optional.
     6: subdir string:MAX_PATH_LENGTH;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    7: availability Availability;
 };
 
 /// Declares a runner exposed to a component's containing realm, such as a
@@ -102,6 +114,10 @@ type ExposeRunner = table {
 
     /// The name by which the capability is being exposed.
     4: target_name name;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    5: availability Availability;
 };
 
 /// Declares a resolver exposed to a component's containing realm, such as a
@@ -119,6 +135,10 @@ type ExposeResolver = table {
 
     /// The name by which the capability is being exposed.
     4: target_name name;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    5: availability Availability;
 };
 
 /// Declares an event stream exposed to a component's containing realm, such as
@@ -141,4 +161,8 @@ type ExposeEventStream = table {
 
     /// The name by which the capability is being exposed.
     5: target_name name;
+
+    /// The availability of this capability. See [`Availability`].
+    @available(added=11)
+    6: availability Availability;
 };

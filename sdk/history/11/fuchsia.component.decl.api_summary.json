@@ -642,6 +642,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDirectory.availability",
+        "ordinal": "7",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeDirectory.rights",
         "ordinal": "5",
         "type": "fuchsia.io/Operations"
@@ -682,6 +688,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeEventStream.availability",
+        "ordinal": "6",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeEventStream.scope",
         "ordinal": "3",
         "type": "vector<fuchsia.component.decl/Ref>"
@@ -716,6 +728,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeProtocol.availability",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeProtocol.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
@@ -741,6 +759,12 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/ExposeProtocol"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeResolver.availability",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/Availability"
     },
     {
         "kind": "table/member",
@@ -772,6 +796,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeRunner.availability",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeRunner.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
@@ -797,6 +827,12 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/ExposeRunner"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeService.availability",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/Availability"
     },
     {
         "kind": "table/member",
