@@ -7,6 +7,7 @@ use argh::FromArgs;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as finterfaces;
+use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use std::convert::{TryFrom as _, TryInto as _};
@@ -130,8 +131,10 @@ pub enum IfEnum {
     Disable(IfDisable),
     Enable(IfEnable),
     Get(IfGet),
+    Igmp(IfIgmp),
     IpForward(IfIpForward),
     List(IfList),
+    Mld(IfMld),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -273,6 +276,53 @@ pub struct IfGet {
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "igmp")]
+/// get or set IGMP configuration
+pub struct IfIgmp {
+    #[argh(subcommand)]
+    pub cmd: IfIgmpEnum,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum IfIgmpEnum {
+    Get(IfIgmpGet),
+    Set(IfIgmpSet),
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "get")]
+/// get IGMP configuration for an interface
+pub struct IfIgmpGet {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "set")]
+/// set IGMP configuration for an interface
+pub struct IfIgmpSet {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+
+    /// the version of IGMP to perform.
+    #[argh(option, from_str_fn(parse_igmp_version))]
+    pub version: Option<finterfaces_admin::IgmpVersion>,
+}
+
+fn parse_igmp_version(s: &str) -> Result<finterfaces_admin::IgmpVersion, String> {
+    match s.parse::<u8>() {
+        Err(err) => Err(format!("Failed to parse IGMP version (error: {})", err)),
+        Ok(v) => match v {
+            1 => Ok(finterfaces_admin::IgmpVersion::V1),
+            2 => Ok(finterfaces_admin::IgmpVersion::V2),
+            3 => Ok(finterfaces_admin::IgmpVersion::V3),
+            v => Err(format!("Invalid IGMP version ({}). Valid values: 1, 2, 3", v)),
+        },
+    }
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "ip-forward")]
 /// get or set IP forwarding for an interface
 pub struct IfIpForward {
@@ -283,14 +333,14 @@ pub struct IfIpForward {
 #[derive(FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum IfIpForwardEnum {
-    Show(IfIpForwardShow),
+    Get(IfIpForwardGet),
     Set(IfIpForwardSet),
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
-#[argh(subcommand, name = "show")]
+#[argh(subcommand, name = "get")]
 /// get IP forwarding for an interface
-pub struct IfIpForwardShow {
+pub struct IfIpForwardGet {
     #[argh(positional, arg_name = "nicid or name:ifname")]
     pub interface: InterfaceIdentifier,
 
@@ -318,6 +368,52 @@ pub struct IfIpForwardSet {
 pub struct IfList {
     #[argh(positional)]
     pub name_pattern: Option<String>,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "mld")]
+/// get or set MLD configuration
+pub struct IfMld {
+    #[argh(subcommand)]
+    pub cmd: IfMldEnum,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum IfMldEnum {
+    Get(IfMldGet),
+    Set(IfMldSet),
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "get")]
+/// get MLD configuration for an interface
+pub struct IfMldGet {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "set")]
+/// set MLD configuration for an interface
+pub struct IfMldSet {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+
+    /// the version of MLD to perform.
+    #[argh(option, from_str_fn(parse_mld_version))]
+    pub version: Option<finterfaces_admin::MldVersion>,
+}
+
+fn parse_mld_version(s: &str) -> Result<finterfaces_admin::MldVersion, String> {
+    match s.parse::<u8>() {
+        Err(err) => Err(format!("Failed to parse MLD version (error: {})", err)),
+        Ok(v) => match v {
+            1 => Ok(finterfaces_admin::MldVersion::V1),
+            2 => Ok(finterfaces_admin::MldVersion::V2),
+            v => Err(format!("Invalid MLD version ({}). Valid values: 1, 2", v)),
+        },
+    }
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
@@ -696,5 +792,24 @@ mod tests {
                 metric: 100,
             }
         )
+    }
+
+    #[test_case("0", Err("Invalid IGMP version (0). Valid values: 1, 2, 3".to_string()); "input_0")]
+    #[test_case("1", Ok(finterfaces_admin::IgmpVersion::V1); "input_1")]
+    #[test_case("2", Ok(finterfaces_admin::IgmpVersion::V2); "input_2")]
+    #[test_case("3", Ok(finterfaces_admin::IgmpVersion::V3); "input_3")]
+    #[test_case("4", Err("Invalid IGMP version (4). Valid values: 1, 2, 3".to_string()); "input_4")]
+    #[test_case("a", Err("Failed to parse IGMP version (error: invalid digit found in string)".to_string()); "input_a")]
+    fn igmp_version(s: &str, expected: Result<finterfaces_admin::IgmpVersion, String>) {
+        assert_eq!(parse_igmp_version(s), expected)
+    }
+
+    #[test_case("0", Err("Invalid MLD version (0). Valid values: 1, 2".to_string()); "input_0")]
+    #[test_case("1", Ok(finterfaces_admin::MldVersion::V1); "input_1")]
+    #[test_case("2", Ok(finterfaces_admin::MldVersion::V2); "input_2")]
+    #[test_case("3", Err("Invalid MLD version (3). Valid values: 1, 2".to_string()); "input_3")]
+    #[test_case("a", Err("Failed to parse MLD version (error: invalid digit found in string)".to_string()); "input_a")]
+    fn mld_version(s: &str, expected: Result<finterfaces_admin::MldVersion, String>) {
+        assert_eq!(parse_mld_version(s), expected)
     }
 }

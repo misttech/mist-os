@@ -241,6 +241,26 @@ fn extract_ip_forwarding(
     }
 }
 
+fn extract_igmp_version(
+    finterfaces_admin::Configuration { ipv4: ipv4_config, .. }: finterfaces_admin::Configuration,
+) -> Result<Option<finterfaces_admin::IgmpVersion>, Error> {
+    let finterfaces_admin::Ipv4Configuration { igmp, .. } =
+        ipv4_config.context("get IPv4 configuration")?;
+    let finterfaces_admin::IgmpConfiguration { version: igmp_version, .. } =
+        igmp.context("get IGMP configuration")?;
+    Ok(igmp_version)
+}
+
+fn extract_mld_version(
+    finterfaces_admin::Configuration { ipv6: ipv6_config, .. }: finterfaces_admin::Configuration,
+) -> Result<Option<finterfaces_admin::MldVersion>, Error> {
+    let finterfaces_admin::Ipv6Configuration { mld, .. } =
+        ipv6_config.context("get IPv6 configuration")?;
+    let finterfaces_admin::MldConfiguration { version: mld_version, .. } =
+        mld.context("get MLD configuration")?;
+    Ok(mld_version)
+}
+
 async fn do_if<C: NetCliDepsConnector>(
     out: &mut ffx_writer::Writer,
     cmd: opts::IfEnum,
@@ -315,8 +335,112 @@ async fn do_if<C: NetCliDepsConnector>(
                 }
             }
         }
+        opts::IfEnum::Igmp(opts::IfIgmp { cmd }) => match cmd {
+            opts::IfIgmpEnum::Get(opts::IfIgmpGet { interface }) => {
+                let id = interface.find_nicid(connector).await.context("find nicid")?;
+                let control = get_control(connector, id).await.context("get control")?;
+                let configuration = control
+                    .get_configuration()
+                    .await
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("get configuration")?;
+
+                out.line(format!("IGMP configuration on interface {}:", id))?;
+                out.line(format!(
+                    "    Version: {:?}",
+                    extract_igmp_version(configuration).context("get IGMP version")?
+                ))?;
+            }
+            opts::IfIgmpEnum::Set(opts::IfIgmpSet { interface, version }) => {
+                let id = interface.find_nicid(connector).await.context("find nicid")?;
+                let control = get_control(connector, id).await.context("get control")?;
+                let prev_config = control
+                    .set_configuration(finterfaces_admin::Configuration {
+                        ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                            igmp: Some(finterfaces_admin::IgmpConfiguration {
+                                version,
+                                ..finterfaces_admin::IgmpConfiguration::EMPTY
+                            }),
+                            ..finterfaces_admin::Ipv4Configuration::EMPTY
+                        }),
+                        ..finterfaces_admin::Configuration::EMPTY
+                    })
+                    .await
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("set configuration")?;
+
+                info!(
+                    "IGMP version set to {:?} on interface {}; previously set to {:?}",
+                    version,
+                    id,
+                    extract_igmp_version(prev_config).context("get IGMP version")?,
+                );
+            }
+        },
+        opts::IfEnum::Mld(opts::IfMld { cmd }) => match cmd {
+            opts::IfMldEnum::Get(opts::IfMldGet { interface }) => {
+                let id = interface.find_nicid(connector).await.context("find nicid")?;
+                let control = get_control(connector, id).await.context("get control")?;
+                let configuration = control
+                    .get_configuration()
+                    .await
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("get configuration")?;
+
+                out.line(format!("MLD configuration on interface {}:", id))?;
+                out.line(format!(
+                    "    Version: {:?}",
+                    extract_mld_version(configuration).context("get MLD version")?
+                ))?;
+            }
+            opts::IfMldEnum::Set(opts::IfMldSet { interface, version }) => {
+                let id = interface.find_nicid(connector).await.context("find nicid")?;
+                let control = get_control(connector, id).await.context("get control")?;
+                let prev_config = control
+                    .set_configuration(finterfaces_admin::Configuration {
+                        ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                            mld: Some(finterfaces_admin::MldConfiguration {
+                                version,
+                                ..finterfaces_admin::MldConfiguration::EMPTY
+                            }),
+                            ..finterfaces_admin::Ipv6Configuration::EMPTY
+                        }),
+                        ..finterfaces_admin::Configuration::EMPTY
+                    })
+                    .await
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("set configuration")?;
+
+                info!(
+                    "MLD version set to {:?} on interface {}; previously set to {:?}",
+                    version,
+                    id,
+                    extract_mld_version(prev_config).context("get MLD version")?,
+                );
+            }
+        },
         opts::IfEnum::IpForward(opts::IfIpForward { cmd }) => match cmd {
-            opts::IfIpForwardEnum::Show(opts::IfIpForwardShow { interface, ip_version }) => {
+            opts::IfIpForwardEnum::Get(opts::IfIpForwardGet { interface, ip_version }) => {
                 let id = interface.find_nicid(connector).await.context("find nicid")?;
                 let control = get_control(connector, id).await.context("get control")?;
                 let configuration = control
@@ -1199,7 +1323,7 @@ mod tests {
     use fidl_fuchsia_hardware_network as fhardware_network;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use net_declare::{fidl_ip, fidl_ip_v4};
-    use std::convert::TryInto as _;
+    use std::{convert::TryInto as _, fmt::Debug};
     use test_case::test_case;
 
     const IF_ADDR_V4: fnet::Subnet = net_declare::fidl_subnet!("192.168.0.1/32");
@@ -1403,37 +1527,12 @@ mod tests {
         let connector =
             TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
 
-        let requests_fut = async {
-            let (id, control, _control_handle) = requests
-                .next()
-                .await
-                .expect("debug request stream not ended")
-                .expect("debug request stream not error")
-                .into_get_admin()
-                .expect("get admin request");
-            assert_eq!(id, interface1.nicid);
-
-            let mut control: finterfaces_admin::ControlRequestStream =
-                control.into_stream().expect("control request stream");
-            let (configuration, responder) = control
-                .next()
-                .await
-                .expect("control request stream not ended")
-                .expect("control request stream not error")
-                .into_set_configuration()
-                .expect("set configuration request");
-            assert_eq!(
-                extract_ip_forwarding(configuration, ip_version)
-                    .expect("extract IP forwarding configuration"),
-                enable
-            );
-            // net-cli does not check the returned configuration so we do not
-            // return a populated one.
-            let () = responder
-                .send(&mut Ok(finterfaces_admin::Configuration::EMPTY))
-                .expect("responder.send should succeed");
-            Ok(())
-        };
+        let requests_fut = set_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            |c| extract_ip_forwarding(c, ip_version).expect("extract IP forwarding configuration"),
+            enable,
+        );
         let mut out = ffx_writer::Writer::new_test(None);
         let do_if_fut = do_if(
             &mut out,
@@ -1446,46 +1545,27 @@ mod tests {
             }),
             &connector,
         );
-        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut)
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
             .await
             .expect("setting interface ip forwarding should succeed");
 
-        let requests_fut = async {
-            let (id, control, _control_handle) = requests
-                .next()
-                .await
-                .expect("debug request stream not ended")
-                .expect("debug request stream not error")
-                .into_get_admin()
-                .expect("get admin request");
-            assert_eq!(id, interface1.nicid);
-
-            let mut control: finterfaces_admin::ControlRequestStream =
-                control.into_stream().expect("control request stream");
-            let responder = control
-                .next()
-                .await
-                .expect("control request stream not ended")
-                .expect("control request stream not error")
-                .into_get_configuration()
-                .expect("get configuration request");
-            let () = responder
-                .send(&mut Ok(configuration_with_ip_forwarding_set(ip_version, enable)))
-                .expect("responder.send should succeed");
-            Ok(())
-        };
+        let requests_fut = get_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            configuration_with_ip_forwarding_set(ip_version, enable),
+        );
         let mut output_buf = ffx_writer::Writer::new_test(None);
         let do_if_fut = do_if(
             &mut output_buf,
             opts::IfEnum::IpForward(opts::IfIpForward {
-                cmd: opts::IfIpForwardEnum::Show(opts::IfIpForwardShow {
+                cmd: opts::IfIpForwardEnum::Get(opts::IfIpForwardGet {
                     interface: interface1.identifier(false /* use_ifname */),
                     ip_version,
                 }),
             }),
             &connector,
         );
-        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut)
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
             .await
             .expect("getting interface ip forwarding should succeed");
         let got_output = output_buf.test_output().unwrap();
@@ -1494,6 +1574,206 @@ mod tests {
             trim_whitespace_for_comparison(&format!(
                 "IP forwarding for {:?} is {} on interface {}",
                 ip_version, enable, interface1.nicid
+            )),
+        )
+    }
+
+    async fn set_configuration_request<
+        O: Debug + PartialEq,
+        F: FnOnce(finterfaces_admin::Configuration) -> O,
+    >(
+        requests: &mut fdebug::InterfacesRequestStream,
+        expected_nicid: u64,
+        extract_config: F,
+        expected_config: O,
+    ) {
+        let (id, control, _control_handle) = requests
+            .next()
+            .await
+            .expect("debug request stream not ended")
+            .expect("debug request stream not error")
+            .into_get_admin()
+            .expect("get admin request");
+        assert_eq!(id, expected_nicid);
+
+        let mut control: finterfaces_admin::ControlRequestStream =
+            control.into_stream().expect("control request stream");
+        let (configuration, responder) = control
+            .next()
+            .await
+            .expect("control request stream not ended")
+            .expect("control request stream not error")
+            .into_set_configuration()
+            .expect("set configuration request");
+        assert_eq!(extract_config(configuration), expected_config);
+        // net-cli does not check the returned configuration so we do not
+        // return a populated one.
+        let () = responder
+            .send(&mut Ok(finterfaces_admin::Configuration::EMPTY))
+            .expect("responder.send should succeed");
+    }
+
+    async fn get_configuration_request(
+        requests: &mut fdebug::InterfacesRequestStream,
+        expected_nicid: u64,
+        config: finterfaces_admin::Configuration,
+    ) {
+        let (id, control, _control_handle) = requests
+            .next()
+            .await
+            .expect("debug request stream not ended")
+            .expect("debug request stream not error")
+            .into_get_admin()
+            .expect("get admin request");
+        assert_eq!(id, expected_nicid);
+
+        let mut control: finterfaces_admin::ControlRequestStream =
+            control.into_stream().expect("control request stream");
+        let responder = control
+            .next()
+            .await
+            .expect("control request stream not ended")
+            .expect("control request stream not error")
+            .into_get_configuration()
+            .expect("get configuration request");
+        let () = responder.send(&mut Ok(config)).expect("responder.send should succeed");
+    }
+
+    #[test_case(finterfaces_admin::IgmpVersion::V1)]
+    #[test_case(finterfaces_admin::IgmpVersion::V2)]
+    #[test_case(finterfaces_admin::IgmpVersion::V3)]
+    #[fasync::run_singlethreaded(test)]
+    async fn if_igmp(igmp_version: finterfaces_admin::IgmpVersion) {
+        let interface1 = TestInterface { nicid: 1, name: "interface1" };
+        let (debug_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let connector =
+            TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
+
+        let requests_fut = set_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            |c| extract_igmp_version(c).unwrap(),
+            Some(igmp_version),
+        );
+        let mut out = ffx_writer::Writer::new_test(None);
+        let do_if_fut = do_if(
+            &mut out,
+            opts::IfEnum::Igmp(opts::IfIgmp {
+                cmd: opts::IfIgmpEnum::Set(opts::IfIgmpSet {
+                    interface: interface1.identifier(false /* use_ifname */),
+                    version: Some(igmp_version),
+                }),
+            }),
+            &connector,
+        );
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
+            .await
+            .expect("setting interface IGMP configuration should succeed");
+
+        let requests_fut = get_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            finterfaces_admin::Configuration {
+                ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                    igmp: Some(finterfaces_admin::IgmpConfiguration {
+                        version: Some(igmp_version),
+                        ..finterfaces_admin::IgmpConfiguration::EMPTY
+                    }),
+                    ..finterfaces_admin::Ipv4Configuration::EMPTY
+                }),
+                ..finterfaces_admin::Configuration::EMPTY
+            },
+        );
+        let mut output_buf = ffx_writer::Writer::new_test(None);
+        let do_if_fut = do_if(
+            &mut output_buf,
+            opts::IfEnum::Igmp(opts::IfIgmp {
+                cmd: opts::IfIgmpEnum::Get(opts::IfIgmpGet {
+                    interface: interface1.identifier(false /* use_ifname */),
+                }),
+            }),
+            &connector,
+        );
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
+            .await
+            .expect("getting interface IGMP configuration should succeed");
+        let got_output = output_buf.test_output().unwrap();
+        pretty_assertions::assert_eq!(
+            trim_whitespace_for_comparison(&got_output),
+            trim_whitespace_for_comparison(&format!(
+                "IGMP configuration on interface {}:\n    Version: {:?}",
+                interface1.nicid,
+                Some(igmp_version),
+            )),
+        )
+    }
+
+    #[test_case(finterfaces_admin::MldVersion::V1)]
+    #[test_case(finterfaces_admin::MldVersion::V2)]
+    #[fasync::run_singlethreaded(test)]
+    async fn if_mld(mld_version: finterfaces_admin::MldVersion) {
+        let interface1 = TestInterface { nicid: 1, name: "interface1" };
+        let (debug_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let connector =
+            TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
+
+        let requests_fut = set_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            |c| extract_mld_version(c).unwrap(),
+            Some(mld_version),
+        );
+        let mut out = ffx_writer::Writer::new_test(None);
+        let do_if_fut = do_if(
+            &mut out,
+            opts::IfEnum::Mld(opts::IfMld {
+                cmd: opts::IfMldEnum::Set(opts::IfMldSet {
+                    interface: interface1.identifier(false /* use_ifname */),
+                    version: Some(mld_version),
+                }),
+            }),
+            &connector,
+        );
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
+            .await
+            .expect("setting interface MLD configuration should succeed");
+
+        let requests_fut = get_configuration_request(
+            &mut requests,
+            interface1.nicid,
+            finterfaces_admin::Configuration {
+                ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                    mld: Some(finterfaces_admin::MldConfiguration {
+                        version: Some(mld_version),
+                        ..finterfaces_admin::MldConfiguration::EMPTY
+                    }),
+                    ..finterfaces_admin::Ipv6Configuration::EMPTY
+                }),
+                ..finterfaces_admin::Configuration::EMPTY
+            },
+        );
+        let mut output_buf = ffx_writer::Writer::new_test(None);
+        let do_if_fut = do_if(
+            &mut output_buf,
+            opts::IfEnum::Mld(opts::IfMld {
+                cmd: opts::IfMldEnum::Get(opts::IfMldGet {
+                    interface: interface1.identifier(false /* use_ifname */),
+                }),
+            }),
+            &connector,
+        );
+        let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
+            .await
+            .expect("getting interface MLD configuration should succeed");
+        let got_output = output_buf.test_output().unwrap();
+        pretty_assertions::assert_eq!(
+            trim_whitespace_for_comparison(&got_output),
+            trim_whitespace_for_comparison(&format!(
+                "MLD configuration on interface {}:\n    Version: {:?}",
+                interface1.nicid,
+                Some(mld_version),
             )),
         )
     }
