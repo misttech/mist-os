@@ -2875,8 +2875,12 @@ mod tests {
             self.borrow().len()
         }
 
-        fn cap(&self) -> usize {
-            self.borrow().cap()
+        fn capacity(&self) -> usize {
+            self.borrow().capacity()
+        }
+
+        fn target_capacity(&self) -> usize {
+            self.borrow().target_capacity()
         }
     }
 
@@ -2907,9 +2911,14 @@ mod tests {
             ring.len() + fake_stream.borrow().len()
         }
 
-        fn cap(&self) -> usize {
+        fn capacity(&self) -> usize {
             let Self { fake_stream, ring } = self;
-            ring.cap() + fake_stream.borrow().capacity()
+            ring.capacity() + fake_stream.borrow().capacity()
+        }
+
+        fn target_capacity(&self) -> usize {
+            let Self { fake_stream: _, ring } = self;
+            ring.target_capacity()
         }
     }
 
@@ -2931,7 +2940,7 @@ mod tests {
             let Self { fake_stream, ring } = self;
             if !fake_stream.borrow().is_empty() {
                 // Pull from the fake stream into the ring if there is capacity.
-                let len = (ring.cap() - ring.len()).min(fake_stream.borrow().len());
+                let len = (ring.capacity() - ring.len()).min(fake_stream.borrow().len());
                 let rest = fake_stream.borrow_mut().split_off(len);
                 let first = fake_stream.replace(rest);
                 assert_eq!(ring.enqueue_data(&first[..]), len);

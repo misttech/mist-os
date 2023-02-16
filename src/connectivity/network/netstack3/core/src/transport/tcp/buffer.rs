@@ -33,7 +33,20 @@ pub trait Buffer: Takeable + Debug + Sized {
     fn len(&self) -> usize;
 
     /// Returns the maximum number of bytes that can reside in the buffer.
-    fn cap(&self) -> usize;
+    fn capacity(&self) -> usize;
+
+    /// Gets the target size of the buffer, in bytes.
+    ///
+    /// The target capacity of the buffer is distinct from the actual capacity
+    /// (returned by [`Buffer::capacity`]) in that the target capacity should
+    /// remain fixed unless requested otherwise, while the actual capacity can
+    /// vary with usage.
+    ///
+    /// For fixed-size buffers this should return the same result as calling
+    /// `self.capacity()`. For buffer types that support resizing, the
+    /// returned value can be different but should not change unless a resize
+    /// was requested.
+    fn target_capacity(&self) -> usize;
 }
 
 /// A buffer supporting TCP receiving operations.
@@ -365,7 +378,7 @@ impl RingBuffer {
 
     /// Returns the writable regions of the [`RingBuffer`].
     pub fn writable_regions(&mut self) -> impl IntoIterator<Item = &mut [u8]> {
-        let available = self.cap() - self.len();
+        let available = self.capacity() - self.len();
         let Self { storage, head, len, shrink: _ } = self;
 
         let mut write_start = *head + *len;
@@ -439,15 +452,20 @@ impl Buffer for RingBuffer {
         self.len
     }
 
-    fn cap(&self) -> usize {
+    fn capacity(&self) -> usize {
         let Self { storage, shrink, len: _, head: _ } = self;
         storage.len() - shrink.as_ref().map_or(0, |r| r.current)
+    }
+
+    fn target_capacity(&self) -> usize {
+        let Self { storage, shrink, len: _, head: _ } = self;
+        storage.len() - shrink.as_ref().map_or(0, |r| r.target.get())
     }
 }
 
 impl ReceiveBuffer for RingBuffer {
     fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
-        let available = self.cap() - self.len();
+        let available = self.capacity() - self.len();
         let Self { storage, head, len, shrink: _ } = self;
         if storage.len() == 0 {
             return 0;
@@ -470,7 +488,7 @@ impl ReceiveBuffer for RingBuffer {
     }
 
     fn make_readable(&mut self, count: usize) {
-        debug_assert!(count <= self.cap() - self.len());
+        debug_assert!(count <= self.capacity() - self.len());
         self.len += count;
     }
 }
@@ -826,8 +844,8 @@ mod test {
                 slice.fill(BYTE_TO_WRITE);
                 acc + slice.len()
             });
-            assert_eq!(writable_len + rb.len(), rb.cap());
-            for i in 0..rb.cap() {
+            assert_eq!(writable_len + rb.len(), rb.capacity());
+            for i in 0..rb.capacity() {
                 let expected = if i < rb.len() {
                     0
                 } else {
@@ -874,7 +892,7 @@ mod test {
                 acc.extend_from_slice(slice);
                 acc
             });
-            assert_eq!(new_writable.len() + rb.len(), rb.cap());
+            assert_eq!(new_writable.len() + rb.len(), rb.capacity());
             assert!(new_writable.len() >= written);
             for (i, x) in new_writable.iter().enumerate() {
                 let expected = (i < written).then_some(BYTE_TO_WRITE).unwrap_or(0);

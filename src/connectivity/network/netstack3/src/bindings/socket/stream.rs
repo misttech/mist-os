@@ -219,7 +219,11 @@ impl Buffer for ReceiveBufferWithZirconSocket {
         info.tx_buf_size
     }
 
-    fn cap(&self) -> usize {
+    fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    fn target_capacity(&self) -> usize {
         self.capacity
     }
 }
@@ -263,7 +267,7 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
         // Bindings, we can reclaim the memory more promptly by teaching Core
         // about SHUT_RD.
         if shut_rd {
-            if self.out_of_order.cap() != 0 {
+            if self.out_of_order.capacity() != 0 {
                 self.out_of_order = RingBuffer::new(0);
             }
             return;
@@ -299,9 +303,14 @@ impl Buffer for SendBufferWithZirconSocket {
         info.rx_buf_size + self.ready_to_send.len()
     }
 
-    fn cap(&self) -> usize {
+    fn capacity(&self) -> usize {
         let Self { zx_socket_capacity, socket: _, ready_to_send, notifier: _ } = self;
-        *zx_socket_capacity + ready_to_send.cap()
+        *zx_socket_capacity + ready_to_send.capacity()
+    }
+
+    fn target_capacity(&self) -> usize {
+        let Self { zx_socket_capacity, socket: _, ready_to_send, notifier: _ } = self;
+        *zx_socket_capacity + ready_to_send.target_capacity()
     }
 }
 
@@ -337,7 +346,7 @@ impl SendBufferWithZirconSocket {
     }
 
     fn poll(&mut self) {
-        let want_bytes = self.ready_to_send.cap() - self.ready_to_send.len();
+        let want_bytes = self.ready_to_send.capacity() - self.ready_to_send.len();
         if want_bytes == 0 {
             return;
         }
@@ -1458,7 +1467,7 @@ mod tests {
         let (local, _peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
-        let ring_buffer_capacity = sbuf.cap() - sbuf.socket.info().unwrap().rx_buf_max;
+        let ring_buffer_capacity = sbuf.capacity() - sbuf.socket.info().unwrap().rx_buf_max;
         assert_eq!(ring_buffer_capacity, expected)
     }
 
@@ -1525,9 +1534,8 @@ mod tests {
             sbuf.poll();
         }
 
-        // Request a shrink of the send buffer. With the buggy behavior, this
-        // didn't actually decrease sbuf.capacity.
-        let capacity_before = sbuf.cap();
+        // Request a shrink of the send buffer.
+        let capacity_before = sbuf.capacity();
         sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY);
 
         // Empty out the ring buffer and zircon socket by reading from them.
@@ -1537,13 +1545,13 @@ mod tests {
             len != 0
         } {}
 
-        let cap = sbuf.cap();
+        let capacity = sbuf.capacity();
         // The requested capacity isn't directly reflected in `cap` but we can
         // assert that its change is equal to the requested change.
         const EXPECTED_CAPACITY_DECREASE: usize =
             SendBufferWithZirconSocket::MAX_CAPACITY - SendBufferWithZirconSocket::MIN_CAPACITY;
         assert_eq!(
-            cap,
+            capacity,
             capacity_before - EXPECTED_CAPACITY_DECREASE,
             "capacity_before: {}, expected decrease: {}",
             capacity_before,
@@ -1553,9 +1561,8 @@ mod tests {
         // The socket's capacity is a measure of how many readable bytes it can
         // hold. If the socket is implemented correctly, this loop will continue
         // until the send buffer's ring buffer is full and the socket buffer is
-        // full, then exit. Otherwise this loop will continue indefinitely until
-        // the socket buffer is full and the write fails.
-        while sbuf.len() < cap {
+        // full, then exit.
+        while sbuf.len() < capacity {
             let _: usize = peer.write(TEST_BYTES).expect("can write");
             sbuf.poll();
         }

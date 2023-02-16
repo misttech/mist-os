@@ -1308,13 +1308,9 @@ async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &
         // If the sender supports setting SO_SNDBUF, it should be able to buffer
         // a large amount of data even if the receiver isn't reading.
         const BUFFER_SIZE: usize = 1024 * 1024;
-        {
-            let socket =
-                socket2::Socket::from(sender.std().try_clone().expect("stream is cloneable"));
-            socket.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
-            let size = socket.send_buffer_size().expect("get size is infallible");
-            assert!(size >= BUFFER_SIZE, "{} >= {}", size, BUFFER_SIZE);
-        }
+        sender.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
+        let size = sender.send_buffer_size().expect("get size is infallible");
+        assert!(size >= BUFFER_SIZE, "{} >= {}", size, BUFFER_SIZE);
 
         let data = Vec::from_iter((0..BUFFER_SIZE).map(|i| i as u8));
         sender.write_all(data.as_slice()).await.expect("all written");
@@ -1323,6 +1319,66 @@ async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &
         let mut buf = Vec::with_capacity(BUFFER_SIZE);
         let read = receiver.read_to_end(&mut buf).await.expect("all bytes read");
         assert_eq!(read, BUFFER_SIZE);
+    })
+    .await
+}
+
+#[netstack_test]
+async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
+    // This is a regression test for https://fxbug.dev/121878. With Netstack3,
+    // if a TCP socket had a full send buffer and a decrease of the send buffer
+    // size was requested, the new size would not take effect immediately as
+    // expected.  Instead, the apparent size (visible via POSIX `getsockopt`
+    // with `SO_SNDBUF`) would decrease linearly as data was transferred. This
+    // test verifies that this is no longer the case by filling up the send
+    // buffer for a TCP socket, requesting a smaller size, then observing the
+    // size as the buffer is drained (by transferring to the receiver).
+    tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
+        // Fill up the sender and receiver buffers by writing a lot of data.
+        const LARGE_BUFFER_SIZE: usize = 1024 * 1024;
+        sender.set_send_buffer_size(LARGE_BUFFER_SIZE).expect("can set");
+
+        let data = vec![b'x'; LARGE_BUFFER_SIZE];
+        // Fill up the sending socket's send buffer. Since we can't prevent it
+        // from sending data to the receiver, this will also fill up the
+        // receiver's receive buffer, which is fine. We do this by writing as
+        // much as possible while giving time for the sender to transfer the
+        // bytes to the receiver.
+        let mut written = 0;
+        while sender
+            .write_all(data.as_slice())
+            .map(|r| {
+                r.unwrap();
+                true
+            })
+            .on_timeout(zx::Duration::from_seconds(2), || false)
+            .await
+        {
+            written += data.len();
+        }
+
+        // Now reduce the size of the send buffer. The apparent size of the send
+        // buffer should decrease immediately.
+        let size_before = sender.send_buffer_size().unwrap();
+        sender.set_send_buffer_size(0).expect("can set");
+        let size_after = sender.send_buffer_size().unwrap();
+        assert!(size_before > size_after, "{} > {}", size_before, size_after);
+
+        // Read data from the socket so that the the sender can send more.
+        // This won't finish until the entire transfer has been received.
+        let mut buf = vec![0; LARGE_BUFFER_SIZE];
+        let mut read = 0;
+        while read < written {
+            read += receiver.read(&mut buf).await.expect("can read");
+        }
+
+        // Draining all the data from the sender into the receiver shouldn't
+        // decrease the sender's apparent send buffer size.
+        assert_eq!(sender.send_buffer_size().unwrap(), size_after);
+        // Now that the sender's buffer is empty, try setting the size again.
+        // This should have no effect!
+        sender.set_send_buffer_size(0).expect("can set");
+        assert_eq!(sender.send_buffer_size().unwrap(), size_after);
     })
     .await
 }

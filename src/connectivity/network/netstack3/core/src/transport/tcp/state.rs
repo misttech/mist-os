@@ -601,7 +601,7 @@ struct Recv<R: ReceiveBuffer> {
 
 impl<R: ReceiveBuffer> Recv<R> {
     fn wnd(&self) -> WindowSize {
-        WindowSize::new(self.buffer.cap() - self.buffer.len()).unwrap_or(WindowSize::MAX)
+        WindowSize::new(self.buffer.capacity() - self.buffer.len()).unwrap_or(WindowSize::MAX)
     }
 
     fn nxt(&self) -> SeqNum {
@@ -996,7 +996,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         buffer.request_capacity(size)
     }
 
-    fn capacity(&self) -> usize {
+    fn target_capacity(&self) -> usize {
         let Self {
             nxt: _,
             max: _,
@@ -1010,7 +1010,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer: _,
             congestion_control: _,
         } = self;
-        buffer.cap()
+        buffer.target_capacity()
     }
 }
 
@@ -1983,10 +1983,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 default_mss: _,
             }) => *send,
             State::Established(Established { snd, rcv: _ })
-            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => snd.capacity(),
+            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
+                snd.target_capacity()
+            }
             State::FinWait1(FinWait1 { snd, rcv: _ })
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
-            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.capacity(),
+            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.target_capacity(),
         }
     }
 }
@@ -2076,7 +2078,11 @@ mod test {
             0
         }
 
-        fn cap(&self) -> usize {
+        fn capacity(&self) -> usize {
+            0
+        }
+
+        fn target_capacity(&self) -> usize {
             0
         }
     }
@@ -3942,8 +3948,12 @@ mod test {
             self.buffer.len()
         }
 
-        fn cap(&self) -> usize {
-            self.buffer.cap()
+        fn capacity(&self) -> usize {
+            self.buffer.capacity()
+        }
+
+        fn target_capacity(&self) -> usize {
+            self.buffer.target_capacity()
         }
     }
 
