@@ -1442,7 +1442,6 @@ dependencies = [
  "vk-sys",
  "vm-device",
  "vte",
- "waker-fn",
  "walkdir",
  "wasm-bindgen",
  "webpki",

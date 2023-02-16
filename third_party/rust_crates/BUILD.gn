@@ -1024,12 +1024,6 @@ group("vte") {
   public_deps = [ ":vte-v0_3_3" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("waker-fn") {
-    public_deps = [ ":waker-fn-v1_1_0" ]
-  }
-}
-
 group("walkdir") {
   public_deps = [ ":walkdir-v2_3_1" ]
 }
