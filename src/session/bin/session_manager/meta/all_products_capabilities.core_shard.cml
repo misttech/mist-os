@@ -28,20 +28,6 @@
         },
         {
             protocol: [
-                "fuchsia.media.ActivityReporter",
-                "fuchsia.media.Audio",
-                "fuchsia.media.audio.EffectsController",
-                "fuchsia.media.AudioCore",
-                "fuchsia.media.AudioDeviceEnumerator",
-                "fuchsia.media.ProfileProvider",
-                "fuchsia.media.UsageGainReporter",
-                "fuchsia.media.UsageReporter",
-            ],
-            from: "#audio_core",
-            to: "#session-manager",
-        },
-        {
-            protocol: [
                 "fuchsia.bluetooth.gatt.Server",
                 "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.le.Peripheral",
@@ -67,11 +53,6 @@
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],
             from: "#cobalt",
-            to: "#session-manager",
-        },
-        {
-            protocol: [ "fuchsia.mediacodec.CodecFactory" ],
-            from: "#codec_factory",
             to: "#session-manager",
         },
         {
@@ -141,21 +122,11 @@
             to: "#session-manager",
         },
         {
-            protocol: [ "fuchsia.process.explorer.Query" ],
-            from: "#process_explorer",
-            to: "#session-manager",
-        },
-        {
             protocol: [
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
             ],
             from: "#regulatory_region",
-            to: "#session-manager",
-        },
-        {
-            protocol: [ "fuchsia.media.sounds.Player" ],
-            from: "#soundplayer",
             to: "#session-manager",
         },
         {
@@ -175,58 +146,6 @@
                 "fuchsia.update.Manager",
             ],
             from: "#system-update-checker",
-            to: "#session-manager",
-        },
-        {
-            directory: "tzdata-icu-44-le",
-            from: "#tzdata-provider",
-            to: "#session-manager",
-        },
-        {
-            protocol: [
-                "fuchsia.accessibility.gesture.ListenerRegistry",
-                "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.accessibility.tts.EngineRegistry",
-                "fuchsia.accessibility.tts.TtsManager",
-                "fuchsia.accessibility.virtualkeyboard.Registry",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
-                "fuchsia.input.virtualkeyboard.Manager",
-                "fuchsia.recovery.policy.Device",
-                "fuchsia.recovery.ui.FactoryResetCountdown",
-                "fuchsia.ui.brightness.ColorAdjustmentHandler",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.composition.internal.ScreenCapture",
-                "fuchsia.ui.composition.ScreenCapture",
-                "fuchsia.ui.composition.Screenshot",
-                "fuchsia.ui.display.singleton.Info",
-                "fuchsia.ui.focus.FocusChainListenerRegistry",
-                "fuchsia.ui.input.ImeService",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.input3.KeyEventInjector",
-                "fuchsia.ui.keyboard.focus.Controller",
-                "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.policy.DeviceListenerRegistry",
-                "fuchsia.ui.policy.DisplayBacklight",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.ui.views.ViewRefInstalled",
-            ],
-            from: "#ui",
-            to: "#session-manager",
-        },
-        {
-            protocol: [ "fuchsia.vulkan.loader.Loader" ],
-            from: "#vulkan_loader",
-            to: "#session-manager",
-        },
-        {
-            protocol: [
-                "fuchsia.wlan.policy.AccessPointProvider",
-                "fuchsia.wlan.policy.ClientProvider",
-                "fuchsia.wlan.product.deprecatedclient.DeprecatedClient",
-                "fuchsia.wlan.product.deprecatedconfiguration.DeprecatedConfigurator",
-            ],
-            from: "#wlancfg",
             to: "#session-manager",
         },
 
@@ -338,17 +257,6 @@
             ],
             from: "self",
             to: "#session-manager",
-        },
-        {
-            // Routed from v1 components.
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Launcher",
-                "fuchsia.sys.Loader",
-            ],
-            from: "self",
-            to: "#session-manager",
-            dependency: "weak_for_migration",
         },
     ],
 }

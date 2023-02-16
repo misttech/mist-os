@@ -20,6 +20,21 @@
             source_availability: "unknown",
         },
         {
+            protocol: [
+                "fuchsia.media.ActivityReporter",
+                "fuchsia.media.Audio",
+                "fuchsia.media.audio.EffectsController",
+                "fuchsia.media.AudioCore",
+                "fuchsia.media.AudioDeviceEnumerator",
+                "fuchsia.media.ProfileProvider",
+                "fuchsia.media.UsageGainReporter",
+                "fuchsia.media.UsageReporter",
+            ],
+            from: "#audio_core",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.power.battery.BatteryManager",
             from: "#battery_manager",
             to: "#session-manager",
@@ -34,6 +49,12 @@
         {
             protocol: [ "fuchsia.bluetooth.hfp.Hfp" ],
             from: "#bt-hfp-audio-gateway",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.mediacodec.CodecFactory" ],
+            from: "#codec_factory",
             to: "#session-manager",
             source_availability: "unknown",
         },
@@ -69,6 +90,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.lowpan.bootstrap.Thread",
+            from: "#lowpan-ot-driver",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.lowpan.device.CountersConnector",
                 "fuchsia.lowpan.device.DeviceConnector",
@@ -79,12 +106,6 @@
                 "fuchsia.lowpan.thread.MeshcopConnector",
             ],
             from: "#lowpanservice",
-            to: "#session-manager",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.lowpan.bootstrap.Thread",
-            from: "#lowpan-ot-driver",
             to: "#session-manager",
             source_availability: "unknown",
         },
@@ -107,6 +128,12 @@
         {
             protocol: [ "fuchsia.media.drm.PlayReady" ],
             from: "#playready-cdm",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.process.explorer.Query" ],
+            from: "#process_explorer",
             to: "#session-manager",
             source_availability: "unknown",
         },
@@ -134,6 +161,13 @@
             ],
             from: "#setui_service",
             to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.media.sounds.Player" ],
+            from: "#soundplayer",
+            to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -155,6 +189,51 @@
             // Trace manager may be excluded from builds where tracing is not
             // expected to be used for observability, such as the non-eng
             // builds of any product.
+            source_availability: "unknown",
+        },
+        {
+            directory: "tzdata-icu-44-le",
+            from: "#tzdata-provider",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.accessibility.gesture.ListenerRegistry",
+                "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.accessibility.tts.EngineRegistry",
+                "fuchsia.accessibility.tts.TtsManager",
+                "fuchsia.accessibility.virtualkeyboard.Registry",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
+                "fuchsia.input.virtualkeyboard.Manager",
+                "fuchsia.recovery.policy.Device",
+                "fuchsia.recovery.ui.FactoryResetCountdown",
+                "fuchsia.ui.brightness.ColorAdjustmentHandler",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.internal.ScreenCapture",
+                "fuchsia.ui.composition.ScreenCapture",
+                "fuchsia.ui.composition.Screenshot",
+                "fuchsia.ui.display.singleton.Info",
+                "fuchsia.ui.focus.FocusChainListenerRegistry",
+                "fuchsia.ui.input.ImeService",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.input3.KeyEventInjector",
+                "fuchsia.ui.keyboard.focus.Controller",
+                "fuchsia.ui.pointerinjector.Registry",
+                "fuchsia.ui.policy.DeviceListenerRegistry",
+                "fuchsia.ui.policy.DisplayBacklight",
+                "fuchsia.ui.scenic.Scenic",
+                "fuchsia.ui.views.ViewRefInstalled",
+            ],
+            from: "#ui",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.vulkan.loader.Loader" ],
+            from: "#vulkan_loader",
+            to: "#session-manager",
             source_availability: "unknown",
         },
         {
@@ -180,6 +259,17 @@
         {
             protocol: [ "fuchsia.media.drm.Widevine" ],
             from: "#widevine_cdm",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.wlan.policy.AccessPointProvider",
+                "fuchsia.wlan.policy.ClientProvider",
+                "fuchsia.wlan.product.deprecatedclient.DeprecatedClient",
+                "fuchsia.wlan.product.deprecatedconfiguration.DeprecatedConfigurator",
+            ],
+            from: "#wlancfg",
             to: "#session-manager",
             source_availability: "unknown",
         },

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/session/bin/session_manager/meta/optional_capabilities.core_shard.cml",
-        "//src/session/bin/session_manager/meta/required_capabilities.core_shard.cml",
+        "//src/session/bin/session_manager/meta/all_products_capabilities.core_shard.cml",
+        "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
         "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
     ],
 
@@ -71,6 +71,17 @@
             protocol: [ "fuchsia.bluetooth.sys.Bootstrap" ],
             from: "#bluetooth-core",
             to: "#session-manager",
+        },
+        {
+            // Routed from v1 components.
+            protocol: [
+                "fuchsia.sys.Environment",
+                "fuchsia.sys.Launcher",
+                "fuchsia.sys.Loader",
+            ],
+            from: "self",
+            to: "#session-manager",
+            dependency: "weak_for_migration",
         },
     ],
 }
