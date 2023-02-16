@@ -279,25 +279,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "backtrace"
-version = "0.3.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4b1549d804b6c73f4817df2ba073709e96e426f12987127c48e6745568c350b"
-dependencies = [
- "backtrace-sys",
- "cfg-if 0.1.10",
- "libc",
- "rustc-demangle",
-]
-
-[[package]]
-name = "backtrace-sys"
-version = "0.1.37"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "base16ct"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1315,7 +1296,6 @@ dependencies = [
  "getrandom",
  "glob",
  "gpt",
- "gpu-allocator",
  "half",
  "handlebars",
  "heck 0.3.1",
@@ -1698,18 +1678,6 @@ dependencies = [
  "crc",
  "log",
  "uuid 0.8.2",
-]
-
-[[package]]
-name = "gpu-allocator"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4faf2ac0387a5a316b5611eb35f1854849c98a8615cc4e76f48d1cf88890cbaa"
-dependencies = [
- "ash",
- "backtrace",
- "log",
- "thiserror",
 ]
 
 [[package]]

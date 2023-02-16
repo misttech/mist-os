@@ -314,14 +314,6 @@ group("gpt") {
   public_deps = [ ":gpt-v3_0_0" ]
 }
 
-import("//src/experiences/session_shells/gazelle/build/visibility.gni")
-
-group("gpu-allocator") {
-  public_deps = [ ":gpu-allocator-v0_19_1" ]
-
-  visibility = gpu_allocator_visibility
-}
-
 group("half") {
   public_deps = [ ":half-v1_6_0" ]
 }
@@ -1455,7 +1447,6 @@ rust_library("ash-v0_37_0+1_3_209") {
     "--edition=2018",
     "-Cmetadata=b07aaa2f97684336",
     "-Cextra-filename=-b07aaa2f97684336",
-    "--cfg=feature=\"debug\"",
     "--cfg=feature=\"linked\"",
   ]
 
@@ -1749,61 +1740,6 @@ rust_library("atty-v0_2_11") {
     "--edition=2015",
     "-Cmetadata=8928199b13c115d5",
     "-Cextra-filename=-8928199b13c115d5",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("backtrace-v0_3_42") {
-  crate_name = "backtrace"
-  crate_root = "//third_party/rust_crates/vendor/backtrace-0.3.42/src/lib.rs"
-  output_name = "backtrace-8890db06d187a09"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-  if (current_os == "fuchsia") {
-    configs += [ "//build/config/fuchsia:libunwind" ]
-  }
-
-  deps = []
-  deps += [ ":backtrace-sys-v0_1_37" ]
-  deps += [ ":cfg-if-v0_1_10" ]
-  deps += [ ":libc-v0_2_138" ]
-  deps += [ ":rustc-demangle-v0_1_21" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=8890db06d187a09",
-    "-Cextra-filename=-8890db06d187a09",
-    "--cfg=feature=\"backtrace-sys\"",
-    "--cfg=feature=\"dbghelp\"",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"dladdr\"",
-    "--cfg=feature=\"libbacktrace\"",
-    "--cfg=feature=\"libunwind\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("backtrace-sys-v0_1_37") {
-  crate_name = "backtrace_sys"
-  crate_root = "//third_party/rust_crates/empty/backtrace-sys/src/lib.rs"
-  output_name = "backtrace_sys-76b66386b02bc30d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":libc-v0_2_138" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=76b66386b02bc30d",
-    "-Cextra-filename=-76b66386b02bc30d",
   ]
 
   visibility = [ ":*" ]
@@ -4682,33 +4618,6 @@ rust_library("gpt-v3_0_0") {
     "--edition=2018",
     "-Cmetadata=ee8537fb7cdea5c1",
     "-Cextra-filename=-ee8537fb7cdea5c1",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("gpu-allocator-v0_19_1") {
-  crate_name = "gpu_allocator"
-  crate_root =
-      "//third_party/rust_crates/vendor/gpu-allocator-0.19.1/src/lib.rs"
-  output_name = "gpu_allocator-271f71d3a703900a"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":ash-v0_37_0+1_3_209" ]
-  deps += [ ":backtrace-v0_3_42" ]
-  deps += [ ":log-v0_4_11" ]
-  deps += [ ":thiserror-v1_0_23" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=271f71d3a703900a",
-    "-Cextra-filename=-271f71d3a703900a",
-    "--cfg=feature=\"ash\"",
-    "--cfg=feature=\"vulkan\"",
   ]
 
   visibility = [ ":*" ]
