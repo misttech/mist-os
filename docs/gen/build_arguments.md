@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2705,7 +2705,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2740,7 +2740,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -2852,7 +2852,7 @@ From //third_party/perfetto/gn/perfetto.gni:302
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:149
+From //src/power/power-manager/BUILD.gn:148
 
 ### enable_recovery_ui_v2
 
@@ -3694,7 +3694,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3922,6 +3922,18 @@ only useful on Chrome OS.
 **Current value (from the default):** `false`
 
 From //build/icu.gni:19
+
+### icu_fuchsia_extra_compile_flags
+
+Fuchsia sometimes requires extra compilation flags for ICU to adapt it to
+its current toolchain. Since it takes a while for ICU to roll through
+Fuchsia, it can take a long time from an ICU commit to a fix rolling into
+Fuchsia. This flag allows us to define the flag ahead of time in
+//build/icu.gni, and remove the rollout issues.
+
+**Current value (from the default):** `[]`
+
+From //build/icu.gni:38
 
 ### icu_fuchsia_override_data_dir
 
@@ -6652,17 +6664,6 @@ of the test binary itself cannot generate coverage reports.
 
 From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:29
 
-### pw_toolchain_CXX_STANDARD
-
-Specifies the C++ standard this toolchain is compiling for. The value must
-be an integer that matches the value of the __cplusplus macro when compiling
-with that standard. Use the pw_toolchain_CXX_STANDARD_## constants to set
-this value.
-
-**Current value (from the default):** `201703`
-
-From //third_party/pigweed/src/pw_toolchain/traits.gni:31
-
 ### pw_toolchain_OSS_FUZZ_ENABLED
 
 Indicates if this build is a part of OSS-Fuzz, which needs to be able to
@@ -7898,7 +7899,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8255,7 +8256,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
