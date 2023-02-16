@@ -240,7 +240,6 @@ hyper-rustls = { version = "0.22.1", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
 pretty = "0.5.2"
-proc-macro-nested = "0.1.7"
 rust_icu_common = { version = "3.0.0", default-features = false, features = ["renaming"] }
 rust_icu_sys = { version = "3.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ucal = { version = "3.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
@@ -576,10 +575,6 @@ deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
-
-[gn.package.proc-macro-nested."0.1.7"]
-rustflags = []
-env_vars = ["OUT_DIR=../../../compat/proc-macro-nested", "PATH_SEPARATOR=/"]
 
 [gn.package.schemars."0.8.10"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]

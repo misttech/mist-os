@@ -582,12 +582,6 @@ group("prettytable-rs") {
   public_deps = [ ":prettytable-rs-v0_8_0" ]
 }
 
-if (current_os == "fuchsia") {
-  group("proc-macro-nested") {
-    public_deps = [ ":proc-macro-nested-v0_1_7" ]
-  }
-}
-
 if (!(current_os == "fuchsia")) {
   group("proc-macro2") {
     public_deps = [ ":proc-macro2-v1_0_39" ]
@@ -7637,30 +7631,6 @@ rust_library("prettytable-rs-v0_8_0") {
     "--cfg=feature=\"csv\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"win_crlf\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("proc-macro-nested-v0_1_7") {
-  crate_name = "proc_macro_nested"
-  crate_root =
-      "//third_party/rust_crates/vendor/proc-macro-nested-0.1.7/src/lib.rs"
-  output_name = "proc_macro_nested-2f16aa10e567d43e"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = [
-    "OUT_DIR=../../../compat/proc-macro-nested",
-    "PATH_SEPARATOR=/",
-  ]
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=2f16aa10e567d43e",
-    "-Cextra-filename=-2f16aa10e567d43e",
   ]
 
   visibility = [ ":*" ]

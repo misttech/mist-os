@@ -1349,7 +1349,6 @@ dependencies = [
  "pretty",
  "pretty_assertions",
  "prettytable-rs",
- "proc-macro-nested",
  "proc-macro2 1.0.39",
  "proptest",
  "proptest-derive",
@@ -2859,12 +2858,6 @@ dependencies = [
  "term",
  "unicode-width",
 ]
-
-[[package]]
-name = "proc-macro-nested"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc881b2c22681370c6a780e47af9840ef841837bc98118431d4e1868bd0c1086"
 
 [[package]]
 name = "proc-macro2"
