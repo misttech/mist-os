@@ -42,6 +42,10 @@ def _fuchsia_licenses_spdx_impl(ctx):
 
     spdx_output = ctx.actions.declare_file(ctx.attr.name)
 
+    root_package_name = ctx.attr.root_package_name
+    if not root_package_name:
+        root_package_name = ctx.attr.target.label.name
+
     ctx.actions.run(
         progress_message = "Generating SPDX from %s into %s" %
                            (licenses_used_file.path, spdx_output.path),
@@ -51,7 +55,7 @@ def _fuchsia_licenses_spdx_impl(ctx):
         arguments = [
             "--licenses_used=%s" % licenses_used_file.path,
             "--spdx_output=%s" % spdx_output.path,
-            "--root_package_name=%s" % ctx.attr.target.label.name,
+            "--root_package_name=%s" % root_package_name,
             "--document_namespace=%s" % ctx.attr.document_namespace,
             "--licenses_cross_refs_base_url=%s" % ctx.attr.licenses_cross_refs_base_url,
         ],
@@ -76,6 +80,11 @@ https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json
             doc = "The target to aggregate the licenses from.",
             mandatory = True,
             aspects = [gather_licenses_info],
+        ),
+        "root_package_name": attr.string(
+            doc = """The name of the SPDX root package.
+If absent, the target's name is used instead.""",
+            default = "",
         ),
         "document_namespace": attr.string(
             doc = "A unique namespace url for the SPDX references in the doc",

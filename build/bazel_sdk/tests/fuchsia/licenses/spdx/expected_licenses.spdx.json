@@ -1,7 +1,7 @@
 {
     "spdxVersion": "SPDX-2.2",
     "SPDXID": "SPDXRef-DOCUMENT",
-    "name": "test_package",
+    "name": "my_root_package",
     "documentNamespace": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx",
     "creationInfo": {
         "creators": [
@@ -20,7 +20,7 @@
     "packages": [
         {
             "SPDXID": "SPDXRef-Package-0",
-            "name": "test_package"
+            "name": "my_root_package"
         },
         {
             "SPDXID": "SPDXRef-Package-1",
