@@ -763,6 +763,7 @@ async fn inspect_stat_counters(name: &str) {
                 ExhaustedTTL: AnyProperty,
                 ExtensionHeaderProblem: AnyProperty,
                 HostUnreachable: AnyProperty,
+                InitializingSource: AnyProperty,
                 LinkLocalDestination: AnyProperty,
                 LinkLocalSource: AnyProperty,
                 NoMulticastPendingQueueBufferSpace: AnyProperty,

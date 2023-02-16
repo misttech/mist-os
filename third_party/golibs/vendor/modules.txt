@@ -397,7 +397,7 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gvisor.dev/gvisor v0.0.0-20230214214945-d4ea3e15bb16
+# gvisor.dev/gvisor v0.0.0-20230215213814-b683bfe82989
 ## explicit; go 1.20
 gvisor.dev/gvisor/pkg/atomicbitops
 gvisor.dev/gvisor/pkg/bits
