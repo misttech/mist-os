@@ -1294,7 +1294,6 @@ dependencies = [
  "derp",
  "difference",
  "downcast-rs",
- "dyn-clone",
  "easy-parallel",
  "ecdsa",
  "either",

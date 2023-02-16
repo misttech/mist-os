@@ -220,10 +220,6 @@ group("downcast-rs") {
   public_deps = [ ":downcast-rs-v1_2_0" ]
 }
 
-group("dyn-clone") {
-  public_deps = [ ":dyn-clone-v1_0_5" ]
-}
-
 if (!(current_os == "fuchsia")) {
   group("easy-parallel") {
     public_deps = [ ":easy-parallel-v3_1_0" ]
