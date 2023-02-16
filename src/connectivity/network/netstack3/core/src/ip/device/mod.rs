@@ -18,7 +18,7 @@ use core::num::NonZeroU8;
 #[cfg(test)]
 use net_types::ip::IpVersion;
 use net_types::{
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     MulticastAddr, SpecifiedAddr, UnicastAddr,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -28,7 +28,6 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
     },
-    device::Mtu,
     error::{ExistsError, NotFoundError},
     ip::{
         device::{
@@ -1476,10 +1475,7 @@ mod tests {
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
         let device_id = sync_ctx.state.device.add_ethernet_device(
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(
-                Ipv4::MINIMUM_LINK_MTU as u32
-            )))
-            .unwrap(),
+            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
         );
 
         assert_eq!(non_sync_ctx.take_events()[..], []);

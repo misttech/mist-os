@@ -7,10 +7,14 @@ use std::collections::hash_map::HashMap;
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use futures::stream::StreamExt as _;
-use net_types::{ethernet::Mac, ip::IpAddr, SpecifiedAddr, UnicastAddr};
+use net_types::{
+    ethernet::Mac,
+    ip::{IpAddr, Mtu},
+    SpecifiedAddr, UnicastAddr,
+};
 use netstack3_core::{
     data_structures::id_map_collection::{Entry, IdMapCollection, IdMapCollectionKey},
-    device::{handle_queued_rx_packets, DeviceId, Mtu},
+    device::{handle_queued_rx_packets, DeviceId},
     Ctx,
 };
 

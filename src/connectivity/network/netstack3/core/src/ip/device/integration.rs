@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use core::{marker::PhantomData, num::NonZeroU8, time::Duration};
 
 use net_types::{
-    ip::{AddrSubnet, GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{AddrSubnet, GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -19,7 +19,6 @@ use packet_formats::icmp::{
 
 use crate::{
     context::SendFrameContext,
-    device::Mtu,
     error::{ExistsError, NotFoundError},
     ip::{
         self,

@@ -24,11 +24,11 @@ use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
 use fuchsia_zircon as zx;
 use futures::stream::BoxStream;
+use net_types::ip::{Ip as _, Ipv6};
 use parking_lot::Mutex;
 use socket2::{Domain, Protocol};
 use std::convert::TryInto;
 
-const IPV6_MIN_MTU: u32 = 1280;
 const TUN_PORT_ID: u8 = 0;
 
 #[derive(Debug)]
@@ -63,7 +63,7 @@ impl TunNetworkInterface {
                 ftun::DevicePortConfig {
                     base: Some(ftun::BasePortConfig {
                         id: Some(TUN_PORT_ID),
-                        mtu: Some(IPV6_MIN_MTU),
+                        mtu: Some(Ipv6::MINIMUM_LINK_MTU.get()),
                         rx_types: Some(vec![
                             fhwnet::FrameType::Ipv6,
                             // TODO(fxbug.dev/64292): Remove this once netstack doesn't require it.

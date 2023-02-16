@@ -9,7 +9,7 @@ use core::cmp::Ordering;
 use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
-use net_types::ip::{Ip, IpVersion, Ipv6Addr};
+use net_types::ip::{Ip, IpVersion, Ipv6Addr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use packet::{Buf, BufferMut, SerializeError, Serializer};
 
@@ -20,7 +20,7 @@ use crate::{
     ip::{
         device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
         forwarding::Destination,
-        IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, Mtu, SendIpPacketMeta,
+        IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, SendIpPacketMeta,
     },
 };
 
@@ -186,7 +186,7 @@ pub(crate) struct Mms(NonZeroU32);
 
 impl Mms {
     pub(crate) fn from_mtu<I: IpExt>(mtu: Mtu, options_size: u32) -> Option<Self> {
-        NonZeroU32::new(mtu.get().get().saturating_sub(I::IP_HEADER_LENGTH.get() + options_size))
+        NonZeroU32::new(mtu.get().saturating_sub(I::IP_HEADER_LENGTH.get() + options_size))
             .map(|mms| Self(mms.min(I::IP_MAX_PAYLOAD_LENGTH)))
     }
 
@@ -1200,7 +1200,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::{
-        ip::{AddrSubnet, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, SubnetEither},
+        ip::{AddrSubnet, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu, SubnetEither},
         Witness,
     };
     use nonzero_ext::nonzero;
@@ -1216,7 +1216,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{self, testutil::FakeInstant, EventContext},
-        device::{DeviceId, Mtu},
+        device::DeviceId,
         ip::{
             device::{
                 IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
@@ -1414,7 +1414,7 @@ mod tests {
         let loopback_device_id = crate::device::add_loopback_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+            Mtu::new(u16::MAX as u32),
         )
         .expect("create the loopback interface");
         crate::device::testutil::enable_device(
@@ -1580,7 +1580,7 @@ mod tests {
         let loopback_device_id = crate::device::add_loopback_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+            Mtu::new(u16::MAX as u32),
         )
         .expect("create the loopback interface");
         crate::device::testutil::enable_device(
@@ -1768,7 +1768,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &sock,
-            (&[0; crate::ip::Ipv6::MINIMUM_LINK_MTU as usize][..]).into_serializer(),
+            (&[0; crate::ip::Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
             None,
         );
         assert_matches::assert_matches!(res, Err((_, IpSockSendError::Mtu)));

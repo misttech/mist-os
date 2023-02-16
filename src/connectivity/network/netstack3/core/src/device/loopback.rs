@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_loopback_methods() {
-        const MTU: Mtu = Mtu::new(nonzero_ext::nonzero!(66_u32));
+        const MTU: Mtu = Mtu::new(66);
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, MTU)

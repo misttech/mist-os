@@ -266,7 +266,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         now: Instant,
     ) -> Result<Option<u32>, Option<u32>> {
         // New MTU must not be smaller than the minimum MTU for an IP.
-        if new_mtu < I::MINIMUM_LINK_MTU.into() {
+        if new_mtu < I::MINIMUM_LINK_MTU.get() {
             return Err(self.get_pmtu(src_ip, dst_ip));
         }
 

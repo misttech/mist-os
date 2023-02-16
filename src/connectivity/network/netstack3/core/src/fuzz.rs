@@ -10,7 +10,7 @@ use arbitrary::{Arbitrary, Unstructured};
 use fuzz_util::Fuzzed;
 use net_declare::net_mac;
 use net_types::{
-    ip::{IpAddress, Ipv4Addr, Ipv6Addr},
+    ip::{IpAddress, Ipv4Addr, Ipv6Addr, Mtu},
     UnicastAddr,
 };
 use packet::{
@@ -28,7 +28,7 @@ use packet_formats::{
 
 use crate::{
     context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt},
-    device::{ethernet, Mtu},
+    device::ethernet,
     Ctx, DeviceId, TimerId,
 };
 
@@ -344,7 +344,7 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
         sync_ctx,
         non_sync_ctx,
         UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap(),
-        ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32))).unwrap(),
+        ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
     );
     crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id);
 

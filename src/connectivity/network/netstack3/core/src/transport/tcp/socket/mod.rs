@@ -2774,7 +2774,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr},
+        ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
         AddrAndZone, LinkLocalAddr, Witness,
     };
     use packet::ParseBuffer as _;
@@ -2788,7 +2788,6 @@ mod tests {
             FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
             WrappedFakeSyncCtx,
         },
-        device::Mtu,
         ip::{
             device::state::{
                 AddrConfig, AddressState, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry,
@@ -3006,7 +3005,7 @@ mod tests {
             _ctx: &mut TcpNonSyncCtx,
             _ip_sock: &IpSock<I, D, O>,
         ) -> Result<Mms, MmsError> {
-            Ok(Mms::from_mtu::<I>(Mtu::new(nonzero_ext::nonzero!(1500_u32)), 0).unwrap())
+            Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
         }
     }
 

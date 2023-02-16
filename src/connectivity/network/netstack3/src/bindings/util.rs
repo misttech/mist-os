@@ -995,13 +995,10 @@ mod tests {
     use fuchsia_zircon_status as zx_status;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{Ipv4Addr, Ipv6Addr},
+        ip::{Ipv4Addr, Ipv6Addr, Mtu},
         UnicastAddr,
     };
-    use netstack3_core::{
-        device::{ethernet, Mtu},
-        Ctx,
-    };
+    use netstack3_core::{device::ethernet, Ctx};
     use test_case::test_case;
 
     use crate::bindings::NetstackContext;
@@ -1028,8 +1025,7 @@ mod tests {
                     &mut state.sync_ctx,
                     &mut state.non_sync_ctx,
                     UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap(),
-                    ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(1500_u32)))
-                        .unwrap(),
+                    ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
                 )
             });
 

@@ -4,17 +4,14 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
-use core::{
-    convert::TryInto as _,
-    fmt::Debug,
-    num::{NonZeroU32, NonZeroU8},
-};
+use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
 
 use derivative::Derivative;
 use log::{debug, error, trace};
 use net_types::{
     ip::{
-        Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, SubnetError,
+        Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
+        SubnetError,
     },
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -47,7 +44,7 @@ use crate::{
     data_structures::{
         id_map::IdMap, id_map_collection::IdMapCollectionKey, token_bucket::TokenBucket,
     },
-    device::{FrameDestination, Mtu},
+    device::FrameDestination,
     ip::{
         device::{
             nud::NudIpHandler,
@@ -1562,9 +1559,7 @@ fn receive_ndp_packet<
                         // TODO(https://fxbug.dev/101357): Control whether or
                         // not we should update the link's MTU in response to
                         // RAs.
-                        if let Some(mtu) = NonZeroU32::new(mtu) {
-                            Ipv6DeviceHandler::set_link_mtu(sync_ctx, &device_id, Mtu::new(mtu));
-                        }
+                        Ipv6DeviceHandler::set_link_mtu(sync_ctx, &device_id, Mtu::new(mtu));
                     }
                 }
             }
@@ -2534,7 +2529,7 @@ fn send_icmpv6_error_message<
                 TruncatingSerializer::new(original_packet, TruncateDirection::DiscardBack)
                     .encapsulate(icmp_builder)
             },
-            Some(Ipv6::MINIMUM_LINK_MTU.into()),
+            Some(Ipv6::MINIMUM_LINK_MTU.get()),
         ),
         SEND_ICMPV6_ERROR_MESSAGE_COUNTER_NAME
     );
@@ -3745,7 +3740,7 @@ mod tests {
                 crate::device::add_loopback_device(
                     &mut &*sync_ctx,
                     non_sync_ctx,
-                    Mtu::new(nonzero_ext::nonzero!(u16::MAX as u32)),
+                    Mtu::new(u16::MAX as u32),
                 )
                 .expect("create the loopback interface")
             });

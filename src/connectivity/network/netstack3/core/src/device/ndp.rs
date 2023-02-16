@@ -90,7 +90,6 @@ mod tests {
         testutil::{
             assert_empty, get_counter_val, handle_timer, set_logger_for_test,
             FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            IPV6_MIN_MTU,
         },
         Ctx, Instant, TimerId, TimerIdInner,
     };
@@ -1119,7 +1118,7 @@ mod tests {
 
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let hw_mtu = Mtu::new(nonzero_ext::nonzero!(5000_u32));
+        let hw_mtu = Mtu::new(5000);
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1182,7 +1181,7 @@ mod tests {
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device),
-            IPV6_MIN_MTU,
+            Ipv6::MINIMUM_LINK_MTU,
         );
     }
 

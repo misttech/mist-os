@@ -32,7 +32,7 @@ use log::{debug, trace};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Subnet,
+        Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -50,7 +50,7 @@ use crate::{
         CounterContext, EventContext, InstantContext, NonTestCtxMarker, RngContext, TimerHandler,
     },
     data_structures::token_bucket::TokenBucket,
-    device::{DeviceId, FrameDestination, Mtu},
+    device::{DeviceId, FrameDestination},
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
@@ -1868,7 +1868,7 @@ pub(crate) fn receive_ipv6_packet<
                             Icmpv6ErrorKind::PacketTooBig {
                                 proto,
                                 header_len: meta.header_len(),
-                                mtu: mtu.get().get(),
+                                mtu: mtu.get(),
                             },
                         );
                     }
@@ -2782,7 +2782,7 @@ mod tests {
         testutil::{
             assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
             FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, IPV6_MIN_MTU,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, DeviceId, StackState,
     };
@@ -4539,7 +4539,8 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, mut device_ids) = builder.build();
         let mut sync_ctx = &sync_ctx;
         let loopback_id =
-            crate::device::add_loopback_device(sync_ctx, &mut non_sync_ctx, IPV6_MIN_MTU).unwrap();
+            crate::device::add_loopback_device(sync_ctx, &mut non_sync_ctx, Ipv6::MINIMUM_LINK_MTU)
+                .unwrap();
         crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
         crate::add_ip_addr_subnet(
             sync_ctx,

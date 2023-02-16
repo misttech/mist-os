@@ -513,7 +513,7 @@ mod tests {
             testutil::{handle_timer_helper_with_sc_ref_mut, FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
-        device::{ethernet, Mtu},
+        device::ethernet,
         ip::{
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
@@ -1241,10 +1241,7 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device_id = sync_ctx.state.device.add_ethernet_device(
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Mtu::new(nonzero_ext::nonzero!(
-                Ipv4::MINIMUM_LINK_MTU as u32
-            )))
-            .unwrap(),
+            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
         );
         crate::ip::device::add_ipv4_addr_subnet(
             &mut sync_ctx,

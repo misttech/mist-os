@@ -53,14 +53,14 @@ use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceU
 use timers::TimerDispatcher;
 
 use net_types::{
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
 use netstack3_core::{
     add_ip_addr_subnet,
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
-    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher, Mtu},
+    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
     error::NetstackError,
     handle_timer,
     ip::{
@@ -86,7 +86,7 @@ const LOOPBACK_NAME: &'static str = "lo";
 /// 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
 ///     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 /// ```
-const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(nonzero_ext::nonzero!(65536_u32));
+const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
 
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;

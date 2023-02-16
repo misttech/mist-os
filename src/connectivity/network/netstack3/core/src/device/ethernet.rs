@@ -321,15 +321,13 @@ impl MaxFrameSize {
     /// Converts the maximum frame size to its corresponding MTU.
     pub const fn as_mtu(&self) -> Mtu {
         // MTU must be positive because of the limit on minimum ethernet frame size
-        Mtu(const_unwrap::const_unwrap_option(NonZeroU32::new(
-            self.get().get().saturating_sub(ETHERNET_HDR_LEN_NO_TAG_U32),
-        )))
+        Mtu::new(self.get().get().saturating_sub(ETHERNET_HDR_LEN_NO_TAG_U32))
     }
 
     /// Creates the maximum ethernet frame size from MTU.
     pub const fn from_mtu(mtu: Mtu) -> Option<MaxFrameSize> {
         let frame_size = mtu.get().saturating_add(ETHERNET_HDR_LEN_NO_TAG_U32);
-        Self::new(frame_size.get())
+        Self::new(frame_size)
     }
 }
 
@@ -599,7 +597,7 @@ where
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
 
-    let body = body.with_mtu(get_mtu(sync_ctx, device_id).get().get() as usize);
+    let body = body.with_mtu(get_mtu(sync_ctx, device_id).get() as usize);
 
     if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
         send_ip_frame_to_dst(
@@ -1214,8 +1212,8 @@ mod tests {
             assert_eq!(sync_ctx.frames().len(), expect_frames_sent);
         }
 
-        test(Ipv6::MINIMUM_LINK_MTU.into(), 1);
-        test(usize::from(Ipv6::MINIMUM_LINK_MTU) + 1, 0);
+        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap(), 1);
+        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap() + 1, 0);
     }
 
     #[ip_test]
