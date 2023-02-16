@@ -102,7 +102,7 @@ MSDs should be fuzzed through the magma FIDL interface. Each MSD should have
 its own fuzzer, as every driver is unique in how it processes command buffer
 or immediate command data and as such needs different input pre-processing to
 ensure adequate coverage. [libfuzzer][libfuzzer] fuzzers should link against
-the MSD using [fake-ddk][fake-ddk] to ensure coverage information can be
+the MSD using [mock-ddk][mock-ddk] to ensure coverage information can be
 received from the driver. Since the real GPU hardware can't be used in a
 fuzzer environment, the fuzzer must have a fake device implementation.
 
@@ -134,7 +134,7 @@ happens in connection with the Vulkan CTS. There are external efforts such as
 * [Contributing](contributing.md)
 
 [graphicsfuzz]: https://github.com/google/graphicsfuzz
-[fake-ddk]: /src/devices/testing/fake_ddk
+[mock-ddk]: /src/devices/testing/mock-ddk
 [libfuzzer]: /docs/development/testing/fuzzing/write-a-fuzzer.md
 [seedcorpus]: /docs/development/testing/fuzzing/improve-a-fuzzer.md#measure_code_coverage
 [vulkanerrors]: https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#fundamentals-errors
