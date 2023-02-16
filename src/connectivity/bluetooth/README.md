@@ -145,15 +145,16 @@ and bt-snoop all expose information though Inspect.
 
 #### Usage
 
-*   bt-host: `fx iquery show-file /dev/diagnostics/class/bt-host/000.inspect`
+*   bt-host: `ffx inspect show bootstrap/driver_manager --file class/bt-host/000.inspect`
     exposes information about the controller, peers, and services.
-*   bt-gap: `fx iquery show bt-gap` exposes information on host devices managed
-    by bt-gap, pairing capabilities, stored bonds, and actively connected peers.
-*   bt-a2dp: `fx iquery show bt-a2dp` exposes information on audio streaming
+*   bt-gap: `ffx inspect show core/bluetooth-core/bt-gap` exposes information on host devices
+    managed by bt-gap, pairing capabilities, stored bonds, and actively connected peers.
+*   bt-a2dp: `ffx inspect show core/bt-a2dp` exposes information on audio streaming
     capabilities and active streams
-*   bt-snoop: `fx iquery show bt-snoop` exposes information about which hci
+*   bt-snoop: `ffx inspect show core/bt-snoop` exposes information about which hci
     devices are being logged and how much data is stored.
-*   All Bluetooth components: `fx iquery show bt-*`
+*   All core Bluetooth components `ffx inspect show core/bluetooth-core/*`
+*   All other Bluetooth components: `ffx inspect show core/bt-*`
 
 See the [iquery documentation](/docs/development/diagnostics/inspect/iquery) for
 complete instructions on using `iquery`.

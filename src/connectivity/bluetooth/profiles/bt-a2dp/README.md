@@ -53,7 +53,7 @@ in the `core_shard`.
 
 The `bt-a2dp.cm` component implements
 [component inspection](https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect).
-To view the current state of the profile, use `fx iquery show core/bt-a2dp`.
+To view the current state of the profile, use `ffx inspect show core/bt-a2dp`.
 
 ### Hierarchy
 

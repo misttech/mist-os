@@ -52,7 +52,7 @@ Include the `bt-fastpair-provider` package in the build of your Fuchsia product.
 
 The `bt-fastpair-provider` component includes support for
 [component inspection](https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect). To view
-component metrics and inspect data, use `fx iquery show core/bluetooth-core/bt-fastpair-provider`.
+component metrics and inspect data, use `ffx inspect show core/bluetooth-core/bt-fastpair-provider`.
 
 ### Hierarchy
 

@@ -48,7 +48,7 @@ fx test bt-hfp-audio-gateway-tests
 
 The `bt-hfp-audio-gateway` component includes support for
 [component inspection](https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect). To view
-the current state of the component, use `fx iquery show core/bt-hfp-audio-gateway`.
+the current state of the component, use `ffx inspect show core/bt-hfp-audio-gateway`.
 
 ### Hierarchy
 

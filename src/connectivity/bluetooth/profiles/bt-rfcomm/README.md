@@ -47,7 +47,7 @@ Follow the instructions in the [manual testing README](manual_testing.md).
 
 The `bt-rfcomm` component includes support for
 [component inspection](https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect). To view
-the current state of the RFCOMM server, use `fx iquery show core/bluetooth-core/bt-rfcomm`.
+the current state of the RFCOMM server, use `ffx inspect show core/bluetooth-core/bt-rfcomm`.
 
 ### Hierarchy
 
