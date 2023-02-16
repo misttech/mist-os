@@ -1430,7 +1430,6 @@ dependencies = [
  "ttf-parser",
  "tuf",
  "type_hash",
- "type_hash_macros",
  "typed-builder",
  "unic-char-range",
  "unic-ucd-block",

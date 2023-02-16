@@ -980,10 +980,6 @@ group("type_hash") {
   public_deps = [ ":type_hash-v0_3_0" ]
 }
 
-group("type_hash_macros") {
-  public_deps = [ ":type_hash_macros-v0_3_0($host_toolchain)" ]
-}
-
 group("typed-builder") {
   public_deps = [ ":typed-builder-v0_10_0($host_toolchain)" ]
 }
