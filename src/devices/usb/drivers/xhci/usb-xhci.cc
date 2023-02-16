@@ -183,8 +183,6 @@ struct UsbXhci::UsbRequestState {
   TRB* last_trb;
 };
 
-UsbXhci::~UsbXhci() { device_state_.release(); }
-
 uint16_t UsbXhci::InterrupterMapping() {
   // No inactive interrupters. Find one with least pressure.
   uint16_t idx = 0;
@@ -687,6 +685,14 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
       // TODO (fxbug.dev/44375): Migrate to joins
       RunUntilIdle();
     } while (pending);
+
+    for (auto& it : device_state_) {
+      if (it) {
+        // Reset HCI reference in device state so that HCI commands won't be issued.
+        it->ResetHci();
+      }
+    }
+    device_state_.reset();
     interrupters_.reset();
     transaction.Reply();
     return ZX_OK;

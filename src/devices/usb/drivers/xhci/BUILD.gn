@@ -146,15 +146,6 @@ test("xhci-core-unittest-bin") {
     "xhci-device-state.cc",
   ]
   deps = [ ":test-libs" ]
-
-  # TODO(fxbug.dev/54318): Fix the leaks and remove this.
-  deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
-
-  # TODO: delete the below and fix compiler errors.
-  configs += [ "//build/config:Wno-unused-but-set-variable" ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 test("xhci-event-ring-unittest-bin") {

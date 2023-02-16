@@ -188,8 +188,6 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
 
 DeviceState::~DeviceState() = default;
 
-UsbXhci::~UsbXhci() = default;
-
 TEST_F(TransferRingHarness, EmptyShortTransferTest) {
   auto ring = this->ring();
   ASSERT_EQ(ring->HandleShortPacket(nullptr, 0, nullptr), ZX_ERR_IO);

@@ -393,7 +393,12 @@ class XhciHarness : public zxtest::Test {
 
   FakeTRB* crcr() { return fake_device_.crcr(); }
 
-  virtual ~XhciHarness() {}
+  ~XhciHarness() {
+    // The order of destroying the objects matter. First release the xhci device by destroying the
+    // mock ddk root. Then release resources xhci was dependent on.
+    root_ = nullptr;
+    trbs_.clear();
+  }
 
  protected:
   UsbXhci* xhci_ = nullptr;
@@ -717,7 +722,8 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   request->request()->setup.bm_request_type = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
   request->request()->setup.b_request = USB_REQ_GET_DESCRIPTOR;
   request->request()->setup.w_value = USB_DT_DEVICE << 8;
-  request->request()->setup.w_length = zx_system_get_page_size() * 2;
+  ASSERT_LE(zx_system_get_page_size() * 2, UINT16_MAX);
+  request->request()->setup.w_length = static_cast<uint16_t>(zx_system_get_page_size() * 2);
   RequestQueue(std::move(*request));
   ASSERT_TRUE(rang);
   // Find slot context pointer in address device command
@@ -838,13 +844,11 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
 
 TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
   ConnectDevice(1, USB_SPEED_HIGH);
-  uint64_t paddr;
   {
     auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock _(&state->transaction_lock());
     state->GetTransferRing(0).set_stall(true);
-    paddr = state->GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
   }
   zx_status_t cancel_status;
   auto cr = FakeTRB::get(crcr()->next);
