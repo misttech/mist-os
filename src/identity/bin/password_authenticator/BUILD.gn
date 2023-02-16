@@ -109,21 +109,6 @@ fuchsia_unittest_package("password-authenticator-tests") {
   }
 }
 
-fidl("test.identity") {
-  sources = [ "block.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.device",
-    "//sdk/fidl/fuchsia.hardware.block",
-    "//sdk/fidl/fuchsia.hardware.block.partition",
-    "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.logger",
-  ]
-
-  # TODO(https://fxbug.dev/88443): Remove this dependency since this target does
-  # not directly depend on these libraries.
-  public_deps += [ "//sdk/fidl/fuchsia.unknown" ]
-}
-
 group("tests") {
   testonly = true
   public_deps = [ ":password-authenticator-tests" ]

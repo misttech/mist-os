@@ -40,8 +40,8 @@ rustc_library("storage_manager") {
   ]
 
   test_deps = [
-    ":test.identity_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:assert_matches",
@@ -59,19 +59,4 @@ rustc_library("storage_manager") {
     "src/state.rs",
     "src/volume.rs",
   ]
-}
-
-fidl("test.identity") {
-  sources = [ "block.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.device",
-    "//sdk/fidl/fuchsia.hardware.block",
-    "//sdk/fidl/fuchsia.hardware.block.partition",
-    "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.logger",
-  ]
-
-  # TODO(https://fxbug.dev/88443): Remove this dependency since this target does
-  # not directly depend on these libraries.
-  public_deps += [ "//sdk/fidl/fuchsia.unknown" ]
 }

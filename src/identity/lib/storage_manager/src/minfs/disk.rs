@@ -492,8 +492,8 @@ pub mod test {
         fidl_fuchsia_hardware_block::{BlockInfo, Flag, MAX_TRANSFER_UNBOUNDED},
         fidl_fuchsia_hardware_block_encrypted::{DeviceManagerRequest, DeviceManagerRequestStream},
         fidl_fuchsia_hardware_block_partition::Guid,
-        fidl_test_identity::{
-            MockPartitionMarker, MockPartitionRequest, MockPartitionRequestStream,
+        fidl_fuchsia_hardware_block_volume::{
+            VolumeAndNodeMarker, VolumeAndNodeRequest, VolumeAndNodeRequestStream,
         },
         futures::{future::BoxFuture, lock::Mutex},
         std::cell::Cell,
@@ -549,20 +549,20 @@ pub mod test {
             self: Arc<Self>,
             scope: ExecutionScope,
             id: u64,
-            mut stream: MockPartitionRequestStream,
+            mut stream: VolumeAndNodeRequestStream,
         ) -> BoxFuture<'static, ()> {
             Box::pin(async move {
                 while let Some(request) = stream.try_next().await.expect("failed to read request") {
                     match request {
                         // fuchsia.hardware.block.partition.Partition methods
-                        MockPartitionRequest::GetTypeGuid { responder } => {
+                        VolumeAndNodeRequest::GetTypeGuid { responder } => {
                             match &self.guid {
                                 Ok(guid) => responder.send(0, Some(&mut guid.clone())),
                                 Err(raw_status) => responder.send(*raw_status, None),
                             }
                             .expect("failed to send Partition.GetTypeGuid response");
                         }
-                        MockPartitionRequest::GetName { responder } => {
+                        VolumeAndNodeRequest::GetName { responder } => {
                             match &self.label {
                                 Ok(label) => responder.send(0, Some(label)),
                                 Err(raw_status) => responder.send(*raw_status, None),
@@ -571,7 +571,7 @@ pub mod test {
                         }
 
                         // fuchsia.hardware.block.Block methods
-                        MockPartitionRequest::GetInfo { responder } => {
+                        VolumeAndNodeRequest::GetInfo { responder } => {
                             responder
                                 .send(&mut Ok(BlockInfo {
                                     block_count: 1,
@@ -583,13 +583,13 @@ pub mod test {
                         }
 
                         // fuchsia.device.Controller methods
-                        MockPartitionRequest::GetTopologicalPath { responder } => {
+                        VolumeAndNodeRequest::GetTopologicalPath { responder } => {
                             responder
                                 .send(&mut Ok(format!("/dev/mocks/{id}")))
                                 .expect("failed to send Controller.GetTopologicalPath response");
                         }
 
-                        MockPartitionRequest::Bind { driver, responder } => {
+                        VolumeAndNodeRequest::Bind { driver, responder } => {
                             assert_eq!(driver, "zxcrypt.so");
                             let zxcrypt_dir = simple::simple();
                             let mut resp = self
@@ -616,10 +616,10 @@ pub mod test {
                         }
 
                         // fuchsia.io.Node methods
-                        MockPartitionRequest::Clone { flags, object, control_handle: _ } => {
+                        VolumeAndNodeRequest::Clone { flags, object, control_handle: _ } => {
                             assert_eq!(flags, fio::OpenFlags::CLONE_SAME_RIGHTS);
                             let stream =
-                                ServerEnd::<MockPartitionMarker>::new(object.into_channel())
+                                ServerEnd::<VolumeAndNodeMarker>::new(object.into_channel())
                                     .into_stream()
                                     .unwrap();
                             scope.spawn(Arc::clone(&self).handle_requests_for_stream(
@@ -628,8 +628,8 @@ pub mod test {
                                 stream,
                             ));
                         }
-                        MockPartitionRequest::ConnectToDeviceFidl { server, control_handle: _ } => {
-                            let stream = ServerEnd::<MockPartitionMarker>::new(server)
+                        VolumeAndNodeRequest::ConnectToDeviceFidl { server, control_handle: _ } => {
+                            let stream = ServerEnd::<VolumeAndNodeMarker>::new(server)
                                 .into_stream()
                                 .unwrap();
                             scope.spawn(Arc::clone(&self).handle_requests_for_stream(
@@ -641,7 +641,7 @@ pub mod test {
                         req => {
                             error!("{:?} is not implemented for this mock", req);
                             unimplemented!(
-                                "MockPartition request is not implemented for this mock"
+                                "VolumeAndNode request is not implemented for this mock"
                             );
                         }
                     }
