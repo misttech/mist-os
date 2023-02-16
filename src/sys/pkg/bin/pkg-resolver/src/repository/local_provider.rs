@@ -40,9 +40,7 @@ impl RepositoryProvider<Pouf1> for LocalMirrorRepositoryProvider {
         let meta_path = meta_path.clone();
         let path = meta_path.components::<Pouf1>(version).join("/");
         async move {
-            let (local, remote) = fidl::endpoints::create_endpoints::<fio::FileMarker>()
-                .context("creating file proxy")
-                .map_err(make_opaque_error)?;
+            let (local, remote) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
             self.proxy
                 .get_metadata(&mut RepositoryUrl::from(self.url.clone()).into(), &path, remote)
                 .await

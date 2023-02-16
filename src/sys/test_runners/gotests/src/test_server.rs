@@ -417,8 +417,7 @@ where
         id: HandleInfo::new(HandleType::FileDescriptor, STDIN).as_raw(),
     });
 
-    let (client_end, loader) =
-        fidl::endpoints::create_endpoints().map_err(launch::LaunchError::Fidl)?;
+    let (client_end, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
 
     let executable_vmo = Some(component.executable_vmo()?);

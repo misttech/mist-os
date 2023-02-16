@@ -367,7 +367,7 @@ mod tests {
         };
         streamer.set_status_callback(Box::new(callback)).await;
 
-        let (client_end, server_end) = fidl::endpoints::create_endpoints::<PayloadStreamMarker>()?;
+        let (client_end, server_end) = fidl::endpoints::create_endpoints::<PayloadStreamMarker>();
         let stream = server_end.into_stream()?;
 
         // Do not await as we return this Future so that the caller can run the client and server

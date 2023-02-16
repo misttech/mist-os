@@ -142,8 +142,7 @@ impl DmaBufFile {
         &self,
     ) -> Result<fsysmem::BufferCollectionTokenSynchronousProxy, Errno> {
         let (collection_token, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>()
-                .map_err(|_| errno!(EINVAL))?;
+            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
         let buffer_collection_token_proxy =
             fsysmem::BufferCollectionTokenSynchronousProxy::new(collection_token.into_channel());
 
@@ -161,8 +160,7 @@ impl DmaBufFile {
         buffer_collection_proxy: &BufferCollectionTokenSynchronousProxy,
     ) -> Result<fuicomp::BufferCollectionImportToken, Errno> {
         let (scenic_token, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>()
-                .map_err(|_| errno!(EINVAL))?;
+            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
 
         buffer_collection_proxy.duplicate(u32::MAX, remote).map_err(|_| errno!(EINVAL))?;
         buffer_collection_proxy.sync(zx::Time::INFINITE).map_err(|_| errno!(EINVAL))?;
@@ -198,8 +196,7 @@ impl DmaBufFile {
         buffer_allocation_args: &DmaBufAllocationArgs,
     ) -> Result<fsysmem::BufferCollectionInfo2, Errno> {
         let (buffer_token, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionMarker>()
-                .map_err(|_| errno!(EINVAL))?;
+            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionMarker>();
         self.sysmem_proxy
             .bind_shared_collection(buffer_collection_proxy.into_channel().into(), remote)
             .map_err(|_| errno!(EINVAL))?;

@@ -157,12 +157,7 @@ impl DiscoveryProxy {
         // Trim the `local.` part, trim the trailing dot.
         let name = name_local_domain.trim_end_matches(LOCAL_DOMAIN).trim_end_matches('.');
 
-        let (client, server) = match create_endpoints::<HostNameSubscriptionListenerMarker>() {
-            Ok(x) => x,
-            Err(err) => {
-                bail!("create_endpoints::<HostNameSubscriberMarker>: {:?}", err);
-            }
-        };
+        let (client, server) = create_endpoints::<HostNameSubscriptionListenerMarker>();
 
         debug!(
             "DNS-SD subscription to {:?} as host name, will proxy to {:?}",
@@ -278,12 +273,7 @@ impl DiscoveryProxy {
             name_srp_domain, service_name
         );
 
-        let (client, server) = match create_endpoints::<ServiceSubscriptionListenerMarker>() {
-            Ok(x) => x,
-            Err(err) => {
-                bail!("create_endpoints::<ServiceSubscriberMarker>: {:?}", err);
-            }
-        };
+        let (client, server) = create_endpoints::<ServiceSubscriptionListenerMarker>();
 
         if service_name.len() > MAX_DNSSD_SERVICE_LEN {
             bail!(

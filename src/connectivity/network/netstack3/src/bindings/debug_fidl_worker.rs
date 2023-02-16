@@ -238,16 +238,14 @@ mod tests {
         // Attach channels.
         let channels = {
             let handler = &handler;
-            futures::stream::repeat_with(|| {
-                fidl::endpoints::create_endpoints().expect("create_endpoints")
-            })
-            .then(|(client, server)| async move {
-                handler.serve_diagnostics(server).await;
-                client.into_channel()
-            })
-            .take(streams)
-            .collect::<Vec<_>>()
-            .await
+            futures::stream::repeat_with(|| fidl::endpoints::create_endpoints())
+                .then(|(client, server)| async move {
+                    handler.serve_diagnostics(server).await;
+                    client.into_channel()
+                })
+                .take(streams)
+                .collect::<Vec<_>>()
+                .await
         };
 
         // Dropping the handler should stop the alternative executor and join

@@ -226,7 +226,7 @@ async fn unlock_device_with_creds<W: Write>(
     writeln!(writer, "Preparing to upload unlock token")?;
 
     let file_path = path.to_str().ok_or(anyhow!("Could not get path for temporary token file"))?;
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
     try_join!(
         fastboot_proxy.stage(&file_path.to_string(), prog_client).map_err(map_fidl_error),
         handle_upload_progress_for_staging(writer, prog_server),

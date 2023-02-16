@@ -252,9 +252,9 @@ impl StatusCommand {
             }
 
             for name in device_names {
-                let (client, server) = create_endpoints::<DeviceMarker>()?;
-                let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>()?;
-                let (client_test, server_test) = create_endpoints::<DeviceTestMarker>()?;
+                let (client, server) = create_endpoints::<DeviceMarker>();
+                let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>();
+                let (client_test, server_test) = create_endpoints::<DeviceTestMarker>();
 
                 let name = &name;
 

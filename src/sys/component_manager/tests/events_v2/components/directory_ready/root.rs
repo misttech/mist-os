@@ -53,7 +53,7 @@ async fn main() {
         let expected_entries = all_expected_entries.remove(&payload.name).unwrap();
 
         // Open the directory and verify its contents
-        let (node_clone, server_end) = create_endpoints().unwrap();
+        let (node_clone, server_end) = create_endpoints();
         payload.node.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end).unwrap();
         let directory = ClientEnd::<fio::DirectoryMarker>::new(node_clone.into_channel());
         let directory = directory.into_proxy().unwrap();

@@ -122,8 +122,7 @@ async fn single_storage_user() {
 
     done_signal.await;
 
-    let (node_client_end, node_server) =
-        create_endpoints::<fio::NodeMarker>().expect("create node client end");
+    let (node_client_end, node_server) = create_endpoints::<fio::NodeMarker>();
     let directory = ClientEnd::<fio::DirectoryMarker>::new(node_client_end.into_channel());
     let dir_proxy = directory.into_proxy().unwrap();
     let storage_user_moniker_with_instances = storage_users.into_iter().next().unwrap();

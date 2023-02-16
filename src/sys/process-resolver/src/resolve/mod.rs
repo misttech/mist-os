@@ -67,8 +67,7 @@ pub async fn get_binary_and_loader_from_pkg_dir(
     .await
     {
         Ok(lib_dir) => {
-            let (ldsvc, server_end) =
-                fidl::endpoints::create_endpoints::<fldsvc::LoaderMarker>().unwrap();
+            let (ldsvc, server_end) = fidl::endpoints::create_endpoints::<fldsvc::LoaderMarker>();
             let server_end = server_end.into_channel();
             library_loader::start(Arc::new(lib_dir), server_end);
             Some(ldsvc)

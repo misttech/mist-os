@@ -291,7 +291,7 @@ mod test {
 
     async fn create_noop_proxy() -> Result<(ffx_test::NoopProxy, ProtocolRegister)> {
         let register = create_noop_register();
-        let (noop_proxy, server) = fidl::endpoints::create_endpoints::<ffx_test::NoopMarker>()?;
+        let (noop_proxy, server) = fidl::endpoints::create_endpoints::<ffx_test::NoopMarker>();
         register
             .open(
                 ffx_test::NoopMarker::PROTOCOL_NAME.to_owned(),
@@ -314,7 +314,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_err_on_open_after_shutdown() -> Result<()> {
         let register = create_noop_register();
-        let (noop_proxy, server) = fidl::endpoints::create_endpoints::<ffx_test::NoopMarker>()?;
+        let (noop_proxy, server) = fidl::endpoints::create_endpoints::<ffx_test::NoopMarker>();
         register.shutdown(Context::new(TestDaemon::default())).await?;
         let res = register
             .open(

@@ -193,7 +193,7 @@ fn serve_instance_info_iterator(
     mut instance_infos: Vec<fsys::InstanceInfo>,
 ) -> ClientEnd<fsys::InstanceInfoIteratorMarker> {
     let (client_end, server_end) =
-        fidl::endpoints::create_endpoints::<fsys::InstanceInfoIteratorMarker>().unwrap();
+        fidl::endpoints::create_endpoints::<fsys::InstanceInfoIteratorMarker>();
     fasync::Task::spawn(async move {
         let mut stream: fsys::InstanceInfoIteratorRequestStream = server_end.into_stream().unwrap();
         while let Some(Ok(fsys::InstanceInfoIteratorRequest::Next { responder })) =

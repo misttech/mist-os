@@ -230,8 +230,7 @@ mod tests {
         let (helper, future) = setup();
         pin_mut!(future);
         assert_eq!(0, helper.service.inner.lock().watchers.len());
-        let (client_end, server_end) =
-            fidl::endpoints::create_endpoints().expect("Failed to create endpoints");
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
 
         // Add a watcher and check that it was added to the map
         helper.service.add_watcher(server_end).expect("add_watcher failed");

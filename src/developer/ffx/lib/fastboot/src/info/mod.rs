@@ -28,7 +28,7 @@ async fn handle_variables_for_fastboot<W: Write>(
 #[tracing::instrument(skip(writer))]
 pub async fn info<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
     prepare(writer, &fastboot_proxy).await?;
-    let (var_client, var_server) = create_endpoints::<VariableListenerMarker>()?;
+    let (var_client, var_server) = create_endpoints::<VariableListenerMarker>();
     let _ = try_join!(
         fastboot_proxy.get_all_vars(var_client).map_err(|e| {
             tracing::error!("FIDL Communication error: {}", e);

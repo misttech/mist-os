@@ -136,8 +136,7 @@ impl<'a> Guest<'a> {
         let device =
             device.into_proxy().expect("fuchsia.hardware.network/Device into_proxy failed");
         let (port, server_end) =
-            fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>()
-                .expect("failed to create fuchsia.hardware.network/Port endpoints");
+            fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
         let () = device.get_port(&mut port_id, server_end).expect("get_port");
 
         let (interface_proxy, server_end) =

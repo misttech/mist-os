@@ -297,7 +297,7 @@ mod tests {
             }))
         );
 
-        let (client_end, _server_end) = fidl::endpoints::create_endpoints().unwrap();
+        let (client_end, _server_end) = fidl::endpoints::create_endpoints();
         let event = SuiteEvents::suite_syslog(ftest_manager::Syslog::Archive(client_end))
             .into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));
@@ -308,7 +308,7 @@ mod tests {
             }))
         );
 
-        let (client_end, _server_end) = fidl::endpoints::create_endpoints().unwrap();
+        let (client_end, _server_end) = fidl::endpoints::create_endpoints();
         let event = SuiteEvents::suite_syslog(ftest_manager::Syslog::Batch(client_end))
             .into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));

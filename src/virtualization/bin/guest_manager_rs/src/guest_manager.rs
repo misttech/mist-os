@@ -754,10 +754,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn config_fails_due_to_duplicate_vsock_listeners() {
-        let (listener_client, listener_server) =
-            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
-        let (listener_client2, listener_server2) =
-            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let (listener_client, listener_server) = create_endpoints::<HostVsockAcceptorMarker>();
+        let (listener_client2, listener_server2) = create_endpoints::<HostVsockAcceptorMarker>();
         let userconfig = GuestConfig {
             vsock_listeners: Some(vec![
                 Listener { port: 2011, acceptor: listener_client },
@@ -774,10 +772,8 @@ mod tests {
     #[fuchsia::test]
     async fn user_provided_initial_listeners() {
         let manager = ManagerFixture::new_with_defaults();
-        let (listener_client, listener_server) =
-            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
-        let (listener_client2, listener_server2) =
-            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let (listener_client, listener_server) = create_endpoints::<HostVsockAcceptorMarker>();
+        let (listener_client2, listener_server2) = create_endpoints::<HostVsockAcceptorMarker>();
         let user_config = GuestConfig {
             virtio_vsock: Some(true),
             vsock_listeners: Some(vec![
@@ -813,7 +809,7 @@ mod tests {
 
         // Launch Guest
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         stream_tx.unbounded_send(manager_server).expect("stream should never close");
 
         select! {
@@ -849,7 +845,7 @@ mod tests {
         futures::pin_mut!(run_fut);
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let manager_proxy = manager.new_proxy();
 
         select! {
@@ -870,7 +866,7 @@ mod tests {
         futures::pin_mut!(run_fut);
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         let manager_proxy = manager.new_proxy();
 
@@ -892,9 +888,9 @@ mod tests {
         let manager_proxy = manager.new_proxy();
 
         let (guest_client_end1, guest_server_end1) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let (guest_client_end2, guest_server_end2) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         // Lanuch Guest
         select! {
@@ -930,9 +926,9 @@ mod tests {
         futures::pin_mut!(run_fut);
         let manager_proxy = manager.new_proxy();
         let (guest_client_end1, guest_server_end1) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let (guest_client_end2, guest_server_end2) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         // Launch Guest and fail to start the VMM
         let launch_fut = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1), async {
@@ -985,7 +981,7 @@ mod tests {
         let manager = ManagerFixture::new_with_defaults();
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         let run_fut = manager.run().fuse();
         futures::pin_mut!(run_fut);
@@ -1037,7 +1033,7 @@ mod tests {
             GuestConfig { virtio_gpu: Some(true), cpus: Some(8), ..GuestConfig::EMPTY };
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let manager_proxy = manager.new_proxy();
 
         let run_fut = manager.run().fuse();
@@ -1111,7 +1107,7 @@ mod tests {
         let manager = ManagerFixture::new_with_defaults();
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         let manager_proxy = manager.new_proxy();
         let run_fut = manager.run().fuse();
@@ -1164,7 +1160,7 @@ mod tests {
         let manager = ManagerFixture::new_with_defaults();
 
         let (guest_client_end, guest_server_end) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         let manager_proxy = manager.new_proxy();
         let run_fut = manager.run().fuse();
@@ -1213,11 +1209,11 @@ mod tests {
         let manager = ManagerFixture::new_with_defaults();
 
         let (guest_client_end_connect_fail, guest_server_end_connect_fail) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let (guest_client_end_launch, guest_server_end_launch) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
         let (guest_client_end_connect_success, guest_server_end_connect_success) =
-            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<GuestMarker>();
 
         let manager_proxy = manager.new_proxy();
         let run_fut = manager.run().fuse();

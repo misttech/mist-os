@@ -78,7 +78,7 @@ async fn test_pkg_dir() -> Result<()> {
 
     let instance = realm.build().await?;
 
-    let (pkg, pkg_server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
+    let (pkg, pkg_server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
     let pkg_flags = fuchsia_fs::OpenFlags::RIGHT_READABLE
         | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE
         | fio::OpenFlags::DIRECTORY;

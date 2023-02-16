@@ -887,7 +887,7 @@ mod tests {
                 .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
-                    let (_, account_server_end) = create_endpoints().unwrap();
+                    let (_, account_server_end) = create_endpoints();
                     assert_eq!(
                         proxy.get_account(account_server_end).await?,
                         Err(ApiError::FailedPrecondition)
@@ -907,7 +907,7 @@ mod tests {
                 .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
-                    let (_, account_server_end) = create_endpoints().unwrap();
+                    let (_, account_server_end) = create_endpoints();
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
                     proxy.preload(&pre_auth_state).await??;
                     assert_eq!(
@@ -969,7 +969,7 @@ mod tests {
                             }
                         });
 
-                        let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                        let (account_client_end, account_server_end) = create_endpoints();
                         account_handler_proxy.get_account(account_server_end).await??;
 
                         assert_data_tree!(inspector, root: {
@@ -1145,7 +1145,7 @@ mod tests {
                         });
 
                         // Keep an open channel to an account.
-                        let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                        let (account_client_end, account_server_end) = create_endpoints();
                         proxy.get_account(account_server_end).await??;
                         let account_proxy = account_client_end.into_proxy().unwrap();
 
@@ -1189,7 +1189,7 @@ mod tests {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
 
                     // Keep an open channel to an account.
-                    let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                    let (account_client_end, account_server_end) = create_endpoints();
                     proxy.get_account(account_server_end).await??;
                     let account_proxy = account_client_end.into_proxy().unwrap();
 
@@ -1243,7 +1243,7 @@ mod tests {
                             .await??;
 
                         // Keep an open channel to an account.
-                        let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                        let (account_client_end, account_server_end) = create_endpoints();
                         proxy.get_account(account_server_end).await??;
                         let account_proxy = account_client_end.into_proxy().unwrap();
 
@@ -1404,7 +1404,7 @@ mod tests {
                         .await??;
 
                     // Get a proxy to the Account interface
-                    let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                    let (account_client_end, account_server_end) = create_endpoints();
                     account_handler_proxy.get_account(account_server_end).await??;
                     let account_proxy = account_client_end.into_proxy().unwrap();
 
@@ -1450,7 +1450,7 @@ mod tests {
                         .await??;
 
                     // Get a proxy to the Account interface
-                    let (account_client_end, account_server_end) = create_endpoints().unwrap();
+                    let (account_client_end, account_server_end) = create_endpoints();
                     account_handler_proxy.get_account(account_server_end).await??;
                     let account_proxy = account_client_end.into_proxy().unwrap();
 

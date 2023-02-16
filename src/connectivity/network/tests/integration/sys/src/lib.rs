@@ -42,7 +42,7 @@ where
         }));
     }
 
-    let (mock_dir, server_end) = fidl::endpoints::create_endpoints().expect("create endpoints");
+    let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service_at(service_name, |rs: RS| rs);
     let _: &mut ServiceFs<_> = fs.serve_connection(server_end).expect("serve connection");

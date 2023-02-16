@@ -445,7 +445,7 @@ async fn fail_additional_start_requests_when_not_compatible_v1() {
             .unwrap_err(),
         UpdateAttemptError::InstallInProgress
     );
-    let (_, server_end) = fidl::endpoints::create_endpoints().unwrap();
+    let (_, server_end) = fidl::endpoints::create_endpoints();
     assert_matches!(
         start_update(
             &compatible_url.parse().unwrap(),
@@ -519,7 +519,7 @@ async fn fail_additional_start_requests_when_not_compatible() {
             .unwrap_err(),
         UpdateAttemptError::InstallInProgress
     );
-    let (_, server_end) = fidl::endpoints::create_endpoints().unwrap();
+    let (_, server_end) = fidl::endpoints::create_endpoints();
     assert_matches!(
         start_update(
             &compatible_url.parse().unwrap(),

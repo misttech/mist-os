@@ -15,8 +15,7 @@ use {
 const TCP_USER_TIMEOUT_OPTION_VALUE: i32 = -13;
 
 fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
-    let (client, server) = fidl::endpoints::create_endpoints::<fposix_socket::StreamSocketMarker>()
-        .expect("create stream socket endpoints");
+    let (client, server) = fidl::endpoints::create_endpoints::<fposix_socket::StreamSocketMarker>();
 
     // fdio::create_fd isn't async, so we need a dedicated thread for FIDL dispatch.
     let handle = std::thread::spawn(|| {

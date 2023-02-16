@@ -251,8 +251,7 @@ pub fn open_no_describe<P: fidl::endpoints::ProtocolMarker>(
     path: &str,
     flags: fio::OpenFlags,
 ) -> Result<P::Proxy, OpenError> {
-    let (client, server_end) =
-        fidl::endpoints::create_endpoints().map_err(OpenError::CreateProxy)?;
+    let (client, server_end) = fidl::endpoints::create_endpoints();
 
     let () = parent
         .open(flags, fio::ModeType::empty(), path, server_end)

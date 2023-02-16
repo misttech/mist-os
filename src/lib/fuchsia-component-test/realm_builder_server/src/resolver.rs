@@ -233,7 +233,7 @@ impl Registry {
             AbiRevision::PATH,
         )
         .await?;
-        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
+        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         package_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
         let package = Some(fresolution::Package {
@@ -304,8 +304,7 @@ impl Registry {
                 .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         cm_fidl_validator::validate(&component_decl)
             .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
-        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()
-            .map_err(|_| fresolution::ResolverError::Internal)?;
+        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         component
             .package_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))

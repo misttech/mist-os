@@ -803,7 +803,7 @@ mod tests {
         //        ^            ^            ^-- zx channel connection
         //        |            |-- connected through namespace bind/connect
         //        |-- zx channel connection
-        let (ns_client, _server) = fidl::endpoints::create_endpoints().unwrap();
+        let (ns_client, _server) = fidl::endpoints::create_endpoints();
         let (_client, ns_server) = zx::Channel::create();
         let path = "/test_path1";
 
@@ -815,8 +815,8 @@ mod tests {
     #[test]
     fn namespace_double_bind_error() {
         let namespace = Namespace::installed().unwrap();
-        let (ns_client1, _server1) = fidl::endpoints::create_endpoints().unwrap();
-        let (ns_client2, _server2) = fidl::endpoints::create_endpoints().unwrap();
+        let (ns_client1, _server1) = fidl::endpoints::create_endpoints();
+        let (ns_client2, _server2) = fidl::endpoints::create_endpoints();
         let path = "/test_path2";
 
         assert_eq!(namespace.bind(path, ns_client1), Ok(()));

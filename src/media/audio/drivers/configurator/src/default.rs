@@ -1025,8 +1025,7 @@ mod tests {
             bytes_per_sample: 2,
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Format::EMPTY };
-        let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>()
-            .expect("Error creating ring buffer endpoint");
+        let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(ring_buffer_format, server)?;
@@ -1084,8 +1083,7 @@ mod tests {
             bytes_per_sample: 2,
         };
         let ring_buffer_format = Format { pcm_format: Some(pcm_format), ..Format::EMPTY };
-        let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>()
-            .expect("Error creating ring buffer endpoint");
+        let (_client, server) = fidl::endpoints::create_endpoints::<RingBufferMarker>();
         let proxy = stream_config.client.take().expect("Must have a client").into_proxy()?;
         let _task = fasync::Task::spawn(stream_config.process_stream_requests());
         proxy.create_ring_buffer(ring_buffer_format, server)?;

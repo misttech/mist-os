@@ -392,8 +392,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn broken_port_instance() {
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>()
-                .expect("create endpoints");
+            fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
         drop(server_end);
 
         let result = configure_interface(fnetemul::InterfaceOptions {

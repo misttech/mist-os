@@ -229,8 +229,8 @@ mod tests {
         })?;
 
         let realm_query = spawn_stream_handler(move |realm_query_request| async move {
-            let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
-            let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+            let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>();
+            let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>();
 
             match realm_query_request {
                 fsys::RealmQueryRequest::GetInstanceInfo { moniker, responder } => {

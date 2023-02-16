@@ -288,8 +288,7 @@ fn add_directory_helper(
     let flags = flags | fio::OpenFlags::DIRECTORY;
 
     let use_ = use_.clone();
-    let (client_end, server_end) =
-        create_endpoints().expect("could not create storage proxy endpoints");
+    let (client_end, server_end) = create_endpoints();
     let route_on_usage = async move {
         // Wait for the channel to become readable.
         let server_end = fasync::Channel::from_channel(server_end.into_channel())
@@ -499,8 +498,7 @@ fn serve_and_install_svc_dirs(
     svc_dirs: HashMap<String, Directory>,
 ) {
     for (target_dir_path, pseudo_dir) in svc_dirs {
-        let (client_end, server_end) =
-            create_endpoints::<fio::NodeMarker>().expect("could not create node proxy endpoints");
+        let (client_end, server_end) = create_endpoints::<fio::NodeMarker>();
         pseudo_dir.clone().open(
             ExecutionScope::new(),
             // TODO(https://fxbug.dev/101092): remove RIGHT_WRITABLE once all downstream consumers
@@ -654,8 +652,7 @@ pub mod test {
             availability: Availability::Required,
         };
 
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-            .expect("failed to create VFS endpoints");
+        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut root_dir = ServiceFs::new_local();
         root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
         let _sub_dir = root_dir.dir("subdir");
@@ -682,8 +679,7 @@ pub mod test {
             availability: Availability::Required,
         };
 
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-            .expect("failed to create VFS endpoints");
+        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut root_dir = ServiceFs::new_local();
         let mut svc_dir = root_dir.dir("arbitrary-dir");
         svc_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
@@ -709,8 +705,7 @@ pub mod test {
             availability: Availability::Required,
         };
 
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-            .expect("failed to create VFS endpoints");
+        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut root_dir = ServiceFs::new_local();
         root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
         let _sub_dir = root_dir.dir("subdir");
@@ -719,8 +714,7 @@ pub mod test {
         // Create a directory for another namespace entry which we don't
         // actually expect to be accessed.
         let (extra_dir_client, extra_dir_server) =
-            endpoints::create_endpoints::<fio::DirectoryMarker>()
-                .expect("Failed creating directory endpoints");
+            endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut extra_dir = ServiceFs::new_local();
         extra_dir.add_fidl_service(MockServiceRequest::LogSink);
         extra_dir.serve_connection(extra_dir_server).expect("serving channel failed");
@@ -774,8 +768,7 @@ pub mod test {
             availability: Availability::Required,
         };
 
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-            .expect("failed to create VFS endpoints");
+        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut root_dir = ServiceFs::new_local();
         root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
         root_dir.serve_connection(dir_server).expect("failed to add serving channel");

@@ -318,7 +318,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
         .unwrap();
 
     // Get controller for mock peer
-    let (_c_client, c_server) = create_endpoints::<ControllerMarker>().unwrap();
+    let (_c_client, c_server) = create_endpoints::<ControllerMarker>();
     let _ = avrcp_svc
         .get_controller_for_target(&mut tf.mock_peer.peer_id().into(), c_server)
         .await
@@ -335,7 +335,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
 
     // Register with AVRCP again
     // Request should be rejected, so no handler needs to be instantiated
-    let (avh_client, _avh_server) = create_endpoints::<AbsoluteVolumeHandlerMarker>().unwrap();
+    let (avh_client, _avh_server) = create_endpoints::<AbsoluteVolumeHandlerMarker>();
     let _ = avrcp_svc
         .set_absolute_volume_handler(avh_client)
         .await
@@ -354,7 +354,7 @@ async fn avrcp_disallows_handler_double_sets(mut tf: AvrcpIntegrationTest) {
 
     // Register with AVRCP again
     // Request should be rejected, so no handler needs to be instantiated
-    let (t_client, _t_server) = create_endpoints::<TargetHandlerMarker>().unwrap();
+    let (t_client, _t_server) = create_endpoints::<TargetHandlerMarker>();
     let _ = avrcp_svc
         .register_target_handler(t_client)
         .await

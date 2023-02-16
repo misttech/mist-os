@@ -45,7 +45,7 @@ async fn run_echo_launcher_server(stream: EchoLauncherRequestStream) -> Result<(
                 // communication channel ourselves
                 EchoLauncherRequest::GetEcho { echo_prefix, responder } => {
                     println!("Got non pipelined request");
-                    let (client_end, server_end) = create_endpoints::<EchoMarker>()?;
+                    let (client_end, server_end) = create_endpoints::<EchoMarker>();
                     responder.send(client_end)?;
                     (echo_prefix, server_end)
                 }

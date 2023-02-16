@@ -1647,7 +1647,7 @@ mod tests {
     }
 
     async fn get_repositories(proxy: &ffx::RepositoryRegistryProxy) -> Vec<ffx::RepositoryConfig> {
-        let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints();
         proxy.list_repositories(server).unwrap();
         let client = client.into_proxy().unwrap();
 
@@ -1666,7 +1666,7 @@ mod tests {
     async fn get_target_registrations(
         proxy: &ffx::RepositoryRegistryProxy,
     ) -> Vec<ffx::RepositoryTarget> {
-        let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints();
         proxy.list_registered_targets(server).unwrap();
         let client = client.into_proxy().unwrap();
 

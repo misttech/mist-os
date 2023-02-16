@@ -313,8 +313,7 @@ impl ScanResultUpdate for LocationSensorUpdater {
         async fn send_results(scan_results: Vec<fidl_policy::ScanResult>) -> Result<(), Error> {
             // Get an output iterator
             let (iter, server) =
-                fidl::endpoints::create_endpoints::<fidl_policy::ScanResultIteratorMarker>()
-                    .map_err(|err| format_err!("failed to create iterator: {:?}", err))?;
+                fidl::endpoints::create_endpoints::<fidl_policy::ScanResultIteratorMarker>();
             let location_watcher_proxy =
                 connect_to_protocol::<fidl_location_sensor::WlanBaseStationWatcherMarker>()
                     .map_err(|err| {

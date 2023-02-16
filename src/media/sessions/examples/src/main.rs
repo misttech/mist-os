@@ -77,8 +77,7 @@ impl Player {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<()> {
-    let (player_client_end, player_server_end) =
-        create_endpoints::<PlayerMarker>().context("Creating session channels.")?;
+    let (player_client_end, player_server_end) = create_endpoints::<PlayerMarker>();
 
     let session_id = component::client::connect_to_protocol::<PublisherMarker>()
         .context("Connecting to publisher.")?

@@ -407,8 +407,7 @@ impl<'a> TestRealm<'a> {
     /// Adds a device to the realm's virtual device filesystem.
     pub async fn add_virtual_device(&self, e: &TestEndpoint<'_>, path: &Path) -> Result {
         let (device, device_server_end) =
-            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>()
-                .context("create endpoints")?;
+            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>();
         e.get_proxy_(device_server_end).context("get proxy")?;
 
         self.add_raw_device(path, device).await
@@ -778,7 +777,7 @@ async fn to_netdevice_inner(
     port: fidl::endpoints::ClientEnd<fnetwork::PortMarker>,
 ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
     let port = port.into_proxy()?;
-    let (device, server_end) = fidl::endpoints::create_endpoints::<fnetwork::DeviceMarker>()?;
+    let (device, server_end) = fidl::endpoints::create_endpoints::<fnetwork::DeviceMarker>();
     let () = port.get_device(server_end)?;
     let port_id = port
         .get_info()
@@ -808,7 +807,7 @@ impl<'a> TestEndpoint<'a> {
     pub async fn get_netdevice(
         &self,
     ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
-        let (port, server_end) = fidl::endpoints::create_endpoints().context("create endpoints")?;
+        let (port, server_end) = fidl::endpoints::create_endpoints();
         self.get_port(server_end)
             .with_context(|| format!("failed to get device connection for {}", self.name))?;
         to_netdevice_inner(port).await

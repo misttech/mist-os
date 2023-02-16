@@ -862,7 +862,7 @@ mod tests {
         let mut fs = ServiceFs::new();
         fs.add_fidl_service(move |_: hwinfo::BoardRequestStream| {});
 
-        let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints();
         fs.serve_connection(server).unwrap();
 
         fasync::Task::spawn(fs.collect::<()>()).detach();

@@ -92,7 +92,7 @@ impl ProxyFacadeInternal {
                 Ok(proxy.open_port)
             }
             None => {
-                let (client, server) = fidl::endpoints::create_endpoints::<TcpProxy_Marker>()?;
+                let (client, server) = fidl::endpoints::create_endpoints::<TcpProxy_Marker>();
                 let open_port =
                     self.proxy_control.open_proxy_(target_port, proxy_port, server).await?;
                 self.open_proxies.insert(

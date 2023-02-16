@@ -968,7 +968,7 @@ mod test {
             MockCredManagerProvider::new(),
             make_insecure_storage_manager,
         );
-        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>().unwrap();
+        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>();
         assert_eq!(
             account_manager.get_account(GLOBAL_ACCOUNT_ID, TEST_SCRYPT_PASSWORD, server).await,
             Err(faccount::Error::NotFound)
@@ -988,7 +988,7 @@ mod test {
             cred_manager_provider,
             make_insecure_storage_manager,
         );
-        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>().unwrap();
+        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>();
         assert_eq!(
             account_manager.get_account(UNSUPPORTED_ACCOUNT_ID, TEST_SCRYPT_PASSWORD, server).await,
             Err(faccount::Error::Internal)
@@ -1012,7 +1012,7 @@ mod test {
             cred_manager_provider,
             storage_manager_factory,
         );
-        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>().unwrap();
+        let (_, server) = fidl::endpoints::create_endpoints::<AccountMarker>();
         assert_eq!(
             account_manager.get_account(GLOBAL_ACCOUNT_ID, BAD_PASSWORD, server).await,
             Err(faccount::Error::FailedAuthentication)

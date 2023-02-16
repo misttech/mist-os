@@ -91,7 +91,7 @@ pub async fn run_process_async<'a>(
         proxy_by_path_cstring.iter().map(|(path, dir)| (path.as_c_str(), *dir)).collect();
 
     for (path, proxy) in proxy_by_path_cstr {
-        let (proxy_client_end, proxy_server_end) = fidl::endpoints::create_endpoints().unwrap();
+        let (proxy_client_end, proxy_server_end) = fidl::endpoints::create_endpoints();
         fuchsia_fs::directory::clone_onto_no_describe(proxy, None, proxy_server_end).unwrap();
         let proxy_client_channel = proxy_client_end.into_channel();
         spawn_actions

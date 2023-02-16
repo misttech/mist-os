@@ -25,8 +25,7 @@ pub async fn add_impl<W: std::io::Write>(
 ) -> Result<()> {
     writeln!(writer, "Add {} to the current session", &cmd.url)?;
     let (controller_client, controller_server) = if cmd.interactive {
-        let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>()
-            .context("creating element controller")?;
+        let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>();
         let client = client.into_proxy().context("converting client end to proxy")?;
         (Some(client), Some(server))
     } else {

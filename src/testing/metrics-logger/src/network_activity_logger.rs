@@ -28,7 +28,7 @@ pub async fn generate_network_devices() -> Result<Vec<fhwnet::DeviceProxy>> {
 
         // Get client proxy from device instance.
         let (device, device_server_end) =
-            fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>()?;
+            fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>();
         device_instance_proxy.get_device(device_server_end)?;
 
         proxies.push(device.into_proxy()?);

@@ -186,7 +186,7 @@ impl MockResolver {
             None
         };
         let (client, server): (ClientEnd<fio::DirectoryMarker>, ServerEnd<fio::DirectoryMarker>) =
-            create_endpoints().unwrap();
+            create_endpoints();
 
         let sub_dir = pseudo_directory!(
             "fake_file" => read_only(b"content"),

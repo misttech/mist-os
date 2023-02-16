@@ -578,7 +578,7 @@ mod test {
     #[serial]
     async fn test_flash() -> Result<()> {
         let _env = ffx_config::test_init().await?;
-        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
         let mut stream = prog_server.into_stream()?;
         let file: NamedTempFile = NamedTempFile::new().expect("tmp access failed");
         let mut buffer = BufWriter::new(&file);
@@ -608,7 +608,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_flash_sends_protocol_error_after_unexpected_reply() -> Result<()> {
-        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
         let mut stream = prog_server.into_stream()?;
         let file: NamedTempFile = NamedTempFile::new().expect("tmp access failed");
         let mut buffer = BufWriter::new(&file);
@@ -661,7 +661,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_bootloader() -> Result<()> {
-        let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>()?;
+        let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
         let mut stream = reboot_server.into_stream()?;
         let (target, proxy) = setup(vec![Reply::Okay("".to_string())]).await;
         try_join!(
@@ -685,7 +685,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_bootloader_sends_protocol_error_after_unexpected_reply() -> Result<()> {
-        let (reboot_client, _) = create_endpoints::<RebootListenerMarker>()?;
+        let (reboot_client, _) = create_endpoints::<RebootListenerMarker>();
         let (_, proxy) = setup(vec![Reply::Fail("".to_string())]).await;
         let res = proxy.reboot_bootloader(reboot_client).await?;
         assert_eq!(res.err(), Some(RebootError::FastbootError));
@@ -695,7 +695,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_bootloader_sends_communication_error_if_reboot_listener_dropped(
     ) -> Result<()> {
-        let (reboot_client, _) = create_endpoints::<RebootListenerMarker>()?;
+        let (reboot_client, _) = create_endpoints::<RebootListenerMarker>();
         let (_, proxy) = setup(vec![Reply::Okay("".to_string())]).await;
         let res = proxy.reboot_bootloader(reboot_client).await?;
         assert_eq!(res.err(), Some(RebootError::FailedToSendOnReboot));
@@ -706,7 +706,7 @@ mod test {
     // Disabling until we can make this not rely on a timeout
     #[ignore]
     async fn test_reboot_bootloader_sends_rediscovered_error_if_not_rediscovered() -> Result<()> {
-        let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>()?;
+        let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
         let mut stream = reboot_server.into_stream()?;
         let (_, proxy) = setup(vec![Reply::Okay("".to_string())]).await;
         try_join!(
@@ -760,7 +760,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stage() -> Result<()> {
-        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
         let mut stream = prog_server.into_stream()?;
         let file: NamedTempFile = NamedTempFile::new().expect("tmp access failed");
         let mut buffer = BufWriter::new(&file);
@@ -787,7 +787,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stage_sends_protocol_error_after_unexpected_reply() -> Result<()> {
-        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+        let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
         let mut stream = prog_server.into_stream()?;
         let file: NamedTempFile = NamedTempFile::new().expect("tmp access failed");
         let mut buffer = BufWriter::new(&file);

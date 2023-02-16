@@ -712,8 +712,7 @@ mod tests {
         J: FnOnce() + std::marker::Send,
     {
         let (client_endpoint, server_endpoint) =
-            create_endpoints::<fcrunner::ComponentControllerMarker>()
-                .expect("could not create component controller endpoints");
+            create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         // Get a proxy to the ComponentController channel.
         let controller_stream =
@@ -760,8 +759,7 @@ mod tests {
             }
 
             for path in extra_paths {
-                let (client, _server) = create_endpoints::<fio::DirectoryMarker>()
-                    .expect("could not create component controller endpoints");
+                let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
                 ns.push(fcrunner::ComponentNamespaceEntry {
                     path: Some(path.to_string()),
                     directory: Some(client),
@@ -1062,8 +1060,7 @@ mod tests {
             let extra_paths = vec!["/extra1", "/extra2"];
 
             for path in &extra_paths {
-                let (client, _server) = create_endpoints::<fio::DirectoryMarker>()
-                    .expect("could not create component controller endpoints");
+                let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
 
                 names.push(fproc::NameInfo { path: path.to_string(), directory: client });
             }
@@ -1183,8 +1180,7 @@ mod tests {
 
             let mut handle_infos = vec![];
             for fd in 0..3 {
-                let (client, _server) = create_endpoints::<fio::DirectoryMarker>()
-                    .expect("could not create component controller endpoints");
+                let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
                 handle_infos.push(fproc::HandleInfo {
                     handle: client.into_channel().into_handle(),
                     id: fd,

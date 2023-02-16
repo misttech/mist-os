@@ -22,8 +22,7 @@ where
     R: RegisterProxyInterface,
     D: Driver + 'a,
 {
-    let (client_ep, server_ep) =
-        create_endpoints::<DriverMarker>().context("Failed to create FIDL endpoints")?;
+    let (client_ep, server_ep) = create_endpoints::<DriverMarker>();
 
     registry.register_device(name, client_ep)?;
 
@@ -122,8 +121,7 @@ where
     use fidl_fuchsia_factory_lowpan::FactoryDriverMarker;
     use fidl_fuchsia_factory_lowpan::FactoryDriverRequest;
 
-    let (client_ep, server_ep) =
-        create_endpoints::<FactoryDriverMarker>().context("Failed to create FIDL endpoints")?;
+    let (client_ep, server_ep) = create_endpoints::<FactoryDriverMarker>();
 
     registry.register(name, client_ep)?;
 

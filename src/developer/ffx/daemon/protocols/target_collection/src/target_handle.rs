@@ -409,8 +409,7 @@ mod tests {
             .await
         });
         let (client, server) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>()
-                .unwrap();
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>();
         let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), server);
         hoist2
             .connect_as_service_publisher()

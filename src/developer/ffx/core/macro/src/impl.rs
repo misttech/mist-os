@@ -419,7 +419,7 @@ fn generate_daemon_protocol_proxy(
             // TODO(awdavies): When there is a component to test if a protocol exists, add the test
             // command for it in the daemon.
             let implementation = quote! {
-                let (#output, #server_end) = ffx_core::macro_deps::fidl::endpoints::create_endpoints::<<#path as ffx_core::macro_deps::fidl::endpoints::Proxy>::Protocol>()?;
+                let (#output, #server_end) = ffx_core::macro_deps::fidl::endpoints::create_endpoints::<<#path as ffx_core::macro_deps::fidl::endpoints::Proxy>::Protocol>();
                 let #output = #output.into_proxy()?;
                 let #output_fut;
                 {

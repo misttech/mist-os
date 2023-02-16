@@ -643,8 +643,7 @@ mod tests {
     #[test]
     fn test_resolved_package() {
         let url = "some_url".to_string();
-        let (dir_client, _) =
-            create_endpoints::<fio::DirectoryMarker>().expect("failed to create Directory proxy");
+        let (dir_client, _) = create_endpoints::<fio::DirectoryMarker>();
         let fidl_package = fresolution::Package {
             url: Some(url.clone()),
             directory: Some(dir_client),

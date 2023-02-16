@@ -352,7 +352,7 @@ async fn blobfs_corrupt_blob(ramdisk: fio::NodeProxy, merkle: &Hash) -> Result<(
         None
     });
 
-    let (devfs_client, devfs_server) = fidl::endpoints::create_endpoints()?;
+    let (devfs_client, devfs_server) = fidl::endpoints::create_endpoints();
     fs.serve_connection(devfs_server)?;
     let serve_fs = fs.collect::<()>();
 

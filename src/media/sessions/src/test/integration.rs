@@ -180,8 +180,7 @@ impl TestService {
     }
 
     fn new_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
-        let (watcher_client, watcher_server) =
-            create_endpoints().context("Creating watcher endpoints")?;
+        let (watcher_client, watcher_server) = create_endpoints();
         self.discovery.watch_sessions(watch_options, watcher_client)?;
         Ok(TestWatcher {
             watcher: watcher_server.into_stream().context("Turning watcher into stream")?,
@@ -189,8 +188,7 @@ impl TestService {
     }
 
     fn new_observer_watcher(&self, watch_options: WatchOptions) -> Result<TestWatcher> {
-        let (watcher_client, watcher_server) =
-            create_endpoints().context("Creating observer watcher endpoints")?;
+        let (watcher_client, watcher_server) = create_endpoints();
         self.observer_discovery.watch_sessions(watch_options, watcher_client)?;
         Ok(TestWatcher {
             watcher: watcher_server
@@ -506,7 +504,7 @@ async fn player_controls_are_proxied() -> Result<()> {
     // the stream of requests coming in that we match on down below doesn't contain it.
     let _watch_request = player.requests.try_next().await?;
 
-    let (session_client, session_server) = create_endpoints()?;
+    let (session_client, session_server) = create_endpoints();
     let session: SessionControlProxy = session_client.into_proxy()?;
     session.play()?;
     service.discovery.connect_to_session(id, session_server)?;
@@ -518,7 +516,7 @@ async fn player_controls_are_proxied() -> Result<()> {
         })
         .await?;
 
-    let (_volume_client, volume_server) = create_endpoints()?;
+    let (_volume_client, volume_server) = create_endpoints();
     session.bind_volume_control(volume_server)?;
     player
         .wait_for_request(|request| match request {
@@ -539,7 +537,7 @@ async fn player_disconnection_propagates() -> Result<()> {
     let mut updates = watcher.wait_for_n_updates(1).await?;
     let (id, _) = updates.remove(0);
 
-    let (session_client, session_server) = create_endpoints()?;
+    let (session_client, session_server) = create_endpoints();
     let session: SessionControlProxy = session_client.into_proxy()?;
     service.discovery.connect_to_session(id, session_server)?;
 

@@ -85,7 +85,7 @@ impl ServerPty {
         use std::os::fd::AsRawFd as _;
 
         let Self { proxy } = self;
-        let (client_end, server_end) = fidl::endpoints::create_endpoints()?;
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let () = proxy.clone2(server_end)?;
         let file = fdio::create_fd::<File>(client_end.into())
             .context("failed to create FD from server PTY")?;
@@ -126,7 +126,7 @@ impl ServerPty {
     /// Creates a File which is suitable to use as the client side of the Pty.
     async fn open_client_pty(&self) -> Result<File, Error> {
         ftrace::duration!("pty", "Pty:open_client_pty");
-        let (client_end, server_end) = fidl::endpoints::create_endpoints()?;
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let () = self.open_client(server_end).await.context("failed to open client")?;
         fdio::create_fd(client_end.into()).context("failed to create FD from client PTY")
     }

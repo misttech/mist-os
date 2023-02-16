@@ -66,7 +66,7 @@ impl Unpin for Watcher {}
 impl Watcher {
     /// Creates a new `Watcher` for the directory given by `dir`.
     pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, anyhow::Error> {
-        let (client_end, server_end) = fidl::endpoints::create_endpoints()?;
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let options = 0u32;
         let status = dir.watch(fio::WatchMask::all(), options, server_end).await?;
         zx::Status::ok(status)?;

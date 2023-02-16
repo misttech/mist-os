@@ -304,9 +304,9 @@ impl FlatlandViewStrategy {
                 fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
             let mut view_bound_protocols = flatland::ViewBoundProtocols::EMPTY;
 
-            let (touch_client, touch_server) = create_endpoints()?;
-            let (mouse_client, mouse_server) = create_endpoints()?;
-            let (view_ref_focused_client, view_ref_focused_server) = create_endpoints()?;
+            let (touch_client, touch_server) = create_endpoints();
+            let (mouse_client, mouse_server) = create_endpoints();
+            let (view_ref_focused_client, view_ref_focused_server) = create_endpoints();
 
             view_bound_protocols.touch_source = Some(touch_server);
             view_bound_protocols.mouse_source = Some(mouse_server);

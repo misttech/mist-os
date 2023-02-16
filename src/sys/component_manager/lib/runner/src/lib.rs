@@ -118,8 +118,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_null_runner() {
         let null_runner = NullRunner {};
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         null_runner
             .start(
                 fcrunner::ComponentStartInfo {

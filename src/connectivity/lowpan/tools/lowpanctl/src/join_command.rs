@@ -150,7 +150,7 @@ impl JoinCommand {
             .get_default_experimental_device_extra()
             .await
             .context("Unable to get device instance")?;
-        let (client_end, server_end) = create_endpoints::<ProvisioningMonitorMarker>()?;
+        let (client_end, server_end) = create_endpoints::<ProvisioningMonitorMarker>();
         let monitor = client_end.into_proxy()?;
         device_extra
             .join_network(&mut join_args, server_end)

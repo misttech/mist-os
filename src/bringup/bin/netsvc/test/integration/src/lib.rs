@@ -61,7 +61,7 @@ where
 {
     use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 
-    let (mock_dir, server_end) = fidl::endpoints::create_endpoints().expect("create endpoints");
+    let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
 
     enum Services {
         Log(fidl_fuchsia_logger::LogRequestStream),

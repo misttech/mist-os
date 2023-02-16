@@ -101,8 +101,7 @@ pub async fn start_ap_and_wait_for_confirmation(network_config: NetworkConfigBui
     let (ap_controller, server_end) =
         create_proxy::<fidl_policy::AccessPointControllerMarker>().expect("creating AP controller");
     let (update_client_end, update_server_end) =
-        create_endpoints::<fidl_policy::AccessPointStateUpdatesMarker>()
-            .expect("creating AP update listener");
+        create_endpoints::<fidl_policy::AccessPointStateUpdatesMarker>();
     let () =
         ap_provider.get_controller(server_end, update_client_end).expect("getting AP controller");
 
@@ -169,7 +168,7 @@ pub async fn get_client_controller(
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>().unwrap();
     let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy().unwrap();
-    let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints().unwrap();
+    let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints();
     provider.get_controller(controller_server_end, listener_client_end).unwrap();
     let client_state_update_stream = listener_server_end.into_stream().unwrap();
 

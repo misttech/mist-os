@@ -124,7 +124,7 @@ pub async fn load_image_from_bytes_using_allocators(
 
     // Allocate shared buffers.
     let (buffer_collection_token, buffer_collection_token_server_end) =
-        create_endpoints::<sysmem::BufferCollectionTokenMarker>()?;
+        create_endpoints::<sysmem::BufferCollectionTokenMarker>();
     sysmem_allocator.allocate_shared_collection(buffer_collection_token_server_end)?;
 
     // Duplicate buffer collection token for [ui_comp::Allocator].

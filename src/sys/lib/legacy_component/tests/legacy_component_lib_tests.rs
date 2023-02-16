@@ -157,8 +157,7 @@ async fn test_legacy_echo_with_directory() {
     let config_data_dir = pseudo_directory! {
         "default_reply.txt" => read_only(TEST_VALUE),
     };
-    let (client_end, server_end) =
-        fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+    let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     config_data_dir.open(
         scope,

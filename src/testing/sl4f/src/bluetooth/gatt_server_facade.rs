@@ -619,7 +619,7 @@ impl GattServerFacade {
     ) -> Result<(), Error> {
         let tag = "GattServerFacade::publish_service:";
         let (service_client, service_server) =
-            fidl::endpoints::create_endpoints::<LocalServiceMarker>()?;
+            fidl::endpoints::create_endpoints::<LocalServiceMarker>();
         let (service_request_stream, service_control_handle) =
             service_server.into_stream_and_control_handle()?;
 

@@ -282,8 +282,7 @@ mod tests {
         let fuzz_manager =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -339,8 +338,7 @@ mod tests {
         let fuzz_manager_foo =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let foo_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager_foo
                 .connect(FOO_URL, server)
                 .await
@@ -366,8 +364,7 @@ mod tests {
         let fuzz_manager_bar =
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let bar_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager_bar
                 .connect(BAR_URL, server)
                 .await
@@ -445,8 +442,7 @@ mod tests {
             test_realm_mut.killable = true;
         }
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -523,8 +519,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::ResourceUnavailable);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -545,8 +540,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::InstanceCannotResolve);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -571,8 +565,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::InvalidArgs);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -593,8 +586,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::FailedToConnectToTestSuite);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -615,8 +607,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::CaseEnumeration);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
@@ -637,8 +628,7 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         test_realm.borrow_mut().launch_error = Some(LaunchError::InternalError);
         let test_fut = || async move {
-            let (_, server) = create_endpoints::<fuzz::ControllerMarker>()
-                .context("failed to create Controller endpoints")?;
+            let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
             let status = fuzz_manager
                 .connect(FOO_URL, server)
                 .await

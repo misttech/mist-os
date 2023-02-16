@@ -334,8 +334,7 @@ mod tests {
             &self,
             target_identifier: Option<String>,
         ) -> Result<rcs::RemoteControlProxy> {
-            let (client, server) =
-                fidl::endpoints::create_endpoints::<rcs::RemoteControlMarker>().unwrap();
+            let (client, server) = fidl::endpoints::create_endpoints::<rcs::RemoteControlMarker>();
             assert_eq!(target_identifier, Some("dummy_target".to_owned()));
 
             fuchsia_async::Task::local(async move {
@@ -396,7 +395,7 @@ mod tests {
     async fn test_reverse() {
         let forward = Forward::default();
         let context = Context::new(TestDaemon);
-        let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints::<ffx::TunnelMarker>();
 
         fuchsia_async::Task::local(async move {
             let mut server = server.into_stream().unwrap();

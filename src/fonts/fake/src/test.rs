@@ -49,7 +49,7 @@ async fn test_experimental_api() -> Result<(), Error> {
     let res = font_provider.get_typeface_by_id(0).await?;
     assert_matches!(res, Err(fonts_exp::Error::NotFound));
 
-    let (_client_end, server_end) = fidl::endpoints::create_endpoints()?;
+    let (_client_end, server_end) = fidl::endpoints::create_endpoints();
     let res =
         font_provider.list_typefaces(fonts_exp::ListTypefacesRequest::EMPTY, server_end).await?;
     assert_matches!(res, Err(fonts_exp::Error::NotFound));

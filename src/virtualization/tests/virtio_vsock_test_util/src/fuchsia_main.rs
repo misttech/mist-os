@@ -71,7 +71,7 @@ async fn test_read_write<'a>(
 
 fn make_con() -> Result<(fasync::Socket, ConnectionProxy, ConnectionTransport), anyhow::Error> {
     let (data_stream, server_socket) = make_socket_pair()?;
-    let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>()?;
+    let (client_end, server_end) = endpoints::create_endpoints::<ConnectionMarker>();
     let client_end = client_end.into_proxy().unwrap();
     let con = ConnectionTransport { data: server_socket, con: server_end };
     Ok((data_stream, client_end, con))
@@ -82,11 +82,11 @@ async fn main() -> Result<(), Error> {
     let vsock =
         connect_to_protocol::<ConnectorMarker>().context("failed to connect to vsock service")?;
     // Register the listeners early to avoid any race conditions later.
-    let (acceptor_client, acceptor) = endpoints::create_endpoints::<AcceptorMarker>()?;
+    let (acceptor_client, acceptor) = endpoints::create_endpoints::<AcceptorMarker>();
     vsock.listen(8001, acceptor_client).await?;
-    let (acceptor_client2, acceptor2) = endpoints::create_endpoints::<AcceptorMarker>()?;
+    let (acceptor_client2, acceptor2) = endpoints::create_endpoints::<AcceptorMarker>();
     vsock.listen(8002, acceptor_client2).await?;
-    let (acceptor_client3, acceptor3) = endpoints::create_endpoints::<AcceptorMarker>()?;
+    let (acceptor_client3, acceptor3) = endpoints::create_endpoints::<AcceptorMarker>();
     vsock.listen(8003, acceptor_client3).await?;
     let mut acceptor = acceptor.into_stream()?;
     let mut acceptor2 = acceptor2.into_stream()?;

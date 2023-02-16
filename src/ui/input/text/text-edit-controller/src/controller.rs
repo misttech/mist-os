@@ -54,11 +54,11 @@ impl TextEditController {
         // The text field's client is the Text Edit Server.
         // The host is the frontend app that displays a text box.
         let (field_client_end, _field_host_end) =
-            fidl::endpoints::create_endpoints::<ftext::TextFieldMarker>()?;
+            fidl::endpoints::create_endpoints::<ftext::TextFieldMarker>();
         let field_client_end = field_client_end.into_channel().into();
 
         let (session_client_end, session_server_end) =
-            fidl::endpoints::create_endpoints::<ftext::TextEditServerSessionMarker>()?;
+            fidl::endpoints::create_endpoints::<ftext::TextEditServerSessionMarker>();
 
         let options = ftext::TextFieldOptions::EMPTY;
 

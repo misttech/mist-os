@@ -240,7 +240,7 @@ impl GfxTilesSession {
         let width_in_pixels = display_info.width_in_px as f32;
         let height_in_pixels = display_info.height_in_px as f32;
 
-        let (session_listener, session_listener_request) = create_endpoints()?;
+        let (session_listener, session_listener_request) = create_endpoints();
         let (session_proxy, session_request) = create_proxy()?;
         let (view_focuser, view_focuser_request) = create_proxy::<ui_views::FocuserMarker>()?;
         scenic

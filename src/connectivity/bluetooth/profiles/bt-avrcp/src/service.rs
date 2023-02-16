@@ -294,8 +294,7 @@ mod tests {
                 panic!("Shouldn't have spawned a controller!");
             };
 
-        let (target_client, _target_server) =
-            create_endpoints::<TargetHandlerMarker>().expect("Target proxy creation");
+        let (target_client, _target_server) = create_endpoints::<TargetHandlerMarker>();
 
         let request_fut = peer_manager_proxy.register_target_handler(target_client);
         pin_mut!(request_fut);
@@ -541,7 +540,7 @@ mod tests {
             spawn_peer_manager();
 
         // create an target handler.
-        let (target_client, target_server) = create_endpoints::<TargetHandlerMarker>().unwrap();
+        let (target_client, target_server) = create_endpoints::<TargetHandlerMarker>();
 
         // Make a request and start it.  It should be pending.
         let register_fut = peer_manager_proxy.register_target_handler(target_client);
@@ -567,8 +566,7 @@ mod tests {
         drop(target_server);
 
         // create an new target handler.
-        let (target_client_2, _target_server_2) =
-            create_endpoints::<TargetHandlerMarker>().unwrap();
+        let (target_client_2, _target_server_2) = create_endpoints::<TargetHandlerMarker>();
 
         // should succeed if the previous handler was dropped.
         let register_fut = peer_manager_proxy.register_target_handler(target_client_2);
@@ -585,8 +583,7 @@ mod tests {
         );
 
         // create an new target handler.
-        let (target_client_3, _target_server_3) =
-            create_endpoints::<TargetHandlerMarker>().unwrap();
+        let (target_client_3, _target_server_3) = create_endpoints::<TargetHandlerMarker>();
 
         // should fail since the target handler is already set.
         let register_fut = peer_manager_proxy.register_target_handler(target_client_3);
@@ -609,8 +606,7 @@ mod tests {
             spawn_peer_manager();
 
         // create a volume handler.
-        let (volume_client, volume_server) =
-            create_endpoints::<AbsoluteVolumeHandlerMarker>().unwrap();
+        let (volume_client, volume_server) = create_endpoints::<AbsoluteVolumeHandlerMarker>();
 
         // Make a request and start it.  It should be pending.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client);
@@ -636,8 +632,7 @@ mod tests {
         drop(volume_server);
 
         // create an new target handler.
-        let (volume_client_2, _volume_server_2) =
-            create_endpoints::<AbsoluteVolumeHandlerMarker>().unwrap();
+        let (volume_client_2, _volume_server_2) = create_endpoints::<AbsoluteVolumeHandlerMarker>();
 
         // should succeed if the previous handler was dropped.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client_2);
@@ -654,8 +649,7 @@ mod tests {
         );
 
         // create an new target handler.
-        let (volume_client_3, _volume_server_3) =
-            create_endpoints::<AbsoluteVolumeHandlerMarker>().unwrap();
+        let (volume_client_3, _volume_server_3) = create_endpoints::<AbsoluteVolumeHandlerMarker>();
 
         // should fail since the target handler is already set.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client_3);

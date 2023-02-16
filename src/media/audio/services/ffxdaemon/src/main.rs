@@ -83,7 +83,7 @@ impl AudioDaemon {
         socket.write_wav_header(duration, &format).await?;
 
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>()?;
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>();
 
         audio_component.create_audio_capturer(server_end, loopback)?;
 
@@ -258,10 +258,10 @@ impl AudioDaemon {
         let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
 
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>()?;
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>();
 
         let (gain_control_client_end, gain_control_server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media_audio::GainControlMarker>()?;
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media_audio::GainControlMarker>();
 
         let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
         audio_component.create_audio_renderer(server_end)?;

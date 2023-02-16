@@ -39,7 +39,7 @@ impl LowpanContext {
 
     /// Returns the default DeviceProxy.
     pub async fn get_default_device(&self) -> Result<DeviceProxy, Error> {
-        let (client, server) = create_endpoints::<DeviceMarker>()?;
+        let (client, server) = create_endpoints::<DeviceMarker>();
 
         connect_to_protocol::<DeviceConnectorMarker>()
             .context("Failed to connect to DeviceConnector")?
@@ -53,7 +53,7 @@ impl LowpanContext {
         let lookup = connect_to_protocol::<FactoryLookupMarker>()
             .context("Failed to connect to Lowpan FactoryLookup service")?;
 
-        let (client, server) = create_endpoints::<FactoryDeviceMarker>()?;
+        let (client, server) = create_endpoints::<FactoryDeviceMarker>();
 
         lookup.lookup(&self.device_name, server)?;
 
@@ -64,9 +64,9 @@ impl LowpanContext {
     pub async fn get_default_device_proxies(
         &self,
     ) -> Result<(DeviceProxy, DeviceExtraProxy, DeviceTestProxy), Error> {
-        let (client, server) = create_endpoints::<DeviceMarker>()?;
-        let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>()?;
-        let (client_test, server_test) = create_endpoints::<DeviceTestMarker>()?;
+        let (client, server) = create_endpoints::<DeviceMarker>();
+        let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>();
+        let (client_test, server_test) = create_endpoints::<DeviceTestMarker>();
 
         connect_to_protocol::<DeviceConnectorMarker>()
             .context("Failed to connect to DeviceConnector")?

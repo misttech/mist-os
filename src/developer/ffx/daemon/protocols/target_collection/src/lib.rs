@@ -625,7 +625,7 @@ mod tests {
         tc: &ffx::TargetCollectionProxy,
     ) -> Vec<ffx::TargetInfo> {
         let (reader, server) =
-            fidl::endpoints::create_endpoints::<ffx::TargetCollectionReaderMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<ffx::TargetCollectionReaderMarker>();
         tc.list_targets(
             ffx::TargetQuery {
                 string_matcher: query.map(|s| s.to_owned()),
@@ -837,7 +837,7 @@ mod tests {
         let target_addr = TargetAddr::from_str("[::1]:0").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let (client, server) =
-            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>().unwrap();
+            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
         proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::EMPTY, client).unwrap();
         target_add_fut.await.unwrap();
@@ -873,7 +873,7 @@ mod tests {
         let target_addr = TargetAddr::from_str("[::1]:8022").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let (client, server) =
-            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>().unwrap();
+            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
         proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::EMPTY, client).unwrap();
         target_add_fut.await.unwrap();
@@ -908,7 +908,7 @@ mod tests {
             .inject_fidl_protocol(tc_impl.clone())
             .build();
         let (client, server) =
-            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>().unwrap();
+            fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         proxy

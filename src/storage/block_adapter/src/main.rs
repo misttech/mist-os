@@ -146,7 +146,7 @@ impl FileIo for BlockFile {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    let (client, server) = create_endpoints::<fio::DirectoryMarker>()?;
+    let (client, server) = create_endpoints::<fio::DirectoryMarker>();
 
     let server_fut = {
         let handle = fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(

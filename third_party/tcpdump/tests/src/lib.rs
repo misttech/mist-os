@@ -141,8 +141,7 @@ async fn start_tcpdump_and_wait_for_patterns<
     inject_packet: F,
     patterns: Vec<Regex>,
 ) {
-    let (svc_client_end, svc_server_end) =
-        fidl::endpoints::create_endpoints().expect("create channel");
+    let (svc_client_end, svc_server_end) = fidl::endpoints::create_endpoints();
     let (process, stdout_reader, stderr_reader) = start_tcpdump(
         args,
         vec![

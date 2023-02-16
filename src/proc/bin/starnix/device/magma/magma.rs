@@ -261,8 +261,7 @@ pub fn init_sysmem(
     let sysmem_allocator = fsysmem::AllocatorSynchronousProxy::new(client_end);
 
     let (client, remote) =
-        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>()
-            .map_err(|_| errno!(EINVAL))?;
+        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
 
     sysmem_allocator.allocate_shared_collection(remote).map_err(|_| errno!(EINVAL))?;
 
@@ -271,8 +270,7 @@ pub fn init_sysmem(
 
     let scenic_token = if use_scenic {
         let (token, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>()
-                .map_err(|_| errno!(EINVAL))?;
+            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
 
         buffer_token_proxy.duplicate(!0, remote).map_err(|_| errno!(EINVAL))?;
         Some(token)
@@ -281,8 +279,7 @@ pub fn init_sysmem(
     };
 
     let (vulkan_token, remote) =
-        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>()
-            .map_err(|_| errno!(EINVAL))?;
+        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
 
     buffer_token_proxy.duplicate(!0, remote).map_err(|_| errno!(EINVAL))?;
 

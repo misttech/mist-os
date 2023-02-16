@@ -247,7 +247,7 @@ impl MemfsInstance {
             .expect("Failed to connect to memfs");
         let mut options = StartOptions::new_empty();
         // Memfs doesn't need a block device but FIDL prevents passing an invalid handle.
-        let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>().unwrap();
+        let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>();
         startup
             .start(device_client_end, &mut options)
             .await
@@ -259,7 +259,7 @@ impl MemfsInstance {
             .await
             .expect("Failed to connect to memfs's exposed directory");
 
-        let (root_dir, server_end) = fidl::endpoints::create_endpoints().unwrap();
+        let (root_dir, server_end) = fidl::endpoints::create_endpoints();
         exposed_dir
             .open(
                 fio::OpenFlags::RIGHT_READABLE

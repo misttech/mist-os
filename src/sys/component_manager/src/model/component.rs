@@ -534,7 +534,7 @@ impl ComponentInstance {
             if let Some(runner) = decl.get_runner() {
                 // Open up a channel to the runner.
                 let (client_channel, server_channel) =
-                    endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>().unwrap();
+                    endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>();
                 let mut server_channel = server_channel.into_channel();
                 let options = OpenRunnerOptions {
                     flags: fio::OpenFlags::NOT_DIRECTORY,
@@ -1921,8 +1921,7 @@ pub mod tests {
         // the component.
         let stop_timeout = zx::Duration::from_millis(50);
         let kill_timeout = zx::Duration::from_millis(10);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let server_channel_koid = server
             .as_handle_ref()
             .basic_info()
@@ -1971,8 +1970,7 @@ pub mod tests {
     async fn stop_component_successful_component_already_gone() {
         let stop_timeout = zx::Duration::from_millis(100);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         let stop_timer = Box::pin(fasync::Timer::new(fasync::Time::after(stop_timeout)));
         let kill_timer = Box::pin(async move {
@@ -2009,8 +2007,7 @@ pub mod tests {
         // for the component to stop.
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let server_channel_koid = server
             .as_handle_ref()
             .basic_info()
@@ -2097,8 +2094,7 @@ pub mod tests {
         // component.
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(200);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let server_channel_koid = server
             .as_handle_ref()
             .basic_info()
@@ -2206,8 +2202,7 @@ pub mod tests {
         // component.
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(200);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let server_channel_koid = server
             .as_handle_ref()
             .basic_info()
@@ -2282,8 +2277,7 @@ pub mod tests {
         // component.
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) =
-            endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let server_channel_koid = server
             .as_handle_ref()
             .basic_info()

@@ -132,7 +132,7 @@ mod tests {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HfpMarker>().unwrap();
 
         let (call_manager_client_end, _call_manager_server_end) =
-            fidl::endpoints::create_endpoints::<CallManagerMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<CallManagerMarker>();
 
         // Register a call manager.
         proxy.register(call_manager_client_end).expect("request to be sent");

@@ -542,8 +542,7 @@ async fn launch_component_process_separate_std_handles<E>(
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
 {
-    let (client, loader) =
-        fidl::endpoints::create_endpoints().map_err(launch::LaunchError::Fidl)?;
+    let (client, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
     let executable_vmo = Some(component.executable_vmo()?);
 
@@ -572,8 +571,7 @@ async fn launch_component_process<E>(
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
 {
-    let (client, loader) =
-        fidl::endpoints::create_endpoints().map_err(launch::LaunchError::Fidl)?;
+    let (client, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
     let executable_vmo = Some(component.executable_vmo()?);
 

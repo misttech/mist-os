@@ -397,7 +397,7 @@ async fn setup_rtc(
                         let _ = &handles;
                         let scope = ExecutionScope::new();
                         let (client_end, server_end) =
-                            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+                            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
                         let () = rtc_dir.open(
                             scope.clone(),
                             fio::OpenFlags::RIGHT_READABLE

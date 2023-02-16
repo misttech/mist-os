@@ -62,7 +62,7 @@ impl MemoryPressureMonitor {
         let provider = connect_to_protocol::<ProviderMarker>()?;
         debug!("Successfully connected to fuchsia.memorypressure/Provider");
 
-        let (watcher_client, watcher_server) = fidl::endpoints::create_endpoints()?;
+        let (watcher_client, watcher_server) = fidl::endpoints::create_endpoints();
         provider.register_watcher(watcher_client)?;
 
         debug!("Successfully registered as a fuchsia.memorypressure/Watcher");

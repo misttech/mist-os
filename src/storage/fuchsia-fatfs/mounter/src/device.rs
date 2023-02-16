@@ -224,7 +224,7 @@ pub mod test {
     async fn test_get_guid_succeeds() {
         let mut fs = ServiceFs::new();
         fs.dir("dev").add_service_at("000", |chan| Some(MockPartition::fat(chan)));
-        let (local, remote) = fidl::endpoints::create_endpoints().expect("create channel OK");
+        let (local, remote) = fidl::endpoints::create_endpoints();
 
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
@@ -247,7 +247,7 @@ pub mod test {
             .add_service_at("000", |chan| Some(MockPartition::not_fat(chan)))
             .add_service_at("001", |chan| Some(MockPartition::block(chan)))
             .add_service_at("002", |chan| Some(MockPartition::fat(chan)));
-        let (local, remote) = fidl::endpoints::create_endpoints().expect("create channel OK");
+        let (local, remote) = fidl::endpoints::create_endpoints();
 
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));
@@ -270,7 +270,7 @@ pub mod test {
             .add_service_at("000", |chan| Some(MockPartition::not_fat(chan)))
             .add_service_at("001", |chan| Some(MockPartition::block(chan)))
             .add_service_at("002", |chan| Some(MockPartition::not_fat(chan)));
-        let (local, remote) = fidl::endpoints::create_endpoints().expect("create channel OK");
+        let (local, remote) = fidl::endpoints::create_endpoints();
 
         fs.serve_connection(remote).unwrap();
         let _fs_task = fasync::Task::spawn(fs.for_each(|part| async { part.serve().await }));

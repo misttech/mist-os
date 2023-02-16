@@ -34,8 +34,7 @@ impl ComponentLauncher for FuzzComponentLauncher {
         let registry = fuchsia_component::client::connect_to_protocol::<fuzzer::RegistrarMarker>()
             .map_err(launch::LaunchError::Launcher)?;
         let channel = registry.into_channel().expect("failed to take channel from proxy");
-        let (loader_client, loader_server) =
-            fidl::endpoints::create_endpoints().map_err(launch::LaunchError::Fidl)?;
+        let (loader_client, loader_server) = fidl::endpoints::create_endpoints();
         component.loader_service(loader_server);
         let executable_vmo = Some(component.executable_vmo()?);
         let result = launch::launch_process_with_separate_std_handles(launch::LaunchProcessArgs {

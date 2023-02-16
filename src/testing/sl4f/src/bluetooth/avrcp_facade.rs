@@ -75,7 +75,7 @@ impl AvrcpFacade {
             Some(p) => p.clone(),
             None => fx_err_and_bail!(&with_line!(tag), "No AVRCP service proxy created"),
         };
-        let (cont_client, cont_server) = create_endpoints::<ControllerMarker>()?;
+        let (cont_client, cont_server) = create_endpoints::<ControllerMarker>();
         let _status = avrcp_service_proxy
             .get_controller_for_target(&mut PeerId { value: id }, cont_server)
             .await?;

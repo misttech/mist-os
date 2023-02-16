@@ -40,7 +40,7 @@ pub fn make_writer_request(
 ) -> Result<(fclip::FocusedWriterRegistryRequestWriterRequest, fclip::WriterProxy), Error> {
     let view_ref = scenic::duplicate_view_ref(view_ref)?;
 
-    let (client_end, server_end) = create_endpoints::<fclip::WriterMarker>()?;
+    let (client_end, server_end) = create_endpoints::<fclip::WriterMarker>();
 
     let req = fclip::FocusedWriterRegistryRequestWriterRequest {
         view_ref: Some(view_ref),
@@ -73,7 +73,7 @@ pub fn make_reader_request(
 ) -> Result<(fclip::FocusedReaderRegistryRequestReaderRequest, fclip::ReaderProxy), Error> {
     let view_ref = scenic::duplicate_view_ref(view_ref)?;
 
-    let (client_end, server_end) = create_endpoints::<fclip::ReaderMarker>()?;
+    let (client_end, server_end) = create_endpoints::<fclip::ReaderMarker>();
 
     let req = fclip::FocusedReaderRegistryRequestReaderRequest {
         view_ref: Some(view_ref),

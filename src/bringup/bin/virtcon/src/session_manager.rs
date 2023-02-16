@@ -180,7 +180,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn can_create_session() -> Result<(), Error> {
         let client = TestSessionManagerClient::default();
-        let (_, server_end) = fidl::endpoints::create_endpoints()?;
+        let (_, server_end) = fidl::endpoints::create_endpoints();
         let () = SessionManager::create_session(server_end, &client, 0, false).await;
         Ok(())
     }

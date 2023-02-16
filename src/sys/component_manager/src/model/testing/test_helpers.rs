@@ -496,8 +496,7 @@ impl ActionsTest {
 /// Returns the created directory and corresponding namespace entries.
 pub fn create_fs_with_mock_logsink(
 ) -> Result<(MockServiceFs<'static>, Vec<fcrunner::ComponentNamespaceEntry>), Error> {
-    let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-        .context("Failed to create VFS endpoints.")?;
+    let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
     let mut dir = ServiceFs::new_local();
     dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
     dir.serve_connection(server).context("Failed to add serving channel.")?;

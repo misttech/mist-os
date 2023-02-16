@@ -395,7 +395,7 @@ impl Window {
         let (graphical_presenter_fut, view_controller_fut) = match viewport_creation_token {
             Some(viewport_creation_token) => {
                 let (annotation_controller_client_end, annotation_controller_server_end) =
-                    create_endpoints::<felement::AnnotationControllerMarker>()?;
+                    create_endpoints::<felement::AnnotationControllerMarker>();
                 let (view_controller_proxy, view_controller_request) =
                     create_proxy::<felement::ViewControllerMarker>()?;
                 let view_ref_for_graphical_presenter = self.get_view_ref()?;

@@ -248,7 +248,7 @@ mod test {
         let storage_unlock_mechanism =
             create_storage_unlock_with_custom_cmp(config, cred_manager_provider.clone());
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
         let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -289,7 +289,7 @@ mod test {
     ) -> Result<()> {
         let auth_storage_unlock_mechanism = create_storage_unlock_with_custom_cmp(config, cmp);
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
 
@@ -322,7 +322,7 @@ mod test {
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -355,7 +355,7 @@ mod test {
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -386,7 +386,7 @@ mod test {
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -404,7 +404,7 @@ mod test {
         let enroll_storage_unlock_mechanism =
             create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -415,7 +415,7 @@ mod test {
         let (enroll_data, _) = enroll_storage_unlock_mechanism.enroll(enroll_stream).await.unwrap();
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
 
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
@@ -437,7 +437,7 @@ mod test {
             enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.unwrap();
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
 
         let auth_storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
@@ -456,7 +456,7 @@ mod test {
         let enroll_storage_unlock_mechanism =
             create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -468,7 +468,7 @@ mod test {
             enroll_storage_unlock_mechanism.enroll(enroll_stream).await.unwrap();
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
 
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
@@ -517,7 +517,7 @@ mod test {
         let auth_storage_unlock_mechanism =
             create_storage_unlock_with_custom_cmp(PINWEAVER_ONLY_CONFIG, cmp);
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("wrong password").unwrap();
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -534,7 +534,7 @@ mod test {
     async fn test_scrypt_roundtrip() {
         let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
         let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -545,7 +545,7 @@ mod test {
         let (enroll_data, enroll_key) = storage_unlock_mechanism.enroll(stream).await.unwrap();
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
             InteractionProtocolServerEnd::Password(auth_interaction_server),
@@ -566,7 +566,7 @@ mod test {
     async fn test_scrypt_roundtrip_different_passwords() {
         let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -577,7 +577,7 @@ mod test {
         let (enroll_data, enroll_key) = storage_unlock_mechanism.enroll(stream).await.unwrap();
 
         let (client, auth_interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
         let _ = client.into_proxy().unwrap().set_password("wrong password").unwrap();
 
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
@@ -598,7 +598,7 @@ mod test {
     async fn test_enroll_scrypt() {
         let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
         let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
@@ -622,7 +622,7 @@ mod test {
         let storage_unlock_mechanism =
             create_storage_unlock_with_custom_cmp(PINWEAVER_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>();
 
         let password_proxy = client.into_proxy().unwrap();
         let _ = password_proxy.set_password(TEST_SCRYPT_PASSWORD).unwrap();
@@ -648,7 +648,7 @@ mod test {
     #[fuchsia::test]
     async fn test_enroll_incorrect_ipse() {
         let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<TestInteractionMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<TestInteractionMarker>();
 
         let _ = client.into_proxy().unwrap().set_success().unwrap();
         let result = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(

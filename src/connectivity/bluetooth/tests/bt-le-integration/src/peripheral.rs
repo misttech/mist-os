@@ -79,7 +79,7 @@ fn default_parameters() -> AdvertisingParameters {
 
 #[test_harness::run_singlethreaded_test]
 async fn test_enable_advertising(harness: PeripheralHarness) {
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
@@ -91,7 +91,7 @@ async fn test_enable_advertising(harness: PeripheralHarness) {
 
 #[test_harness::run_singlethreaded_test]
 async fn test_enable_and_disable_advertising(harness: PeripheralHarness) {
-    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -109,7 +109,7 @@ async fn test_enable_and_disable_advertising(harness: PeripheralHarness) {
 
 #[test_harness::run_singlethreaded_test]
 async fn test_advertising_handle_closed_while_pending(harness: PeripheralHarness) {
-    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     // Drop the handle before getting a response to abort the procedure.
     drop(handle);
@@ -130,7 +130,7 @@ async fn test_advertising_handle_closed_while_pending(harness: PeripheralHarness
 #[test_harness::run_singlethreaded_test]
 async fn test_advertising_data_too_long(harness: PeripheralHarness) {
     const LENGTH: usize = (MAX_LEGACY_ADVERTISING_DATA_LENGTH + 1) as usize;
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     // Assign a very long name.
     let mut params = default_parameters();
@@ -145,7 +145,7 @@ async fn test_advertising_data_too_long(harness: PeripheralHarness) {
 #[test_harness::run_singlethreaded_test]
 async fn test_scan_response_data_too_long(harness: PeripheralHarness) {
     const LENGTH: usize = (MAX_LEGACY_ADVERTISING_DATA_LENGTH + 1) as usize;
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     // Assign a very long name.
     let mut params = default_parameters();
@@ -159,7 +159,7 @@ async fn test_scan_response_data_too_long(harness: PeripheralHarness) {
 
 #[test_harness::run_singlethreaded_test]
 async fn test_update_advertising(harness: PeripheralHarness) {
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -178,7 +178,7 @@ async fn test_update_advertising(harness: PeripheralHarness) {
     // Call `start_advertising` again with new parameters.
     let mut params = default_parameters();
     params.connectable = Some(true);
-    let (_handle2, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle2, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
@@ -204,7 +204,7 @@ async fn test_update_advertising(harness: PeripheralHarness) {
 async fn test_advertising_types(harness: PeripheralHarness) {
     // Non-connectable
     let params = AdvertisingParameters { connectable: Some(false), ..default_parameters() };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -217,7 +217,7 @@ async fn test_advertising_types(harness: PeripheralHarness) {
 
     // Connectable
     let params = AdvertisingParameters { connectable: Some(true), ..default_parameters() };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -237,7 +237,7 @@ async fn test_advertising_types(harness: PeripheralHarness) {
         }),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -257,7 +257,7 @@ async fn test_advertising_types(harness: PeripheralHarness) {
         }),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -277,7 +277,7 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
         mode_hint: Some(AdvertisingModeHint::VeryFast),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -291,7 +291,7 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
         mode_hint: Some(AdvertisingModeHint::VeryFast),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -307,7 +307,7 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
         mode_hint: Some(AdvertisingModeHint::Fast),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -323,7 +323,7 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
         mode_hint: Some(AdvertisingModeHint::Slow),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
     let _ = harness
@@ -342,7 +342,7 @@ async fn test_advertising_data(harness: PeripheralHarness) {
         data: Some(AdvertisingData { name: Some("hello".to_string()), ..empty_advertising_data() }),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
@@ -389,7 +389,7 @@ async fn test_scan_response(harness: PeripheralHarness) {
         }),
         ..default_parameters()
     };
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
@@ -443,7 +443,7 @@ async fn test_receive_connection(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
     let peer = add_fake_peer(&emulator, &address).await.unwrap();
-    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     let mut params = default_parameters();
     params.connectable = Some(true);
@@ -478,7 +478,7 @@ async fn test_connection_dropped_when_not_connectable(harness: PeripheralHarness
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
     let peer = add_fake_peer(&emulator, &address).await.unwrap();
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     // `default_parameters()` are configured as non-connectable.
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
@@ -520,7 +520,7 @@ async fn test_drop_connection(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
     let peer = add_fake_peer(&emulator, &address).await.unwrap();
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     let mut params = default_parameters();
     params.connectable = Some(true);
@@ -563,7 +563,7 @@ async fn test_connection_handle_closes_on_disconnect(harness: PeripheralHarness)
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
     let peer = add_fake_peer(&emulator, &address).await.unwrap();
-    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>().unwrap();
+    let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
     let mut params = default_parameters();
     params.connectable = Some(true);

@@ -302,7 +302,7 @@ pub fn clone_directory_proxy(
     proxy: &fio::DirectoryProxy,
     rights: fio::OpenFlags,
 ) -> fio::DirectoryProxy {
-    let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+    let (client, server) = fidl::endpoints::create_endpoints();
     proxy.clone(rights, server).unwrap();
     ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap()
 }

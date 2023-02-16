@@ -87,8 +87,7 @@ async fn create_session(
     scenic: Arc<fscenic::ScenicProxy>,
 ) -> (scenic::SessionPtr, fasync::Task<()>) {
     let (session_proxy, session_server) = create_proxy::<fscenic::SessionMarker>().unwrap();
-    let (listener_client, listener_server) =
-        create_endpoints::<fscenic::SessionListenerMarker>().unwrap();
+    let (listener_client, listener_server) = create_endpoints::<fscenic::SessionListenerMarker>();
 
     let endpoints = fscenic::SessionEndpoints {
         session: Some(session_server),

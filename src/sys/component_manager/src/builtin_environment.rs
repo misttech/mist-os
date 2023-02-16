@@ -1084,7 +1084,7 @@ impl BuiltinEnvironment {
                 // The component manager running on startup does not get a directory handle. If it was
                 // to run as a component itself, it'd get one. When we don't have a handle to the out
                 // directory, create one.
-                let (_client, server) = fidl::endpoints::create_endpoints().unwrap();
+                let (_client, server) = fidl::endpoints::create_endpoints();
                 server
             }
         };

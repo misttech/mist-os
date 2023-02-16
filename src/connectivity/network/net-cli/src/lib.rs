@@ -1037,8 +1037,7 @@ async fn print_neigh_entries(
     view: fneighbor::ViewProxy,
 ) -> Result<(), Error> {
     let (it_client, it_server) =
-        fidl::endpoints::create_endpoints::<fneighbor::EntryIteratorMarker>()
-            .context("error creating channel for entry iterator")?;
+        fidl::endpoints::create_endpoints::<fneighbor::EntryIteratorMarker>();
     let it = it_client.into_proxy().context("error creating proxy to entry iterator")?;
 
     let () = view

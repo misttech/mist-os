@@ -492,8 +492,7 @@ mod test {
     static TEST_DOMAIN: &str = "test_domain";
 
     fn test_player() -> (Inspector, Player, ServerEnd<PlayerMarker>) {
-        let (player_client, player_server) =
-            create_endpoints::<PlayerMarker>().expect("Creating endpoints for test");
+        let (player_client, player_server) = create_endpoints::<PlayerMarker>();
         let inspector = Inspector::default();
         let (player_published_sink, _player_published_receiver) = oneshot::channel();
         let player = Player::new(

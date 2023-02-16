@@ -143,8 +143,7 @@ mod tests {
                         WatchType::Address => {
                             let (_, server_end) = fidl::endpoints::create_endpoints::<
                                 fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
-                            >()
-                            .expect("create endpoints");
+                            >();
                             let mut subnet = SUBNET;
                             address_responder
                                 .take()

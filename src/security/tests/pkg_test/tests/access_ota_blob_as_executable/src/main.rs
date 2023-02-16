@@ -447,7 +447,7 @@ async fn get_hello_world_v1_update_merkle(v1_update_far_path: String) -> Hash {
 
 async fn perform_update(update_url: &str) {
     let installer_proxy = connect_to_protocol::<InstallerMarker>().unwrap();
-    let (monitor_client_end, monitor_server_end) = create_endpoints::<MonitorMarker>().unwrap();
+    let (monitor_client_end, monitor_server_end) = create_endpoints::<MonitorMarker>();
 
     // Prevent reboot attempt by signalling that the client (this code) will
     // manage reboot via the provided RebootController.

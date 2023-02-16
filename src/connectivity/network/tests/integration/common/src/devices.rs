@@ -21,8 +21,7 @@ pub fn create_tun_device(
         .create_device(fnet_tun::DeviceConfig::EMPTY, tun_dev_server_end)
         .expect("create tun device");
     let (netdevice_client_end, netdevice_server_end) =
-        fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>()
-            .expect("create endpoints");
+        fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
     tun_dev.get_device(netdevice_server_end).expect("get device");
     (tun_dev, netdevice_client_end)
 }

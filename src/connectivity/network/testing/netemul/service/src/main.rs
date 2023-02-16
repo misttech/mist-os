@@ -1892,8 +1892,7 @@ mod tests {
         endpoint: &fnetemul_network::EndpointProxy,
     ) -> fidl::endpoints::ClientEnd<fnetemul_network::DeviceProxy_Marker> {
         let (device_proxy, server) =
-            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>()
-                .expect("failed to create device proxy endpoints");
+            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>();
         let () = endpoint
             .get_proxy_(server)
             .expect("failed to get device proxy from netdevice endpoint");
@@ -2337,8 +2336,7 @@ mod tests {
         let TestRealm { realm } = TestRealm::new(&sandbox, fnetemul::RealmOptions::EMPTY);
         const INVALID_FILE_PATH: &str = "class/ethernet/..";
         let (device_proxy, _server) =
-            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>()
-                .expect("create device proxy endpoints");
+            fidl::endpoints::create_endpoints::<fnetemul_network::DeviceProxy_Marker>();
         let err = realm
             .add_device(INVALID_FILE_PATH, device_proxy)
             .await
@@ -2432,7 +2430,7 @@ mod tests {
     #[fixture(with_sandbox)]
     #[fuchsia::test]
     async fn mock_child(sandbox: fnetemul::SandboxProxy) {
-        let (mock_dir, server_end) = fidl::endpoints::create_endpoints().expect("create endpoints");
+        let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
 
         let mut fs = ServiceFs::new();
         let _: &mut ServiceFsDir<'_, _> =

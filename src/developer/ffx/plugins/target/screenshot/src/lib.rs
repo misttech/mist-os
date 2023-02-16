@@ -256,8 +256,7 @@ mod test {
                     ScreenshotTakeFileResponse { ..ScreenshotTakeFileResponse::EMPTY };
 
                 let (file_client_end, file_server_end) =
-                    fidl::endpoints::create_endpoints::<fio::FileMarker>()
-                        .expect("failed to create file marker");
+                    fidl::endpoints::create_endpoints::<fio::FileMarker>();
 
                 let _ = screenshot.file.insert(file_client_end);
                 let _ = screenshot.size.insert(SizeU { width: 2, height: 2 });

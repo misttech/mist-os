@@ -69,7 +69,7 @@ impl EnclosingEnvironment {
     ) -> Result<Arc<Self>, Error> {
         tracing::info!("Creating an environment");
         let sys_env = connect_to_protocol::<fv1sys::EnvironmentMarker>()?;
-        let (additional_svc_client, additional_svc_server) = fidl::endpoints::create_endpoints()?;
+        let (additional_svc_client, additional_svc_server) = fidl::endpoints::create_endpoints();
         let incoming_svc = Arc::new(incoming_svc);
         let incoming_svc_clone = incoming_svc.clone();
         let mut fs = ServiceFs::new();
@@ -141,7 +141,7 @@ impl EnclosingEnvironment {
         };
 
         let (env_proxy, env_server_end) = fidl::endpoints::create_proxy()?;
-        let (service_directory, directory_request) = fidl::endpoints::create_endpoints()?;
+        let (service_directory, directory_request) = fidl::endpoints::create_endpoints();
 
         let (env_controller_proxy, env_controller_server_end) = fidl::endpoints::create_proxy()?;
         let name = format!("env-{}", ENCLOSING_ENV_ID.fetch_add(1, Ordering::SeqCst));

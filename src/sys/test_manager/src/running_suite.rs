@@ -151,16 +151,14 @@ impl RunningSuite {
 
         let (log_iterator, syslog) = match options.log_iterator {
             Some(ftest_manager::LogsIteratorOption::ArchiveIterator) => {
-                let (proxy, request) =
-                    fidl::endpoints::create_endpoints().expect("cannot create suite");
+                let (proxy, request) = fidl::endpoints::create_endpoints();
                 (
                     ftest_manager::LogsIterator::Archive(request),
                     ftest_manager::Syslog::Archive(proxy),
                 )
             }
             _ => {
-                let (proxy, request) =
-                    fidl::endpoints::create_endpoints().expect("cannot create suite");
+                let (proxy, request) = fidl::endpoints::create_endpoints();
                 (ftest_manager::LogsIterator::Batch(request), ftest_manager::Syslog::Batch(proxy))
             }
         };
@@ -306,7 +304,7 @@ impl RunningSuite {
         let stream = stream_fn(move || iterator.next());
         futures::pin_mut!(stream);
         while let Some(storage_moniker) = stream.try_next().await? {
-            let (node, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>()?;
+            let (node, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
             let directory: ClientEnd<fio::DirectoryMarker> = node.into_channel().into();
             artifact_storage_admin.open_component_storage(
                 &storage_moniker,

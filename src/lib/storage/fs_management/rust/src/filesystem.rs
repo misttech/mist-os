@@ -94,7 +94,7 @@ impl Filesystem {
     fn device_channel(
         &self,
     ) -> Result<ClientEnd<fidl_fuchsia_hardware_block::BlockMarker>, fidl::Error> {
-        let (client, server) = fidl::endpoints::create_endpoints()?;
+        let (client, server) = fidl::endpoints::create_endpoints();
         let () = self.block_device.connect_to_device_fidl(server.into_channel())?;
         Ok(client)
     }
@@ -260,7 +260,7 @@ impl Filesystem {
                 .await?
                 .map_err(Status::from_raw)?;
 
-            let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>()?;
+            let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
             exposed_dir.open(
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::POSIX_EXECUTABLE
@@ -389,7 +389,7 @@ pub struct NamespaceBinding(String);
 
 impl NamespaceBinding {
     pub fn create(root_dir: &fio::DirectoryProxy, path: String) -> Result<NamespaceBinding, Error> {
-        let (client_end, server_end) = create_endpoints()?;
+        let (client_end, server_end) = create_endpoints();
         root_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
         let namespace = fdio::Namespace::installed()?;
@@ -688,7 +688,7 @@ impl ServingMultiVolumeFilesystem {
         volume: String,
         exposed_dir: fio::DirectoryProxy,
     ) -> Result<&mut ServingVolume, Error> {
-        let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>()?;
+        let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
         exposed_dir.open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE

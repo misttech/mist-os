@@ -30,7 +30,7 @@ pub async fn create_proxy<F: FidlProtocol + 'static>(
     f: Rc<RefCell<F>>,
     fake_daemon: &FakeDaemon,
 ) -> (<F::Protocol as ProtocolMarker>::Proxy, Task<()>) {
-    let (client, server) = create_endpoints::<F::Protocol>().unwrap();
+    let (client, server) = create_endpoints::<F::Protocol>();
     let client = AsyncChannel::from_channel(client.into_channel()).unwrap();
     let client = <F::Protocol as ProtocolMarker>::Proxy::from_channel(client);
     let cx = Context::new(fake_daemon.clone());

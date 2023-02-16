@@ -217,8 +217,7 @@ mod tests {
             create_proxy::<fidl_sme::GenericSmeMarker>().expect("failed to create MlmeProxy");
 
         // Construct the request.
-        let (mlme_channel, mlme_receiver) =
-            create_endpoints().expect("failed to create fake MLME proxy");
+        let (mlme_channel, mlme_receiver) = create_endpoints();
         let mut mlme_stream = mlme_receiver.into_stream().expect("failed to create MLME stream");
         let req = fidl_svc::AddIfaceRequest {
             phy_id: 123,
@@ -290,8 +289,7 @@ mod tests {
             create_proxy::<fidl_sme::GenericSmeMarker>().expect("failed to create MlmeProxy");
 
         // Construct the request.
-        let (mlme_channel, mlme_receiver) =
-            create_endpoints().expect("failed to create fake MLME proxy");
+        let (mlme_channel, mlme_receiver) = create_endpoints();
 
         // Drop the receiver so that the initial device info query fails.
         drop(mlme_receiver);
@@ -329,8 +327,7 @@ mod tests {
             create_proxy::<fidl_sme::GenericSmeMarker>().expect("failed to create MlmeProxy");
 
         // Construct the request.
-        let (mlme_channel, mlme_receiver) =
-            create_endpoints().expect("failed to create fake MLME proxy");
+        let (mlme_channel, mlme_receiver) = create_endpoints();
         let mut mlme_stream = mlme_receiver.into_stream().expect("failed to create MLME stream");
 
         let req = fidl_svc::AddIfaceRequest {

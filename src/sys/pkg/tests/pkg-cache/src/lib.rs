@@ -691,7 +691,7 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     async fn block_until_started(&self) {
-        let (_, server_end) = fidl::endpoints::create_endpoints().unwrap();
+        let (_, server_end) = fidl::endpoints::create_endpoints();
         // The fidl call should succeed, but the result of open doesn't matter.
         let _ = self
             .proxies

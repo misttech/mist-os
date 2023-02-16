@@ -309,8 +309,7 @@ mod tests {
             },
         };
 
-        let (client, server) =
-            fidl::endpoints::create_endpoints().expect("failed to make channel pair");
+        let (client, server) = fidl::endpoints::create_endpoints();
         let scope = ExecutionScope::new();
         class_block_and_nand.open(
             scope.clone(),

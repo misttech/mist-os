@@ -121,9 +121,7 @@ impl NetworkDeviceInstance {
 
         let get_device = || {
             let (device, device_server_end) =
-                fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>()
-                    .context("create device endpoints")
-                    .map_err(errors::Error::NonFatal)?;
+                fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>();
             let () = device_instance
                 .get_device(device_server_end)
                 .context("calling DeviceInstance get_device")

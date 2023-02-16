@@ -220,7 +220,7 @@ mod tests {
             resolve(
                 "fuchsia-pkg://fuchsia.test/name?\
                     hash=0000000000000000000000000000000000000000000000000000000000000000",
-                fidl::endpoints::create_endpoints().unwrap().1,
+                fidl::endpoints::create_endpoints().1,
                 &HashMap::from_iter([(
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()
@@ -240,7 +240,7 @@ mod tests {
                 "fuchsia-pkg://fuchsia.test/name?\
                     hash=0000000000000000000000000000000000000000000000000000000000000000",
                 fpkg::ResolutionContext { bytes: vec![] },
-                fidl::endpoints::create_endpoints().unwrap().1,
+                fidl::endpoints::create_endpoints().1,
                 &HashMap::from_iter([(
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()

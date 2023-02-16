@@ -433,7 +433,7 @@ mod tests {
                 responder,
                 ..
             }) => {
-                let (conn_client_end, conn_server_end) = create_endpoints::<ConnectionMarker>()?;
+                let (conn_client_end, conn_server_end) = create_endpoints::<ConnectionMarker>();
                 let peer = Peer {
                     id: Some(fidl_fuchsia_bluetooth::PeerId { value: 1 }),
                     connectable: Some(true),

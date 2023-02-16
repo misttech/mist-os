@@ -900,8 +900,7 @@ mod tests {
         dir: Arc<Simple<MutableConnection>>,
         scope: ExecutionScope,
     ) -> fio::DirectoryProxy {
-        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()
-            .expect("failed to create FIDL endpoints");
+        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
 
         dir.open(
             scope.clone(),
@@ -1305,8 +1304,7 @@ mod tests {
             hex_storage_id => storage_dir.clone(),
         };
 
-        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()
-            .expect("failed to create FIDL endpoints");
+        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
         let dir_proxy = client.into_proxy().unwrap();
 
         let scope = ExecutionScope::new();
@@ -1435,7 +1433,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_storage_utilization() {
         let execution_scope = ExecutionScope::new();
-        let (client, server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
 
         let used = 10;
         let total = 1000;

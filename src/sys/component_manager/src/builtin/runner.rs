@@ -180,7 +180,7 @@ mod tests {
         // Open a connection to the provider.
         let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;
         let (_, server_controller) =
-            fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>()?;
+            fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let mut server = server.into_channel();
         let task_scope = TaskScope::new();
         provider
@@ -261,7 +261,7 @@ mod tests {
         // even after errors.
         for _ in 0..3i32 {
             let (client_controller, server_controller) =
-                fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>()?;
+                fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
             client.start(sample_start_info("xxx://failing"), server_controller)?;
             let actual = client_controller
                 .into_proxy()?

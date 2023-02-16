@@ -110,7 +110,7 @@ impl TrelInstance {
     }
 
     fn make_subscriber_request_stream() -> ServiceSubscriptionListenerRequestStream {
-        let (client, server) = create_endpoints::<ServiceSubscriptionListenerMarker>().unwrap();
+        let (client, server) = create_endpoints::<ServiceSubscriptionListenerMarker>();
 
         let subscriber =
             fuchsia_component::client::connect_to_protocol::<ServiceSubscriber2Marker>().unwrap();
@@ -134,8 +134,7 @@ impl TrelInstance {
     fn register_service(&mut self, port: u16, txt: &[u8]) {
         let txt = split_txt(txt);
 
-        let (client, server) =
-            create_endpoints::<ServiceInstancePublicationResponder_Marker>().unwrap();
+        let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
 
         let publisher =
             fuchsia_component::client::connect_to_protocol::<ServiceInstancePublisherMarker>()

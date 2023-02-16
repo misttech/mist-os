@@ -438,16 +438,16 @@ mod tests {
     async fn test_interface_name_check() {
         let service = LowpanService::with_spawner(FuchsiaGlobalExecutor);
 
-        let (client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+        let (client_ep, _) = create_endpoints::<DriverMarker>();
         assert_eq!(service.register("lowpan0", client_ep), Ok(()));
 
-        let (client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+        let (client_ep, _) = create_endpoints::<DriverMarker>();
         assert_eq!(service.register("low pan 0", client_ep), Err(ZxStatus::INVALID_ARGS));
 
-        let (client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+        let (client_ep, _) = create_endpoints::<DriverMarker>();
         assert_eq!(service.register("0lowpan", client_ep), Err(ZxStatus::INVALID_ARGS));
 
-        let (client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+        let (client_ep, _) = create_endpoints::<DriverMarker>();
         assert_eq!(service.register("l", client_ep), Err(ZxStatus::INVALID_ARGS));
     }
 
@@ -455,7 +455,7 @@ mod tests {
     async fn test_factory_interface() {
         let service = LowpanService::with_spawner(FuchsiaGlobalExecutor);
 
-        let (client_ep, _) = create_endpoints::<FactoryDriverMarker>().unwrap();
+        let (client_ep, _) = create_endpoints::<FactoryDriverMarker>();
         assert_eq!(service.register_factory("lowpan0", client_ep), Ok(()));
     }
 
@@ -465,7 +465,7 @@ mod tests {
 
         let waiter = service.added_removed_cond.wait();
 
-        let (driver_client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+        let (driver_client_ep, _) = create_endpoints::<DriverMarker>();
         assert_eq!(service.register("lowpan0", driver_client_ep), Ok(()));
 
         waiter.await;
@@ -477,7 +477,7 @@ mod tests {
 
         let mut waiter = service.added_removed_cond.wait();
         {
-            let (driver_client_ep, _) = create_endpoints::<DriverMarker>().unwrap();
+            let (driver_client_ep, _) = create_endpoints::<DriverMarker>();
             assert_eq!(service.register("lowpan0", driver_client_ep), Ok(()));
 
             waiter.await;

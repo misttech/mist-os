@@ -32,7 +32,7 @@ fn read_info() -> Result<DetectResult, Error> {
         ProviderSynchronousProxy::new(client_end)
     };
     let controller = {
-        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>()?;
+        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>();
         provider.open_controller(dc_server, zx::Time::INFINITE)?;
         ControllerSynchronousProxy::new(dc_client.into_channel())
     };

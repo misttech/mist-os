@@ -478,8 +478,7 @@ impl Config {
             {
                 debug!("configuring interface `{}` with static IPs {:?}", name, static_ips);
 
-                let (port, server_end) =
-                    fidl::endpoints::create_endpoints().context("create endpoints")?;
+                let (port, server_end) = fidl::endpoints::create_endpoints();
                 endpoint_handles
                     .get(&name)
                     .with_context(|| format!("could not find endpoint `{}`", name))?

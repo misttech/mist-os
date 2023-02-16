@@ -286,8 +286,7 @@ impl TestSetup {
 
         let (port, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
         ep.get_port(server_end).context("get port")?;
-        let (device, server_end) =
-            fidl::endpoints::create_endpoints().context("create endpoints")?;
+        let (device, server_end) = fidl::endpoints::create_endpoints();
         port.get_device(server_end).context("get device")?;
         let port_id = port
             .get_info()

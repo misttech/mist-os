@@ -215,7 +215,7 @@ pub(crate) async fn serve_iterator(
         let debug_data = next_files
             .into_iter()
             .map(|file_name| {
-                let (file, server) = create_endpoints::<fio::NodeMarker>()?;
+                let (file, server) = create_endpoints::<fio::NodeMarker>();
                 directory.open(
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,
                     fio::ModeType::empty(),

@@ -27,8 +27,7 @@ async fn list_impl(
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>()
-        .context("creating endpoints")?;
+    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
     repos_proxy.list_repositories(server).context("listing repositories")?;
     let client = client.into_proxy().context("creating repository iterator proxy")?;
 

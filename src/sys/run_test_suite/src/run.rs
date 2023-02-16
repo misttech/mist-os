@@ -709,7 +709,7 @@ mod test {
         };
 
         let (directory_client, directory_service) =
-            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         dir.open(
             scope,
@@ -856,8 +856,7 @@ mod test {
             "test_file.profraw" => read_only("Not a real profile"),
         };
 
-        let (file_client, file_service) =
-            fidl::endpoints::create_endpoints::<fio::FileMarker>().unwrap();
+        let (file_client, file_service) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
         let scope = ExecutionScope::new();
         dir.open(
             scope,
@@ -867,7 +866,7 @@ mod test {
         );
 
         let (debug_client, debug_service) =
-            fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>();
         let debug_data_fut = async move {
             let mut service = debug_service.into_stream().unwrap();
             let mut data = vec![ftest_manager::DebugData {

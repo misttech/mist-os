@@ -248,8 +248,7 @@ async fn make_execution_runtime(
     let ns = namespace.populate(component, decl).await?;
 
     let (controller_client, controller_server) =
-        endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>()
-            .expect("could not create component controller endpoints");
+        endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
     let controller =
         controller_client.into_proxy().expect("failed to create ComponentControllerProxy");
     // Set up channels into/out of the new component. These are absent from non-executable

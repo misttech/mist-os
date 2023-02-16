@@ -132,7 +132,7 @@ macro_rules! assert_watch {
     ($proxy:expr, $mask:expr) => {{
         use $crate::directory::test_utils::reexport::{fidl, Channel, Status};
 
-        let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints();
 
         let status = $proxy.watch($mask, 0, server).await.expect("watch failed");
         assert_eq!(Status::from_raw(status), Status::OK);
@@ -146,7 +146,7 @@ macro_rules! assert_watch_err {
     ($proxy:expr, $mask:expr, $expected_status:expr) => {{
         use $crate::directory::test_utils::reexport::{fidl, Status};
 
-        let (_client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (_client, server) = fidl::endpoints::create_endpoints();
 
         let status = $proxy.watch($mask, 0, server).await.expect("watch failed");
         assert_eq!(Status::from_raw(status), $expected_status);

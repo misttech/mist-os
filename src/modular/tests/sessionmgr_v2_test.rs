@@ -180,7 +180,7 @@ impl TestFixture {
 
 // Returns a `DirectoryProxy` that serves the directory entry `dir`.
 fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-    let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+    let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     dir.open(
         scope,
@@ -234,7 +234,7 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
     let instance = fixture.builder.build().await?;
 
     let (session_context_client_end, _session_context_server_end) =
-        create_endpoints::<fmodular_internal::SessionContextMarker>()?;
+        create_endpoints::<fmodular_internal::SessionContextMarker>();
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
     let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
@@ -342,7 +342,7 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
     let instance = fixture.builder.build().await?;
 
     let (session_context_client_end, _session_context_server_end) =
-        create_endpoints::<fmodular_internal::SessionContextMarker>()?;
+        create_endpoints::<fmodular_internal::SessionContextMarker>();
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
     let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
@@ -516,7 +516,7 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
     let instance = fixture.builder.build().await?;
 
     let (session_context_client_end, _session_context_server_end) =
-        create_endpoints::<fmodular_internal::SessionContextMarker>()?;
+        create_endpoints::<fmodular_internal::SessionContextMarker>();
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
     let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
@@ -647,7 +647,7 @@ async fn test_v2_session_shell() -> Result<(), Error> {
     let instance = fixture.builder.build().await?;
 
     let (session_context_client_end, _session_context_server_end) =
-        create_endpoints::<fmodular_internal::SessionContextMarker>()?;
+        create_endpoints::<fmodular_internal::SessionContextMarker>();
     let (services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
     let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;

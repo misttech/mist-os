@@ -234,7 +234,7 @@ mod tests {
         }
 
         fn create_endpoints<T: ProtocolMarker>() -> (RwLock<Option<T::Proxy>>, T::RequestStream) {
-            let (client_ep, server_ep) = fidl::endpoints::create_endpoints::<T>().unwrap();
+            let (client_ep, server_ep) = fidl::endpoints::create_endpoints::<T>();
             (RwLock::new(Some(client_ep.into_proxy().unwrap())), server_ep.into_stream().unwrap())
         }
 

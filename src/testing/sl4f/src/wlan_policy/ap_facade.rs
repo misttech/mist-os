@@ -47,7 +47,7 @@ impl WlanApPolicyFacade {
         let (ap_controller, server_end) = create_proxy::<AccessPointControllerMarker>().unwrap();
 
         let (update_client_end, update_listener) =
-            create_endpoints::<AccessPointStateUpdatesMarker>().unwrap();
+            create_endpoints::<AccessPointStateUpdatesMarker>();
         let () = policy_provider.get_controller(server_end, update_client_end)?;
         let update_stream = update_listener.into_stream()?;
         Ok(WlanApPolicyFacade { ap_controller, update_listener: Cell::new(Some(update_stream)) })
@@ -62,7 +62,7 @@ impl WlanApPolicyFacade {
         band: OperatingBand,
     ) -> Result<(), Error> {
         let listener = connect_to_protocol::<AccessPointListenerMarker>()?;
-        let (client_end, server_end) = create_endpoints::<AccessPointStateUpdatesMarker>().unwrap();
+        let (client_end, server_end) = create_endpoints::<AccessPointStateUpdatesMarker>();
         listener.get_listener(client_end)?;
         let mut server_stream = server_end.into_stream()?;
 
@@ -175,7 +175,7 @@ impl WlanApPolicyFacade {
     fn init_listener() -> Result<AccessPointStateUpdatesRequestStream, Error> {
         let listener = connect_to_protocol::<AccessPointListenerMarker>()?;
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<AccessPointStateUpdatesMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<AccessPointStateUpdatesMarker>();
         listener.get_listener(client_end)?;
         Ok(server_end.into_stream()?)
     }

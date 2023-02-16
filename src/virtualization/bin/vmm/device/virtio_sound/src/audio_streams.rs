@@ -269,7 +269,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
 
         // Configure the renderer.
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>()?;
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>();
         self.audio.create_audio_renderer(server_end)?;
         let fidl_proxy = client_end.into_proxy()?;
         fidl_proxy.set_usage(fidl_fuchsia_media::AudioRenderUsage::Media)?;
@@ -629,7 +629,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
         // Configure the capturer.
         // Must call SetPcmStreamType before AddPayloadBuffer.
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>()?;
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>();
         self.audio.create_audio_capturer(server_end, false /* not loopback */)?;
         let fidl_proxy = client_end.into_proxy()?;
         fidl_proxy.set_usage(fidl_fuchsia_media::AudioCaptureUsage::Foreground)?;

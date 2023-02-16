@@ -58,9 +58,9 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
     assert_eq!(removed, Vec::<String>::new());
 
     // Step 4: Try to lookup the dummy device via the Lookup API
-    let (client, server) = create_endpoints::<DeviceMarker>()?;
-    let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>()?;
-    let (client_test, server_test) = create_endpoints::<DeviceTestMarker>()?;
+    let (client, server) = create_endpoints::<DeviceMarker>();
+    let (client_extra, server_extra) = create_endpoints::<DeviceExtraMarker>();
+    let (client_test, server_test) = create_endpoints::<DeviceTestMarker>();
 
     connect_to_protocol::<DeviceConnectorMarker>()
         .context("Failed to connect to DeviceConnector")?

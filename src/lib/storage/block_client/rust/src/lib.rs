@@ -611,7 +611,7 @@ impl RemoteBlockClientSync {
     pub fn new(client_end: fidl::endpoints::ClientEnd<block::BlockMarker>) -> Result<Self, Error> {
         let remote = block::BlockSynchronousProxy::new(client_end.into_channel());
         let info = remote.get_info(zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
-        let (client, server) = fidl::endpoints::create_endpoints()?;
+        let (client, server) = fidl::endpoints::create_endpoints();
         let () = remote.open_session(server)?;
         let session = block::SessionSynchronousProxy::new(client.into_channel());
         let fifo = session.get_fifo(zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
@@ -1131,8 +1131,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_block_close_is_called() {
         let close_called = std::sync::Mutex::new(false);
-        let (client_end, server) =
-            fidl::endpoints::create_endpoints::<block::BlockMarker>().expect("create_proxy failed");
+        let (client_end, server) = fidl::endpoints::create_endpoints::<block::BlockMarker>();
 
         std::thread::spawn(move || {
             let _remote_block_device =

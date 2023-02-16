@@ -338,7 +338,7 @@ fn get_kernel_name() -> Result<String> {
 }
 
 async fn list_targets(query: Option<&str>, tc: &TargetCollectionProxy) -> Result<Vec<TargetInfo>> {
-    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>()?;
+    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc.list_targets(
         TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..TargetQuery::EMPTY },

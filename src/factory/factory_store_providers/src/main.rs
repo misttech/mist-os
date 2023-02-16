@@ -451,7 +451,7 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_client, dir_server) = create_endpoints().unwrap();
+        let (dir_client, dir_server) = create_endpoints();
         let scope = ExecutionScope::new();
         dir.open(
             scope,

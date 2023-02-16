@@ -119,7 +119,7 @@ impl WlanPolicyFacade {
     fn init_listener() -> Result<fidl_policy::ClientStateUpdatesRequestStream, Error> {
         let listener = connect_to_protocol::<fidl_policy::ClientListenerMarker>()?;
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_policy::ClientStateUpdatesMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fidl_policy::ClientStateUpdatesMarker>();
         listener.get_listener(client_end)?;
         Ok(server_end.into_stream()?)
     }

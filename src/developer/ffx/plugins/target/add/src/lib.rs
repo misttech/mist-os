@@ -39,7 +39,7 @@ pub async fn add(target_collection_proxy: TargetCollectionProxy, cmd: AddCommand
         ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
     };
 
-    let (client, server) = fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>()?;
+    let (client, server) = fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy.add_target(
         &mut addr,
         ffx::AddTargetConfig {

@@ -32,7 +32,7 @@ macro_rules! impl_get_protocol_method {
         pub async fn $method(
             &self,
         ) -> Result<<$marker as fidl::endpoints::ProtocolMarker>::Proxy, Error> {
-            let (client, server) = create_endpoints::<$marker>()?;
+            let (client, server) = create_endpoints::<$marker>();
 
             connect_to_protocol::<$connector_marker>()
                 .context("Failed to connect")?
@@ -102,7 +102,7 @@ impl LowpanCtlContext {
         let lookup = connect_to_protocol::<FactoryLookupMarker>()
             .context("Failed to connect to Lowpan FactoryLookup service")?;
 
-        let (client, server) = create_endpoints::<FactoryDeviceMarker>()?;
+        let (client, server) = create_endpoints::<FactoryDeviceMarker>();
 
         lookup.lookup(&self.device_name, server)?;
 

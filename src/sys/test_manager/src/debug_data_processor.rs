@@ -117,7 +117,7 @@ impl DebugDataProcessor {
             MaybeOwnedDirectory::Unowned(dir) => std::borrow::Cow::Borrowed(*dir),
         };
 
-        let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
+        let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
         open_channel_in_namespace(
             &debug_directory_path,
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,

@@ -129,8 +129,7 @@ mod tests {
         let ns = fdio::Namespace::installed().expect("installed namespace");
         let service_device_path = "/test/service_connector/svc";
         let c = ServiceReconnector::<TestMarker>::with_service_at(service_device_path);
-        let (service_channel, server_end) =
-            fidl::endpoints::create_endpoints().expect("create channel");
+        let (service_channel, server_end) = fidl::endpoints::create_endpoints();
         ns.bind(&service_device_path, service_channel).expect("bind test svc");
 
         // In order to test that we reconnect, we create a mock service that

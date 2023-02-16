@@ -328,12 +328,8 @@ async fn create_iface_with_wlanstack(
     let phy_id = req.phy_id;
     let phy = phys.get(&req.phy_id).ok_or(zx::Status::NOT_FOUND)?;
 
-    let (mlme_client, mlme_server) = create_endpoints::<fidl_mlme::MlmeMarker>()
-        .map_err(|e| {
-            error!("failed to create MlmeProxy: {}", e);
-            zx::Status::INTERNAL
-        })
-        .map(|(p, c)| (p, Some(c.into_channel())))?;
+    let (mlme_client, mlme_server) = create_endpoints::<fidl_mlme::MlmeMarker>();
+    let mlme_server = Some(mlme_server.into_channel());
 
     let mut phy_req = fidl_dev::CreateIfaceRequest {
         role: req.role,
@@ -353,11 +349,7 @@ async fn create_iface_with_wlanstack(
             zx::Status::ok(e)
         })?;
 
-    let (generic_sme_client, generic_sme_server) = create_endpoints::<fidl_sme::GenericSmeMarker>()
-        .map_err(|e| {
-            error!("failed to create GenericSmeProxy: {}", e);
-            zx::Status::INTERNAL
-        })?;
+    let (generic_sme_client, generic_sme_server) = create_endpoints::<fidl_sme::GenericSmeMarker>();
     let generic_sme_proxy = generic_sme_client.into_proxy().map_err(|e| {
         error!("Error creating GenericSmeProxy: {}", e);
         zx::Status::INTERNAL
@@ -404,10 +396,7 @@ async fn create_iface_with_usme(
     // Create the bootstrap channel. This channel is only used for initial communication
     // with the USME device.
     let (usme_bootstrap_client, usme_bootstrap_server) =
-        create_endpoints::<fidl_sme::UsmeBootstrapMarker>().map_err(|e| {
-            error!("failed to create UsmeBootstrapProxy: {}", e);
-            zx::Status::INTERNAL
-        })?;
+        create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
     let usme_bootstrap_proxy = usme_bootstrap_client.into_proxy().map_err(|e| {
         error!("Error creating UsmeBootstrapProxy: {}", e);
         zx::Status::INTERNAL
@@ -415,11 +404,7 @@ async fn create_iface_with_usme(
 
     // Create a GenericSme channel. This channel will be used for continued communication with
     // the USME driver and hence will be persisted.
-    let (generic_sme_client, generic_sme_server) = create_endpoints::<fidl_sme::GenericSmeMarker>()
-        .map_err(|e| {
-            error!("failed to create GenericSmeProxy: {}", e);
-            zx::Status::INTERNAL
-        })?;
+    let (generic_sme_client, generic_sme_server) = create_endpoints::<fidl_sme::GenericSmeMarker>();
     let generic_sme_proxy = generic_sme_client.into_proxy().map_err(|e| {
         error!("Error creating GenericSmeProxy: {}", e);
         zx::Status::INTERNAL

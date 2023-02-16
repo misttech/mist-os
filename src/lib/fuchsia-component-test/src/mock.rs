@@ -223,7 +223,7 @@ mod tests {
         let file_name = "example_file";
         let file_contents = "example contents";
 
-        let (_outgoing_dir_client_end, outgoing_dir_server_end) = create_endpoints().unwrap();
+        let (_outgoing_dir_client_end, outgoing_dir_server_end) = create_endpoints();
 
         let data_dir = pseudo_directory!(
             file_name => read_only(file_contents),
@@ -359,8 +359,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn mock_handles_service_connection() {
-        let (svc_client_end, svc_server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
-        let (_ignored, outgoing_dir) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (svc_client_end, svc_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        let (_ignored, outgoing_dir) = create_endpoints::<fio::DirectoryMarker>();
 
         let fidl_mock_handles = ftest::MockComponentStartInfo {
             ns: Some(vec![fcrunner::ComponentNamespaceEntry {

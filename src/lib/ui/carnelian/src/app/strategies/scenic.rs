@@ -37,7 +37,7 @@ impl ScenicAppStrategy {
         view_key: ViewKey,
         app_sender: &UnboundedSender<MessageInternal>,
     ) -> Result<SessionPtr, Error> {
-        let (session_listener, session_listener_request) = create_endpoints()?;
+        let (session_listener, session_listener_request) = create_endpoints();
         let (session_proxy, session_request) = create_proxy()?;
 
         self.scenic.create_session(session_request, Some(session_listener))?;

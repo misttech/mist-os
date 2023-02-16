@@ -64,8 +64,7 @@ pub async fn spawn_pty_forwarder(
     let server = connect_to_protocol::<pty::DeviceMarker>().map_err(|_| LauncherError::Pty)?;
 
     // Open a new controlling client and make it active.
-    let (stdio, to_pty_stdio) =
-        fidl::endpoints::create_endpoints::<pty::DeviceMarker>().map_err(|_| LauncherError::Pty)?;
+    let (stdio, to_pty_stdio) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>();
     let status_client =
         server.open_client(0, to_pty_stdio).await.map_err(|_| LauncherError::Pty)?;
     zx::Status::ok(status_client).map_err(|_| LauncherError::Pty)?;

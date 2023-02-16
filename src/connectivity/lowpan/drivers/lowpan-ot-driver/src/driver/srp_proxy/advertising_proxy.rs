@@ -249,8 +249,7 @@ impl AdvertisingProxyInner {
                 bail!("Host {:?} is too long (max {} chars)", local_name, MAX_DNSSD_HOST_LEN);
             }
 
-            let (client, server) = create_endpoints::<ServiceInstancePublisherMarker>()
-                .context("Failed to create FIDL endpoints")?;
+            let (client, server) = create_endpoints::<ServiceInstancePublisherMarker>();
 
             // This is copied just for use in error messages below.
             let local_name_copy = local_name.to_string();
@@ -405,8 +404,7 @@ impl AdvertisingProxyInner {
                 continue;
             }
 
-            let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>()
-                .context("Failed to create FIDL endpoints")?;
+            let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
 
             let publish_init_future = host
                 .service_publisher

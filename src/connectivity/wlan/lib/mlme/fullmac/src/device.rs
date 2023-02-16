@@ -595,8 +595,7 @@ pub mod test_utils {
         pub fn new() -> Self {
             // Create a channel for SME requests, to be surfaced by start().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
-                fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>()
-                    .expect("creating UsmeBootstrap proxy should succeed");
+                fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
             Self {
                 usme_bootstrap_client_end: Some(usme_bootstrap_client_end),
                 usme_bootstrap_server_end: Some(usme_bootstrap_server_end),

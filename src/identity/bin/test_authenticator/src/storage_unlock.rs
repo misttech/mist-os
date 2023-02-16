@@ -152,7 +152,7 @@ mod test {
     const TEST_TIMEOUT: Duration = Duration::from_seconds(2);
 
     fn create_test_interaction_protocol() -> InteractionProtocolServerEnd {
-        let (_, server_end) = create_endpoints().unwrap();
+        let (_, server_end) = create_endpoints();
         InteractionProtocolServerEnd::Test(server_end)
     }
 
@@ -163,7 +163,7 @@ mod test {
     }
 
     fn create_password_interaction_protocol() -> InteractionProtocolServerEnd {
-        let (_, server_end) = create_endpoints().unwrap();
+        let (_, server_end) = create_endpoints();
         InteractionProtocolServerEnd::Password(server_end)
     }
 

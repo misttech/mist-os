@@ -343,7 +343,7 @@ mod tests {
     async fn directory_register_watcher_not_supported() {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
-        let (_client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (_client, server) = fidl::endpoints::create_endpoints();
 
         assert_eq!(
             Directory::register_watcher(

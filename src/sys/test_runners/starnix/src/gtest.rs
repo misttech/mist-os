@@ -262,7 +262,7 @@ fn add_output_dir_to_namespace(
     )
     .expect("Cannot open test data directory.");
 
-    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>()?;
+    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     test_data_dir
         .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server)
         .expect("Couldn't clone output directory.");

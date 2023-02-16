@@ -154,8 +154,8 @@ fn split_pty_into_handles(
     let pty = pty.into_proxy().unwrap();
 
     // Split the PTY into 3 channels (stdin, stdout, stderr).
-    let (stdout, to_pty_stdout) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>().unwrap();
-    let (stderr, to_pty_stderr) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>().unwrap();
+    let (stdout, to_pty_stdout) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>();
+    let (stderr, to_pty_stderr) = fidl::endpoints::create_endpoints::<pty::DeviceMarker>();
     let to_pty_stdout = to_pty_stdout.into_channel().into();
     let to_pty_stderr = to_pty_stderr.into_channel().into();
 

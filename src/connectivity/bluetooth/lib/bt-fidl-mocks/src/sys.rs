@@ -145,7 +145,7 @@ mod tests {
         let input_cap = InputCapability::None;
         let output_cap = OutputCapability::Display;
         let (pairing_delegate_client, _pairing_delegate_server) =
-            fidl::endpoints::create_endpoints::<PairingDelegateMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<PairingDelegateMarker>();
 
         let pair_set_result =
             proxy.set_pairing_delegate(input_cap, output_cap, pairing_delegate_client);

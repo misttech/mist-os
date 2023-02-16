@@ -90,7 +90,7 @@ impl TunNetworkInterface {
             )
             .context("failed to add device port")?;
 
-        let (device, device_req) = create_endpoints::<fhwnet::DeviceMarker>()?;
+        let (device, device_req) = create_endpoints::<fhwnet::DeviceMarker>();
 
         tun_dev.get_device(device_req).context("get device failed")?;
 

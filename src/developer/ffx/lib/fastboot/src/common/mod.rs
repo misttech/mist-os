@@ -218,7 +218,7 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync>(
     file: &str,
     fastboot_proxy: &FastbootProxy,
 ) -> Result<()> {
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
     let file_to_upload = if resolve {
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?
     } else {
@@ -241,7 +241,7 @@ async fn do_flash<W: Write>(
     fastboot_proxy: &FastbootProxy,
     file_to_upload: &str,
 ) -> Result<()> {
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>()?;
+    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
     try_join!(
         fastboot_proxy.flash(name, file_to_upload, prog_client).map_err(map_fidl_error),
         handle_upload_progress_for_flashing(name, writer, prog_server),
@@ -389,7 +389,7 @@ pub async fn reboot_bootloader<W: Write>(
 ) -> Result<()> {
     write!(writer, "Rebooting to bootloader... ")?;
     writer.flush()?;
-    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>()?;
+    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
     let mut stream = reboot_server.into_stream()?;
     let start_time = Utc::now();
     try_join!(fastboot_proxy.reboot_bootloader(reboot_client).map_err(map_fidl_error), async move {
@@ -441,7 +441,7 @@ fn map_reboot_error(err: RebootError) -> Result<()> {
 }
 
 pub async fn prepare<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>()?;
+    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
     let mut stream = reboot_server.into_stream()?;
     let mut start_time = None;
     writer.flush()?;

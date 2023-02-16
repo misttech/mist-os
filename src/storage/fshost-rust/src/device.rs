@@ -234,7 +234,7 @@ impl Device for BlockDevice {
     }
 
     fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
-        let (client, server) = create_endpoints()?;
+        let (client, server) = create_endpoints();
         self.volume_proxy.clone(OpenFlags::CLONE_SAME_RIGHTS, server)?;
         Ok(client.into_channel().into())
     }

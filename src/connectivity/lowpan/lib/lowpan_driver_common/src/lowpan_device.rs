@@ -1367,7 +1367,7 @@ mod tests {
     async fn test_send_mfg_command() {
         let device = DummyDevice::default();
 
-        let (client_ep, server_ep) = create_endpoints::<FactoryDeviceMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<FactoryDeviceMarker>();
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
@@ -1392,15 +1392,14 @@ mod tests {
     async fn test_energy_scan() {
         let device = DummyDevice::default();
 
-        let (client_ep, server_ep) = create_endpoints::<EnergyScanMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<EnergyScanMarker>();
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
         let proxy = client_ep.into_proxy().unwrap();
 
         let client_future = async move {
-            let (client_ep, server_ep) =
-                create_endpoints::<EnergyScanResultStreamMarker>().unwrap();
+            let (client_ep, server_ep) = create_endpoints::<EnergyScanResultStreamMarker>();
             let params = EnergyScanParameters::EMPTY;
 
             assert_matches!(proxy.start_energy_scan(params, server_ep), Ok(()));
@@ -1431,14 +1430,14 @@ mod tests {
     async fn test_network_scan() {
         let device = DummyDevice::default();
 
-        let (client_ep, server_ep) = create_endpoints::<ExperimentalDeviceExtraMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<ExperimentalDeviceExtraMarker>();
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
         let proxy = client_ep.into_proxy().unwrap();
 
         let client_future = async move {
-            let (client_ep, server_ep) = create_endpoints::<BeaconInfoStreamMarker>().unwrap();
+            let (client_ep, server_ep) = create_endpoints::<BeaconInfoStreamMarker>();
             let params = NetworkScanParameters::EMPTY;
 
             assert_matches!(proxy.start_network_scan(params, server_ep), Ok(()));
@@ -1469,7 +1468,7 @@ mod tests {
     async fn test_get_telemetry_info() {
         let device = DummyDevice::default();
 
-        let (client_ep, server_ep) = create_endpoints::<TelemetryProviderMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<TelemetryProviderMarker>();
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
@@ -1500,7 +1499,7 @@ mod tests {
     async fn test_device_extra_request() {
         let device = DummyDevice::default();
 
-        let (client_ep, server_ep) = create_endpoints::<DeviceExtraMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<DeviceExtraMarker>();
 
         let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
@@ -1521,7 +1520,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_dataset_request() {
-        let (client_ep, server_ep) = create_endpoints::<DatasetMarker>().unwrap();
+        let (client_ep, server_ep) = create_endpoints::<DatasetMarker>();
 
         let server_future = async move {
             let device = DummyDevice::default();

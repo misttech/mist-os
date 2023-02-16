@@ -139,8 +139,8 @@ impl BufferSetFactory {
         buffer_collection_constraints: Option<BufferCollectionConstraints>,
     ) -> Result<(BufferCollectionProxy, StreamBufferPartialSettings)> {
         let (client_token, client_token_request) =
-            create_endpoints::<BufferCollectionTokenMarker>()?;
-        let (codec_token, codec_token_request) = create_endpoints::<BufferCollectionTokenMarker>()?;
+            create_endpoints::<BufferCollectionTokenMarker>();
+        let (codec_token, codec_token_request) = create_endpoints::<BufferCollectionTokenMarker>();
         let client_token = client_token.into_proxy()?;
 
         let sysmem_client =
@@ -153,7 +153,7 @@ impl BufferSetFactory {
             .context("Allocating shared collection")?;
         client_token.duplicate(std::u32::MAX, codec_token_request)?;
 
-        let (collection_client, collection_request) = create_endpoints::<BufferCollectionMarker>()?;
+        let (collection_client, collection_request) = create_endpoints::<BufferCollectionMarker>();
         sysmem_client.bind_shared_collection(
             ClientEnd::new(
                 client_token

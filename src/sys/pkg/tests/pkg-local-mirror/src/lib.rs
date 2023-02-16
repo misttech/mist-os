@@ -153,8 +153,7 @@ impl TestEnv {
 }
 
 fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-    let (client_end, server_end) =
-        fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+    let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     dir.open(
         scope,

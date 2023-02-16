@@ -29,15 +29,14 @@ impl Future for Yield {
 async fn test_legacy_joining_mutual_exclusion() {
     let device = DummyDevice::default();
 
-    let (client_ep, server_ep) =
-        create_endpoints::<DriverMarker>().context("Failed to create FIDL endpoints").unwrap();
+    let (client_ep, server_ep) = create_endpoints::<DriverMarker>();
 
     let server_future = device.serve_to(server_ep.into_stream().unwrap());
 
     let client_future = async move {
         let driver_proxy = client_ep.into_proxy().unwrap();
 
-        let (client1_ep, server1_ep) = create_endpoints::<LegacyJoiningMarker>().unwrap();
+        let (client1_ep, server1_ep) = create_endpoints::<LegacyJoiningMarker>();
 
         driver_proxy
             .get_protocols(Protocols {
@@ -50,7 +49,7 @@ async fn test_legacy_joining_mutual_exclusion() {
 
         client1_proxy.make_joinable(0, 0).await.unwrap();
 
-        let (client2_ep, server2_ep) = create_endpoints::<LegacyJoiningMarker>().unwrap();
+        let (client2_ep, server2_ep) = create_endpoints::<LegacyJoiningMarker>();
 
         driver_proxy
             .get_protocols(Protocols {
@@ -73,7 +72,7 @@ async fn test_legacy_joining_mutual_exclusion() {
         Yield::default().await;
         Yield::default().await;
 
-        let (client3_ep, server3_ep) = create_endpoints::<LegacyJoiningMarker>().unwrap();
+        let (client3_ep, server3_ep) = create_endpoints::<LegacyJoiningMarker>();
 
         driver_proxy
             .get_protocols(Protocols {

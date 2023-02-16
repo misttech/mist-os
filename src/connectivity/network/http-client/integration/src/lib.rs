@@ -249,7 +249,7 @@ async fn test_fetch_https() {
 #[fasync::run_singlethreaded(test)]
 async fn test_start_http() {
     run(|loader, addr| async move {
-        let (tx, rx) = fidl::endpoints::create_endpoints().expect("failed to create endpoints");
+        let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
             .start(make_request("GET", format!("http://{}", addr), None), tx)
@@ -292,7 +292,7 @@ async fn test_fetch_redirect() {
 #[fasync::run_singlethreaded(test)]
 async fn test_start_redirect() {
     run(|loader, addr| async move {
-        let (tx, rx) = fidl::endpoints::create_endpoints().expect("failed to create endpoints");
+        let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
             .start(make_request("GET", format!("http://{}{}", addr, TRIGGER_301), None), tx)
@@ -356,7 +356,7 @@ async fn test_fetch_see_other() {
 #[fasync::run_singlethreaded(test)]
 async fn test_start_see_other() {
     run(|loader, addr| async move {
-        let (tx, rx) = fidl::endpoints::create_endpoints().expect("failed to create endpoints");
+        let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
             .start(make_request("POST", format!("http://{}{}", addr, SEE_OTHER), None), tx)
@@ -428,7 +428,7 @@ async fn test_fetch_max_redirect() {
 #[fasync::run_singlethreaded(test)]
 async fn test_start_redirect_loop() {
     run(|loader, addr| async move {
-        let (tx, rx) = fidl::endpoints::create_endpoints().expect("failed to create endpoints");
+        let (tx, rx) = fidl::endpoints::create_endpoints();
 
         let () = loader
             .start(make_request("GET", format!("http://{}{}", addr, LOOP1), None), tx)

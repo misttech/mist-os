@@ -382,7 +382,7 @@ mod tests {
         let mut state_fut = proxy.watch_state();
         assert!(futures::poll!(&mut state_fut).is_pending());
 
-        let (_password_proxy, test_password_interaction_server_end) = create_endpoints().unwrap();
+        let (_password_proxy, test_password_interaction_server_end) = create_endpoints();
         // Send a StartPassword event and verify that channel closes with unsupported error.
         let _ = proxy.start_password(test_password_interaction_server_end, Mode::Enroll).unwrap();
         assert_matches!(
@@ -413,7 +413,7 @@ mod tests {
         let state = proxy.watch_state().await.expect("Failed to get interaction state");
         assert_eq!(state, InteractionWatchStateResponse::Enrollment(vec![Mechanism::Test]));
 
-        let (_test_proxy, test_interaction_server_end) = create_endpoints().unwrap();
+        let (_test_proxy, test_interaction_server_end) = create_endpoints();
         // Send a StartTest event and verify that channel closes with Ok.
         let _ = proxy.start_test(test_interaction_server_end, Mode::Enroll).unwrap();
         assert_matches!(
@@ -437,7 +437,7 @@ mod tests {
         let state = proxy.watch_state().await.expect("Failed to get interaction state");
         assert_eq!(state, InteractionWatchStateResponse::Authenticate(vec![Mechanism::Test]));
 
-        let (_test_proxy, test_interaction_server_end) = create_endpoints().unwrap();
+        let (_test_proxy, test_interaction_server_end) = create_endpoints();
         // Send a StartTest event and verify that channel closes with Ok.
         let _ = proxy.start_test(test_interaction_server_end, Mode::Authenticate).unwrap();
         assert_matches!(
@@ -462,7 +462,7 @@ mod tests {
         let state = proxy.watch_state().await.expect("Failed to get interaction state");
         assert_eq!(state, InteractionWatchStateResponse::Authenticate(vec![Mechanism::Test]));
 
-        let (_test_proxy, test_interaction_server_end) = create_endpoints().unwrap();
+        let (_test_proxy, test_interaction_server_end) = create_endpoints();
         // Send a StartTest event and verify that channel closes with Ok.
         let _ = proxy.start_test(test_interaction_server_end, Mode::Authenticate).unwrap();
 

@@ -374,7 +374,7 @@ impl VirtualOutput {
 
         // Create the output.
         let (va_output_client, va_output_server) =
-            create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>()?;
+            create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
             .add_output(config, va_output_server, zx::Time::INFINITE)?
             .map_err(|status| anyhow!("AddOutput returned error {:?}", status))?;
@@ -762,7 +762,7 @@ impl VirtualInput {
 
         // Create the input.
         let (va_input_client, va_input_server) =
-            create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>()?;
+            create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
             .add_input(config, va_input_server, zx::Time::INFINITE)?
             .map_err(|status| anyhow!("AddInput returned error {:?}", status))?;

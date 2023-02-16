@@ -53,7 +53,7 @@ pub(crate) fn setup_backing_directories() {
 
 // Returns a `DirectoryProxy` that serves the directory entry `dir`.
 fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> DirectoryProxy {
-    let (client_end, server_end) = fidl::endpoints::create_endpoints::<DirectoryMarker>().unwrap();
+    let (client_end, server_end) = fidl::endpoints::create_endpoints::<DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     dir.open(
         scope,

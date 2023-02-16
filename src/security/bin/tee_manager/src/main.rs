@@ -180,8 +180,7 @@ mod tests {
     }
 
     fn get_storage(provider_proxy: &ProviderProxy) -> fio::DirectoryProxy {
-        let (client_end, server_end) = endpoints::create_endpoints::<fio::DirectoryMarker>()
-            .expect("Failed to create fuchsia::io::Directory endpoints");
+        let (client_end, server_end) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         assert!(provider_proxy.request_persistent_storage(server_end).is_ok());
         client_end.into_proxy().expect("Failed to convert ClientEnd to DirectoryProxy")
     }
@@ -240,8 +239,7 @@ mod tests {
         })
         .detach();
 
-        let (app_client, app_server) = endpoints::create_endpoints::<ApplicationMarker>()
-            .expect("Failed to create Device endpoints");
+        let (app_client, app_server) = endpoints::create_endpoints::<ApplicationMarker>();
 
         let app_proxy =
             app_client.into_proxy().expect("Failed to convert ClientEnd to DeviceProxy");
@@ -281,8 +279,7 @@ mod tests {
         .detach();
 
         let (device_info_client, device_info_server) =
-            endpoints::create_endpoints::<DeviceInfoMarker>()
-                .expect("Failed to create DeviceInfo endpoints");
+            endpoints::create_endpoints::<DeviceInfoMarker>();
 
         let device_info_proxy = device_info_client
             .into_proxy()

@@ -344,7 +344,7 @@ impl BootfsSvc {
         let mut get_inode = |_| -> u64 { BootfsSvc::get_next_inode(&mut self.next_inode) };
 
         let vfs = tree_builder.build_with_inode_generator(&mut get_inode);
-        let (directory, directory_server_end) = fidl::endpoints::create_endpoints()?;
+        let (directory, directory_server_end) = fidl::endpoints::create_endpoints();
         vfs.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE

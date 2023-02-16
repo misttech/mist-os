@@ -114,8 +114,7 @@ fn publish_border_agent_service(
     txt: Vec<(String, Vec<u8>)>,
     port: u16,
 ) -> impl Future<Output = Result<(), anyhow::Error>> + 'static {
-    let (client, server) =
-        create_endpoints::<ServiceInstancePublicationResponder_Marker>().unwrap();
+    let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
 
     let publisher = connect_to_protocol::<ServiceInstancePublisherMarker>().unwrap();
 

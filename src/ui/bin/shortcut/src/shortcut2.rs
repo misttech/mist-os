@@ -771,7 +771,7 @@ mod tests {
         // Test will need to implement Listener so that it can receive shortcut
         // notifications.
         let (listener_client_end, _listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         // set_view is a fire-and-forget call. The expect() will report FIDL errors
         // only. It may not report anything until the next await.
@@ -877,7 +877,7 @@ mod tests {
         let view_ref = new_view_ref();
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         registry_proxy.set_view(&mut clone_view_ref(&view_ref), listener_client_end).unwrap();
 
@@ -916,7 +916,7 @@ mod tests {
         let view_ref = new_view_ref();
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         // This shortcut is registered out of order.
         registry_proxy
@@ -968,7 +968,7 @@ mod tests {
         let view_ref = new_view_ref();
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         registry_proxy.set_view(&mut clone_view_ref(&view_ref), listener_client_end).unwrap();
 
@@ -1013,7 +1013,7 @@ mod tests {
         let view_ref = new_view_ref();
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         registry_proxy.set_view(&mut clone_view_ref(&view_ref), listener_client_end).unwrap();
 
@@ -1068,7 +1068,7 @@ mod tests {
         let view_ref = new_view_ref();
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         registry_proxy.set_view(&mut clone_view_ref(&view_ref), listener_client_end).unwrap();
 
@@ -1138,7 +1138,7 @@ mod tests {
         assert_eq!(vec![fs2::Handled::NotHandled, fs2::Handled::NotHandled,], result);
 
         let (listener_client_end, listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
 
         registry_proxy.set_view(&mut view_ref, listener_client_end).unwrap();
 
@@ -1190,7 +1190,7 @@ mod tests {
         handler.handle_focus_change(&focus_chain).await;
 
         let (parent_listener_client_end, parent_listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
         registry_proxy.set_view(&mut parent_view_ref, parent_listener_client_end).unwrap();
 
         registry_proxy
@@ -1201,7 +1201,7 @@ mod tests {
 
         // Register the child for the same shortcut as the parent.
         let (child_listener_client_end, child_listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
         registry_proxy.set_view(&mut child_view_ref, child_listener_client_end).unwrap();
 
         registry_proxy
@@ -1259,7 +1259,7 @@ mod tests {
         handler.handle_focus_change(&focus_chain).await;
 
         let (parent_listener_client_end, parent_listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
         registry_proxy.set_view(&mut parent_view_ref, parent_listener_client_end).unwrap();
 
         registry_proxy
@@ -1270,7 +1270,7 @@ mod tests {
 
         // Register the child for the same shortcut as the parent.
         let (child_listener_client_end, child_listener_server_end) =
-            endpoints::create_endpoints::<fs2::ListenerMarker>().unwrap();
+            endpoints::create_endpoints::<fs2::ListenerMarker>();
         registry_proxy.set_view(&mut child_view_ref, child_listener_client_end).unwrap();
 
         registry_proxy

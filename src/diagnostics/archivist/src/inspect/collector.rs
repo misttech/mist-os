@@ -195,7 +195,7 @@ mod tests {
         fs.dir("diagnostics").dir("a").add_vmo_file_at("root.inspect", vmo3);
         fs.dir("diagnostics").dir("b").add_vmo_file_at("root.inspect", vmo4);
         // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints().unwrap();
+        let (h0, h1) = fidl::endpoints::create_endpoints();
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
@@ -263,7 +263,7 @@ mod tests {
         inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspector");
 
         // Create a connection to the ServiceFs.
-        let (h0, h1) = fidl::endpoints::create_endpoints().unwrap();
+        let (h0, h1) = fidl::endpoints::create_endpoints();
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();

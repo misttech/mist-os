@@ -213,8 +213,7 @@ mod tests {
             Duration::from_secs(60 * 60 * 24 * 30),
         ));
         let (client_channel, server_channel) =
-            endpoints::create_endpoints::<fsys::SystemControllerMarker>()
-                .expect("failed creating channel endpoints");
+            endpoints::create_endpoints::<fsys::SystemControllerMarker>();
         let mut server_channel = server_channel.into_channel();
         let task_scope = TaskScope::new();
         sys_controller
@@ -299,8 +298,7 @@ mod tests {
                 Duration::from_secs(u64::try_from(TIMEOUT_SECONDS).unwrap()),
             ));
             let (client_channel, server_channel) =
-                endpoints::create_endpoints::<fsys::SystemControllerMarker>()
-                    .expect("failed creating channel endpoints");
+                endpoints::create_endpoints::<fsys::SystemControllerMarker>();
             let mut server_channel = server_channel.into_channel();
             let task_scope = TaskScope::new();
             sys_controller

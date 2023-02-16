@@ -149,7 +149,7 @@ mod tests {
     use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only};
 
     async fn fake_wipe_storage() -> Result<fio::DirectoryProxy, Error> {
-        let (client, server) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
 
         let scope = vfs::execution_scope::ExecutionScope::new();
 

@@ -36,8 +36,7 @@ mod test {
             let path = path.into();
 
             let ns = fdio::Namespace::installed().context("installed namespace")?;
-            let (service_channel, server_end) =
-                fidl::endpoints::create_endpoints().context("create channel")?;
+            let (service_channel, server_end) = fidl::endpoints::create_endpoints();
             ns.bind(path.as_str(), service_channel).context("bind svc")?;
 
             Ok((NamespacedServiceConnector(path), server_end))

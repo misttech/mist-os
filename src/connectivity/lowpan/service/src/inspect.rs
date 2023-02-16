@@ -281,11 +281,11 @@ pub async fn start_inspect_process(inspect_tree: Arc<LowpanServiceTree>) -> Resu
 }
 
 async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Result<(), Error> {
-    let (device_client, device_server) = create_endpoints::<DeviceMarker>()?;
-    let (device_extra_client, device_extra_server) = create_endpoints::<DeviceExtraMarker>()?;
-    let (device_test_client, device_test_server) = create_endpoints::<DeviceTestMarker>()?;
-    let (counters_client, counters_server) = create_endpoints::<CountersMarker>()?;
-    let (telemetry_client, telemetry_server) = create_endpoints::<TelemetryProviderMarker>()?;
+    let (device_client, device_server) = create_endpoints::<DeviceMarker>();
+    let (device_extra_client, device_extra_server) = create_endpoints::<DeviceExtraMarker>();
+    let (device_test_client, device_test_server) = create_endpoints::<DeviceTestMarker>();
+    let (counters_client, counters_server) = create_endpoints::<CountersMarker>();
+    let (telemetry_client, telemetry_server) = create_endpoints::<TelemetryProviderMarker>();
 
     connect_to_protocol::<DeviceConnectorMarker>()?.connect(&name, device_server)?;
     connect_to_protocol::<DeviceExtraConnectorMarker>()?.connect(&name, device_extra_server)?;

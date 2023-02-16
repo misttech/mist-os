@@ -6405,7 +6405,7 @@ mod tests {
     #[fuchsia::test]
     async fn external_binder_connection() {
         let (process_accessor_client_end, process_accessor_server_end) =
-            create_endpoints::<fbinder::ProcessAccessorMarker>().expect("endpoints");
+            create_endpoints::<fbinder::ProcessAccessorMarker>();
 
         let process_accessor_thread =
             spawn_new_process_accessor_thread(process_accessor_server_end);
@@ -6455,7 +6455,7 @@ mod tests {
     fn remote_binder_task() {
         const vector_size: usize = 128 * 1024 * 1024;
         let (process_accessor_client_end, process_accessor_server_end) =
-            create_endpoints::<fbinder::ProcessAccessorMarker>().expect("endpoints");
+            create_endpoints::<fbinder::ProcessAccessorMarker>();
 
         let process_accessor_thread =
             spawn_new_process_accessor_thread(process_accessor_server_end);

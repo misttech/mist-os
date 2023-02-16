@@ -387,8 +387,7 @@ impl AvdtpFacade {
             match evt {
                 Ok(e) => match e {
                     PeerManagerEvent::OnPeerConnected { mut peer_id } => {
-                        let (client, server) = create_endpoints::<PeerControllerMarker>()
-                            .expect("Failed to create peer endpoint");
+                        let (client, server) = create_endpoints::<PeerControllerMarker>();
                         let peer =
                             client.into_proxy().expect("Error: Couldn't obtain peer client proxy");
                         match peer_map.write().entry(peer_id.value.to_string()) {

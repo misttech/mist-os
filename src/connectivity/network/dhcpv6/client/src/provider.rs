@@ -72,8 +72,7 @@ mod tests {
         Fut: Future<Output = Result<()>>,
         F: Fn(NewClientParams, ServerEnd<ClientMarker>) -> Fut,
     {
-        let (client_end, server_end) =
-            create_endpoints::<ClientProviderMarker>().expect("failed to create test fidl channel");
+        let (client_end, server_end) = create_endpoints::<ClientProviderMarker>();
         let client_provider_proxy =
             client_end.into_proxy().expect("failed to create test client proxy");
         let client_provider_stream =
@@ -81,8 +80,7 @@ mod tests {
 
         let test_fut = async {
             for interface_id in 0..10 {
-                let (_client_end, server_end) =
-                    create_endpoints::<ClientMarker>().expect("failed to create test fidl channel");
+                let (_client_end, server_end) = create_endpoints::<ClientMarker>();
                 client_provider_proxy
                     .new_client(
                         NewClientParams {

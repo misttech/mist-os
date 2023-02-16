@@ -80,8 +80,7 @@ mod tests {
     #[test]
     fn forma_init() {
         generic::tests::run(|| {
-            let (token, _) =
-                create_endpoints::<BufferCollectionTokenMarker>().expect("create_endpoint");
+            let (token, _) = create_endpoints::<BufferCollectionTokenMarker>();
             Forma::new_context(token, size2(100, 100), DisplayRotation::Deg0);
         });
     }

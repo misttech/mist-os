@@ -61,7 +61,7 @@ impl FacadeState {
         );
 
         info!("Adding Flatland example to tiles");
-        let (tiles_client, tiles_server) = create_endpoints::<TilesControllerMarker>().unwrap();
+        let (tiles_client, tiles_server) = create_endpoints::<TilesControllerMarker>();
         connect_channel_to_protocol_at_path(
             tiles_server.into_channel(),
             "/svc/fuchsia.developer.tiles.Controller.flatland",

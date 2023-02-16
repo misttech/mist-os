@@ -6,7 +6,7 @@ use crate::{
     Context, DaemonProtocolProvider, FidlProtocol, NameToStreamHandlerMap, ProtocolRegister,
     StreamHandler,
 };
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use ffx_daemon_events::TargetInfo;
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
@@ -169,8 +169,7 @@ impl DaemonProtocolProvider for FakeDaemon {
         target_identifier: Option<String>,
     ) -> Result<rcs::RemoteControlProxy> {
         if let Some(rcs_handler) = self.rcs_handler.clone() {
-            let (client, server) = fidl::endpoints::create_endpoints::<rcs::RemoteControlMarker>()
-                .context("creating endpoints")?;
+            let (client, server) = fidl::endpoints::create_endpoints::<rcs::RemoteControlMarker>();
             fuchsia_async::Task::local(async move {
                 let mut server = server.into_stream().unwrap();
 

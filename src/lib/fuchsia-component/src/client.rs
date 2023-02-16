@@ -454,7 +454,7 @@ pub fn launch_with_options(
     options: LaunchOptions,
 ) -> Result<App, Error> {
     let (controller, controller_server_end) = fidl::endpoints::create_proxy()?;
-    let (directory_request, directory_server_chan) = fidl::endpoints::create_endpoints()?;
+    let (directory_request, directory_server_chan) = fidl::endpoints::create_endpoints();
     let directory_request = Arc::new(directory_request);
     let mut launch_info = LaunchInfo {
         url,
@@ -638,7 +638,7 @@ impl AppBuilder {
             Some(ref channel) => channel,
             None => {
                 let (directory_request, directory_server_chan) =
-                    fidl::endpoints::create_endpoints()?;
+                    fidl::endpoints::create_endpoints();
                 let directory_request = Arc::new(directory_request);
                 self.launch_info.directory_request = Some(directory_server_chan);
                 self.directory_request = Some(directory_request);
@@ -735,7 +735,7 @@ impl AppBuilder {
         let directory_request = if let Some(directory_request) = self.directory_request.take() {
             directory_request
         } else {
-            let (directory_request, directory_server_chan) = fidl::endpoints::create_endpoints()?;
+            let (directory_request, directory_server_chan) = fidl::endpoints::create_endpoints();
             self.launch_info.directory_request = Some(directory_server_chan);
             Arc::new(directory_request)
         };

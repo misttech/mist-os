@@ -320,7 +320,7 @@ impl Directory {
 
     // Return a clone of the existing proxy of the Directory.
     pub fn clone_proxy(&self) -> Result<fio::DirectoryProxy> {
-        let (clone, clone_server) = create_endpoints::<fio::NodeMarker>()?;
+        let (clone, clone_server) = create_endpoints::<fio::NodeMarker>();
         self.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, clone_server)?;
 
         match ClientEnd::<fio::DirectoryMarker>::new(clone.into_channel()).into_proxy() {

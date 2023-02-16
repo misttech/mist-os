@@ -573,8 +573,7 @@ async fn main() -> Result<(), Error> {
         .context("Failed to connect to Bluetooth Test AVRCP interface")?;
 
     // Create a channel for our Request<TestController> to live
-    let (t_client, t_server) =
-        create_endpoints::<ControllerExtMarker>().expect("Error creating Test Controller endpoint");
+    let (t_client, t_server) = create_endpoints::<ControllerExtMarker>();
 
     let _status = test_avrcp_svc.get_controller_for_target(&mut device_id.into(), t_server).await?;
     eprintln!(
@@ -583,8 +582,7 @@ async fn main() -> Result<(), Error> {
     );
 
     // Create a channel for our Request<TestBrowseController> to live
-    let (tb_client, tb_server) = create_endpoints::<BrowseControllerExtMarker>()
-        .expect("Error creating Test Browse Controller endpoint");
+    let (tb_client, tb_server) = create_endpoints::<BrowseControllerExtMarker>();
 
     let _status =
         test_avrcp_svc.get_browse_controller_for_target(&mut device_id.into(), tb_server).await?;
@@ -599,8 +597,7 @@ async fn main() -> Result<(), Error> {
         .context("Failed to connect to Bluetooth AVRCP interface")?;
 
     // Create a channel for our Request<Controller> to live
-    let (c_client, c_server) =
-        create_endpoints::<ControllerMarker>().expect("Error creating Controller endpoint");
+    let (c_client, c_server) = create_endpoints::<ControllerMarker>();
 
     let _status = avrcp_svc.get_controller_for_target(&mut device_id.into(), c_server).await?;
     eprintln!(
@@ -609,8 +606,7 @@ async fn main() -> Result<(), Error> {
     );
 
     // Create a channel for our Request<Controller> to live
-    let (bc_client, bc_server) = create_endpoints::<BrowseControllerMarker>()
-        .expect("Error creating Browse Controller endpoint");
+    let (bc_client, bc_server) = create_endpoints::<BrowseControllerMarker>();
 
     let _status =
         avrcp_svc.get_browse_controller_for_target(&mut device_id.into(), bc_server).await?;

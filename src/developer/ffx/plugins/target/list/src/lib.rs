@@ -35,7 +35,7 @@ pub async fn list_targets(
     #[ffx(machine = Vec<JsonTarget>)] writer: Writer,
     cmd: ListCommand,
 ) -> Result<()> {
-    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>()?;
+    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc_proxy.list_targets(
         TargetQuery { string_matcher: cmd.nodename.clone(), ..TargetQuery::EMPTY },

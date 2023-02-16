@@ -495,8 +495,7 @@ mod tests {
             Fut: Future<Output = Result<(), Error>>,
             SM: StorageManager + Send + Sync + 'static,
         {
-            let (account_client_end, account_server_end) =
-                create_endpoints::<AccountMarker>().unwrap();
+            let (account_client_end, account_server_end) = create_endpoints::<AccountMarker>();
             let account_proxy = account_client_end.into_proxy().unwrap();
             let request_stream = account_server_end.into_stream().unwrap();
 
@@ -649,7 +648,7 @@ mod tests {
         test.run(
             test.create_persistent_account().await.unwrap(),
             |(proxy, _storage_manager)| async move {
-                let (auth_listener_client_end, _) = create_endpoints().unwrap();
+                let (auth_listener_client_end, _) = create_endpoints();
                 assert_eq!(
                     proxy
                         .register_auth_listener(AuthTargetRegisterAuthListenerRequest {
@@ -695,7 +694,7 @@ mod tests {
 
         test.run(account, |(account_proxy, _storage_manager)| {
             async move {
-                let (persona_client_end, persona_server_end) = create_endpoints().unwrap();
+                let (persona_client_end, persona_server_end) = create_endpoints();
                 let response = account_proxy.get_default_persona(persona_server_end).await?;
                 assert_eq!(&PersonaId::from(response.unwrap()), persona_id);
 
@@ -719,7 +718,7 @@ mod tests {
         let mut test = Test::new();
         let account = test.create_ephemeral_account().await.unwrap();
         test.run(account, |(account_proxy, _storage_manager)| async move {
-            let (persona_client_end, persona_server_end) = create_endpoints().unwrap();
+            let (persona_client_end, persona_server_end) = create_endpoints();
             assert!(account_proxy.get_default_persona(persona_server_end).await?.is_ok());
             let persona_proxy = persona_client_end.into_proxy().unwrap();
 
@@ -737,7 +736,7 @@ mod tests {
 
         test.run(account, |(account_proxy, _storage_manager)| {
             async move {
-                let (persona_client_end, persona_server_end) = create_endpoints().unwrap();
+                let (persona_client_end, persona_server_end) = create_endpoints();
                 assert!(account_proxy
                     .get_persona(FidlPersonaId::from(persona_id), persona_server_end)
                     .await?
@@ -765,7 +764,7 @@ mod tests {
         let wrong_id = PersonaId::new(13);
 
         test.run(account, |(proxy, _storage_manager)| async move {
-            let (_, persona_server_end) = create_endpoints().unwrap();
+            let (_, persona_server_end) = create_endpoints();
             assert_eq!(
                 proxy.get_persona(wrong_id.into(), persona_server_end).await?,
                 Err(ApiError::NotFound)
@@ -786,7 +785,7 @@ mod tests {
                     proxy.get_auth_mechanism_enrollments().await?,
                     Err(ApiError::UnsupportedOperation)
                 );
-                let (_, interaction_server_end) = create_endpoints().unwrap();
+                let (_, interaction_server_end) = create_endpoints();
                 assert_eq!(
                     proxy.create_auth_mechanism_enrollment(interaction_server_end).await?,
                     Err(ApiError::UnsupportedOperation)

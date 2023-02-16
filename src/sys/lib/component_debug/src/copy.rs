@@ -464,7 +464,7 @@ pub async fn get_matching_ns_entries(
 /// # Arguments
 /// * `ns_dir`: A proxy to the component's namespace directory.
 pub fn duplicate_namespace_client(ns_dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy> {
-    let (client, server) = create_endpoints::<fio::NodeMarker>().unwrap();
+    let (client, server) = create_endpoints::<fio::NodeMarker>();
     ns_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).unwrap();
     let client =
         ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap();
@@ -551,7 +551,7 @@ mod tests {
         moniker: &str,
         ns_dir: ClientEnd<fio::DirectoryMarker>,
     ) -> HashMap<String, (fsys::InstanceInfo, Option<Box<fsys::ResolvedState>>)> {
-        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>();
         HashMap::from([(
             name.to_string(),
             (
@@ -567,7 +567,7 @@ mod tests {
     }
 
     fn create_realm_query(seed_files: Vec<SeedPath>, is_read_only: bool) -> fsys::RealmQueryProxy {
-        let (ns_dir, ns_server) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (ns_dir, ns_server) = create_endpoints::<fio::DirectoryMarker>();
         let () = serve_realm_query_with_namespace(ns_server, seed_files, is_read_only).unwrap();
         let query_instance =
             create_hashmap_of_instance_info(RELATIVE_FOO_MONIKER, RELATIVE_FOO_MONIKER, ns_dir);

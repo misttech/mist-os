@@ -44,7 +44,7 @@ impl NamespaceBinder {
             Entry::Vacant(map_entry) => {
                 let dir = pfs::simple();
 
-                let (client, server) = fidl::endpoints::create_endpoints()?;
+                let (client, server) = fidl::endpoints::create_endpoints();
                 dir.clone().open(
                     self.scope.clone(),
                     fio::OpenFlags::RIGHT_READABLE

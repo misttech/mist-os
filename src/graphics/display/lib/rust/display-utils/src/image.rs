@@ -182,7 +182,7 @@ async fn allocate_image_buffer(
 
     // Duplicate of `collection_token` to be transferred to the display driver.
     let display_duplicate = {
-        let (local, remote) = create_endpoints::<BufferCollectionTokenMarker>()?;
+        let (local, remote) = create_endpoints::<BufferCollectionTokenMarker>();
         collection_token.duplicate(std::u32::MAX, remote)?;
         collection_token.sync().await?;
         local
@@ -208,7 +208,7 @@ async fn allocate_image_buffer_helper(
 ) -> Result<(BufferCollectionInfo2, BufferCollectionProxy)> {
     // Turn in the collection token to obtain a connection to the logical buffer collection.
     let collection = {
-        let (local, remote) = create_endpoints::<BufferCollectionMarker>()?;
+        let (local, remote) = create_endpoints::<BufferCollectionMarker>();
         let token_channel =
             token.into_channel().map_err(|_| Error::SysmemConnection)?.into_zx_channel();
         allocator.bind_shared_collection(ClientEnd::new(token_channel), remote)?;

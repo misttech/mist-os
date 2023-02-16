@@ -139,8 +139,7 @@ impl LegacyComponent {
             }
         }
 
-        let (host_dir_client_end, host_dir_server_end) = create_endpoints::<fio::DirectoryMarker>()
-            .context("could not create node proxy endpoints")?;
+        let (host_dir_client_end, host_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
         host_pseudo_dir.clone().open(
             execution_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE

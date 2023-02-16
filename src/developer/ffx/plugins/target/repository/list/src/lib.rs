@@ -22,7 +22,7 @@ async fn list_impl<W: Write>(
     repos: RepositoryRegistryProxy,
     mut writer: W,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints()?;
+    let (client, server) = fidl::endpoints::create_endpoints();
     repos.list_registered_targets(server).context("communicating with daemon")?;
     let registered_targets = client.into_proxy()?;
 

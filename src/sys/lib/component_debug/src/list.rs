@@ -529,7 +529,7 @@ mod tests {
         }
 
         let root = root.display().to_string();
-        let (client, server) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
         fuchsia_fs::directory::open_channel_in_namespace(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
@@ -565,8 +565,8 @@ mod tests {
         let (_temp_out_dir, out_dir) = create_appmgr_out();
 
         // The exposed and namespace dir is not used by this library.
-        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
-        let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>();
+        let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>();
 
         let query = serve_realm_query(HashMap::from([(
             "./core/appmgr".to_string(),
@@ -632,8 +632,8 @@ mod tests {
         let (temp_dir, out_dir) = create_appmgr_out();
 
         // The exposed and namespace dir is not used by this library.
-        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
-        let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>();
+        let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>();
 
         let query = serve_realm_query(HashMap::from([(
             "./core/appmgr".to_string(),

@@ -116,7 +116,7 @@ impl RebootController {
                 }
                 TargetRebootState::Bootloader => {
                     let (reboot_client, reboot_server) =
-                        fidl::endpoints::create_endpoints::<ffx::RebootListenerMarker>()?;
+                        fidl::endpoints::create_endpoints::<ffx::RebootListenerMarker>();
                     let mut stream = reboot_server.into_stream()?;
                     match try_join!(
                         self.get_fastboot_proxy().await?.reboot_bootloader(reboot_client).map_err(

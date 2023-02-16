@@ -883,7 +883,7 @@ impl RoutingTestModel for RoutingTest {
     }
 
     fn install_namespace_directory(&self, path: &str) {
-        let (client, server) = fidl::endpoints::create_endpoints().unwrap();
+        let (client, server) = fidl::endpoints::create_endpoints();
         let ns = fdio::Namespace::installed().expect("Failed to get installed namespace");
         ns.bind(path, client).unwrap_or_else(|e| panic!("Failed to bind dir {}: {:?}", path, e));
         let mut out_dir = OutDir::new();

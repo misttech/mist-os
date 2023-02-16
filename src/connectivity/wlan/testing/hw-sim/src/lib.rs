@@ -947,8 +947,7 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
     let policy_provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>()
         .expect("connecting to wlan policy");
     let (client_controller, server_end) = create_proxy().expect("creating client controller");
-    let (update_client_end, _update_server_end) =
-        create_endpoints().expect("creating client listener");
+    let (update_client_end, _update_server_end) = create_endpoints();
     let () =
         policy_provider.get_controller(server_end, update_client_end).expect("getting controller");
 

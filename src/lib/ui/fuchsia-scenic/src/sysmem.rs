@@ -41,7 +41,7 @@ pub async fn duplicate_buffer_collection_token(
     token: &mut fsysmem::BufferCollectionTokenProxy,
 ) -> Result<ClientEnd<fsysmem::BufferCollectionTokenMarker>, Error> {
     let (duplicate_token, duplicate_token_server_end) =
-        create_endpoints::<fsysmem::BufferCollectionTokenMarker>()?;
+        create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
 
     token.duplicate(std::u32::MAX, duplicate_token_server_end)?;
     token.sync().await?;

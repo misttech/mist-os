@@ -60,7 +60,7 @@ impl NetworkScanCommand {
             .get_default_experimental_device_extra()
             .await
             .context("Unable to get device instance")?;
-        let (client_end, server_end) = create_endpoints::<BeaconInfoStreamMarker>()?;
+        let (client_end, server_end) = create_endpoints::<BeaconInfoStreamMarker>();
         let result_stream = client_end.into_proxy()?;
         device_extra
             .start_network_scan(network_scan_marker, server_end)

@@ -175,7 +175,7 @@ impl BufferCollectionAllocator {
         let _ = set_allocator_name(&sysmem);
 
         let (local_token, local_token_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>()?;
+            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
 
         sysmem.allocate_shared_collection(local_token_request)?;
 
@@ -205,7 +205,7 @@ impl BufferCollectionAllocator {
     ) -> Result<fidl_fuchsia_sysmem::BufferCollectionInfo2, Error> {
         let token = self.token.take().expect("token in allocate_buffers");
         let (collection_client, collection_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionMarker>()?;
+            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionMarker>();
         self.sysmem.bind_shared_collection(
             ClientEnd::new(token.into_channel().unwrap().into_zx_channel()),
             collection_request,
@@ -246,7 +246,7 @@ impl BufferCollectionAllocator {
         &mut self,
     ) -> Result<ClientEnd<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>, Error> {
         let (requested_token, requested_token_request) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>()?;
+            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
 
         self.token
             .as_ref()

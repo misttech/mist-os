@@ -389,14 +389,14 @@ mod test {
         let (_observer_request_sink, observer_request_stream) = mpsc::channel(100);
         let (player_published_sink, _player_published_receiver) = oneshot::channel();
         let dummy_control_handle =
-            create_endpoints::<DiscoveryMarker>()?.1.into_stream_and_control_handle()?.1;
+            create_endpoints::<DiscoveryMarker>().1.into_stream_and_control_handle()?.1;
 
         let (usage_reporter_proxy, _server_end) = create_proxy::<UsageReporterMarker>()?;
         let under_test = Discovery::new(player_stream, usage_reporter_proxy);
         spawn_log_error(under_test.serve(discovery_request_stream, observer_request_stream));
 
         // Create one watcher ahead of any players, for synchronization.
-        let (watcher1_client, watcher1_server) = create_endpoints::<SessionsWatcherMarker>()?;
+        let (watcher1_client, watcher1_server) = create_endpoints::<SessionsWatcherMarker>();
         let mut watcher1 = watcher1_server.into_stream()?;
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
@@ -408,7 +408,7 @@ mod test {
 
         // Add a player to the set, and vend an update from it.
         let inspector = Inspector::default();
-        let (player_client, player_server) = create_endpoints::<PlayerMarker>()?;
+        let (player_client, player_server) = create_endpoints::<PlayerMarker>();
         let player = Player::new(
             Id::new()?,
             player_client,
@@ -435,7 +435,7 @@ mod test {
 
         // A new watcher connecting after the registration of the player should be caught up
         // with the existence of the player.
-        let (watcher2_client, watcher2_server) = create_endpoints::<SessionsWatcherMarker>()?;
+        let (watcher2_client, watcher2_server) = create_endpoints::<SessionsWatcherMarker>();
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
                 watch_options: Decodable::new_empty(),

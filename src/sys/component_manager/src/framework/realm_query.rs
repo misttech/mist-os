@@ -603,7 +603,7 @@ fn serve_instance_iterator(
     mut instances: Vec<fsys::Instance>,
 ) -> ClientEnd<fsys::InstanceIteratorMarker> {
     let (client_end, server_end) =
-        fidl::endpoints::create_endpoints::<fsys::InstanceIteratorMarker>().unwrap();
+        fidl::endpoints::create_endpoints::<fsys::InstanceIteratorMarker>();
     fasync::Task::spawn(async move {
         let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
         while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await
@@ -841,7 +841,7 @@ mod tests {
 
         model.start().await;
 
-        let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -859,7 +859,7 @@ mod tests {
         // should just be closed.
         assert!(is_closed(outgoing_dir));
 
-        let (runtime_dir, server_end) = create_endpoints::<fio::DirectoryMarker>().unwrap();
+        let (runtime_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
         query
             .open(
@@ -1191,7 +1191,7 @@ mod deprecated {
                     None
                 };
 
-                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
+                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints();
                 r.get_exposed_dir().open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                     vfs::path::Path::dot(),
@@ -1201,7 +1201,7 @@ mod deprecated {
                 let exposed_dir =
                     fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(exposed_dir);
 
-                let (ns_dir, ns_server) = fidl::endpoints::create_endpoints().unwrap();
+                let (ns_dir, ns_server) = fidl::endpoints::create_endpoints();
                 r.get_ns_dir().open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -1248,7 +1248,7 @@ mod deprecated {
                     None
                 };
 
-                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
+                let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints();
                 r.get_exposed_dir().open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                     vfs::path::Path::dot(),

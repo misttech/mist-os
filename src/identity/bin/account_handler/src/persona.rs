@@ -210,7 +210,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_register_auth_listener() {
         run_test(create_persona(), |proxy| async move {
-            let (auth_listener_client_end, _) = create_endpoints().unwrap();
+            let (auth_listener_client_end, _) = create_endpoints();
             assert_eq!(
                 proxy
                     .register_auth_listener(AuthTargetRegisterAuthListenerRequest {

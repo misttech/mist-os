@@ -601,7 +601,7 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
             }
         });
 
-        let (client_end, server_end) = fidl::endpoints::create_endpoints()?;
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
         self.serve_connection(server_end)?;
 
         Ok(ServiceList { names, provider: None, host_directory: Some(client_end) })
@@ -658,7 +658,7 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
         let (new_env, new_env_server_end) = fidl::endpoints::create_proxy()?;
         let (controller, controller_server_end) = fidl::endpoints::create_proxy()?;
         let (launcher, launcher_server_end) = fidl::endpoints::create_proxy()?;
-        let (directory_request, directory_server_end) = fidl::endpoints::create_endpoints()?;
+        let (directory_request, directory_server_end) = fidl::endpoints::create_endpoints();
 
         env.create_nested_environment(
             new_env_server_end,
@@ -691,7 +691,7 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     where
         ServiceObjTy: ServiceObjTrait<Output = O>,
     {
-        let (directory_request, directory_server_end) = fidl::endpoints::create_endpoints()?;
+        let (directory_request, directory_server_end) = fidl::endpoints::create_endpoints();
         self.serve_connection(directory_server_end)?;
 
         Ok(ProtocolConnector { directory_request })

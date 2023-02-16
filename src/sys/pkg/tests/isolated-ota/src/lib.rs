@@ -265,7 +265,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
         );
 
         let (blobfs_client_end_clone, remote) =
-            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         blobfs_proxy
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::from(remote.into_channel()))
             .unwrap();

@@ -268,8 +268,7 @@ impl Loader {
         }
 
         let (client, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionMarker>()
-                .expect("Failed to create buffer collection endpoints.");
+            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionMarker>();
 
         sysmem_allocator
             .bind_shared_collection(tokens.buffer_token_proxy.into_channel().into(), remote)

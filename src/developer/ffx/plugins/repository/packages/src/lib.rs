@@ -47,7 +47,7 @@ async fn show_impl(
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints::<PackageEntryIteratorMarker>()?;
+    let (client, server) = fidl::endpoints::create_endpoints::<PackageEntryIteratorMarker>();
 
     let repo_name = if let Some(repo_name) = cmd.repository.clone() {
         repo_name
@@ -142,7 +142,7 @@ async fn list_impl(
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryPackagesIteratorMarker>()?;
+    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryPackagesIteratorMarker>();
 
     let repo_name = if let Some(repo_name) = cmd.repository.clone() {
         repo_name

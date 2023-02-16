@@ -49,7 +49,7 @@ fn main() {
     };
 
     // Write the test process output to the block device in the expected format.
-    let (client_end, server_end) = fidl::endpoints::create_endpoints::<BlockMarker>().unwrap();
+    let (client_end, server_end) = fidl::endpoints::create_endpoints::<BlockMarker>();
     connect_channel_to_protocol_at_path(server_end.into_channel(), &block_device)
         .expect("connecting to block device");
 

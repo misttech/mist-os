@@ -2013,7 +2013,7 @@ mod tests {
             Arc::new(AtomicBool::new(false)),
         );
 
-        let (runner_client_end, runner_server_end) = create_endpoints().unwrap();
+        let (runner_client_end, runner_server_end) = create_endpoints();
         drop(runner_server_end);
         let res =
             builder_proxy.build(runner_client_end).await.expect("failed to send build command");
@@ -2141,13 +2141,13 @@ mod tests {
             Arc::new(AtomicBool::new(false)),
         );
 
-        let (runner_client_end, runner_server_end) = create_endpoints().unwrap();
+        let (runner_client_end, runner_server_end) = create_endpoints();
         drop(runner_server_end);
         let res =
             builder_proxy.build(runner_client_end).await.expect("failed to send build command");
         assert!(res.is_ok());
 
-        let (runner_client_end, runner_server_end) = create_endpoints().unwrap();
+        let (runner_client_end, runner_server_end) = create_endpoints();
         drop(runner_server_end);
         let res =
             builder_proxy.build(runner_client_end).await.expect("failed to send build command");
@@ -2533,7 +2533,7 @@ mod tests {
         };
 
         let (_controller_client_end, controller_server_end) =
-            create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+            create_endpoints::<fcrunner::ComponentControllerMarker>();
         let runner_proxy_for_a =
             get_runner_proxy(&local_component_proxies, "0").lock().await.clone().unwrap();
         runner_proxy_for_a

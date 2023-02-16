@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_typical_case() {
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>();
 
         // Create a take storage server with the canned call responses for
         // GetStatus that we want.
@@ -336,7 +336,7 @@ mod tests {
     /// threshold. In this case we expect the call behavior to be the same as "normal" operrations.
     fn test_utilization_stays_above_threshold() {
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>();
 
         // Create a take storage server with the canned call responses for
         // GetStatus that we want.
@@ -426,7 +426,7 @@ mod tests {
     #[should_panic]
     fn test_channel_closure_panics() {
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>().unwrap();
+            fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>();
 
         let (mut _calls_rx, mut exec, time_step, client, config) = common_setup(None, client_end);
         let mut monitor = Box::pin(monitor_storage(&client, config));

@@ -47,8 +47,7 @@ impl ComponentLauncher for ElfComponentLauncher {
         component: &Component,
         args: Vec<String>,
     ) -> Result<(zx::Process, launch::ScopedJob, LoggerStream, LoggerStream), RunTestError> {
-        let (client_end, loader) =
-            fidl::endpoints::create_endpoints().map_err(launch::LaunchError::Fidl)?;
+        let (client_end, loader) = fidl::endpoints::create_endpoints();
         component.loader_service(loader);
         let executable_vmo = Some(component.executable_vmo()?);
         let mut handle_infos = vec![fproc::HandleInfo {

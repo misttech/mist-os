@@ -423,7 +423,7 @@ impl VulkanRenderer {
         )?;
 
         let (buffer_collection_token, buffer_collection_token_server_end) =
-            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>()?;
+            create_endpoints::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>();
         sysmem_allocator.allocate_shared_collection(buffer_collection_token_server_end)?;
 
         // Temporarily transform this from a `ClientEnd` to a `Proxy` in order to make a duplicate.

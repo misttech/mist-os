@@ -68,8 +68,7 @@ impl Controller {
     /// to `remote_path` on the guest.
     pub async fn put_file(&self, local_path: &str, remote_path: &str) -> Result {
         let (file_client_end, file_server_end) =
-            fidl::endpoints::create_endpoints::<fio::FileMarker>()
-                .context("failed to create file endpoints")?;
+            fidl::endpoints::create_endpoints::<fio::FileMarker>();
         fdio::open(&local_path, fio::OpenFlags::RIGHT_READABLE, file_server_end.into_channel())
             .with_context(|| format!("failed to open file '{}'", local_path))?;
         let status = self
@@ -89,8 +88,7 @@ impl Controller {
     /// namespace of the current process.
     pub async fn get_file(&self, local_path: &str, remote_path: &str) -> Result {
         let (file_client_end, file_server_end) =
-            fidl::endpoints::create_endpoints::<fio::FileMarker>()
-                .context("failed to create file endpoints")?;
+            fidl::endpoints::create_endpoints::<fio::FileMarker>();
         fdio::open(
             &local_path,
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,

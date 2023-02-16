@@ -783,7 +783,7 @@ impl FrameBuffer {
         fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, &device_path)?;
         let provider = ProviderSynchronousProxy::new(client_end);
 
-        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>()?;
+        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>();
         let status = if virtcon_mode.is_some() {
             provider.open_virtcon_controller(dc_server, zx::Time::INFINITE)
         } else {
@@ -943,7 +943,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_vsync() -> Result<(), anyhow::Error> {
-        let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>()?;
+        let (client, server) = fidl::endpoints::create_endpoints::<ControllerMarker>();
         let mut stream = server.into_stream()?;
         let vsync_enabled = Rc::new(Cell::new(false));
         let vsync_enabled_clone = Rc::clone(&vsync_enabled);

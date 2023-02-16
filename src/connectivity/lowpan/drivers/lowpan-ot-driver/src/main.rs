@@ -107,7 +107,7 @@ impl Config {
             fdio::clone_channel(&file)?,
         )?);
 
-        let (client_side, server_side) = fidl::endpoints::create_endpoints::<SpinelDeviceMarker>()?;
+        let (client_side, server_side) = fidl::endpoints::create_endpoints::<SpinelDeviceMarker>();
 
         spinel_device_setup_proxy
             .set_channel(server_side)

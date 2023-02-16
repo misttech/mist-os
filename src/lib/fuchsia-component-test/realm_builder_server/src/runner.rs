@@ -273,11 +273,11 @@ mod tests {
         };
 
         let (_controller_client_end, controller_server_end) =
-            create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+            create_endpoints::<fcrunner::ComponentControllerMarker>();
         let (_outgoing_dir_client_end, outgoing_dir_server_end) =
-            create_endpoints::<fio::DirectoryMarker>().unwrap();
+            create_endpoints::<fio::DirectoryMarker>();
         let (_runtime_dir_client_end, runtime_dir_server_end) =
-            create_endpoints::<fio::DirectoryMarker>().unwrap();
+            create_endpoints::<fio::DirectoryMarker>();
 
         server_runner_proxy
             .start(
@@ -348,11 +348,11 @@ mod tests {
         };
 
         let (_controller_client_end, controller_server_end) =
-            create_endpoints::<fcrunner::ComponentControllerMarker>().unwrap();
+            create_endpoints::<fcrunner::ComponentControllerMarker>();
         let (_outgoing_dir_client_end, outgoing_dir_server_end) =
-            create_endpoints::<fio::DirectoryMarker>().unwrap();
+            create_endpoints::<fio::DirectoryMarker>();
         let (_runtime_dir_client_end, runtime_dir_server_end) =
-            create_endpoints::<fio::DirectoryMarker>().unwrap();
+            create_endpoints::<fio::DirectoryMarker>();
 
         server_runner_proxy
             .start(

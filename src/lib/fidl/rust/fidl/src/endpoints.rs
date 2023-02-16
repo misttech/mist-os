@@ -392,11 +392,11 @@ impl<T> HandleBased for ServerEnd<T> {}
 handle_based_codable![ClientEnd :- <T,>, ServerEnd :- <T,>,];
 
 /// Creates client and server endpoints connected to by a channel.
-pub fn create_endpoints<T: ProtocolMarker>() -> Result<(ClientEnd<T>, ServerEnd<T>), Error> {
+pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
     let (client, server) = Channel::create();
     let client_end = ClientEnd::<T>::new(client);
     let server_end = ServerEnd::new(server);
-    Ok((client_end, server_end))
+    (client_end, server_end)
 }
 
 // TODO(https://fxbug.dev/115384) delete once create_endpoints is infallible
@@ -414,7 +414,7 @@ pub fn try_create_endpoints<T: ProtocolMarker>() -> Result<(ClientEnd<T>, Server
 /// Useful for sending channel handles to calls that take arguments
 /// of type `server_end:SomeProtocol`
 pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
-    let (client, server) = create_endpoints()?;
+    let (client, server) = create_endpoints();
     Ok((client.into_proxy()?, server))
 }
 
@@ -424,7 +424,7 @@ pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Err
 /// of type `client_end:SomeProtocol`
 pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::RequestStream), Error>
 {
-    let (client, server) = create_endpoints()?;
+    let (client, server) = create_endpoints();
     Ok((client, server.into_stream()?))
 }
 
@@ -433,7 +433,7 @@ pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::Re
 /// Useful for testing where both the request stream and proxy are
 /// used in the same process.
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
-    let (client, server) = create_endpoints::<T>()?;
+    let (client, server) = create_endpoints::<T>();
     Ok((client.into_proxy()?, server.into_stream()?))
 }
 

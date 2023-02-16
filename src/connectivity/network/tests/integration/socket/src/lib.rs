@@ -1339,8 +1339,7 @@ async fn install_ip_device(
     let mut port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
     let device = {
         let (device, server_end) =
-            fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>()
-                .expect("create endpoints");
+            fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
         let () = port.get_device(server_end).expect("get device");
         device
     };

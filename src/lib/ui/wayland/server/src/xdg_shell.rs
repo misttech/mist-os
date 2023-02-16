@@ -1292,7 +1292,7 @@ impl XdgToplevel {
         ftrace::duration!("wayland", "XdgToplevel::spawn_view_provider");
         // Create a new ViewProvider service, hand off the client endpoint to
         // our ViewSink to be presented.
-        let (client_end, server_end) = create_endpoints::<ViewProviderMarker>().unwrap();
+        let (client_end, server_end) = create_endpoints::<ViewProviderMarker>();
         let view_id = this.get(client)?.view_id;
         client.display().new_view_provider(client_end, view_id);
 

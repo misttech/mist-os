@@ -85,7 +85,7 @@ impl MockRealmExplorer {
             match request {
                 fsys2::RealmExplorerRequest::GetAllInstanceInfos { responder } => {
                     let (client_end, server_end) =
-                        create_endpoints::<fsys2::InstanceInfoIteratorMarker>().unwrap();
+                        create_endpoints::<fsys2::InstanceInfoIteratorMarker>();
                     let mut cloned_info = self.info_vec.clone();
 
                     tx.unbounded_send(fuchsia_async::Task::spawn(async move {
@@ -163,9 +163,9 @@ pub struct MockRealmQueryBuilderInner {
 /// Convert a `MockRealmQueryBuilderInner` to a `RealmQueryResult` which we can
 /// transmit over the wire.
 async fn to_realm_query_result(builder: &MockRealmQueryBuilderInner) -> RealmQueryResult {
-    let (exposed_client, _) = create_endpoints::<DirectoryMarker>().unwrap();
-    let (ns_client, _) = create_endpoints::<DirectoryMarker>().unwrap();
-    let (outdir_client, outdir_server) = create_endpoints::<DirectoryMarker>().unwrap();
+    let (exposed_client, _) = create_endpoints::<DirectoryMarker>();
+    let (ns_client, _) = create_endpoints::<DirectoryMarker>();
+    let (outdir_client, outdir_server) = create_endpoints::<DirectoryMarker>();
 
     let mut mock_dir_top = MockDir::new("out".to_owned());
     let mut mock_dir_diagnostics = MockDir::new("diagnostics".to_owned());

@@ -1191,7 +1191,7 @@ async fn assert_unsupported_directory_calls(
     );
 
     // Verify watch() is not supported.
-    let (_client, server) = fidl::endpoints::create_endpoints().unwrap();
+    let (_client, server) = fidl::endpoints::create_endpoints();
     assert_eq!(
         zx::Status::from_raw(parent.watch(fio::WatchMask::empty(), 0, server).await.unwrap()),
         zx::Status::NOT_SUPPORTED

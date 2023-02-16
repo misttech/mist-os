@@ -423,7 +423,7 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
 
     let account_id = provision_new_account(&account_manager, Lifetime::Persistent).await?;
 
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -435,7 +435,7 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
     lock_and_check(&account_proxy).await?;
 
     // Unlock the account and re-acquire a channel
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -455,7 +455,7 @@ async fn test_unlock_account() -> Result<(), Error> {
     account_manager.lock().await.restart().await?;
 
     // Unlock the account and acquire a channel to it
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
 
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
@@ -473,7 +473,7 @@ async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<()
     let account_manager = create_account_manager().await?;
 
     let account_id = provision_new_account(&account_manager, Lifetime::Persistent).await?;
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
             .await?,
@@ -486,7 +486,7 @@ async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<()
 
     // Attempting to unlock the account fails with a Aborted error
     // since we don't finish interaction procedure while authenticating.
-    let (_, account_server_end) = create_endpoints()?;
+    let (_, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
             .await?,
@@ -506,7 +506,7 @@ async fn test_unlock_account_fail_authentication() -> Result<(), Error> {
 
     // Attempting to unlock the account fails with a Aborted error
     // since we don't finish interaction procedure while authenticating.
-    let (_, account_server_end) = create_endpoints()?;
+    let (_, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
             .await?,
@@ -524,7 +524,7 @@ async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error>
     let account_id = provision_new_account(&account_manager, lifetime).await?;
 
     // Connect a channel to the newly created account and verify it's usable.
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -546,7 +546,7 @@ async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error>
     assert_eq!(account_proxy.get_lifetime().await?, lifetime);
 
     // Connect a channel to the account's default persona and verify it's usable.
-    let (persona_client_end, persona_server_end) = create_endpoints()?;
+    let (persona_client_end, persona_server_end) = create_endpoints();
     assert!(account_proxy.get_default_persona(persona_server_end).await?.is_ok());
     let persona_proxy = persona_client_end.into_proxy()?;
     let persona_auth_state = persona_proxy.get_auth_state().await?;
@@ -583,7 +583,7 @@ async fn test_one_account_deletion() -> Result<(), Error> {
     assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
     // Connecting to the deleted account should fail.
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -616,7 +616,7 @@ async fn test_many_account_deletions() -> Result<(), Error> {
     assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![account_2]);
 
     // Connecting to the deleted account should fail.
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -647,7 +647,7 @@ async fn test_one_lifecycle_persistent() -> Result<(), Error> {
     assert_eq!(existing_accounts.len(), 1); // The persistent account was kept.
 
     // Retrieve a persistent account that was created in the earlier lifetime
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -678,7 +678,7 @@ async fn test_one_lifecycle_ephemeral() -> Result<(), Error> {
     assert_eq!(existing_accounts.len(), 0); // The ephemeral account was dropped
 
     // Make sure we can't retrieve the ephemeral account
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account, account_server_end, InteractionOutcome::Fail)
             .await?,
@@ -713,14 +713,14 @@ async fn test_many_lifecycles() -> Result<(), Error> {
     assert_eq!(existing_accounts.len(), 2); // The ephemeral account was dropped
 
     // Make sure we can't retrieve the ephemeral account
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_3, account_server_end, InteractionOutcome::Fail)
             .await?,
         Err(ApiError::NotFound)
     );
     // Retrieve a persistent account that was created in the earlier lifetime
-    let (_account_client_end, account_server_end) = create_endpoints()?;
+    let (_account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
             .await?,
@@ -806,7 +806,7 @@ async fn test_get_data_directory() -> Result<(), Error> {
 
     let account_id = provision_new_account(&account_manager, Lifetime::Persistent).await?;
 
-    let (account_client_end, account_server_end) = create_endpoints()?;
+    let (account_client_end, account_server_end) = create_endpoints();
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
             .await?,

@@ -131,7 +131,7 @@ impl SysmemAllocation {
             .context("Allocating shared collection")?;
 
         // Duplicate to get another BufferCollectionToken to the same collection.
-        let (token, token_request) = fidl::endpoints::create_endpoints()?;
+        let (token, token_request) = fidl::endpoints::create_endpoints();
         client_token.duplicate(std::u32::MAX, token_request)?;
 
         client_token
