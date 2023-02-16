@@ -1,3 +1,4 @@
+
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -9,6 +10,7 @@
 
 #include "fastboot.h"
 #include "gigaboot/src/inet6.h"
+#include "gigaboot/src/mdns.h"
 #include "gigaboot/src/tcp.h"
 #include "phys/efi/main.h"
 #include "zircon_boot_ops.h"
@@ -80,17 +82,19 @@ zx::result<> FastbootTcpMain() {
   ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
   Fastboot fastboot(download_buffer, zb_ops);
 
-  while (true) {
-    // TODO(b/235489025): Investigate broadcasting mdns here.
+  constexpr uint32_t namegen = 1;
+  mdns_start(namegen);
 
+  while (true) {
+    mdns_poll();
     tcp6_result result = tcp6_accept(&fb_tcp_socket);
 
     if (result == TCP6_RESULT_SUCCESS) {
       printf("Receive client connection\n");
       FastbootTcpSession(transport, fastboot);
       if (fastboot.IsContinue()) {
-        // Since we'll be handing over to OS, the closing will be treated as
-        // best errort only.
+        // Close is best effort since we're about to hand control over to the kernel.
+        mdns_stop();
         tcp6_close(&fb_tcp_socket);
         return zx::ok();
       }
@@ -102,6 +106,7 @@ zx::result<> FastbootTcpMain() {
       }
 
       if (disconnect_res != TCP6_RESULT_SUCCESS) {
+        mdns_stop();
         printf("Failed to disconnect socket, %d\n", disconnect_res);
         return zx::error(ZX_ERR_INTERNAL);
       }
