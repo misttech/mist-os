@@ -126,17 +126,6 @@
             to: "#test_manager",
             source_availability: "unknown",
         },
-        {
-            protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.policy.Presenter",
-            ],
-            from: "#ui",
-            to: "#test_manager",
-            source_availability: "unknown",
-        },
 
         // Test realms may offer subdirectories of config-data to test
         // components. See:
@@ -200,6 +189,19 @@
             source_availability: "unknown",
         },
         {
+            // TODO(fxbug.dev/107526): After removing "weak" from the block
+            // below, merge them together
+            protocol: [
+                "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.policy.Presenter",
+            ],
+            from: "#ui",
+            to: "#test_manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.composition.Allocator",
@@ -210,8 +212,21 @@
             from: "#ui",
             to: "#test_manager",
 
-            // TODO(fxbug.dev/107526): break the cycle
+            // TODO(fxbug.dev/107526): break the cycle, then merge the 2 blocks
             dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            // Note: Please check with tq-scenic-team@google.com before
+            // offering this protocol, as its provider will change.
+            // TODO(fxbug.dev/121453): Update to `from: "#ui"` once scene manager
+            // is enabled everywhere, then update to `from: "#session-manager"`
+            // once the tests which rely on direct access to scene manager are
+            // fixed.
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "void",
+            to: "#test_manager",
+            availability: "optional",
             source_availability: "unknown",
         },
         {

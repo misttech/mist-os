@@ -62,15 +62,5 @@
             from: "#setui_service",
             to: "#ui",
         },
-        {
-            // Note: Please check with tq-scenic-team@google.com before
-            // offering this protocol, as its provider will change.
-            // TODO(fxbug.dev/121453): Update to `from: "#session-manager"`
-            // and move this offer to test_manager.core_shard.cml.
-            protocol: [ "fuchsia.element.GraphicalPresenter" ],
-            from: "#ui",
-            to: "#test_manager",
-            source_availability: "unknown",
-        },
     ],
 }
