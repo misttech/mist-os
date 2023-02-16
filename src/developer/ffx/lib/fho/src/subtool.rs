@@ -144,6 +144,7 @@ async fn run_main<T: FfxTool>(
     let injector = cmd
         .global
         .initialize_overnet(
+            suite.context.clone(),
             hoist_cache_dir.path(),
             None,
             DaemonVersionCheck::SameVersionInfo(build_info),

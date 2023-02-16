@@ -238,6 +238,7 @@ impl Ffx {
 
     pub async fn initialize_overnet(
         &self,
+        env_context: EnvironmentContext,
         hoist_cache_dir: &Path,
         router_interval: Option<Duration>,
         daemon_check: DaemonVersionCheck,
@@ -263,7 +264,7 @@ impl Ffx {
             None => None,
         };
 
-        Ok(Injection::new(daemon_check, hoist.clone(), self.machine, target))
+        Ok(Injection::new(env_context, daemon_check, hoist.clone(), self.machine, target))
     }
 }
 

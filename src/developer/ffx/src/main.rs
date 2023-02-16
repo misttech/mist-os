@@ -109,13 +109,10 @@ async fn run_legacy_subcommand(
     let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
         .and_then(|_| tempfile::tempdir_in(&cache_path))
         .user_message("Unable to create hoist cache directory")?;
+    let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
     let injector = app
         .global
-        .initialize_overnet(
-            hoist_cache_dir.path(),
-            router_interval,
-            DaemonVersionCheck::SameBuildId(context.daemon_version_string()?),
-        )
+        .initialize_overnet(context, hoist_cache_dir.path(), router_interval, daemon_version_string)
         .await?;
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await

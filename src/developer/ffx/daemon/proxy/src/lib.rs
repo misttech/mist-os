@@ -35,6 +35,7 @@ pub enum DaemonVersionCheck {
 }
 
 pub struct Injection {
+    env_context: EnvironmentContext,
     daemon_check: DaemonVersionCheck,
     format: Option<Format>,
     target: Option<TargetKind>,
@@ -51,12 +52,14 @@ impl std::fmt::Debug for Injection {
 
 impl Injection {
     pub fn new(
+        env_context: EnvironmentContext,
         daemon_check: DaemonVersionCheck,
         hoist: Hoist,
         format: Option<Format>,
         target: Option<TargetKind>,
     ) -> Self {
         Self {
+            env_context,
             daemon_check,
             hoist,
             format,
@@ -124,14 +127,11 @@ impl Injector for Injection {
     // the spawning only happens one thread at a time.
     #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy> {
-        let context = ffx_config::global_env_context()
-            .context("Trying to initialize daemon with no global context")?;
-
         self.daemon_once
             .get_or_try_init(init_daemon_proxy(
                 DaemonStart::AutoStart,
                 self.hoist.clone(),
-                context,
+                self.env_context.clone(),
                 self.daemon_check.clone(),
             ))
             .await
@@ -140,14 +140,12 @@ impl Injector for Injection {
 
     #[tracing::instrument]
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>> {
-        let context = ffx_config::global_env_context()
-            .context("Trying to initialize daemon with no global context")?;
         let result = self
             .daemon_once
             .get_or_try_init(init_daemon_proxy(
                 DaemonStart::DoNotAutoStart,
                 self.hoist.clone(),
-                context,
+                self.env_context.clone(),
                 self.daemon_check.clone(),
             ))
             .await
