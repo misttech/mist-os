@@ -129,12 +129,6 @@ void dlog_panic_start();
 // printfs bypass the normal debuglog queue and drainer thread.
 void dlog_bluescreen_init();
 
-// Force the dlog into panic mode.  Can be used in special circumstances to
-// force log messages to the serial console in the event that interrupts are off
-// and will never be turned back on (for example, when about to force a watchdog
-// to fire).
-void dlog_force_panic();
-
 // Initialize the debuglog subsystem. Called once at extremely early boot.
 void dlog_init_early();
 

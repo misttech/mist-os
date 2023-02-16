@@ -131,7 +131,7 @@ static int cmd_watchdog(int argc, const cmd_args* argv, uint32_t flags) {
       // Make sure that our printf goes directly to the UART, bypassing any
       // buffering which is not going to get drained now that we have stopped
       // the system.
-      dlog_force_panic();
+      dlog_panic_start();
 
       zx_time_t deadline =
           zx_time_add_duration(hw_watchdog_get_last_pet_time(), hw_watchdog_get_timeout_nsec());
