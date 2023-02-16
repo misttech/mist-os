@@ -280,14 +280,6 @@ group("futures") {
   public_deps = [ ":futures-v0_3_19" ]
 }
 
-group("futures-channel") {
-  public_deps = [ ":futures-channel-v0_3_19" ]
-}
-
-group("futures-core") {
-  public_deps = [ ":futures-core-v0_3_19" ]
-}
-
 group("futures-executor") {
   public_deps = [ ":futures-executor-v0_3_19" ]
 }
@@ -298,18 +290,6 @@ group("futures-io") {
 
 group("futures-lite") {
   public_deps = [ ":futures-lite-v1_11_3" ]
-}
-
-group("futures-macro") {
-  public_deps = [ ":futures-macro-v0_3_19($host_toolchain)" ]
-}
-
-group("futures-sink") {
-  public_deps = [ ":futures-sink-v0_3_19" ]
-}
-
-group("futures-task") {
-  public_deps = [ ":futures-task-v0_3_19" ]
 }
 
 group("futures-test") {
@@ -4458,7 +4438,6 @@ rust_library("futures-sink-v0_3_19") {
     "-Cmetadata=3c76929821bf0d",
     "-Cextra-filename=-3c76929821bf0d",
     "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
@@ -4481,7 +4460,6 @@ rust_library("futures-task-v0_3_19") {
     "-Cmetadata=176189a99c38d371",
     "-Cextra-filename=-176189a99c38d371",
     "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
