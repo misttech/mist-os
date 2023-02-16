@@ -2709,6 +2709,20 @@
   submitted: '2022-11-02'
   reviewed: '2023-02-01'
 
+- name: 'RFC-0208'
+  title: 'Distributing Packages with the SDK'
+  short_description: 'Proposes how we will distribute some in-tree packages in the SDK for out-of-tree subpackaging.'
+  authors: ['crjohns@google.com']
+  file: '0208_distributing_packages_with_the_sdk.md'
+  area: ['Software Delivery', 'Testing']
+  issue: ['http://fxbug.dev/119425']
+  gerrit_change_id: ['724843']
+  status: 'Accepted'
+  reviewers: ['aaronwood@google.com', 'dschuyler@google.com', 'jsankey@google.com', 'richkadel@google.com', 'yuxiaosun@google.com']
+  consulted: ['etryzelaar@google.com','geb@google.com', 'jeremymanson@google.com', 'kjharland@google.com', 'wittrock@google.com']
+  submitted: '2023-02-15'
+  reviewed: '2023-02-10'
+
 - name: 'RFC-0209'
   title: 'Memory priority profiles'
   short_description: 'Mark VMARs with a priority using profiles.'
