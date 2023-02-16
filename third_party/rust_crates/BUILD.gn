@@ -504,10 +504,6 @@ group("num-traits") {
   public_deps = [ ":num-traits-v0_2_14" ]
 }
 
-group("numtoa") {
-  public_deps = [ ":numtoa-v0_1_0" ]
-}
-
 group("once_cell") {
   public_deps = [ ":once_cell-v1_5_2" ]
 }

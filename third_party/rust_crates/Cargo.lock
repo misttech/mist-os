@@ -1337,7 +1337,6 @@ dependencies = [
  "num",
  "num-derive",
  "num-traits",
- "numtoa",
  "once_cell",
  "openat",
  "p256",
