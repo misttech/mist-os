@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_command::{Error, FfxContext, Result};
-use ffx_fidl::DaemonError;
+use ffx_fidl::{DaemonError, VersionInfo};
 use ffx_writer::ToolIO;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
@@ -71,6 +71,13 @@ where
 {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(T::try_from_env(env).await)
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for VersionInfo {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(env.context.build_info())
     }
 }
 
