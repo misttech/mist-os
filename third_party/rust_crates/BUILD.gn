@@ -916,12 +916,6 @@ group("toml_edit") {
   public_deps = [ ":toml_edit-v0_2_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("tower-service") {
-    public_deps = [ ":tower-service-v0_3_0" ]
-  }
-}
-
 group("tracing") {
   public_deps = [ ":tracing-v0_1_34" ]
 }

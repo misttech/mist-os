@@ -296,7 +296,6 @@ tinyjson = "2.5.0"
 # TODO(fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
 tokio = { version = "1.19.2", default-features = false }
-tower-service = "0.3.0"
 waker-fn = "1.1"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
