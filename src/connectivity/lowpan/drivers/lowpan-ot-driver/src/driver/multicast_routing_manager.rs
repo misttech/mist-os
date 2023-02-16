@@ -86,12 +86,14 @@ impl MulticastRoutingManager {
             match multicast_routing_client_end.watch_routing_events().await {
                 Ok((dropped_events, mut addresses, input_interface, event)) => {
                     if dropped_events != 0 {
-                        error!("Dropped {:?} events before getting the event", dropped_events);
+                        warn!("Dropped {dropped_events:?} events before getting the event");
                     }
 
                     info!(
                         "Got routing event {:?} for addresses: {:?} on interface: {:?}",
-                        event, addresses, input_interface
+                        event,
+                        PiiWrap(&addresses),
+                        input_interface
                     );
 
                     let mut multicast_forwarding_cache = multicast_forwarding_cache.lock().await;
@@ -151,13 +153,13 @@ impl MulticastRoutingManager {
                             // programmer error.
                             match err {
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InterfaceNotFound
-                                    => error!("Got error {err:?} when trying to add route {route:?} for address {:?}",
+                                    => error!("Got error `{err:?}` when trying to add route {route:?} for address {:?}",
                                               PiiWrap(&addresses)) ,
 
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InvalidAddress |
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::RequiredRouteFieldsMissing |
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InputCannotBeOutput
-                                    => panic!("Invalid error {err:?} trying to add {route:?} for address {:?}",
+                                    => panic!("Unexpected error `{err:?}` trying to add {route:?} for address {:?}",
                                               PiiWrap(&addresses)),
                             }
                         }
