@@ -34,7 +34,7 @@ argh = "0.1.10"
 arrayvec = "0.7.1"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
-async-channel = "1.6.1"
+async-channel = "1.8.0"
 async-lock = "2.3"
 async-trait = "0.1.56"
 atomic-waker = "1.0.0"
@@ -280,13 +280,13 @@ vk-sys = "0.7.0"
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
 async-broadcast = "0.2.0"
-async-executor = "1.4.1"
+async-executor = "1.5.0"
 async-fs = "1.6.0"
-async-io = "1.4.1"
-async-net = "1.6.0"
+async-io = "1.12.0"
+async-net = "1.7.0"
 cargo_metadata = "0.14.1"
 crossterm = "0.19"
-concurrent-queue = "1.2.2"
+concurrent-queue = "2.1.0"
 easy-parallel = "3.1"
 fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
@@ -424,6 +424,12 @@ configs = [ "//build/config/rust:allow_simd" ]
 rustflags = []
 
 [gn.package.async-fs."1.6.0"]
+rustflags = []
+
+[gn.package.async-io."1.12.0"]
+rustflags = []
+
+[gn.package.async-net."1.7.0"]
 rustflags = []
 
 [gn.package.async-trait."0.1.56"]

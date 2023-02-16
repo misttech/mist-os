@@ -55,12 +55,12 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("async-channel") {
-  public_deps = [ ":async-channel-v1_6_1" ]
+  public_deps = [ ":async-channel-v1_8_0" ]
 }
 
 if (!(current_os == "fuchsia")) {
   group("async-executor") {
-    public_deps = [ ":async-executor-v1_4_1" ]
+    public_deps = [ ":async-executor-v1_5_0" ]
   }
 }
 
@@ -72,7 +72,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("async-io") {
-    public_deps = [ ":async-io-v1_4_1" ]
+    public_deps = [ ":async-io-v1_12_0" ]
   }
 }
 
@@ -82,7 +82,7 @@ group("async-lock") {
 
 if (!(current_os == "fuchsia")) {
   group("async-net") {
-    public_deps = [ ":async-net-v1_6_0" ]
+    public_deps = [ ":async-net-v1_7_0" ]
   }
 }
 
@@ -162,7 +162,7 @@ group("clap") {
 
 if (!(current_os == "fuchsia")) {
   group("concurrent-queue") {
-    public_deps = [ ":concurrent-queue-v1_2_2" ]
+    public_deps = [ ":concurrent-queue-v2_1_0" ]
   }
 }
 
@@ -1559,14 +1559,14 @@ rust_library("async-broadcast-v0_2_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-channel-v1_6_1") {
+rust_library("async-channel-v1_8_0") {
   crate_name = "async_channel"
-  crate_root = "//third_party/rust_crates/vendor/async-channel-1.6.1/src/lib.rs"
-  output_name = "async_channel-c9fb29c233c87151"
+  crate_root = "//third_party/rust_crates/vendor/async-channel-1.8.0/src/lib.rs"
+  output_name = "async_channel-4d9e4e3e151dd008"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":concurrent-queue-v1_2_2" ]
+  deps += [ ":concurrent-queue-v2_1_0" ]
   deps += [ ":event-listener-v2_5_1" ]
   deps += [ ":futures-core-v0_3_19" ]
 
@@ -1575,26 +1575,26 @@ rust_library("async-channel-v1_6_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c9fb29c233c87151",
-    "-Cextra-filename=-c9fb29c233c87151",
+    "-Cmetadata=4d9e4e3e151dd008",
+    "-Cextra-filename=-4d9e4e3e151dd008",
   ]
 
   visibility = [ ":*" ]
 }
 
-rust_library("async-executor-v1_4_1") {
+rust_library("async-executor-v1_5_0") {
   crate_name = "async_executor"
   crate_root =
-      "//third_party/rust_crates/vendor/async-executor-1.4.1/src/lib.rs"
-  output_name = "async_executor-e1794cda02b66d3c"
+      "//third_party/rust_crates/vendor/async-executor-1.5.0/src/lib.rs"
+  output_name = "async_executor-124118651f47136"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":async-task-v4_0_3" ]
-  deps += [ ":concurrent-queue-v1_2_2" ]
+  deps += [ ":concurrent-queue-v2_1_0" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":once_cell-v1_5_2" ]
   deps += [ ":slab-v0_4_7" ]
 
   rustenv = []
@@ -1602,8 +1602,8 @@ rust_library("async-executor-v1_4_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=e1794cda02b66d3c",
-    "-Cextra-filename=-e1794cda02b66d3c",
+    "-Cmetadata=124118651f47136",
+    "-Cextra-filename=-124118651f47136",
   ]
 
   visibility = [ ":*" ]
@@ -1632,18 +1632,17 @@ rust_library("async-fs-v1_6_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-io-v1_4_1") {
+rust_library("async-io-v1_12_0") {
   crate_name = "async_io"
-  crate_root = "//third_party/rust_crates/vendor/async-io-1.4.1/src/lib.rs"
-  output_name = "async_io-91b1974caf87c87c"
+  crate_root = "//third_party/rust_crates/vendor/async-io-1.12.0/src/lib.rs"
+  output_name = "async_io-8cea39e881d5ae1e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":concurrent-queue-v1_2_2" ]
-  deps += [ ":fastrand-v1_4_0" ]
+  deps += [ ":async-lock-v2_6_0" ]
+  deps += [ ":concurrent-queue-v2_1_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
   deps += [ ":log-v0_4_11" ]
-  deps += [ ":once_cell-v1_5_2" ]
   deps += [ ":parking-v2_0_0" ]
   deps += [ ":polling-v2_0_2" ]
   deps += [ ":slab-v0_4_7" ]
@@ -1653,7 +1652,7 @@ rust_library("async-io-v1_4_1") {
     deps += [ ":libc-v0_2_138" ]
   }
   if (false) {
-    deps += [ ":winapi-v0_3_9" ]
+    deps += [ ":windows-sys-v0_42_0" ]
   }
 
   rustenv = []
@@ -1661,8 +1660,8 @@ rust_library("async-io-v1_4_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=91b1974caf87c87c",
-    "-Cextra-filename=-91b1974caf87c87c",
+    "-Cmetadata=8cea39e881d5ae1e",
+    "-Cextra-filename=-8cea39e881d5ae1e",
   ]
 
   visibility = [ ":*" ]
@@ -1690,16 +1689,15 @@ rust_library("async-lock-v2_6_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-net-v1_6_0") {
+rust_library("async-net-v1_7_0") {
   crate_name = "async_net"
-  crate_root = "//third_party/rust_crates/vendor/async-net-1.6.0/src/lib.rs"
-  output_name = "async_net-54d8e12346b1db6c"
+  crate_root = "//third_party/rust_crates/vendor/async-net-1.7.0/src/lib.rs"
+  output_name = "async_net-40ebfd6a451158cd"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-io-v1_4_1" ]
+  deps += [ ":async-io-v1_12_0" ]
   deps += [ ":blocking-v1_3_0" ]
-  deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
 
   rustenv = []
@@ -1707,8 +1705,8 @@ rust_library("async-net-v1_6_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=54d8e12346b1db6c",
-    "-Cextra-filename=-54d8e12346b1db6c",
+    "-Cmetadata=40ebfd6a451158cd",
+    "-Cextra-filename=-40ebfd6a451158cd",
   ]
 
   visibility = [ ":*" ]
@@ -2061,7 +2059,7 @@ rust_library("blocking-v1_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-channel-v1_6_1" ]
+  deps += [ ":async-channel-v1_8_0" ]
   deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":async-task-v4_0_3" ]
   deps += [ ":atomic-waker-v1_0_0" ]
@@ -2194,26 +2192,6 @@ rust_library("bytes-v1_0_1") {
     "-Cextra-filename=-95481d3375f8e2b1",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("cache-padded-v1_1_1") {
-  crate_name = "cache_padded"
-  crate_root = "//third_party/rust_crates/vendor/cache-padded-1.1.1/src/lib.rs"
-  output_name = "cache_padded-d5ffac023176ef0c"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=d5ffac023176ef0c",
-    "-Cextra-filename=-d5ffac023176ef0c",
   ]
 
   visibility = [ ":*" ]
@@ -2572,23 +2550,25 @@ rust_library("combine-v4_6_2") {
   visibility = [ ":*" ]
 }
 
-rust_library("concurrent-queue-v1_2_2") {
+rust_library("concurrent-queue-v2_1_0") {
   crate_name = "concurrent_queue"
   crate_root =
-      "//third_party/rust_crates/vendor/concurrent-queue-1.2.2/src/lib.rs"
-  output_name = "concurrent_queue-13df2ce2106c7e2c"
+      "//third_party/rust_crates/vendor/concurrent-queue-2.1.0/src/lib.rs"
+  output_name = "concurrent_queue-c9905697768476bb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cache-padded-v1_1_1" ]
+  deps += [ ":crossbeam-utils-v0_8_14" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=13df2ce2106c7e2c",
-    "-Cextra-filename=-13df2ce2106c7e2c",
+    "-Cmetadata=c9905697768476bb",
+    "-Cextra-filename=-c9905697768476bb",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
@@ -13001,6 +12981,7 @@ rust_library("windows-sys-v0_42_0") {
     "-Cmetadata=c774e6555c42216d",
     "-Cextra-filename=-c774e6555c42216d",
     "--cfg=feature=\"Win32_Foundation\"",
+    "--cfg=feature=\"Win32_Networking_WinSock\"",
     "--cfg=feature=\"Win32_System_LibraryLoader\"",
     "--cfg=feature=\"Win32_System_SystemServices\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
