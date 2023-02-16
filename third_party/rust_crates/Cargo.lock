@@ -1303,7 +1303,6 @@ dependencies = [
  "bitfield",
  "bitflags",
  "blocking",
- "bumpalo",
  "byteorder",
  "bytes",
  "camino",

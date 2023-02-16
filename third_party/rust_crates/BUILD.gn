@@ -118,10 +118,6 @@ group("blocking") {
   public_deps = [ ":blocking-v1_3_0" ]
 }
 
-group("bumpalo") {
-  public_deps = [ ":bumpalo-v3_2_1" ]
-}
-
 group("byteorder") {
   public_deps = [ ":byteorder-v1_3_1" ]
 }
