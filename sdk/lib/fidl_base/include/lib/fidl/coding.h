@@ -35,20 +35,6 @@ zx_status_t fidl_encode_etc(const fidl_type_t* type, void* bytes, uint32_t num_b
 zx_status_t fidl_encode_msg(const fidl_type_t* type, fidl_outgoing_msg_byte_t* msg,
                             uint32_t* out_actual_handles, const char** out_error_msg);
 
-// Perform a fidl_decode and check handle types and rights against the types and rights specified in
-// the FIDL file.
-//
-// It is an error for a zx_handle_info_t to contain a handle type that does not match what is
-// expected from FIDL unless either the expected or actual type is ZX_OBJ_TYPE_NONE. It is also
-// error if there are fewer actual rights than expected rights and the actual or expected rights are
-// not ZX_RIGHT_SAME_RIGHTS. If there are more actual rights than expected rights, the actual rights
-// will be reduced to the expected rights via a call to zx_handle_replace.
-//
-// This method expects non-transactional messages.
-zx_status_t fidl_decode_etc(const fidl_type_t* type, void* bytes, uint32_t num_bytes,
-                            const zx_handle_info_t* handle_infos, uint32_t num_handle_infos,
-                            const char** error_msg_out);
-
 // Perform a fidl_decode_etc as input for HLCPP (leave unknown handles in flexible resource types
 // intact instead of closing them, add offsets to unknown envelopes).
 // IT MAY BREAK AT ANY TIME OR BE REMOVED WITHOUT NOTICE.
@@ -57,13 +43,6 @@ zx_status_t internal__fidl_decode_etc_hlcpp__v2__may_break(const fidl_type_t* ty
                                                            const zx_handle_info_t* handle_infos,
                                                            uint32_t num_handle_infos,
                                                            const char** error_msg_out);
-
-// This function assumes that the message being passed in has a 16-byte transaction header
-// attached.
-//
-// This method is only intended for use by the deprecated FIDL C bindings.
-zx_status_t fidl_decode_msg(const fidl_type_t* type, fidl_incoming_msg_t* msg,
-                            const char** out_error_msg);
 
 // Validates an encoded message against the given |type|.
 //

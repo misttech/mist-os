@@ -5,29 +5,11 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/test.gni")
-import("//src/tests/fidl/conformance_suite/gidl-conformance-suite.gni")
 import("//tools/fidl/gidl/gidl.gni")
-
-gidl_deps = []
-foreach(gidl_file, conformance_suite_gidl_files) {
-  gidl_name = get_path_info(gidl_file, "name")
-  target = "conformance_suite__${gidl_name}"
-  gidl_deps += [ ":" + target ]
-  gidl_c_conformance(target) {
-    testonly = true
-    inputs = [ gidl_file ]
-    fidl = conformance_suite_fidl_target
-    deps = [ "//third_party/googletest:gtest" ]
-    if (is_fuchsia) {
-      deps += [ "//sdk/ctf/tests/pkg/fidl/cpp:handle_util" ]
-    }
-  }
-}
 
 source_set("test_sources") {
   testonly = true
   sources = [
-    "decoding_tests.cc",
     "encoding_tests.cc",
     "fidl_align_tests.cc",
     "fidl_coded_types.cc",
@@ -70,22 +52,6 @@ if (is_fuchsia) {
     deprecated_legacy_test_execution = true
   }
 
-  executable("c_conformance_tests_bin") {
-    output_name = "c-conformance-tests"
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-    testonly = true
-    sources = []
-    deps = gidl_deps + [ "//src/lib/fxl/test:gtest_main" ]
-  }
-
-  fuchsia_unittest_package("fidl-c-conformance-tests") {
-    deps = [ ":c_conformance_tests_bin" ]
-    deprecated_legacy_test_execution = true
-  }
-
   executable("tests_to_run_under_handle_policy") {
     # this must match the requested binary in run_with_handle_policy_tests.cc
     output_name = "fidl-handle-policy-test-app"
@@ -123,7 +89,6 @@ if (is_fuchsia) {
 source_set("host_test_sources") {
   testonly = true
   sources = [
-    "decoding_tests.cc",
     "encoding_tests.cc",
     "fidl_align_tests.cc",
     "fidl_coded_types.cc",
@@ -143,12 +108,6 @@ if (!is_fuchsia) {
     testonly = true
     sources = []
     deps = [ ":host_test_sources" ]
-  }
-
-  test("fidl-c-conformance-host-tests") {
-    testonly = true
-    sources = []
-    deps = gidl_deps + [ "//src/lib/fxl/test:gtest_main" ]
   }
 }
 

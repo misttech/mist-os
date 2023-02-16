@@ -484,42 +484,6 @@ zx_status_t internal__fidl_decode_etc_hlcpp__v2__may_break(const fidl_type_t* ty
       type, bytes, num_bytes, handle_infos, num_handle_infos, error_msg_out, true);
 }
 
-zx_status_t fidl_decode_etc(const fidl_type_t* type, void* bytes, uint32_t num_bytes,
-                            const zx_handle_info_t* handle_infos, uint32_t num_handle_infos,
-                            const char** error_msg_out) {
-  return fidl_decode_impl_handle_info<FIDL_WIRE_FORMAT_VERSION_V2>(
-      type, bytes, num_bytes, handle_infos, num_handle_infos, error_msg_out, false);
-}
-
-zx_status_t fidl_decode_msg(const fidl_type_t* type, fidl_incoming_msg_t* msg,
-                            const char** out_error_msg) {
-  zx_handle_info_t handle_infos[ZX_CHANNEL_MAX_MSG_HANDLES];
-  fidl_channel_handle_metadata_t* metadata =
-      reinterpret_cast<fidl_channel_handle_metadata_t*>(msg->handle_metadata);
-  for (uint32_t i = 0; i < msg->num_handles; i++) {
-    handle_infos[i] = {
-        .handle = msg->handles[i],
-        .type = metadata[i].obj_type,
-        .rights = metadata[i].rights,
-    };
-    msg->handles[i] = ZX_HANDLE_INVALID;
-  }
-
-  uint8_t* trimmed_bytes;
-  uint32_t trimmed_num_bytes;
-  zx_status_t trim_status = ::fidl::internal::fidl_exclude_header_bytes(
-      msg->bytes, msg->num_bytes, &trimmed_bytes, &trimmed_num_bytes, out_error_msg);
-  if (unlikely(trim_status != ZX_OK)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (trimmed_num_bytes == 0) {
-    return ZX_OK;
-  }
-
-  return fidl_decode_etc(type, trimmed_bytes, trimmed_num_bytes, handle_infos, msg->num_handles,
-                         out_error_msg);
-}
-
 template <FidlWireFormatVersion WireFormatVersion>
 zx_status_t fidl_validate_impl(const fidl_type_t* type, const void* bytes, uint32_t num_bytes,
                                uint32_t num_handles, const char** out_error_msg) {
