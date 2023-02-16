@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::{
-    cli::{GraphFilter, GraphOrientation},
-    list::ListFilter,
-};
+use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(

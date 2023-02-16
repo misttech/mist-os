@@ -13,7 +13,7 @@ use {
     std::collections::HashMap,
     std::fs::{create_dir, create_dir_all, metadata, set_permissions, write},
     std::path::PathBuf,
-    tempfile::tempdir,
+    tempfile::{tempdir, TempDir},
 };
 
 #[derive(Clone)]
@@ -46,12 +46,13 @@ fn serve_instance_iterator(
 }
 
 pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::RealmQueryProxy {
-    serve_realm_query(instances, HashMap::new())
+    serve_realm_query(instances, HashMap::new(), HashMap::new())
 }
 
 pub fn serve_realm_query(
     instances: Vec<fsys::Instance>,
     manifests: HashMap<String, fcdecl::Component>,
+    dirs: HashMap<(String, fsys::OpenDirType), TempDir>,
 ) -> fsys::RealmQueryProxy {
     let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
@@ -78,6 +79,27 @@ pub fn serve_realm_query(
                     let instances = instance_map.values().cloned().collect();
                     let iterator = serve_instance_iterator(instances);
                     responder.send(&mut Ok(iterator)).unwrap();
+                }
+                fsys::RealmQueryRequest::Open {
+                    moniker,
+                    dir_type,
+                    flags,
+                    mode: _,
+                    path,
+                    object,
+                    responder,
+                } => {
+                    eprintln!(
+                        "Open call for {} for {:?} at path '{}' with flags {:?}",
+                        moniker, dir_type, path, flags
+                    );
+                    if let Some(dir) = dirs.get(&(moniker, dir_type)) {
+                        let path = dir.path().join(path).display().to_string();
+                        fuchsia_fs::node::open_channel_in_namespace(&path, flags, object).unwrap();
+                        responder.send(&mut Ok(())).unwrap();
+                    } else {
+                        responder.send(&mut Err(fsys::OpenError::NoSuchDir)).unwrap();
+                    }
                 }
                 _ => panic!("Unexpected RealmQuery request"),
             }

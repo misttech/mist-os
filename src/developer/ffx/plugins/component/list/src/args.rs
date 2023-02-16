@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::list::ListFilter;
+use component_debug::cli::list::ListFilter;
 use ffx_core::ffx_command;
 
 #[ffx_command()]
