@@ -26,9 +26,16 @@ if (is_host) {
     environments = [
       {
         dimensions = {
-          device_type = "Intel NUC Kit NUC7i5DNHE"
+          device_type = "AEMU"
         }
       },
     ]
   }
+}
+
+# Tests that we want to run in an FYI builder.
+# We do not want failures from these tests to break the tree.
+group("fyi") {
+  testonly = true
+  deps = [ ":hello_world_test($host_toolchain)" ]
 }

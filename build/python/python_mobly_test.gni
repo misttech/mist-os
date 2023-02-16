@@ -161,7 +161,8 @@ template("python_mobly_test") {
   _md_test_data_dir =
       get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
   _host_test_args = [
-    rebase_path("${_md_test_data_dir}/mobly_driver.pyz", root_build_dir),
+    rebase_path("${_md_test_data_dir}/test_data/mobly_driver.pyz",
+                root_build_dir),
     rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
   ]
   _additional_deps = []
