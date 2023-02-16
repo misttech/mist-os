@@ -10,7 +10,7 @@ To prepare a USB flash drive to be a bootable disk, do the following:
    the recovery package (`recovery-installer`):
 
    ```posix-terminal
-   fx set workstation_eng.x64 --with //build/images/recovery:recovery-installer
+   fx set workstation_eng.x64 --with //build/images/recovery:recovery-installer --release
    ```
 
 1. Build a new Fuchsia image and its artifacts:
