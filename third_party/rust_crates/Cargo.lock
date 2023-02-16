@@ -1263,7 +1263,6 @@ dependencies = [
  "async-lock",
  "async-net",
  "async-trait",
- "atomic-waker",
  "atty",
  "base64",
  "bincode",

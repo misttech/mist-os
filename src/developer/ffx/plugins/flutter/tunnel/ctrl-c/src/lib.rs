@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use atomic_waker::AtomicWaker;
 use futures::{
     future::Future,
     never::Never,
-    task::{Context, Poll},
+    task::{AtomicWaker, Context, Poll},
 };
 use std::{
     pin::Pin,

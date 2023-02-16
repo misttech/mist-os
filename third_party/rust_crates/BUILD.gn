@@ -90,10 +90,6 @@ group("async-trait") {
   public_deps = [ ":async-trait-v0_1_56($host_toolchain)" ]
 }
 
-group("atomic-waker") {
-  public_deps = [ ":atomic-waker-v1_0_0" ]
-}
-
 group("atty") {
   public_deps = [ ":atty-v0_2_11" ]
 }
