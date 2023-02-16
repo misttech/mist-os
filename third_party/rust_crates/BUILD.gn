@@ -546,10 +546,6 @@ group("pest_derive") {
   public_deps = [ ":pest_derive-v2_1_0($host_toolchain)" ]
 }
 
-group("pest_generator") {
-  public_deps = [ ":pest_generator-v2_1_3" ]
-}
-
 if (!(current_os == "fuchsia")) {
   group("petgraph") {
     public_deps = [ ":petgraph-v0_6_2" ]

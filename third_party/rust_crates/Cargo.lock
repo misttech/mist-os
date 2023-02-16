@@ -1347,7 +1347,6 @@ dependencies = [
  "percent-encoding 2.2.0",
  "pest",
  "pest_derive",
- "pest_generator",
  "petgraph",
  "pin-project",
  "pin-utils",
