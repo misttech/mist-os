@@ -26,6 +26,7 @@ use fidl::endpoints::create_proxy;
 
 use crate::driver::OtDriver;
 use crate::prelude::*;
+use fuchsia as _;
 use std::ffi::CString;
 use std::num::NonZeroU32;
 
@@ -320,11 +321,19 @@ where
 }
 
 // The OpenThread platform implementation currently requires a multithreaded executor.
-#[fuchsia::main(threads = 10)]
+#[fasync::run(10)]
 async fn main() -> Result<(), Error> {
     use std::path::Path;
 
     let config = Config::try_new().context("Config::try_new")?;
+
+    // Use the diagnostics_log library directly rather than e.g. the #[fuchsia::main] macro on
+    // the main function, so that we can specify the logging severity level at runtime based on a
+    // command line argument.
+    diagnostics_log::init!(&[], diagnostics_log::interest(config.log_level));
+
+    // Make sure OpenThread is logging at a similar level as the rest of the system.
+    ot::set_logging_level(openthread_fuchsia::logging::ot_log_level_from(config.log_level));
 
     if Path::new("/config/data/bootstrap_config.json").exists() {
         warn!("Bootstrapping thread. Skipping ot-driver loop.");

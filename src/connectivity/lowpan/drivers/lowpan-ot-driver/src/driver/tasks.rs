@@ -163,39 +163,40 @@ where
             const SCAN_WATCHDOG_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
             loop {
-                debug!("SCAN_WATCHDOG: Waiting for a scan to start.");
+                debug!(tag = "scan_watchdog", "Waiting for a scan to start.");
                 self.wait_for_state(|x| {
                     x.ot_instance.is_energy_scan_in_progress()
                         || x.ot_instance.is_active_scan_in_progress()
                 })
                 .await;
 
-                debug!("SCAN_WATCHDOG: Scan started! Waiting for it to complete.");
+                debug!(tag = "scan_watchdog", "Scan started! Waiting for it to complete.");
                 self.wait_for_state(|x| {
                     !x.ot_instance.is_energy_scan_in_progress()
                         && !x.ot_instance.is_active_scan_in_progress()
                 })
-                    .map(|()| Ok(()))
-                    .on_timeout(SCAN_WATCHDOG_TIMEOUT, || {
-                        let driver_state = self.driver_state.lock();
-                        if driver_state.ot_instance.is_energy_scan_in_progress()
-                            || driver_state.ot_instance.is_active_scan_in_progress()
-                        {
-                            error!(
-                                "SCAN_WATCHDOG: OpenThread was scanning for longer than {:?}, will restart.",
-                                SCAN_WATCHDOG_TIMEOUT
-                            );
-                            Err(format_err!(
-                                "OpenThread was scanning for longer than {:?}",
-                                SCAN_WATCHDOG_TIMEOUT
-                            ))
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .await?;
+                .map(|()| Ok(()))
+                .on_timeout(SCAN_WATCHDOG_TIMEOUT, || {
+                    let driver_state = self.driver_state.lock();
+                    if driver_state.ot_instance.is_energy_scan_in_progress()
+                        || driver_state.ot_instance.is_active_scan_in_progress()
+                    {
+                        error!(
+                            tag = "scan_watchdog",
+                            "OpenThread was scanning for longer than {:?}, will restart.",
+                            SCAN_WATCHDOG_TIMEOUT
+                        );
+                        Err(format_err!(
+                            "OpenThread was scanning for longer than {:?}",
+                            SCAN_WATCHDOG_TIMEOUT
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                })
+                .await?;
 
-                debug!("SCAN_WATCHDOG: Scan completed! Watchdog disarmed.");
+                debug!(tag = "scan_watchdog", "Scan completed! Watchdog disarmed.");
             }
         };
 
@@ -267,10 +268,10 @@ where
     }
 
     /// A single iteration of the main task loop
+    #[tracing::instrument(skip_all)]
     async fn state_machine_single(&self) -> Result<(), Error> {
-        info!("main_task");
         if self.get_connectivity_state().is_active_and_ready() {
-            info!("main_task: Initialized, active, and ready");
+            info!(tag = "main_task", "Initialized, active, and ready");
 
             // Exit criteria is when we are no longer active nor ready.
             // When this future terminates, we are no longer online.
@@ -287,7 +288,7 @@ where
                 .map_err(|x| x.context("online_task"))
                 .await?;
 
-            info!("main_task: online_task terminated");
+            info!(tag = "main_task", "online_task terminated");
 
             self.online_task_cleanup()
                 .boxed()
@@ -296,7 +297,7 @@ where
         } else if self.get_connectivity_state().is_commissioning() {
             self.wait_for_state(|x| !x.is_commissioning()).await;
         } else {
-            info!("main_task: Initialized, but either not active or not ready.");
+            info!(tag = "main_task", "Initialized, but either not active or not ready.");
 
             // Exit criteria is when we are no longer active nor ready.
             // When this future terminates, we are no longer offline.
@@ -313,7 +314,7 @@ where
                 .map_err(|x| x.context("offline_task"))
                 .await?;
 
-            info!("main_task: offline_task terminated");
+            info!(tag = "main_task", "offline_task terminated");
         }
         Ok(())
     }
@@ -324,8 +325,9 @@ where
     /// is an active participant in the network.
     ///
     /// The resulting future may be terminated at any time.
+    #[tracing::instrument(skip_all)]
     async fn online_task(&self) -> Result<(), Error> {
-        info!("online_loop: Entered");
+        info!(tag = "main_task", "online_loop: Entered");
 
         {
             let driver_state = self.driver_state.lock();
@@ -337,7 +339,7 @@ where
             driver_state.ot_instance.thread_set_enabled(true).context("thread_set_enabled")?;
         }
 
-        info!("online_loop: Waiting for us to become online. . .");
+        info!(tag = "main_task", "online_loop: Waiting for us to become online. . .");
 
         self.wait_for_state(|x| x.connectivity_state != ConnectivityState::Attaching)
             .on_timeout(std::time::Duration::from_secs(10), || ())
@@ -367,7 +369,7 @@ where
             // Mark the network interface as online.
             self.net_if.set_online(true).await.context("Marking network interface as online")?;
 
-            info!("online_loop: We are online, starting outbound packet pump");
+            info!(tag = "main_task", "online_loop: We are online, starting outbound packet pump");
 
             // The pump that pulls outbound data from netstack to the NCP.
             let outbound_packet_pump = self
@@ -398,8 +400,9 @@ where
     /// it is not an active participant in the network.
     ///
     /// The resulting future may be terminated at any time.
+    #[tracing::instrument(skip_all)]
     async fn offline_task(&self) -> Result<(), Error> {
-        info!("offline_loop: Entered");
+        info!(tag = "main_task", "offline_loop: Entered");
 
         self.net_if
             .set_online(false)
@@ -416,7 +419,7 @@ where
             driver_state.ot_instance.ip6_set_enabled(false).context("ip6_set_enabled")?;
         } // Driver state lock goes out of scope here
 
-        info!("offline_loop: Waiting");
+        info!(tag = "main_task", "offline_loop: Waiting");
 
         #[allow(clippy::unit_arg)]
         Ok(futures::future::pending().await)

@@ -5,7 +5,10 @@
 use crate::prelude_internal::*;
 
 /// DNS-SD Service Name for TREL
-pub const TREL_DNSSD_SERVICE_NAME: &str = "_trel._udp.";
+pub const TREL_DNSSD_SERVICE_NAME: &str = "_trel._udp";
+
+/// DNS-SD Service Name for TREL, with a dot at the end.
+pub const TREL_DNSSD_SERVICE_NAME_WITH_DOT: &str = "_trel._udp.";
 
 /// Methods from the [OpenThread TREL Module][1].
 ///

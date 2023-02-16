@@ -9,7 +9,7 @@
 
 mod backing;
 mod binding;
-mod logging;
+pub mod logging;
 pub(crate) mod to_escaped_string;
 
 use futures::prelude::*;
@@ -113,19 +113,22 @@ impl Platform {
         let ot_to_rcp_task = fasync::Task::spawn(async move {
             spinel_sink.open().await.expect("Unable to open spinel stream");
             loop {
-                trace!(target: "ot_to_rcp_task", "waiting on frame from OpenThread");
+                trace!(tag = "ot_to_rcp_task", "waiting on frame from OpenThread");
 
                 let frame = match ot_to_rcp_receiver.recv() {
                     Ok(frame) => frame,
                     Err(e) => {
-                        warn!(target: "ot_to_rcp_task", "ot_to_rcp_receiver.recv() failed with {:?}", e);
+                        warn!(
+                            tag = "ot_to_rcp_task",
+                            "ot_to_rcp_receiver.recv() failed with {:?}", e
+                        );
                         break;
                     }
                 };
 
-                trace!(target: "ot_to_rcp_task", "sending frame from OpenThread to RCP");
+                trace!(tag = "ot_to_rcp_task", "sending frame from OpenThread to RCP");
                 if let Err(e) = spinel_sink.send(frame.as_slice()).await {
-                    warn!(target: "ot_to_rcp_task", "spinel_sink.send() failed with {:?}", e);
+                    warn!(tag = "ot_to_rcp_task", "spinel_sink.send() failed with {:?}", e);
                     break;
                 }
             }
@@ -139,10 +142,13 @@ impl Platform {
             while let Some(frame_result) = spinel_stream.next().await {
                 match frame_result {
                     Ok(frame) => {
-                        trace!(target: "rcp_to_ot_task", "sending frame from RCP to OpenThread");
+                        trace!(tag = "rcp_to_ot_task", "sending frame from RCP to OpenThread");
 
                         if let Err(e) = rcp_to_ot_sender.send(frame) {
-                            warn!(target: "rcp_to_ot_task", "rcp_to_ot_sender.send() failed with {:?}", e);
+                            warn!(
+                                tag = "rcp_to_ot_task",
+                                "rcp_to_ot_sender.send() failed with {:?}", e
+                            );
                             break;
                         }
 
@@ -151,18 +157,21 @@ impl Platform {
                             Ok(()) => {}
                             Err(e) if e.is_full() => {}
                             Err(e) => {
-                                warn!(target: "rcp_to_ot_task", "rcp_to_ot_frame_ready_sender.send() failed with {:?}", e);
+                                warn!(
+                                    tag = "rcp_to_ot_task",
+                                    "rcp_to_ot_frame_ready_sender.send() failed with {:?}", e
+                                );
                                 break;
                             }
                         }
                     }
                     Err(e) => {
-                        warn!(target: "rcp_to_ot_task", "spinel_stream.next() failed with {:?}", e);
+                        warn!(tag = "rcp_to_ot_task", "spinel_stream.next() failed with {:?}", e);
                         break;
                     }
                 }
             }
-            trace!(target: "rcp_to_ot_task", "Stream ended.");
+            trace!(tag = "rcp_to_ot_task", "Stream ended.");
         });
 
         unsafe {
@@ -188,7 +197,7 @@ impl Platform {
 
 impl Drop for Platform {
     fn drop(&mut self) {
-        debug!("Dropping Platform");
+        debug!(tag = "openthread_fuchsia", "Dropping Platform");
         unsafe {
             // SAFETY: Both calls below must only be called from Drop.
             otSysDeinit();
@@ -221,7 +230,7 @@ impl Platform {
         let instance_ptr = instance.as_ot_ptr();
 
         while let Poll::Ready(Some(())) = self.rcp_to_ot_frame_ready_receiver.poll_next_unpin(cx) {
-            trace!("Firing platformRadioProcess");
+            trace!(tag = "rcp", "Firing platformRadioProcess");
 
             // SAFETY: Must be called with a valid pointer to otInstance,
             //         must also only be called from the main OpenThread thread,
@@ -236,7 +245,7 @@ impl Platform {
         for udp_socket in instance.udp_get_sockets() {
             // This `poll` call comes from the trait `UdpSocketHelpers` in `backing/udp.rs`
             if let Poll::Ready(Err(err)) = poll_ot_udp_socket(udp_socket, instance, cx) {
-                error!("Error in {:?}: {:?}", udp_socket, err);
+                error!(tag = "udp", "Error in {:?}: {:?}", udp_socket, err);
             }
         }
     }
@@ -267,30 +276,3 @@ impl Platform {
         }
     }
 }
-
-// Disabled for now due to flakiness. The test was of questionable utility anyway.
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use lowpan_driver_common::spinel::mock::*;
-//
-//     #[fasync::run(10, test)]
-//     async fn test_runner() {
-//         test_init_and_drop().await;
-//         test_init_and_drop().await;
-//     }
-//
-//     async fn test_init_and_drop() {
-//         fuchsia_syslog::LOGGER.set_severity(fuchsia_syslog::levels::DEBUG);
-//
-//         let (sink, stream, ncp_task) = new_fake_spinel_pair();
-//
-//         let ncp_task = fasync::Task::spawn(ncp_task);
-//
-//         let instance = ot::Instance::new(Platform::init(sink, stream));
-//
-//         ncp_task.cancel().await;
-//
-//         std::mem::drop(instance);
-//     }
-// }

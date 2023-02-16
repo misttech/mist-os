@@ -62,7 +62,12 @@ impl AlarmInstance {
             )
         }
 
-        trace!("on_alarm_milli_start_at: scheduling alarm for {:?}ms after {:?}", dt, t0);
+        trace!(
+            tag = "alarm",
+            "on_alarm_milli_start_at: scheduling alarm for {:?}ms after {:?}",
+            dt,
+            t0
+        );
 
         let ot_instance_ptrval =
             instance.map(ot::Boxable::as_ot_ptr).map(|x| x as usize).unwrap_or(0usize);
@@ -76,9 +81,13 @@ impl AlarmInstance {
             } else {
                 Duration::ZERO
             };
-            trace!("on_alarm_milli_start_at: helper task now waiting {:?}", duration);
+            trace!(
+                tag = "alarm",
+                "on_alarm_milli_start_at: helper task now waiting {:?}",
+                duration
+            );
             fasync::Timer::new(duration).await;
-            trace!("on_alarm_milli_start_at: helper task finished waiting, now sending ot_instance_ptrval");
+            trace!(tag="alarm", "on_alarm_milli_start_at: helper task finished waiting, now sending ot_instance_ptrval");
             timer_sender.send(ot_instance_ptrval).await.unwrap();
         };
 
@@ -105,7 +114,7 @@ impl AlarmInstance {
         }
 
         if let Some(old_task) = self.task_alarm.take() {
-            trace!("on_alarm_milli_stop: Alarm cancelled");
+            trace!(tag = "alarm", "on_alarm_milli_stop: Alarm cancelled");
 
             // Cancel the previous/old alarm task, if any.
             old_task.cancel().now_or_never();
@@ -113,7 +122,7 @@ impl AlarmInstance {
     }
 
     fn on_alarm_fired(&self, instance: &ot::Instance, value: usize) {
-        trace!("on_alarm_fired");
+        trace!(tag = "alarm", "on_alarm_fired");
 
         let instance_ptr = instance.as_ot_ptr();
         assert_eq!(instance_ptr as usize, value, "Got wrong pointer from timer receiver");

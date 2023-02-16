@@ -98,7 +98,7 @@ where
             }
 
             Err(err) => {
-                warn!("Failed to get active dataset: {:?}", err);
+                warn!(tag = "meshcop", "Failed to get active dataset: {:?}", err);
             }
         }
 
@@ -159,15 +159,16 @@ fn publish_border_agent_service(
                   ..
               }| {
             debug!(
-                "meshcop: publish_border_agent_service: publication_cause: {:?}",
-                publication_cause
+                tag = "meshcop",
+                "publish_border_agent_service: publication_cause: {:?}", publication_cause
             );
             debug!(
-                "meshcop: publish_border_agent_service: source_addresses: {:?}",
-                source_addresses
+                tag = "meshcop",
+                "publish_border_agent_service: source_addresses: {:?}", source_addresses
             );
             debug!(
-                "meshcop: publish_border_agent_service: publication: {:?}",
+                tag = "meshcop",
+                "publish_border_agent_service: publication: {:?}",
                 publication.as_ref().unwrap()
             );
             let mut publication = publication.clone();
@@ -185,12 +186,15 @@ fn publish_border_agent_service(
 
     futures::future::try_join(
         publish_init_future.inspect_err(|err| {
-            warn!("meshcop: publish_border_agent_service: publish_init_future failed: {:?}", err);
+            warn!(
+                tag = "meshcop",
+                "publish_border_agent_service: publish_init_future failed: {:?}", err
+            );
         }),
         publish_responder_future.inspect_err(|err| {
             warn!(
-                "meshcop: publish_border_agent_service: publish_responder_future failed: {:?}",
-                err
+                tag = "meshcop",
+                "publish_border_agent_service: publish_responder_future failed: {:?}", err
             );
         }),
     )
@@ -210,7 +214,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
                 (vendor, model)
             }
             Err(err) => {
-                warn!("Unable to get product info: {:?}", err);
+                warn!(tag = "meshcop", "Unable to get product info: {:?}", err);
                 ("Unknown".to_string(), "Fuchsia".to_string())
             }
         };
@@ -253,11 +257,11 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
         let mut last_txt_entries = border_agent_current_txt_entries.lock().await;
 
         if txt == *last_txt_entries {
-            debug!("meshcop: update_border_agent_service: No changes.");
+            debug!(tag = "meshcop", "update_border_agent_service: No changes.");
         } else {
             debug!(
-                "meshcop: update_border_agent_service: Updating meshcop dns-sd: port={} txt={:?}",
-                port, txt
+                tag = "meshcop",
+                "update_border_agent_service: Updating meshcop dns-sd: port={} txt={:?}", port, txt
             );
 
             *last_txt_entries = txt.clone();
@@ -271,7 +275,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
                 .and_then(|x| x.cancel().now_or_never().flatten())
                 .transpose()
             {
-                warn!("meshcop: update_border_agent_service: Previous publication task ended with an error: {:?}", err);
+                warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);
             }
         }
     }

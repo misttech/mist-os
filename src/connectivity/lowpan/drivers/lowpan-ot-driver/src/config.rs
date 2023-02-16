@@ -4,10 +4,38 @@
 
 use crate::prelude::*;
 use anyhow::Error;
-use fuchsia_syslog::levels::LogLevel;
 use serde::Deserialize;
 use std::io;
 use std::path;
+
+/// Allows us to directly use [`tracing::Level`] in our config struct.
+mod serde_with_level {
+    use serde::de::{Deserializer, Error, Visitor};
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<tracing::Level, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Helper;
+
+        impl<'de> Visitor<'de> for Helper {
+            type Value = tracing::Level;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "a string")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                value.parse::<Self::Value>().map_err(Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(Helper)
+    }
+}
 
 /// Arguments decoded from the command line invocation of the driver.
 ///
@@ -41,12 +69,8 @@ pub(crate) struct DriverArgs {
     #[argh(option, long = "backbone-name", description = "name of backbone network interface")]
     pub backbone_name: Option<String>,
 
-    #[argh(
-        option,
-        long = "verbosity",
-        description = "verbosity, larger number means more logging"
-    )]
-    pub verbosity: Option<u8>,
+    #[argh(option, long = "log-level", description = "log level")]
+    pub log_level: Option<tracing::Level>,
 
     #[argh(
         option,
@@ -70,8 +94,8 @@ pub(crate) struct Config {
     #[serde(default = "Config::default_backbone_name")]
     pub backbone_name: Option<String>,
 
-    #[serde(default = "Config::default_log_level")]
-    pub log_level: LogLevel,
+    #[serde(default = "Config::default_log_level", with = "serde_with_level")]
+    pub log_level: tracing::Level,
 
     #[serde(default = "Config::default_ot_radio_path")]
     pub ot_radio_path: Option<String>,
@@ -100,8 +124,8 @@ impl Config {
         10
     }
 
-    fn default_log_level() -> LogLevel {
-        fuchsia_syslog::levels::INFO
+    fn default_log_level() -> tracing::Level {
+        tracing::Level::INFO
     }
 
     fn default_name() -> String {
@@ -176,10 +200,9 @@ impl Config {
             self.backbone_name = Some(tmp);
         }
 
-        if let Some(x) = args.verbosity {
-            let severity = fuchsia_syslog::get_severity_from_verbosity(x);
-            info!("cmdline log verbosity set to {:?}", x);
-            self.log_level = severity;
+        if let Some(x) = args.log_level {
+            info!("cmdline log level set to {:?}", x);
+            self.log_level = x;
         }
 
         if let Some(tmp) = args.ot_radio_path {
