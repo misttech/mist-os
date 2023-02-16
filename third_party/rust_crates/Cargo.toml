@@ -259,7 +259,6 @@ vk-sys = "0.7.0"
 
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
-async-broadcast = "0.2.0"
 async-executor = "1.5.0"
 async-fs = "1.6.0"
 async-io = "1.12.0"
