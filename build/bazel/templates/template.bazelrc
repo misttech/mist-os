@@ -28,7 +28,9 @@ build --incompatible_enable_cc_toolchain_resolution
 # By using 'diff_against_baseline', Bazel will ignore the transition path, and recognize
 # that //:final only needs to be built once, at a single common location.
 #
-common --experimental_output_directory_naming_scheme=diff_against_baseline
+build --experimental_output_directory_naming_scheme=diff_against_baseline
+cquery --experimental_output_directory_naming_scheme=diff_against_baseline
+aquery --experimental_output_directory_naming_scheme=diff_against_baseline
 
 # Setup the default platform.
 # We need to set them for cqueries and aqueries as well as build (and
