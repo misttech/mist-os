@@ -1253,7 +1253,6 @@ dependencies = [
  "chrono",
  "chrono-english",
  "clap",
- "concurrent-queue",
  "crc",
  "criterion",
  "crossbeam",

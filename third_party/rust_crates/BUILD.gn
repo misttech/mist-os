@@ -152,12 +152,6 @@ group("clap") {
   public_deps = [ ":clap-v2_34_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("concurrent-queue") {
-    public_deps = [ ":concurrent-queue-v2_1_0" ]
-  }
-}
-
 group("crc") {
   public_deps = [ ":crc-v1_8_1" ]
 }
