@@ -84,7 +84,7 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
                 epoch,
                 abi_revision,
                 Utf8Path::from_path(gen_dir.path())
-                    .context("checkinf if temporary directory is UTF-8")?,
+                    .context("checking if temporary directory is UTF-8")?,
             );
             let mut all_packages = UpdatePackagesManifest::default();
             for (_path, package) in &packages_a {
@@ -190,7 +190,10 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
         Some(manifest_path)
     };
 
+    let product_name = cmd.product_name.to_owned();
+
     let product_bundle = ProductBundleV2 {
+        product_name,
         partitions,
         system_a,
         system_b,
@@ -393,6 +396,7 @@ mod test {
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
             CreateCommand {
+                product_name: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -413,6 +417,7 @@ mod test {
         assert_eq!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
+                product_name: String::default(),
                 partitions: PartitionsConfig::default(),
                 system_a: None,
                 system_b: None,
@@ -441,6 +446,7 @@ mod test {
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
             CreateCommand {
+                product_name: String::default(),
                 partitions: partitions_path,
                 system_a: Some(system_path.clone()),
                 system_b: None,
@@ -461,6 +467,7 @@ mod test {
         assert_eq!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
+                product_name: String::default(),
                 partitions: PartitionsConfig::default(),
                 system_a: Some(AssemblyManifest::default()),
                 system_b: None,
@@ -492,6 +499,7 @@ mod test {
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
             CreateCommand {
+                product_name: String::default(),
                 partitions: partitions_path,
                 system_a: Some(system_path.clone()),
                 system_b: None,
@@ -512,6 +520,7 @@ mod test {
         assert_eq!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
+                product_name: String::default(),
                 partitions: PartitionsConfig::default(),
                 system_a: Some(AssemblyManifest::default()),
                 system_b: None,
@@ -547,6 +556,7 @@ mod test {
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
             CreateCommand {
+                product_name: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -570,6 +580,7 @@ mod test {
         assert_matches::assert_matches!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
+                product_name: _,
                 partitions,
                 system_a: None,
                 system_b: None,
@@ -607,6 +618,7 @@ mod test {
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
             CreateCommand {
+                product_name: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -627,6 +639,7 @@ mod test {
         assert_eq!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
+                product_name: String::default(),
                 partitions: PartitionsConfig::default(),
                 system_a: None,
                 system_b: None,

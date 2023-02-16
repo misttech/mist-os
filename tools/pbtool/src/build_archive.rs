@@ -109,6 +109,7 @@ mod tests {
         create_temp_file("kernel");
 
         let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig::default(),
             system_a: Some(AssemblyManifest {
                 images: vec![

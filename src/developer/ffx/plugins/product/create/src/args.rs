@@ -11,6 +11,10 @@ use ffx_core::ffx_command;
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
+    /// product.board label. e.g. "workstation_eng.qemu-x64".
+    #[argh(option)]
+    pub product_name: String,
+
     /// path to a partitions config, which lists the physical partitions of the target.
     #[argh(option)]
     pub partitions: Utf8PathBuf,

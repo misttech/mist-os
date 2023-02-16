@@ -423,6 +423,7 @@ mod tests {
             product_bundle_path.as_ref().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH),
         );
         SdkProductBundle::V2(SdkProductBundleV2 {
+            product_name: String::default(),
             partitions: PartitionsConfig::default(),
             system_a: Some(AssemblyManifest::default()),
             system_b: None,

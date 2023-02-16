@@ -8,8 +8,10 @@
 //! archives.
 
 mod build_archive;
+mod product_description;
 mod transfer_manifest;
 
+use crate::product_description::GenerateProductDescription;
 use crate::transfer_manifest::GenerateTransferManifest;
 use anyhow::Result;
 use argh::FromArgs;
@@ -29,6 +31,13 @@ struct Command {
 enum Subcommand {
     /// Generate a build archive.
     GenerateBuildArchive(GenerateBuildArchive),
+
+    /// Generate a description of the product bundle with a link to the transfer
+    /// manifest json file.
+    GenerateProductDescription(GenerateProductDescription),
+
+    /// Generate the transfer manifest which lists how to upload/download the
+    /// product bundle.
     GenerateTransferManifest(GenerateTransferManifest),
 }
 
@@ -37,6 +46,7 @@ async fn main() -> Result<()> {
     let command = argh::from_env::<Command>();
     match command.sub {
         Subcommand::GenerateBuildArchive(cmd) => cmd.generate(),
+        Subcommand::GenerateProductDescription(cmd) => cmd.generate(),
         Subcommand::GenerateTransferManifest(cmd) => cmd.generate().await,
     }
 }

@@ -455,6 +455,7 @@ mod tests {
             Utf8PathBuf::from_path_buf(sdk_root.join("zbi")).expect("couldn't convert zbi to utf8");
 
         let mut pb = ProductBundleV2 {
+            product_name: String::default(),
             partitions: PartitionsConfig::default(),
             system_a: Some(AssemblyManifest {
                 images: vec![

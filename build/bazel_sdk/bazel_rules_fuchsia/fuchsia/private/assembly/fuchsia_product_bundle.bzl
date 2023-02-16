@@ -380,6 +380,7 @@ def _fuchsia_product_bundle_impl(ctx):
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
+    product_name = "{}.{}".format(ctx.attr.product_name, ctx.attr.board_name)
 
     # Gather all the arguments to pass to ffx.
     ffx_invocation = [
@@ -388,6 +389,8 @@ def _fuchsia_product_bundle_impl(ctx):
         "--isolate-dir $FFX_ISOLATE_DIR",
         "product",
         "create",
+        "--product-name",
+        product_name,
         "--partitions $ORIG_DIR/$PARTITIONS_PATH",
         "--system-a $ORIG_DIR/$SYSTEM_A_MANIFEST",
         "--out-dir $ORIG_DIR/$OUTDIR",
@@ -499,6 +502,11 @@ fuchsia_product_bundle = rule(
     implementation = _fuchsia_product_bundle_impl,
     toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
     attrs = {
+        "board_name": attr.string(
+            doc = "Name of the board this PB runs on. E.g. qemu-x64",
+            # TODO(fxbug.dev/122067): Make mandatory after soft transition.
+            mandatory = False,
+        ),
         "partitions_config": attr.label(
             doc = "Partitions config to use",
             mandatory = True,
@@ -507,6 +515,11 @@ fuchsia_product_bundle = rule(
             doc = "fuchsia_product_image target to put in slot A",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
+        ),
+        "product_name": attr.string(
+            doc = "Name of the Fuchsia product. E.g. workstation_eng",
+            # TODO(fxbug.dev/122067): Make mandatory after soft transition.
+            mandatory = False,
         ),
         "recovery": attr.label(
             doc = "fuchsia_product_image target to put in slot R",

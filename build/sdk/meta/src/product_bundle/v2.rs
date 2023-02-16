@@ -34,6 +34,9 @@ use std::collections::HashSet;
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductBundleV2 {
+    /// The <product>.<board> for the product bundle.
+    pub product_name: String,
+
     /// The physical partitions of the target to place images into.
     pub partitions: PartitionsConfig,
 
@@ -247,6 +250,7 @@ mod tests {
     #[test]
     fn test_canonicalize_no_paths() {
         let mut pb = ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![],
                 bootloader_partitions: vec![],
@@ -286,6 +290,7 @@ mod tests {
         create_temp_file("device");
 
         let mut pb = ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![BootstrapPartition {
                     name: "bootstrap".into(),
@@ -325,6 +330,7 @@ mod tests {
     #[test]
     fn test_relativize_no_paths() {
         let mut pb = ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![],
                 bootloader_partitions: vec![],
@@ -351,6 +357,7 @@ mod tests {
         File::create(&vd_manifest).expect("Create vd manifest file");
 
         let mut pb = ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![BootstrapPartition {
                     name: "bootstrap".into(),
@@ -394,6 +401,7 @@ mod tests {
         let _repo = test_utils::make_pm_repo_dir(&tempdir.path()).await;
 
         let pb = ProductBundleV2 {
+            product_name: "".to_string(),
             partitions: PartitionsConfig::default(),
             system_a: None,
             system_b: None,
@@ -423,6 +431,7 @@ mod tests {
     #[test]
     fn test_targets_path() {
         let pb = ProductBundleV2 {
+            product_name: String::default(),
             partitions: PartitionsConfig::default(),
             system_a: None,
             system_b: None,

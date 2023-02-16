@@ -15,6 +15,7 @@ rustc_binary("pbtool") {
     "//build/sdk/meta:rust",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/fuchsia",
+    "//src/lib/product_description",
     "//src/lib/transfer_manifest",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
@@ -38,6 +39,7 @@ rustc_binary("pbtool") {
   sources = [
     "src/build_archive.rs",
     "src/main.rs",
+    "src/product_description.rs",
     "src/transfer_manifest.rs",
   ]
 }

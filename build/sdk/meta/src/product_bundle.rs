@@ -149,6 +149,7 @@ mod tests {
             &pb_file,
             &json!({
                 "version": "2",
+                "product_name": "fake.pb-name",
                 "partitions": {
                     "hardware_revision": "board",
                     "bootstrap_partitions": [],
