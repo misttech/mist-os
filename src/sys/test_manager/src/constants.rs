@@ -23,6 +23,7 @@ pub const SYSTEM_TESTS_COLLECTION: &'static str = "system-tests";
 pub const CTS_TESTS_COLLECTION: &'static str = "cts-tests";
 pub const VULKAN_TESTS_COLLECTION: &'static str = "vulkan-tests";
 pub const CHROMIUM_TESTS_COLLECTION: &'static str = "chromium-tests";
+pub const CHROMIUM_SYSTEM_TESTS_COLLECTION: &'static str = "chromium-system-tests";
 pub const DRM_TESTS_COLLECTION: &'static str = "drm-tests";
 pub const MEDIA_TESTS_COLLECTION: &'static str = "media-tests";
 pub const GOOGLE_TESTS_COLLECTION: &'static str = "google-tests";
@@ -34,6 +35,7 @@ lazy_static! {
     pub static ref TEST_TYPE_REALM_MAP: HashMap<&'static str, &'static str> = [
         ("hermetic", HERMETIC_TESTS_COLLECTION),
         ("chromium", CHROMIUM_TESTS_COLLECTION),
+        ("chromium-system", CHROMIUM_SYSTEM_TESTS_COLLECTION),
         ("cts", CTS_TESTS_COLLECTION),
         ("devices", DEVICES_TESTS_COLLECTION),
         ("drm", DRM_TESTS_COLLECTION),

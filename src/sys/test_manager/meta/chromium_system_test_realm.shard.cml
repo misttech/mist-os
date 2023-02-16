@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/91934): This shard defines a realm for tests in chromium. Once we are able
-// to define these out of tree this definition should be moved to chromium.
+// TODO(fxbug.dev/91934): Consider making this not Chromium-specific or using
+// //sdk/lib/sys/testing/system-test.shard.cml instead.
 {
     collections: [
         {
-            name: "chromium-tests",
+            name: "chromium-system-tests",
             environment: "#legacy-test-env",
             durability: "transient",
         },
@@ -21,17 +21,13 @@
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
-            to: [ "#chromium-tests" ],
+            to: [ "#chromium-system-tests" ],
         },
 
         // These system capabilities are offered for use by the chromium tests.
-        // TODO(fxbug.dev/91934): Drive down this list via fakes and similar.
         {
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
-
-                // TODO(fxbug.dev/121700): Once tests in Chromium "release" use
-                // `chromium-system-tests`, comment out as faked.
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.feedback.ComponentDataRegister",
@@ -41,9 +37,6 @@
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
-
-                // TODO(fxbug.dev/121700): Once tests in Chromium "release" use
-                // `chromium-system-tests`, comment out as faked.
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.Audio",
@@ -62,8 +55,6 @@
 
                 // Tests of the media system change their behavior based on
                 // board.
-                // TODO(fxbug.dev/83512): Remove when specialized test realms
-                // are ready.
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.ui.composition.Allocator",
@@ -75,7 +66,7 @@
                 "fuchsia.web.ContextProvider",
             ],
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
         },
         {
             protocol: [
@@ -83,7 +74,7 @@
                 "fuchsia.media.drm.Widevine",
             ],
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
             availability: "optional",
         },
         {
@@ -92,7 +83,7 @@
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
             availability: "same_as_target",
         },
 
@@ -102,7 +93,7 @@
         {
             directory: "config-data",
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
         },
         {
             event_stream: [
@@ -115,17 +106,8 @@
                 "stopped",
             ],
             from: "parent",
-            to: "#chromium-tests",
-            scope: "#chromium-tests",
-        },
-
-        // TODO(fxbug.dev/91934, fxbug.dev/121700): Once tests in Chromium
-        // "release" use `chromium-system-tests` when necessary and
-        // `fake-build-info` otherwise, remove this.
-        {
-            directory: "build-info",
-            from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
+            scope: "#chromium-system-tests",
         },
         {
             directory: [
@@ -134,45 +116,41 @@
                 "dev-goldfish-pipe",
                 "dev-goldfish-sync",
                 "dev-gpu",
-
-                // Tests of the media system want to test against the real hardware.
-                //
-                // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
                 "dev-mediacodec",
             ],
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
             rights: [ "r*" ],
         },
         {
             directory: "root-ssl-certificates",
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
         },
         {
             directory: "tzdata-icu-44-le",
             from: "parent",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
         },
         {
             storage: "data",
             from: "self",
-            to: [ "#chromium-tests" ],
+            to: [ "#chromium-system-tests" ],
         },
         {
             storage: "tmp",
             from: "self",
-            to: [ "#chromium-tests" ],
+            to: [ "#chromium-system-tests" ],
         },
         {
             storage: "cache",
             from: "self",
-            to: [ "#chromium-tests" ],
+            to: [ "#chromium-system-tests" ],
         },
         {
             storage: "custom_artifacts",
             from: "self",
-            to: "#chromium-tests",
+            to: "#chromium-system-tests",
         },
     ],
 }
