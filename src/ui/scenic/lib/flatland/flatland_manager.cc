@@ -34,12 +34,12 @@ FlatlandManager::FlatlandManager(
       uber_struct_system_(uber_struct_system),
       link_system_(link_system),
       buffer_collection_importers_(std::move(buffer_collection_importers)),
-      executor_(dispatcher),
       primary_display_(std::move(display)),
       register_view_focuser_(std::move(register_view_focuser)),
       register_view_ref_focused_(std::move(register_view_ref_focused)),
       register_touch_source_(std::move(register_touch_source)),
-      register_mouse_source_(std::move(register_mouse_source)) {
+      register_mouse_source_(std::move(register_mouse_source)),
+      executor_(dispatcher) {
   FX_DCHECK(dispatcher);
   FX_DCHECK(flatland_presenter_);
   FX_DCHECK(uber_struct_system_);

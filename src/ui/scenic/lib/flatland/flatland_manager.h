@@ -163,11 +163,6 @@ class FlatlandManager {
   std::unordered_map<scheduling::SessionId, std::unique_ptr<FlatlandDisplayInstance>>
       flatland_display_instances_;
 
-  // Stores and executes async tasks on the dispatcher provided in this object's constructor. This
-  // object is the final member of this class to ensure that async tasks are cancelled and
-  // destroyed first during destruction, else they might access already-destroyed members.
-  async::Executor executor_;
-
   // Eventually we will support multiple displays, but as we bootstrap Flatland we assume that
   // there is a single primary display.
   std::shared_ptr<scenic_impl::display::Display> primary_display_;
@@ -186,6 +181,12 @@ class FlatlandManager {
       register_touch_source_;
   fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
       register_mouse_source_;
+
+  // Stores and executes async tasks on the dispatcher provided in this object's constructor.
+  // NOTE: This object MUST BE the final member of this class to ensure that async tasks are
+  // cancelled and destroyed first during destruction, else they might access already-destroyed
+  // members.
+  async::Executor executor_;
 };
 
 }  // namespace flatland
