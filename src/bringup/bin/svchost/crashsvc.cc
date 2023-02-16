@@ -135,8 +135,12 @@ void HandOffException(zx::exception exception, const zx_exception_info_t& info,
         "serving fuchsia.exception.Handler",
         ZX_ERR_NOT_SUPPORTED);
 
-    // Release the exception to let the kernel terminate the process.
-    exception.reset();
+    // Delay releasing the exception to give the stack trace a chance to propagate to the previous
+    // boot logs. The kernel won't terminate the process until we release the exception.
+    async::PostDelayedTask(
+        loop.dispatcher(), [exception = std::move(exception)]() mutable { exception.reset(); },
+        zx::sec(5));
+
     return;
   }
 
