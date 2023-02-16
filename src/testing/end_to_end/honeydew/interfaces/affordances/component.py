@@ -8,7 +8,7 @@ import abc
 from typing import List
 
 
-class ComponentBase(abc.ABC):
+class Component(abc.ABC):
     """Abstract base class for Component affordance."""
 
     # List all the public methods in alphabetical order

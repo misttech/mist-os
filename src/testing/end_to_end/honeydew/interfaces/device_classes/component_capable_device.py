@@ -6,7 +6,7 @@
 
 import abc
 
-from honeydew.interfaces.affordances import component_base
+from honeydew.interfaces.affordances import component
 
 
 # pylint: disable=too-few-public-methods
@@ -16,9 +16,9 @@ class ComponentCapableDevice(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def component(self) -> component_base.ComponentBase:
+    def component(self) -> component.Component:
         """Returns a component affordance object.
 
         Returns:
-            component_base.ComponentBase object
+            component.Component object
         """

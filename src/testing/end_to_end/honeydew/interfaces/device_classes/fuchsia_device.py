@@ -9,14 +9,14 @@ import os
 from typing import Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances import component_base
+from honeydew.interfaces.affordances import component
 from honeydew.utils import ffx_cli
 
 DEFAULT_SSH_USER = "fuchsia"
 DEFAULT_SSH_PKEY = os.environ.get("SSH_PRIVATE_KEY_FILE")
 
 
-class FuchsiaDeviceBase(abc.ABC):
+class FuchsiaDevice(abc.ABC):
     """Abstract base class for Fuchsia device.
 
     This class contains abstract methods that are supported by every device
@@ -113,7 +113,7 @@ class FuchsiaDeviceBase(abc.ABC):
     # List all the affordances in alphabetical order
     @property
     @abc.abstractmethod
-    def component(self) -> component_base.ComponentBase:
+    def component(self) -> component.Component:
         """Returns a component affordance object.
 
         Returns:
