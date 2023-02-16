@@ -43,9 +43,9 @@ type Error = strict enum {
 @discoverable
 protocol Stack {
     /// List all the entries in the forwarding table for the network stack.
-    // TODO(https://fxbug.dev/38528): This is unbounded for now, until we change
-    // the API to allow for pagination.
-    GetForwardingTable() -> (struct {
+    // TODO(https://fxbug.dev/122014): Remove this method.
+    @deprecated("Use fuchsia.net.routes/StateV{4,6}.WatcherV{4,6}")
+    GetForwardingTableDeprecated() -> (struct {
         table vector<ForwardingEntry>:MAX;
     });
 

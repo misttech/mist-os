@@ -697,8 +697,10 @@ async fn do_route<C: NetCliDepsConnector>(
     let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
     match cmd {
         opts::RouteEnum::List(opts::RouteList {}) => {
-            let response =
-                stack.get_forwarding_table().await.context("error retrieving forwarding table")?;
+            let response = stack
+                .get_forwarding_table_deprecated()
+                .await
+                .context("error retrieving forwarding table")?;
             if out.is_machine() {
                 let response: Vec<_> = response
                     .into_iter()
@@ -2465,8 +2467,8 @@ mac             -
                 .await
                 .expect("stack FIDL error")
                 .expect("request stream should not have ended")
-                .into_get_forwarding_table()
-                .expect("request should be of type GetForwardingTable");
+                .into_get_forwarding_table_deprecated()
+                .expect("request should be of type GetForwardingTableDeprecated");
             let () = responder
                 .send(
                     &mut vec![

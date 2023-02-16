@@ -524,7 +524,7 @@ async fn add_address_success<N: Netstack>(name: &str) {
 
         // Ensure that no route to the subnet was added as a result of adding the address.
         assert!(stack
-            .get_forwarding_table()
+            .get_forwarding_table_deprecated()
             .await
             .expect("FIDL error calling fuchsia.net.stack/Stack.GetForwardingTable")
             .into_iter()

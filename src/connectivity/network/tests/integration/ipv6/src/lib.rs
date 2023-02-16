@@ -658,7 +658,7 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
         for attempt in 0..check_attempts {
             let () = sleep(ASYNC_EVENT_CHECK_INTERVAL.into_seconds()).await;
             let route_table =
-                stack.get_forwarding_table().await.expect("failed to get route table");
+                stack.get_forwarding_table_deprecated().await.expect("failed to get route table");
 
             if want_routes.iter().all(|route| route_table.contains(route)) {
                 return;
@@ -1209,7 +1209,7 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("connect to protocol)");
     let forwarding_table_stream = futures::stream::unfold(stack, |stack| async move {
-        let table = stack.get_forwarding_table().await.expect("get forwarding table");
+        let table = stack.get_forwarding_table_deprecated().await.expect("get forwarding table");
         Some((table, stack))
     });
     futures::pin_mut!(forwarding_table_stream);

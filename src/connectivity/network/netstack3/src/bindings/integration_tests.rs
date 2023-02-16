@@ -658,7 +658,7 @@ async fn test_list_del_routes() {
         })
         .await;
 
-    let routes = stack.get_forwarding_table().await.expect("Can get forwarding table");
+    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
     let route3_with_device: AddableEntryEither<_> =
         AddableEntry::with_gateway(sub10, Some(device.clone()), sub10_gateway).into();
 
@@ -713,7 +713,7 @@ async fn test_list_del_routes() {
     );
 
     // check that route was deleted (should've disappeared from core)
-    let routes = stack.get_forwarding_table().await.expect("Can get forwarding table");
+    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
     assert_eq!(
         test_stack
             .with_ctx(|ctx| {

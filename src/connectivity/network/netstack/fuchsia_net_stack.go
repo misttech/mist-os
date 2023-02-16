@@ -32,7 +32,7 @@ type stackImpl struct {
 	dnsWatchers *dnsServerWatcherCollection
 }
 
-func (ns *Netstack) getForwardingTable() []stack.ForwardingEntry {
+func (ns *Netstack) getForwardingTableDeprecated() []stack.ForwardingEntry {
 	ert := ns.GetExtendedRouteTable()
 	entries := make([]stack.ForwardingEntry, 0, len(ert))
 	for _, er := range ert {
@@ -107,8 +107,8 @@ func (ns *Netstack) delForwardingEntry(entry stack.ForwardingEntry) stack.StackD
 	return stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{})
 }
 
-func (ni *stackImpl) GetForwardingTable(fidl.Context) ([]stack.ForwardingEntry, error) {
-	return ni.ns.getForwardingTable(), nil
+func (ni *stackImpl) GetForwardingTableDeprecated(fidl.Context) ([]stack.ForwardingEntry, error) {
+	return ni.ns.getForwardingTableDeprecated(), nil
 }
 
 func (ni *stackImpl) AddForwardingEntry(_ fidl.Context, entry stack.ForwardingEntry) (stack.StackAddForwardingEntryResult, error) {

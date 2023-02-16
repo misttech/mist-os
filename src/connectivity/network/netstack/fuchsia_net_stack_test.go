@@ -63,7 +63,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		t.Cleanup(addNoopEndpoint(t, ns, "").RemoveByUser)
 		ni := stackImpl{ns: ns}
 
-		table, err := ni.GetForwardingTable(context.Background())
+		table, err := ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 
 		nonexistentSubnet := net.Subnet{
@@ -115,7 +115,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Fatalf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", localRoute, addResult)
 		}
-		table, err = ni.GetForwardingTable(context.Background())
+		table, err = ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 		expectedTable := []stack.ForwardingEntry{wantLocalRoute}
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
@@ -128,7 +128,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Errorf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", localRoute, addResult)
 		}
-		table, err = ni.GetForwardingTable(context.Background())
+		table, err = ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
 			t.Fatalf("forwarding table mismatch (-want +got):\n%s", diff)
@@ -140,7 +140,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Errorf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", defaultRoute, addResult)
 		}
-		table, err = ni.GetForwardingTable(context.Background())
+		table, err = ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 		expectedTable = append(expectedTable, wantDefaultRoute)
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
@@ -167,7 +167,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if delResult != stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{}) {
 			t.Fatalf("got ni.DelForwardingEntry(%#v) = Err(%s), want = Response()", localRoute, delResult.Err)
 		}
-		table, err = ni.GetForwardingTable(context.Background())
+		table, err = ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 		expectedTable = []stack.ForwardingEntry{wantDefaultRoute}
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
@@ -180,7 +180,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if delResult != stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{}) {
 			t.Fatalf("got ni.DelForwardingEntry(%#v) = Err(%s), want = Response()", localRoute, delResult.Err)
 		}
-		table, err = ni.GetForwardingTable(context.Background())
+		table, err = ni.GetForwardingTableDeprecated(context.Background())
 		AssertNoError(t, err)
 		expectedTable = []stack.ForwardingEntry{}
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {

@@ -104,7 +104,7 @@ const GATEWAY: fnet::IpAddress = fidl_ip!("192.168.0.1");
 #[fuchsia_async::run_singlethreaded(test)]
 async fn default_gateway() {
     let stack = connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
-    let table = stack.get_forwarding_table().await.expect("get forwarding table");
+    let table = stack.get_forwarding_table_deprecated().await.expect("get forwarding table");
     let found = table.into_iter().any(
         |fnet_stack::ForwardingEntry {
              subnet: fnet::Subnet { addr, prefix_len },

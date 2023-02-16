@@ -38,10 +38,14 @@ impl StackFidlWorker {
         stream
             .try_fold(Self { netstack }, |worker, req| async {
                 match req {
-                    StackRequest::GetForwardingTable { responder } => {
+                    StackRequest::GetForwardingTableDeprecated { responder } => {
                         responder_send!(
                             responder,
-                            &mut worker.lock_worker().await.fidl_get_forwarding_table().iter_mut()
+                            &mut worker
+                                .lock_worker()
+                                .await
+                                .fidl_get_forwarding_table_deprecated()
+                                .iter_mut()
                         );
                     }
                     StackRequest::AddForwardingEntry { entry, responder } => {
@@ -106,7 +110,7 @@ impl StackFidlWorker {
 }
 
 impl<'a> LockedFidlWorker<'a> {
-    fn fidl_get_forwarding_table(self) -> Vec<fidl_net_stack::ForwardingEntry> {
+    fn fidl_get_forwarding_table_deprecated(self) -> Vec<fidl_net_stack::ForwardingEntry> {
         let Ctx { sync_ctx, non_sync_ctx } = self.ctx.deref();
 
         netstack3_core::ip::get_all_routes(sync_ctx)

@@ -335,7 +335,8 @@ async fn inspect_routing_table(name: &str) {
 
     // Capture the state of the routing table to verify the inspect data, and
     // confirm that it's not empty.
-    let routing_table = stack.get_forwarding_table().await.expect("get_route_table FIDL error");
+    let routing_table =
+        stack.get_forwarding_table_deprecated().await.expect("get_route_table FIDL error");
     assert!(!routing_table.is_empty());
     println!("Got routing table: {:#?}", routing_table);
 

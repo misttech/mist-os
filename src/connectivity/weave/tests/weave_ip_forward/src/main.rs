@@ -117,7 +117,7 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     fx_log_info!("successfully added entries to route table");
 
     let route_table =
-        stack.get_forwarding_table().await.context("error retrieving routing table")?;
+        stack.get_forwarding_table_deprecated().await.context("error retrieving routing table")?;
 
     let mut t = Table::new();
     t.set_format(format::FormatBuilder::new().padding(2, 2).build());
