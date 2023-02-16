@@ -110,13 +110,17 @@ class Sl4f {
   /// [Sl4f] using environment variables provided by `fx` and the CI/CQ infra.
   ///
   /// Optionally specify an HTTP [client] to use for all requests.
-  Sl4f(String target, this.ssh,
+  Sl4f(String target, Ssh? ssh,
       [int port = _sl4fHttpDefaultPort,
       List<int> proxyPorts = const [],
       HttpClient? client])
       : assert(target != null && target.isNotEmpty),
         targetUrl = Uri.http('$target:$port', ''),
         _client = client ?? HttpClient() {
+    if (ssh != null) {
+      this.ssh = ssh;
+    }
+
     if (_portSuffixRe.hasMatch(target)) {
       throw ArgumentError('Target argument cannot contain a port. '
           'Use the port argument instead.');

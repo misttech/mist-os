@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io';
@@ -12,8 +11,8 @@ import 'package:sl4f/sl4f.dart';
 import 'package:test/test.dart';
 
 void main(List<String> args) {
-  HttpServer fakeServer;
-  Sl4f sl4f;
+  late HttpServer fakeServer;
+  late Sl4f sl4f;
 
   setUp(() async {
     fakeServer = await HttpServer.bind('127.0.0.1', 18081);

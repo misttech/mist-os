@@ -5845,12 +5845,6 @@
         "Sl4f": {
           "ConstructorDeclarationImpl": {
             "Sl4f": {
-              "FieldFormalParameterImpl": {
-                "this.ssh": {
-                  "name": "this.ssh",
-                  "type": "FieldFormalParameterImpl"
-                }
-              },
               "SimpleFormalParameterImpl": {
                 "client": {
                   "isConst": false,
@@ -5893,6 +5887,20 @@
                   "name": "proxyPorts",
                   "type": "SimpleFormalParameterImpl",
                   "varType": "List<int>"
+                },
+                "ssh": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "ssh",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "Ssh?"
                 },
                 "target": {
                   "isConst": false,
