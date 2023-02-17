@@ -122,6 +122,7 @@ func NewFFXInstance(
 		{"config", "env", "set", filepath.Join(outputDir, "global_config.json"), "-l", "global"},
 		{"config", "set", "fastboot.usb.disabled", "true", "-l", "global"},
 		{"config", "set", "ffx.analytics.disabled", "true", "-l", "global"},
+		{"config", "set", "proactive_log.enabled", "false"},
 	}
 	if sshKey != "" {
 		sshKey, err = filepath.Abs(sshKey)
