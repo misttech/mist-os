@@ -25,9 +25,13 @@ use core::{
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
-use lock_order::Locked;
 
 use derivative::Derivative;
+use lock_order::{
+    lock::{RwLockFor, UnlockedAccess},
+    relation::LockBefore,
+    Locked,
+};
 use log::{debug, trace};
 use net_types::{
     ip::{
@@ -71,7 +75,7 @@ use crate::{
             IpSockUnroutableError, IpSocketContext, IpSocketHandler,
         },
     },
-    sync::{Mutex, RwLock},
+    sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -481,12 +485,25 @@ impl IpLayerIpExt for Ipv6 {
 pub(crate) trait IpStateContext<I: IpLayerIpExt, Instant: crate::Instant>:
     IpDeviceIdContext<I>
 {
-    /// Calls the function with an immutable reference to IP layer state.
-    fn with_ip_layer_state<O, F: FnOnce(&I::State<Instant, Self::DeviceId>) -> O>(
-        &self,
+    /// Calls the function with an immutable reference to IP routing table.
+    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<I, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to IP routing table.
+    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<I, Self::DeviceId>) -> O>(
+        &mut self,
         cb: F,
     ) -> O;
 }
+
+pub(crate) trait Ipv4StateContext<Instant: crate::Instant>:
+    IpStateContext<Ipv4, Instant>
+{
+    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O;
+}
+
 /// The IP device context provided to the IP layer.
 pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     /// Is the device enabled?
@@ -723,14 +740,25 @@ impl<
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
-    fn with_ip_layer_state<
-        O,
-        F: FnOnce(&Ipv4State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
-    >(
-        &self,
+    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+        &mut self,
         cb: F,
     ) -> O {
-        IpStateContext::<Ipv4, _>::with_ip_layer_state(&Locked::new(*self), cb)
+        IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
+    }
+
+    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        IpStateContext::<Ipv4, _>::with_ip_routing_table_mut(&mut Locked::new(*self), cb)
+    }
+}
+
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
+impl<NonSyncCtx: NonSyncContext> Ipv4StateContext<NonSyncCtx::Instant> for &'_ SyncCtx<NonSyncCtx> {
+    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
+        Locked::new(*self).with_next_packet_id(cb)
     }
 }
 
@@ -738,42 +766,66 @@ impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
-    fn with_ip_layer_state<
-        O,
-        F: FnOnce(&Ipv6State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
-    >(
-        &self,
+    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+        &mut self,
         cb: F,
     ) -> O {
-        IpStateContext::<Ipv6, _>::with_ip_layer_state(&Locked::new(*self), cb)
+        IpStateContext::<Ipv6, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
+    }
+
+    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        IpStateContext::<Ipv6, _>::with_ip_routing_table_mut(&mut Locked::new(*self), cb)
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> IpStateContext<Ipv4, NonSyncCtx::Instant>
-    for Locked<'_, SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    Ipv4StateContext<NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_layer_state<
-        O,
-        F: FnOnce(&Ipv4State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
-    >(
-        &self,
-        cb: F,
-    ) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IpState<Ipv4>>())
+    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> IpStateContext<Ipv6, NonSyncCtx::Instant>
-    for Locked<'_, SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    IpStateContext<Ipv4, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_layer_state<
-        O,
-        F: FnOnce(&Ipv6State<NonSyncCtx::Instant, DeviceId<NonSyncCtx::Instant>>) -> O,
-    >(
-        &self,
+    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+        &mut self,
         cb: F,
     ) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IpState<Ipv6>>())
+        let cache = self.read_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
+        cb(&cache)
+    }
+
+    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let mut cache = self.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
+        cb(&mut cache)
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    IpStateContext<Ipv6, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+{
+    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let cache = self.read_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
+        cb(&cache)
+    }
+
+    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let mut cache = self.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
+        cb(&mut cache)
     }
 }
 
@@ -1006,14 +1058,15 @@ impl<I: Instant, DeviceId> AsRef<IpStateInner<Ipv4, I, DeviceId>> for Ipv4State<
     }
 }
 
-fn gen_ipv4_packet_id<I: Instant, C: IpStateContext<Ipv4, I>>(sync_ctx: &mut C) -> u16 {
+fn gen_ipv4_packet_id<I: Instant, C: Ipv4StateContext<I>>(sync_ctx: &mut C) -> u16 {
     // Relaxed ordering as we only need atomicity without synchronization. See
     // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
     // for more details.
     //
     // TODO(https://fxbug.dev/87588): Generate IPv4 IDs unpredictably
-    sync_ctx
-        .with_ip_layer_state(|state| state.next_packet_id.fetch_add(1, atomic::Ordering::Relaxed))
+    sync_ctx.with_next_packet_id(|next_packet_id| {
+        next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
+    })
 }
 
 pub(crate) struct Ipv6State<Instant: crate::Instant, D> {
@@ -1024,6 +1077,44 @@ pub(crate) struct Ipv6State<Instant: crate::Instant, D> {
 impl<I: Instant, DeviceId> AsRef<IpStateInner<Ipv6, I, DeviceId>> for Ipv6State<I, DeviceId> {
     fn as_ref(&self) -> &IpStateInner<Ipv6, I, DeviceId> {
         &self.inner
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4>> for SyncCtx<C> {
+    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv4, DeviceId<C::Instant>>>
+        where Self: 'l;
+    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv4, DeviceId<C::Instant>>>
+        where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.state.ipv4.inner.table.read()
+    }
+
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.state.ipv4.inner.table.write()
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv6>> for SyncCtx<C> {
+    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv6, DeviceId<C::Instant>>>
+        where Self: 'l;
+    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv6, DeviceId<C::Instant>>>
+        where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.state.ipv6.inner.table.read()
+    }
+
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.state.ipv6.inner.table.write()
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId> for SyncCtx<C> {
+    type Data<'l> = &'l AtomicU16 where Self: 'l;
+
+    fn access(&self) -> Self::Data<'_> {
+        &self.state.ipv4.next_packet_id
     }
 }
 
@@ -2162,28 +2253,12 @@ fn lookup_route_table<
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
     SC: IpLayerContext<I, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     _ctx: &mut C,
     device: Option<&SC::DeviceId>,
     dst_ip: SpecifiedAddr<I::Addr>,
 ) -> Option<Destination<I::Addr, SC::DeviceId>> {
-    sync_ctx.with_ip_layer_state(|state| {
-        AsRef::<IpStateInner<_, _, _>>::as_ref(state).table.read().lookup(device, dst_ip)
-    })
-}
-
-fn with_ip_layer_state_inner<
-    'a,
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
-    O,
-    F: FnOnce(&IpStateInner<I, C::Instant, SC::DeviceId>) -> O,
->(
-    sync_ctx: &mut SC,
-    cb: F,
-) -> O {
-    sync_ctx.with_ip_layer_state(|state| cb(state.as_ref()))
+    sync_ctx.with_ip_routing_table(|table| table.lookup(device, dst_ip))
 }
 
 /// Add a route to the forwarding table, returning `Err` if the subnet
@@ -2198,7 +2273,7 @@ pub(crate) fn add_route<
     subnet: Subnet<I::Addr>,
     next_hop: SpecifiedAddr<I::Addr>,
 ) -> Result<(), AddRouteError> {
-    with_ip_layer_state_inner(sync_ctx, |state| state.table.write().add_route(subnet, next_hop))
+    sync_ctx.with_ip_routing_table_mut(|table| table.add_route(subnet, next_hop))
 }
 
 /// Add a device route to the forwarding table, returning `Err` if the
@@ -2213,8 +2288,8 @@ pub(crate) fn add_device_route<
     subnet: Subnet<I::Addr>,
     device: SC::DeviceId,
 ) -> Result<(), ExistsError> {
-    with_ip_layer_state_inner(sync_ctx, |state| {
-        state.table.write().add_device_route(subnet, device.clone()).map(|()| {
+    sync_ctx.with_ip_routing_table_mut(|table| {
+        table.add_device_route(subnet, device.clone()).map(|()| {
             ctx.on_event(IpLayerEvent::DeviceRouteAdded { device, subnet });
         })
     })
@@ -2231,8 +2306,8 @@ pub(crate) fn del_route<
     ctx: &mut C,
     subnet: Subnet<I::Addr>,
 ) -> Result<(), NotFoundError> {
-    with_ip_layer_state_inner(sync_ctx, |state| {
-        state.table.write().del_route(subnet).map(|removed| {
+    sync_ctx.with_ip_routing_table_mut(|table| {
+        table.del_route(subnet).map(|removed| {
             removed.into_iter().for_each(|types::Entry { subnet, device, gateway }| match gateway {
                 None => ctx.on_event(IpLayerEvent::DeviceRouteRemoved { device, subnet }),
                 Some(SpecifiedAddr { .. }) => (),
@@ -2250,11 +2325,8 @@ pub(crate) fn del_device_routes<
     _ctx: &mut C,
     to_delete: &SC::DeviceId,
 ) {
-    with_ip_layer_state_inner(sync_ctx, |state| {
-        state
-            .table
-            .write()
-            .retain(|types::Entry { subnet: _, device, gateway: _ }| device != to_delete)
+    sync_ctx.with_ip_routing_table_mut(|table| {
+        table.retain(|types::Entry { subnet: _, device, gateway: _ }| device != to_delete)
     })
 }
 
@@ -2346,7 +2418,7 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv4, C, B> + IpStateContext<Ipv4, C::Instant> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C::Instant> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2384,7 +2456,7 @@ impl<
 pub(crate) fn send_ipv4_packet_from_device<
     B: BufferMut,
     C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv4, C, B> + IpStateContext<Ipv4, C::Instant>,
+    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C::Instant>,
     S: Serializer<Buffer = B>,
 >(
     sync_ctx: &mut SC,

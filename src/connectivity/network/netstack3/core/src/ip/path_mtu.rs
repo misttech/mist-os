@@ -36,7 +36,7 @@ pub(crate) struct PmtuTimerId<I: Ip>(IpVersionMarker<I>);
 /// The state context for the path MTU cache.
 pub(super) trait PmtuStateContext<I: Ip, Instant> {
     /// Calls a function with a mutable reference to the PMTU cache.
-    fn with_state_mut<F: FnOnce(&mut PmtuCache<I, Instant>)>(&mut self, cb: F);
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, Instant>) -> O>(&mut self, cb: F) -> O;
 }
 
 /// The non-synchronized execution context for path MTU discovery.
@@ -448,7 +448,10 @@ mod tests {
     type FakeSyncCtxImpl<I> = FakeSyncCtx<FakePmtuContext<I>, (), ()>;
 
     impl<I: Ip> PmtuStateContext<I, FakeInstant> for FakeSyncCtxImpl<I> {
-        fn with_state_mut<F: FnOnce(&mut PmtuCache<I, FakeInstant>)>(&mut self, cb: F) {
+        fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, FakeInstant>) -> O>(
+            &mut self,
+            cb: F,
+        ) -> O {
             cb(&mut self.get_mut().cache)
         }
     }

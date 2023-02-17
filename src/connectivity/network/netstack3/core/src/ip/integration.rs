@@ -18,34 +18,39 @@ use crate::{
         reassembly::FragmentStateContext,
         send_ipv4_packet_from_device, send_ipv6_packet_from_device,
         socket::{BufferIpSocketContext, IpSocketContext, IpSocketNonSyncContext},
-        IpDeviceIdContext, IpLayerIpExt, IpLayerNonSyncContext, IpPacketFragmentCache,
-        IpStateContext, MulticastMembershipHandler, SendIpPacketMeta,
+        IpDeviceIdContext, IpLayerNonSyncContext, IpPacketFragmentCache, IpStateContext,
+        Ipv4StateContext, MulticastMembershipHandler, SendIpPacketMeta,
     },
     NonSyncContext, SyncCtx,
 };
 
-impl<
-        Instant: crate::Instant,
-        I: IpLayerIpExt,
-        SC: IpStateContext<I, Instant> + NonTestCtxMarker,
-    > FragmentStateContext<I, Instant> for SC
-{
-    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, Instant>) -> O>(
+impl<C: NonSyncContext> FragmentStateContext<Ipv4, C::Instant> for &'_ SyncCtx<C> {
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv4, C::Instant>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        self.with_ip_layer_state(|state| cb(&mut state.as_ref().fragment_cache.lock()))
+        cb(&mut self.state.ipv4.inner.fragment_cache.lock())
     }
 }
 
-impl<
-        Instant: crate::Instant,
-        I: IpLayerIpExt,
-        SC: IpStateContext<I, Instant> + NonTestCtxMarker,
-    > PmtuStateContext<I, Instant> for SC
-{
-    fn with_state_mut<F: FnOnce(&mut PmtuCache<I, Instant>)>(&mut self, cb: F) {
-        self.with_ip_layer_state(|state| cb(&mut state.as_ref().pmtu_cache.lock()))
+impl<C: NonSyncContext> FragmentStateContext<Ipv6, C::Instant> for &'_ SyncCtx<C> {
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv6, C::Instant>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.state.ipv6.inner.fragment_cache.lock())
+    }
+}
+
+impl<C: NonSyncContext> PmtuStateContext<Ipv4, C::Instant> for &'_ SyncCtx<C> {
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, C::Instant>) -> O>(&mut self, cb: F) -> O {
+        cb(&mut self.state.ipv4.inner.pmtu_cache.lock())
+    }
+}
+
+impl<C: NonSyncContext> PmtuStateContext<Ipv6, C::Instant> for &'_ SyncCtx<C> {
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, C::Instant>) -> O>(&mut self, cb: F) -> O {
+        cb(&mut self.state.ipv6.inner.pmtu_cache.lock())
     }
 }
 
@@ -54,7 +59,7 @@ impl<
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
         SC: ip::BufferIpDeviceContext<Ipv4, C, B>
-            + IpStateContext<Ipv4, C::Instant>
+            + Ipv4StateContext<C::Instant>
             + IpSocketContext<Ipv4, C>
             + NonTestCtxMarker,
     > BufferIpSocketContext<Ipv4, C, B> for SC
