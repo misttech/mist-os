@@ -16,6 +16,7 @@
 #include <zircon/status.h>
 
 #include "magma_util/dlog.h"
+#include "magma_util/status.h"
 #include "msd/msd_defs.h"
 #include "msd_cc.h"
 #include "platform_object.h"

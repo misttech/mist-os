@@ -9,7 +9,6 @@
 
 #include "platform_object.h"
 #include "platform_thread.h"
-#include "zircon_platform_handle.h"
 
 namespace magma {
 

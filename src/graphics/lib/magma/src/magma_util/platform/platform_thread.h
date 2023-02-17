@@ -13,8 +13,6 @@
 #include <cstdint>
 #include <string>
 
-#include "platform_handle.h"
-
 namespace magma {
 
 // Use std::thread except for ids.

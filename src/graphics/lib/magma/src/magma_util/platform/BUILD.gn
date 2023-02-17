@@ -247,8 +247,6 @@ source_set("device_client") {
 source_set("thread_header") {
   public_configs = [ ":platform_include_config" ]
 
-  public_deps = [ ":handle" ]
-
   sources = [ "platform_thread.h" ]
 }
 

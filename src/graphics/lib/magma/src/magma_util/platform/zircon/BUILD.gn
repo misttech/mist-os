@@ -242,7 +242,6 @@ source_set("thread") {
   sources = [ "zircon_platform_thread.cc" ]
 
   deps = [
-    ":handle",
     "..:object",
     "..:thread_header",
   ]
