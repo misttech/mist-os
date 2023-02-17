@@ -60,13 +60,6 @@ impl std::ops::Deref for ConfigWrapper {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref COMMAND: inspect::StringReference = "command".into();
-    static ref PPID: inspect::StringReference = "ppid".into();
-    static ref TASKS: inspect::StringReference = "tasks".into();
-    static ref STOPPED: inspect::StringReference = "stopped".into();
-}
-
 /// Returns the configuration object for the galaxy being run by this `starnix_kernel`.
 fn get_config() -> ConfigWrapper {
     if let Ok(config_bytes) = std::fs::read("/galaxy_config/config") {
@@ -405,13 +398,13 @@ fn create_galaxy_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
             let tg = thread_group.read();
 
             let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
-            tg_node.record_int(&*PPID, tg.get_ppid() as i64);
-            tg_node.record_bool(&*STOPPED, tg.stopped);
+            tg_node.record_int("ppid", tg.get_ppid() as i64);
+            tg_node.record_bool("stopped", tg.stopped);
 
-            let tasks_node = tg_node.create_child(&*TASKS);
+            let tasks_node = tg_node.create_child("tasks");
             for task in tg.tasks() {
                 if task.id == thread_group.leader {
-                    record_task_command_to_node(&task, &*COMMAND, &tg_node);
+                    record_task_command_to_node(&task, "command", &tg_node);
                     continue;
                 }
                 record_task_command_to_node(&task, format!("{}", task.id), &tasks_node);
