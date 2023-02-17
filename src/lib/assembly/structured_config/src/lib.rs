@@ -9,7 +9,7 @@ use assembly_validate_util::PkgNamespace;
 use camino::{Utf8Path, Utf8PathBuf};
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use fidl::encoding::{unpersist, Persistable};
-use fuchsia_pkg::{PackageBuilder, PackageManifest};
+use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::{collections::BTreeMap, fmt::Debug};
 
 /// Add structured configuration values to an existing package.
@@ -36,6 +36,7 @@ impl Repackager<PackageBuilder> {
         let Self { mut builder, outdir } = self;
         let manifest_path = outdir.join("package_manifest.json");
         builder.manifest_path(&manifest_path);
+        builder.manifest_blobs_relative_to(RelativeTo::File);
         builder.build(&outdir, outdir.join("meta.far")).map_err(RepackageError::BuildPackage)?;
         Ok(manifest_path)
     }
