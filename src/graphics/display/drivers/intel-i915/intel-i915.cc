@@ -896,6 +896,18 @@ zx_status_t Controller::DisplayControllerImplImportBufferCollection(uint64_t col
   }
 
   buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+
+  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
+  // we need to set null constraints in order not to block the sysmem Allocator.
+  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
+  // correctly implemented.
+  fidl::OneWayStatus status =
+      buffer_collections_.at(collection_id)->SetConstraints(/*has_constraints=*/false, {});
+  if (!status.ok()) {
+    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
   return ZX_OK;
 }
 

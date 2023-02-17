@@ -77,6 +77,10 @@ class MockNoCpuBufferCollection
   void SetConstraints(SetConstraintsRequestView request,
                       SetConstraintsCompleter::Sync& _completer) override {
     set_constraints_called_ = true;
+    if (!request->has_constraints) {
+      return;
+    }
+
     EXPECT_FALSE(request->constraints.buffer_memory_constraints.inaccessible_domain_supported);
     EXPECT_FALSE(request->constraints.buffer_memory_constraints.cpu_domain_supported);
     constraints_ = request->constraints;

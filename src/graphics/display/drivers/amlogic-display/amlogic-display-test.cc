@@ -28,6 +28,10 @@ class MockBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::
 
   void SetConstraints(SetConstraintsRequestView request,
                       SetConstraintsCompleter::Sync& _completer) override {
+    if (!request->has_constraints) {
+      return;
+    }
+
     EXPECT_TRUE(request->constraints.buffer_memory_constraints.inaccessible_domain_supported);
     EXPECT_FALSE(request->constraints.buffer_memory_constraints.cpu_domain_supported);
     EXPECT_EQ(64u, request->constraints.image_format_constraints[0].bytes_per_row_divisor);
