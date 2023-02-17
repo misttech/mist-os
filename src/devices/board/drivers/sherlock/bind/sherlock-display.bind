@@ -8,11 +8,11 @@ using fuchsia.sysmem;
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.t931;
 using fuchsia.gpio;
-using fuchsia.dsi;
+using fuchsia.hardware.dsi;
 using fuchsia.platform;
 
 primary node "dsi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.dsi.BIND_PROTOCOL.IMPL;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL;
 }
 
 node "pdev" {

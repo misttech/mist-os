@@ -74,8 +74,8 @@ driver_bind_rules("astro-display-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.dsi",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.dsi",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]

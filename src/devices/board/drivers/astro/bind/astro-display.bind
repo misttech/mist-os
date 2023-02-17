@@ -4,7 +4,7 @@
 
 composite display;
 
-using fuchsia.dsi;
+using fuchsia.hardware.dsi;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.sysmem;
@@ -12,7 +12,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.s905d2;
 
 primary node "dsi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.dsi.BIND_PROTOCOL.IMPL;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL;
 }
 
 node "pdev" {
