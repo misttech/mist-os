@@ -61,8 +61,11 @@ zx_status_t AudioDeviceStream::Open() {
   auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
   ZX_ASSERT(endpoints.is_ok());
   auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client->Connect(std::move(stream_channel_remote));
+  auto result = client->Connect(std::move(stream_channel_remote));
+  if (result.status() != ZX_OK) {
+    printf("client connect failed with error %s\n", result.status_string());
+    return result.status();
+  }
 
   stream_ch_ = std::move(stream_channel_local);
   return ZX_OK;
@@ -122,8 +125,11 @@ zx_status_t AudioDeviceStream::SetGainParams() {
   fidl::Arena allocator;
   audio_fidl::wire::GainState gain_state(allocator);
   gain_state.set_muted(muted_).set_agc_enabled(agc_enabled_).set_gain_db(gain_);
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)fidl::WireCall(stream_ch_)->SetGain(std::move(gain_state));
+  auto result = fidl::WireCall(stream_ch_)->SetGain(std::move(gain_state));
+  if (result.status() != ZX_OK) {
+    printf("set gain failed with error %s\n", result.status_string());
+    return result.status();
+  }
   return ZX_OK;
 }
 
@@ -257,18 +263,22 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
   audio_fidl::wire::Format format(allocator);
   format.set_pcm_format(allocator, std::move(pcm_format));
 
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)fidl::WireCall(stream_ch_)->CreateRingBuffer(std::move(format), std::move(remote));
+  auto result0 = fidl::WireCall(stream_ch_)->CreateRingBuffer(std::move(format), std::move(remote));
+  if (result0.status() != ZX_OK) {
+    printf("create ring buffer failed with error %s\n", result0.status_string());
+    return ZX_ERR_BAD_STATE;
+  }
   rb_ch_ = std::move(local);
 
   // Stash the FIFO depth, in case users need to know it.
-  auto result = fidl::WireCall(rb_ch_)->GetProperties();
-  if (result.status() != ZX_OK) {
+  auto result1 = fidl::WireCall(rb_ch_)->GetProperties();
+  if (result1.status() != ZX_OK) {
+    printf("get properties failed with error %s\n", result1.status_string());
     return ZX_ERR_BAD_STATE;
   }
-  fifo_depth_ = result.value().properties.fifo_depth();
-  if (result.value().properties.has_external_delay()) {
-    external_delay_nsec_ = result.value().properties.external_delay();
+  fifo_depth_ = result1.value().properties.fifo_depth();
+  if (result1.value().properties.has_external_delay()) {
+    external_delay_nsec_ = result1.value().properties.external_delay();
   }
 
   // TODO(81650): Add support to audio-driver-ctl to interactively activate/deactivate channels.

@@ -35,8 +35,10 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
     return {};
   }
   auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client->Connect(std::move(stream_channel_remote));
+  auto result = client->Connect(std::move(stream_channel_remote));
+  if (!result.ok()) {
+    return {};
+  }
   return fidl::WireSyncClient<audio_fidl::StreamConfig>(std::move(stream_channel_local));
 }
 

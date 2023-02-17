@@ -253,6 +253,7 @@ class BaseUsbAudioTest : public inspect::InspectTestHelper, public zxtest::Test 
     fake_dev_->DdkAsyncRemove();
     mock_ddk::ReleaseFlaggedDevices(root_.get());
   }
+
  protected:
   std::shared_ptr<FakeDevType> fake_dev_;
   std::shared_ptr<MockDevice> root_;
@@ -611,14 +612,14 @@ TEST_F(UsbAudioTest, CreateRingBuffer) {
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
     format.set_pcm_format(allocator, GetDefaultPcmFormat());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+    auto result1 = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+    ASSERT_OK(result1.status());
 
     // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
     // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
     // StreamConfig synchronously.
-    auto result = stream_client->GetProperties();
-    ASSERT_OK(result.status());
+    auto result2 = stream_client->GetProperties();
+    ASSERT_OK(result2.status());
   }
 }
 
