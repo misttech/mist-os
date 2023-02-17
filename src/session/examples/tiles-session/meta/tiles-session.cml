@@ -121,4 +121,11 @@
             from: "#element_manager",
         },
     ],
+    config: {
+        // This URL specifies which, if any, element to launch on startup.
+        main_element_url: {
+            type: "string",
+            max_size: 256,
+        },
+    },
 }

@@ -16,6 +16,7 @@ use {
     fidl_fuchsia_element as element, fidl_fuchsia_ui_scenic as ui_scenic, fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs, server::ServiceObj},
     futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
+    tiles_config,
     tracing::{error, warn},
 };
 
@@ -137,6 +138,26 @@ async fn main() -> Result<(), Error> {
 
     // Serve the FIDL services on the message loop, proxying them into internal messages.
     run_services(fs, internal_sender.clone());
+
+    let config = tiles_config::Config::take_from_startup_handle();
+    if !config.main_element_url.is_empty() {
+        fasync::Task::local(async move {
+            let element_manager = connect_to_protocol::<element::ManagerMarker>()
+                .expect("failed to connect to fuchsia.element.Manager");
+            element_manager
+                .propose_element(
+                    element::Spec {
+                        component_url: Some(config.main_element_url),
+                        ..element::Spec::EMPTY
+                    },
+                    None,
+                )
+                .await
+                .expect("Failed to propose element.")
+                .expect("Failed to propose element.");
+        })
+        .detach();
+    }
 
     // Process internal messages using the tiles session, then cleanup when done.
     while let Some(message) = internal_receiver.next().await {

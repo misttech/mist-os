@@ -5,11 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-fuchsia_package_with_single_component("tiles-session") {
-  manifest = "meta/tiles-session.cml"
-  deps = [ ":bin" ]
-}
-
 # TODO(fxbug.dev/88656): add some tests.  Add these to //src/session/examples:tests
 # group("tests") {}
 
@@ -19,6 +14,7 @@ rustc_binary("bin") {
   edition = "2021"
 
   deps = [
+    ":tiles_config",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
@@ -44,5 +40,34 @@ rustc_binary("bin") {
     "src/flatland.rs",
     "src/gfx.rs",
     "src/main.rs",
+  ]
+}
+
+fuchsia_component_manifest("tiles_manifest") {
+  manifest = "meta/tiles-session.cml"
+  component_name = "tiles-session"
+}
+
+fuchsia_structured_config_rust_lib("tiles_config") {
+  cm_label = ":tiles_manifest"
+}
+
+fuchsia_component("tiles_component") {
+  cm_label = ":tiles_manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_values("tiles_config_values") {
+  cm_label = ":tiles_manifest"
+  values_source = "//src/session/examples/tiles-session/meta/config.json5"
+}
+
+fuchsia_package("tiles-session") {
+  package_name = "tiles-session"
+
+  deps = [
+    ":tiles_component",
+    ":tiles_config_values",
+    ":tiles_manifest",
   ]
 }
