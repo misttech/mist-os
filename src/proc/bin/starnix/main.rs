@@ -4,6 +4,8 @@
 
 #![warn(clippy::all)]
 #![allow(clippy::too_many_arguments)]
+// TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
+#![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
 #[macro_use]
 extern crate macro_rules_attribute;
