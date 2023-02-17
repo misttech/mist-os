@@ -3,6 +3,11 @@
 # found in the LICENSE file.
 
 # buildifier: disable=bzl-visibility
+
+# __BEGIN_FUCHSIA_SDK_INCLUDE__
+# The above allows this fragment to be merged from `bazel_rules_fuchsia` into
+# `@fuchsia_sdk//:BUILD.bazel`.
+
 load("//fuchsia/private:debug_info.bzl", "print_debug_info")
 
 # A target that will dump debug information about the Fuchsia
@@ -15,3 +20,5 @@ load("//fuchsia/private:debug_info.bzl", "print_debug_info")
 print_debug_info(
     name = "debug_info",
 )
+
+# __END_FUCHSIA_SDK_INCLUDE__

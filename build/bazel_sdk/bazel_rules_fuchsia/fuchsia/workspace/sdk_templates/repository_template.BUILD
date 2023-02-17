@@ -117,3 +117,5 @@ sdk_host_tool(name = "cmc")
 sdk_host_tool(name = "pm")
 
 sdk_host_tool(name = "far")
+
+{{__FUCHSIA_SDK_INCLUDE__}}

@@ -72,6 +72,26 @@ def _instantiate_local_env(ctx, manifests):
 
         manifests.append({"root": "%s/." % local_exp, "manifest": "meta/manifest.json"})
 
+def _merge_rules_fuchsia(ctx):
+    rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
+    for child in ["cipd", "fuchsia"]:
+        ctx.symlink(rules_fuchsia_root.get_child(child), child)
+
+    rules_fuchsia_build = ctx.read(rules_fuchsia_root.get_child("BUILD.bazel")).split("\n")
+    start, end = [
+        i
+        for i, s in enumerate(rules_fuchsia_build)
+        if "__BEGIN_FUCHSIA_SDK_INCLUDE__" in s or "__END_FUCHSIA_SDK_INCLUDE__" in s
+    ]
+    rules_fuchsia_build_fragment = "\n".join(rules_fuchsia_build[start:end + 1])
+    ctx.template(
+        "BUILD.bazel",
+        "BUILD.bazel",
+        substitutions = {
+            "{{__FUCHSIA_SDK_INCLUDE__}}": rules_fuchsia_build_fragment,
+        },
+    )
+
 def _fuchsia_sdk_repository_impl(ctx):
     ctx.file("WORKSPACE.bazel", content = "")
     manifests = []
@@ -126,9 +146,11 @@ def _fuchsia_sdk_repository_impl(ctx):
         },
     )
 
-    #TODO(fxbug.dev/117511 Allow generate_sdk_build_rules to provide substitutions directly
-    # to the call to ctx.template above.
+    # TODO(fxbug.dev/117511): Allow generate_sdk_build_rules to provide
+    # substitutions directly to the call to ctx.template above.
     generate_sdk_build_rules(ctx, manifests, copy_content_strategy)
+
+    _merge_rules_fuchsia(ctx)
 
 fuchsia_sdk_repository = repository_rule(
     doc = """
@@ -252,6 +274,10 @@ allow Bazel to cache the file.
         ),
         "_sysroot_arch_subtemplate": attr.label(
             default = "@rules_fuchsia//fuchsia/workspace/sdk_templates:sysroot_arch_subtemplate.BUILD",
+            allow_single_file = True,
+        ),
+        "_rules_fuchsia_root": attr.label(
+            default = "//:BUILD.bazel",
             allow_single_file = True,
         ),
     },

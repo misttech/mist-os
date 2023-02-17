@@ -47,9 +47,10 @@ def symlink_or_copy(ctx, copy_content_strategy, files_to_copy):
             # this is not an "else" intentionally, since we want to execute regular copy if we couldn't hardlink
             if not try_hardlink:
                 # Note: -n is the same as --no-clobber but is supported on MacOS.
-                result = ctx.execute(["cp", "-n"] + per_dest_dir[dest_dir] + [dest_dir], quiet = False)
+                command = ["cp", "-n"] + per_dest_dir[dest_dir] + [dest_dir]
+                result = ctx.execute(command, quiet = False)
                 if result.return_code != 0:
-                    fail("Cannot copy files (%s):\n     cp -n %s  %s" % (str(result.return_code), " ".join(per_dest_dir[dest_dir]), dest_dir))
+                    fail("Cannot copy files (%s):\n     %s" % (str(result.return_code), " ".join(command)))
 
     elif copy_content_strategy == "symlink":
         for root in files_to_copy.keys():
