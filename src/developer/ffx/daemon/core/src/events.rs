@@ -20,6 +20,8 @@ use std::{
     time::Duration,
 };
 use timeout::timeout;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub trait EventTrait: Debug + Sized + Hash + Clone + Eq {}
 impl<T> EventTrait for T where T: Debug + Sized + Hash + Clone + Eq {}
@@ -67,7 +69,7 @@ pub trait EventHandler<T: EventTrait> {
 
 struct DispatcherInner<T: EventTrait + 'static> {
     handler: Box<dyn EventHandler<T>>,
-    event_in: async_channel::Sender<T>,
+    event_in: UnboundedSender<T>,
 }
 
 /// Dispatcher runs events in the handler's queue until the handler is finished,
@@ -111,12 +113,12 @@ impl<T: EventTrait + 'static> Dispatcher<T> {
 
     #[tracing::instrument(skip(handler))]
     fn new(handler: impl EventHandler<T> + 'static) -> Self {
-        let (event_in, queue) = async_channel::unbounded::<T>();
+        let (event_in, queue) = unbounded_channel::<T>();
         let inner = Rc::new(DispatcherInner { handler: Box::new(handler), event_in });
         Self {
             inner: Rc::downgrade(&inner),
             _task: Task::local(async move {
-                queue
+                UnboundedReceiverStream::new(queue)
                     .map(|e| Ok(e))
                     .try_for_each_concurrent_while_connected(None, move |e| {
                         Self::handler_helper(e, inner.clone())
@@ -137,7 +139,7 @@ impl<T: EventTrait + 'static> Dispatcher<T> {
             None => return Err(anyhow!("done")),
         };
 
-        inner.event_in.send(e).await.map_err(|e| anyhow!("error enqueueing event: {:#}", e))
+        inner.event_in.send(e).map_err(|e| anyhow!("error enqueueing event: {:#}", e))
     }
 }
 
@@ -169,7 +171,7 @@ where
     F: Future<Output = bool>,
 {
     parent_link: Weak<()>,
-    predicate_matched: async_channel::Sender<()>,
+    predicate_matched: UnboundedSender<()>,
     predicate: Box<dyn Fn(T) -> F + 'static>,
 }
 
@@ -180,8 +182,8 @@ where
     fn new(
         parent_link: Weak<()>,
         predicate: impl (Fn(T) -> F) + 'static,
-    ) -> (Self, async_channel::Receiver<()>) {
-        let (tx, rx) = async_channel::unbounded::<()>();
+    ) -> (Self, UnboundedReceiver<()>) {
+        let (tx, rx) = unbounded_channel::<()>();
         let s = Self { parent_link, predicate_matched: tx, predicate: Box::new(predicate) };
 
         (s, rx)
@@ -201,7 +203,7 @@ where
             return Ok(Status::Done);
         }
         if (self.predicate)(event).await {
-            self.predicate_matched.send(()).await.context("sending 'done' signal to waiter")?;
+            self.predicate_matched.send(()).context("sending 'done' signal to waiter")?;
             return Ok(Status::Done);
         }
         Ok(Status::Waiting)
@@ -212,7 +214,7 @@ type Handlers<T> = Rc<Mutex<Vec<Dispatcher<T>>>>;
 
 #[derive(Clone)]
 pub struct Queue<T: EventTrait + 'static> {
-    inner_tx: async_channel::Sender<T>,
+    inner_tx: UnboundedSender<T>,
     handlers: Handlers<T>,
     state: Weak<dyn EventSynthesizer<T>>,
 
@@ -222,7 +224,7 @@ pub struct Queue<T: EventTrait + 'static> {
 }
 
 struct Processor<T: 'static + EventTrait> {
-    inner_rx: Option<async_channel::Receiver<T>>,
+    inner_rx: Option<UnboundedReceiver<T>>,
     handlers: Handlers<T>,
 }
 
@@ -234,7 +236,7 @@ impl<T: 'static + EventTrait> Queue<T> {
     /// background and tied to the lifetimes of these objects. Once all objects
     /// are dropped, the background process will be shutdown automatically.
     pub fn new(state: &Rc<impl EventSynthesizer<T> + 'static>) -> Self {
-        let (inner_tx, inner_rx) = async_channel::unbounded::<T>();
+        let (inner_tx, inner_rx) = unbounded_channel::<T>();
         let handlers = Rc::new(Mutex::new(Vec::<Dispatcher<T>>::new()));
         let proc = Processor::<T> { inner_rx: Some(inner_rx), handlers: handlers.clone() };
         let state = Rc::downgrade(state);
@@ -247,7 +249,7 @@ impl<T: 'static + EventTrait> Queue<T> {
         state: &Rc<impl EventSynthesizer<T> + 'static>,
         handler: impl EventHandler<T> + 'static,
     ) -> Self {
-        let (inner_tx, inner_rx) = async_channel::unbounded::<T>();
+        let (inner_tx, inner_rx) = unbounded_channel::<T>();
         let handlers = Rc::new(Mutex::new(vec![Dispatcher::new(handler)]));
         let proc = Processor::<T> { inner_rx: Some(inner_rx), handlers: handlers.clone() };
         let state = Rc::downgrade(state);
@@ -313,8 +315,9 @@ impl<T: 'static + EventTrait> Queue<T> {
     {
         let link = Rc::new(());
         let parent_link = Rc::downgrade(&link);
-        let (handler, mut handler_done) = PredicateHandler::new(parent_link, move |t| predicate(t));
+        let (handler, handler_done) = PredicateHandler::new(parent_link, move |t| predicate(t));
         let fut = async move {
+            let mut handler_done = UnboundedReceiverStream::new(handler_done);
             handler_done
                 .next()
                 .await
@@ -333,7 +336,7 @@ impl<T: 'static + EventTrait> Queue<T> {
     }
 
     pub fn push(&self, event: T) -> Result<()> {
-        self.inner_tx.try_send(event).map_err(|e| anyhow!("event queue push: {:#}", e))
+        self.inner_tx.send(event).map_err(|e| anyhow!("event queue push: {:#}", e))
     }
 }
 
@@ -361,6 +364,7 @@ where
     #[tracing::instrument(skip(self))]
     async fn process(mut self) {
         if let Some(rx) = self.inner_rx.take() {
+            let rx = UnboundedReceiverStream::new(rx);
             rx.for_each(|event| self.dispatch(event)).await;
         } else {
             tracing::warn!("process should only ever be called once");
@@ -373,27 +377,27 @@ mod test {
     use super::*;
 
     struct TestHookFirst {
-        callbacks_done: async_channel::Sender<bool>,
+        callbacks_done: UnboundedSender<bool>,
     }
 
     #[async_trait(?Send)]
     impl EventHandler<i32> for TestHookFirst {
         async fn on_event(&self, event: i32) -> Result<Status> {
             assert_eq!(event, 5);
-            self.callbacks_done.send(true).await.unwrap();
+            self.callbacks_done.send(true).unwrap();
             Ok(Status::Done)
         }
     }
 
     struct TestHookSecond {
-        callbacks_done: async_channel::Sender<bool>,
+        callbacks_done: UnboundedSender<bool>,
     }
 
     #[async_trait(?Send)]
     impl EventHandler<i32> for TestHookSecond {
         async fn on_event(&self, event: i32) -> Result<Status> {
             assert_eq!(event, 5);
-            self.callbacks_done.send(true).await.unwrap();
+            self.callbacks_done.send(true).unwrap();
             Ok(Status::Waiting)
         }
     }
@@ -409,7 +413,8 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_receive_two_handlers() {
-        let (tx_from_callback, mut rx_from_callback) = async_channel::unbounded::<bool>();
+        let (tx_from_callback, rx_from_callback) = unbounded_channel::<bool>();
+        let mut rx_from_callback = UnboundedReceiverStream::new(rx_from_callback);
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
         let ((), ()) = futures::join!(
@@ -490,20 +495,19 @@ mod test {
     }
 
     struct EventFailer {
-        dropped: async_channel::Sender<bool>,
+        dropped: UnboundedSender<bool>,
     }
 
     impl EventFailer {
-        fn new() -> (Self, async_channel::Receiver<bool>) {
-            let (dropped, handler_dropped_rx) = async_channel::unbounded::<bool>();
+        fn new() -> (Self, UnboundedReceiver<bool>) {
+            let (dropped, handler_dropped_rx) = unbounded_channel::<bool>();
             (Self { dropped }, handler_dropped_rx)
         }
     }
 
     impl Drop for EventFailer {
         fn drop(&mut self) {
-            // TODO(raggi): use a safer executor
-            futures::executor::block_on(self.dropped.send(true)).unwrap();
+            self.dropped.send(true).unwrap();
         }
     }
 
@@ -530,7 +534,8 @@ mod test {
     async fn event_failure_drops_handler_synth_events() {
         let fake_events = Rc::new(EventFailerState {});
         let queue = Queue::new(&fake_events);
-        let (handler, mut handler_dropped_rx) = EventFailer::new();
+        let (handler, handler_dropped_rx) = EventFailer::new();
+        let mut handler_dropped_rx = UnboundedReceiverStream::new(handler_dropped_rx);
         queue.add_handler(handler).await;
         assert!(handler_dropped_rx.next().await.unwrap());
     }
@@ -539,8 +544,12 @@ mod test {
     async fn event_failure_drops_handler() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
-        let (handler, mut handler_dropped_rx) = EventFailer::new();
-        let (handler2, mut handler_dropped_rx2) = EventFailer::new();
+        let (handler, handler_dropped_rx) = EventFailer::new();
+        let (handler2, handler_dropped_rx2) = EventFailer::new();
+        let (mut handler_dropped_rx, mut handler_dropped_rx2) = (
+            UnboundedReceiverStream::new(handler_dropped_rx),
+            UnboundedReceiverStream::new(handler_dropped_rx2),
+        );
         let ((), ()) = futures::join!(queue.add_handler(handler), queue.add_handler(handler2));
         queue.push(EventFailerInput::Fail).unwrap();
         assert!(handler_dropped_rx.next().await.unwrap());
@@ -551,8 +560,12 @@ mod test {
     async fn event_done_drops_handler() {
         let fake_events = Rc::new(FakeEventStruct {});
         let queue = Queue::new(&fake_events);
-        let (handler, mut handler_dropped_rx) = EventFailer::new();
-        let (handler2, mut handler_dropped_rx2) = EventFailer::new();
+        let (handler, handler_dropped_rx) = EventFailer::new();
+        let (handler2, handler_dropped_rx2) = EventFailer::new();
+        let (mut handler_dropped_rx, mut handler_dropped_rx2) = (
+            UnboundedReceiverStream::new(handler_dropped_rx),
+            UnboundedReceiverStream::new(handler_dropped_rx2),
+        );
         let ((), ()) = futures::join!(queue.add_handler(handler), queue.add_handler(handler2));
         queue.push(EventFailerInput::Complete).unwrap();
         assert!(handler_dropped_rx.next().await.unwrap());
