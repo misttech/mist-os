@@ -142,7 +142,7 @@ class EfiBootShim : public EfiBootShimBase<Items...> {
     if (result.is_error()) {
       // TODO(mcgrathr): EFI error strings
       constexpr std::string_view kEfiError = "EFI error";
-      return Check(what, fit::error{kEfiError});
+      return Check(what, fit::result<std::string_view>{fit::error{kEfiError}});
     }
     return true;
   }
