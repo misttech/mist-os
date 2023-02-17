@@ -13,7 +13,12 @@ declare_args() {
   # Whether wayland protocol logging should be enabled
   starnix_wayland_protocol_logging = false
 
-  starnix_restricted_mode = true
+  # Restricted mode is currently only supported by Zircon on x64.
+  if (target_cpu == "x64") {
+    starnix_restricted_mode = true
+  } else {
+    starnix_restricted_mode = false
+  }
 
   # Whether or not logging is disabled globally.
   starnix_disable_logging = false
