@@ -5,7 +5,6 @@
 #include "src/bringup/bin/netsvc/payload-streamer.h"
 
 #include <lib/async/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/errors.h>
 
 namespace netsvc {
@@ -13,7 +12,7 @@ namespace netsvc {
 PayloadStreamer::PayloadStreamer(fidl::ServerEnd<fuchsia_paver::PayloadStream> server_end,
                                  ReadCallback callback)
     : read_(std::move(callback)) {
-  fidl::BindSingleInFlightOnly(async_get_default_dispatcher(), std::move(server_end), this);
+  fidl::BindServer(async_get_default_dispatcher(), std::move(server_end), this);
 }
 
 void PayloadStreamer::RegisterVmo(RegisterVmoRequestView request,
