@@ -8,7 +8,7 @@ use {
             constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+                LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
             },
             Device,
         },
@@ -359,18 +359,21 @@ impl Matcher for BlobfsMatcher {
 }
 
 // Matches against a Data partition (by checking for partition label and type GUID).
-struct DataMatcher(PartitionMatcher);
+struct DataMatcher(PartitionMatcher, PartitionMatcher);
 
 impl DataMatcher {
     fn new() -> Self {
-        Self(PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID))
+        Self(
+            PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
+            PartitionMatcher::new(LEGACY_DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
+        )
     }
 }
 
 #[async_trait]
 impl Matcher for DataMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
-        self.0.match_device(device).await
+        self.0.match_device(device).await || self.1.match_device(device).await
     }
 
     async fn process_device(
@@ -383,18 +386,21 @@ impl Matcher for DataMatcher {
 }
 
 // Matches a zxcrypt partition.
-struct ZxcryptMatcher(PartitionMatcher);
+struct ZxcryptMatcher(PartitionMatcher, PartitionMatcher);
 
 impl ZxcryptMatcher {
     fn new() -> Self {
-        Self(PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID))
+        Self(
+            PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
+            PartitionMatcher::new(LEGACY_DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
+        )
     }
 }
 
 #[async_trait]
 impl Matcher for ZxcryptMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
-        self.0.match_device(device).await
+        self.0.match_device(device).await || self.1.match_device(device).await
     }
 
     async fn process_device(
@@ -415,7 +421,7 @@ mod tests {
             device::constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                NAND_BROKER_DRIVER_PATH,
+                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
             },
         },
         anyhow::{anyhow, Error},
@@ -834,6 +840,18 @@ mod tests {
                 &mut MockDevice::new()
                     .set_topological_path("mock_device/fvm/data-p-2/block")
                     .set_partition_label(DATA_PARTITION_LABEL)
+                    .set_partition_type(&DATA_TYPE_GUID),
+                &mut MockEnv::new().expect_mount_data()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // Check that the data partition is mounted with the legacy label.
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_topological_path("mock_device/fvm/data-p-2/block")
+                    .set_partition_label(LEGACY_DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
                 &mut MockEnv::new().expect_mount_data()
             )

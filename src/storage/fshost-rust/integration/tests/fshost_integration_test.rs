@@ -89,9 +89,34 @@ async fn blobfs_and_data_mounted() {
 }
 
 #[fuchsia::test]
+async fn blobfs_and_data_mounted_legacy_label() {
+    let mut builder = new_builder();
+    builder.with_disk().format_data(data_fs_spec()).with_legacy_data_label();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
 async fn data_formatted() {
     let mut builder = new_builder();
     builder.with_disk();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn data_formatted_legacy_label() {
+    let mut builder = new_builder();
+    builder.with_disk().with_legacy_data_label();
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;

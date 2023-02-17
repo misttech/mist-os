@@ -230,6 +230,7 @@ pub struct DiskBuilder {
     corrupt_contents: bool,
     gpt: bool,
     format_fvm: bool,
+    legacy_data_label: bool,
 }
 
 impl DiskBuilder {
@@ -241,6 +242,7 @@ impl DiskBuilder {
             corrupt_contents: false,
             gpt: false,
             format_fvm: true,
+            legacy_data_label: false,
         }
     }
 
@@ -274,6 +276,11 @@ impl DiskBuilder {
     pub fn with_unformatted_fvm(&mut self) -> &mut Self {
         assert!(self.data_spec.format.is_none());
         self.format_fvm = false;
+        self
+    }
+
+    pub fn with_legacy_data_label(&mut self) -> &mut Self {
+        self.legacy_data_label = true;
         self
     }
 
@@ -344,10 +351,11 @@ impl DiskBuilder {
         let mut blobfs = Blobfs::new(blobfs_controller);
         blobfs.format().await.expect("format failed");
 
+        let data_label = if self.legacy_data_label { "minfs" } else { "data" };
         // Create and format the data partition.
         create_fvm_volume(
             &volume_manager,
-            "data",
+            data_label,
             &DATA_TYPE_GUID,
             Uuid::new_v4().as_bytes(),
             Some(self.data_volume_size),
@@ -357,8 +365,8 @@ impl DiskBuilder {
         .expect("create_fvm_volume failed");
 
         // TODO(https://fxbug.dev/121274): Remove hardcoded path.
-        let data_block_path = "/fvm/data-p-2/block";
-        let data_dir = recursive_wait_and_open_directory(&device_dir, data_block_path)
+        let data_block_path = format!("/fvm/{}-p-2/block", data_label);
+        let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
             .await
             .expect("failed to open data partition");
         let data_controller =

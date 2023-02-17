@@ -5,6 +5,7 @@
 // -- Partition labels --
 pub const BLOBFS_PARTITION_LABEL: &str = "blobfs";
 pub const DATA_PARTITION_LABEL: &str = "data";
+pub const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
 
 // -- Partition type GUIDs --
 pub const BLOBFS_TYPE_GUID: [u8; 16] = [
