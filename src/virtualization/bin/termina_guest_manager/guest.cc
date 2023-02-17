@@ -352,6 +352,43 @@ void Guest::SetupGPUDriversInContainer() {
       });
 }
 
+void Guest::StartLxd() {
+  TRACE_DURATION("termina_guest_manager", "Guest::StartLxd");
+  FX_CHECK(tremplin_) << "StartLxd called without a Tremplin connection";
+  FX_LOGS(INFO) << "Starting LXD...";
+
+  grpc::ClientContext context;
+  vm_tools::tremplin::StartLxdRequest request;
+  vm_tools::tremplin::StartLxdResponse response;
+
+  request.set_reset_lxd_db(false);
+  {
+    TRACE_DURATION("termina_guest_manager", "StartLxdRPC");
+    auto status = tremplin_->StartLxd(&context, request, &response);
+    if (!status.ok()) {
+      FX_LOGS(ERROR) << "Failed to create container: " << status.error_message();
+    }
+  }
+  switch (response.status()) {
+    case vm_tools::tremplin::StartLxdResponse::UNKNOWN:
+      FX_LOGS(INFO) << "StartLxd -- UNKNOWN";
+      break;
+    case vm_tools::tremplin::StartLxdResponse::STARTING:
+      FX_LOGS(INFO) << "StartLxd -- STARTING";
+      break;
+    case vm_tools::tremplin::StartLxdResponse::ALREADY_RUNNING:
+      FX_LOGS(INFO) << "StartLxd -- ALREADY_RUNNING";
+      CreateContainer();
+      break;
+    case vm_tools::tremplin::StartLxdResponse::FAILED:
+      FX_LOGS(INFO) << "StartLxd -- FAILED";
+      break;
+    default:
+      PostContainerFailure("Unknown status: " + std::to_string(response.status()));
+      break;
+  }
+}
+
 void Guest::CreateContainer() {
   TRACE_DURATION("termina_guest_manager", "Guest::CreateContainer");
   FX_CHECK(tremplin_) << "CreateContainer called without a Tremplin connection";
@@ -375,7 +412,9 @@ void Guest::CreateContainer() {
   {
     TRACE_DURATION("termina_guest_manager", "CreateContainerRPC");
     auto status = tremplin_->CreateContainer(&context, request, &response);
-    FX_CHECK(status.ok()) << "Failed to create container: " << status.error_message();
+    if (!status.ok()) {
+      FX_LOGS(ERROR) << "Failed to create container: " << status.error_message();
+    }
   }
   switch (response.status()) {
     case vm_tools::tremplin::CreateContainerResponse::CREATING:
@@ -501,7 +540,7 @@ grpc::Status Guest::TremplinReady(grpc::ServerContext* context,
                  result) mutable -> fpromise::result<> {
     FX_CHECK(result.is_ok()) << "Failed to connect to Tremplin";
     tremplin_ = std::move(result.value());
-    CreateContainer();
+    StartLxd();
     return fpromise::ok();
   };
   auto task = NewGrpcVsockStub<vm_tools::tremplin::Tremplin>(socket_endpoint_, kTremplinPort)
@@ -568,6 +607,39 @@ grpc::Status Guest::UpdateStartStatus(::grpc::ServerContext* context,
   }
   return grpc::Status::OK;
 }
+
+grpc::Status Guest::UpdateStartLxdStatus(grpc::ServerContext* context,
+                                         const ::vm_tools::tremplin::StartLxdProgress* request,
+                                         vm_tools::tremplin::EmptyMessage* response) {
+  TRACE_DURATION("termina_guest_manager", "Guest::UpdateStartLxdStatus");
+  FX_LOGS(INFO) << "UpdateStartLxdStatus";
+  switch (request->status()) {
+    // LXD started successfully.
+    case vm_tools::tremplin::StartLxdProgress::STARTED:
+      FX_LOGS(INFO) << "LXD started";
+      CreateContainer();
+      break;
+
+    // Log these events, but don't do anything else.
+    case vm_tools::tremplin::StartLxdProgress::STARTING:
+    case vm_tools::tremplin::StartLxdProgress::RECOVERING:
+      FX_LOGS(INFO) << "LXD " + std::to_string(request->status());
+      break;
+
+    // Explicit failure to start.
+    case vm_tools::tremplin::StartLxdProgress::FAILED:
+      PostContainerFailure("Failed to start LXD: " + request->failure_reason());
+      break;
+
+    // Unknown or unhandled start status values.
+    case vm_tools::tremplin::StartLxdProgress::UNKNOWN:
+    default:
+      PostContainerFailure("Unknown start status: " + std::to_string(request->status()));
+      break;
+  }
+  return grpc::Status::OK;
+}
+
 grpc::Status Guest::UpdateExportStatus(::grpc::ServerContext* context,
                                        const ::vm_tools::tremplin::ContainerExportProgress* request,
                                        ::vm_tools::tremplin::EmptyMessage* response) {

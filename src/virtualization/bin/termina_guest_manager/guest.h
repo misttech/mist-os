@@ -85,6 +85,7 @@ class Guest : public vm_tools::StartupListener::Service,
   void LaunchContainerShell();
   void AddMagmaDeviceToContainer();
   void SetupGPUDriversInContainer();
+  void StartLxd();
   void CreateContainer();
   void StartContainer();
   void SetupUser();
@@ -98,6 +99,9 @@ class Guest : public vm_tools::StartupListener::Service,
   grpc::Status TremplinReady(grpc::ServerContext* context,
                              const ::vm_tools::tremplin::TremplinStartupInfo* request,
                              vm_tools::tremplin::EmptyMessage* response) override;
+  grpc::Status UpdateStartLxdStatus(grpc::ServerContext* context,
+                                    const ::vm_tools::tremplin::StartLxdProgress* request,
+                                    vm_tools::tremplin::EmptyMessage* response) override;
   grpc::Status UpdateCreateStatus(grpc::ServerContext* context,
                                   const vm_tools::tremplin::ContainerCreationProgress* request,
                                   vm_tools::tremplin::EmptyMessage* response) override;
