@@ -21,7 +21,6 @@ load(
     "fuchsia_filesystem_blobfs",
     "fuchsia_filesystem_empty_account",
     "fuchsia_filesystem_empty_data",
-    "fuchsia_filesystem_minfs",
     "fuchsia_filesystem_reserved",
     "fuchsia_fvm_nand",
     "fuchsia_fvm_sparse",
@@ -182,10 +181,10 @@ fuchsia_product_configuration_test(
 fuchsia_zbi(
     name = "my_zbi",
     compression = ZBI_COMPRESSION.ZSTD_MAX,
-    post_processing_args = [
+    postprocessing_args = [
         "-v",
     ],
-    post_processing_script = ":test_data/execute_script.sh",
+    postprocessing_script = ":test_data/execute_script.sh",
     zbi_name = "fuchsia",
 )
 
@@ -201,12 +200,6 @@ fuchsia_filesystem_blobfs(
     compress = True,
     layout = BLOBFS_LAYOUT.DEPRECATED_PADDED,
     maximum_contents_size = "182452224",
-)
-
-fuchsia_filesystem_minfs(
-    name = "my_minfs",
-    maximum_bytes = "13860864",
-    minimum_data_bytes = "10485760",
 )
 
 fuchsia_filesystem_empty_data(
@@ -227,8 +220,8 @@ fuchsia_fvm_standard(
     compress = True,
     filesystems = [
         ":my_blobfs",
-        ":my_minfs",
         ":my_empty_account",
+        ":my_empty_data",
         ":my_reserved",
     ],
     fvm_standard_name = "fvm",
@@ -239,7 +232,7 @@ fuchsia_fvm_standard(
     compress = True,
     filesystems = [
         ":my_blobfs",
-        ":my_minfs",
+        ":my_empty_data",
         ":my_reserved",
     ],
     fvm_standard_name = "fvm",

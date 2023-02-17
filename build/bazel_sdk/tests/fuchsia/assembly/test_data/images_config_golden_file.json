@@ -3,7 +3,7 @@
     {
       "compression": "zstd.max",
       "name": "fuchsia",
-      "post_processing_script": {
+      "postprocessing_script": {
         "args": [
           "-v"
         ],
@@ -36,12 +36,6 @@
           "type": "reserved"
         },
         {
-          "maximum_bytes": 13860864,
-          "minimum_data_bytes": 10485760,
-          "name": "data",
-          "type": "minfs"
-        },
-        {
           "name": "account",
           "type": "empty-account"
         }
@@ -66,8 +60,8 @@
           "compress": true,
           "filesystems": [
             "blob",
-            "data",
             "account",
+            "empty_data",
             "internal"
           ],
           "name": "fvm",
