@@ -66,10 +66,9 @@ uint32_t to_mem_range_type(uint32_t efi_mem_type) {
 static unsigned char scratch[32768] __attribute__((aligned(8)));
 
 // Tries to generate an EFI memory attributes table ZBI item and insert it in the given ramdisk.
-static efi_status generate_efi_memory_attributes_table_item(void* ramdisk,
-                                                            const size_t ramdisk_size,
-                                                            efi_system_table* sys, const void* mmap,
-                                                            size_t memory_map_size, size_t dsize) {
+efi_status generate_efi_memory_attributes_table_item(void* ramdisk, const size_t ramdisk_size,
+                                                     efi_system_table* sys, const void* mmap,
+                                                     size_t memory_map_size, size_t dsize) {
   const efi_memory_attributes_table_header* efi_provided_table = NULL;
 
   const efi_guid kMemoryAttributesGuid = EFI_MEMORY_ATTRIBUTES_GUID;

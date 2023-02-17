@@ -19,6 +19,12 @@
 #include "zircon/boot/image.h"
 #include "zircon/pixelformat.h"
 
+extern "C" efi_status generate_efi_memory_attributes_table_item(
+    void *ramdisk, const size_t ramdisk_size, efi_system_table *sys, const void *mmap,
+    size_t memory_map_size, size_t dsize) {
+  return EFI_SUCCESS;
+}
+
 namespace gigaboot {
 namespace {
 
@@ -42,7 +48,7 @@ class BootZbiItemTest : public ::testing::Test {
   std::array<uint8_t, 1024> buffer_ = {};
 };
 
-TEST_F(BootZbiItemTest, AddMemoryRanges) {
+TEST_F(BootZbiItemTest, AddMemoryItems) {
   auto cleanup = SetupEfiGlobalState();
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
@@ -67,14 +73,14 @@ TEST_F(BootZbiItemTest, AddMemoryRanges) {
       },
   };
 
-  stub_service().SetMemoryMap(memory_map);
-
-  AbrSlotIndex slot = kAbrSlotIndexA;
-  ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
-                                  buffer().size(), &slot));
+  const size_t kMkey = 123;
+  stub_service().SetMemoryMap(memory_map, kMkey);
+  auto res = AddMemoryItems(reinterpret_cast<zbi_header_t *>(buffer().data()), buffer().size());
+  ASSERT_TRUE(res.is_ok());
+  ASSERT_EQ(res.value(), kMkey);
 
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_MEM_CONFIG);
-  EXPECT_EQ(items.size(), 1ULL);
+  ASSERT_EQ(items.size(), 1ULL);
 
   cpp20::span<const zbi_mem_range_t> zbi_mem_ranges = {
       reinterpret_cast<const zbi_mem_range_t *>(items[0].data()),

@@ -36,55 +36,13 @@ const efi_guid kSmbios3TableGUID = SMBIOS3_TABLE_GUID;
 const uint8_t kSmbiosAnchor[4] = {'_', 'S', 'M', '_'};
 const uint8_t kSmbios3Anchor[5] = {'_', 'S', 'M', '3', '_'};
 
+extern "C" efi_status generate_efi_memory_attributes_table_item(
+    void* ramdisk, const size_t ramdisk_size, efi_system_table* sys, const void* mmap,
+    size_t memory_map_size, size_t dsize);
+
 namespace {
 
 uint8_t scratch_buffer[32 * 1024];
-
-bool AddMemoryRanges(void* zbi, size_t capacity) {
-  uint32_t dversion = 0;
-  size_t mkey = 0;
-  size_t dsize = 0;
-  size_t msize = sizeof(scratch_buffer);
-  efi_status status = gEfiSystemTable->BootServices->GetMemoryMap(
-      &msize, reinterpret_cast<efi_memory_descriptor*>(scratch_buffer), &mkey, &dsize, &dversion);
-  if (status != EFI_SUCCESS) {
-    printf("boot: cannot GetMemoryMap(). %s\n", EfiStatusToString(status));
-    return false;
-  }
-
-  // Convert the memory map in place to a range of zbi_mem_range_t, the
-  // preferred ZBI memory format. In-place conversion can safely be done
-  // one-by-one, given that zbi_mem_range_t is smaller than a descriptor.
-  static_assert(sizeof(zbi_mem_range_t) <= sizeof(efi_memory_descriptor),
-                "Cannot assume that sizeof(zbi_mem_range_t) <= dsize");
-  size_t num_ranges = msize / dsize;
-  zbi_mem_range_t* ranges = reinterpret_cast<zbi_mem_range_t*>(scratch_buffer);
-  for (size_t i = 0; i < num_ranges; ++i) {
-    const efi_memory_descriptor* desc =
-        reinterpret_cast<efi_memory_descriptor*>(scratch_buffer + i * dsize);
-    const zbi_mem_range_t range = {
-        .paddr = desc->PhysicalStart,
-        .length = desc->NumberOfPages * kUefiPageSize,
-        .type = EfiToZbiMemRangeType(desc->Type),
-    };
-    memcpy(&ranges[i], &range, sizeof(range));
-  }
-
-  // TODO(b/236039205): Add memory ranges for uart peripheral. Refer to
-  // `src/firmware/gigaboot/src/zircon.c` at line 477.
-
-  // TODO(b/236039205): Add memory ranges for GIC. Rfer to `src/firmware/gigaboot/src/zircon.c` at
-  // line 488.
-
-  zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,
-                                                      ranges, num_ranges * sizeof(zbi_mem_range_t));
-  if (result != ZBI_RESULT_OK) {
-    printf("Failed to create memory range entry, %d\n", result);
-    return false;
-  }
-
-  return true;
-}
 
 bool AppendSmbiosPtr(zbi_header_t* image, size_t capacity) {
   uint64_t smbios = 0;
@@ -265,11 +223,66 @@ void ClearBootloaderFiles() { zbi_file_is_initialized = false; }
 
 cpp20::span<uint8_t> GetZbiFiles() { return zbi_files; }
 
-bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
-  if (!AddMemoryRanges(image, capacity)) {
-    return false;
+// Add memory related zbi items.
+//
+// Returns memory map key on success, which will be used for ExitBootService.
+zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity) {
+  uint32_t dversion = 0;
+  size_t mkey = 0;
+  size_t dsize = 0;
+  size_t msize = sizeof(scratch_buffer);
+  // Note: Once memory map is grabbed, do not do anything that can change it, i.e. anything that
+  // involves memory allocation/de-allocation, including printf if it is printing to graphics.
+  efi_status status = gEfiSystemTable->BootServices->GetMemoryMap(
+      &msize, reinterpret_cast<efi_memory_descriptor*>(scratch_buffer), &mkey, &dsize, &dversion);
+  if (status != EFI_SUCCESS) {
+    printf("boot: cannot GetMemoryMap(). %s\n", EfiStatusToString(status));
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
+  // Look for an EFI memory attributes table we can pass to the kernel.
+  efi_status mem_attr_res = generate_efi_memory_attributes_table_item(
+      zbi, capacity, gEfiSystemTable, scratch_buffer, msize, dsize);
+  if (mem_attr_res != EFI_SUCCESS) {
+    printf("failed to generate EFI memory attributes table: %s", EfiStatusToString(mem_attr_res));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  // Convert the memory map in place to a range of zbi_mem_range_t, the
+  // preferred ZBI memory format. In-place conversion can safely be done
+  // one-by-one, given that zbi_mem_range_t is smaller than a descriptor.
+  static_assert(sizeof(zbi_mem_range_t) <= sizeof(efi_memory_descriptor),
+                "Cannot assume that sizeof(zbi_mem_range_t) <= dsize");
+  size_t num_ranges = msize / dsize;
+  zbi_mem_range_t* ranges = reinterpret_cast<zbi_mem_range_t*>(scratch_buffer);
+  for (size_t i = 0; i < num_ranges; ++i) {
+    const efi_memory_descriptor* desc =
+        reinterpret_cast<efi_memory_descriptor*>(scratch_buffer + i * dsize);
+    const zbi_mem_range_t range = {
+        .paddr = desc->PhysicalStart,
+        .length = desc->NumberOfPages * kUefiPageSize,
+        .type = EfiToZbiMemRangeType(desc->Type),
+    };
+    memcpy(&ranges[i], &range, sizeof(range));
+  }
+
+  // TODO(b/236039205): Add memory ranges for uart peripheral. Refer to
+  // `src/firmware/gigaboot/src/zircon.c` at line 477.
+
+  // TODO(b/236039205): Add memory ranges for GIC. Rfer to `src/firmware/gigaboot/src/zircon.c` at
+  // line 488.
+
+  zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,
+                                                      ranges, num_ranges * sizeof(zbi_mem_range_t));
+  if (result != ZBI_RESULT_OK) {
+    printf("Failed to create memory range entry, %d\n", result);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  return zx::ok(mkey);
+}
+
+bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
   if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
     return false;
   }

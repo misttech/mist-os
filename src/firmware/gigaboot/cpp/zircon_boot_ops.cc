@@ -7,6 +7,7 @@
 #include <lib/zircon_boot/zircon_boot.h>
 
 #include <phys/boot-zbi.h>
+#include <phys/stdio.h>
 
 #include "backends.h"
 #include "boot_zbi_items.h"
@@ -67,14 +68,37 @@ void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity) {
     abort();
   }
 
-  if (auto result = boot.Load(); result.is_error()) {
+  // Reserve extra capacity for memory map items to be added next.
+  // Once we add memory map related items, we must not do anything that can change the memory map,
+  // i.e. dynamic allocation. Because BootZbi::Load() do memory allocation, we can only add these
+  // items after.
+  uint32_t extra_data_capacity = 64 * 1024;
+  if (auto result = boot.Load(extra_data_capacity); result.is_error()) {
     printf("boot: Failed to load ZBI: ");
     zbitl::PrintViewCopyError(result.error_value());
     abort();
   }
 
-  // TODO(b/235489025): Perform ExitBootService() here.
+  void* data_zbi = reinterpret_cast<void*>(boot.DataLoadAddress());
+  size_t data_zbi_capacity = boot.DataZbi().storage().size();
+  auto memory_attr = AddMemoryItems(data_zbi, data_zbi_capacity);
+  if (memory_attr.is_error()) {
+    printf("Failed to add additional memory ranges\n");
+    abort();
+  }
+  size_t mkey = memory_attr.value();
 
+  efi_status exit_res = gEfiSystemTable->BootServices->ExitBootServices(gEfiImageHandle, mkey);
+  if (exit_res != EFI_SUCCESS) {
+    printf("Failed to exit boot service %s\n", gigaboot::EfiStatusToString(exit_res));
+    abort();
+  }
+
+  // Once we exit boot service, console output will be set to NULL. Thus we must not print from now
+  // on otherwise it crashes.
+  PhysConsole& console = PhysConsole::Get();
+  console.set_serial(*console.null());
+  console.set_graphics(*console.null());
   boot.Boot();
 }
 

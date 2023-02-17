@@ -144,13 +144,15 @@ class MockStubService : public efi::StubBootServices {
 
   void AddDevice(Device* device) { devices_.push_back(device); }
 
-  void SetMemoryMap(const std::vector<efi_memory_descriptor>& memory_map) {
+  void SetMemoryMap(const std::vector<efi_memory_descriptor>& memory_map, size_t mkey = 0) {
+    mkey_ = mkey;
     memory_map_ = memory_map;
   }
 
  private:
   std::vector<Device*> devices_;
 
+  size_t mkey_ = 0;
   std::vector<efi_memory_descriptor> memory_map_;
 };
 

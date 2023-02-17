@@ -258,7 +258,7 @@ efi_status MockStubService::OpenProtocol(efi_handle handle, const efi_guid* prot
 efi_status MockStubService::GetMemoryMap(size_t* memory_map_size, efi_memory_descriptor* memory_map,
                                          size_t* map_key, size_t* desc_size,
                                          uint32_t* desc_version) {
-  *map_key = 0;
+  *map_key = mkey_;
   *desc_version = 0;
   *desc_size = sizeof(efi_memory_descriptor);
   size_t total_size = memory_map_.size() * sizeof(efi_memory_descriptor);

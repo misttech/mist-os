@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 
+#include <phys/stdio.h>
+
 #include "backends.h"
 #include "fastboot_tcp.h"
 #include "gigaboot/src/netifc.h"
@@ -24,7 +26,31 @@ extern "C" char key_prompt(const char* valid_keys, int timeout_s);
 // 'undefined' error in asan builds.
 extern "C" int _purecall(void) { return 0; }
 
+namespace {
+// Always enable serial output if not already. Infra relies on serial to get device feedback.
+// Without it, some CI/CQs fail.
+void SetSerial() {
+  PhysConsole& console = PhysConsole::Get();
+  if (*console.serial() != FILE()) {
+    return;
+  }
+
+  // Temporarily set `gEfiSystemTable->ConOut` to NULL to force serial console setup.
+  // This won't affect the graphic set up done earlier. There's a known issue that this may cause
+  // double print on QEMU. Since Gigaboot++ is not intended run on QEMU (the intended emulator is
+  // GCE), this is fine for now.
+  //
+  // This function can be removed once SetEfiStdout() can correctly set up both graphics and serial
+  // output.
+  auto conn_out = gEfiSystemTable->ConOut;
+  gEfiSystemTable->ConOut = nullptr;
+  SetEfiStdout(gEfiSystemTable);
+  gEfiSystemTable->ConOut = conn_out;
+}
+}  // namespace
+
 int main(int argc, char** argv) {
+  SetSerial();
   printf("Gigaboot main\n");
 
   auto is_secureboot_on = gigaboot::IsSecureBootOn();
@@ -54,6 +80,7 @@ int main(int argc, char** argv) {
 
   gigaboot::RebootMode reboot_mode =
       gigaboot::GetRebootMode().value_or(gigaboot::RebootMode::kNormal);
+
   bool enter_fastboot = reboot_mode == gigaboot::RebootMode::kBootloader;
   if (!enter_fastboot) {
     printf("Auto boot in 2 seconds. Press f to enter fastboot.\n");

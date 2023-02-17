@@ -9,8 +9,14 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
+#include <lib/zx/result.h>
 
 namespace gigaboot {
+// Add memory related zbi items. Note that once memory items are added, we must not do anything that
+// can cause memory map changes, i.e. anything that involves memory allocation/de-allocation.
+//
+// Returns memory map key on success, which will be used for ExitBootService.
+zx::result<size_t> AddMemoryItems(void *zbi, size_t capacity);
 bool AddGigabootZbiItems(zbi_header_t *image, size_t capacity, const AbrSlotIndex *slot);
 zbi_result_t AddBootloaderFiles(const char *name, const void *data, size_t len);
 cpp20::span<uint8_t> GetZbiFiles();
