@@ -38,6 +38,7 @@ source_set("src") {
 
   public_deps = [
     "../include",
+    "//sdk/lib/fit",
     "//src/graphics/lib/magma/include:msd",
     "//zircon/system/ulib/hwreg",
   ]

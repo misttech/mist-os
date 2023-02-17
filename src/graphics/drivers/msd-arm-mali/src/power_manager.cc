@@ -183,7 +183,7 @@ void PowerManager::UpdateGpuActiveLocked(bool active) {
 
   if ((now - last_trace_time_) > kMemoryDuration) {
     TRACE_COUNTER("magma", "GPU Utilization", 0, "utilization",
-                  [this]() MAGMA_REQUIRES(active_time_mutex_) {
+                  [this]() FIT_REQUIRES(active_time_mutex_) {
                     std::chrono::steady_clock::duration total_time_accumulate(0);
                     std::chrono::steady_clock::duration active_time_accumulate(0);
                     for (const auto& period : time_periods_) {

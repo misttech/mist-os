@@ -5,6 +5,8 @@
 #ifndef MSD_VSI_CONNECTION_H
 #define MSD_VSI_CONNECTION_H
 
+#include <lib/fit/thread_safety.h>
+
 #include <memory>
 
 #include "address_space.h"
@@ -92,8 +94,8 @@ class MsdVsiConnection {
     }
 
    private:
-    MAGMA_GUARDED(mutex_) msd_connection_notification_callback_t callback_ = nullptr;
-    MAGMA_GUARDED(mutex_) void* token_ = nullptr;
+    FIT_GUARDED(mutex_) msd_connection_notification_callback_t callback_ = nullptr;
+    FIT_GUARDED(mutex_) void* token_ = nullptr;
     std::mutex mutex_;
   };
 

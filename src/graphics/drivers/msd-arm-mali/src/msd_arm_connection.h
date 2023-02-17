@@ -6,6 +6,7 @@
 #define MSD_ARM_CONNECTION_H
 
 #include <lib/fit/function.h>
+#include <lib/fit/thread_safety.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/compiler.h>
 
@@ -176,8 +177,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   bool Init();
 
   JitMemoryRegion* FindBestJitRegionAddressWithUsage(const magma_arm_jit_memory_allocate_info& info,
-                                                     bool check_usage)
-      MAGMA_REQUIRES(address_lock_);
+                                                     bool check_usage) FIT_REQUIRES(address_lock_);
   uint64_t FindBestJitRegionAddress(const magma_arm_jit_memory_allocate_info& info);
   std::optional<ArmMaliResultCode> AllocateNewJitMemoryRegion(
       const magma_arm_jit_memory_allocate_info& info, uint64_t* address_out);
@@ -190,8 +190,8 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   void ReleaseOneJitMemory(const magma_arm_jit_memory_free_info& info);
 
   // Release all unused JIT regions to save memory. Returns the number of bytes freed.
-  size_t FreeUnusedJitRegionsIfNeeded() MAGMA_REQUIRES(address_lock_);
-  bool RemoveMappingLocked(uint64_t gpu_va) MAGMA_REQUIRES(address_lock_);
+  size_t FreeUnusedJitRegionsIfNeeded() FIT_REQUIRES(address_lock_);
+  bool RemoveMappingLocked(uint64_t gpu_va) FIT_REQUIRES(address_lock_);
 
   PerformanceCounters* performance_counters() { return owner_->performance_counters(); }
 
@@ -207,10 +207,10 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   __THREAD_ANNOTATION(__pt_guarded_by__(address_lock_))
   std::unique_ptr<AddressSpace> address_space_;
   // Map GPU va to a mapping.
-  MAGMA_GUARDED(address_lock_) std::map<uint64_t, std::unique_ptr<GpuMapping>> gpu_mappings_;
-  MAGMA_GUARDED(address_lock_) JitProperties jit_properties_;
-  MAGMA_GUARDED(address_lock_) std::list<JitMemoryRegion> jit_memory_regions_;
-  MAGMA_GUARDED(address_lock_) std::unique_ptr<magma::AddressSpaceAllocator> jit_allocator_;
+  FIT_GUARDED(address_lock_) std::map<uint64_t, std::unique_ptr<GpuMapping>> gpu_mappings_;
+  FIT_GUARDED(address_lock_) JitProperties jit_properties_;
+  FIT_GUARDED(address_lock_) std::list<JitMemoryRegion> jit_memory_regions_;
+  FIT_GUARDED(address_lock_) std::unique_ptr<magma::AddressSpaceAllocator> jit_allocator_;
 
   // Store a list of a small number of mappings to help debug issues when references to freed
   // memory.

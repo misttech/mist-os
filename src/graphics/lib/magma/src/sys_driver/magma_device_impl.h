@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/ddk/device.h>
+#include <lib/fit/thread_safety.h>
 
 #include <ddktl/device.h>
 
@@ -36,19 +37,19 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     zx_device_ = zx_device;
   }
 
-  std::mutex& magma_mutex() MAGMA_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
+  std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
 
-  MagmaDriver* magma_driver() MAGMA_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
-  void set_magma_driver(std::unique_ptr<MagmaDriver> magma_driver) MAGMA_REQUIRES(magma_mutex_) {
+  MagmaDriver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }
+  void set_magma_driver(std::unique_ptr<MagmaDriver> magma_driver) FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_driver_);
     magma_driver_ = std::move(magma_driver);
   }
   void set_magma_system_device(std::shared_ptr<MagmaSystemDevice> magma_system_device)
-      MAGMA_REQUIRES(magma_mutex_) {
+      FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_system_device_);
     magma_system_device_ = std::move(magma_system_device);
   }
-  MagmaSystemDevice* magma_system_device() MAGMA_REQUIRES(magma_mutex_) {
+  MagmaSystemDevice* magma_system_device() FIT_REQUIRES(magma_mutex_) {
     return magma_system_device_.get();
   }
 #if MAGMA_TEST_DRIVER
@@ -91,7 +92,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
   }
 
   // Initialize magma_system_device_ on creation.
-  void InitSystemDevice() MAGMA_REQUIRES(magma_mutex_) {
+  void InitSystemDevice() FIT_REQUIRES(magma_mutex_) {
     magma_system_device_->set_perf_count_access_token_id(perf_counter_koid_);
     if (last_memory_pressure_level_) {
       magma_system_device_->SetMemoryPressureLevel(*last_memory_pressure_level_);
@@ -99,7 +100,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
   }
 
   template <typename T>
-  bool CheckSystemDevice(T& completer) MAGMA_REQUIRES(magma_mutex_) {
+  bool CheckSystemDevice(T& completer) FIT_REQUIRES(magma_mutex_) {
     if (!magma_system_device_) {
       MAGMA_LOG(WARNING, "Got message on torn-down device");
       completer.Close(ZX_ERR_BAD_STATE);
@@ -207,11 +208,11 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
 
  private:
   std::mutex magma_mutex_;
-  std::unique_ptr<MagmaDriver> magma_driver_ MAGMA_GUARDED(magma_mutex_);
-  std::shared_ptr<MagmaSystemDevice> magma_system_device_ MAGMA_GUARDED(magma_mutex_);
+  std::unique_ptr<MagmaDriver> magma_driver_ FIT_GUARDED(magma_mutex_);
+  std::shared_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
   zx_device_t* zx_device_ = nullptr;
   zx_koid_t perf_counter_koid_ = 0;
-  std::optional<MagmaMemoryPressureLevel> last_memory_pressure_level_ MAGMA_GUARDED(magma_mutex_);
+  std::optional<MagmaMemoryPressureLevel> last_memory_pressure_level_ FIT_GUARDED(magma_mutex_);
 #if MAGMA_TEST_DRIVER
   zx_status_t unit_test_status_ = ZX_ERR_NOT_SUPPORTED;
 #endif

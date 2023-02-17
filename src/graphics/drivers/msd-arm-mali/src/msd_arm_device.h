@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/gpu/mali/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/fit/thread_safety.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/compiler.h>
 
@@ -263,7 +264,7 @@ class MsdArmDevice : public msd::Device,
   inspect::UintProperty memory_pressure_level_property_;
 
   std::mutex inspect_events_mutex_;
-  MAGMA_GUARDED(inspect_events_mutex_) std::deque<InspectEvent> inspect_events_;
+  FIT_GUARDED(inspect_events_mutex_) std::deque<InspectEvent> inspect_events_;
 
   ddk::ArmMaliProtocolClient mali_protocol_client_;
   // Flag is set to true if reset completion should trigger FinishExitProtectedMode.
@@ -324,13 +325,13 @@ class MsdArmDevice : public msd::Device,
   std::unique_ptr<PerformanceCounters> perf_counters_;
 
   std::mutex connection_list_mutex_;
-  MAGMA_GUARDED(connection_list_mutex_)
+  FIT_GUARDED(connection_list_mutex_)
   std::vector<std::weak_ptr<MsdArmConnection>> connection_list_;
-  MAGMA_GUARDED(connection_list_mutex_)
+  FIT_GUARDED(connection_list_mutex_)
   MagmaMemoryPressureLevel current_memory_pressure_level_ = MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
-  MAGMA_GUARDED(connection_list_mutex_)
+  FIT_GUARDED(connection_list_mutex_)
   uint32_t scheduled_memory_pressure_task_count_ = 0;
-  MAGMA_GUARDED(connection_list_mutex_)
+  FIT_GUARDED(connection_list_mutex_)
   zx::time next_scheduled_memory_pressure_task_time_{};
 };
 

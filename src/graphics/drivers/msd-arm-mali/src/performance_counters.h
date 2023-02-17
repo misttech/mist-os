@@ -6,6 +6,7 @@
 #define PERFORMANCE_COUNTERS_H
 
 #include <lib/fit/thread_checker.h>
+#include <lib/fit/thread_safety.h>
 
 #include <mutex>
 #include <thread>
@@ -62,7 +63,7 @@ class PerformanceCounters {
   void ReadCompleted();
 
   void ForceDisable();
-  void TriggerCanceledClients() MAGMA_REQUIRES(*device_thread_checker_);
+  void TriggerCanceledClients() FIT_REQUIRES(*device_thread_checker_);
 
   bool running() const {
     std::lock_guard<fit::thread_checker> lock(*device_thread_checker_);
@@ -95,19 +96,19 @@ class PerformanceCounters {
 
   Owner* owner_;
   // Size of the performance counter block in bytes.
-  MAGMA_GUARDED(*device_thread_checker_) size_t perf_counter_size_ = 0;
+  FIT_GUARDED(*device_thread_checker_) size_t perf_counter_size_ = 0;
   mutable std::optional<fit::thread_checker> device_thread_checker_;
-  MAGMA_GUARDED(*device_thread_checker_)
+  FIT_GUARDED(*device_thread_checker_)
   PerformanceCounterState counter_state_ = PerformanceCounterState::kDisabled;
-  MAGMA_GUARDED(*device_thread_checker_) std::shared_ptr<MsdArmConnection> connection_;
-  MAGMA_GUARDED(*device_thread_checker_) std::shared_ptr<MsdArmBuffer> buffer_;
-  MAGMA_GUARDED(*device_thread_checker_) std::shared_ptr<AddressSlotMapping> address_mapping_;
-  MAGMA_GUARDED(*device_thread_checker_) uint64_t last_perf_base_ = 0;
-  MAGMA_GUARDED(*device_thread_checker_) std::chrono::steady_clock::time_point enable_time_;
-  MAGMA_GUARDED(*device_thread_checker_) bool force_disabled_ = false;
+  FIT_GUARDED(*device_thread_checker_) std::shared_ptr<MsdArmConnection> connection_;
+  FIT_GUARDED(*device_thread_checker_) std::shared_ptr<MsdArmBuffer> buffer_;
+  FIT_GUARDED(*device_thread_checker_) std::shared_ptr<AddressSlotMapping> address_mapping_;
+  FIT_GUARDED(*device_thread_checker_) uint64_t last_perf_base_ = 0;
+  FIT_GUARDED(*device_thread_checker_) std::chrono::steady_clock::time_point enable_time_;
+  FIT_GUARDED(*device_thread_checker_) bool force_disabled_ = false;
 
-  MAGMA_GUARDED(*device_thread_checker_) std::unordered_set<Client*> clients_;
-  MAGMA_GUARDED(*device_thread_checker_) PerformanceCountersManager* manager_{};
+  FIT_GUARDED(*device_thread_checker_) std::unordered_set<Client*> clients_;
+  FIT_GUARDED(*device_thread_checker_) PerformanceCountersManager* manager_{};
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PERFORMANCE_COUNTERS_H_

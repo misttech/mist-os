@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/fit/thread_safety.h>
 #include <lib/zx/channel.h>
 
 #include <mutex>
@@ -70,8 +71,8 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
   uint64_t inflight_bytes() { return inflight_bytes_; }
 
  private:
-  void FlowControl(uint64_t new_bytes = 0) MAGMA_REQUIRES(flow_control_mutex_);
-  void UpdateFlowControl(uint64_t new_bytes = 0) MAGMA_REQUIRES(flow_control_mutex_);
+  void FlowControl(uint64_t new_bytes = 0) FIT_REQUIRES(flow_control_mutex_);
+  void UpdateFlowControl(uint64_t new_bytes = 0) FIT_REQUIRES(flow_control_mutex_);
 
   void on_fidl_error(::fidl::UnbindInfo info) override;
   void OnNotifyMessagesConsumed(
@@ -90,7 +91,7 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
   uint64_t inflight_bytes_ = 0;
   std::mutex flow_control_mutex_;
   std::mutex get_error_lock_;
-  MAGMA_GUARDED(get_error_lock_) magma_status_t error_{};
+  FIT_GUARDED(get_error_lock_) magma_status_t error_{};
 };
 
 }  // namespace magma

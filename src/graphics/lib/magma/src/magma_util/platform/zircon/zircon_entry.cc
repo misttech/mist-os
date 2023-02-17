@@ -9,6 +9,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/cpp/wire/arena.h>
+#include <lib/fit/thread_safety.h>
 #include <zircon/process.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -49,7 +50,7 @@ class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GP
   zx_status_t Init();
 
  private:
-  zx_status_t MagmaStart() MAGMA_REQUIRES(magma_mutex());
+  zx_status_t MagmaStart() FIT_REQUIRES(magma_mutex());
 };
 
 zx_status_t GpuDevice::MagmaStart() {

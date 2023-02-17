@@ -44,6 +44,7 @@ source_set("device_impl") {
   public_deps = [
     ":sys_driver",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/lib/fit",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:dependency_injection_device",

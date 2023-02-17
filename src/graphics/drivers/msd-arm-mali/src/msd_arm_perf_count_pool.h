@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_MSD_ARM_PERF_COUNT_POOL_H_
 
 #include <lib/fit/thread_checker.h>
+#include <lib/fit/thread_safety.h>
 
 #include <list>
 #include <vector>
@@ -42,7 +43,7 @@ class MsdArmPerfCountPool : public PerformanceCounters::Client {
 
  private:
   void OnPerfCountDumpLocked(const std::vector<uint32_t>& dumped)
-      MAGMA_REQUIRES(device_thread_checker_);
+      FIT_REQUIRES(device_thread_checker_);
 
   fit::thread_checker device_thread_checker_;
 
@@ -53,14 +54,14 @@ class MsdArmPerfCountPool : public PerformanceCounters::Client {
     uint64_t size;
   };
 
-  MAGMA_GUARDED(device_thread_checker_) std::weak_ptr<MsdArmConnection> connection_;
+  FIT_GUARDED(device_thread_checker_) std::weak_ptr<MsdArmConnection> connection_;
   // If valid_ is false, this pool is in the process of being torn down.
-  MAGMA_GUARDED(device_thread_checker_) bool valid_ = true;
+  FIT_GUARDED(device_thread_checker_) bool valid_ = true;
   const uint64_t pool_id_;
 
-  MAGMA_GUARDED(device_thread_checker_) std::list<BufferOffset> buffers_;
-  MAGMA_GUARDED(device_thread_checker_) std::vector<uint32_t> triggers_;
-  MAGMA_GUARDED(device_thread_checker_) bool discontinuous_ = true;
+  FIT_GUARDED(device_thread_checker_) std::list<BufferOffset> buffers_;
+  FIT_GUARDED(device_thread_checker_) std::vector<uint32_t> triggers_;
+  FIT_GUARDED(device_thread_checker_) bool discontinuous_ = true;
 
   static constexpr uint32_t kMagic = 'MPCP';
 };

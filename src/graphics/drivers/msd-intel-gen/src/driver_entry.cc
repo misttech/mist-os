@@ -51,7 +51,7 @@ class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_
  public:
   explicit IntelDevice(zx_device_t* parent_device) : DdkDeviceType(parent_device) {}
 
-  int MagmaStart() MAGMA_REQUIRES(magma_mutex()) {
+  int MagmaStart() FIT_REQUIRES(magma_mutex()) {
     DLOG("magma_start");
 
     set_magma_system_device(magma_driver()->CreateDevice(&gpu_core_protocol_));
