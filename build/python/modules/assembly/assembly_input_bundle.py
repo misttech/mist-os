@@ -725,7 +725,9 @@ class AIBCreator:
             if "config-data" == package_name:
                 continue
 
-            self._copy_package(manifest, rebased_destination, blobs, deps)
+            self._copy_package(
+                manifest, os.path.dirname(package_manifest_path),
+                rebased_destination, blobs, deps)
 
             # Track the package manifest in our set of packages
             packages.append(rebased_destination)
@@ -735,6 +737,7 @@ class AIBCreator:
     def _copy_package(
         self,
         manifest: PackageManifest,
+        package_manifest_dir: FilePath,
         rebased_destination: FilePath,
         blobs: BlobList,
         deps: DepSet,
@@ -763,6 +766,11 @@ class AIBCreator:
                 raise ValueError(
                     f"Found a blob with no source path: {package_name}::{blob.path} in {package_manifest_path}"
                 )
+
+            # Make the path relative to the package manifest if necessary.
+            if manifest.blob_sources_relative == 'file':
+                source = os.path.join(package_manifest_dir, source)
+
             blobs.append((blob.merkle, source))
 
             blob_destination = _make_internal_blob_path(blob.merkle)
@@ -805,7 +813,9 @@ class AIBCreator:
                     deps.add(subpackage.manifest_path)
 
                 self._copy_package(
-                    subpackage_manifest, subpackage_destination, blobs, deps)
+                    subpackage_manifest,
+                    os.path.dirname(subpackage.manifest_path),
+                    subpackage_destination, blobs, deps)
 
         package_manifest_destination = os.path.join(
             self.outdir, rebased_destination)
