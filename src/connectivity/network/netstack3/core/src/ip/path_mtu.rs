@@ -213,7 +213,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
             // A PMTU exists but it is less than or equal to `new_mtu` so no need to
             // update.
             Some(prev_mtu) => {
-                trace!("update_pmtu_if_less: Not updating the PMTU  between src {} and dest {} to {}; is {}", src_ip, dst_ip, new_mtu, prev_mtu);
+                trace!("update_pmtu_if_less: Not updating the PMTU between src {} and dest {} to {}; is {}", src_ip, dst_ip, new_mtu, prev_mtu);
                 Ok(Some(prev_mtu))
             }
         }
