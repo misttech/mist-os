@@ -4,13 +4,17 @@
 
 use {
     anyhow::Result,
+    blocking::Unblock,
     errors::ffx_bail,
     ffx_audio_device_args::{DeviceCommand, SubCommand},
     ffx_core::ffx_plugin,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonDeviceInfoRequest, AudioDaemonPlayRequest, AudioDaemonProxy, DeviceSelector,
+        AudioDaemonDeviceInfoRequest, AudioDaemonPlayRequest, AudioDaemonProxy,
+        AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
+    fidl_fuchsia_media::AudioStreamType,
+    futures,
     serde::{Deserialize, Serialize},
 };
 
@@ -22,6 +26,7 @@ pub async fn device_cmd(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Re
     match cmd.subcommand {
         SubCommand::Info(_) => device_info(audio_proxy, cmd).await?,
         SubCommand::Play(_) => device_play(audio_proxy, cmd).await?,
+        SubCommand::Record(_) => device_record(audio_proxy, cmd).await?,
     }
 
     Ok(())
@@ -372,5 +377,45 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
     };
 
     ffx_audio_common::play(request, audio_proxy, play_local).await?;
+    Ok(())
+}
+
+pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+    let device_id = cmd.id;
+    let record_command = match cmd.subcommand {
+        SubCommand::Record(record_command) => record_command,
+        _ => ffx_bail!("Unreachable"),
+    };
+
+    let request = AudioDaemonRecordRequest {
+        location: Some(RecordLocation::RingBuffer(fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
+            is_input: Some(true),
+            id: Some(device_id),
+            ..fidl_fuchsia_audio_ffxdaemon::DeviceSelector::EMPTY
+        })),
+
+        stream_type: Some(AudioStreamType::from(&record_command.format)),
+        duration: Some(record_command.duration.as_nanos() as i64),
+        ..AudioDaemonRecordRequest::EMPTY
+    };
+
+    let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
+        Ok(value) => (
+            value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
+            value.stderr.ok_or(anyhow::anyhow!("No stderr socket"))?,
+        ),
+        Err(err) => ffx_bail!("Record failed with err: {}", err),
+    };
+
+    let mut stdout = Unblock::new(std::io::stdout());
+    let mut stderr = Unblock::new(std::io::stderr());
+
+    futures::future::try_join(
+        futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
+        futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))?;
+
     Ok(())
 }

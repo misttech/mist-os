@@ -399,6 +399,49 @@ impl AudioDaemon {
         Ok(())
     }
 
+    async fn record_device(
+        &self,
+        request: AudioDaemonRecordRequest,
+        responder: AudioDaemonRecordResponder,
+    ) -> Result<(), anyhow::Error> {
+        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
+        let (stderr_remote, stderr_local) = zx::Socket::create_stream();
+
+        let response = AudioDaemonRecordResponse {
+            stdout: Some(stdout_remote),
+            stderr: Some(stderr_remote),
+            ..AudioDaemonRecordResponse::EMPTY
+        };
+        responder.send(&mut Ok(response)).expect("Failed to send response.");
+
+        let stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
+        let device_id = request
+            .location
+            .ok_or(anyhow::anyhow!("Device id argument missing."))
+            .and_then(|location| match location {
+                RecordLocation::RingBuffer(device_selector) => Ok(device_selector.id.unwrap()),
+                _ => Err(anyhow::anyhow!("Expected Ring Buffer location")),
+            })?;
+
+        let duration_nanos =
+            request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64;
+        let duration = std::time::Duration::from_nanos(duration_nanos);
+
+        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
+        let output_message = device
+            .record(
+                format_utils::Format::from(&stream_type),
+                fasync::Socket::from_socket(stdout_local)?,
+                duration,
+            )
+            .await?;
+
+        let mut stderr = fasync::Socket::from_socket(stderr_local)?;
+
+        stderr.write_all(output_message.as_bytes()).await?;
+        Ok(())
+    }
+
     async fn serve(&mut self, mut stream: AudioDaemonRequestStream) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -419,6 +462,10 @@ impl AudioDaemon {
                     match payload.location {
                         Some(RecordLocation::Capturer(..)) => {
                             self.record_capturer(payload, responder).await?;
+                            Ok(())
+                        }
+                        Some(RecordLocation::RingBuffer(..)) => {
+                            self.record_device(payload, responder).await?;
                             Ok(())
                         }
                         Some(RecordLocation::Loopback(..)) => {
@@ -452,6 +499,7 @@ impl AudioDaemon {
                         if device_selector.is_input.unwrap() { "input" } else { "output" },
                         device_selector.id.unwrap()
                     );
+                    println!("path for device info {}", path);
                     let device = device::Device::connect(path);
 
                     let info = device.get_info().await?;

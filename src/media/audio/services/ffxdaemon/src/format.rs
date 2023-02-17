@@ -19,7 +19,11 @@ pub struct Format {
 }
 
 impl Format {
-    pub fn bytes_per_frame(&self) -> u32 {
+    pub const fn bytes_per_frame(&self) -> u32 {
+        self.bytes_per_sample() * self.channels
+    }
+
+    pub const fn bytes_per_sample(&self) -> u32 {
         match self.sample_type {
             fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 1,
             fidl_fuchsia_media::AudioSampleFormat::Signed16 => 2,
@@ -28,15 +32,11 @@ impl Format {
         }
     }
 
-    pub fn bytes_per_sample(&self) -> u32 {
-        return self.bytes_per_frame() * self.channels;
-    }
-
     pub fn frames_in_duration(&self, duration: std::time::Duration) -> u64 {
         (self.frames_per_second as f64 * duration.as_secs_f64()).ceil() as u64
     }
 
-    pub fn valid_bits_per_sample(&self) -> u32 {
+    pub const fn valid_bits_per_sample(&self) -> u32 {
         match self.sample_type {
             fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 8,
             fidl_fuchsia_media::AudioSampleFormat::Signed16 => 16,
@@ -45,7 +45,7 @@ impl Format {
         }
     }
 
-    pub fn silence_value(&self) -> u8 {
+    pub const fn silence_value(&self) -> u8 {
         match self.sample_type {
             fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 128,
             _ => 0,
@@ -54,12 +54,13 @@ impl Format {
 
     pub fn is_supported_by(
         &self,
-        supported_formats: Vec<fidl_fuchsia_hardware_audio::SupportedFormats>,
+        supported_formats: &Vec<fidl_fuchsia_hardware_audio::SupportedFormats>,
     ) -> bool {
         let hardware_format = fidl_fuchsia_hardware_audio::Format::from(self);
         let mut is_format_supported = false;
+
         for supported_format in supported_formats {
-            let pcm_formats = supported_format.pcm_supported_formats.unwrap();
+            let pcm_formats = supported_format.pcm_supported_formats.as_ref().unwrap().clone();
 
             if pcm_formats.frame_rates.unwrap().contains(&self.frames_per_second)
                 && pcm_formats.bytes_per_sample.unwrap().contains(&(self.bytes_per_sample() as u8))

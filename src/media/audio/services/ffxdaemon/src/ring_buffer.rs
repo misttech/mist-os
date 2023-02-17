@@ -17,7 +17,7 @@ pub struct RingBuffer {
     ring_buffer_proxy: fidl_fuchsia_hardware_audio::RingBufferProxy,
     format: Format,
     pub num_frames: u64,
-    pub consumer_bytes: u64,
+    pub driver_bytes: u64,
 }
 
 impl RingBuffer {
@@ -46,7 +46,7 @@ impl RingBuffer {
             panic!();
         }
 
-        let consumer_bytes = ring_buffer_client
+        let driver_bytes = ring_buffer_client
             .get_properties()
             .await?
             .fifo_depth
@@ -68,7 +68,7 @@ impl RingBuffer {
             ring_buffer_proxy: ring_buffer_client,
             num_frames: num_frames_in_rb,
             format: requested_format.to_owned(),
-            consumer_bytes,
+            driver_bytes,
         })
     }
 
@@ -154,7 +154,7 @@ impl RingBuffer {
         }
         Ok(())
     }
-    pub fn read_from_frame(&self, frame: u64, buf: &mut Vec<u8>) -> Result<(), Error> {
+    pub fn read_from_frame(&self, frame: u64, buf: &mut [u8]) -> Result<(), Error> {
         if buf.len() % self.format.bytes_per_frame() as usize != 0 {
             panic!("Must pass buffer with complete frames.")
         }
@@ -181,7 +181,7 @@ impl RingBuffer {
                     )));
                 }
             }
-            self.vmo.read(&mut buf[..], byte_offset)?;
+            self.vmo.read(buf, byte_offset)?;
         } else {
             let frames_to_write_until_end = self.num_frames - frame_offset;
             let bytes_until_buffer_end =

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, argh::FromArgs, ffx_core::ffx_command, std::str::FromStr};
+use {
+    anyhow::Result, argh::FromArgs, ffx_core::ffx_command, format_utils::Format, std::str::FromStr,
+};
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -32,6 +34,7 @@ pub struct DeviceCommand {
 pub enum SubCommand {
     Info(InfoCommand),
     Play(DevicePlayCommand),
+    Record(DeviceRecordCommand),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -56,6 +59,20 @@ pub struct DevicePlayCommand {}
 pub enum InfoOutputFormat {
     Json,
     Text,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "record", description = "Capture audio data directly from ring buffer.")]
+pub struct DeviceRecordCommand {
+    #[argh(
+        option,
+        description = "duration of output signal. Examples: 5ms or 3s.",
+        from_str_fn(parse_duration)
+    )]
+    pub duration: std::time::Duration,
+
+    #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
+    pub format: Format,
 }
 
 impl FromStr for InfoOutputFormat {
@@ -86,4 +103,8 @@ impl FromStr for DeviceType {
             _ => Err(anyhow::anyhow!("invalid device type, {}. Expected one of: input, output", s)),
         }
     }
+}
+
+fn parse_duration(value: &str) -> Result<std::time::Duration, String> {
+    format_utils::parse_duration(value)
 }

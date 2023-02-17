@@ -11,6 +11,7 @@ use {
     fidl_fuchsia_hardware_audio::StreamConfigProxy,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
+    futures::{AsyncWriteExt, StreamExt},
 };
 
 pub struct Device {
@@ -58,7 +59,7 @@ impl Device {
         let format = format_utils::Format::from(&spec);
 
         let supported_formats = self.stream_config_client.get_supported_formats().await?;
-        if !format.is_supported_by(supported_formats) {
+        if !format.is_supported_by(&supported_formats) {
             panic!("Requested format not supported");
         }
 
@@ -81,34 +82,27 @@ impl Device {
         let wakeup_interval = zx::Duration::from_millis(10);
 
         let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
-        let producer_bytes = (frames_per_nanosecond * nanos_per_wakeup_interval).floor() as u64
-            / format.bytes_per_frame() as u64;
+
         let bytes_in_rb = ring_buffer_wrapper.num_frames * format.bytes_per_frame() as u64;
-        let consumer_bytes = ring_buffer_wrapper.consumer_bytes;
+        let consumer_bytes = ring_buffer_wrapper.driver_bytes;
         let bytes_per_wakeup_interval =
             (nanos_per_wakeup_interval * frames_per_nanosecond * format.bytes_per_frame() as f64)
                 .floor() as u64;
 
-        if consumer_bytes + producer_bytes > bytes_in_rb {
+        if consumer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
             panic!(
                 "Ring buffer not large enough for internal delay. Ring buffer bytes: {}, 
             consumer + producer bytes: {}",
                 bytes_in_rb,
-                consumer_bytes + producer_bytes
+                consumer_bytes + bytes_per_wakeup_interval
             )
         }
 
         let t_zero = zx::Time::from_nanos(ring_buffer_wrapper.start().await?);
 
-        println!(
-            "Time between present and t0 returned by start {}",
-            (zx::Time::get_monotonic() - t_zero).into_nanos()
-        );
-
-        // Running counter representing the next time we'll wake up and write to ring buffer.
-        // To start, sleep until at least t0 + (wakeup_interval) so we can start writing at
+        // To start, wait until at least t0 + (wakeup_interval) so we can start writing at
         // the first bytes in the ring buffer.
-        let mut next_wakeup = t_zero + wakeup_interval;
+        fuchsia_async::Timer::new(t_zero).await;
 
         let mut last_wakeup = t_zero;
 
@@ -143,16 +137,18 @@ impl Device {
                         on wakeup time
         */
 
+        let mut timer = fuchsia_async::Interval::new(wakeup_interval);
+
         loop {
-            next_wakeup.sleep(); // Wraps zx::nanosleep(wakeup_time);
+            timer.next().await;
 
             // Check that we woke up on time. Approximate ring buffer pointer position based on
-            // clock time. Ring buffer pointer should be ahead of last byte written.
+            // the current time and the expected rate of how fast it moves.
+            // Ring buffer pointer should be ahead of last byte written.
             let now = zx::Time::get_monotonic();
 
             let duration_since_last_wakeup = now - last_wakeup;
             last_wakeup = now;
-            next_wakeup = now + wakeup_interval;
 
             let total_time_elapsed = now - t_zero;
             let total_rb_frames_elapsed =
@@ -176,8 +172,9 @@ impl Device {
             // greater than the range of safe bytes, we've woken up too late and
             // some of the audio data will not be read by the driver.
 
-            if (rb_frames_elapsed_since_last_wakeup.floor() as i64
+            if ((rb_frames_elapsed_since_last_wakeup.floor() as i64
                 - new_frames_available_to_write as i64)
+                * format.bytes_per_frame() as i64)
                 .abs() as u64
                 > bytes_in_rb - (consumer_bytes + bytes_per_wakeup_interval)
             {
@@ -219,6 +216,142 @@ impl Device {
             late_wakeups
         );
 
+        Ok(output_message)
+    }
+
+    pub async fn record(
+        self,
+        format: format_utils::Format,
+        mut data_socket: fasync::Socket,
+        duration: std::time::Duration,
+    ) -> Result<String, Error> {
+        let mut socket = socket::Socket { socket: &mut data_socket };
+        socket.write_wav_header(duration, &format).await?;
+
+        let supported_formats = self.stream_config_client.get_supported_formats().await?;
+        if !format.is_supported_by(&supported_formats) {
+            panic!("Requested format not supported");
+        }
+
+        // Create ring buffer channel.
+        let (ring_buffer_client, ring_buffer_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
+                .expect("failed to create ring buffer channel");
+
+        self.stream_config_client.create_ring_buffer(
+            fidl_fuchsia_hardware_audio::Format::from(&format),
+            ring_buffer_server,
+        )?;
+
+        let ring_buffer_wrapper = RingBuffer::new(&format, ring_buffer_client).await?;
+
+        // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
+        let bytes_in_rb = ring_buffer_wrapper.num_frames * format.bytes_per_frame() as u64;
+        let producer_bytes = ring_buffer_wrapper.driver_bytes;
+        let wakeup_interval = zx::Duration::from_millis(10);
+        let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
+
+        let bytes_per_wakeup_interval = (wakeup_interval.into_nanos() as f64
+            * frames_per_nanosecond
+            * format.bytes_per_frame() as f64)
+            .floor() as u64;
+
+        if producer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
+            panic!(
+                "Ring buffer not large enough for driver internal delay and plugin wakeup interval.
+                 Ring buffer bytes: {}, bytes_per_wakeup_interval + producer bytes: {}",
+                bytes_in_rb,
+                bytes_per_wakeup_interval + producer_bytes
+            )
+        }
+
+        let mut late_wakeups = 0;
+
+        // Running counter representing the next time we'll wake up and read from ring buffer.
+        // To start, sleep until at least t0 + (wakeup_interval) so we can start reading from
+        // the first bytes in the ring buffer.
+
+        let t_zero = zx::Time::from_nanos(ring_buffer_wrapper.start().await?);
+        fuchsia_async::Timer::new(t_zero).await;
+
+        let mut last_wakeup = t_zero;
+        let mut last_frame_read = 0u64;
+
+        let mut timer = fuchsia_async::Interval::new(wakeup_interval);
+        let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
+
+        loop {
+            timer.next().await;
+
+            // Check that we woke up on time. Approximate ring buffer pointer position based on
+            // the current time and the expected rate of how fast it moves.
+            // Ring buffer pointer should be ahead of last byte read.
+            let now = zx::Time::get_monotonic();
+
+            let elapsed_since_last_wakeup = now - last_wakeup;
+            let elapsed_since_start = now - t_zero;
+
+            let elapsed_frames_since_start =
+                (frames_per_nanosecond * elapsed_since_start.into_nanos() as f64).floor() as u64;
+
+            let expected_frames_since_last_wakeup =
+                (wakeup_interval.into_nanos() as f64 * frames_per_nanosecond).floor() as u64;
+
+            let available_frames_to_read = elapsed_frames_since_start - last_frame_read;
+            let bytes_to_read = available_frames_to_read * format.bytes_per_frame() as u64;
+            if buf.len() < bytes_to_read as usize {
+                buf.resize(bytes_to_read as usize, 0);
+            }
+
+            // Check for late wakeup to know whether we have missed reading some audio signal.
+            // In a given wakeup period, the "unsafe bytes" we avoid reading from
+            // are the range of bytes that the driver will write to during that period,
+            // since we'd be reading stale data.
+            // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes since reads
+            // can take up to one period in the worst case. The remaining bytes in the ring buffer
+            // are safe to read from since the data will be up to date.
+            // If the difference in elapsed frames and what we expect to write is
+            // greater than the range of safe bytes, we've woken up too late and
+            // we will miss some of the audio signal.
+
+            let distance_bytes = (available_frames_to_read - expected_frames_since_last_wakeup)
+                * format.bytes_per_frame() as u64;
+
+            let unsafe_bytes = producer_bytes + bytes_per_wakeup_interval;
+
+            let bytes_missed = if distance_bytes > bytes_in_rb - unsafe_bytes {
+                println!(
+                    "Woke up {} ns late",
+                    elapsed_since_last_wakeup.into_nanos() - wakeup_interval.into_nanos()
+                );
+                late_wakeups += 1;
+                (distance_bytes + unsafe_bytes - bytes_in_rb) as usize
+            } else {
+                0usize
+            };
+
+            buf[..bytes_missed].fill(format.silence_value());
+            let _ =
+                ring_buffer_wrapper.read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;
+
+            last_frame_read += available_frames_to_read;
+
+            if format.frames_in_duration(duration) - last_frame_read > available_frames_to_read {
+                data_socket.write_all(&buf).await?;
+
+                last_wakeup = now;
+            } else {
+                let bytes_to_write = (format.frames_in_duration(duration) - last_frame_read)
+                    as usize
+                    * format.bytes_per_frame() as usize;
+                data_socket.write_all(&buf[..bytes_to_write]).await?;
+                break;
+            }
+        }
+        let output_message = format!(
+            "Succesfully processed all audio data. \n Woke up late {} times.\n ",
+            late_wakeups
+        );
         Ok(output_message)
     }
 }

@@ -64,6 +64,9 @@ type RecordLocation = flexible union {
 
     /// Capture audio loopback.
     2: loopback struct {};
+
+    /// Capture audio directly from the device ring buffer.
+    3: ring_buffer DeviceSelector;
 };
 
 /// Configuration for AudioCapturer.

@@ -38,49 +38,39 @@ pub async fn record_capture(
         | AudioCaptureUsageExtended::SystemAgent(usage) => Some(usage),
         _ => None,
     };
-    let stream_type = AudioStreamType {
-        sample_format: record_command.format.sample_type,
-        channels: record_command.format.channels as u32,
-        frames_per_second: record_command.format.frames_per_second,
+
+    let request = AudioDaemonRecordRequest {
+        location: if loopback {
+            Some(RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}))
+        } else {
+            Some(RecordLocation::Capturer(CapturerInfo {
+                usage: capturer_usage,
+                buffer_size: record_command.buffer_size,
+                ..CapturerInfo::EMPTY
+            }))
+        },
+        stream_type: Some(AudioStreamType::from(&record_command.format)),
+        duration: Some(record_command.duration.as_nanos() as i64),
+        ..AudioDaemonRecordRequest::EMPTY
     };
 
-    let fut = async {
-        let request = AudioDaemonRecordRequest {
-            location: if loopback {
-                Some(RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}))
-            } else {
-                Some(RecordLocation::Capturer(CapturerInfo {
-                    usage: capturer_usage,
-                    buffer_size: record_command.buffer_size,
-                    clock: Some(record_command.clock),
-                    ..CapturerInfo::EMPTY
-                }))
-            },
-            stream_type: Some(stream_type),
-            duration: Some(record_command.duration.as_nanos() as i64),
-            ..AudioDaemonRecordRequest::EMPTY
-        };
-
-        let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
-            Ok(value) => (
-                value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
-                value.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
-            ),
-            Err(err) => ffx_bail!("Record failed with err: {}", err),
-        };
-
-        let mut stdout = Unblock::new(std::io::stdout());
-        let mut stderr = Unblock::new(std::io::stderr());
-
-        futures::future::try_join(
-            futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
-            futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
-        )
-        .await
-        .map_err(|e| anyhow::anyhow!("Error joining stdio futures: {}", e))
+    let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
+        Ok(value) => (
+            value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
+            value.stderr.ok_or(anyhow::anyhow!("No stderr socket"))?,
+        ),
+        Err(err) => ffx_bail!("Record failed with err: {}", err),
     };
 
-    fut.await?;
+    let mut stdout = Unblock::new(std::io::stdout());
+    let mut stderr = Unblock::new(std::io::stderr());
+
+    futures::future::try_join(
+        futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
+        futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))?;
 
     Ok(())
 }
