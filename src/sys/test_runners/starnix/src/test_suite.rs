@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::gbenchmark::*,
     crate::gtest::*,
     crate::helpers::*,
     anyhow::{anyhow, Context, Error},
@@ -55,6 +56,14 @@ pub async fn handle_suite_requests(
                 }
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
+                let run_listener_proxy =
+                    listener.into_proxy().context("Can't convert run listener channel to proxy")?;
+
+                if tests.is_empty() {
+                    run_listener_proxy.on_finished()?;
+                    break;
+                }
+
                 // Replace tests with program arguments if they were passed in.
                 let mut program =
                     test_start_info.program.clone().ok_or(anyhow!("Missing program."))?;
@@ -63,10 +72,8 @@ pub async fn handle_suite_requests(
                 }
                 test_start_info.program = Some(program);
 
-                let run_listener_proxy =
-                    listener.into_proxy().context("Can't convert run listener channel to proxy")?;
-                if !tests.is_empty() {
-                    if test_type.is_gtest_like() {
+                match test_type {
+                    TestType::Gtest | TestType::Gunit => {
                         run_gtest_cases(
                             tests,
                             test_start_info,
@@ -75,14 +82,24 @@ pub async fn handle_suite_requests(
                             &test_type,
                         )
                         .await?;
-                    } else {
+                    }
+                    TestType::Gbenchmark => {
+                        run_gbenchmark(
+                            tests.get(0).unwrap().clone(),
+                            test_start_info,
+                            &run_listener_proxy,
+                            &starnix_kernel,
+                        )
+                        .await?
+                    }
+                    _ => {
                         run_test_case(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
                             &starnix_kernel,
                         )
-                        .await?;
+                        .await?
                     }
                 }
 

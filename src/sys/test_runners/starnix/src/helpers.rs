@@ -10,6 +10,7 @@ use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
     fidl_fuchsia_test::{self as ftest},
+    frunner::ComponentNamespaceEntry,
     fuchsia_component::client as fclient,
     fuchsia_runtime as fruntime, fuchsia_zircon as zx,
     futures::StreamExt,
@@ -163,6 +164,35 @@ pub async fn read_result(
         }
         _ => ftest::Result_ { status: Some(ftest::Status::Failed), ..ftest::Result_::EMPTY },
     }
+}
+
+pub fn add_output_dir_to_namespace(
+    start_info: &mut frunner::ComponentStartInfo,
+) -> Result<fio::DirectoryProxy, Error> {
+    const TEST_DATA_DIR: &str = "/tmp/test_data";
+
+    let test_data_path = format!("{}/{}", TEST_DATA_DIR, uuid::Uuid::new_v4());
+    std::fs::create_dir_all(&test_data_path).expect("cannot create test output directory.");
+    let test_data_dir = fuchsia_fs::directory::open_in_namespace(
+        &test_data_path,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    )
+    .expect("Cannot open test data directory.");
+
+    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+    test_data_dir
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server)
+        .expect("Couldn't clone output directory.");
+    let data_dir =
+        fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(dir_client.into_channel());
+
+    start_info.ns.as_mut().ok_or(anyhow!("Missing namespace."))?.push(ComponentNamespaceEntry {
+        path: Some("/test_data".to_string()),
+        directory: Some(data_dir),
+        ..ComponentNamespaceEntry::EMPTY
+    });
+
+    Ok(test_data_dir)
 }
 
 /// Replace or append the arguments in `program` with `new_args`.

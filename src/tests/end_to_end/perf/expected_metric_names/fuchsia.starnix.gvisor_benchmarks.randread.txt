@@ -1,0 +1,5 @@
+fuchsia.starnix.gvisor_benchmarks: RandRead/1
+fuchsia.starnix.gvisor_benchmarks: RandRead/8
+fuchsia.starnix.gvisor_benchmarks: RandRead/64
+fuchsia.starnix.gvisor_benchmarks: RandRead/512
+fuchsia.starnix.gvisor_benchmarks: RandRead/4096

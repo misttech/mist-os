@@ -1,0 +1,5 @@
+fuchsia.starnix.gvisor_benchmarks: Pipe/1
+fuchsia.starnix.gvisor_benchmarks: Pipe/8
+fuchsia.starnix.gvisor_benchmarks: Pipe/64
+fuchsia.starnix.gvisor_benchmarks: Pipe/512
+fuchsia.starnix.gvisor_benchmarks: Pipe/4096

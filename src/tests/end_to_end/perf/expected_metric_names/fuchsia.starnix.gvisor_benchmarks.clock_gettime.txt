@@ -1,0 +1,3 @@
+fuchsia.starnix.gvisor_benchmarks: ClockGettimeThreadCPUTime
+fuchsia.starnix.gvisor_benchmarks: VDSOClockGettime/1
+fuchsia.starnix.gvisor_benchmarks: VDSOClockGettime/0

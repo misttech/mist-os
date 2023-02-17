@@ -1,0 +1,10 @@
+fuchsia.starnix.gvisor_benchmarks: GetdentsNewFD/1
+fuchsia.starnix.gvisor_benchmarks: GetdentsNewFD/8
+fuchsia.starnix.gvisor_benchmarks: GetdentsNewFD/64
+fuchsia.starnix.gvisor_benchmarks: GetdentsNewFD/512
+fuchsia.starnix.gvisor_benchmarks: GetdentsNewFD/4096
+fuchsia.starnix.gvisor_benchmarks: GetdentsSameFD/1
+fuchsia.starnix.gvisor_benchmarks: GetdentsSameFD/8
+fuchsia.starnix.gvisor_benchmarks: GetdentsSameFD/64
+fuchsia.starnix.gvisor_benchmarks: GetdentsSameFD/512
+fuchsia.starnix.gvisor_benchmarks: GetdentsSameFD/4096

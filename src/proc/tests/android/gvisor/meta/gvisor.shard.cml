@@ -11,6 +11,17 @@
             "TEST_TMPDIR=/data/tmp",
             "TEST_ON_GVISOR=1",
             "TEST_SRCDIR={pkg_path}/data/tests",
+            "BENCHMARK_FORMAT=json",
+            "BENCHMARK_OUT=/test_data/benchmark.json",
         ],
+        test_type: "gbenchmark",
+        test_suite_label: "fuchsia.starnix.gvisor_benchmarks",
     },
+    use: [
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
+    ],
 }

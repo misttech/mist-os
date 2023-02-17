@@ -8,11 +8,7 @@ import(
 
 group("gvisor") {
   testonly = true
-  deps = [
-    # The benchmarks aren't currently enabled by default in CQ.
-    #":starnix_gvisor_benchmarks",
-    ":starnix_gvisor_tests",
-  ]
+  deps = [ ":starnix_gvisor_tests" ]
 }
 
 gvisor_tests = [
@@ -243,14 +239,19 @@ gvisor_benchmarks = [
 
   "getdents_benchmark",
   "getpid_benchmark",
-  "gettid_benchmark",
+
+  # Takes too long
+  # "gettid_benchmark",
+
   "mapping_benchmark",
   "open_benchmark",
   "open_read_close_benchmark",
   "pipe_benchmark",
   "randread_benchmark",
   "read_benchmark",
-  "sched_yield_benchmark",
+
+  # Takes too long
+  # "sched_yield_benchmark",
 
   # Not passing
   # "send_recv_benchmark",
@@ -398,5 +399,12 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
 
   if (target_cpu == "x64") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+
+  # Set environments to none so infra doesn't run these benchmarks.
+  # These benchmarks are run as a part of:
+  # //src/tests/end_to_end/perf/test/starnix_gvisor_benchmarks_test.dart
+  test_specs = {
+    environments = []
   }
 }

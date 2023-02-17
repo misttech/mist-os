@@ -35,7 +35,9 @@ pub fn parse_results(test_type: &TestType, contents: &str) -> Result<TestOutput,
             parse_xml_test_output(&mut iter)
                 .map_err(|e| anyhow!("Parsing error: {e} errors from XML parser: {errors:?}"))
         }
-        TestType::Unknown => panic!("Do not know how to parse results for unknown test type."),
+        TestType::Gbenchmark | TestType::Unknown => {
+            panic!("Do not know how to parse results for test type.")
+        }
     }
 }
 

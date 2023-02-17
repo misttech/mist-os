@@ -42,7 +42,10 @@ test_list = [
 if (target_cpu == "x64" && !is_asan) {
   test_list += [ "direct_mode_benchmarks_test" ]
   if (host_os == "linux") {
-    test_list += [ "starnix_benchmarks_test" ]
+    test_list += [
+      "starnix_benchmarks_test",
+      "starnix_gvisor_benchmarks_test",
+    ]
   }
 }
 
@@ -219,6 +222,23 @@ if (is_host) {
     "fuchsia.rust_inspect.benchmarks.txt",
     "fuchsia.rust_inspect.reader_benchmarks.txt",
     "fuchsia.rust_inspect.selectors.txt",
+    "fuchsia.starnix.gvisor_benchmarks.clock_getres.txt",
+    "fuchsia.starnix.gvisor_benchmarks.clock_gettime.txt",
+    "fuchsia.starnix.gvisor_benchmarks.epoll.txt",
+    "fuchsia.starnix.gvisor_benchmarks.getdents.txt",
+    "fuchsia.starnix.gvisor_benchmarks.getpid.txt",
+    "fuchsia.starnix.gvisor_benchmarks.mapping.txt",
+    "fuchsia.starnix.gvisor_benchmarks.open_read_close.txt",
+    "fuchsia.starnix.gvisor_benchmarks.open.txt",
+    "fuchsia.starnix.gvisor_benchmarks.pipe.txt",
+    "fuchsia.starnix.gvisor_benchmarks.randread.txt",
+    "fuchsia.starnix.gvisor_benchmarks.read.txt",
+    "fuchsia.starnix.gvisor_benchmarks.seqwrite.txt",
+    "fuchsia.starnix.gvisor_benchmarks.signal.txt",
+    "fuchsia.starnix.gvisor_benchmarks.sleep.txt",
+    "fuchsia.starnix.gvisor_benchmarks.stat.txt",
+    "fuchsia.starnix.gvisor_benchmarks.unlink.txt",
+    "fuchsia.starnix.gvisor_benchmarks.write.txt",
     "fuchsia.storage.txt",
   ]
 
@@ -277,7 +297,11 @@ group("package_deps") {
   ]
 
   if (target_cpu == "x64" && !is_asan) {
-    public_deps += [ "//src/tests/microbenchmarks:direct_mode_microbenchmarks" ]
+    public_deps += [
+      # This is used by starnix benchmarks.
+      "//src/proc/tests/android/gvisor:starnix_gvisor_benchmarks",
+      "//src/tests/microbenchmarks:direct_mode_microbenchmarks",
+    ]
     if (host_os == "linux") {
       public_deps +=
           [ "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode" ]

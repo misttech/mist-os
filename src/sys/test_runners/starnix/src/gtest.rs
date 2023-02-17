@@ -7,9 +7,8 @@ use {
     crate::results_parser::*,
     anyhow::{anyhow, Error},
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
     fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
-    frunner::ComponentNamespaceEntry,
     fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::TryStreamExt,
@@ -26,7 +25,9 @@ const LIST_TESTS_ARG: &str = "list_tests";
 const FILTER_ARG: &str = "filter=";
 const OUTPUT_PATH: &str = "/test_data/";
 
+#[derive(PartialEq)]
 pub enum TestType {
+    Gbenchmark,
     Gtest,
     Gunit,
     GtestXmlOutput,
@@ -52,6 +53,7 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
             "gtest" => TestType::Gtest,
             "gunit" => TestType::Gunit,
             "gtest_xml_output" => TestType::GtestXmlOutput,
+            "gbenchmark" => TestType::Gbenchmark,
             _ => TestType::Unknown,
         },
         _ => TestType::Unknown,
@@ -178,7 +180,7 @@ pub async fn run_gtest_cases(
     let output_format = match test_type {
         TestType::Gtest | TestType::Gunit => "json",
         TestType::GtestXmlOutput => "xml",
-        TestType::Unknown => panic!("unexpected type"),
+        TestType::Gbenchmark | TestType::Unknown => panic!("unexpected type"),
     };
     let output_arg = format_arg(
         &test_type,
@@ -241,39 +243,10 @@ fn format_arg(test_type: &TestType, test_arg: &str) -> Result<String, Error> {
     match test_type {
         TestType::Gtest | TestType::GtestXmlOutput => Ok(format!("--gtest_{}", test_arg)),
         TestType::Gunit => Ok(format!("--gunit_{}", test_arg)),
-        TestType::Unknown => Err(anyhow!("Unknown test type")),
+        TestType::Gbenchmark | TestType::Unknown => Err(anyhow!("Unknown test type")),
     }
 }
 
 fn unique_filename() -> String {
     format!("test_result-{}.json", uuid::Uuid::new_v4())
-}
-
-fn add_output_dir_to_namespace(
-    start_info: &mut frunner::ComponentStartInfo,
-) -> Result<fio::DirectoryProxy, Error> {
-    const TEST_DATA_DIR: &str = "/tmp/test_data";
-
-    let test_data_path = format!("{}/{}", TEST_DATA_DIR, uuid::Uuid::new_v4());
-    std::fs::create_dir_all(&test_data_path).expect("cannot create test output directory.");
-    let test_data_dir = fuchsia_fs::directory::open_in_namespace(
-        &test_data_path,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    )
-    .expect("Cannot open test data directory.");
-
-    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    test_data_dir
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server)
-        .expect("Couldn't clone output directory.");
-    let data_dir =
-        fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(dir_client.into_channel());
-
-    start_info.ns.as_mut().ok_or(anyhow!("Missing namespace."))?.push(ComponentNamespaceEntry {
-        path: Some("/test_data".to_string()),
-        directory: Some(data_dir),
-        ..ComponentNamespaceEntry::EMPTY
-    });
-
-    Ok(test_data_dir)
 }

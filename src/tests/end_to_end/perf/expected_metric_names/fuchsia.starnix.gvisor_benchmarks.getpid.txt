@@ -1,0 +1,2 @@
+fuchsia.starnix.gvisor_benchmarks: Getpid
+fuchsia.starnix.gvisor_benchmarks: GetpidOpt

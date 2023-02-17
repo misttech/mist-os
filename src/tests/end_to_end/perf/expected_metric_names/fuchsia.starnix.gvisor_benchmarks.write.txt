@@ -1,0 +1,6 @@
+fuchsia.starnix.gvisor_benchmarks: Write/1
+fuchsia.starnix.gvisor_benchmarks: Write/8
+fuchsia.starnix.gvisor_benchmarks: Write/64
+fuchsia.starnix.gvisor_benchmarks: Write/512
+fuchsia.starnix.gvisor_benchmarks: Write/4096
+fuchsia.starnix.gvisor_benchmarks: Append
