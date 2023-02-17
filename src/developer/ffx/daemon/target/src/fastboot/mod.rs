@@ -220,7 +220,7 @@ where
             false
         }
     };
-    Interface::open(&mut open_cb)
+    Interface::open(&mut open_cb).map_err(Into::into)
 }
 
 fn enumerate_interfaces<F>(mut cb: F)

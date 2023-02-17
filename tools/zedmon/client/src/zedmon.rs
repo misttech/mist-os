@@ -809,7 +809,7 @@ pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitE
 mod tests {
     use {
         super::*,
-        anyhow::{format_err, Error},
+        anyhow::Error,
         num_traits::FromPrimitive,
         protocol::{tests::serialize_reports, PacketType, Report, ScalarType},
         std::collections::VecDeque,
@@ -867,7 +867,7 @@ mod tests {
         struct FakeEnumerationInterface {}
 
         impl usb_bulk::Open<FakeEnumerationInterface> for FakeEnumerationInterface {
-            fn open<F>(matcher: &mut F) -> Result<FakeEnumerationInterface, Error>
+            fn open<F>(matcher: &mut F) -> Result<FakeEnumerationInterface, usb_bulk::Error>
             where
                 F: FnMut(&InterfaceInfo) -> bool,
             {
@@ -878,7 +878,7 @@ mod tests {
                             return Ok(FakeEnumerationInterface {});
                         }
                     }
-                    Err(format_err!("No matching devices found."))
+                    Err(usb_bulk::Error::NoDeviceMatched)
                 })
             }
         }
@@ -1097,11 +1097,11 @@ mod tests {
         }
 
         impl usb_bulk::Open<FakeZedmonInterface> for FakeZedmonInterface {
-            fn open<F>(_matcher: &mut F) -> Result<FakeZedmonInterface, Error>
+            fn open<F>(_matcher: &mut F) -> Result<FakeZedmonInterface, usb_bulk::Error>
             where
                 F: FnMut(&InterfaceInfo) -> bool,
             {
-                Err(format_err!("usb_bulk::Open not implemented"))
+                Err(usb_bulk::Error::NoDeviceMatched)
             }
         }
 
@@ -1359,11 +1359,11 @@ mod tests {
         }
 
         impl usb_bulk::Open<StillReportingInterface> for StillReportingInterface {
-            fn open<F>(_matcher: &mut F) -> Result<StillReportingInterface, Error>
+            fn open<F>(_matcher: &mut F) -> Result<StillReportingInterface, usb_bulk::Error>
             where
                 F: FnMut(&InterfaceInfo) -> bool,
             {
-                Err(format_err!("usb_bulk::Open not implemented"))
+                Err(usb_bulk::Error::NoDeviceMatched)
             }
         }
 
@@ -1434,11 +1434,11 @@ mod tests {
     }
 
     impl usb_bulk::Open<TransientFailureInterface> for TransientFailureInterface {
-        fn open<F>(_matcher: &mut F) -> Result<TransientFailureInterface, Error>
+        fn open<F>(_matcher: &mut F) -> Result<TransientFailureInterface, usb_bulk::Error>
         where
             F: FnMut(&InterfaceInfo) -> bool,
         {
-            Err(format_err!("usb_bulk::Open not implemented"))
+            Err(usb_bulk::Error::NoDeviceMatched)
         }
     }
 

@@ -12,7 +12,6 @@
 //!
 //! See tests for examples using the Zedmon power monitor.
 
-use anyhow::{bail, format_err, Result};
 use fuchsia_async::unblock;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -25,8 +24,20 @@ use std::io::{ErrorKind, Read, Write};
 use std::os::raw::c_void;
 use std::pin::Pin;
 use std::sync::{Mutex, RwLock};
+use thiserror::Error;
 
 mod usb;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("No device matched.")]
+    NoDeviceMatched,
+    #[error("Serial number missing.")]
+    SerialNumberMissing,
+}
+
+/// Standard result type that defaults to our [`Error`] for the error type.
+pub type Result<V, E = Error> = std::result::Result<V, E>;
 
 /// A collection of information about an interface.
 ///
@@ -111,7 +122,7 @@ impl Open<Interface> for Interface {
         if !device_ptr.is_null() {
             return Ok(Interface { interface: device_ptr as *mut usb::UsbInterface });
         } else {
-            return Err(format_err!("No device matched."));
+            return Err(Error::NoDeviceMatched);
         }
     }
 }
@@ -197,9 +208,7 @@ impl Open<AsyncInterface> for AsyncInterface {
                 (*write_guard).insert(s.clone(), Mutex::new(iface));
                 Ok(AsyncInterface { serial: s, task: None })
             }
-            None => {
-                bail!("Serial number is missing");
-            }
+            None => Err(Error::SerialNumberMissing),
         })
     }
 }
@@ -312,17 +321,17 @@ mod tests {
     }
 
     #[test]
-    fn test_zedmon_read_parameter() -> Result<()> {
+    fn test_zedmon_read_parameter() {
         // Open USB interface.
         let mut matcher = |info: &InterfaceInfo| -> bool { zedmon_match(info) };
-        let mut interface = Interface::open(&mut matcher)?;
+        let mut interface = Interface::open(&mut matcher).unwrap();
 
         // Send a Query Parameter request.
-        interface.write_all(&[0x02, 0x00])?;
+        interface.write_all(&[0x02, 0x00]).unwrap();
 
         // Read response.
         let mut packet = [0x00; 64];
-        let len = interface.read(&mut packet)?;
+        let len = interface.read(&mut packet).unwrap();
 
         // Verify the parameter is as we expect.  Format of this packet can be
         // found at https://fuchsia.googlesource.com/zedmon/+/HEAD/docs/usb_proto.md
@@ -336,7 +345,5 @@ mod tests {
                 0x0a, 0xd7, 0x23, 0x3c, 0x00, 0x00, 0x00
             ][..]
         );
-
-        Ok(())
     }
 }
