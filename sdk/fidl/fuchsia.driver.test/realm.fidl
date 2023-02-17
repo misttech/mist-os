@@ -17,6 +17,25 @@ type DriverLog = struct {
     log_level fuchsia.diagnostics.Severity;
 };
 
+@available(added=HEAD)
+type Collection = strict enum {
+    UNKNOWN = 0;
+    BOOT_DRIVERS = 1;
+    PACKAGE_DRIVERS = 2;
+};
+
+@available(added=HEAD)
+type Offer = struct {
+    protocol_name string:MAX;
+    collection Collection;
+};
+
+@available(added=HEAD)
+type Expose = struct {
+    service_name string:MAX;
+    collection Collection;
+};
+
 /// A list of arguments that can be used to configure DriverTestRealm.
 type RealmArgs = resource table {
     /// This is what DriverManager will see as its boot directory.
@@ -65,7 +84,21 @@ type RealmArgs = resource table {
 
     /// Specify the board name that drivers are aware of.
     /// Default: driver-integration-test
-   10: board_name string:MAX;
+    10: board_name string:MAX;
+
+    // TODO(http://fxbug.dev/122149): This parameter should either be updated
+    // or removed.
+    /// Specify additional offers from the test to a driver collection
+    /// Default: empty
+    @available(added=HEAD)
+    11: offers vector<Offer>:MAX;
+
+    // TODO(http://fxbug.dev/122149): This parameter should either be updated
+    // or removed.
+    /// Specify services to expose from the test to a driver collection
+    /// Default: empty
+    @available(added=HEAD)
+    12: exposes vector<Expose>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

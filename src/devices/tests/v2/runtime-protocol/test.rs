@@ -60,10 +60,17 @@ async fn test_driver_runtime() -> Result<()> {
         .await?;
     // Build the Realm.
     let instance = builder.build().await?;
+
+    let offers = vec![fdt::Offer {
+        protocol_name: "fuchsia.runtime.test.Waiter".to_string(),
+        collection: fdt::Collection::BootDrivers,
+    }];
+
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
+        offers: Some(offers),
         ..fdt::RealmArgs::EMPTY
     };
     instance.driver_test_realm_start(args).await?;

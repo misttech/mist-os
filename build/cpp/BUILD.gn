@@ -28,7 +28,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//sdk/lib/driver_test_realm:bin",
 
     #------------------
     #------------------

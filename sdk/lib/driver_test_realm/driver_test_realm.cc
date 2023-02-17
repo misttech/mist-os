@@ -1,31 +1,23 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// To get drivermanager to run in a test environment, we need to fake boot-arguments & root-job.
-
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
-#include <fidl/fuchsia.diagnostics/cpp/wire.h>
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
-#include <fidl/fuchsia.driver.index/cpp/wire.h>
-#include <fidl/fuchsia.driver.test/cpp/wire.h>
+#include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl/cpp/wire/vector_view.h>
-#include <lib/stdcompat/string_view.h>
-#include <lib/svc/dir.h>
-#include <lib/svc/outgoing.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
 #include <lib/vfs/cpp/remote_dir.h>
@@ -39,6 +31,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 #include <ddk/metadata/test.h>
@@ -48,25 +41,28 @@
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/pseudo_file.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 
-constexpr zx_signals_t kDriverTestRealmStartSignal = ZX_USER_SIGNAL_1;
+namespace fio = fuchsia_io;
+namespace fdt = fuchsia_driver_test;
 
-const char* LogLevelToString(fuchsia_diagnostics::wire::Severity severity) {
+using namespace component_testing;
+
+const char* LogLevelToString(fuchsia_diagnostics::Severity severity) {
   switch (severity) {
-    case fuchsia_diagnostics::wire::Severity::kTrace:
+    case fuchsia_diagnostics::Severity::kTrace:
       return "TRACE";
-    case fuchsia_diagnostics::wire::Severity::kDebug:
+    case fuchsia_diagnostics::Severity::kDebug:
       return "DEBUG";
-    case fuchsia_diagnostics::wire::Severity::kInfo:
+    case fuchsia_diagnostics::Severity::kInfo:
       return "INFO";
-    case fuchsia_diagnostics::wire::Severity::kWarn:
+    case fuchsia_diagnostics::Severity::kWarn:
       return "WARN";
-    case fuchsia_diagnostics::wire::Severity::kError:
+    case fuchsia_diagnostics::Severity::kError:
       return "ERROR";
-    case fuchsia_diagnostics::wire::Severity::kFatal:
+    case fuchsia_diagnostics::Severity::kFatal:
       return "FATAL";
   }
 }
@@ -204,24 +200,6 @@ class FakeSystemStateTransition final
   }
 };
 
-class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
-  void MatchDriver(MatchDriverRequestView request, MatchDriverCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-  }
-
-  void WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) override {
-    completer.Reply();
-  }
-  void MatchDriversV1(MatchDriversV1RequestView request,
-                      MatchDriversV1Completer::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-  }
-  void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
-                            AddCompositeNodeSpecCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-  }
-};
-
 class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   void Get(GetCompleter::Sync& completer) override {
     zx::job job;
@@ -231,81 +209,6 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
     }
     completer.Reply(std::move(job));
   }
-};
-
-class FakeBootResolver final : public fidl::WireServer<fuchsia_component_resolution::Resolver> {
- public:
-  void SetPkgDir(fbl::RefPtr<fs::RemoteDir> pkg_dir) { pkg_dir_ = std::move(pkg_dir); }
-
- private:
-  void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
-    std::string_view kPrefix = "fuchsia-boot:///";
-    std::string_view relative_path = request->component_url.get();
-    if (!cpp20::starts_with(relative_path, kPrefix)) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
-      return;
-    }
-    relative_path.remove_prefix(kPrefix.size() + 1);
-
-    auto file = fidl::CreateEndpoints<fuchsia_io::File>();
-    if (file.is_error()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    zx_status_t status =
-        fdio_open_at(pkg_dir_->client_end().channel()->get(), std::string(relative_path).data(),
-                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-                     file->server.channel().release());
-    if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-    fidl::WireResult result =
-        fidl::WireCall(file->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
-    if (!result.ok()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-      return;
-    }
-    auto& response = result.value();
-    if (response.is_error()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-      return;
-    }
-    zx::vmo& vmo = response.value()->vmo;
-    uint64_t size;
-    status = vmo.get_prop_content_size(&size);
-    if (status != ZX_OK) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
-    }
-
-    zx::result directory = component::Clone(pkg_dir_->client_end());
-    if (directory.is_error()) {
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-
-    fidl::Arena arena;
-    fuchsia_component_resolution::wire::Package package(arena);
-    package.set_url(arena, fidl::StringView::FromExternal(kPrefix));
-    package.set_directory(std::move(directory.value()));
-
-    fuchsia_component_resolution::wire::Component component(arena);
-    component.set_url(arena, request->component_url);
-    component.set_decl(arena, fuchsia_mem::wire::Data::WithBuffer(arena, fuchsia_mem::wire::Buffer{
-                                                                             .vmo = std::move(vmo),
-                                                                             .size = size,
-                                                                         }));
-    component.set_package(arena, package);
-    completer.ReplySuccess(component);
-  }
-
-  void ResolveWithContext(ResolveWithContextRequestView request,
-                          ResolveWithContextCompleter::Sync& completer) override {
-    FX_SLOG(ERROR, "FakeBootResolver does not currently support ResolveWithContext");
-    completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
-  }
-
-  fbl::RefPtr<fs::RemoteDir> pkg_dir_;
 };
 
 class FakePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
@@ -366,38 +269,165 @@ class FakePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageRe
   }
 };
 
-class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm> {
- public:
-  DriverTestRealm(svc::Outgoing* outgoing, async::Loop* loop) : outgoing_(outgoing), loop_(loop) {}
+std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::RealmArgs& args) {
+  std::map<std::string, std::string> boot_args;
 
-  static zx::result<std::unique_ptr<DriverTestRealm>> Create(svc::Outgoing* outgoing,
-                                                             async::Loop* loop) {
-    auto realm = std::make_unique<DriverTestRealm>(outgoing, loop);
-    zx_status_t status = realm->Initialize();
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(realm));
+  bool is_dfv2 = false;
+  if (args.use_driver_framework_v2().has_value()) {
+    is_dfv2 = *args.use_driver_framework_v2();
   }
 
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override {
+  boot_args["devmgr.enable-ephemeral"] = "true";
+  boot_args["devmgr.require-system"] = "true";
+  if (is_dfv2) {
+    boot_args["driver_manager.use_driver_framework_v2"] = "true";
+  }
+  if (args.root_driver().has_value()) {
+    boot_args["driver_manager.root-driver"] = *args.root_driver();
+  } else {
+    if (is_dfv2) {
+      boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#meta/test-parent-sys.cm";
+    } else {
+      boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#driver/test-parent-sys.so";
+    }
+  }
+
+  if (args.driver_tests_enable_all().has_value() && *args.driver_tests_enable_all()) {
+    boot_args["driver.tests.enable"] = "true";
+  }
+
+  if (args.driver_tests_enable().has_value()) {
+    for (const auto& driver : *args.driver_tests_enable()) {
+      auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.c_str());
+      boot_args[string.data()] = "true";
+    }
+  }
+
+  if (args.driver_tests_disable().has_value()) {
+    for (const auto& driver : *args.driver_tests_disable()) {
+      auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.c_str());
+      boot_args[string.data()] = "false";
+    }
+  }
+
+  if (args.driver_log_level().has_value()) {
+    for (const auto& driver : *args.driver_log_level()) {
+      auto string = fbl::StringPrintf("driver.%s.log", driver.name().c_str());
+      boot_args[string.data()] = LogLevelToString(driver.log_level());
+    }
+  }
+
+  if (args.driver_disable().has_value()) {
+    std::vector<std::string_view> drivers(args.driver_disable()->size());
+    for (const auto& driver : *args.driver_disable()) {
+      drivers.emplace_back(driver);
+      auto string = fbl::StringPrintf("driver.%s.disable", driver.c_str());
+      boot_args[string.data()] = "true";
+    }
+    boot_args["devmgr.disabled-drivers"] = fxl::JoinStrings(drivers, ",");
+  }
+
+  if (args.driver_bind_eager().has_value() && args.driver_bind_eager()->size() > 0) {
+    std::vector<std::string_view> drivers(args.driver_bind_eager()->size());
+    for (const auto& driver : *args.driver_bind_eager()) {
+      drivers.emplace_back(driver.c_str());
+    }
+    boot_args["devmgr.bind-eager"] = fxl::JoinStrings(drivers, ",");
+  }
+
+  return boot_args;
+}
+
+class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
+ public:
+  DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher)
+      : outgoing_(outgoing), dispatcher_(dispatcher), vfs_(dispatcher_) {}
+
+  zx::result<> Init() {
+    // We must connect capabilities up early as not all users wait for Start to complete before
+    // trying to access the capabilities. The lack of synchonrization with simple variants of DTR
+    // in particular cause issues.
+    for (auto& [dir, _, server_end] : directories_) {
+      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      if (endpoints.is_error()) {
+        return endpoints.take_error();
+      }
+      auto result = outgoing_->AddDirectory(std::move(endpoints->client), dir);
+      if (result.is_error()) {
+        FX_SLOG(ERROR, "Failed to add directory to outgoing directory", KV("directory", dir));
+        return result.take_error();
+      }
+      server_end = std::move(endpoints->server);
+    }
+
+    const std::array<std::string, 6> kProtocols = {
+        "fuchsia.device.fs.Exporter",
+        "fuchsia.device.manager.Administrator",
+        "fuchsia.driver.development.DriverDevelopment",
+        "fuchsia.driver.registrar.DriverRegistrar",
+        "fuchsia.hardware.pci.DeviceWatcher",
+        "fuchsia.hardware.usb.DeviceWatcher",
+    };
+    for (const auto& protocol : kProtocols) {
+      auto result = outgoing_->AddUnmanagedProtocol(
+          [this, protocol](zx::channel request) {
+            if (exposed_dir_.channel().is_valid()) {
+              fdio_service_connect_at(exposed_dir_.channel().get(), protocol.c_str(),
+                                      request.release());
+            } else {
+              // Queue these up to run later.
+              cb_queue_.push_back([this, protocol, request = std::move(request)]() mutable {
+                fdio_service_connect_at(exposed_dir_.channel().get(), protocol.c_str(),
+                                        request.release());
+              });
+            }
+          },
+          protocol);
+      if (result.is_error()) {
+        FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
+                KV("protocol", protocol.c_str()));
+        return result.take_error();
+      }
+    }
+
+    // Hook up fuchsia.driver.test/Realm so we can proceed with the rest of initialization once
+    // |Start| is invoked
+    zx::result result = outgoing_->AddUnmanagedProtocol<fuchsia_driver_test::Realm>(
+        bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+    if (result.is_error()) {
+      FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
+              KV("protocol", "fuchsia.driver.test/Realm"));
+      return result.take_error();
+    }
+
+    result = InitializeDirectories();
+    if (result.is_error()) {
+      FX_SLOG(ERROR, "Failed to initialize directories", KV("status", result.status_string()));
+      return result.take_error();
+    }
+
+    return zx::ok();
+  }
+
+  void Start(StartRequest& request, StartCompleter::Sync& completer) override {
+    // Non-hermetic users will end up calling start several times as the component test framework
+    // invokes the binary multiple times, resulting in main running several times. We may be
+    // ignoring real issues by ignoreing the subsequent calls in the case that multiple parties
+    // are invoking start unknowingly. Comparing the args may be a way to avoid that issue.
+    // TODO(http://fxbug.dev/122136): Remedy this situation
     if (is_started_) {
-      completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
+      completer.Reply(zx::ok());
       return;
     }
+    is_started_ = true;
 
-    if (request->args.has_board_name()) {
-      boot_items_.board_name_ =
-          std::string(request->args.board_name().data(), request->args.board_name().size());
-    }
-
-    auto boot_args = CreateBootArgs(request);
+    auto boot_args = CreateBootArgs(request.args());
     for (std::pair<std::string, std::string> boot_arg : boot_args) {
       if (boot_arg.first.size() > fuchsia_boot::wire::kMaxArgsNameLength) {
         FX_SLOG(ERROR, "The length of the name of the boot argument is too long",
                 KV("arg", boot_arg.first.data()),
                 KV("maximum_length", fuchsia_boot::wire::kMaxArgsNameLength));
-        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
         return;
       }
 
@@ -405,19 +435,56 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
         FX_SLOG(ERROR, "The length of the value of the boot argument is too long",
                 KV("arg", boot_arg.first.data()), KV("value", boot_arg.second.data()),
                 KV("maximum_length", fuchsia_boot::wire::kMaxArgsValueLength));
-        completer.ReplyError(ZX_ERR_INVALID_ARGS);
+        completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
         return;
       }
     }
-    boot_arguments_ = mock_boot_arguments::Server(std::move(boot_args));
+    auto boot_arguments = std::make_unique<mock_boot_arguments::Server>(std::move(boot_args));
+
+    // Add protocols which are routed to realm builder.
+    zx::result result = outgoing_->AddProtocol<fuchsia_boot::Arguments>(std::move(boot_arguments));
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    auto boot_items = std::make_unique<FakeBootItems>();
+    if (request.args().board_name().has_value()) {
+      boot_items->board_name_ = *request.args().board_name();
+    }
+    result = outgoing_->AddProtocol<fuchsia_boot::Items>(std::move(boot_items));
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    result = outgoing_->AddProtocol<fuchsia_device_manager::SystemStateTransition>(
+        std::make_unique<FakeSystemStateTransition>());
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    result = outgoing_->AddProtocol<fuchsia_kernel::RootJob>(std::make_unique<FakeRootJob>());
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    result = outgoing_->AddProtocol<fuchsia_pkg::PackageResolver>(
+        std::make_unique<FakePackageResolver>());
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
 
     fidl::ClientEnd<fuchsia_io::Directory> boot_dir;
-    if (request->args.has_boot()) {
-      boot_dir = fidl::ClientEnd<fuchsia_io::Directory>(std::move(request->args.boot()));
+    if (request.args().boot().has_value()) {
+      boot_dir = fidl::ClientEnd<fuchsia_io::Directory>(std::move(*request.args().boot()));
     } else {
       auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
       if (endpoints.is_error()) {
-        completer.ReplyError(ZX_ERR_INTERNAL);
+        completer.Reply(zx::error(ZX_ERR_INTERNAL));
         return;
       }
       zx_status_t status =
@@ -425,144 +492,92 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
                                           fuchsia_io::wire::OpenFlags::kRightReadable |
                                           fuchsia_io::wire::OpenFlags::kRightExecutable),
-                    endpoints->server.channel().release());
+                    endpoints->server.TakeChannel().release());
       if (status != ZX_OK) {
-        completer.ReplyError(ZX_ERR_INTERNAL);
+        completer.Reply(zx::error(ZX_ERR_INTERNAL));
         return;
       }
       boot_dir = std::move(endpoints->client);
     }
 
-    auto remote_dir = fbl::MakeRefCounted<fs::RemoteDir>(std::move(boot_dir));
-    boot_resolver_.SetPkgDir(remote_dir);
-    outgoing_->root_dir()->AddEntry("boot", remote_dir);
+    result = outgoing_->AddDirectory(std::move(boot_dir), "boot");
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
 
-    start_event_.signal(0, kDriverTestRealmStartSignal);
-    completer.ReplySuccess();
+    // Add additional routes if specified.
+    std::unordered_map<fdt::Collection, const char*> kMap = {
+        {fdt::Collection::kBootDrivers, "boot-drivers"},
+        {fdt::Collection::kPackageDrivers, "pkg-drivers"},
+    };
+    if (request.args().offers().has_value()) {
+      for (const auto& offer : *request.args().offers()) {
+        realm_builder_.AddRoute(Route{.capabilities = {Protocol{offer.protocol_name()}},
+                                      .source = {ParentRef()},
+                                      .targets = {CollectionRef{kMap[offer.collection()]}}});
+      }
+    }
+
+    if (request.args().exposes().has_value()) {
+      for (const auto& expose : *request.args().exposes()) {
+        realm_builder_.AddRoute(Route{.capabilities = {Service{expose.service_name()}},
+                                      .source = {CollectionRef{kMap[expose.collection()]}},
+                                      .targets = {ParentRef()}});
+      }
+    }
+
+    realm_ = realm_builder_.SetRealmName("0").Build(dispatcher_);
+
+    // Forward all other protocols.
+    exposed_dir_ =
+        fidl::ClientEnd<fuchsia_io::Directory>(realm_->component().CloneExposedDir().TakeChannel());
+
+    for (auto& [dir, flags, server_end] : directories_) {
+      zx_status_t status = fdio_open_at(exposed_dir_.channel().get(), dir, flags,
+                                        server_end.TakeChannel().release());
+      if (status != ZX_OK) {
+        completer.Reply(zx::error(status));
+        return;
+      }
+    }
+
+    if (request.args().exposes().has_value()) {
+      for (const auto& expose : *request.args().exposes()) {
+        auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+        if (endpoints.is_error()) {
+          completer.Reply(endpoints.take_error());
+          return;
+        }
+        auto flags = static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
+                                           fio::wire::OpenFlags::kDirectory);
+        zx_status_t status =
+            fdio_open_at(exposed_dir_.channel().get(), expose.service_name().c_str(), flags,
+                         endpoints->server.TakeChannel().release());
+        if (status != ZX_OK) {
+          completer.Reply(zx::error(status));
+          return;
+        }
+        auto result =
+            outgoing_->AddDirectoryAt(std::move(endpoints->client), "svc", expose.service_name());
+        if (result.is_error()) {
+          completer.Reply(result.take_error());
+          return;
+        }
+      }
+    }
+
+    // Connect all requests that came in before Start was triggered.
+    while (cb_queue_.empty() == false) {
+      cb_queue_.back()();
+      cb_queue_.pop_back();
+    };
+
+    completer.Reply(zx::ok());
   }
 
  private:
-  zx_status_t Initialize() {
-    zx_status_t status = zx::event::create(0, &start_event_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocol<fuchsia_driver_test::Realm>(this);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_boot::Arguments>(&boot_arguments_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_boot::Items>(&boot_items_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_device_manager::SystemStateTransition>(
-        &system_state_transition_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_kernel::RootJob>(&root_job_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_component_resolution::Resolver>(&boot_resolver_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = AddProtocolWithWait<fuchsia_pkg::PackageResolver>(&package_resolver_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    status = InitializeDirectories();
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
-    return ZX_OK;
-  }
-
-  static std::map<std::string, std::string> CreateBootArgs(StartRequestView& request) {
-    std::map<std::string, std::string> boot_args;
-
-    bool is_dfv2 = false;
-    if (request->args.has_use_driver_framework_v2()) {
-      is_dfv2 = request->args.use_driver_framework_v2();
-    }
-
-    boot_args["devmgr.enable-ephemeral"] = "true";
-    boot_args["devmgr.require-system"] = "true";
-    if (is_dfv2) {
-      boot_args["driver_manager.use_driver_framework_v2"] = "true";
-    }
-    if (request->args.has_root_driver()) {
-      boot_args["driver_manager.root-driver"] =
-          std::string(request->args.root_driver().data(), request->args.root_driver().size());
-    } else {
-      if (is_dfv2) {
-        boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#meta/test-parent-sys.cm";
-      } else {
-        boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#driver/test-parent-sys.so";
-      }
-    }
-
-    if (request->args.has_driver_tests_enable_all() && request->args.driver_tests_enable_all()) {
-      boot_args["driver.tests.enable"] = "true";
-    }
-
-    if (request->args.has_driver_tests_enable()) {
-      for (auto& driver : request->args.driver_tests_enable()) {
-        auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.data());
-        boot_args[string.data()] = "true";
-      }
-    }
-
-    if (request->args.has_driver_tests_disable()) {
-      for (auto& driver : request->args.driver_tests_disable()) {
-        auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.data());
-        boot_args[string.data()] = "false";
-      }
-    }
-
-    if (request->args.has_driver_log_level()) {
-      for (auto& driver : request->args.driver_log_level()) {
-        auto string = fbl::StringPrintf("driver.%s.log", driver.name.data());
-        boot_args[string.data()] = LogLevelToString(driver.log_level);
-      }
-    }
-
-    if (request->args.has_driver_disable()) {
-      std::vector<std::string_view> drivers(request->args.driver_disable().count());
-      for (auto& driver : request->args.driver_disable()) {
-        drivers.emplace_back(driver.get());
-        auto string = fbl::StringPrintf("driver.%s.disable", driver.data());
-        boot_args[string.data()] = "true";
-      }
-      boot_args["devmgr.disabled-drivers"] = fxl::JoinStrings(drivers, ",");
-    }
-
-    if (request->args.has_driver_bind_eager() && request->args.driver_bind_eager().count() > 0) {
-      std::vector<std::string_view> drivers(request->args.driver_bind_eager().count());
-      for (auto& driver : request->args.driver_bind_eager()) {
-        drivers.emplace_back(driver.data());
-      }
-      boot_args["devmgr.bind-eager"] = fxl::JoinStrings(drivers, ",");
-    }
-
-    return boot_args;
-  }
-
-  zx_status_t InitializeDirectories() {
+  zx::result<> InitializeDirectories() {
     auto pkgfs = fbl::MakeRefCounted<fs::PseudoDir>();
     // Add the necessary empty base driver manifest.
     // It's added to /pkgfs/packages/driver-manager-base-config/0/config/base-driver-manifest.json
@@ -585,68 +600,84 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
       packages->AddEntry("driver-manager-base-config", std::move(driver_manager_base_config));
       pkgfs->AddEntry("packages", std::move(packages));
     }
-    outgoing_->root_dir()->AddEntry("pkgfs", std::move(pkgfs));
-    return ZX_OK;
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    zx_status_t status = vfs_.Serve(std::move(pkgfs), endpoints->server.TakeChannel(),
+                                    fs::VnodeConnectionOptions::ReadExec());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    zx::result result = outgoing_->AddDirectory(std::move(endpoints->client), "pkgfs");
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok();
   }
 
-  template <class Protocol>
-  zx_status_t AddProtocolWithWait(fidl::WireServer<Protocol>* server) {
-    auto service_callback = [this, server](fidl::ServerEnd<Protocol> request) {
-      auto wait =
-          std::make_shared<async::WaitOnce>(start_event_.get(), kDriverTestRealmStartSignal);
-      auto wait_callback = [wait_object = wait, request = std::move(request), server](
-                               async_dispatcher_t* dispatcher, async::WaitOnce* wait,
-                               zx_status_t status, const zx_packet_signal_t* signal) mutable {
-        if (status == ZX_OK) {
-          fidl::BindServer(dispatcher, std::move(request), server);
-        }
-      };
-      return wait->Begin(loop_->dispatcher(), std::move(wait_callback));
-    };
-
-    return outgoing_->svc_dir()->AddEntry(
-        fidl::DiscoverableProtocolName<Protocol>,
-        fbl::MakeRefCounted<fs::Service>(std::move(service_callback)));
-  }
-
-  template <class Protocol>
-  zx_status_t AddProtocol(fidl::WireServer<Protocol>* server) {
-    auto service_callback = [this, server](fidl::ServerEnd<Protocol> request) {
-      fidl::BindServer(loop_->dispatcher(), std::move(request), server);
-      return ZX_OK;
-    };
-    return outgoing_->svc_dir()->AddEntry(
-        fidl::DiscoverableProtocolName<Protocol>,
-        fbl::MakeRefCounted<fs::Service>(std::move(service_callback)));
-  }
-
-  svc::Outgoing* outgoing_;
-  async::Loop* loop_;
-
-  mock_boot_arguments::Server boot_arguments_;
-  FakeBootItems boot_items_;
-  FakeSystemStateTransition system_state_transition_;
-  FakeRootJob root_job_;
-  FakeBootResolver boot_resolver_;
-  FakePackageResolver package_resolver_;
-
-  zx::event start_event_;
   bool is_started_ = false;
+  component::OutgoingDirectory* outgoing_;
+  async_dispatcher_t* dispatcher_;
+  fs::SynchronousVfs vfs_;
+  fidl::ServerBindingGroup<fuchsia_driver_test::Realm> bindings_;
+
+  struct Directory {
+    const char* name;
+    uint32_t flags;
+    fidl::ServerEnd<fuchsia_io::Directory> server_end;
+  };
+
+  std::array<Directory, 3> directories_ = {
+      Directory{
+          .name = "dev",
+          .flags =
+              static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
+                                    fio::OpenFlags::kRightWritable | fio::OpenFlags::kDirectory),
+          .server_end = {},
+      },
+      Directory{
+          .name = "dev-class",
+          .flags =
+              static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDirectory),
+          .server_end = {},
+      },
+      Directory{
+          .name = "dev-topological",
+          .flags =
+              static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
+                                    fio::OpenFlags::kRightWritable | fio::OpenFlags::kDirectory),
+          .server_end = {},
+      },
+  };
+
+  component_testing::RealmBuilder realm_builder_ =
+      component_testing::RealmBuilder::CreateFromRelativeUrl("#meta/test_realm.cm");
+  std::optional<component_testing::RealmRoot> realm_;
+  fidl::ClientEnd<fuchsia_io::Directory> exposed_dir_;
+  // Queue of connection requests that need to be ran once exposed_dir_ is valid.
+  std::vector<fit::closure> cb_queue_;
 };
 
 }  // namespace
 
-int main() {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  component::OutgoingDirectory outgoing(loop.dispatcher());
 
-  svc::Outgoing outgoing(loop.dispatcher());
-  zx_status_t status = outgoing.ServeFromStartupInfo();
-  if (status != ZX_OK) {
-    return status;
+  DriverTestRealm dtr(&outgoing, loop.dispatcher());
+  {
+    zx::result result = dtr.Init();
+    ZX_ASSERT(result.is_ok());
   }
-  auto realm = DriverTestRealm::Create(&outgoing, &loop);
-  if (realm.status_value() != ZX_OK) {
-    return realm.status_value();
+
+  {
+    zx::result result = outgoing.ServeFromStartupInfo();
+    ZX_ASSERT(result.is_ok());
   }
 
   loop.Run();

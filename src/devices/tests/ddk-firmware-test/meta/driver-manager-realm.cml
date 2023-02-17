@@ -12,7 +12,7 @@
         },
         {
             name: "driver-manager-support",
-            url: "#meta/driver_manager_support.cm",
+            url: "#meta/driver_test_realm_support.cm",
         },
         {
             name: "driver-index",

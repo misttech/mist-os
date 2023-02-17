@@ -65,10 +65,16 @@ async fn test_compat_nodegroup() -> Result<()> {
 
     let instance = builder.build().await?;
 
+    let offers = vec![fdt::Offer {
+        protocol_name: "fuchsia.compat.nodegroup.test.Waiter".to_string(),
+        collection: fdt::Collection::BootDrivers,
+    }];
+
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
         use_driver_framework_v2: Some(true),
+        offers: Some(offers),
         ..fdt::RealmArgs::EMPTY
     };
     instance.driver_test_realm_start(args).await?;

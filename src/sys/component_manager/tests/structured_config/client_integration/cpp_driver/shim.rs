@@ -58,9 +58,16 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
     let realm = builder.build().await?;
+
+    let exposes = vec![fdt::Expose {
+        service_name: "test.structuredconfig.receiver.shim.ConfigService".to_string(),
+        collection: fdt::Collection::PackageDrivers,
+    }];
+
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/cpp_driver_receiver.cm".to_string()),
         use_driver_framework_v2: Some(true),
+        exposes: Some(exposes),
         ..fdt::RealmArgs::EMPTY
     };
     info!("about to start driver test realm");

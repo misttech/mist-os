@@ -153,6 +153,8 @@ async fn create_realm(pkgfs: Directory) -> Result<fuchsia_component_test::RealmI
     Ok(realm)
 }
 
+// TODO(fxbug.dev/116950): Re-enable after merging test into driver test realm proper.
+#[ignore]
 #[fuchsia::test]
 async fn load_package_firmware_test() -> Result<(), Error> {
     let firmware_file = vfs::file::vmo::read_only(b"this is some firmware\n");

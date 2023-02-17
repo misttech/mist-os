@@ -3,110 +3,99 @@
 // found in the LICENSE file.
 {
     include: [
-        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+        "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
     ],
-    children: [
+    program: {
+        runner: "elf",
+        binary: "bin/driver_test_realm",
+    },
+    capabilities: [
+        // From #realm_builder to test.
         {
-            name: "driver_manager",
-            url: "#meta/driver_manager_test.cm",
-            startup: "eager",
-            environment: "#driver_manager-env",
-        },
-        {
-            name: "driver-manager-support",
-            url: "#meta/driver_manager_support.cm",
-        },
-        {
-            name: "driver-index",
-            url: "#meta/driver-index.cm",
-        },
-        {
-            name: "devfs",
-            url: "#meta/devfs.cm",
-        },
-    ],
-    collections: [
-        {
-            name: "driver-hosts",
-            environment: "#driver-host-env",
-            durability: "single_run",
-        },
-        {
-            name: "boot-drivers",
-            environment: "#driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-        },
-        {
-            name: "pkg-drivers",
-            environment: "#driver-env",
-            durability: "single_run",
-            allowed_offers: "static_and_dynamic",
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
-            from: "#driver_manager",
-            to: [ "#devfs" ],
+            protocol: [
+                "fuchsia.device.fs.Exporter",
+                "fuchsia.device.manager.Administrator",
+                "fuchsia.device.manager.SystemStateTransition",
+                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.registrar.DriverRegistrar",
+                "fuchsia.driver.test.Realm",
+                "fuchsia.hardware.pci.DeviceWatcher",
+                "fuchsia.hardware.usb.DeviceWatcher",
+            ],
         },
         {
             directory: "dev",
-            from: "#driver_manager",
-            to: "#devfs",
+            rights: [ "rw*" ],
+            path: "/dev",
         },
         {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-            to: "#driver_manager",
+            directory: "dev-topological",
+            rights: [ "rw*" ],
+            path: "/dev-topological",
         },
         {
-            protocol: [
-                "fuchsia.device.composite.DeprecatedCompositeCreator",
-                "fuchsia.device.fs.Exporter",
-                "fuchsia.driver.framework.CompositeNodeManager",
-            ],
-            from: "#driver_manager",
-            to: [
-                "#boot-drivers",
-                "#pkg-drivers",
-            ],
+            directory: "dev-class",
+            rights: [ "r*" ],
+            path: "/dev-class",
         },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#boot-drivers",
-                "#devfs",
-                "#driver-hosts",
-                "#driver-index",
-                "#driver-manager-support",
-                "#driver_manager",
-                "#pkg-drivers",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.boot.RootResource",
-                "fuchsia.boot.WriteOnlyLog",
-            ],
-            from: "parent",
-            to: [ "#driver_manager" ],
-        },
-        {
-            protocol: "fuchsia.process.Launcher",
-            from: "parent",
-            to: "#driver_manager",
-        },
+
+        // From DTR to #realm_builder
         {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
+                "fuchsia.pkg.PackageResolver",
             ],
-            from: "#driver-manager-support",
-            to: [ "#boot-drivers" ],
+        },
+        {
+            directory: "pkgfs",
+            rights: [ "rx*" ],
+            path: "/pkgfs",
+        },
+        {
+            directory: "pkgfs-packages",
+            rights: [ "r*" ],
+            path: "/pkgfs/packages",
+        },
+        {
+            directory: "boot",
+            rights: [ "rx*" ],
+            path: "/boot",
+        },
+    ],
+    expose: [
+        {
+            directory: [
+                // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this
+                //affects OOT.
+                "dev",
+                "dev-class",
+                "dev-topological",
+            ],
+            from: "self",
+        },
+        {
+            protocol: [
+                "fuchsia.device.fs.Exporter",
+                "fuchsia.device.manager.Administrator",
+                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.registrar.DriverRegistrar",
+                "fuchsia.driver.test.Realm",
+                "fuchsia.hardware.pci.DeviceWatcher",
+                "fuchsia.hardware.usb.DeviceWatcher",
+            ],
+            from: "self",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.RootResource" ],
+            from: "parent",
+            to: "#realm_builder",
         },
         {
             protocol: [
@@ -114,123 +103,25 @@
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
+                "fuchsia.pkg.PackageResolver",
             ],
-            from: "#driver-manager-support",
-            to: [ "#driver_manager" ],
-        },
-        {
-            protocol: [ "fuchsia.boot.Arguments" ],
-            from: "#driver-manager-support",
-            to: "#driver-index",
-        },
-        {
-            protocol: [
-                "fuchsia.driver.development.DriverIndex",
-                "fuchsia.driver.index.DriverIndex",
-                "fuchsia.driver.registrar.DriverRegistrar",
-            ],
-            from: "#driver-index",
-            to: [ "#driver_manager" ],
-        },
-        {
-            protocol: [ "fuchsia.pkg.PackageResolver" ],
-            from: "#driver-manager-support",
-            to: [
-                "#driver-index",
-                "#driver_manager",
-            ],
+            from: "self",
+            to: "#realm_builder",
         },
         {
             directory: "pkgfs",
-            from: "#driver-manager-support",
-            to: [ "#driver_manager" ],
+            from: "self",
+            to: "#realm_builder",
         },
         {
             directory: "pkgfs-packages",
-            from: "#driver-manager-support",
-            to: [ "#driver-index" ],
+            from: "self",
+            to: "#realm_builder",
         },
         {
             directory: "boot",
-            from: "#driver-manager-support",
-            to: [
-                "#driver-index",
-                "#driver_manager",
-            ],
-            rights: [ "rx*" ],
-        },
-    ],
-    expose: [
-        // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
-        {
-            directory: "dev-topological",
-            from: "#devfs",
-            as: "dev",
-        },
-        {
-            directory: [
-                "dev-class",
-                "dev-topological",
-            ],
-            from: "#devfs",
-        },
-        {
-            protocol: [
-                "fuchsia.device.fs.Exporter",
-                "fuchsia.device.manager.Administrator",
-                "fuchsia.driver.development.DriverDevelopment",
-                "fuchsia.hardware.pci.DeviceWatcher",
-                "fuchsia.hardware.usb.DeviceWatcher",
-            ],
-            from: "#driver_manager",
-        },
-        {
-            protocol: "fuchsia.driver.registrar.DriverRegistrar",
-            from: "#driver-index",
-        },
-        {
-            runner: "driver",
-            from: "#driver_manager",
-        },
-        {
-            protocol: [ "fuchsia.driver.test.Realm" ],
-            from: "#driver-manager-support",
-        },
-    ],
-    environments: [
-        {
-            name: "driver_manager-env",
-            extends: "realm",
-
-            // 1 minute
-            __stop_timeout_ms: 60000,
-        },
-        {
-            name: "driver-host-env",
-            extends: "realm",
-
-            // 20 seconds
-            __stop_timeout_ms: 20000,
-        },
-        {
-            name: "driver-env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot-resolver",
-                    from: "#driver-manager-support",
-                    scheme: "fuchsia-boot",
-                },
-            ],
-
-            // 10 seconds
-            __stop_timeout_ms: 10000,
+            from: "self",
+            to: "#realm_builder",
         },
     ],
 }

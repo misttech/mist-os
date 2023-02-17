@@ -27,10 +27,17 @@ async fn test_services() -> Result<()> {
         .await?;
     // Build the Realm.
     let realm = builder.build().await?;
+
+    let exposes = vec![fdt::Expose {
+        service_name: "fuchsia.services.test.Device".to_string(),
+        collection: fdt::Collection::PackageDrivers,
+    }];
+
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
+        exposes: Some(exposes),
         ..fdt::RealmArgs::EMPTY
     };
     realm.driver_test_realm_start(args).await?;

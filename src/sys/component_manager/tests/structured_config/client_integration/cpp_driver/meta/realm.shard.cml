@@ -5,10 +5,15 @@
 // This file gets merged into //sdk/lib/driver_test_realm/meta/driver_test_realm.cml in
 // the associated BUILD.gn
 {
+    capabilities: [
+        {
+            service: "test.structuredconfig.receiver.shim.ConfigService",
+        },
+    ],
     expose: [
         {
             service: "test.structuredconfig.receiver.shim.ConfigService",
-            from: "#pkg-drivers",
+            from: "self",
         },
     ],
 }

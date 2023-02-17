@@ -61,11 +61,17 @@ test("test") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-fuchsia_unittest_package("ddk-fallback-test-v2-package") {
+fuchsia_unittest_component("component") {
+  component_name = "ddk-fallback-test-v2"
+  deps = [ ":test" ]
+}
+
+fuchsia_package("ddk-fallback-test-v2-package") {
+  testonly = true
   package_name = "ddk-fallback-test-v2"
   deps = [
+    ":component",
     ":ddk-fallback-test-driver",
-    ":test",
     "//sdk/lib/driver_test_realm",
     "//src/devices/misc/drivers/test-parent",
   ]

@@ -6,7 +6,7 @@
         {
             protocol: "fuchsia.compat.nodegroup.test.Waiter",
             from: "parent",
-            to: "#boot-drivers",
+            to: "#realm_builder",
         },
     ],
 }

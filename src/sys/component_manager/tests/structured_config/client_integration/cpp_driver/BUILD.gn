@@ -97,6 +97,7 @@ cmc_merge("realm.cml") {
 fuchsia_test_component("realm") {
   manifest = "${target_out_dir}/realm.cml"
   manifest_deps = [ ":realm.cml" ]
+  deps = [ "//sdk/lib/driver_test_realm:bin" ]
 }
 
 rustc_test("cpp_driver_sc_client_test_bin") {

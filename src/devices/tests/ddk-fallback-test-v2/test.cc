@@ -12,7 +12,7 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-TEST(DdkFirmwaretest, DriverWasLoaded) {
+TEST(DdkFallbackTest, DriverWasLoaded) {
   fbl::unique_fd dev(open("/dev", O_RDONLY));
   ASSERT_TRUE(dev);
 

@@ -9,15 +9,29 @@ group("driver_test_realm") {
   testonly = true
   deps = [
     ":client_includes",
+    ":driver_manager_test",
     ":driver_test_realm_component",
+    ":fake_boot_resolver",
+    ":test_realm_manifest",
+    "//src/devices/bin/devfs:component",
+    "//src/devices/bin/driver-index:component",
+    "//src/devices/bin/driver_host:driver_host",
+    "//src/devices/bin/driver_host2:component",
   ]
 }
 
 group("realm_builder_version") {
   testonly = true
   deps = [
+    ":driver_manager_test",
     ":driver_test_realm_component",
+    ":fake_boot_resolver",
     ":realm_builder_includes",
+    ":test_realm_manifest",
+    "//src/devices/bin/devfs:component",
+    "//src/devices/bin/driver-index:component",
+    "//src/devices/bin/driver_host:driver_host",
+    "//src/devices/bin/driver_host2:component",
   ]
 }
 
@@ -35,50 +49,60 @@ executable("bin") {
   output_name = "driver_test_realm"
   testonly = true
   sources = [ "driver_test_realm.cc" ]
-  data_deps = [ "fake_driver:driver_package" ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp_wire",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_wire",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/svc",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl",
     "//src/lib/storage/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-boot-arguments",
-    "//zircon/system/ulib/svc",
   ]
-
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_component("driver_test_realm_component") {
   component_name = "driver_test_realm"
   testonly = true
   manifest = "meta/driver_test_realm.cml"
+  deps = [ ":bin" ]
+}
+
+executable("fake_boot_resolver_bin") {
+  output_name = "fake_boot_resolver"
+  testonly = true
+  sources = [ "fake_boot_resolver.cc" ]
+  data_deps = [ "fake_driver:driver_package" ]
   deps = [
-    ":driver_manager_support",
-    ":driver_manager_test",
-    "//src/devices/bin/devfs:component",
-    "//src/devices/bin/driver-index:component",
-    "//src/devices/bin/driver_host2:component",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/svc",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/storage/vfs/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/svc",
   ]
 }
 
-fuchsia_component_manifest("manifest") {
+fuchsia_component("fake_boot_resolver") {
+  testonly = true
+  manifest = "meta/fake_boot_resolver.cml"
+  deps = [ ":fake_boot_resolver_bin" ]
+}
+
+fuchsia_component_manifest("driver_manager_manifest") {
   testonly = true
   component_name = "driver_manager_test"
   manifest = "meta/driver_manager_test.cml"
@@ -86,7 +110,7 @@ fuchsia_component_manifest("manifest") {
 
 fuchsia_structured_config_values("test_config") {
   testonly = true
-  cm_label = ":manifest"
+  cm_label = ":driver_manager_manifest"
   values = {
     set_root_driver_host_critical = false
   }
@@ -94,18 +118,17 @@ fuchsia_structured_config_values("test_config") {
 
 fuchsia_component("driver_manager_test") {
   testonly = true
-  cm_label = ":manifest"
+  cm_label = ":driver_manager_manifest"
   deps = [
     ":test_config",
-    "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_manager",
   ]
 }
 
-fuchsia_component("driver_manager_support") {
+fuchsia_component_manifest("test_realm_manifest") {
   testonly = true
-  manifest = "meta/support.cml"
-  deps = [ ":bin" ]
+  component_name = "test_realm"
+  manifest = "meta/test_realm.cml"
 }
 
 expect_includes("client_includes") {
