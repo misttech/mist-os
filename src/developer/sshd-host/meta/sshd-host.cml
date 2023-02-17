@@ -86,6 +86,7 @@
             directory: "mnt",
             rights: [ "rw*" ],
             path: "/mnt",
+            availability: "optional",
         },
         {
             directory: "pkgfs",

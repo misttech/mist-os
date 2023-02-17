@@ -30,11 +30,6 @@
             path: "/fs/factory",
         },
         {
-            directory: "mnt",
-            rights: [ "rw*" ],
-            path: "/mnt",
-        },
-        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.fshost.BlockWatcher",
@@ -81,7 +76,6 @@
             directory: [
                 "data",
                 "factory",
-                "mnt",
             ],
             from: "self",
         },

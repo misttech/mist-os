@@ -97,7 +97,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
                                        const console_launcher::Arguments& args) {
   std::tuple<const char*, const std::string&, std::vector<std::string_view>> map[] = {
       // NB: //tools/emulator/emulator.go expects these to be available in its boot autorun.
-      {"autorun:boot", args.autorun_boot, {"/dev", "/mnt"}},
+      {"autorun:boot", args.autorun_boot, {"/dev"}},
       {"autorun:system", args.autorun_system, {"/system"}},
   };
 

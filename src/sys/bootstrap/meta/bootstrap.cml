@@ -701,7 +701,6 @@
             directory: [
                 "blob",
                 "data",
-                "mnt",
             ],
             from: "#fshost",
             to: [ "#console-launcher" ],
@@ -1096,7 +1095,6 @@
                 "blob",
                 "data",
                 "factory",
-                "mnt",
                 "tmp",
             ],
             from: "#fshost",

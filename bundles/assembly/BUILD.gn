@@ -317,6 +317,9 @@ assembly_input_bundle("common_minimal_eng") {
 
     # Dash launcher should be available in every engineering-mode product.
     "//src/sys/tools/debug-dash-launcher",
+
+    # The fs_realm component should be available in every engineering-mode product.
+    "//src/storage/fs_realm",
   ]
   compiled_packages = [
     {
@@ -328,6 +331,8 @@ assembly_input_bundle("common_minimal_eng") {
           rebase_path(
               "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
               root_build_dir),
+          rebase_path("//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
+                      root_build_dir),
         ]
       }
     },

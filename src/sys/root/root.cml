@@ -134,7 +134,6 @@
                 "dev-class",
                 "dev-topological",
                 "factory",
-                "mnt",
                 "pkgfs",
                 "root-ssl-certificates",
                 "system",

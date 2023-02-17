@@ -1,0 +1,28 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "fs_realm",
+            url: "fuchsia-pkg://fuchsia.com/fs_realm#meta/fs_realm.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: "#fs_realm",
+        },
+    ],
+    expose: [
+        {
+            directory: [ "mnt" ],
+            from: "#fs_realm",
+        },
+    ],
+}

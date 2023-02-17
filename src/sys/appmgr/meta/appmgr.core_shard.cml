@@ -58,7 +58,6 @@
                 "data",
                 "dev-topological",
                 "factory",
-                "mnt",
                 "system",
                 "tmp",
             ],
