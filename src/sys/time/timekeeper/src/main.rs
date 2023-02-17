@@ -83,6 +83,10 @@ impl Config {
     fn get_monitor_uses_pull(&self) -> bool {
         self.source_config.monitor_uses_pull
     }
+
+    fn get_back_off_time_between_pull_samples(&self) -> zx::Duration {
+        zx::Duration::from_seconds(self.source_config.back_off_time_between_pull_samples_sec)
+    }
 }
 
 /// A definition which time sources to install, along with the URL and child names for each.
@@ -368,6 +372,7 @@ mod tests {
             primary_time_source_url: "".to_string(),
             initial_frequency_ppm: 1_000_000,
             monitor_uses_pull: false,
+            back_off_time_between_pull_samples_sec: 0,
         }))
     }
 

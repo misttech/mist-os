@@ -21,7 +21,7 @@ use {
         sync::Arc,
     },
     time_util::Transform,
-    tracing::{error, info},
+    tracing::{debug, error, info},
 };
 
 /// One million for PPM calculations
@@ -329,6 +329,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
     /// Maintain the clock indefinitely. This future will never complete.
     async fn maintain_clock(mut self) {
+        let pull_delay = self.config.get_back_off_time_between_pull_samples();
         let details = self.clock.get_details().expect("failed to get UTC clock details");
         let mut clock_started =
             details.backstop.into_nanos() != details.ticks_to_synthetic.synthetic_offset;
@@ -364,6 +365,11 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
             // Update the RTC clock if we have one.
             self.update_rtc(&estimate_transform).await;
+
+            if self.time_source_manager.is_suspendable_source() {
+                debug!("backing off for pull source resampling.");
+                fasync::Timer::new(fasync::Time::after(pull_delay)).await;
+            }
         }
     }
 

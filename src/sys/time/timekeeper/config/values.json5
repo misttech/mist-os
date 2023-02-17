@@ -17,4 +17,7 @@
 
     // Don't use monitor track by default.
     monitor_uses_pull: false,
+
+    // Wait for 5 minutes between successive pull samples.
+    back_off_time_between_pull_samples_sec: 300,
 }

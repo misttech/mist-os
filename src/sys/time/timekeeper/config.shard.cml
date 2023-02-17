@@ -31,5 +31,9 @@
         // Flag for enabling usage of `PullSource` API for the monitor track.
         // If set to false, monitor track is not used.
         monitor_uses_pull: { type: "bool" },
+
+        // The time to wait until retrying to sample the pull
+        // time source, expressed in seconds.
+        back_off_time_between_pull_samples_sec: { type: "int64" },
     },
 }

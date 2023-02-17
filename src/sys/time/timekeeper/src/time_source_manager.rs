@@ -59,6 +59,16 @@ enum TimeManager<D: Diagnostics, M: MonotonicProvider> {
     Pull(PullSourceManager<D, M>),
 }
 
+impl<D: Diagnostics, M: MonotonicProvider> TimeManager<D, M> {
+    /// Return true if this TimeManager is a pull source.
+    fn is_pull_source(&self) -> bool {
+        match self {
+            TimeManager::Pull(_) => true,
+            _ => false,
+        }
+    }
+}
+
 /// A wrapper that launches a time source component, uses PushSource to obtain time samples,
 /// validates them from the source, and handles relaunching the source in the case of failures.
 struct PushSourceManager<D: Diagnostics, M: MonotonicProvider> {
@@ -248,6 +258,13 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
             }),
         };
         TimeSourceManager { manager }
+    }
+
+    /// Returns true if this time source can be suspended. Suspended
+    /// sources are typically more power-aware than ones that are
+    /// not.
+    pub fn is_suspendable_source(&self) -> bool {
+        self.manager.is_pull_source()
     }
 
     /// Constructs a new `TimeSourceManager` that reads monotonic times from the kernel and has
