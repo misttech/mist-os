@@ -61,8 +61,20 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.lightsensor/LightSensorData.is_calibrated",
+        "ordinal": "5",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.lightsensor/LightSensorData.rgbc",
         "ordinal": "1",
+        "type": "fuchsia.lightsensor/Rgbc"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lightsensor/LightSensorData.si_rgbc",
+        "ordinal": "4",
         "type": "fuchsia.lightsensor/Rgbc"
     },
     {
