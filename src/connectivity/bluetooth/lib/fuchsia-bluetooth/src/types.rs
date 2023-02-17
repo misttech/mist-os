@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_bluetooth, fidl_fuchsia_bluetooth_sys as sys, std::fmt};
+use fidl_fuchsia_bluetooth;
+use fidl_fuchsia_bluetooth_sys as sys;
+use std::fmt;
 
 pub use {self::uuid::*, address::*, bonding_data::*, channel::*, host_info::*, id::*, peer::*};
 

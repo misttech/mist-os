@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        assigned_numbers::find_service_uuid,
-        inspect::*,
-        types::{Address, PeerId, Uuid},
-    },
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth::{Appearance, DeviceClass},
-    fidl_fuchsia_bluetooth_sys as fsys,
-    fuchsia_inspect::Node,
-    std::{convert::TryFrom, fmt},
-};
+use fidl_fuchsia_bluetooth::{Appearance, DeviceClass};
+use fidl_fuchsia_bluetooth_sys as fsys;
+use fuchsia_inspect::Node;
+use std::{convert::TryFrom, fmt};
+
+use crate::assigned_numbers::find_service_uuid;
+use crate::error::Error;
+use crate::inspect::*;
+use crate::types::{Address, PeerId, Uuid};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Peer {
@@ -149,9 +146,9 @@ impl TryFrom<fsys::Peer> for Peer {
     type Error = Error;
     fn try_from(src: fsys::Peer) -> Result<Peer, Self::Error> {
         Ok(Peer {
-            id: src.id.ok_or(format_err!("`Peer.id` is mandatory"))?.into(),
-            address: src.address.ok_or(format_err!("`Peer.address` is mandatory"))?.into(),
-            technology: src.technology.ok_or(format_err!("`Peer.technology` is mandatory!"))?,
+            id: src.id.ok_or(Error::missing("sys.Peer.id"))?.into(),
+            address: src.address.ok_or(Error::missing("sys.Peer.address"))?.into(),
+            technology: src.technology.ok_or(Error::missing("sys.Peer.technology"))?,
             connected: src.connected.unwrap_or(false),
             bonded: src.bonded.unwrap_or(false),
             name: src.name.clone(),
@@ -304,7 +301,7 @@ mod tests {
             use std::convert::TryInto;
 
             let sys = fsys::Peer::from(&peer);
-            assert_eq!(Ok(peer), sys.try_into().map_err(|e: anyhow::Error| e.to_string()));
+            assert_eq!(peer, sys.try_into().expect("valid Peer"));
         }
     }
 

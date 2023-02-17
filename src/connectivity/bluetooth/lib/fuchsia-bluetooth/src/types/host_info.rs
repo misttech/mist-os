@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        inspect::{DebugExt, InspectData, Inspectable, IsInspectable, ToProperty},
-        types::{addresses_to_custom_string, Address, HostId},
-    },
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth_sys as fsys,
-    fuchsia_inspect::{self as inspect, Property},
-    std::{convert::TryFrom, fmt},
-};
+use fidl_fuchsia_bluetooth_sys as fsys;
+use fuchsia_inspect::{self as inspect, Property};
+use std::{convert::TryFrom, fmt};
+
+use crate::error::Error;
+use crate::inspect::{DebugExt, InspectData, Inspectable, IsInspectable, ToProperty};
+use crate::types::{addresses_to_custom_string, Address, HostId};
 
 /// `HostInfo` contains informational parameters and state for a bt-host device.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,15 +42,14 @@ pub struct HostInfo {
 impl TryFrom<&fsys::HostInfo> for HostInfo {
     type Error = Error;
     fn try_from(src: &fsys::HostInfo) -> Result<HostInfo, Self::Error> {
-        let addresses =
-            src.addresses.as_ref().ok_or(format_err!("HostInfo.addresses is mandatory!"))?;
+        let addresses = src.addresses.as_ref().ok_or(Error::missing("HostInfo.addresses"))?;
         if addresses.is_empty() {
-            return Err(format_err!("HostInfo.addresses must be nonempty!"));
+            return Err(Error::conversion("HostInfo.addresses must be nonempty"));
         }
         let addresses = addresses.iter().map(Into::into).collect();
         Ok(HostInfo {
-            id: HostId::from(src.id.ok_or(format_err!("HostInfo.id is mandatory!"))?),
-            technology: src.technology.ok_or(format_err!("HostInfo.technology is mandatory!"))?,
+            id: HostId::from(src.id.ok_or(Error::missing("HostInfo.id"))?),
+            technology: src.technology.ok_or(Error::missing("HostInfo.technology"))?,
             addresses,
             active: src.active.unwrap_or(false),
             local_name: src.local_name.clone(),

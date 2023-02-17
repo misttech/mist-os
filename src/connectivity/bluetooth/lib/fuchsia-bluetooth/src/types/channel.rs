@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        io,
-        stream::{FusedStream, Stream},
-        Future, TryFutureExt,
-    },
-    std::convert::TryFrom,
-    std::{
-        fmt,
-        ops::Deref,
-        pin::Pin,
-        sync::{Arc, Mutex},
-        task::{Context, Poll},
-    },
-};
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
+use futures::io;
+use futures::stream::{FusedStream, Stream};
+use futures::{Future, TryFutureExt};
+use std::convert::TryFrom;
+use std::fmt;
+use std::ops::Deref;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
+
+use crate::error::Error;
 
 /// The Channel mode in use for a BR/EDR channel.
 #[derive(PartialEq, Debug, Clone)]
@@ -144,11 +141,11 @@ impl Channel {
         let proxy = self.audio_direction_ext.clone();
         async move {
             match proxy {
-                None => return Err(format_err!("Audio Priority not supported")),
+                None => return Err(Error::profile("audio priority not supported")),
                 Some(proxy) => proxy
                     .set_priority(dir.into())
                     .await?
-                    .map_err(|e| format_err!("Setting priority failed: {:?}", e)),
+                    .map_err(|e| Error::profile(format!("setting priority failed: {e:?}"))),
             }
         }
     }
@@ -174,7 +171,7 @@ impl Channel {
                 }
                 _ => {}
             };
-            let proxy = proxy.ok_or(format_err!("L2Cap parameter changing not supported"))?;
+            let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
             let parameters = bredr::ChannelParameters {
                 flush_timeout: duration.clone().map(zx::Duration::into_nanos),
                 ..bredr::ChannelParameters::EMPTY
@@ -210,7 +207,7 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
 }
 
 impl TryFrom<Channel> for bredr::Channel {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(channel: Channel) -> Result<Self, Self::Error> {
         let socket = channel.socket.into_zx_socket();
@@ -222,7 +219,7 @@ impl TryFrom<Channel> for bredr::Channel {
             })
             .transpose()
             .map_err(|_: bredr::AudioDirectionExtProxy| {
-                format_err!("Audio Direction proxy in use")
+                Error::profile("AudioDirection proxy in use")
             })?;
         let ext_l2cap = channel
             .l2cap_parameters_ext
@@ -232,7 +229,7 @@ impl TryFrom<Channel> for bredr::Channel {
             })
             .transpose()
             .map_err(|_: bredr::L2capParametersExtProxy| {
-                format_err!("L2cap parameters proxy in use")
+                Error::profile("l2cap parameters proxy in use")
             })?;
         let flush_timeout = channel.flush_timeout.lock().unwrap().map(zx::Duration::into_nanos);
         Ok(bredr::Channel {

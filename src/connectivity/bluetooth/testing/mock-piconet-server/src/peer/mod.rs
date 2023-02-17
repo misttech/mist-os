@@ -198,7 +198,7 @@ impl MockPeer {
         // Notify observer relay of the connection.
         let _ = self.observer.as_ref().map(|o| Self::relay_connected(o, other, protocol));
 
-        local.try_into()
+        local.try_into().map_err(|e| format_err!("{e:?}"))
     }
 
     /// Registers a new search for the provided `service_uuid`.

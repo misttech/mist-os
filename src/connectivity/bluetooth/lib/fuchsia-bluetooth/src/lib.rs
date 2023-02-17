@@ -12,6 +12,8 @@ pub mod assigned_numbers;
 pub mod detachable_map;
 /// Bluetooth Error type
 pub mod error;
+pub use error::Error;
+
 /// Tools for writing asynchronous expectations in tests
 #[macro_use]
 pub mod expectation;

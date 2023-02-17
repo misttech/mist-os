@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth as fidl,
-    std::fmt,
-};
+use fidl_fuchsia_bluetooth as fidl;
+use std::fmt;
+
+use crate::error::Error;
 
 /// A Bluetooth device address can either be public or private. The controller device address used
 /// in BR/EDR (aka BD_ADDR) and LE have the "public" address type. A private address is one that is
@@ -93,14 +92,14 @@ fn le_bytes_from_be_str(s: &str) -> Result<AddressBytes, Error> {
 
     for octet in s.split(|c| c == ':') {
         if insert_cursor == 0 {
-            return Err(format_err!("Too many octets"));
+            return Err(Error::other("too many octets in Address string"));
         }
-        bytes[insert_cursor - 1] = u8::from_str_radix(octet, 16)?;
+        bytes[insert_cursor - 1] = u8::from_str_radix(octet, 16).map_err(Error::external)?;
         insert_cursor -= 1;
     }
 
     if insert_cursor != 0 {
-        return Err(format_err!("Too few octets"));
+        return Err(Error::other("too few octets in Address string"));
     }
     Ok(bytes)
 }
@@ -159,6 +158,8 @@ pub(crate) mod proptest_util {
 pub mod tests {
     use super::proptest_util::*;
     use super::*;
+
+    use assert_matches::assert_matches;
     use proptest::prelude::*;
 
     proptest! {
@@ -187,20 +188,22 @@ pub mod tests {
     #[test]
     fn address_from_string_too_few_octets() {
         let str_rep = "01:02:03:04:05";
-        let parsed = Address::public_from_str(&str_rep).map_err(|e| e.to_string());
-        assert_eq!(parsed, Err("Too few octets".to_string()));
+        let parsed = Address::public_from_str(&str_rep);
+        assert_matches!(parsed, Err(Error::Other(_)));
     }
+
     #[test]
     fn address_from_string_too_many_octets() {
         let str_rep = "01:02:03:04:05:06:07";
-        let parsed = Address::public_from_str(&str_rep).map_err(|e| e.to_string());
-        assert_eq!(parsed, Err("Too many octets".to_string()));
+        let parsed = Address::public_from_str(&str_rep);
+        assert_matches!(parsed, Err(Error::Other(_)));
     }
+
     #[test]
     fn address_from_string_non_hex_chars() {
         let str_rep = "01:02:03:04:05:0G";
-        let parsed = Address::public_from_str(&str_rep).map_err(|e| e.to_string());
-        assert_eq!(parsed, Err("invalid digit found in string".to_string()));
+        let parsed = Address::public_from_str(&str_rep);
+        assert_matches!(parsed, Err(Error::Other(_)));
     }
 
     #[test]

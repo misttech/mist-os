@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys, fuchsia_inspect as inspect,
-    std::convert::{TryFrom, TryInto},
-};
+use fidl_fuchsia_bluetooth as bt;
+use fidl_fuchsia_bluetooth_sys as sys;
+use fuchsia_inspect as inspect;
+use std::convert::{TryFrom, TryInto};
 
-use crate::{
-    inspect::{InspectData, IsInspectable, ToProperty},
-    types::{uuid::Uuid, Address, OneOrBoth, PeerId},
-};
+use crate::error::Error;
+use crate::inspect::{InspectData, IsInspectable, ToProperty};
+use crate::types::{uuid::Uuid, Address, OneOrBoth, PeerId};
 
 #[derive(Debug)]
 struct LeInspect {
@@ -291,7 +289,7 @@ impl BondingData {
 }
 
 impl TryFrom<sys::BondingData> for BondingData {
-    type Error = anyhow::Error;
+    type Error = Error;
     fn try_from(fidl: sys::BondingData) -> Result<BondingData, Self::Error> {
         let fidl_clone = fidl.clone();
         let data = match (fidl_clone.le_bond, fidl_clone.bredr_bond) {
@@ -299,14 +297,17 @@ impl TryFrom<sys::BondingData> for BondingData {
             (Some(le_bond), None) => OneOrBoth::Left(le_bond.into()),
             (None, Some(bredr_bond)) => OneOrBoth::Right(bredr_bond.into()),
             _ => {
-                return Err(format_err!("bond missing transport-specific data: {:?}", fidl));
+                return Err(Error::missing(format!("bond data: {fidl:?}")));
             }
         };
 
         Ok(BondingData {
-            identifier: fidl.identifier.ok_or(format_err!("identifier missing"))?.into(),
-            address: fidl.address.ok_or(format_err!("address missing"))?.into(),
-            local_address: fidl.local_address.ok_or(format_err!("local address missing"))?.into(),
+            identifier: fidl.identifier.ok_or(Error::missing("BondingData identifier"))?.into(),
+            address: fidl.address.ok_or(Error::missing("BondingData address"))?.into(),
+            local_address: fidl
+                .local_address
+                .ok_or(Error::missing("BondingData local address"))?
+                .into(),
             name: fidl.name,
             data,
         })
@@ -317,7 +318,7 @@ impl TryFrom<sys::BondingData> for BondingData {
 /// fuchsia PeerId to be used if the external source is missing one (for instance, it is being
 /// migrated from a previous, non-Fuchsia system)
 impl TryFrom<(sys::BondingData, PeerId)> for BondingData {
-    type Error = anyhow::Error;
+    type Error = Error;
     fn try_from(from: (sys::BondingData, PeerId)) -> Result<BondingData, Self::Error> {
         let mut bond = from.0;
         let id = match bond.identifier {
@@ -577,10 +578,7 @@ pub mod tests {
                 ..sys::BondingData::EMPTY
             };
             let result = BondingData::try_from(src);
-            assert_eq!(
-                Err("identifier missing".to_string()),
-                result.map_err(|e| format!("{:?}", e))
-            );
+            assert_matches!(result, Err(Error::MissingRequired(_)));
         }
 
         #[test]
@@ -592,7 +590,7 @@ pub mod tests {
                 ..sys::BondingData::EMPTY
             };
             let result = BondingData::try_from(src);
-            assert_matches!(result.map_err(|e| format!("{:?}", e)), Err(e) if e.contains("address missing"));
+            assert_matches!(result, Err(Error::MissingRequired(_)));
         }
 
         #[test]
@@ -684,7 +682,8 @@ pub mod tests {
             fn bonding_data_sys_roundtrip(data in any_bonding_data()) {
                 let peer_id = data.identifier;
                 let sys_bonding_data: sys::BondingData = data.clone().into();
-                assert_eq!(Ok(data), (sys_bonding_data, peer_id).try_into().map_err(|e: anyhow::Error| e.to_string()));
+                let roundtrip_data: BondingData = (sys_bonding_data, peer_id).try_into().expect("bonding data can be converted");
+                assert_eq!(data, roundtrip_data);
             }
         }
     }

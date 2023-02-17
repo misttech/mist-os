@@ -17,6 +17,10 @@ pub enum Error {
     /// and for the fuchsia.bluetooth.sys.Access API.
     #[error("fuchsia.bluetooth.sys Error: {0:?}")]
     SysError(sys::Error),
+
+    /// Errors from the fuchsia-bluetooth crate.
+    #[error(transparent)]
+    BTCrate(#[from] fuchsia_bluetooth::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -29,7 +33,8 @@ impl Error {
     pub fn as_failure(self) -> anyhow::Error {
         match self {
             Error::InternalError(err) => err,
-            Error::SysError(err) => format_err!("Host Error: {:?}", err),
+            Error::SysError(err) => format_err!("Host Error: {err:?}"),
+            Error::BTCrate(err) => format_err!("Bluetooth crate Error: {err:?}"),
         }
     }
 }
@@ -44,7 +49,7 @@ impl Into<sys::Error> for Error {
     fn into(self) -> sys::Error {
         match self {
             Error::SysError(err) => err,
-            Error::InternalError(_) => sys::Error::Failed,
+            Error::InternalError(_) | Error::BTCrate(_) => sys::Error::Failed,
         }
     }
 }

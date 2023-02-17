@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth as fidl_bt,
-    fidl_fuchsia_bluetooth_bredr::{
-        self as fidl_bredr, ProfileDescriptor, ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-        ATTR_SERVICE_CLASS_ID_LIST,
-    },
-    fidl_table_validation::ValidFidlTable,
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::{AttachError, Inspect, Unit},
-    std::{
-        cmp::min,
-        collections::HashSet,
-        convert::{TryFrom, TryInto},
-    },
+use fidl_fuchsia_bluetooth as fidl_bt;
+use fidl_fuchsia_bluetooth_bredr::{
+    self as fidl_bredr, ProfileDescriptor, ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
+    ATTR_SERVICE_CLASS_ID_LIST,
 };
+use fidl_table_validation::ValidFidlTable;
+use fuchsia_inspect as inspect;
+use fuchsia_inspect_derive::{AttachError, Inspect, Unit};
+use std::cmp::min;
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
 
 use crate::assigned_numbers::{constants::SERVICE_CLASS_UUIDS, AssignedNumber};
+use crate::error::Error;
 use crate::types::Uuid;
 
 /// The Protocol and Service Multiplexer (PSM) for L2cap connections.
@@ -90,24 +86,23 @@ pub fn find_profile_descriptors(
     let attr = attributes
         .iter()
         .find(|a| a.id == ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST)
-        .ok_or(format_err!("Profile Descriptor not found"))?;
+        .ok_or(Error::profile("missing profile descriptor"))?;
 
-    if let fidl_bredr::DataElement::Sequence(profiles) = &attr.element {
-        let mut result = Vec::new();
-        for elem in profiles {
-            let elem =
-                elem.as_ref().ok_or(format_err!("DataElements in sequences shouldn't be null"))?;
-            result.push(
-                elem_to_profile_descriptor(&*elem)
-                    .ok_or(format_err!("Couldn't convert to a ProfileDescriptor"))?,
-            );
-        }
-        if result.is_empty() {
-            return Err(format_err!("Profile Descriptor List had no profiles!"));
-        }
-        Ok(result)
+    let fidl_bredr::DataElement::Sequence(profiles) = &attr.element else {
+        return Err(Error::profile("attribute element is invalidly formatted"));
+    };
+    let mut result = Vec::new();
+    for elem in profiles {
+        let elem = elem.as_ref().ok_or(Error::profile("null DataElement in sequence"))?;
+        result.push(
+            elem_to_profile_descriptor(&*elem)
+                .ok_or(Error::profile("couldn't convert to a ProfileDescriptor"))?,
+        );
+    }
+    if result.is_empty() {
+        Err(Error::profile("no profile descriptor found"))
     } else {
-        Err(format_err!("Profile Descriptor List Element was not formatted correctly"))
+        Ok(result)
     }
 }
 
@@ -412,7 +407,7 @@ impl TryFrom<&fidl_bredr::Information> for Information {
 
     fn try_from(src: &fidl_bredr::Information) -> Result<Information, Self::Error> {
         let language = match src.language.as_ref().map(String::as_str) {
-            None | Some("") => return Err(format_err!("language must be provided")),
+            None | Some("") => return Err(Error::missing("bredr.Information.language")),
             Some(l) => l.to_string().clone(),
         };
 
@@ -430,7 +425,7 @@ impl TryFrom<&Information> for fidl_bredr::Information {
 
     fn try_from(src: &Information) -> Result<fidl_bredr::Information, Self::Error> {
         if src.language.is_empty() {
-            return Err(format_err!("language must be provided"));
+            return Err(Error::missing("Information.language"));
         }
 
         Ok(fidl_bredr::Information {
@@ -490,7 +485,11 @@ impl TryFrom<&fidl_bredr::ServiceDefinition> for ServiceDefinition {
     fn try_from(src: &fidl_bredr::ServiceDefinition) -> Result<ServiceDefinition, Self::Error> {
         let service_class_uuids = match &src.service_class_uuids {
             Some(uuids) if !uuids.is_empty() => uuids.iter().map(Uuid::from).collect(),
-            _ => return Err(format_err!("There must be at least one service class UUID")),
+            _ => {
+                return Err(Error::conversion(
+                    "bredr.ServiceDefinition.service_class_uuids is empty",
+                ))
+            }
         };
 
         let protocol_descriptor_list: Vec<ProtocolDescriptor> = src
@@ -533,7 +532,7 @@ impl TryFrom<&ServiceDefinition> for fidl_bredr::ServiceDefinition {
 
     fn try_from(src: &ServiceDefinition) -> Result<fidl_bredr::ServiceDefinition, Self::Error> {
         if src.service_class_uuids.is_empty() {
-            return Err(format_err!("There must be at least one service class UUID"));
+            return Err(Error::conversion("ServiceDefinitions.service_class_uuids is empty"));
         }
         let service_class_uuids = src.service_class_uuids.iter().map(fidl_bt::Uuid::from).collect();
 
@@ -619,7 +618,9 @@ impl TryFrom<&fidl_bredr::ChannelParameters> for ChannelParameters {
     fn try_from(src: &fidl_bredr::ChannelParameters) -> Result<ChannelParameters, Self::Error> {
         if let Some(size) = src.max_rx_sdu_size {
             if size < MIN_RX_SDU_SIZE {
-                return Err(format_err!("Min RX SDU size too small: {:?}", size));
+                return Err(Error::conversion(format!(
+                    "bredr.ChannelParameters.max_rx_sdu_size is too small: {size}"
+                )));
             }
         }
 
@@ -640,7 +641,9 @@ impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
     fn try_from(src: &ChannelParameters) -> Result<fidl_bredr::ChannelParameters, Self::Error> {
         if let Some(size) = src.max_rx_sdu_size {
             if size < MIN_RX_SDU_SIZE {
-                return Err(format_err!("Min RX SDU size too small: {:?}", size));
+                return Err(Error::conversion(format!(
+                    "ChannelParameters.max_rx_sdu_size is too small: {size}"
+                )));
             }
         }
 

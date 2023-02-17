@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::format_err, fidl_fuchsia_bluetooth_sys as sys, std::str::FromStr};
+use fidl_fuchsia_bluetooth_sys as sys;
+use std::str::FromStr;
+
+use crate::error::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InputCapability {
@@ -12,14 +15,14 @@ pub enum InputCapability {
 }
 
 impl FromStr for InputCapability {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         match src {
             "none" => Ok(InputCapability::None),
             "confirmation" => Ok(InputCapability::Confirmation),
             "keyboard" => Ok(InputCapability::Keyboard),
-            _ => Err(format_err!("Invalid input capability")),
+            cap => Err(Error::other(&format!("invalid input capability: {cap}"))),
         }
     }
 }
@@ -41,13 +44,13 @@ pub enum OutputCapability {
 }
 
 impl FromStr for OutputCapability {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         match src {
             "none" => Ok(OutputCapability::None),
             "display" => Ok(OutputCapability::Display),
-            _ => Err(format_err!("Invalid output capability")),
+            cap => Err(Error::other(&format!("invalid output capability: {cap}"))),
         }
     }
 }

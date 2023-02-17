@@ -64,15 +64,13 @@ async fn watch_hosts(harness: HostWatcherHarness) -> Result<(), Error> {
             .watch()
             .await
             .context("Error calling fuchsia.bluetooth.sys.HostWatcher.watch()")?;
-        let hosts: Result<HashMap<HostId, HostInfo>, Error> = hosts
+        let hosts: HashMap<HostId, HostInfo> = hosts
             .into_iter()
             .map(|info| {
-                let info = HostInfo::try_from(info);
-                info.map(|info| (info.id, info))
+                let info = HostInfo::try_from(info).expect("valid host");
+                (info.id, info)
             })
             .collect();
-        let hosts = hosts
-            .context("Invalid host received from fuchsia.bluetooth.sys.HostWatcher.watch()")?;
         harness.write_state().hosts = hosts;
         harness.notify_state_changed();
     }

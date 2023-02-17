@@ -5,17 +5,15 @@
 //! This module defines the `Uuid` type which represents a 128-bit Bluetooth UUID. It provides
 //! convenience functions to support 16-bit, 32-bit, and 128-bit canonical formats as well as
 //! string representation. It can be converted to/from a fuchsia.bluetooth.Uuid FIDL type.
-use {
-    anyhow::format_err,
-    fidl_fuchsia_bluetooth as fidl, fidl_fuchsia_bluetooth_bredr as fidlbredr,
-    serde::{Deserialize, Serialize},
-    std::{
-        convert::{TryFrom, TryInto},
-        str::FromStr,
-    },
-    uuid,
-};
 
+use fidl_fuchsia_bluetooth as fidl;
+use fidl_fuchsia_bluetooth_bredr as fidlbredr;
+use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
+use uuid;
+
+use crate::error::Error;
 use crate::inspect::ToProperty;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -47,23 +45,23 @@ impl Uuid {
 }
 
 impl TryFrom<Uuid> for u32 {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(u: Uuid) -> Result<u32, <u32 as TryFrom<Uuid>>::Error> {
         let (first, second, third, final_bytes) = u.0.as_fields();
         if second != 0x0000 || third != 0x1000 || final_bytes != &BASE_UUID_FINAL_EIGHT_BYTES {
-            return Err(format_err!("not derived from the base UUID"));
+            return Err(Error::conversion("not derived from the base UUID"));
         }
         Ok(first)
     }
 }
 
 impl TryFrom<Uuid> for u16 {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(u: Uuid) -> Result<u16, <u16 as TryFrom<Uuid>>::Error> {
         let x: u32 = u.try_into()?;
-        x.try_into().map_err(|_e| format_err!("Not a 16-bit UUID"))
+        x.try_into().map_err(|_e| Error::conversion("not a 16-bit UUID"))
     }
 }
 
@@ -106,11 +104,12 @@ impl From<Uuid> for uuid::Uuid {
 }
 
 impl TryFrom<Uuid> for fidlbredr::ServiceClassProfileIdentifier {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(value: Uuid) -> Result<Self, Self::Error> {
         let short: u16 = value.try_into()?;
-        Self::from_primitive(short).ok_or(format_err!("ServiceClassProfileIdentifier unknown"))
+        Self::from_primitive(short)
+            .ok_or(Error::conversion(format!("unknown ServiceClassProfileIdentifier: {short}")))
     }
 }
 
@@ -127,10 +126,10 @@ impl From<Uuid> for fidlbredr::DataElement {
 }
 
 impl FromStr for Uuid {
-    type Err = uuid::Error;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Uuid, Self::Err> {
-        uuid::Uuid::parse_str(s).map(|uuid| Uuid(uuid))
+        uuid::Uuid::parse_str(s).map(|uuid| Uuid(uuid)).map_err(Error::external)
     }
 }
 

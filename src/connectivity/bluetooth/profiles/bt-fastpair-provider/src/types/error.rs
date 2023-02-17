@@ -61,6 +61,10 @@ pub enum Error {
     #[error("Serde error: {0:?}")]
     Serde(serde_json::Error),
 
+    /// Errors from the fuchsia-bluetooth crate.
+    #[error(transparent)]
+    BTCrate(#[from] fuchsia_bluetooth::Error),
+
     /// Internal component error.
     #[error("Internal component Error: {0}")]
     Internal(#[from] anyhow::Error),

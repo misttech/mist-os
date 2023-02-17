@@ -18,13 +18,12 @@
 //!   }
 //! ```
 
+use fidl_fuchsia_bluetooth::Appearance;
+use fidl_fuchsia_bluetooth_le as fidl;
+use std::{convert::TryFrom, fmt, str::FromStr};
+
+use crate::error::Error;
 use crate::types::{id::PeerId, uuid::Uuid};
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth::Appearance,
-    fidl_fuchsia_bluetooth_le as fidl,
-    std::{convert::TryFrom, fmt, str::FromStr},
-};
 
 #[derive(Clone, Debug)]
 pub struct RemoteDevice {
@@ -85,10 +84,7 @@ impl TryFrom<fidl::Peer> for Peer {
     type Error = Error;
     fn try_from(src: fidl::Peer) -> Result<Peer, Error> {
         Ok(Peer {
-            id: src
-                .id
-                .ok_or(format_err!("`le.Peer` missing mandatory `id` field"))
-                .map(PeerId::from)?,
+            id: src.id.map(PeerId::from).ok_or(Error::missing("le.Peer.id"))?,
             name: src.name,
             connectable: src.connectable.unwrap_or(false),
             rssi: src.rssi,
@@ -135,7 +131,8 @@ impl TryFrom<fidl::AdvertisingDataDeprecated> for AdvertisingData {
             appearance: src
                 .appearance
                 .map(|v| {
-                    Appearance::from_primitive(v.value).ok_or(format_err!("invalid appearance"))
+                    Appearance::from_primitive(v.value)
+                        .ok_or(Error::conversion("invalid AdvertisingDataDeprecated.appearance"))
                 })
                 .map_or(Ok(None), |v| v.map(Some))?,
             service_uuids: src
