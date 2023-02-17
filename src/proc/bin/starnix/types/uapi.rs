@@ -15,13 +15,14 @@ use linux_uapi as uapi;
 
 pub use uapi::*;
 
-pub type dev_t = uapi::__kernel_old_dev_t;
+pub type dev_t = u64;
 pub type gid_t = uapi::__kernel_gid_t;
 pub type ino_t = uapi::__kernel_ino_t;
 pub type mode_t = uapi::__kernel_mode_t;
 pub type off_t = uapi::__kernel_off_t;
 pub type pid_t = uapi::__kernel_pid_t;
 pub type uid_t = uapi::__kernel_uid_t;
+pub type nlink_t = u32;
 
 pub const ENOTSUP: u32 = uapi::EOPNOTSUPP;
 
@@ -35,6 +36,7 @@ pub struct utsname_t {
     pub machine: [u8; 65],
 }
 
+#[cfg(target_arch = "x86_64")]
 #[derive(Debug, Default, Clone, Copy, AsBytes, FromBytes)]
 #[repr(C)]
 pub struct stat_t {
@@ -53,6 +55,28 @@ pub struct stat_t {
     pub st_mtim: timespec,
     pub st_ctim: timespec,
     pub _pad3: [i64; 3],
+}
+
+#[cfg(target_arch = "aarch64")]
+#[derive(Debug, Default, Clone, Copy, AsBytes, FromBytes)]
+#[repr(C)]
+pub struct stat_t {
+    pub st_dev: dev_t,
+    pub st_ino: ino_t,
+    pub st_mode: mode_t,
+    pub st_nlink: nlink_t,
+    pub st_uid: uid_t,
+    pub st_gid: gid_t,
+    pub st_rdev: dev_t,
+    pub _pad1: u64,
+    pub st_size: off_t,
+    pub st_blksize: i32,
+    pub _pad2: i32,
+    pub st_blocks: i64,
+    pub st_atim: timespec,
+    pub st_mtim: timespec,
+    pub st_ctim: timespec,
+    pub _pad3: [u32; 2],
 }
 
 #[derive(Debug, Clone, Copy, AsBytes, FromBytes, Eq, PartialEq)]

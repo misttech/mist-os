@@ -36,6 +36,8 @@ group("tests") {
 static_library("restricted_trampoline") {
   if (current_cpu == "x64") {
     sources = [ "execution/trampoline_x64.S" ]
+  } else if (current_cpu == "arm64") {
+    sources = [ "execution/trampoline_arm64.S" ]
   }
 }
 
