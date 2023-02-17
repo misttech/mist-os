@@ -6,7 +6,6 @@
 
 pub mod capability;
 pub mod cli;
-pub mod cmx;
 pub mod copy;
 pub mod doctor;
 pub mod explore;

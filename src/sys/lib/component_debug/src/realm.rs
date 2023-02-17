@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::Directory,
     cm_rust::{ComponentDecl, FidlIntoNative},
     fidl_fuchsia_sys2 as fsys,
     moniker::{
@@ -62,22 +61,6 @@ pub enum GetManifestError {
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug)]
-pub enum InstanceType {
-    Cml,
-    Cmx(#[cfg_attr(feature = "serde", serde(skip))] Directory),
-}
-
-impl std::fmt::Display for InstanceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Cml => write!(f, "CML component"),
-            Self::Cmx(_) => write!(f, "CMX component"),
-        }
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug)]
 pub struct Instance {
     /// Moniker of the component.
     pub moniker: AbsoluteMoniker,
@@ -87,10 +70,6 @@ pub struct Instance {
 
     /// Unique identifier of component.
     pub instance_id: Option<String>,
-
-    /// Type of instance.
-    // TODO(https://fxbug.dev/102390): Remove this when CMX is deprecated.
-    pub instance_type: InstanceType,
 
     /// Information about resolved state of instance.
     pub resolved_info: Option<ResolvedInfo>,
@@ -110,13 +89,7 @@ impl TryFrom<fsys::Instance> for Instance {
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "url" })?;
         let resolved_info = instance.resolved_info.map(|i| i.try_into()).transpose()?;
 
-        Ok(Self {
-            moniker,
-            url,
-            instance_id: instance.instance_id,
-            instance_type: InstanceType::Cml,
-            resolved_info,
-        })
+        Ok(Self { moniker, url, instance_id: instance.instance_id, resolved_info })
     }
 }
 

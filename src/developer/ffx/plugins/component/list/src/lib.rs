@@ -5,10 +5,10 @@
 use anyhow::Result;
 use component_debug::{
     cli::{list_cmd_print, list_cmd_serialized},
-    realm::Instance,
+    list::Instance,
 };
 use errors::FfxError;
-use ffx_component::rcs::connect_to_realm_query;
+use ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query};
 use ffx_component_list_args::ComponentListCommand;
 use ffx_core::ffx_plugin;
 use ffx_writer::Writer;
@@ -20,16 +20,17 @@ pub async fn cmd(
     args: ComponentListCommand,
     #[ffx(machine = Vec<Instance>)] writer: Writer,
 ) -> Result<()> {
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
     let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
     // All errors from component_debug library are user-visible.
     if writer.is_machine() {
-        let output = list_cmd_serialized(args.filter, realm_query)
+        let output = list_cmd_serialized(args.filter, realm_query, realm_explorer)
             .await
             .map_err(|e| FfxError::Error(e, 1))?;
         writer.machine(&output)
     } else {
-        list_cmd_print(args.filter, args.verbose, realm_query, writer)
+        list_cmd_print(args.filter, args.verbose, realm_query, realm_explorer, writer)
             .await
             .map_err(|e| FfxError::Error(e, 1))?;
         Ok(())

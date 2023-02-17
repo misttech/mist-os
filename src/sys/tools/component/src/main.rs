@@ -56,7 +56,7 @@ pub async fn exec() -> Result<()> {
             capability_cmd(args.capability_name, realm_query, writer).await
         }
         ComponentSubcommand::List(args) => {
-            list_cmd_print(args.filter, args.verbose, realm_query, writer).await
+            list_cmd_print(args.filter, args.verbose, realm_query, realm_explorer, writer).await
         }
         ComponentSubcommand::Graph(args) => {
             graph_cmd(args.filter, args.orientation, realm_query, writer).await

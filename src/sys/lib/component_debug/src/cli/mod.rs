@@ -26,7 +26,7 @@ pub use {
     doctor::{doctor_cmd_print, doctor_cmd_serialized},
     explore::explore_cmd,
     graph::{graph_cmd, GraphFilter, GraphOrientation},
-    list::{list_cmd_print, list_cmd_serialized, ListFilter},
+    list::{list_cmd_print, list_cmd_serialized},
     reload::reload_cmd,
     resolve::resolve_cmd,
     run::run_cmd,

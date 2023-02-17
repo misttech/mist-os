@@ -138,7 +138,6 @@ mod tests {
                     ..fdecl::Component::EMPTY
                 },
             )]),
-            HashMap::new(),
         )
     }
 
