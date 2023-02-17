@@ -14,7 +14,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/fdio/fd.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/netboot/netboot.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -63,7 +62,7 @@ class FakeSvc {
         }));
     ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
         [this, dispatcher](fidl::ServerEnd<fuchsia_fshost::Admin> server_end) {
-          ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), &fake_fshost_));
+          fidl::BindServer(dispatcher, std::move(server_end), &fake_fshost_);
         }));
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();

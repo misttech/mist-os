@@ -87,7 +87,6 @@ source_set("netsvc_common") {
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
   ]
   public_deps = [
@@ -126,7 +125,6 @@ test("netsvc-test") {
     "//src/lib/storage/ramdevice_client/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
@@ -145,7 +143,6 @@ test("netsvc-stress-test") {
     "//src/devices/testing/devmgr-integration-test-shim",
     "//src/lib/storage/ramdevice_client/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
