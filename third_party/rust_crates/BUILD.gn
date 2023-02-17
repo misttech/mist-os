@@ -896,6 +896,10 @@ group("tokio-rustls") {
   public_deps = [ ":tokio-rustls-v0_22_0" ]
 }
 
+group("tokio-stream") {
+  public_deps = [ ":tokio-stream-v0_1_11" ]
+}
+
 group("toml") {
   public_deps = [ ":toml-v0_5_6" ]
 }
@@ -10808,6 +10812,7 @@ rust_library("tokio-v1_19_2") {
     "-Cextra-filename=-93e9171240b81c17",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"sync\"",
+    "--cfg=feature=\"time\"",
   ]
   if (!(current_os == "fuchsia")) {
     rustflags += [
@@ -10847,6 +10852,31 @@ rust_library("tokio-rustls-v0_22_0") {
     "--edition=2018",
     "-Cmetadata=16584d9dad632eb3",
     "-Cextra-filename=-16584d9dad632eb3",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("tokio-stream-v0_1_11") {
+  crate_name = "tokio_stream"
+  crate_root = "//third_party/rust_crates/vendor/tokio-stream-0.1.11/src/lib.rs"
+  output_name = "tokio_stream-228fc6dc03fe9295"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":futures-core-v0_3_19" ]
+  deps += [ ":pin-project-lite-v0_2_4" ]
+  deps += [ ":tokio-v1_19_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=228fc6dc03fe9295",
+    "-Cextra-filename=-228fc6dc03fe9295",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"time\"",
   ]
 
   visibility = [ ":*" ]
