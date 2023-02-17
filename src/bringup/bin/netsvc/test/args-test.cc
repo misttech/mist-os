@@ -6,17 +6,18 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/spawn.h>
-#include <lib/fit/defer.h>
-#include <lib/fit/function.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/process.h>
 
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
+
+#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 constexpr char kInterface[] = "/dev/whatever/whatever";
@@ -39,47 +40,40 @@ TEST(ArgsTest, NetsvcNodenamePrintsAndExits) {
 
 class FakeSvc {
  public:
-  explicit FakeSvc(async_dispatcher_t* dispatcher) : outgoing_(dispatcher) {
-    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_boot::Arguments>(
-        [this, dispatcher](fidl::ServerEnd<fuchsia_boot::Arguments> server_end) {
-          fidl::BindServer(dispatcher, std::move(server_end), &mock_boot_);
-        }));
+  explicit FakeSvc(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher), vfs_(dispatcher) {
+    auto root_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    root_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>,
+                       fbl::MakeRefCounted<fs::Service>(
+                           [this](fidl::ServerEnd<fuchsia_boot::Arguments> server_end) {
+                             fidl::BindServer(dispatcher_, std::move(server_end), &mock_boot_);
+                             return ZX_OK;
+                           }));
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
-    zx::result result = outgoing_.Serve(std::move(server_end));
-    ASSERT_OK(result);
-    root_.Bind(std::move(client_end));
+    zx::result server_end = fidl::CreateEndpoints(&svc_local_);
+    ASSERT_OK(server_end.status_value());
+    vfs_.ServeDirectory(root_dir, std::move(server_end.value()));
   }
 
   mock_boot_arguments::Server& mock_boot() { return mock_boot_; }
-
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto& [client_end, server_end] = endpoints.value();
-    const fidl::OneWayStatus status =
-        root_->Open({}, {}, component::OutgoingDirectory::kServiceDirectory,
-                    fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
-    return zx::make_result(status.status(), std::move(client_end));
-  }
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_chan() { return svc_local_; }
 
  private:
-  component::OutgoingDirectory outgoing_;
+  async_dispatcher_t* dispatcher_;
+  fs::SynchronousVfs vfs_;
   mock_boot_arguments::Server mock_boot_;
-  fidl::WireSyncClient<fuchsia_io::Directory> root_;
+  fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
 
 class ArgsTest : public zxtest::Test {
  public:
-  ArgsTest() : loop_(&kAsyncLoopConfigNeverAttachToThread), fake_svc_(loop_.dispatcher()) {}
+  ArgsTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), fake_svc_(loop_.dispatcher()) {
+    loop_.StartThread("paver-test-loop");
+  }
+
+  ~ArgsTest() { loop_.Shutdown(); }
 
   FakeSvc& fake_svc() { return fake_svc_; }
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_root() { return fake_svc_.svc(); }
-  async::Loop& loop() { return loop_; }
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root() { return fake_svc_.svc_chan(); }
 
  private:
   async::Loop loop_;
@@ -91,14 +85,7 @@ TEST_F(ArgsTest, NetsvcNoneProvided) {
   const char* argv[] = {"netsvc"};
   const char* error = nullptr;
   NetsvcArgs args;
-  zx::result svc = svc_root();
-  ASSERT_OK(svc);
-  {
-    ASSERT_OK(loop().StartThread());
-    auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
-  }
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0, "%s", error);
   ASSERT_FALSE(args.netboot);
   ASSERT_FALSE(args.print_nodename_and_exit);
   ASSERT_TRUE(args.advertise);
@@ -115,14 +102,7 @@ TEST_F(ArgsTest, NetsvcAllProvided) {
   };
   const char* error = nullptr;
   NetsvcArgs args;
-  zx::result svc = svc_root();
-  ASSERT_OK(svc);
-  {
-    ASSERT_OK(loop().StartThread());
-    auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
-  }
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0, "%s", error);
   ASSERT_TRUE(args.netboot);
   ASSERT_TRUE(args.print_nodename_and_exit);
   ASSERT_TRUE(args.advertise);
@@ -139,13 +119,7 @@ TEST_F(ArgsTest, NetsvcValidation) {
   };
   const char* error = nullptr;
   NetsvcArgs args;
-  zx::result svc = svc_root();
-  ASSERT_OK(svc);
-  {
-    ASSERT_OK(loop().StartThread());
-    auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0);
-  }
+  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0);
   ASSERT_TRUE(args.interface.empty());
   ASSERT_TRUE(strstr(error, "interface"));
 }
@@ -159,14 +133,7 @@ TEST_F(ArgsTest, LogPackets) {
   NetsvcArgs args;
   EXPECT_FALSE(args.log_packets);
   const char* error = nullptr;
-  zx::result svc = svc_root();
-  ASSERT_OK(svc);
-  {
-    ASSERT_OK(loop().StartThread());
-    auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
-  }
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0, "%s", error);
   EXPECT_TRUE(args.log_packets);
 }
 
