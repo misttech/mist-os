@@ -25,7 +25,6 @@ fuchsia_driver("lp50xx-light-driver") {
     ":lp50xx_light-bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
