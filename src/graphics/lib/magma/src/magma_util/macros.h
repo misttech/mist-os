@@ -72,25 +72,6 @@ static constexpr bool kMagmaDretEnable = kDebug;
                                 "Returning null: " format, ##__VA_ARGS__),            \
    (ret) : (ret))
 
-enum LogLevel { LOG_WARNING, LOG_INFO };
-
-// TODO(fxbug.dev/13095) - replace with MAGMA_LOG
-__attribute__((format(printf, 2, 3))) static inline void log(LogLevel level, const char* msg, ...) {
-  switch (level) {
-    case LOG_WARNING:
-      printf("[WARNING] ");
-      break;
-    case LOG_INFO:
-      printf("[INFO] ");
-      break;
-  }
-  va_list args;
-  va_start(args, msg);
-  vprintf(msg, args);
-  va_end(args);
-  printf("\n");
-}
-
 #define UNIMPLEMENTED(...)                \
   do {                                    \
     DLOG("UNIMPLEMENTED: " #__VA_ARGS__); \

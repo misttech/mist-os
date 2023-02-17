@@ -50,7 +50,7 @@ T* GetNextDataPtr(uint8_t*& current_ptr, msd_client_id_t client_id,
   if (count == 0)
     return nullptr;
   if (*remaining_data_size_in_out / count < sizeof(T)) {
-    magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Atom size too small", client_id);
+    MAGMA_LOG(WARNING, "Client %" PRIu64 ": Atom size too small", client_id);
     return nullptr;
   }
   size_t current_size = count * sizeof(T);
@@ -68,7 +68,7 @@ bool MsdArmConnection::ExecuteAtom(
     std::deque<std::shared_ptr<magma::PlatformSemaphore>>* semaphores) {
   TRACE_DURATION("magma", "Connection::ExecuteAtom");
   if (*remaining_data_size_in_out < atom->size) {
-    magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Submitted too-small atom", client_id_);
+    MAGMA_LOG(WARNING, "Client %" PRIu64 ": Submitted too-small atom", client_id_);
     return false;
   }
   *remaining_data_size_in_out -= atom->size;
@@ -88,8 +88,7 @@ bool MsdArmConnection::ExecuteAtom(
     if (flags == kAtomFlagJitAddressSpaceAllocate) {
       std::lock_guard<std::mutex> lock(address_lock_);
       if (jit_allocator_) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Already allocated JIT memory region",
-                   client_id_);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": Already allocated JIT memory region", client_id_);
         return false;
       }
       auto* allocate_info = GetNextDataPtr<magma_arm_jit_address_space_allocate_info>(
@@ -98,21 +97,20 @@ bool MsdArmConnection::ExecuteAtom(
         return false;
       }
       if (allocate_info->version_number != 0) {
-        magma::log(magma::LOG_WARNING,
-                   "Client %" PRIu64 ": Invalid address space allocate version %d", client_id_,
-                   allocate_info->version_number);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": Invalid address space allocate version %d",
+                  client_id_, allocate_info->version_number);
         return false;
       }
       if (allocate_info->trim_level > 100) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Set invalid trim level %d", client_id_,
-                   allocate_info->trim_level);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": Set invalid trim level %d", client_id_,
+                  allocate_info->trim_level);
         return false;
       }
       const uint64_t kMaxPagesAllowed =
           (1ul << AddressSpace::kVirtualAddressSize) / magma::page_size();
       if (kMaxPagesAllowed < allocate_info->va_page_count) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Set invalid VA page count %ld, max %ld",
-                   client_id_, allocate_info->va_page_count, kMaxPagesAllowed);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": Set invalid VA page count %ld, max %ld", client_id_,
+                  allocate_info->va_page_count, kMaxPagesAllowed);
         return false;
       }
 
@@ -133,7 +131,7 @@ bool MsdArmConnection::ExecuteAtom(
         return false;
       }
       if (trailer->jit_memory_info_count < 1) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": No jit memory info", client_id_);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": No jit memory info", client_id_);
         return false;
       }
       auto* jit_info = GetNextDataPtr<magma_arm_jit_memory_allocate_info>(
@@ -145,9 +143,8 @@ bool MsdArmConnection::ExecuteAtom(
           jit_info, jit_info + trailer->jit_memory_info_count);
       for (auto& info : infos) {
         if (info.version_number != 0) {
-          magma::log(magma::LOG_WARNING,
-                     "Client %" PRIu64 ": Invalid JIT memory allocate version %d", client_id_,
-                     info.version_number);
+          MAGMA_LOG(WARNING, "Client %" PRIu64 ": Invalid JIT memory allocate version %d",
+                    client_id_, info.version_number);
           return false;
         }
       }
@@ -160,7 +157,7 @@ bool MsdArmConnection::ExecuteAtom(
         return false;
       }
       if (trailer->jit_memory_info_count < 1) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": No jit memory info", client_id_);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": No jit memory info", client_id_);
         return false;
       }
       auto* jit_info = GetNextDataPtr<magma_arm_jit_memory_free_info>(
@@ -172,8 +169,8 @@ bool MsdArmConnection::ExecuteAtom(
                                                         jit_info + trailer->jit_memory_info_count);
       for (auto& info : infos) {
         if (info.version_number != 0) {
-          magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Invalid JIT memory free version %d",
-                     client_id_, info.version_number);
+          MAGMA_LOG(WARNING, "Client %" PRIu64 ": Invalid JIT memory free version %d", client_id_,
+                    info.version_number);
           return false;
         }
       }
@@ -182,12 +179,11 @@ bool MsdArmConnection::ExecuteAtom(
     } else {
       if (flags != kAtomFlagSemaphoreSet && flags != kAtomFlagSemaphoreReset &&
           flags != kAtomFlagSemaphoreWait && flags != kAtomFlagSemaphoreWaitAndReset) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": Invalid soft atom flags 0x%x\n",
-                   client_id_, flags);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": Invalid soft atom flags 0x%x\n", client_id_, flags);
         return false;
       }
       if (semaphores->empty()) {
-        magma::log(magma::LOG_WARNING, "Client %" PRIu64 ": No remaining semaphores", client_id_);
+        MAGMA_LOG(WARNING, "Client %" PRIu64 ": No remaining semaphores", client_id_);
         return false;
       }
       msd_atom = std::make_shared<MsdArmSoftAtom>(shared_from_this(), static_cast<AtomFlags>(flags),
