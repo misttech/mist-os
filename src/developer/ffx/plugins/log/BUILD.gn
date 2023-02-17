@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/developer/ffx/build/ffx_tool.gni")
 import("../../build/ffx_plugin.gni")
 
 ffx_plugin("ffx_log") {
@@ -27,7 +28,7 @@ ffx_plugin("ffx_log") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/logger/data:lib",
     "//src/developer/ffx/logger/frontend:lib",
     "//src/lib/diagnostics/data/rust",
@@ -58,4 +59,15 @@ ffx_plugin("ffx_log") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tempfile",
   ]
+}
+
+ffx_tool("ffx_log_tool") {
+  edition = "2021"
+  output_name = "ffx-log"
+  deps = [
+    ":ffx_log",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

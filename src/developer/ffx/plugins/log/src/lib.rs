@@ -9,11 +9,13 @@ use chrono::{Local, TimeZone, Utc};
 use diagnostics_data::{LogsData, Severity, Timestamp};
 use errors::{ffx_bail, ffx_error};
 use ffx_config::{get, keys::TARGET_DEFAULT_KEY};
-use ffx_core::ffx_plugin;
 use ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand};
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_frontend::{exec_log_cmd, LogCommandParameters, LogFormatter};
-use ffx_writer::Writer;
+use fho::{
+    daemon_protocol, deferred, selector, AvailabilityFlag, Deferred, FfxMain, FfxTool,
+    MachineWriter, ToolIO,
+};
 use fidl_fuchsia_developer_ffx::{DiagnosticsProxy, StreamMode, TimeBound};
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
 use fidl_fuchsia_diagnostics::LogSettingsProxy;
@@ -537,14 +539,42 @@ This likely means that your logs will not be symbolized."
     }
 }
 
-#[ffx_plugin(
-    "proactive_log.enabled",
-    DiagnosticsProxy = "daemon::protocol",
-    LogSettingsProxy = "bootstrap/archivist:expose:fuchsia.diagnostics.LogSettings"
-)]
-pub async fn log(
+type Writer = MachineWriter<Vec<LogEntry>>;
+
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("proactive_log.enabled"))]
+pub struct LogTool {
+    #[with(daemon_protocol())]
     diagnostics_proxy: DiagnosticsProxy,
-    #[ffx(machine = Vec<LogEntry>)] writer: Writer,
+    rcs_proxy: fho::Result<RemoteControlProxy>,
+    #[with(deferred(selector("bootstrap/archivist:expose:fuchsia.diagnostics.LogSettings")))]
+    log_settings: Deferred<LogSettingsProxy>,
+    #[command]
+    cmd: LogCommand,
+}
+
+fho::embedded_plugin!(LogTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for LogTool {
+    type Writer = Writer;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        log(
+            self.diagnostics_proxy,
+            writer,
+            self.rcs_proxy.ok(),
+            self.log_settings.await.ok(),
+            self.cmd,
+        )
+        .await
+        .map_err(Into::into)
+    }
+}
+
+async fn log(
+    diagnostics_proxy: DiagnosticsProxy,
+    writer: Writer,
     rcs_proxy: Option<RemoteControlProxy>,
     log_settings: Option<LogSettingsProxy>,
     cmd: LogCommand,
@@ -790,7 +820,7 @@ mod test {
     fn setup_fake_log_settings_proxy(
         expected_selectors: Vec<LogInterestSelector>,
     ) -> Option<LogSettingsProxy> {
-        Some(setup_fake_log_settings(move |req| match req {
+        Some(fho::testing::fake_proxy(move |req| match req {
             LogSettingsRequest::RegisterInterest { selectors, .. } => {
                 assert_eq!(selectors, expected_selectors)
             }
@@ -798,7 +828,7 @@ mod test {
     }
 
     fn setup_fake_rcs() -> Option<RemoteControlProxy> {
-        Some(setup_fake_rcs_proxy(move |req| match req {
+        Some(fho::testing::fake_proxy(move |req| match req {
             RemoteControlRequest::IdentifyHost { responder } => {
                 responder
                     .send(&mut Ok(IdentifyHostResponse {
@@ -817,7 +847,7 @@ mod test {
         expected_parameters: DaemonDiagnosticsStreamParameters,
         expected_responses: Arc<Vec<FakeArchiveIteratorResponse>>,
     ) -> DiagnosticsProxy {
-        setup_fake_diagnostics_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             DiagnosticsRequest::StreamDiagnostics {
                 target: t,
                 parameters,
