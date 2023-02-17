@@ -277,9 +277,15 @@ rustc_binary("starnix_kernel_bin") {
   ]
 
   if (current_cpu == "x64") {
-    sources += [ "signals/signal_handling_x64.rs" ]
+    sources += [
+      "signals/signal_handling_x64.rs",
+      "task/task_x64.rs",
+    ]
   } else if (current_cpu == "arm64") {
-    sources += [ "signals/signal_handling_arm64.rs" ]
+    sources += [
+      "signals/signal_handling_arm64.rs",
+      "task/task_arm64.rs",
+    ]
   }
 
   features = []

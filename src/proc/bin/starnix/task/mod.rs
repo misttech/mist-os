@@ -14,6 +14,12 @@ mod thread_group;
 mod timers;
 mod waiter;
 
+#[cfg(target_arch = "x86_64")]
+mod task_x64;
+
+#[cfg(target_arch = "aarch64")]
+mod task_arm64;
+
 pub use abstract_socket_namespace::*;
 pub use iptables::*;
 pub use kernel::*;
@@ -26,3 +32,9 @@ pub use timers::*;
 pub use waiter::*;
 
 pub mod syscalls;
+
+#[cfg(target_arch = "x86_64")]
+pub use task_x64::*;
+
+#[cfg(target_arch = "aarch64")]
+pub use task_arm64::*;

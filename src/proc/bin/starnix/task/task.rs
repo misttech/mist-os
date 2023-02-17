@@ -184,6 +184,13 @@ pub struct Task {
     vfork_event: Option<zx::Event>,
 }
 
+/// The decoded cross-platform parts we care about for page fault exception reports.
+pub struct PageFaultExceptionReport {
+    pub faulting_address: u64,
+    pub not_present: bool, // Set when the page fault was due to a not-present page.
+    pub is_write: bool,    // Set when the triggering memory operation was a write.
+}
+
 impl Task {
     /// Internal function for creating a Task object. Useful when you need to specify the value of
     /// every field. create_process and create_thread are more likely to be what you want.
@@ -683,20 +690,11 @@ impl Task {
 
             // We should only attempt growth on a not-present fault and we should only extend if the
             // access type matches the protection on the GROWSDOWN mapping.
-            #[cfg(target_arch = "x86_64")]
-            let (faulting_address, not_present, is_write) = {
-                // Safety: The union contains x86_64 data when building for the x86_64 architecture.
-                let x86_64_data = unsafe { report.context.arch.x86_64 };
-                // [intel/vol3]: 6.15: Interrupt 14--Page-Fault Exception (#PF)
-                let faulting_address = x86_64_data.cr2;
-                let not_present = x86_64_data.err_code & 0x01 == 0; // Low bit means "present"
-                let is_write = x86_64_data.err_code & 0x02 != 0;
-                (faulting_address, not_present, is_write)
-            };
-            if not_present {
+            let decoded = decode_page_fault_exception_report(report);
+            if decoded.not_present {
                 match self.mm.extend_growsdown_mapping_to_address(
-                    UserAddress::from(faulting_address),
-                    is_write,
+                    UserAddress::from(decoded.faulting_address),
+                    decoded.is_write,
                 ) {
                     Ok(true) => {
                         exception
