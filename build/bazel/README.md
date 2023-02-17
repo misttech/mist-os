@@ -302,5 +302,21 @@ Always try to add new tests when introducing new features under //build/bazel/,
 and run this script when changing its implementation (for now this is all
 manual, but will likely be automated in CQ in the future).
 
+# DEBUGGING HERMETICITY ISSUES IN REPOSITORY RULES
+
+To help debug hermeticity issues that happen within repository rules, the Bazel
+workspace is configured to save a log of repository-related events to a file
+located under `$BAZEL_TOPDIR/logs/workspace-events.log`, this is a binary
+proto file (see https://bazel.build/remote/workspace) that can be converted
+to text automatically with `//build/bazel/scripts/parse-workspace-event-log.py`
+which can be invoked directly from your Fuchsia directory.
+
+The script will automatically find the log for the latest command and dump
+its content to text on stdout, or to a file if the `--output=FILE` option is
+used.
+
+The log files are rotated, up to 3 older revisions are stored in the
+`$BAZEL_TOPDIR/logs` directory so you can compare them if possible.
+
 [BzlMod]: https://bazel.build/docs/bzlmod
 [Platforms]: https://bazel.build/concepts/platforms-intro

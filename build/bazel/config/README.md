@@ -9,3 +9,4 @@ scripts ot locations.
   Format:  A single line of text for the path.
   Used by: `//build/bazel/bazel_workspace.gni`
   Used by: `//tools/devshell/lib/bazel_utils.sh`
+  Used by: `//build/bazel/scripts/parse-workspace-event-log.py`

@@ -7,6 +7,7 @@
 import argparse
 import os
 import platform
+import shlex
 import subprocess
 import sys
 
@@ -37,9 +38,92 @@ def get_host_arch() -> str:
         return host_arch
 
 
-def get_host_tag():
+def get_host_tag() -> str:
     '''Return host tag, following Fuchsia conventions.'''
     return '%s-%s' % (get_host_platform(), get_host_arch())
+
+
+def find_fuchsia_dir(from_dir: Optional[str] = None) -> Optional[str]:
+    '''Return Fuchsia directory path.
+
+    Args:
+        from_dir: Optional starting directory for the search. If None,
+            uses the current directory.
+
+    Returns:
+        Fuchsia directory path, or None if it could not be found.
+    '''
+    if from_dir is None:
+        from_dir = os.getcwd()
+    while True:
+        if os.path.exists(os.path.join(from_dir, '.jiri_root')):
+            return from_dir
+        new_dir = os.path.dirname(from_dir)
+        if new_dir == from_dir:
+            # The top-level path was reached.
+            return None
+        from_dir = new_dir
+
+
+def find_ninja_build_dir(fuchsia_dir: str) -> Optional[str]:
+    '''Find Ninja build directory.
+
+    Args:
+        fuchsia_dir: Fuchsia directory path.
+
+    Returns:
+        The Ninja build directory, or None if it could not be determined,
+        which happens if `fx set` was not called previously.
+    '''
+    fx_build_dir = os.path.join(fuchsia_dir, '.fx-build-dir')
+    if not os.path.exists(fx_build_dir):
+        print('ERROR: Could not find %s' % fx_build_dir, file=sys.stderr)
+        return None
+
+    with open(fx_build_dir) as f:
+        build_dir = f.read().strip()
+
+    if not build_dir:
+        print('ERROR: Empty .fx-build-dir!', file=sys.stderr)
+        return None
+
+    return os.path.join(fuchsia_dir, build_dir)
+
+
+def find_bazel_top_dir(fuchsia_dir: str, ninja_build_dir: str) -> Optional[str]:
+    '''Find Bazel top directory
+
+    Args:
+        fuchsia_dir: Fuchsia source directory.
+        ninja_build_dir: Ninja build directory.
+
+    Returns:
+        Bazel topdir path, or None if it could not be found.
+    '''
+    top_dir_file = os.path.join(
+        fuchsia_dir, 'build', 'bazel', 'config', 'main_workspace_top_dir')
+    with open(top_dir_file) as f:
+        top_dir_relative = f.read().strip()
+    return os.path.join(ninja_build_dir, top_dir_relative)
+
+
+def find_default_log_file() -> Optional[str]:
+    '''Find the location of the default log file.
+
+    Returns:
+        Path to the default log file, or None if it could not be determined.
+    '''
+    fuchsia_dir = find_fuchsia_dir()
+    if not fuchsia_dir:
+        return None
+
+    build_dir = find_ninja_build_dir(fuchsia_dir)
+    if not build_dir:
+        return None
+
+    top_dir = find_bazel_top_dir(fuchsia_dir, build_dir)
+    log_file = os.path.join(top_dir, 'logs', 'workspace-events.log')
+    return log_file
 
 
 def main():
@@ -60,7 +144,9 @@ def main():
     parser.add_argument(
         '--output_path',
         help='Output file location. If not used, output goes to stdout.')
-    parser.add_argument('log_file', help='Input log file.')
+    parser.add_argument('--log_file', help='Input log file (auto-detected).')
+    parser.add_argument(
+        '--verbose', action='store_true', help='Enable verbose mode.')
     args = parser.parse_args()
 
     # Find the Java Runtime Environment to run the parser first.
@@ -90,6 +176,10 @@ def main():
                 file=sys.stderr)
             return 1
 
+    def verbose(msg):
+        if args.verbose:
+            print('DEBUG: ' + msg, file=sys.stderr)
+
     # Find the parser JAR file now.
     if args.log_parser_jar:
         log_parser_jar = args.log_parser_jar
@@ -97,13 +187,29 @@ def main():
         log_parser_jar = os.path.join(
             _FUCHSIA_DIR, 'prebuilt', 'third_party', 'bazel_workspacelogparser',
             'bazel_workspacelogparser.jar')
+
     if not os.path.exists(log_parser_jar):
         parser.error('Missing parser file: ' + log_parser_jar)
 
-    cmd = [java_launcher, '-jar', log_parser_jar, '--log_path=' + args.log_file]
+    verbose('Using jar file at: ' + log_parser_jar)
+
+    log_file = args.log_file
+    if not args.log_file:
+        log_file = find_default_log_file()
+        if not log_file:
+            print(
+                'ERROR: Could not find default log file, please use --log_file=FILE',
+                file=sys.stderr)
+            return 1
+
+    verbose('Using log file at: ' + log_file)
+
+    cmd = [java_launcher, '-jar', log_parser_jar, '--log_path=' + log_file]
     cmd += ['--exclude_rule=' + rule for rule in args.exclude_rule]
     if args.output_path:
         cmd += ['--output_path=' + args.output_path]
+
+    verbose('Running command: %s' % ' '.join([shlex.quote(c) for c in cmd]))
 
     return subprocess.run(cmd).returncode
 
