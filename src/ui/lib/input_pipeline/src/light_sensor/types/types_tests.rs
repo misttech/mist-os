@@ -110,40 +110,25 @@ fn rgbc_parameters_close_enough(left: Rgbc<Parameters>, right: Rgbc<Parameters>)
 }
 
 #[test_case(None, None; "happy path")]
-#[test_case(
-    Some("leda-r"), Some(&["Failed to map \"leda\"'s rgbc field", "red"]); "leda red failure"
-)]
-#[test_case(
-    Some("leda-g"), Some(&["Failed to map \"leda\"'s rgbc field", "green"]); "leda green failure"
-)]
-#[test_case(
-    Some("leda-b"), Some(&["Failed to map \"leda\"'s rgbc field", "blue"]); "leda blue failure"
-)]
-#[test_case(
-    Some("leda-c"), Some(&["Failed to map \"leda\"'s rgbc field", "clear"]); "leda clear failure"
-)]
-#[test_case(
-    Some("ledg-r"), Some(&["Failed to map \"ledg\"'s rgbc field", "red"]); "ledg red failure"
-)]
-#[test_case(
-    Some("ledg-g"), Some(&["Failed to map \"ledg\"'s rgbc field", "green"]); "ledg green failure"
-)]
-#[test_case(
-    Some("ledg-b"), Some(&["Failed to map \"ledg\"'s rgbc field", "blue"]); "ledg blue failure"
-)]
-#[test_case(
-    Some("ledg-c"), Some(&["Failed to map \"ledg\"'s rgbc field", "clear"]); "ledg clear failure"
-)]
-#[test_case(Some("off-r"), Some(&["Failed to map off rgbc", "red"]); "off red failure")]
-#[test_case(Some("off-g"), Some(&["Failed to map off rgbc", "green"]); "off green failure")]
-#[test_case(Some("off-b"), Some(&["Failed to map off rgbc", "blue"]); "off blue failure")]
-#[test_case(Some("off-c"), Some(&["Failed to map off rgbc", "clear"]); "off clear failure")]
-#[test_case(Some("all_on-r"), Some(&["Failed to map all_on rgbc", "red"]); "all_on red failure")]
-#[test_case(Some("all_on-g"), Some(&["Failed to map all_on rgbc", "green"]); "all_on green failure")]
-#[test_case(Some("all_on-b"), Some(&["Failed to map all_on rgbc", "blue"]); "all_on blue failure")]
-#[test_case(Some("all_on-c"), Some(&["Failed to map all_on rgbc", "clear"]); "all_on clear failure")]
+// LED failures log errors but don't fail calibration setup.
+#[test_case(Some("leda-r"), None; "leda red missing")]
+#[test_case(Some("leda-g"), None; "leda green missing")]
+#[test_case(Some("leda-b"), None; "leda blue missing")]
+#[test_case(Some("leda-c"), None; "leda clear missing")]
+#[test_case(Some("ledg-r"), None; "ledg red missing")]
+#[test_case(Some("ledg-g"), None; "ledg green missing")]
+#[test_case(Some("ledg-b"), None; "ledg blue missing")]
+#[test_case(Some("ledg-c"), None; "ledg clear missing")]
+#[test_case(Some("off-r"), Some(&["Failed to map off rgbc", "red"]); "off red missing")]
+#[test_case(Some("off-g"), Some(&["Failed to map off rgbc", "green"]); "off green missing")]
+#[test_case(Some("off-b"), Some(&["Failed to map off rgbc", "blue"]); "off blue missing")]
+#[test_case(Some("off-c"), Some(&["Failed to map off rgbc", "clear"]); "off clear missing")]
+#[test_case(Some("all_on-r"), Some(&["Failed to map all_on rgbc", "red"]); "all_on red missing")]
+#[test_case(Some("all_on-g"), Some(&["Failed to map all_on rgbc", "green"]); "all_on green missing")]
+#[test_case(Some("all_on-b"), Some(&["Failed to map all_on rgbc", "blue"]); "all_on blue missing")]
+#[test_case(Some("all_on-c"), Some(&["Failed to map all_on rgbc", "clear"]); "all_on clear missing")]
 #[fuchsia::test]
-async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
+async fn calibration_new(missing_file: Option<&str>, error_strings: Option<&[&str]>) {
     let configuration = CalibrationConfiguration {
         leds: vec![
             LedConfig {
@@ -170,13 +155,13 @@ async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&st
     };
 
     struct FakeFileLoader<'a> {
-        failure_file: Option<&'a str>,
+        missing_file: Option<&'a str>,
     }
 
     #[async_trait(?Send)]
     impl FileLoader for FakeFileLoader<'_> {
         async fn load_file(&self, path: &str) -> Result<String, anyhow::Error> {
-            if self.failure_file == Some(path) {
+            if self.missing_file == Some(path) {
                 return Err(format_err!("my_error"));
             }
 
@@ -226,7 +211,8 @@ async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&st
         }
     }
 
-    let file_loader = FakeFileLoader { failure_file };
+    let missing_led = missing_file.map(|f| f.split_once('-').unwrap().0);
+    let file_loader = FakeFileLoader { missing_file };
     let calibration_result = Calibration::new(configuration, &file_loader).await;
 
     fn leds_match(left: &LedMap, right: &LedMap) -> bool {
@@ -280,7 +266,7 @@ async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&st
             ));
             assert!(leds_match(
                 calibration.leds(),
-                &HashMap::from([
+                &[
                     (
                         "leda".to_string(),
                         Rgbc {
@@ -299,7 +285,14 @@ async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&st
                             clear: Parameters { slope: 24.0, intercept: 74.0 },
                         }
                     )
-                ])
+                ]
+                .into_iter()
+                .filter(|(c, _)| if let Some(missing_led) = missing_led {
+                    c != missing_led
+                } else {
+                    true
+                })
+                .collect::<HashMap<_, _>>()
             ));
         }
         (Err(e), Some(errors)) => {

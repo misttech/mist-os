@@ -233,16 +233,21 @@ impl Calibration {
         let mut leds = HashMap::new();
         for led_config in configuration.leds {
             let name = led_config.name;
-            let _ = leds.insert(
-                name.clone(),
-                led_config
-                    .rgbc
-                    .map_async(|file_path| async move {
-                        Self::parse_file(&file_path, file_loader).await
-                    })
-                    .await
-                    .with_context(|| format!("Failed to map {:?}'s rgbc field", name))?,
-            );
+            let config = match led_config
+                .rgbc
+                .map_async(
+                    |file_path| async move { Self::parse_file(&file_path, file_loader).await },
+                )
+                .await
+            {
+                Ok(config) => config,
+                Err(e) => {
+                    fuchsia_syslog::fx_log_err!("Failed to map {name:?}'s rgbc field: {e:?}");
+                    fuchsia_syslog::fx_log_err!("Will not account for {name:?} in calibration");
+                    continue;
+                }
+            };
+            let _ = leds.insert(name.clone(), config);
         }
 
         let off = configuration
@@ -257,7 +262,6 @@ impl Calibration {
             .context("Failed to map all_on rgbc")?;
         let calibrated_slope =
             configuration.golden_calibration_params.map(|c| c.slope) / off.map(|c| c.slope);
-
         Ok(Self { leds, off, all_on, calibrated_slope })
     }
 
