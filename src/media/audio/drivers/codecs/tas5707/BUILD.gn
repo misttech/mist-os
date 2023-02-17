@@ -20,7 +20,6 @@ fuchsia_driver("tas5707-driver") {
   sources = [ "tas5707.cc" ]
   deps = [
     ":ti_tas5707-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/devices/lib/ti",
