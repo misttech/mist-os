@@ -362,8 +362,8 @@ TEST_F(Tcs3400Test, GetInputReports) {
   zx::result reader_client_end = fidl::CreateEndpoints(&reader_server);
   ASSERT_OK(reader_client_end.status_value());
   fidl::WireSyncClient reader{std::move(*reader_client_end)};
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client->GetInputReportsReader(std::move(reader_server));
+  auto result = client->GetInputReportsReader(std::move(reader_server));
+  ASSERT_OK(result.status());
   device_->WaitForNextReader();
 
   SetLightDataRegisters(0x00f8, 0xe79d, 0xa5e4, 0xfb1b);
@@ -479,8 +479,8 @@ TEST_F(Tcs3400Test, GetMultipleInputReports) {
   zx::result reader_client_end = fidl::CreateEndpoints(&reader_server);
   ASSERT_OK(reader_client_end.status_value());
   fidl::WireSyncClient reader{std::move(*reader_client_end)};
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client->GetInputReportsReader(std::move(reader_server));
+  auto result = client->GetInputReportsReader(std::move(reader_server));
+  ASSERT_OK(result.status());
   device_->WaitForNextReader();
 
   constexpr uint16_t kExpectedLightValues[][4] = {
@@ -539,8 +539,8 @@ TEST_F(Tcs3400Test, GetInputReportsMultipleReaders) {
     zx::result reader_client_end = fidl::CreateEndpoints(&reader_server);
     ASSERT_OK(reader_client_end.status_value());
     reader = fidl::WireSyncClient(std::move(*reader_client_end));
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)client->GetInputReportsReader(std::move(reader_server));
+    auto result = client->GetInputReportsReader(std::move(reader_server));
+    ASSERT_OK(result.status());
     device_->WaitForNextReader();
   }
 
@@ -590,12 +590,64 @@ TEST_F(Tcs3400Test, InputReportSaturated) {
   zx::result reader_client_end = fidl::CreateEndpoints(&reader_server);
   ASSERT_OK(reader_client_end.status_value());
   fidl::WireSyncClient reader{std::move(*reader_client_end)};
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  (void)client->GetInputReportsReader(std::move(reader_server));
+  auto result = client->GetInputReportsReader(std::move(reader_server));
+  ASSERT_OK(result.status());
   device_->WaitForNextReader();
 
   // Set the clear channel to 0xffff to indicate saturation.
   SetLightDataRegisters(0xffff, 0xabcd, 0x5566, 0x7788);
+
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+
+  fake_i2c_.WaitForLightDataRead();
+
+  const auto response = reader->ReadInputReports();
+  ASSERT_TRUE(response.ok());
+  ASSERT_TRUE(response->is_ok());
+
+  const auto& reports = response->value()->reports;
+
+  ASSERT_EQ(reports.count(), 1);
+  ASSERT_TRUE(reports[0].has_sensor());
+  ASSERT_TRUE(reports[0].sensor().has_values());
+  ASSERT_EQ(reports[0].sensor().values().count(), 4);
+
+  EXPECT_EQ(reports[0].sensor().values()[0], 65085);
+  EXPECT_EQ(reports[0].sensor().values()[1], 21067);
+  EXPECT_EQ(reports[0].sensor().values()[2], 20395);
+  EXPECT_EQ(reports[0].sensor().values()[3], 20939);
+}
+
+TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
+  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(FidlClient());
+  ASSERT_TRUE(client.client_end().is_valid());
+
+  constexpr Tcs3400FeatureReport kEnableThresholdEvents = {
+      .report_interval_us = 0,
+      .reporting_state = fuchsia_input_report::wire::SensorReportingState::kReportAllEvents,
+      .sensitivity = 16,
+      .threshold_high = 0x8000,
+      .threshold_low = 0x1000,
+      .integration_time_us = 615'000,
+  };
+
+  {
+    const auto response = SetFeatureReport(client, kEnableThresholdEvents);
+    ASSERT_TRUE(response.ok());
+    EXPECT_FALSE(response->is_error());
+  }
+
+  fidl::ServerEnd<fuchsia_input_report::InputReportsReader> reader_server;
+  zx::result reader_client_end = fidl::CreateEndpoints(&reader_server);
+  ASSERT_OK(reader_client_end.status_value());
+  fidl::WireSyncClient reader{std::move(*reader_client_end)};
+  auto result = client->GetInputReportsReader(std::move(reader_server));
+  ASSERT_OK(result.status());
+  device_->WaitForNextReader();
+
+  // Set normal value so we can be sure status register is causing saturation.
+  SetLightDataRegisters(0x0010, 0x0010, 0x0010, 0x0010);
+  fake_i2c_.SetRegister(TCS_I2C_STATUS, 0x0 | TCS_I2C_STATUS_ASAT);
 
   EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
 

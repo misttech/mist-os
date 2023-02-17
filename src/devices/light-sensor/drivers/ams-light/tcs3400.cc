@@ -191,6 +191,24 @@ zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
       time(&lastSaturatedLog_);
     }
   } else {
+    uint8_t status_val;
+    zx_status_t status;
+    status = ReadReg(TCS_I2C_STATUS, status_val);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "i2c_write_read_sync failed: %d", status);
+      return zx::error(status);
+    }
+    if ((status_val & TCS_I2C_STATUS_ASAT) == TCS_I2C_STATUS_ASAT) {
+      report.red = kMaxSaturationRed;
+      report.green = kMaxSaturationGreen;
+      report.blue = kMaxSaturationBlue;
+      report.illuminance = kMaxSaturationClear;
+      saturatedReading = true;
+      if (!isSaturated_ || difftime(time(nullptr), lastSaturatedLog_) >= kSaturatedLogTimeSecs) {
+        zxlogf(INFO, "sensor is saturated via status register");
+        time(&lastSaturatedLog_);
+      }
+    }
     if (isSaturated_) {
       zxlogf(INFO, "sensor is no longer saturated");
     }
