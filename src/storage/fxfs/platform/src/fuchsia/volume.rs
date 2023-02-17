@@ -140,6 +140,7 @@ impl FxVolume {
     }
 
     pub async fn terminate(&self) {
+        self.cache.clear();
         self.scope.shutdown();
         self.scope.wait().await;
         self.pager.terminate().await;

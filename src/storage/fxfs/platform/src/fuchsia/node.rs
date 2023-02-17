@@ -8,6 +8,7 @@ use {
     async_trait::async_trait,
     futures::future::poll_fn,
     fxfs::object_handle::ObjectProperties,
+    linked_hash_map::LinkedHashMap,
     std::{
         any::TypeId,
         collections::{btree_map::Entry, BTreeMap},
@@ -18,6 +19,18 @@ use {
     },
     vfs::common::IntoAny,
 };
+
+/// The number of `FxDirectory` objects to hold strong references to in the cache. The cache
+/// improves performance for clients that make repeated calls to fuchsia.io/Directory.Open with
+/// long paths to the same deeply nested directory.
+/// Example:
+///   open("/deeply/nested/files/file1.txt")
+///   open("/deeply/nested/files/file2.txt")
+/// The intermediate directories will be kept alive in the cache between the calls so they aren't
+/// destructed and recreated each time. The size of the cache was picked to accommodate a single
+/// deep path or multiple shallower paths at the same time.
+// TODO(fxbug.dev/122161) Dynamically adjust the cache size in response to memory pressure events.
+const DIRECTORY_CACHE_SIZE: usize = 12;
 
 /// FxNode is a node in the filesystem hierarchy (either a file or directory).
 #[async_trait]
@@ -69,7 +82,7 @@ impl PlaceholderOwner<'_> {
         let this_object_id = self.inner.object_id();
         assert_eq!(node.object_id(), this_object_id);
         self.committed = true;
-        self.cache.0.lock().unwrap().map.insert(this_object_id, Arc::downgrade(node));
+        self.cache.commit(node.clone());
     }
 }
 
@@ -96,6 +109,25 @@ pub enum GetResult<'a> {
 struct NodeCacheInner {
     map: BTreeMap<u64, Weak<dyn FxNode>>,
     next_waker_sequence: u64,
+
+    // Holds strong references to the most recently used directories.
+    cached_directories: LinkedHashMap<u64, Arc<FxDirectory>>,
+}
+
+impl NodeCacheInner {
+    /// Inserts or updates the position of `directory` in the directory cache. If the cache was full
+    /// and `directory` was inserted then the least recently used directory is returned.
+    fn access_directory(&mut self, directory: Arc<FxDirectory>) -> Option<Arc<FxDirectory>> {
+        // Insert the directory into the cache. If the directory was already in the cache then it
+        // will be moved to the back of the list.
+        self.cached_directories.insert(directory.object_id(), directory);
+
+        if self.cached_directories.len() > DIRECTORY_CACHE_SIZE {
+            self.cached_directories.pop_front().map(|r| r.1)
+        } else {
+            None
+        }
+    }
 }
 
 /// NodeCache is an in-memory cache of weak node references.
@@ -128,7 +160,13 @@ impl<'a> Iterator for FileIter<'a> {
 
 impl NodeCache {
     pub fn new() -> Self {
-        Self(Mutex::new(NodeCacheInner { map: BTreeMap::new(), next_waker_sequence: 0 }))
+        Self(Mutex::new(NodeCacheInner {
+            map: BTreeMap::new(),
+            next_waker_sequence: 0,
+            // New directories are inserted into the caching before checking if the cache is full so
+            // the cache will temporarily contain an extra entry.
+            cached_directories: LinkedHashMap::with_capacity(DIRECTORY_CACHE_SIZE + 1),
+        }))
     }
 
     /// Gets a node in the cache, or reserves a placeholder in the cache to fill.
@@ -141,6 +179,10 @@ impl NodeCache {
         let mut waker_sequence = 0;
         let mut waker_index = 0;
         poll_fn(|cx| {
+            // If a directory is removed from the cache then drop it outside of the lock because it
+            // may call `remove`.
+            let mut _dropped_directory: Option<Arc<FxDirectory>> = None;
+
             let mut this = self.0.lock().unwrap();
             if let Some(node) = this.map.get(&object_id) {
                 if let Some(node) = node.upgrade() {
@@ -155,6 +197,9 @@ impl NodeCache {
                         }
                         return Poll::Pending;
                     } else {
+                        if let Ok(directory) = node.clone().into_any().downcast::<FxDirectory>() {
+                            _dropped_directory = this.access_directory(directory);
+                        }
                         return Poll::Ready(GetResult::Node(node));
                     }
                 }
@@ -203,6 +248,24 @@ impl NodeCache {
     /// Returns an iterator over all files in the cache.
     pub fn files(&self) -> FileIter<'_> {
         FileIter { cache: self, object_id: None }
+    }
+
+    /// Drops all strong references held by the cache.
+    pub fn clear(&self) {
+        let _directories =
+            std::mem::replace(&mut self.0.lock().unwrap().cached_directories, LinkedHashMap::new());
+    }
+
+    fn commit(&self, node: Arc<dyn FxNode>) {
+        // If a directory is removed from the cache then drop it outside of the lock because it may
+        // call `remove`.
+        let mut _dropped_directory: Option<Arc<FxDirectory>> = None;
+
+        let mut this = self.0.lock().unwrap();
+        this.map.insert(node.object_id(), Arc::downgrade(&node));
+        if let Ok(directory) = node.into_any().downcast::<FxDirectory>() {
+            _dropped_directory = this.access_directory(directory);
+        }
     }
 }
 
@@ -257,20 +320,28 @@ mod tests {
     use {
         crate::fuchsia::{
             directory::FxDirectory,
-            node::{FxNode, GetResult, NodeCache},
+            node::{FxNode, GetResult, NodeCache, DIRECTORY_CACHE_SIZE},
+            testing::{close_dir_checked, open_dir_checked},
+            volume::FxVolumeAndRoot,
         },
         anyhow::Error,
         async_trait::async_trait,
-        fuchsia_async as fasync,
+        fidl::endpoints::{create_proxy, ServerEnd},
+        fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::future::join_all,
-        fxfs::object_handle::ObjectProperties,
+        fxfs::{
+            filesystem::FxFilesystem, object_handle::ObjectProperties,
+            object_store::volume::root_volume,
+        },
         std::{
             sync::{
                 atomic::{AtomicU64, Ordering},
-                Arc, Mutex,
+                Arc, Mutex, Weak,
             },
             time::Duration,
         },
+        storage_device::{fake_device::FakeDevice, DeviceHolder},
+        vfs::{directory::entry::DirectoryEntry, path::Path},
     };
 
     struct FakeNode(u64, Arc<NodeCache>);
@@ -403,5 +474,94 @@ mod tests {
         .await;
         assert_eq!(*writes.lock().unwrap(), vec![1u64; NUM_OBJECTS]);
         assert_eq!(*reads.lock().unwrap(), vec![TASKS_PER_OBJECT as u64 - 1; NUM_OBJECTS]);
+    }
+
+    async fn directory_object_id(dir: &fio::DirectoryProxy) -> u64 {
+        let result = dir.get_attr().await.expect("get_attr failed");
+        zx::ok(result.0).unwrap();
+        result.1.id
+    }
+
+    fn cached_directories(volume: &FxVolumeAndRoot) -> Vec<u64> {
+        volume.volume().cache().0.lock().unwrap().cached_directories.keys().map(|k| *k).collect()
+    }
+
+    fn strong_ref_count(volume: &FxVolumeAndRoot, object_id: u64) -> usize {
+        Arc::strong_count(
+            volume.volume().cache().0.lock().unwrap().cached_directories.get(&object_id).unwrap(),
+        )
+    }
+
+    async fn create_directory(dir: &fio::DirectoryProxy, path: &str) -> fio::DirectoryProxy {
+        open_dir_checked(&dir, fio::OpenFlags::DIRECTORY | fio::OpenFlags::CREATE, path).await
+    }
+
+    async fn open_directory(dir: &fio::DirectoryProxy, path: &str) -> fio::DirectoryProxy {
+        open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, path).await
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_directory_cache() {
+        let fs =
+            FxFilesystem::new_empty(DeviceHolder::new(FakeDevice::new(16384, 512))).await.unwrap();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let volume = root_volume.new_volume("vol", None).await.unwrap();
+        let volume = FxVolumeAndRoot::new(Weak::new(), volume, 0).await.unwrap();
+        let (root, server_end) =
+            create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        volume.root().clone().open(
+            volume.volume().scope().clone(),
+            fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            Path::dot(),
+            ServerEnd::new(server_end.into_channel()),
+        );
+        // The cache initially contains the root directory.
+        let root_object_id = volume.root().object_id();
+        assert_eq!(cached_directories(&volume), [root_object_id]);
+
+        let dir1 = create_directory(&root, "dir1").await;
+        // `dir1` is inserted at the back of the cache.
+        let dir1_object_id = directory_object_id(&dir1).await;
+        assert_eq!(cached_directories(&volume), [root_object_id, dir1_object_id]);
+        // Both the cache and the connection hold a strong reference to the directory.
+        assert_eq!(strong_ref_count(&volume, dir1_object_id), 2);
+
+        close_dir_checked(dir1).await;
+        // After closing the directory, the directory is still in the cache and the cache is the
+        // only reference.
+        assert_eq!(cached_directories(&volume), [root_object_id, dir1_object_id]);
+        assert_eq!(strong_ref_count(&volume, dir1_object_id), 1);
+
+        let dir2 = create_directory(&root, "dir2").await;
+        let dir2_object_id = directory_object_id(&dir2).await;
+        assert_eq!(cached_directories(&volume), [root_object_id, dir1_object_id, dir2_object_id]);
+        // Reopening `dir1` moves it to the back of the cache.
+        let dir1 = open_directory(&root, "dir1").await;
+        assert_eq!(cached_directories(&volume), [root_object_id, dir2_object_id, dir1_object_id]);
+
+        close_dir_checked(dir1).await;
+        close_dir_checked(dir2).await;
+
+        for i in 0..DIRECTORY_CACHE_SIZE {
+            close_dir_checked(create_directory(&root, &format!("filler-{}", i)).await).await;
+        }
+        // `dir1` was pushed out of the cache.
+        assert_eq!(cached_directories(&volume).len(), DIRECTORY_CACHE_SIZE);
+        assert!(!cached_directories(&volume).contains(&dir1_object_id));
+
+        // Reopening `dir1` brings it back into the cache.
+        let dir1 = open_directory(&root, "dir1").await;
+        assert_eq!(cached_directories(&volume).last().unwrap(), &dir1_object_id);
+        close_dir_checked(dir1).await;
+
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        Arc::try_unwrap(volume.into_volume())
+            .map_err(|_| "References to volume still exist")
+            .unwrap();
+        fs.close().await.expect("close filesystem failed");
     }
 }
