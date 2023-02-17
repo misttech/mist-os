@@ -869,7 +869,7 @@ zx_status_t TerminaContainerEnclosedGuest::BuildLaunchInfo(GuestLaunchInfo* laun
 
 void TerminaContainerEnclosedGuest::InstallInRealm(component_testing::Realm& realm,
                                                    GuestLaunchInfo& guest_launch_info) {
-  EnclosedGuest::InstallInRealm(realm, guest_launch_info);
+  TerminaEnclosedGuest::InstallInRealm(realm, guest_launch_info);
 
   using component_testing::ConfigValue;
   realm.InitMutableConfigFromPackage(kGuestManagerName);
