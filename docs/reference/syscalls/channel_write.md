@@ -141,7 +141,6 @@ The byte size limitation on messages is not yet finalized.
  - [`zx_channel_read_etc()`]
  - [`zx_channel_write_etc()`]
  - [`zx_handle_close()`]
- - [`zx_handle_duplicate()`]
  - [`zx_handle_replace()`]
  - [`zx_object_wait_async()`]
  - [`zx_object_wait_many()`]
@@ -153,7 +152,6 @@ The byte size limitation on messages is not yet finalized.
 [`zx_channel_read_etc()`]: channel_read_etc.md
 [`zx_channel_write_etc()`]: channel_write_etc.md
 [`zx_handle_close()`]: handle_close.md
-[`zx_handle_duplicate()`]: handle_duplicate.md
 [`zx_handle_replace()`]: handle_replace.md
 [`zx_object_wait_async()`]: object_wait_async.md
 [`zx_object_wait_many()`]: object_wait_many.md

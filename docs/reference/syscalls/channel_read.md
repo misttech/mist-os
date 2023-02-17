@@ -100,7 +100,6 @@ set, then the message is discarded.
  - [`zx_channel_write()`]
  - [`zx_channel_write_etc()`]
  - [`zx_handle_close()`]
- - [`zx_handle_duplicate()`]
  - [`zx_handle_replace()`]
  - [`zx_object_wait_async()`]
  - [`zx_object_wait_many()`]
@@ -112,7 +111,6 @@ set, then the message is discarded.
 [`zx_channel_write()`]: channel_write.md
 [`zx_channel_write_etc()`]: channel_write_etc.md
 [`zx_handle_close()`]: handle_close.md
-[`zx_handle_duplicate()`]: handle_duplicate.md
 [`zx_handle_replace()`]: handle_replace.md
 [`zx_object_wait_async()`]: object_wait_async.md
 [`zx_object_wait_many()`]: object_wait_many.md

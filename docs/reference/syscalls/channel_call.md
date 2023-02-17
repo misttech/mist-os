@@ -175,7 +175,6 @@ communications on a channel that is timing out.
  - [`zx_channel_read()`]
  - [`zx_channel_write()`]
  - [`zx_handle_close()`]
- - [`zx_handle_duplicate()`]
  - [`zx_handle_replace()`]
  - [`zx_object_wait_async()`]
  - [`zx_object_wait_many()`]
@@ -186,7 +185,6 @@ communications on a channel that is timing out.
 [`zx_channel_read()`]: channel_read.md
 [`zx_channel_write()`]: channel_write.md
 [`zx_handle_close()`]: handle_close.md
-[`zx_handle_duplicate()`]: handle_duplicate.md
 [`zx_handle_replace()`]: handle_replace.md
 [`zx_object_wait_async()`]: object_wait_async.md
 [`zx_object_wait_many()`]: object_wait_many.md
