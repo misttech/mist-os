@@ -910,6 +910,7 @@ impl FuseFilesystem for FuseFs {
     /// Forget an object with id `inode`.
     /// This is only called for objects with a limited lifetime, and hence not needed in Fxfs.
     /// TODO(fxbug.dev/117461): Implement this after Fxfs objects support limied lifetime.
+    /// TODO(fxbug.dev/122115): Some applications may call this function to remove objects.
     async fn forget(&self, _req: Request, inode: u64, _nlookup: u64) {
         let inode = self.fuse_inode_to_object_id(inode);
         info!("forget (inode={:?})", inode);
