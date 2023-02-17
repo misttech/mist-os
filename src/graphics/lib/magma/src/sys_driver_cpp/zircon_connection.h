@@ -195,7 +195,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   std::unique_ptr<Delegate> delegate_;
   magma_status_t error_{};
   zx::channel server_notification_endpoint_;
-  zx::channel performance_counter_event_channel_;
   async::Loop async_loop_;
 
   // Flow control
