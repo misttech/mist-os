@@ -300,6 +300,9 @@ assembly_input_bundle("common_minimal") {
               root_build_dir),
           rebase_path("//src/diagnostics/sampler/meta/sampler.core_shard.cml",
                       root_build_dir),
+          rebase_path(
+              "//src/connectivity/network/meta/persistence.core_shard.cml",
+              root_build_dir),
         ]
       }
     },
