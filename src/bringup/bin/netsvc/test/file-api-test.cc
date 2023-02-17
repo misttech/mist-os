@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl-async/cpp/bind.h>
 
 #include <memory>
 #include <string_view>
@@ -81,7 +82,7 @@ class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
   explicit FakeSysinfo(async_dispatcher_t* dispatcher) {
     zx::result server_end = fidl::CreateEndpoints(&svc_chan_);
     ASSERT_OK(server_end.status_value());
-    fidl::BindServer(dispatcher, std::move(server_end.value()), this);
+    fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end.value()), this);
   }
 
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override {
