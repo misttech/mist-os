@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
+#include <lib/fit/function.h>
+
 #include "src/bringup/bin/netsvc/netboot.h"
 #include "src/bringup/bin/netsvc/netsvc.h"
 #include "src/bringup/bin/netsvc/test/paver-test-common.h"
@@ -18,6 +21,8 @@ void udp6_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t dport,
 void netifc_recv(void* data, size_t len) {}
 bool netifc_send_pending() { return false; }
 
+namespace {
+
 // We attempt to write more data than we have memory to ensure we are not keeping the file in memory
 // the entire time.
 TEST_F(PaverTest, WriteFvmManyLargeWrites) {
@@ -31,6 +36,9 @@ TEST_F(PaverTest, WriteFvmManyLargeWrites) {
   fake_svc_.fake_paver().set_wait_for_start_signal(true);
   ASSERT_EQ(paver_.OpenWrite(NB_FVM_FILENAME, payload_size, zx::duration::infinite()),
             TFTP_NO_ERROR);
+
+  loop_.StartThread();
+  auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop_));
   for (size_t offset = 0; offset < payload_size; offset += kChunkSize) {
     size_t size = std::min(kChunkSize, payload_size - offset);
     ASSERT_EQ(paver_.Write(fake_data.get(), &size, offset), TFTP_NO_ERROR);
@@ -47,3 +55,5 @@ TEST_F(PaverTest, WriteFvmManyLargeWrites) {
   ASSERT_EQ(fake_svc_.fake_paver().GetCommandTrace(),
             std::vector<paver_test::Command>{paver_test::Command::kWriteVolumes});
 }
+
+}  // namespace

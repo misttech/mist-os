@@ -9,8 +9,10 @@
 #include <fidl/fuchsia.fshost/cpp/wire_test_base.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/async-loop/loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/fdio/fd.h>
 #include <lib/fidl-async/cpp/bind.h>
@@ -33,13 +35,14 @@
 #include <zxtest/zxtest.h>
 
 #include "src/bringup/bin/netsvc/paver.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/testing/fake-paver.h"
 
 class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
  public:
+  FakeFshost() = default;
+  FakeFshost(const FakeFshost&) = delete;
+  FakeFshost& operator=(const FakeFshost&) = delete;
+
   void WriteDataFile(WriteDataFileRequestView request,
                      WriteDataFileCompleter::Sync& completer) override {
     data_file_path_ = request->filename.get();
@@ -58,34 +61,51 @@ class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
 
 class FakeSvc {
  public:
-  explicit FakeSvc(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher), vfs_(dispatcher) {
-    auto root_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-    root_dir->AddEntry(
-        fidl::DiscoverableProtocolName<fuchsia_paver::Paver>,
-        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_paver::Paver> request) {
-          return fake_paver_.Connect(dispatcher_, std::move(request));
-        }));
-    root_dir->AddEntry(
-        fidl::DiscoverableProtocolName<fuchsia_fshost::Admin>,
-        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_fshost::Admin> request) {
-          return fidl::BindSingleInFlightOnly(dispatcher_, std::move(request), &fake_fshost_);
-        }));
-
-    zx::result server_end = fidl::CreateEndpoints(&svc_local_);
-    ASSERT_OK(server_end.status_value());
-    vfs_.ServeDirectory(root_dir, std::move(server_end.value()));
+  explicit FakeSvc(async_dispatcher_t* dispatcher) {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    async::PostTask(dispatcher, [dispatcher, &fake_paver = fake_paver_, &fake_fshost = fake_fshost_,
+                                 server_end = std::move(server_end)]() mutable {
+      component::OutgoingDirectory outgoing{dispatcher};
+      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(
+          [&fake_paver, dispatcher](fidl::ServerEnd<fuchsia_paver::Paver> server_end) mutable {
+            ASSERT_OK(fake_paver.Connect(dispatcher, std::move(server_end)));
+          }));
+      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
+          [&fake_fshost, dispatcher](fidl::ServerEnd<fuchsia_fshost::Admin> server_end) {
+            ASSERT_OK(
+                fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), &fake_fshost));
+          }));
+      zx::result result = outgoing.Serve(std::move(server_end));
+      ASSERT_OK(result);
+      // Stash the outgoing directory on the dispatcher so that the dtor runs on the dispatcher
+      // thread.
+      async::PostDelayedTask(
+          dispatcher, [outgoing = std::move(outgoing)]() {}, zx::duration::infinite());
+    });
+    root_.Bind(std::move(client_end));
   }
 
   paver_test::FakePaver& fake_paver() { return fake_paver_; }
   FakeFshost& fake_fshost() { return fake_fshost_; }
-  fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    auto& [client_end, server_end] = endpoints.value();
+    const fidl::OneWayStatus status =
+        root_->Open({}, {}, component::OutgoingDirectory::kServiceDirectory,
+                    fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
+    return zx::make_result(status.status(), std::move(client_end));
+  }
 
  private:
-  async_dispatcher_t* dispatcher_;
-  fs::SynchronousVfs vfs_;
   paver_test::FakePaver fake_paver_;
   FakeFshost fake_fshost_;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
+  fidl::WireSyncClient<fuchsia_io::Directory> root_;
 };
 
 class FakeDev {
@@ -110,7 +130,7 @@ class FakeDev {
 class PaverTest : public zxtest::Test {
  protected:
   PaverTest()
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      : loop_(&kAsyncLoopConfigNeverAttachToThread),
         paver_(
             [this]() {
               zx::channel client;
@@ -118,9 +138,11 @@ class PaverTest : public zxtest::Test {
                                       client.reset_and_get_address()));
               return fidl::ClientEnd<fuchsia_io::Directory>{std::move(client)};
             }(),
-            std::move(fake_svc_.svc_chan())) {
-    loop_.StartThread("paver-test-loop");
-  }
+            [this]() {
+              zx::result svc = fake_svc_.svc();
+              EXPECT_OK(svc);
+              return std::move(svc.value());
+            }()) {}
 
   ~PaverTest() override {
     // Need to make sure paver thread exits.
@@ -129,7 +151,6 @@ class PaverTest : public zxtest::Test {
       ramdisk_destroy(ramdisk_);
       ramdisk_ = nullptr;
     }
-    loop_.Shutdown();
   }
 
   void SpawnBlockDevice() {
