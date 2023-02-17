@@ -36,8 +36,6 @@ toc:
   section:
   - title: "FIDL multiplexing deprecation"
     path: /docs/contribute/open_projects/drivers/fidl_multiplexing.md
-- title: "Testing"
-  section:
 - title: "Graduated projects"
   section:
   - title: "Overview"
