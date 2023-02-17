@@ -34,7 +34,7 @@ group("tests") {
 executable("bin") {
   output_name = "driver_test_realm"
   testonly = true
-  sources = [ "support.cc" ]
+  sources = [ "driver_test_realm.cc" ]
   data_deps = [ "fake_driver:driver_package" ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
