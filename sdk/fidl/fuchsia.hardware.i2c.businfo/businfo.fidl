@@ -10,6 +10,8 @@ const MAX_I2C_CHANNEL uint32 = 128; // Enough for every address to be used in 7-
 /// Used to inform the i2c driver about an attached i2c device.
 type I2CChannel = table {
     /// ID of the bus that this device is on.
+    // TODO(fxbug.dev/120971): Remove this after all drivers have switched to
+    // the new bus_id field below.
     1: bus_id uint32;
     /// Address of the device.
     2: address uint16;
@@ -40,4 +42,7 @@ type I2CChannel = table {
 /// Passed to the i2c driver in metadata as DEVICE_METADATA_I2C_CHANNELS.
 type I2CBusMetadata = table {
     1: channels vector<I2CChannel>:MAX_I2C_CHANNEL;
+    /// ID of the bus that these devices are on. Set as a bind property on the
+    /// devices added by the I2C core driver.
+    2: bus_id uint32;
 };
