@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::list::ListFilter;
+use component_debug::cli::list::ListFilter;
 use ffx_core::ffx_command;
 
 #[ffx_command()]
@@ -47,7 +47,7 @@ use ffx_core::ffx_command;
 
 pub struct ComponentListCommand {
     #[argh(option, long = "only", short = 'o')]
-    /// filter the instance list by a criteria: cmx, cml, running, stopped
+    /// filter the instance list by a criteria: cmx, cml, running, stopped, ancestors:<component_name>, descendants:<component_name>, or relatives:<component_name>
     pub filter: Option<ListFilter>,
 
     #[argh(switch, long = "verbose", short = 'v')]
