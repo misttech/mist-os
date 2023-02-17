@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-void do_loop(volatile int n) {
+[[clang::optnone]] void do_loop(int n) {
   for (int i = 0; i < n; i++) {
     std::cout << "Hello world!" << std::endl;
   }

@@ -59,13 +59,8 @@ inferior("inlined_crasher") {
 inferior("loop") {
   sources = [ "loop.cc" ]
 
-  cflags = [
-    # Ensure std::ostream << doesn't get inlined.
-    "-fno-inline-functions",
-
-    # Allow volatile in this test
-    "-Wno-deprecated-volatile",
-  ]
+  # Ensure std::ostream << doesn't get inlined.
+  cflags = [ "-fno-inline-functions" ]
 }
 
 inferior("async_rust") {
