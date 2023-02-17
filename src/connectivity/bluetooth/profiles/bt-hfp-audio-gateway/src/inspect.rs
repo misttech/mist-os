@@ -8,17 +8,12 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::nodes::{NodeExt, TimeProperty};
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use lazy_static::lazy_static;
 use std::collections::VecDeque;
 
 use crate::features::{codecs_to_string, CodecId, HfFeatures};
 use crate::peer::calls::number::Number;
 use crate::peer::calls::types::Direction;
 use crate::peer::service_level_connection::SlcState;
-
-lazy_static! {
-    static ref PEER_ID: inspect::StringReference = "peer_id".into();
-}
 
 #[derive(Default, Debug)]
 pub struct HfpInspect {
@@ -128,7 +123,7 @@ pub struct PeerTaskInspect {
 impl Inspect for &mut PeerTaskInspect {
     fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
         self.inspect_node = parent.create_child(name.as_ref());
-        self.inspect_node.record_string(&*PEER_ID, self.peer_id.to_string());
+        self.inspect_node.record_string("peer_id", self.peer_id.to_string());
         self.connected_peer_handler =
             self.inspect_node.create_bool("connected_peer_handler", false);
         self.network.iattach(&self.inspect_node, "network")?;
