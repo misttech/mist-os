@@ -45,6 +45,14 @@ FuchsiaDevelopmentSupportConfigInfo = provider(
     },
 )
 
+FuchsiaDriverFrameworkConfigInfo = provider(
+    doc = "Platform configuration options for the driver framework area.",
+    fields = {
+        "eager_drivers": "A list of drivers to bind 'eagerly'. This turns a driver that normally binds as a fallback driver into a driver that will be bound normally",
+        "disabled_drivers": "A list of drivers by URL. These drivers will not be bound or loaded",
+    },
+)
+
 FuchsiaStarnixConfigInfo = provider(
     doc = "Platform starnix options for the starnix area.",
     fields = {

@@ -47,6 +47,7 @@ platform_aib_names = [
   "virtualization_support",
   "empty_live_usb",
   "live_usb",
+  "driver_framework_v2",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

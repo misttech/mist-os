@@ -26,6 +26,7 @@ mod connectivity;
 mod console;
 mod development;
 mod diagnostics;
+mod driver_framework;
 mod example;
 mod graphics;
 mod identity;
@@ -153,6 +154,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
+
+    driver_framework::DriverFrameworkSubsystemConfig::define_configuration(
+        context,
+        &config.platform.driver_framework,
+        builder,
+    )
+    .context("Configuring the 'driver_framework' subsystem")?;
 
     graphics::GraphicsSubsystemConfig::define_configuration(
         context,

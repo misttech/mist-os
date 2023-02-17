@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub mod connectivity_config;
 pub mod development_support_config;
 pub mod diagnostics_config;
+pub mod driver_framework_config;
 pub mod example_config;
 pub mod graphics_config;
 pub mod identity_config;
@@ -56,6 +57,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the diagnostics area.
     #[serde(default)]
     pub diagnostics: diagnostics_config::DiagnosticsConfig,
+
+    /// Platform configuration options for the driver framework area.
+    #[serde(default)]
+    pub driver_framework: driver_framework_config::DriverFrameworkConfig,
 
     /// Platform configuration options for graphics
     #[serde(default)]

@@ -10,6 +10,7 @@ load(
     "FuchsiaConnectivityWlanConfigInfo",
     "FuchsiaDevelopmentSupportConfigInfo",
     "FuchsiaDiagnosticsConfigInfo",
+    "FuchsiaDriverFrameworkConfigInfo",
     "FuchsiaIdentityConfigInfo",
     "FuchsiaInputConfigInfo",
     "FuchsiaProductConfigInfo",
@@ -63,6 +64,8 @@ def _create_platform_config(ctx):
         }
     if ctx.attr.development_support != None:
         platform["development_support"] = ctx.attr.development_support[FuchsiaDevelopmentSupportConfigInfo]
+    if ctx.attr.driver_framework != None:
+        platform["driver_framework"] = ctx.attr.driver_framework[FuchsiaDriverFrameworkConfigInfo]
     if ctx.attr.starnix != None:
         platform["starnix"] = ctx.attr.starnix[FuchsiaStarnixConfigInfo]
     if ctx.attr.storage != None:
@@ -231,6 +234,11 @@ fuchsia_product_configuration = rule(
         "development_support": attr.label(
             doc = "Developement Support Configuration.",
             providers = [FuchsiaDevelopmentSupportConfigInfo],
+            default = None,
+        ),
+        "driver_framework": attr.label(
+            doc = "Driver Framework Configuration.",
+            providers = [FuchsiaDriverFrameworkConfigInfo],
             default = None,
         ),
         "starnix": attr.label(
