@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_triage") {
   version = "0.0.1"
@@ -12,15 +13,17 @@ ffx_plugin("ffx_triage") {
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/target/snapshot:ffx_snapshot",
     "//src/developer/ffx/plugins/target/snapshot:ffx_snapshot_args",
     "//src/diagnostics/lib/triage",
     "//src/diagnostics/triage:triage_app_lib",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:zip",
   ]
   test_deps = [
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
@@ -69,4 +72,15 @@ ffx_plugin("ffx_triage") {
     "test_data/structured/map_fold_test.golden.json",
     "test_data/structured/only_runs_included_actions.golden.json",
   ]
+}
+
+ffx_tool("ffx_triage_tool") {
+  edition = "2021"
+  output_name = "ffx-triage"
+  deps = [
+    ":ffx_triage",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

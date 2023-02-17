@@ -4,9 +4,10 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::FfxError;
-use ffx_core::ffx_plugin;
 use ffx_triage_args::TriageCommand;
-use ffx_writer::Writer;
+use fho::{
+    deferred, selector, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO,
+};
 use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
     analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
@@ -19,13 +20,31 @@ mod config;
 mod snapshot;
 pub use snapshot::create_snapshot;
 
-#[ffx_plugin(
-    "triage.enabled",
-    DataProviderProxy = "core/feedback:expose:fuchsia.feedback.DataProvider"
-)]
+pub(crate) type Writer = MachineWriter<TriageOutput>;
+
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("triage.enabled"))]
+pub struct TriageTool {
+    #[with(deferred(selector("core/feedback:expose:fuchsia.feedback.DataProvider")))]
+    data_provider_proxy: Deferred<DataProviderProxy>,
+    #[command]
+    cmd: TriageCommand,
+}
+
+fho::embedded_plugin!(TriageTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for TriageTool {
+    type Writer = Writer;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        triage(self.data_provider_proxy.await.ok(), writer, self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn triage(
     data_provider_proxy: Option<DataProviderProxy>,
-    #[ffx(machine = TriageOutput)] writer: Writer,
+    writer: Writer,
     cmd: TriageCommand,
 ) -> Result<()> {
     triage_impl(data_provider_proxy, cmd, writer).await.map_err(flatten_error)
@@ -119,7 +138,7 @@ fn flatten_error(e: anyhow::Error) -> anyhow::Error {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use ffx_writer::Format;
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_feedback::{DataProviderProxy, DataProviderRequest, Snapshot};
     use lazy_static::lazy_static;
     use std::{collections::HashMap, fs, path::Path};
@@ -167,7 +186,7 @@ mod tests {
     }
 
     fn setup_fake_data_provider_server() -> DataProviderProxy {
-        setup_fake_data_provider_proxy(move |req| match req {
+        fho::testing::fake_proxy(move |req| match req {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let _channel = params.response_channel.unwrap();
 
@@ -199,14 +218,21 @@ mod tests {
         );
     }
 
-    async fn run_triage_test(cmd: TriageCommand, mut writer: Writer) {
+    async fn run_triage_test(
+        cmd: TriageCommand,
+        buffers: &mut TestBuffers,
+        format: Option<Format>,
+    ) {
+        let writer = Writer::new_test(format, &buffers);
         let data_provider_proxy = setup_fake_data_provider_server();
-        let result = triage_impl(Some(data_provider_proxy), cmd, writer.clone())
-            .await
-            .map_err(flatten_error);
+        let result =
+            triage_impl(Some(data_provider_proxy), cmd, writer).await.map_err(flatten_error);
 
         if let Err(e) = result {
-            writer.write_fmt(format_args!("{}", e)).expect("Failed to write to destination.")
+            buffers
+                .stdout
+                .write_fmt(format_args!("{}", e))
+                .expect("Failed to write to destination.")
         }
     }
 
@@ -245,16 +271,15 @@ mod tests {
                 let exclude_tags =vec![$($($exclude_tag.into()),+)?];
 
                 // Test unstructured output.
-                let writer = Writer::new_test(None);
-
+                let mut test_buffers = TestBuffers::default();
                 run_triage_test(TriageCommand {
                     config: config_files.clone(),
                     data: Some(snapshot_tempdir.path().to_string_lossy().into()),
                     tags: tags.clone(),
                     exclude_tags: exclude_tags.clone(),
-                },writer.clone()).await;
+                },&mut test_buffers, None).await;
 
-                let output = writer.test_output()?;
+                let output = test_buffers.into_stdout_str();
 
                 pretty_assertions::assert_eq!(
                     output.contains($substring),
@@ -263,16 +288,15 @@ mod tests {
 
                 $(
                 // Test structured output only if golden_structured_outfile is provided.
-                let writer = Writer::new_test(Some(Format::Json));
-
+                let mut test_buffers = TestBuffers::default();
                 run_triage_test(TriageCommand {
                     config: config_files,
                     data: Some(snapshot_tempdir.path().to_string_lossy().into()),
                     tags: tags.clone(),
                     exclude_tags: exclude_tags.clone(),
-                },writer.clone()).await;
+                },&mut test_buffers, Some(Format::Json)).await;
 
-                let output = writer.test_output()?;
+                let output = test_buffers.into_stdout_str();
 
                 match_structured_output(&output, structured_output!($golden_structured_outfile));
                 )?
