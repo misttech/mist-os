@@ -40,6 +40,22 @@ namespace component {
 // [synchronized async dispatcher][synchronized-dispatcher]. See
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 //
+// # Server lifetimes
+//
+// This class supports a simpler usage style where it owns the server
+// implementations published to the directory, and an advanced usage style
+// where it borrows the server and where the user manages the server lifetimes.
+//
+// When the outgoing directory owns the server implementation (e.g. see
+// |AddProtocol|), removing the published capability or destroying the outgoing
+// directory will destroy the server object and teardown all connections to it.
+//
+// When the outgoing directory borrows the server implementation (usually via
+// callbacks e.g. see |AddUnmanagedProtocol|), removing the published
+// capability or destroying the outgoing directory synchronously stops all
+// future attempts to connect to the server. Thereafter, the user may teardown
+// existing connections and destroy the server.
+//
 // # Maintainer's Note
 //
 // This class' API is semantically identical to the one found in
@@ -402,6 +418,12 @@ class OutgoingDirectory final {
     async_dispatcher_t* dispatcher_;
 
     async::synchronization_checker checker_;
+
+#ifndef _LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK
+    // This task will be scheduled on the async dispatcher to let |checker|
+    // run additional verifications inside a dispatcher task.
+    async::Task synchronization_check_dispatcher_task_;
+#endif
 
     // |root_| is the outgoing directory implementation.
     // It is thread-unsafe, hence guarded by our synchronization checker using

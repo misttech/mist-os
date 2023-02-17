@@ -182,6 +182,16 @@ TEST_F(OutgoingDirectoryTest, MutualExclusionGuarantees_CheckOperations) {
   outgoing_directory.reset();
 }
 
+TEST_F(OutgoingDirectoryTest, MutualExclusionGuarantees_CheckDispatcher) {
+  component::OutgoingDirectory outgoing_directory{dispatcher()};
+  ASSERT_DEATH(
+      {
+        std::thread t([&] { RunLoopUntilIdle(); });
+        t.join();
+      },
+      "\\|component::OutgoingDirectory\\| is thread-unsafe\\.");
+}
+
 TEST_F(OutgoingDirectoryTest, CanBeMovedSafely) {
   component::OutgoingDirectory outgoing_directory(dispatcher());
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();

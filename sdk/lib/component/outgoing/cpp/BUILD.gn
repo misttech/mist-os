@@ -4,29 +4,64 @@
 
 import("//build/cpp/sdk_source_set.gni")
 
+_shared_sources = [
+  "handlers.h",
+  "outgoing_directory.cc",
+  "outgoing_directory.h",
+  "structured_config.h",
+]
+
+_shared_public_deps = [
+  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+  "//sdk/lib/fdio",
+  "//sdk/lib/fit",
+  "//sdk/lib/fit-promise",
+  "//sdk/lib/stdcompat",
+  "//sdk/lib/svc",
+  "//zircon/system/ulib/async",
+  "//zircon/system/ulib/async:async-cpp",
+  "//zircon/system/ulib/zx",
+]
+
+_shared_public_configs = [ "//sdk/config" ]
+
 sdk_source_set("cpp") {
   category = "experimental"
   sdk_name = "component_outgoing_cpp"
   include_base = "//sdk"
 
-  sources = [
-    "handlers.h",
-    "outgoing_directory.cc",
-    "outgoing_directory.h",
-    "structured_config.h",
-  ]
+  sources = _shared_sources
+  public_deps = _shared_public_deps
+  public_configs = _shared_public_configs
+}
 
-  public_deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fit",
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
-    "//sdk/lib/svc",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/zx",
-  ]
+source_set("cpp_disable_synchronization_check") {
+  sources = _shared_sources
+  public_deps = _shared_public_deps
+  public_configs = _shared_public_configs
 
-  public_configs = [ "//sdk/config" ]
+  defines = [ "_LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK" ]
+
+  # Allowlist of components permitted to skip the synchronization check, which
+  # is turned on by default.
+  #
+  # Some components (mostly tests) use OutgoingDirectory with a multithreaded
+  # dispatcher, without honoring the requirement that the dispatcher servicing
+  # the outgoing directory is the same one that created it. These are granted a
+  # legacy exemption to run them with the check disabled so we can enable the
+  # checker in the SDK.
+  #
+  # Do not add to this allowlist without a good reason.
+  #
+  # TODO(https://fxbug.dev/113997): Fix all deps in this allowlist and remove it.
+  visibility = [
+    "//src/developer/adb/bin/adb-file-sync:adb-file-sync",
+    "//src/devices/i2c/lib/device-protocol-i2c-channel:i2c-channel-test-bin",
+    "//src/devices/light-sensor/drivers/ams-light:ams-light-test-bin",
+    "//src/devices/mcu/drivers/chromiumos-ec-lpc:_driver.shlib-used.driver",
+    "//src/devices/mcu/drivers/chromiumos-ec-lpc:chromiumos-ec-lpc-unit-tests",
+    "//src/devices/mcu/drivers/chromiumos-ec-lpc:driver",
+    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/ui/input/drivers/gt6853:gt6853-test",
+  ]
 }

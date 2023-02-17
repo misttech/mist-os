@@ -68,7 +68,10 @@ test("ams-light-test-bin") {
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
-    "//sdk/lib/component/outgoing/cpp",
+
+    # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
+    # "//sdk/lib/component/outgoing/cpp".
+    "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
     "//sdk/lib/input_report_reader",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/fake-i2c",

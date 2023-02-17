@@ -29,7 +29,10 @@ executable("i2c-channel-test-bin") {
   sources = [ "test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
-    "//sdk/lib/component/outgoing/cpp",
+
+    # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
+    # "//sdk/lib/component/outgoing/cpp".
+    "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",

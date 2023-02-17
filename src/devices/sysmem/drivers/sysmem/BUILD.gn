@@ -58,7 +58,10 @@ source_set("sysmem_common_srcs") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
-    "//sdk/lib/component/outgoing/cpp",
+
+    # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
+    # "//sdk/lib/component/outgoing/cpp".
+    "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp:cpp",

@@ -46,10 +46,26 @@ OutgoingDirectory::OutgoingDirectory(async_dispatcher_t* dispatcher) {
 OutgoingDirectory::Inner::Inner(async_dispatcher_t* dispatcher, svc_dir_t* root)
     : dispatcher_(dispatcher),
       checker_(dispatcher, kOutgoingDirectoryThreadSafetyDescription),
-      root_(root),
-      unbind_protocol_callbacks_() {
-  // TODO(fxbug.dev/113997): Post a task onto the dispatcher to verify that the
-  // dispatcher is synchronized.
+#ifndef _LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK
+      synchronization_check_dispatcher_task_(
+          [this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
+            if (status == ZX_ERR_CANCELED) {
+              // This can happen if the dispatcher was shut down. Since the dispatcher is being
+              // joined, we can avoid checking threads and still know that there's no
+              // concurrent access.
+              return;
+            }
+            ZX_ASSERT_MSG(status == ZX_OK,
+                          "The synchronization checker task encountered an "
+                          "unexpected status: %s",
+                          zx_status_get_string(status));
+            std::lock_guard guard(checker_);
+          }),
+#endif
+      root_(root) {
+#ifndef _LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK
+  synchronization_check_dispatcher_task_.Post(dispatcher);
+#endif
 }
 
 OutgoingDirectory::OutgoingDirectory(OutgoingDirectory&& other) noexcept = default;
