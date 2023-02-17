@@ -73,7 +73,7 @@ impl From<SerializeError<Infallible>> for IpSockSendError {
     fn from(err: SerializeError<Infallible>) -> IpSockSendError {
         match err {
             SerializeError::Alloc(err) => match err {},
-            SerializeError::Mtu => IpSockSendError::Mtu,
+            SerializeError::SizeLimitExceeded => IpSockSendError::Mtu,
         }
     }
 }

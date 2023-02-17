@@ -96,7 +96,9 @@ fn serialize_dhcp_message_to_ip_packet(
             let (e, _serializer) = e;
             match e {
                 packet::SerializeError::Alloc(infallible) => match infallible {},
-                packet::SerializeError::Mtu => unreachable!("no MTU constraints on serializer"),
+                packet::SerializeError::SizeLimitExceeded => {
+                    unreachable!("no MTU constraints on serializer")
+                }
             }
         }
     }

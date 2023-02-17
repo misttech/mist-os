@@ -305,7 +305,7 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
         .serialize_vec_outer()
         .map_err(|(e, _): (_, Nested<Buf<Vec<_>>, B>)| match e {
             SerializeError::Alloc(e) => match e {},
-            SerializeError::Mtu => arbitrary::Error::IncorrectFormat,
+            SerializeError::SizeLimitExceeded => arbitrary::Error::IncorrectFormat,
         })?
         .map_a(|buffer| Buf::new(buffer.as_ref().to_vec(), ..))
         .into_inner();

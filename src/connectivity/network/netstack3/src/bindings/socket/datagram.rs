@@ -1223,7 +1223,9 @@ where
                 let _: packet::serialize::Nested<B, IcmpPacketBuilder<_, _, _>> = serializer;
                 match err {
                     SerializeError::Alloc(never) => match never {},
-                    SerializeError::Mtu => panic!("MTU constraint exceeded but not provided"),
+                    SerializeError::SizeLimitExceeded => {
+                        panic!("MTU constraint exceeded but not provided")
+                    }
                 }
             }
         }

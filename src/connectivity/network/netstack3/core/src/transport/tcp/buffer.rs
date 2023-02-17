@@ -195,12 +195,12 @@ impl Serializer for SendPayload<'_> {
     ) -> Result<B, (SerializeError<P::Error>, Self)> {
         let c = match outer.try_constraints() {
             Some(c) => c,
-            None => return Err((SerializeError::Mtu, self)),
+            None => return Err((SerializeError::SizeLimitExceeded, self)),
         };
 
         let len = Payload::len(&self);
         if len > c.max_body_len() {
-            return Err((SerializeError::Mtu, self));
+            return Err((SerializeError::SizeLimitExceeded, self));
         }
 
         let footer_padding = c.min_body_len().saturating_sub(len);
@@ -955,7 +955,7 @@ mod test {
 
         assert_matches!(
             payload.encapsulate(outer).serialize_vec_outer(),
-            Err((SerializeError::Mtu, _))
+            Err((SerializeError::SizeLimitExceeded, _))
         );
     }
 

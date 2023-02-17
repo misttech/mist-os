@@ -1382,7 +1382,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "(Mtu, Nested { inner: Buf { buf:")]
+    #[should_panic(expected = "(SizeLimitExceeded, Nested { inner: Buf { buf:")]
     fn test_serialize_panic_packet_length() {
         // Test that a packet which is longer than 2^16 - 1 bytes is rejected.
         let _: Buf<&mut [u8]> = Buf::new(&mut [0; (1 << 16) - IPV4_MIN_HDR_LEN][..], ..)

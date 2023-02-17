@@ -2414,7 +2414,7 @@ pub(crate) fn send_ipv4_packet_from_device<
     let body = body.encapsulate(builder);
 
     if let Some(mtu) = mtu {
-        let body = body.with_mtu(mtu as usize);
+        let body = body.with_size_limit(mtu as usize);
         sync_ctx
             .send_ip_frame(ctx, device, next_hop, body)
             .map_err(|ser| ser.into_inner().into_inner())
@@ -2461,7 +2461,7 @@ pub(crate) fn send_ipv6_packet_from_device<
     let body = body.encapsulate(builder);
 
     if let Some(mtu) = mtu {
-        let body = body.with_mtu(mtu as usize);
+        let body = body.with_size_limit(mtu as usize);
         sync_ctx
             .send_ip_frame(ctx, device, next_hop, body)
             .map_err(|ser| ser.into_inner().into_inner())

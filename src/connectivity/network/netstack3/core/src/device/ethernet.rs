@@ -597,7 +597,7 @@ where
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
 
-    let body = body.with_mtu(get_mtu(sync_ctx, device_id).get() as usize);
+    let body = body.with_size_limit(get_mtu(sync_ctx, device_id).get() as usize);
 
     if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
         send_ip_frame_to_dst(

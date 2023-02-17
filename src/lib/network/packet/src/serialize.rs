@@ -686,7 +686,7 @@ pub trait NestedPacketBuilder {
     /// the constraints, and no body exists which would satisfy those
     /// constraints (a satisfying body would need to have negative length).
     /// Thus, the correct behavior is to interpret a `None` value as implying
-    /// that an MTU error should be reported.
+    /// that constraints are violated.
     ///
     /// If `constraints` returns `None`, the caller must not call
     /// [`serialize_into`], or risk unspecified behavior (including possibly a
@@ -781,21 +781,18 @@ pub trait NestedPacketBuilder {
         Nested { inner: self, outer }
     }
 
-    // TODO(joshlf): Clarify that the MTU created by with_mtu apply outside of
-    // the NestedPacketBuilder.
-
-    /// Constructs a new `NestedPacketBuilder` with an additional maximum
-    /// transmission unit (MTU) constraint.
+    /// Constructs a new `NestedPacketBuilder` with an additional size limit
+    /// constraint
     ///
     /// The returned `NestedPacketBuilder` will have a maximum body length
     /// constraint equal to the minimum of its original maximum body length
-    /// constraint and `mtu`.
+    /// constraint and `limit`.
     #[inline]
-    fn with_mtu(self, mtu: usize) -> MtuPacketBuilder<Self>
+    fn with_size_limit(self, limit: usize) -> LimitedSizePacketBuilder<Self>
     where
         Self: Sized,
     {
-        MtuPacketBuilder { mtu, inner: self }
+        LimitedSizePacketBuilder { limit, inner: self }
     }
 }
 
@@ -952,34 +949,33 @@ impl<'a, PB: NestedPacketBuilder> NestedPacketBuilder for RefNestedPacketBuilder
     }
 }
 
-/// A [`PacketBuilder`] with a specific maximum transmission unit (MTU)
-/// constraint.
+/// A [`PacketBuilder`] with a specific maximum packet length constraint.
 ///
-/// `MtuPacketBuilder`s are constructed using the
-/// [`NestedPacketBuilder::with_mtu`] method.
+/// `LimitedSizePacketBuilder`s are constructed using the
+/// [`NestedPacketBuilder::with_size_limit`] method.
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
-pub struct MtuPacketBuilder<B> {
-    mtu: usize,
+pub struct LimitedSizePacketBuilder<B> {
+    limit: usize,
     inner: B,
 }
 
-impl<B> MtuPacketBuilder<B> {
-    /// Consumes this `MtuPacketBuilder` and returns the inner `PacketBuilder`.
+impl<B> LimitedSizePacketBuilder<B> {
+    /// Consumes this `LimitedSizePacketBuilder` and returns the inner `PacketBuilder`.
     #[inline]
     pub fn into_inner(self) -> B {
         self.inner
     }
 }
 
-impl<PB: NestedPacketBuilder> NestedPacketBuilder for MtuPacketBuilder<PB> {
+impl<PB: NestedPacketBuilder> NestedPacketBuilder for LimitedSizePacketBuilder<PB> {
     #[inline]
     fn try_constraints(&self) -> Option<PacketConstraints> {
         let mut c = self.inner.try_constraints()?;
         // This is guaranteed not to overflow by the invariants on
         // PacketConstraint.
         let header_footer_len = c.header_len + c.footer_len;
-        c.max_body_len = cmp::min(self.mtu.checked_sub(header_footer_len)?, c.max_body_len);
+        c.max_body_len = cmp::min(self.limit.checked_sub(header_footer_len)?, c.max_body_len);
         Some(c)
     }
 
@@ -1143,14 +1139,14 @@ impl<B: ByteSlice> Debug for ByteSliceInnerPacketBuilder<B> {
 ///
 /// `SerializeError` is the type of errors returned from methods on the
 /// [`Serializer`] trait. The `Alloc` variant indicates that a new buffer could
-/// not be allocated, while the `Mtu` variant indicates that an MTU constraint
-/// was exceeded.
+/// not be allocated, while the `SizeLimitExceeded` variant indicates that a
+/// size limit constraint was exceeded.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SerializeError<A> {
     /// A new buffer could not be allocated.
     Alloc(A),
-    /// A maximum transmission unit (MTU) constraint was exceeded.
-    Mtu,
+    /// The size limit constraint was exceeded.
+    SizeLimitExceeded,
 }
 
 impl<A> SerializeError<A> {
@@ -1159,16 +1155,16 @@ impl<A> SerializeError<A> {
     pub fn is_alloc(&self) -> bool {
         match self {
             SerializeError::Alloc(_) => true,
-            SerializeError::Mtu => false,
+            SerializeError::SizeLimitExceeded => false,
         }
     }
 
-    /// Is this `SerializeError::Mtu`?
+    /// Is this `SerializeError::SizeLimitExceeded`?
     #[inline]
-    pub fn is_mtu(&self) -> bool {
+    pub fn is_size_limit_exceeded(&self) -> bool {
         match self {
             SerializeError::Alloc(_) => false,
-            SerializeError::Mtu => true,
+            SerializeError::SizeLimitExceeded => true,
         }
     }
 }
@@ -1541,7 +1537,7 @@ pub trait Serializer: Sized {
             (
                 match err {
                     SerializeError::Alloc(()) => BufferTooShortError.into(),
-                    SerializeError::Mtu => SerializeError::Mtu,
+                    SerializeError::SizeLimitExceeded => SerializeError::SizeLimitExceeded,
                 },
                 slf,
             )
@@ -1615,18 +1611,17 @@ pub trait Serializer: Sized {
         Nested { inner: self, outer }
     }
 
-    /// Creates a new `Serializer` which will enforce a maximum transmission
-    /// unit (MTU).
+    /// Creates a new `Serializer` which will enforce a size limit.
     ///
-    /// `with_mtu` consumes this `Serializer` and an MTU, and produces a new
-    /// `Serializer` which will enforce the given MTU on all serialization
-    /// requests. Note that the given MTU will be enforced at this layer -
+    /// `with_size_limit` consumes this `Serializer` and limit, and produces a
+    /// new `Serializer` which will enforce the given limit on all serialization
+    /// requests. Note that the given limit will be enforced at this layer -
     /// serialization requests will be rejected if the body produced by the
-    /// request at this layer would exceed the MTU. It has no effect on headers
-    /// or footers added by encapsulating layers outside of this one.
+    /// request at this layer would exceed the limit. It has no effect on
+    /// headers or footers added by encapsulating layers outside of this one.
     #[inline]
-    fn with_mtu(self, mtu: usize) -> Nested<Self, MtuPacketBuilder<()>> {
-        self.encapsulate(MtuPacketBuilder { mtu, inner: () })
+    fn with_size_limit(self, limit: usize) -> Nested<Self, LimitedSizePacketBuilder<()>> {
+        self.encapsulate(LimitedSizePacketBuilder { limit, inner: () })
     }
 }
 
@@ -1734,31 +1729,30 @@ impl<A: Serializer, B: Serializer<Buffer = A::Buffer>> Serializer for EitherSeri
 }
 
 /// The direction a buffer's body should be truncated from to force
-/// it to fit within a maximum transmission unit (MTU).
+/// it to fit within a size limit.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum TruncateDirection {
-    /// If a buffer cannot fit within an MTU, discard bytes from the
+    /// If a buffer cannot fit within a limit, discard bytes from the
     /// front of the body.
     DiscardFront,
-    /// If a buffer cannot fit within an MTU, discard bytes from the
+    /// If a buffer cannot fit within a limit, discard bytes from the
     /// end of the body.
     DiscardBack,
-    /// Do not attempt to truncate a buffer to make it fit within an MTU.
+    /// Do not attempt to truncate a buffer to make it fit within a limit.
     NoTruncating,
 }
 
-/// A [`Serializer`] that truncates its body if it would exceed a maximum
-/// transmission unit (MTU) constraint.
+/// A [`Serializer`] that truncates its body if it would exceed a size limit.
 ///
 /// `TruncatingSerializer` wraps a buffer, and implements `Serializer`. Unlike
 /// the blanket impl of `Serializer` for `B: GrowBuffer + ShrinkBuffer`, if the
-/// buffer's body exceeds the MTU constraint passed to `Serializer::serialize`,
-/// the body is truncated to fit.
+/// buffer's body exceeds the size limit constraint passed to
+/// `Serializer::serialize`, the body is truncated to fit.
 ///
-/// Note that this does not guarantee that MTU errors will not occur. The MTU
-/// may be small enough that the encapsulating headers alone exceed the MTU.
-/// There may also be a minimum body length constraint which is larger than the
-/// MTU.
+/// Note that this does not guarantee that size limit exceeded errors will not
+/// occur. The size limit may be small enough that the encapsulating headers
+/// alone exceed the size limit.  There may also be a minimum body length
+/// constraint which is larger than the size limit.
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct TruncatingSerializer<B> {
@@ -1783,7 +1777,7 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
     ) -> Result<BB, (SerializeError<P::Error>, Self)> {
         let c = match outer.try_constraints() {
             Some(c) => c,
-            None => return Err((SerializeError::Mtu, self)),
+            None => return Err((SerializeError::SizeLimitExceeded, self)),
         };
         let original_len = self.buffer.len();
         let excess_bytes =
@@ -1792,13 +1786,15 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
             match self.direction {
                 TruncateDirection::DiscardFront => self.buffer.shrink_front(excess_bytes),
                 TruncateDirection::DiscardBack => self.buffer.shrink_back(excess_bytes),
-                TruncateDirection::NoTruncating => return Err((SerializeError::Mtu, self)),
+                TruncateDirection::NoTruncating => {
+                    return Err((SerializeError::SizeLimitExceeded, self))
+                }
             }
         }
 
         let padding = c.min_body_len().saturating_sub(self.buffer.len());
 
-        // At this point, the body and padding MUST fit within the MTU. Note
+        // At this point, the body and padding MUST fit within the limit. Note
         // that PacketConstraints guarantees that min_body_len <= max_body_len,
         // so the padding can't cause this assertion to fail.
         debug_assert!(self.buffer.len() + padding <= c.max_body_len());
@@ -1926,7 +1922,7 @@ mod tests {
         fn into<E>(self) -> SerializeError<E> {
             match self {
                 SerializeError::Alloc(never) => match never {},
-                SerializeError::Mtu => SerializeError::Mtu,
+                SerializeError::SizeLimitExceeded => SerializeError::SizeLimitExceeded,
             }
         }
     }
@@ -1935,7 +1931,8 @@ mod tests {
     // particular:
     // - If serialization fails, the original Serializer is returned unmodified.
     // - If `outer.try_constraints()` returns `None`, serialization fails.
-    // - If the MTU is exceeded and truncation is disabled, serialization fails.
+    // - If the size limit is exceeded and truncation is disabled, serialization
+    //   fails.
     // - If serialization succeeds, the body has the correct length, including
     //   taking into account `outer`'s minimum body length requirement
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -1975,7 +1972,7 @@ mod tests {
                 }
             };
             let outer_constraints = outer.try_constraints();
-            let should_fail_mtu = outer_constraints
+            let should_exceed_size_limit = outer_constraints
                 .map(|c| c.max_body_len() < inner_len && !self.truncating)
                 .unwrap_or(true);
 
@@ -1989,13 +1986,13 @@ mod tests {
                     let body_len =
                         cmp::min(cmp::max(inner_len, c.min_body_len()), c.max_body_len());
                     assert_eq!(buf.len(), c.header_len() + body_len + c.footer_len());
-                    assert!(!should_fail_mtu);
+                    assert!(!should_exceed_size_limit);
                     Ok(buf)
                 }
                 Err((err, ser)) => {
-                    // If we shouldn't fail as a result of an MTU error, we
-                    // might still fail as a result of allocation.
-                    assert!(should_fail_mtu || err.is_alloc());
+                    // If we shouldn't fail as a result of a size limit exceeded
+                    // error, we might still fail as a result of allocation.
+                    assert!(should_exceed_size_limit || err.is_alloc());
                     // If serialization fails, the original Serializer should be
                     // unmodified.
                     assert_eq!(ser, orig);
@@ -2024,15 +2021,15 @@ mod tests {
             self.encapsulate(outer).into_verifying(truncating)
         }
 
-        fn with_mtu_verifying(
+        fn with_size_limit_verifying(
             self,
-            mtu: usize,
+            limit: usize,
             truncating: bool,
-        ) -> VerifyingSerializer<Nested<Self, MtuPacketBuilder<()>>>
+        ) -> VerifyingSerializer<Nested<Self, LimitedSizePacketBuilder<()>>>
         where
             Self::Buffer: ReusableBuffer,
         {
-            self.with_mtu(mtu).into_verifying(truncating)
+            self.with_size_limit(limit).into_verifying(truncating)
         }
     }
 
@@ -2216,7 +2213,7 @@ mod tests {
                 .serialize_vec(DummyPacketBuilder::new(0, 0, 0, 9))
                 .unwrap_err()
                 .0,
-            SerializeError::Mtu
+            SerializeError::SizeLimitExceeded
         );
 
         // `into_serializer_with` truncates the buffer's body to zero before
@@ -2399,7 +2396,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mtu() {
+    fn test_size_limit() {
         // ser is a Serializer that will consume 1 byte of buffer space
         fn test<S: Serializer + Clone + Debug + Eq>(ser: S)
         where
@@ -2412,49 +2409,50 @@ mod tests {
 
             let pb = DummyPacketBuilder::new(1, 1, 0, usize::MAX);
 
-            // Test that an MTU of 3 is OK. Note that this is an important test
-            // since it tests the case when the MTU is exactly sufficient. A
-            // previous version of this code had a bug where a packet which fit
-            // the MTU exactly would be rejected.
+            // Test that a size limit of 3 is OK. Note that this is an important
+            // test since it tests the case when the size limit is exactly
+            // sufficient. A previous version of this code had a bug where a
+            // packet which fit the size limit exactly would be rejected.
             assert!(ser
                 .clone()
                 .encapsulate_verifying(pb, false)
-                .with_mtu_verifying(3, false)
+                .with_size_limit_verifying(3, false)
                 .serialize_vec_outer()
                 .is_ok());
-            // Test that a more-than-large-enough MTU of 4 is OK.
+            // Test that a more-than-large-enough size limit of 4 is OK.
             assert!(ser
                 .clone()
                 .encapsulate_verifying(pb, false)
-                .with_mtu_verifying(4, false)
+                .with_size_limit_verifying(4, false)
                 .serialize_vec_outer()
                 .is_ok());
-            // Test that the inner MTU of 1 only applies to the inner
+            // Test that the inner size limit of 1 only applies to the inner
             // serializer, and so is still OK even though the outer serializer
             // consumes 3 bytes total.
             assert!(ser
                 .clone()
-                .with_mtu_verifying(1, false)
+                .with_size_limit_verifying(1, false)
                 .encapsulate_verifying(pb, false)
-                .with_mtu_verifying(3, false)
+                .with_size_limit_verifying(3, false)
                 .serialize_vec_outer()
                 .is_ok());
-            // Test that the inner MTU of 0 is exceeded by the inner
+            // Test that the inner size limit of 0 is exceeded by the inner
             // serializer's 1 byte length.
             assert!(ser
                 .clone()
-                .with_mtu_verifying(0, false)
+                .with_size_limit_verifying(0, false)
                 .encapsulate_verifying(pb, false)
                 .serialize_vec_outer()
                 .is_err());
-            // Test that an MTU which would be exceeded by the encapsulating
-            // layer is rejected by Nested's implementation. If this doesn't
-            // work properly, then the MTU should underflow, resulting in a
-            // panic (see the Nested implementation of Serialize).
+            // Test that a size limit which would be exceeded by the
+            // encapsulating layer is rejected by Nested's implementation. If
+            // this doesn't work properly, then the size limit should underflow,
+            // resulting in a panic (see the Nested implementation of
+            // Serialize).
             assert!(ser
                 .clone()
                 .encapsulate_verifying(pb, false)
-                .with_mtu_verifying(1, false)
+                .with_size_limit_verifying(1, false)
                 .serialize_vec_outer()
                 .is_err());
         }
@@ -2474,7 +2472,7 @@ mod tests {
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::DiscardFront)
                 .into_verifying(true);
-        let buf = ser.clone().with_mtu_verifying(4, true).serialize_vec_outer().unwrap();
+        let buf = ser.clone().with_size_limit_verifying(4, true).serialize_vec_outer().unwrap();
         let buf: &[u8] = buf.as_ref();
         assert_eq!(buf, &[6, 7, 8, 9][..]);
 
@@ -2485,7 +2483,7 @@ mod tests {
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::DiscardBack)
                 .into_verifying(true);
-        let buf = ser.with_mtu_verifying(7, true).serialize_vec_outer().unwrap();
+        let buf = ser.with_size_limit_verifying(7, true).serialize_vec_outer().unwrap();
         let buf: &[u8] = buf.as_ref();
         assert_eq!(buf, &[0, 1, 2, 3, 4, 5, 6][..]);
 
@@ -2496,8 +2494,8 @@ mod tests {
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::NoTruncating)
                 .into_verifying(false);
-        assert!(ser.clone().with_mtu_verifying(5, true).serialize_vec_outer().is_err());
-        assert!(ser.with_mtu_verifying(5, true).serialize_vec_outer().is_err());
+        assert!(ser.clone().with_size_limit_verifying(5, true).serialize_vec_outer().is_err());
+        assert!(ser.with_size_limit_verifying(5, true).serialize_vec_outer().is_err());
 
         //
         // Test that, when serialization fails, any truncation is undone.
@@ -2510,14 +2508,14 @@ mod tests {
         ) where
             S::Buffer: ReusableBuffer + Debug,
         {
-            // Serialize with a PacketBuilder with an MTU of 1 so that the body
-            // (of length 2) is too large. If `ser` is configured not to
-            // truncate, it should result in an MTU error. If it is configured
-            // to truncate, the 2 + 2 = 4 combined bytes of header and footer
-            // will cause allocating a new buffer to fail, and it should result
-            // in an allocation failure. Even if the body was truncated, it
-            // should be returned to its original un-truncated state before
-            // being returned from `serialize`.
+            // Serialize with a PacketBuilder with a size limit of 1 so that the
+            // body (of length 2) is too large. If `ser` is configured not to
+            // truncate, it should result in a size limit error. If it is
+            // configured to truncate, the 2 + 2 = 4 combined bytes of header
+            // and footer will cause allocating a new buffer to fail, and it
+            // should result in an allocation failure. Even if the body was
+            // truncated, it should be returned to its original un-truncated
+            // state before being returned from `serialize`.
             let (e, new_ser) =
                 ser.clone().serialize_no_alloc(DummyPacketBuilder::new(2, 2, 0, 1)).unwrap_err();
             assert_eq!(err, e);
@@ -2538,7 +2536,7 @@ mod tests {
         test_serialization_failure(
             TruncatingSerializer::new(body.clone(), TruncateDirection::NoTruncating)
                 .into_verifying(false),
-            SerializeError::Mtu,
+            SerializeError::SizeLimitExceeded,
         );
     }
 
