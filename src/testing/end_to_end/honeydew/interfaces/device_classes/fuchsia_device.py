@@ -39,7 +39,7 @@ class FuchsiaDevice(abc.ABC):
     def __init__(
             self,
             device_name: str,
-            ssh_pkey: str = DEFAULT_SSH_PKEY,
+            ssh_pkey: Optional[str] = DEFAULT_SSH_PKEY,
             ssh_user: str = DEFAULT_SSH_USER,
             device_ip_address: Optional[str] = None) -> None:
         if not ssh_pkey:
