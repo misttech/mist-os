@@ -14,7 +14,7 @@ use futures::{SinkExt as _, StreamExt as _, TryFutureExt as _};
 use net_declare::{fidl_subnet, std_socket_addr_v4};
 use netstack_testing_common::{
     interfaces, ping as ping_helper,
-    realms::{Netstack2, TestSandboxExt as _},
+    realms::{Netstack, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -91,10 +91,10 @@ enum Step {
     "link_flap",
     &[Step::Bridge(vec![Link::A]), Step::FlapLink(Link::A)];
     "link_flap")]
-async fn test(name: &str, sub_name: &str, steps: &[Step]) {
+async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_{}_gateway", name, sub_name))
+        .create_netstack_realm::<N, _>(format!("{}_{}_gateway", name, sub_name))
         .expect("failed to create gateway netstack realm");
     let net_switch_gateway = sandbox
         .create_network("net_switch_gateway")
@@ -110,7 +110,7 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
         .expect("configure address");
 
     let switch_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_{}_switch", name, sub_name))
+        .create_netstack_realm::<N, _>(format!("{}_{}_switch", name, sub_name))
         .expect("failed to create switch netstack realm");
     let switch_if = switch_realm
         .join_network(&net_switch_gateway, "switch_ep")
@@ -191,7 +191,7 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
                         std::collections::hash_map::Entry::Vacant(vacant) => {
                             // Create a new netstack and a new network between it and the host.
                             let realm = sandbox
-                                .create_netstack_realm::<Netstack2, _>(format!(
+                                .create_netstack_realm::<N, _>(format!(
                                     "{}_{}_host{}",
                                     name, sub_name, link
                                 ))
@@ -338,10 +338,10 @@ async fn test(name: &str, sub_name: &str, steps: &[Step]) {
 // Tests that an admin-disabled interface attached to a bridge is still
 // disabled when the bridge is removed.
 #[netstack_test]
-async fn test_remove_bridge_interface_disabled(name: &str) {
+async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_gateway", name))
+        .create_netstack_realm::<N, _>(format!("{}_gateway", name))
         .expect("failed to create gateway netstack realm");
     let net_switch_gateway = sandbox
         .create_network("net_switch_gateway")
@@ -357,7 +357,7 @@ async fn test_remove_bridge_interface_disabled(name: &str) {
         .expect("configure address");
 
     let switch_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_switch", name))
+        .create_netstack_realm::<N, _>(format!("{}_switch", name))
         .expect("failed to create switch netstack realm");
     let switch_if = switch_realm
         .join_network(&net_switch_gateway, "switch_ep")

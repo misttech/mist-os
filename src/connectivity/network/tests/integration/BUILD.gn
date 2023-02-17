@@ -4,11 +4,14 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
 group("tests") {
   testonly = true
   deps = [
     ":netstack-integration-tests",
+    ":netstack-integration-tests-with-expectations",
     "macros:netstack_testing_macros_test",
   ]
 
@@ -20,7 +23,6 @@ group("tests") {
 }
 
 tests = [
-  "bridge",
   "device",
   "dhcp",
   "dns",
@@ -36,11 +38,22 @@ tests = [
   "sys",
 ]
 
+tests_with_expectations = [ "bridge" ]
+
 long_tests = [ "multicast-forwarding" ]
 
 foreach(test, tests) {
   name = "netstack-${test}-integration-test"
   fuchsia_test_component(name) {
+    manifest = "meta/${name}.cml"
+    deps = [ test ]
+  }
+}
+
+foreach(test, tests_with_expectations) {
+  name = "netstack-${test}-integration-test"
+  fuchsia_test_component_with_expectations(name) {
+    expectations = "expects/${name}.json5"
     manifest = "meta/${name}.cml"
     deps = [ test ]
   }
@@ -102,6 +115,15 @@ fuchsia_test_package("netstack-integration-tests") {
   }
 
   deps = package_deps
+}
+
+fuchsia_test_package("netstack-integration-tests-with-expectations") {
+  test_components = []
+  foreach(test, tests_with_expectations) {
+    test_components += [ ":netstack-${test}-integration-test" ]
+  }
+
+  deps = package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
 fuchsia_test_package("netstack-long-integration-tests") {
