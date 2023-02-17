@@ -16,19 +16,6 @@ group("bootstrap") {
   ]
 }
 
-kernel_cmdline("disable.drivers_for_dfv2") {
-  # da7219 is disabled in favor of da7219-dfv2.
-  args = [ "devmgr.disabled-drivers=fuchsia-boot:///#meta/da7219.cm" ]
-}
-
-group("bootstrap-dfv2") {
-  deps = [
-    "//products/kernel_cmdline:devmgr.enable-ephemeral--true",
-    "//products/kernel_cmdline:driver_manager.root-meta--platform-bus.cm",
-    "//products/kernel_cmdline:driver_manager.use_driver_framework_v2--true",
-  ]
-}
-
 # Drivers which are meant only for non-user facing products.
 group("bootstrap-eng") {
   deps = [ "//src/devices/misc/drivers/cpu-trace" ]

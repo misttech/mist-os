@@ -4,5 +4,5 @@
 
 import("x64.gni")
 
-# Enable DFv2.
-board_bootfs_labels += [ "//bundles/drivers:bootstrap-dfv2" ]
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/x64/dfv2_board_information.json5"

@@ -4,8 +4,9 @@
 
 import("chromebook-x64.gni")
 
-board_bootfs_labels += [
-  "//bundles/drivers:bootstrap-dfv2",
-  "//bundles/drivers:disable.drivers_for_dfv2",
-  "//src/media/audio/drivers/codecs/da7219:component-dfv2",
-]
+# BoardInformation for Product Assembly
+board_information_for_assembly =
+    "//boards/chromebook-x64/dfv2_board_information.json5"
+
+board_bootfs_labels +=
+    [ "//src/media/audio/drivers/codecs/da7219:component-dfv2" ]
