@@ -7,7 +7,7 @@ use assembly_components::ComponentBuilder;
 use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
-use fuchsia_pkg::PackageBuilder;
+use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Default, PartialEq)]
@@ -145,6 +145,7 @@ impl CompiledPackageBuilder {
 
         let package_manifest_path = outdir.join("package_manifest.json");
         package_builder.manifest_path(&package_manifest_path);
+        package_builder.manifest_blobs_relative_to(RelativeTo::File);
         let metafar_path = outdir.join(format!("{}.far", &self.name));
         package_builder.build(&outdir, metafar_path).context("building package")?;
 

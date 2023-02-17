@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use assembly_config_schema::assembly_config::ShellCommands;
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::{Utf8Path, Utf8PathBuf};
-use fuchsia_pkg::PackageBuilder;
+use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeSet;
 
 type RefToPackage<'a> = (&'a String, &'a BTreeSet<PackageInternalPathBuf>);
@@ -43,6 +43,7 @@ impl ShellCommandsBuilder {
         let manifest_path = packages_dir.join(SHELL_COMMANDS_MANIFEST_FILE_NAME);
         package_builder.repository(&self.repository);
         package_builder.manifest_path(&manifest_path);
+        package_builder.manifest_blobs_relative_to(RelativeTo::File);
         self.write_trampolines(&mut package_builder, &packages_dir)?;
         package_builder
             .build(&packages_dir, &packages_dir.join("meta.far"))

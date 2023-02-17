@@ -6,7 +6,7 @@ use {
     anyhow::Result,
     assembly_package_list::{PackageList, PackageUrlList, WritablePackageList},
     camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_pkg::{PackageBuilder, PackageManifest},
+    fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo},
     std::collections::BTreeMap,
 };
 
@@ -95,6 +95,7 @@ impl BasePackageBuilder {
         }
         let manifest_path = outdir.join("package_manifest.json");
         builder.manifest_path(manifest_path.clone());
+        builder.manifest_blobs_relative_to(RelativeTo::File);
         builder.build(gendir.as_std_path(), out.as_std_path())?;
 
         Ok(BasePackageBuildResults {

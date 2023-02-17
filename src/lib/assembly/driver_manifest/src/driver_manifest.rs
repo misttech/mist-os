@@ -6,8 +6,7 @@ use {
     anyhow::{Context, Result},
     assembly_config_schema::DriverDetails,
     camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_pkg::PackageBuilder,
-    fuchsia_pkg::PackageManifest,
+    fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo},
     serde::{Deserialize, Serialize},
     std::fs::File,
 };
@@ -77,6 +76,7 @@ impl DriverManifestBuilder {
         let package_manifest_path = packagedir.join("package_manifest.json");
         let metafar_path = packagedir.join("meta.far");
         builder.manifest_path(package_manifest_path.clone());
+        builder.manifest_blobs_relative_to(RelativeTo::File);
         builder
             .build(packagedir, metafar_path.clone())
             .context(format!("Building driver manifest package {}", metafar_path))?;
