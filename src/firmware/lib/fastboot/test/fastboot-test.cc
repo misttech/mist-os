@@ -915,7 +915,7 @@ class FastbootRebootTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
 
-    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server), state_);
+    mock_.emplace(std::move(endpoints->server), state_);
 
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
@@ -933,7 +933,7 @@ class FastbootRebootTest : public zxtest::Test {
   async::Loop loop_;
   std::shared_ptr<TestState> state_ = std::make_shared<TestState>();
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
-  async_patterns::DispatcherBound<MockComponent> mock_;
+  async_patterns::DispatcherBound<MockComponent> mock_{loop_.dispatcher()};
 };
 
 TEST_F(FastbootRebootTest, Reboot) {
@@ -1098,7 +1098,7 @@ class FastbootFshostTest : public FastbootDownloadTest {
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
 
-    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server), state_);
+    mock_.emplace(std::move(endpoints->server), state_);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
@@ -1109,7 +1109,7 @@ class FastbootFshostTest : public FastbootDownloadTest {
   async::Loop loop_;
   std::shared_ptr<TestState> state_ = std::make_shared<TestState>();
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
-  async_patterns::DispatcherBound<MockComponent> mock_;
+  async_patterns::DispatcherBound<MockComponent> mock_{loop_.dispatcher()};
 };
 
 TEST_F(FastbootFshostTest, OemAddStagedBootloaderFile) {
@@ -1329,7 +1329,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
 
-    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server));
+    mock_.emplace(std::move(endpoints->server));
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
@@ -1337,7 +1337,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
  private:
   async::Loop loop_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
-  async_patterns::DispatcherBound<MockComponent> mock_;
+  async_patterns::DispatcherBound<MockComponent> mock_{loop_.dispatcher()};
 };
 
 TEST_F(FastbootBuildInfoTest, GetVarHwRevision) {

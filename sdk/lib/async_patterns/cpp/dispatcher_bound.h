@@ -13,6 +13,7 @@
 #include <zircon/assert.h>
 
 #include <cstdlib>
+#include <utility>
 
 namespace async_patterns {
 
@@ -35,10 +36,10 @@ namespace async_patterns {
 //     // at construction time.
 //     class Background {
 //      public:
-//       explicit Background(async_dispatcher_t* dispatcher) {
+//       explicit Background() {
 //         // Perform some asynchronous work. The work is canceled if
 //         // |Background| is destroyed.
-//         task_.Post(dispatcher);
+//         task_.Post(async_get_default_dispatcher());
 //       }
 //
 //      private:
@@ -55,8 +56,8 @@ namespace async_patterns {
 //       // Asynchronously constructs a |Background| object on its dispatcher.
 //       // Code in |Owner| and code in |Background| may run concurrently.
 //       explicit Owner() :
-//           background_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-//           background_{background_loop_.dispatcher()} {}
+//           background_loop_(&kAsyncLoopConfigAttachToCurrentThread),
+//           background_{background_loop_.dispatcher(), std::in_place} {}
 //
 //      private:
 //       // The async loop which will manage |Background| objects.
@@ -85,31 +86,33 @@ namespace async_patterns {
 template <typename T>
 class DispatcherBound {
  public:
-  // Constructs a |DispatcherBound| that does not hold an instance of |T|.
-  DispatcherBound() = default;
-
   // Asynchronously constructs |T| on a task posted to |dispatcher|.
   //
+  // Arguments after |std::in_place| are sent to the constructor of |T|.
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
   // If the dispatcher is shutdown, |T| will be synchronously constructed.
   template <typename... Args>
-  explicit DispatcherBound(async_dispatcher_t* dispatcher, Args&&... args)
+  explicit DispatcherBound(async_dispatcher_t* dispatcher, std::in_place_t, Args&&... args)
       : dispatcher_(dispatcher) {
     storage_.Construct<T>(dispatcher, std::forward<Args>(args)...);
   }
 
-  // Asynchronously constructs |T| on a task posted to |dispatcher|.
+  // Constructs a |DispatcherBound| that does not hold an instance of |T|.
+  //
+  // One may later construct |T| using |emplace| on the |dispatcher|.
+  explicit DispatcherBound(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
+  // Asynchronously constructs |T| on a task posted to the dispatcher.
   //
   // If this object already holds an instance of |T|, that older instance will
-  // be asynchronously destroyed on the existing dispatcher it was associated with.
+  // be asynchronously destroyed on the dispatcher.
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   template <typename... Args>
-  void emplace(async_dispatcher_t* dispatcher, Args&&... args) {
+  void emplace(Args&&... args) {
     reset();
-    dispatcher_ = dispatcher;
-    storage_.Construct<T>(dispatcher, std::forward<Args>(args)...);
+    storage_.Construct<T>(dispatcher_, std::forward<Args>(args)...);
   }
 
   // Asynchronously calls |member|, a pointer to member function of |T|, using
@@ -127,6 +130,7 @@ class DispatcherBound {
   //     class Owner {
   //      public:
   //       Owner(async_dispatcher_t* owner_dispatcher) : receiver_{this, owner_dispatcher} {
+  //         background_.emplace();
   //         // Tell |background_| to |DoSomething|, then send back the return
   //         // value to |Owner| using |receiver_|.
   //         background_
@@ -149,6 +153,7 @@ class DispatcherBound {
   // The task will be synchronously called if the dispatcher is shutdown.
   template <typename Member, typename... Args>
   auto AsyncCall(Member T::*member, Args&&... args) {
+    ZX_ASSERT(has_value());
     using invoke_result = std::invoke_result<Member, Args...>;
     constexpr bool kIsInvocable = std::is_invocable_v<Member, Args...>;
     static_assert(kIsInvocable,
@@ -201,6 +206,15 @@ class DispatcherBound {
   async_dispatcher_t* dispatcher_;
   internal::DispatcherBoundStorage storage_;
 };
+
+// Constructs a |DispatcherBound<T>| that holds an instance of |T| by sending
+// the |args| to the constructor of |T| run from a |dispatcher| task.
+//
+// See |DispatcherBound| constructor for details.
+template <typename T, typename... Args>
+DispatcherBound<T> MakeDispatcherBound(async_dispatcher_t* dispatcher, Args&&... args) {
+  return DispatcherBound<T>{dispatcher, std::in_place, std::forward<Args>(args)...};
+}
 
 }  // namespace async_patterns
 

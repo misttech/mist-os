@@ -93,8 +93,8 @@ class ThreadAffine {
   ArcAtomic counter_;
 };
 
-TEST_F(DispatcherBound, DefaultConstruction) {
-  async_patterns::DispatcherBound<ThreadAffine> obj;
+TEST_F(DispatcherBound, ConstructDisengaged) {
+  async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
   EXPECT_FALSE(obj.has_value());
 }
 
@@ -106,8 +106,8 @@ TEST_F(DispatcherBound, Construct) {
   // From a foreign thread |t1|, we schedule the creation and destruction of a
   // |ThreadAffine| object onto the loop.
   std::thread t1{[&] {
-    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher(), loop_thread_id(),
-                                                      object_count};
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher(), std::in_place,
+                                                      loop_thread_id(), object_count};
     EXPECT_TRUE(obj.has_value());
     create.Signal();
 
@@ -141,13 +141,13 @@ TEST_F(DispatcherBound, Emplace) {
   // From a foreign thread |t1|, we schedule the creation and destruction of
   // two |ThreadAffine| objects onto the loop.
   std::thread t1{[&] {
-    async_patterns::DispatcherBound<ThreadAffine> obj;
-    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count_1);
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
+    obj.emplace(loop_thread_id(), object_count_1);
     EXPECT_TRUE(obj.has_value());
     did_create_1.Signal();
 
     will_create_2.Wait();
-    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count_2);
+    obj.emplace(loop_thread_id(), object_count_2);
     EXPECT_TRUE(obj.has_value());
     did_create_2.Signal();
 
@@ -183,7 +183,8 @@ TEST_F(DispatcherBound, Emplace) {
 
 TEST_F(DispatcherBound, AsyncCall) {
   auto count = make_arc_atomic();
-  async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher(), loop_thread_id(), count};
+  async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher(), std::in_place,
+                                                    loop_thread_id(), count};
   EXPECT_OK(loop().RunUntilIdle());
 
   {
@@ -327,7 +328,7 @@ TEST_F(DispatcherBound, AsyncCallWithReply) {
 
     async::Loop background_loop_{&kAsyncLoopConfigNeverAttachToThread};
     async_patterns::DispatcherBound<Background> background_{background_loop_.dispatcher(),
-                                                            std::string("abc")};
+                                                            std::in_place, std::string("abc")};
     async_patterns::Receiver<Owner> receiver_;
     bool got_result_ = false;
   };
@@ -349,9 +350,9 @@ TEST_F(DispatcherBound, SynchronouslyRunIfShutdown) {
   loop().Shutdown();
   auto object_count = make_arc_atomic();
   {
-    async_patterns::DispatcherBound<ThreadAffine> obj;
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
     EXPECT_EQ(0, object_count->load());
-    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    obj.emplace(loop_thread_id(), object_count);
     EXPECT_EQ(1, object_count->load());
 
     auto result = make_arc_atomic();
@@ -364,9 +365,9 @@ TEST_F(DispatcherBound, SynchronouslyRunIfShutdown) {
 TEST_F(DispatcherBound, ShutdownAfterConstruction) {
   auto object_count = make_arc_atomic();
   {
-    async_patterns::DispatcherBound<ThreadAffine> obj;
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
     EXPECT_EQ(0, object_count->load());
-    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    obj.emplace(loop_thread_id(), object_count);
     loop().Shutdown();
     EXPECT_EQ(1, object_count->load());
   }
@@ -376,9 +377,9 @@ TEST_F(DispatcherBound, ShutdownAfterConstruction) {
 TEST_F(DispatcherBound, ShutdownAfterAsyncCall) {
   auto object_count = make_arc_atomic();
   {
-    async_patterns::DispatcherBound<ThreadAffine> obj;
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
     EXPECT_EQ(0, object_count->load());
-    obj.emplace(loop().dispatcher(), loop_thread_id(), object_count);
+    obj.emplace(loop_thread_id(), object_count);
     loop().RunUntilIdle();
     EXPECT_EQ(1, object_count->load());
 
@@ -393,11 +394,20 @@ TEST_F(DispatcherBound, ShutdownAfterAsyncCall) {
 TEST_F(DispatcherBound, DispatcherOutlivesDispatcherBound) {
   auto count = make_arc_atomic();
   {
-    async_patterns::DispatcherBound<ThreadAffine> obj;
-    obj.emplace(loop().dispatcher(), loop_thread_id(), count);
+    async_patterns::DispatcherBound<ThreadAffine> obj{loop().dispatcher()};
+    obj.emplace(loop_thread_id(), count);
   }
   loop().RunUntilIdle();
   EXPECT_EQ(0, count->load());
+}
+
+TEST_F(DispatcherBound, MakeDispatcherBound) {
+  auto object_count = make_arc_atomic();
+  auto obj = async_patterns::MakeDispatcherBound<ThreadAffine>(loop().dispatcher(),
+                                                               loop_thread_id(), object_count);
+  EXPECT_EQ(0, object_count->load());
+  loop().RunUntilIdle();
+  EXPECT_EQ(1, object_count->load());
 }
 
 }  // namespace

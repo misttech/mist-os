@@ -57,6 +57,15 @@ class TestDispatcherBound final : public DispatcherBound<T> {
   }
 };
 
+// Constructs a |TestDispatcherBound<T>| that holds an instance of |T| by sending
+// the |args| to the constructor of |T| run from a |dispatcher| task.
+//
+// See |TestDispatcherBound| constructor for details.
+template <typename T, typename... Args>
+TestDispatcherBound<T> MakeTestDispatcherBound(async_dispatcher_t* dispatcher, Args&&... args) {
+  return TestDispatcherBound<T>{dispatcher, std::in_place, std::forward<Args>(args)...};
+}
+
 }  // namespace async_patterns
 
 #endif  // LIB_ASYNC_PATTERNS_TESTING_CPP_DISPATCHER_BOUND_H_

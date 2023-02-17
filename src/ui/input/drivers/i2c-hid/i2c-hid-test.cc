@@ -290,7 +290,7 @@ class I2cHidTest : public zxtest::Test {
     auto io_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(io_endpoints.status_value());
 
-    mock_component_.emplace(loop_.dispatcher(), std::move(irq), std::move(io_endpoints->server));
+    mock_component_.emplace(std::move(irq), std::move(io_endpoints->server));
 
     parent_->AddFidlService(fuchsia_hardware_interrupt::Service::Name,
                             std::move(io_endpoints->client), "irq001");
@@ -324,7 +324,7 @@ class I2cHidTest : public zxtest::Test {
   fake_hidbus_ifc::FakeHidbusIfc fake_hid_bus_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
   async::Loop loop_;
-  async_patterns::DispatcherBound<MockComponent> mock_component_;
+  async_patterns::DispatcherBound<MockComponent> mock_component_{loop_.dispatcher()};
 };
 
 TEST_F(I2cHidTest, HidTestBind) {
