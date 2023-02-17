@@ -65,14 +65,6 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   fidl::InterfaceRequestHandler<fuchsia::accessibility::scene::Provider> GetHandler();
 
  private:
-  // Helper method to poll continuously for updates to the a11y view's
-  // display connection status.
-  //
-  // Note that a11y-manager will exit if the a11y view ever becomes disconnected
-  // from the display, as this condition indicates that scene manager has
-  // crashed.
-  void WatchParentViewportStatus();
-
   // Helper method to poll continuously for layout info updates.
   void WatchForResizes();
 
@@ -105,11 +97,6 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   // Also true iff the transform w/ id kHighlightTransformId is currently a child
   // of the transform w/ id kHighlightViewRootTransformId.
   bool highlight_is_present_ = false;
-
-  // True iff the last call to
-  // fuchsia.ui.composition.ParentViewportWatcher/GetStatus() returned
-  // CONNECTED_TO_DISPLAY.
-  bool connected_to_display_ = false;
 
   // Holds the proxy viewport creation token between the time that `CreateView`
   // is called, and the first layout info is received from scenic.

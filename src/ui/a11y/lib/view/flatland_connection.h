@@ -30,9 +30,9 @@ class FlatlandConnection final {
                OnFramePresentedCallback callback);
 
  private:
-  void OnError(fuchsia::ui::composition::FlatlandError error);
-  void OnNextFrameBegin(fuchsia::ui::composition::OnNextFrameBeginValues values);
-  void OnFramePresented(fuchsia::scenic::scheduling::FramePresentedInfo info);
+  void OnError(const fuchsia::ui::composition::FlatlandError& error);
+  void OnNextFrameBegin(const fuchsia::ui::composition::OnNextFrameBeginValues& values);
+  void OnFramePresented(const fuchsia::scenic::scheduling::FramePresentedInfo& info);
 
   fuchsia::ui::composition::FlatlandPtr flatland_;
   uint32_t present_credits_ = 1;
@@ -42,8 +42,8 @@ class FlatlandConnection final {
                    OnFramePresentedCallback callback);
     ~PendingPresent();
 
-    PendingPresent(PendingPresent&& other);
-    PendingPresent& operator=(PendingPresent&& other);
+    PendingPresent(PendingPresent&& other) noexcept;
+    PendingPresent& operator=(PendingPresent&& other) noexcept;
 
     fuchsia::ui::composition::PresentArgs present_args;
     OnFramePresentedCallback callback;

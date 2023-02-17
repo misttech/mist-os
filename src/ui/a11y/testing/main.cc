@@ -34,9 +34,16 @@ int run_a11y_manager(int argc, const char** argv) {
 
   std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view;
   if (use_flatland) {
+    auto make_flatland = [&]() {
+      fidl::InterfacePtr flatland = context->svc()->Connect<fuchsia::ui::composition::Flatland>();
+      flatland.set_error_handler([&](zx_status_t status) {
+        FX_PLOGS(ERROR, status) << "flatland connection closed; exiting";
+        loop.Quit();
+      });
+      return flatland;
+    };
     maybe_a11y_view = std::make_unique<a11y::FlatlandAccessibilityView>(
-        context->svc()->Connect<fuchsia::ui::composition::Flatland>(),
-        context->svc()->Connect<fuchsia::ui::composition::Flatland>(),
+        make_flatland(), make_flatland(),
         context->svc()->Connect<fuchsia::ui::observation::scope::Registry>());
     context->outgoing()->AddPublicService(maybe_a11y_view->GetHandler());
   }

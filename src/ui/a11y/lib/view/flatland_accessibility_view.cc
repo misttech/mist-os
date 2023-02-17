@@ -309,25 +309,6 @@ void FlatlandAccessibilityView::CreateView(
   });
 }
 
-void FlatlandAccessibilityView::WatchParentViewportStatus() {
-  parent_watcher_->GetStatus([this](auto parent_viewport_status) {
-    bool new_status = (parent_viewport_status ==
-                       fuchsia::ui::composition::ParentViewportStatus::CONNECTED_TO_DISPLAY);
-
-    // If the a11y viewport was previously connected to the display, and has
-    // become disconnected, scene manager must have crashed. In that case,
-    // a11y-manager should log an error message and exit gracefully.
-    if (connected_to_display_ && !new_status) {
-      FX_LOGS(ERROR) << "A11y view disconnected from display; exiting";
-      exit(0);
-    }
-
-    connected_to_display_ = new_status;
-
-    WatchParentViewportStatus();
-  });
-}
-
 void FlatlandAccessibilityView::WatchForResizes() {
   // Watch for next layout info change.
   parent_watcher_->GetLayout([this](LayoutInfo layout_info) {

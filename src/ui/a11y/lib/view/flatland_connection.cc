@@ -11,18 +11,12 @@ namespace a11y {
 FlatlandConnection::FlatlandConnection(fuchsia::ui::composition::FlatlandPtr flatland,
                                        const std::string& debug_name)
     : flatland_(std::move(flatland)) {
-  flatland_.set_error_handler([](auto status) {
-    if (status == ZX_ERR_PEER_CLOSED) {
-      FX_LOGS(ERROR) << "Flatland connection closed; exiting";
-      exit(0);
-    }
-  });
-  flatland_->SetDebugName(debug_name);
   flatland_.events().OnError = fit::bind_member(this, &FlatlandConnection::OnError);
   flatland_.events().OnFramePresented =
       fit::bind_member(this, &FlatlandConnection::OnFramePresented);
   flatland_.events().OnNextFrameBegin =
       fit::bind_member(this, &FlatlandConnection::OnNextFrameBegin);
+  flatland_->SetDebugName(debug_name);
 }
 
 FlatlandConnection::~FlatlandConnection() = default;
@@ -40,7 +34,8 @@ void FlatlandConnection::Present(fuchsia::ui::composition::PresentArgs present_a
                                  OnFramePresentedCallback callback) {
   if (present_credits_ == 0) {
     pending_presents_.emplace(std::move(present_args), std::move(callback));
-    FX_DCHECK(pending_presents_.size() <= 3u) << "Too many pending presents.";
+    FX_DCHECK(pending_presents_.size() <= 3u)
+        << "Too many pending presents: " << pending_presents_.size();
     return;
   }
   --present_credits_;
@@ -54,11 +49,12 @@ void FlatlandConnection::Present(fuchsia::ui::composition::PresentArgs present_a
   presented_callbacks_.push(std::move(callback));
 }
 
-void FlatlandConnection::OnError(fuchsia::ui::composition::FlatlandError error) {
+void FlatlandConnection::OnError(const fuchsia::ui::composition::FlatlandError& error) {
   FX_LOGS(ERROR) << "Flatland error: " << static_cast<int>(error);
 }
 
-void FlatlandConnection::OnNextFrameBegin(fuchsia::ui::composition::OnNextFrameBeginValues values) {
+void FlatlandConnection::OnNextFrameBegin(
+    const fuchsia::ui::composition::OnNextFrameBeginValues& values) {
   present_credits_ += values.additional_present_credits();
   if (present_credits_ && !pending_presents_.empty()) {
     // Only iterate over the elements once, because they may be added back to
@@ -71,7 +67,8 @@ void FlatlandConnection::OnNextFrameBegin(fuchsia::ui::composition::OnNextFrameB
   }
 }
 
-void FlatlandConnection::OnFramePresented(fuchsia::scenic::scheduling::FramePresentedInfo info) {
+void FlatlandConnection::OnFramePresented(
+    const fuchsia::scenic::scheduling::FramePresentedInfo& info) {
   for (size_t i = 0; i < info.presentation_infos.size(); ++i) {
     presented_callbacks_.front()(info.actual_presentation_time);
     presented_callbacks_.pop();
@@ -83,8 +80,8 @@ FlatlandConnection::PendingPresent::PendingPresent(
     : present_args(std::move(present_args)), callback(std::move(callback)) {}
 FlatlandConnection::PendingPresent::~PendingPresent() = default;
 
-FlatlandConnection::PendingPresent::PendingPresent(PendingPresent&& other) = default;
+FlatlandConnection::PendingPresent::PendingPresent(PendingPresent&& other) noexcept = default;
 FlatlandConnection::PendingPresent& FlatlandConnection::PendingPresent::operator=(
-    PendingPresent&&) = default;
+    PendingPresent&&) noexcept = default;
 
 }  // namespace a11y
