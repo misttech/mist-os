@@ -176,7 +176,7 @@ sdk_documentation("musl_license") {
 }
 
 # Notice file for all contents in the Fuchsia SDK.
-# TODO(fxb/102264): Replace this with individual notices for each SDK element.
+# TODO(fxbug.dev/102264): Replace this with individual notices for each SDK element.
 sdk_documentation("sdk_notice") {
   name = "sdk_notice"
 
@@ -264,7 +264,7 @@ sdk_molecule("host_tools") {
     "//src/storage/minfs/tools:minfs_sdk",
     "//zircon/tools/zbi:zbi_sdk",
 
-    # TODO(https://fxbug.dev/95661): Remove these once the emulators are available independently.
+    # TODO(fxbug.dev/95661): Remove these once the emulators are available independently.
     "//src/developer/ffx/plugins/emulator:aemu_internal",
     "//src/developer/ffx/plugins/emulator:qemu_internal",
   ]
@@ -519,11 +519,11 @@ sdk("fuchsia_dart") {
     "//sdk/dart:kernel_compiler_sdk($dart_toolchain)",
     "//sdk/docs:modular_config_schema",
 
-    # TODO(leetodd): remove, needed to soft transition
+    # TODO(fxbug.dev/122070): remove, needed to soft transition
     # https://fuchsia-review.googlesource.com/c/fuchsia/+/399537
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_sdk($fidl_toolchain)",
 
-    # TODO(viktard): remove, needed to soft transition
+    # TODO(fxbug.dev/122070): remove, needed to soft transition
     # https://fuchsia-review.googlesource.com/c/fuchsia/+/295264
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_sdk($fidl_toolchain)",
 
