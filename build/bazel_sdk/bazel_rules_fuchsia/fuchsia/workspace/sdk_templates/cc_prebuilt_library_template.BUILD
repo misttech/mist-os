@@ -1,6 +1,5 @@
 load(
     "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_only_target",
     "fuchsia_select",
 )
 
@@ -16,5 +15,5 @@ cc_library(
     deps = {{prebuilt_select}} + [ {{deps}} ],
     strip_include_prefix = "{{relative_include_dir}}",
     data = {{dist_select}},
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )

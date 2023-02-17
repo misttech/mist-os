@@ -1,8 +1,3 @@
-load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_only_target",
-)
-
 cc_library(
     name = "{{name}}",
     srcs = [
@@ -19,5 +14,5 @@ cc_library(
         "//:no_experimental": [],
     }),
     strip_include_prefix = "{{relative_include_dir}}",
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )

@@ -87,7 +87,6 @@ load(
 )
 load(
     "//fuchsia/private:fuchsia_select.bzl",
-    _fuchsia_only_target = "fuchsia_only_target",
     _fuchsia_select = "fuchsia_select",
     _if_fuchsia = "if_fuchsia",
 )
@@ -144,6 +143,5 @@ fuchsia_package_group = _fuchsia_package_group
 fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 fuchsia_select = _fuchsia_select
 if_fuchsia = _if_fuchsia
-fuchsia_only_target = _fuchsia_only_target
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info

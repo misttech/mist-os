@@ -39,9 +39,3 @@ def if_fuchsia(value, if_not = [], _unused_rules_fuchsia_root = "@rules_fuchsia"
         "@platforms//os:fuchsia": value,
         "//conditions:default": if_not,
     })
-
-def fuchsia_only_target():
-    return if_fuchsia(
-        [],
-        ["@platforms//:incompatible"],
-    )

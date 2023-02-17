@@ -5,7 +5,6 @@ load(
     "fuchsia_fidl_bind_library",
     "fuchsia_fidl_hlcpp_library",
     "fuchsia_fidl_llcpp_library",
-    "fuchsia_only_target",
 )
 
 fuchsia_fidl_library(
@@ -28,19 +27,19 @@ fuchsia_fidl_library(
         {{deps}}
     ],
     sdk_for_default_deps = "{{parent_sdk}}",
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 
 fuchsia_fidl_bind_library(
     name = "{{name}}_bindlib",
     library = ":{{name}}",
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 
 fuchsia_bind_cc_library(
     name = "{{name}}_bindlib_cc",
     library = ":{{name}}_bindlib",
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 
 # LEGACY: This target will soon be deprecated
@@ -51,7 +50,7 @@ fuchsia_fidl_hlcpp_library(
         "{{parent_sdk}}//pkg/fidl_cpp",
         {{cc_deps}}
     ],
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 
 # TODO(fxbug.dev/117103): Rename HLCPP generated bindings to "_hlcpp" suffix.
@@ -69,5 +68,5 @@ fuchsia_fidl_llcpp_library(
         "{{parent_sdk}}//pkg/fidl_cpp_wire",
         {{llcpp_deps}}
     ],
-    target_compatible_with = fuchsia_only_target(),
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
