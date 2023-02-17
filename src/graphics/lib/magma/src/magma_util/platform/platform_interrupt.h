@@ -23,7 +23,8 @@ class PlatformInterrupt {
   virtual uint64_t GetMicrosecondsSinceLastInterrupt() = 0;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(PlatformInterrupt);
+  PlatformInterrupt(const PlatformInterrupt&) = delete;
+  void operator=(const PlatformInterrupt&) = delete;
 };
 
 }  // namespace magma

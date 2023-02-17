@@ -31,7 +31,8 @@ class SimpleAllocator final : public AddressSpaceAllocator {
   bool CheckGap(SimpleAllocator::Region* prev, SimpleAllocator::Region* next, uint64_t align,
                 size_t size, uint64_t* addr_out, bool* continue_search_out);
 
-  DISALLOW_COPY_AND_ASSIGN(SimpleAllocator);
+  SimpleAllocator(const SimpleAllocator&) = delete;
+  void operator=(const SimpleAllocator&) = delete;
 
  private:
   std::list<SimpleAllocator::Region>::iterator FindRegion(uint64_t addr);

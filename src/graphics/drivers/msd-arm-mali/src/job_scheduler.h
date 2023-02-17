@@ -114,7 +114,8 @@ class JobScheduler {
 
   friend class TestJobScheduler;
 
-  DISALLOW_COPY_AND_ASSIGN(JobScheduler);
+  JobScheduler(const JobScheduler&) = delete;
+  void operator=(const JobScheduler&) = delete;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_JOB_SCHEDULER_H_

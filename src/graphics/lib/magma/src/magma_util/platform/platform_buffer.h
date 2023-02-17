@@ -36,8 +36,8 @@ class PlatformBuffer : public PlatformObject {
 
    protected:
     MappingAddressRange() {}
-
-    DISALLOW_COPY_AND_ASSIGN(MappingAddressRange);
+    MappingAddressRange(MappingAddressRange&) = delete;
+    void operator=(MappingAddressRange&) = delete;
   };
 
   class Mapping {

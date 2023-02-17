@@ -147,7 +147,8 @@ class AddressSpace {
 
   friend class TestAddressSpace;
 
-  DISALLOW_COPY_AND_ASSIGN(AddressSpace);
+  AddressSpace(const AddressSpace&) = delete;
+  void operator=(const AddressSpace&) = delete;
 };
 
 #endif

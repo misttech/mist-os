@@ -71,7 +71,8 @@ class PlatformMmio {
   void* addr_;
   uint64_t size_;
 
-  DISALLOW_COPY_AND_ASSIGN(PlatformMmio);
+  PlatformMmio(const PlatformMmio&) = delete;
+  void operator=(const PlatformMmio&) = delete;
 };
 
 }  // namespace magma

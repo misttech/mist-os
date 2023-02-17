@@ -99,12 +99,6 @@ __attribute__((format(printf, 2, 3))) static inline void log(LogLevel level, con
 
 #define ATTRIBUTE_UNUSED __attribute__((unused))
 
-#ifndef DISALLOW_COPY_AND_ASSIGN
-#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
-  TypeName(const TypeName&) = delete;      \
-  void operator=(const TypeName&) = delete
-#endif
-
 static inline uint32_t to_uint32(uint64_t val) {
   DASSERT(val <= std::numeric_limits<uint32_t>::max());
   return static_cast<uint32_t>(val);

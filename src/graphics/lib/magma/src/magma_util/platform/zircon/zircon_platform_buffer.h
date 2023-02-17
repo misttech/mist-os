@@ -33,7 +33,6 @@ class ZirconPlatformBuffer : public PlatformBuffer {
 
    private:
     zx::vmar vmar_;
-    DISALLOW_COPY_AND_ASSIGN(MappingAddressRange);
   };
 
   ZirconPlatformBuffer(zx::vmo vmo, uint64_t size) : vmo_(std::move(vmo)), size_(size) {

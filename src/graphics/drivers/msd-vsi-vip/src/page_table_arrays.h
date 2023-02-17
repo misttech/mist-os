@@ -50,7 +50,8 @@ class PageTableArrays {
   std::unique_ptr<magma::PlatformBuffer> non_security_safe_page_;
   std::unique_ptr<magma::PlatformBusMapper::BusMapping> non_security_safe_page_bus_mapping_;
 
-  DISALLOW_COPY_AND_ASSIGN(PageTableArrays);
+  PageTableArrays(const PageTableArrays&) = delete;
+  void operator=(const PageTableArrays&) = delete;
 
   friend class TestMsdVsiDevice;
 };
