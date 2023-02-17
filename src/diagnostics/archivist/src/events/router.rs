@@ -4,14 +4,13 @@
 
 use crate::{events::types::*, identity::ComponentIdentity};
 use async_trait::async_trait;
-use fuchsia_inspect::{self as inspect, NumericProperty, StringReference};
+use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use futures::{
     channel::{mpsc, oneshot},
     task::{Context, Poll},
     Future, Stream, StreamExt,
 };
-use lazy_static::lazy_static;
 use pin_project::pin_project;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -22,11 +21,6 @@ use thiserror::Error;
 use tracing::{debug, error};
 
 const RECENT_EVENT_LIMIT: usize = 200;
-
-lazy_static! {
-    static ref EVENT: StringReference = "event".into();
-    static ref MONIKER: StringReference = "moniker".into();
-}
 
 pub struct RouterOptions {
     /// Whether or not to validate that the event routing is complete: for each consumer of an
@@ -348,8 +342,8 @@ impl EventStreamLogger {
     fn log_inspect(&mut self, event_name: &str, identity: &ComponentIdentity) {
         // TODO(fxbug.dev/92374): leverage string references for the `event_name`.
         inspect_log!(self.component_log_node,
-            &*EVENT => event_name,
-            &*MONIKER => match &identity.instance_id {
+            "event" => event_name,
+            "moniker" => match &identity.instance_id {
                 Some(instance_id) => format!("{}:{}", identity.relative_moniker, instance_id),
                 None => identity.relative_moniker.to_string(),
             }

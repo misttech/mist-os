@@ -26,11 +26,6 @@ pub use fuchsia_inspect::StringReference;
 pub use wrappers::{InspectBytes, InspectList, InspectListClosure};
 
 use fuchsia_inspect::Node;
-use lazy_static::lazy_static;
-
-lazy_static! {
-    pub static ref TIME_KEY: StringReference = "@time".into();
-}
 
 /// Trait for writing to a node in bounded lists.
 pub trait WriteInspect {
@@ -69,7 +64,7 @@ pub trait WriteInspect {
 #[macro_export]
 macro_rules! inspect_log {
     ($bounded_list_node:expr, $($args:tt)+) => {{
-        use $crate::{inspect_insert, log::TIME_KEY, nodes::NodeExt};
+        use $crate::{inspect_insert, nodes::NodeExt};
         // Hack to allow the client to pass in a MutexGuard temporary for $bounded_list_node expr,
         // since the temporary lives until the end of the match expression. Example usage:
         // ```
@@ -79,7 +74,7 @@ macro_rules! inspect_log {
         match $bounded_list_node.create_entry() {
             node => {
                 node.atomic_update(|this_node| {
-                    this_node.record_time(&*TIME_KEY);
+                    this_node.record_time("@time");
                     inspect_insert!(@internal_inspect_log this_node, $($args)+);
                 });
             }
@@ -510,14 +505,10 @@ mod tests {
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 
-        lazy_static! {
-            static ref FOO: StringReference = "foo".into();
-        };
-
-        inspect_log!(node, &*FOO => "foo_1");
-        inspect_log!(node, &*FOO => "foo_2");
-        inspect_log!(node, &*FOO => "foo_3");
-        inspect_log!(node, &*FOO => "foo_4");
+        inspect_log!(node, "foo" => "foo_1");
+        inspect_log!(node, "foo" => "foo_2");
+        inspect_log!(node, "foo" => "foo_3");
+        inspect_log!(node, "foo" => "foo_4");
 
         assert_data_tree!(inspector, root: {
             list_node: {

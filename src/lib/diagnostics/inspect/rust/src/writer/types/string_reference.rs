@@ -73,23 +73,15 @@ impl From<Cow<'_, str>> for StringReference {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::writer::{testing_utils::get_state, Inspector, Node};
     use diagnostics_hierarchy::assert_data_tree;
-    use lazy_static::lazy_static;
 
     #[fuchsia::test]
     fn string_references_as_names() {
-        lazy_static! {
-            static ref FOO: StringReference = "foo".into();
-            static ref BAR: StringReference = String::from("bar").into();
-            static ref BAZ: StringReference = String::from("baz").into();
-        };
-
         let inspector = Inspector::default();
-        inspector.root().record_int(&*FOO, 0);
-        let child = inspector.root().create_child(&*BAR);
-        child.record_double(&*FOO, 3.25);
+        inspector.root().record_int("foo", 0);
+        let child = inspector.root().create_child("bar");
+        child.record_double("foo", 3.25);
 
         assert_data_tree!(inspector, root: {
             foo: 0i64,
@@ -99,7 +91,7 @@ mod tests {
         });
 
         {
-            let _baz_property = child.create_uint(&*BAZ, 4);
+            let _baz_property = child.create_uint("baz", 4);
             assert_data_tree!(inspector, root: {
                 foo: 0i64,
                 bar: {
@@ -122,7 +114,7 @@ mod tests {
             inspector.state().unwrap().try_lock().unwrap().stats().deallocated_blocks;
 
         for i in 0..300 {
-            child.record_int(&*BAR, i);
+            child.record_int("bar", i);
         }
 
         assert_eq!(

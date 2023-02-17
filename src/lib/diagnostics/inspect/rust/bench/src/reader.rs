@@ -6,10 +6,9 @@ use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_inspect::{
     reader::snapshot::{Snapshot, SnapshotTree},
-    Inspector, InspectorConfig, NumericProperty, StringReference,
+    Inspector, InspectorConfig, NumericProperty,
 };
 use futures::FutureExt;
-use lazy_static::lazy_static;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -150,14 +149,11 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
-    lazy_static! {
-        static ref NAME: StringReference = "i".into();
-    }
     let mut nodes = vec![];
     if filled_size > 0 {
         let ints_for_filling: i64 = filled_size / 16 - 1;
         for i in 0..ints_for_filling {
-            nodes.push(inspector.root().create_int(&*NAME, i));
+            nodes.push(inspector.root().create_int("i", i));
         }
     }
 

@@ -5,7 +5,7 @@
 use async_lock::Mutex;
 use fuchsia_inspect::{
     ExponentialHistogramParams, HistogramProperty, LinearHistogramParams, Node, NumericProperty,
-    StringReference, UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
+    UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
 };
 use fuchsia_zircon::{self as zx, Duration};
 use lazy_static::lazy_static;
@@ -18,29 +18,6 @@ use std::{
 };
 
 lazy_static! {
-    static ref BATCH_ITERATOR : StringReference = "batch_iterator".into();
-    static ref BATCH_ITERATOR_CONNECTIONS : StringReference = "batch_iterator_connections".into();
-    static ref COMPONENT_TIME_USEC : StringReference = "component_time_usec".into();
-    static ref COMPONENT_TIMEOUTS_COUNT : StringReference = "component_timeouts_count".into();
-    static ref CONNECTIONS_OPENED : StringReference = "connections_opened".into();
-    static ref CONNECTIONS_CLOSED : StringReference = "connections_closed".into();
-    static ref DURATION_SECONDS : StringReference = "duration_seconds".into();
-    static ref GET_NEXT : StringReference = "get_next".into();
-    static ref LONGEST_PROCESSING_TIMES : StringReference = "longest_processing_times".into();
-    static ref MAX_SNAPSHOT_SIZE_BYTES : StringReference = "max_snapshot_sizes_bytes".into();
-    static ref READER_SERVERS_CONSTRUCTED : StringReference = "reader_servers_constructed".into();
-    static ref READER_SERVERS_DESTROYED : StringReference = "reader_servers_destroyed".into();
-    static ref REQUESTS : StringReference = "requests".into();
-    static ref RESPONSES : StringReference = "responses".into();
-    static ref RESULT_COUNT : StringReference = "result_count".into();
-    static ref RESULT_ERRORS : StringReference = "result_errors".into();
-    static ref SCHEMA_TRUNCATION_COUNT : StringReference = "schema_truncation_count".into();
-    static ref SNAPSHOT_SCHEMA_TRUNCATION_PERCENTAGE : StringReference =
-        "snapshot_schema_truncation_percentage".into();
-    static ref TIME_USEC : StringReference = "time_usec".into();
-    static ref TERMINAL_RESPONSES : StringReference = "terminal_responses".into();
-    static ref TIME : StringReference = "@time".into();
-
     // Exponential histograms for time in microseconds contains power-of-two intervals
     static ref TIME_USEC_PARAMS : ExponentialHistogramParams<u64> = ExponentialHistogramParams {
         floor: 0,
@@ -94,8 +71,8 @@ pub struct GlobalAccessorStats {
 
 impl AccessorStats {
     pub fn new(node: Node) -> Self {
-        let connections_opened = node.create_uint(&*CONNECTIONS_OPENED, 0);
-        let connections_closed = node.create_uint(&*CONNECTIONS_CLOSED, 0);
+        let connections_opened = node.create_uint("connections_opened", 0);
+        let connections_closed = node.create_uint("connections_closed", 0);
 
         let stream_diagnostics_requests = node.create_uint("stream_diagnostics_requests", 0);
 
@@ -155,24 +132,24 @@ pub struct GlobalConnectionStats {
 
 impl GlobalConnectionStats {
     pub fn new(node: Node) -> Self {
-        let reader_servers_constructed = node.create_uint(&*READER_SERVERS_CONSTRUCTED, 0);
-        let reader_servers_destroyed = node.create_uint(&*READER_SERVERS_DESTROYED, 0);
+        let reader_servers_constructed = node.create_uint("reader_servers_constructed", 0);
+        let reader_servers_destroyed = node.create_uint("reader_servers_destroyed", 0);
 
         let batch_iterator = GlobalBatchIteratorStats::new(&node);
-        let component_timeouts_count = node.create_uint(&*COMPONENT_TIMEOUTS_COUNT, 0);
+        let component_timeouts_count = node.create_uint("component_timeouts_count", 0);
 
         let max_snapshot_sizes_bytes = node.create_uint_linear_histogram(
-            &*MAX_SNAPSHOT_SIZE_BYTES,
+            "max_snapshot_sizes_bytes",
             MAX_SNAPSHOT_SIZE_BYTES_PARAMS.clone(),
         );
 
         let snapshot_schema_truncation_percentage = node.create_uint_linear_histogram(
-            &*SNAPSHOT_SCHEMA_TRUNCATION_PERCENTAGE,
+            "snapshot_schema_truncation_percentage",
             SNAPSHOT_SCHEMA_TRUNCATION_PARAMS.clone(),
         );
 
-        let schema_truncation_count = node.create_uint(&*SCHEMA_TRUNCATION_COUNT, 0);
-        let batch_iterator_connections = node.create_child(&*BATCH_ITERATOR_CONNECTIONS);
+        let schema_truncation_count = node.create_uint("schema_truncation_count", 0);
+        let batch_iterator_connections = node.create_child("batch_iterator_connections");
 
         GlobalConnectionStats {
             node,
@@ -226,7 +203,7 @@ impl GlobalConnectionStats {
             let mut component_time_usec = self.component_time_usec.lock().await;
             if component_time_usec.is_none() {
                 *component_time_usec = Some(self.node.create_uint_exponential_histogram(
-                    &*COMPONENT_TIME_USEC,
+                    "component_time_usec",
                     TIME_USEC_PARAMS.clone(),
                 ));
             }
@@ -234,7 +211,7 @@ impl GlobalConnectionStats {
             let mut processing_time_tracker = self.processing_time_tracker.lock().await;
             if processing_time_tracker.is_none() {
                 *processing_time_tracker = Some(ProcessingTimeTracker::new(
-                    self.node.create_child(&*LONGEST_PROCESSING_TIMES),
+                    self.node.create_child("longest_processing_times"),
                 ));
             }
 
@@ -255,9 +232,9 @@ struct GlobalBatchIteratorStats {
 
 impl GlobalBatchIteratorStats {
     fn new(parent: &Node) -> Self {
-        let node = parent.create_child(&*BATCH_ITERATOR);
-        let connections_opened = node.create_uint(&*CONNECTIONS_OPENED, 0);
-        let connections_closed = node.create_uint(&*CONNECTIONS_CLOSED, 0);
+        let node = parent.create_child("batch_iterator");
+        let connections_opened = node.create_uint("connections_opened", 0);
+        let connections_closed = node.create_uint("connections_closed", 0);
         let get_next = GlobalBatchIteratorGetNextStats::new(&node);
         Self { _node: node, connections_opened, connections_closed, get_next }
     }
@@ -279,13 +256,13 @@ struct GlobalBatchIteratorGetNextStats {
 
 impl GlobalBatchIteratorGetNextStats {
     fn new(parent: &Node) -> Self {
-        let node = parent.create_child(&*GET_NEXT);
-        let requests = node.create_uint(&*REQUESTS, 0);
-        let responses = node.create_uint(&*RESPONSES, 0);
-        let result_count = node.create_uint(&*RESULT_COUNT, 0);
-        let result_errors = node.create_uint(&*RESULT_ERRORS, 0);
+        let node = parent.create_child("get_next");
+        let requests = node.create_uint("requests", 0);
+        let responses = node.create_uint("responses", 0);
+        let result_count = node.create_uint("result_count", 0);
+        let result_errors = node.create_uint("result_errors", 0);
         let time_usec =
-            node.create_uint_exponential_histogram(&*TIME_USEC, TIME_USEC_PARAMS.clone());
+            node.create_uint_exponential_histogram("time_usec", TIME_USEC_PARAMS.clone());
         Self { _node: node, requests, responses, result_count, result_errors, time_usec }
     }
 }
@@ -322,8 +299,8 @@ impl ProcessingTimeTracker {
 
         let make_entry = || {
             let n = parent_node.create_child(moniker.to_string());
-            n.record_int(&*TIME, zx::Time::get_monotonic().into_nanos());
-            n.record_double(&*DURATION_SECONDS, time_ns as f64 / 1e9);
+            n.record_int("@time", zx::Time::get_monotonic().into_nanos());
+            n.record_double("duration_seconds", time_ns as f64 / 1e9);
             (time_ns, n)
         };
 
@@ -378,10 +355,10 @@ impl BatchIteratorConnectionStats {
         // we'll decrement these on drop
         global_stats.reader_servers_constructed.add(1);
 
-        let get_next = node.create_child(&*GET_NEXT);
-        let get_next_requests = get_next.create_uint(&*REQUESTS, 0);
-        let get_next_responses = get_next.create_uint(&*RESPONSES, 0);
-        let get_next_terminal_responses = get_next.create_uint(&*TERMINAL_RESPONSES, 0);
+        let get_next = node.create_child("get_next");
+        let get_next_requests = get_next.create_uint("requests", 0);
+        let get_next_responses = get_next.create_uint("responses", 0);
+        let get_next_terminal_responses = get_next.create_uint("terminal_responses", 0);
         node.record(get_next);
 
         Self {
