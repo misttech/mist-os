@@ -349,5 +349,37 @@ TEST_F(ServiceTest, AddDirFailsOnBadInput) {
   }
 }
 
+TEST_F(ServiceTest, Rights) {
+  zx::channel dir, dir_request;
+  ASSERT_OK(zx::channel::create(0, &dir, &dir_request));
+
+  std::thread child([this, dir_request = std::move(dir_request)]() mutable {
+    svc_dir_t* dir = nullptr;
+    EXPECT_OK(svc_directory_create(&dir));
+    EXPECT_OK(svc_directory_serve(dir, dispatcher(), dir_request.release()));
+
+    RunLoop();
+
+    ASSERT_OK(svc_directory_destroy(dir));
+  });
+
+  // Turn dir into an file descriptor so open calls synchronously ensure the open completed
+  // successfully.
+  fbl::unique_fd root_fd;
+  ASSERT_OK(fdio_fd_create(dir.release(), root_fd.reset_and_get_address()));
+
+  // Verify that we can open the directory with rx permissions.
+  fbl::unique_fd new_fd;
+  ASSERT_OK(fdio_open_fd_at(root_fd.get(), ".",
+                            static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
+                                                  fuchsia::io::OpenFlags::RIGHT_EXECUTABLE |
+                                                  fuchsia::io::OpenFlags::DIRECTORY),
+                            new_fd.reset_and_get_address()));
+
+  // Shutdown the service thread.
+  QuitLoop();
+  child.join();
+}
+
 }  // namespace
 }  // namespace svc

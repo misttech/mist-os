@@ -133,7 +133,8 @@ zx_status_t svc_directory_serve(svc_dir_t* dir, async_dispatcher_t* dispatcher,
     dir->vfs = std::make_unique<fs::SynchronousVfs>(dispatcher);
   }
 
-  return dir->vfs->Serve(dir->root, zx::channel(request), fs::VnodeConnectionOptions::ReadWrite());
+  return dir->vfs->ServeDirectory(dir->root,
+                                  fidl::ServerEnd<fuchsia_io::Directory>(zx::channel(request)));
 }
 
 zx_status_t svc_directory_add_service(svc_dir_t* dir, const char* path, size_t path_size,
