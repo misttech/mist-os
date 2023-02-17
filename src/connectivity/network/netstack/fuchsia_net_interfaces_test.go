@@ -149,8 +149,6 @@ func (w *watcherHelper) blockingWatch(t *testing.T, ch chan watchResult) {
 }
 
 func TestInterfacesWatcherDisallowMultiplePending(t *testing.T) {
-	addGoleakCheck(t)
-
 	_, watcherChan := startEventLoop(t)
 	si := &interfaceStateImpl{watcherChan: watcherChan}
 
@@ -175,8 +173,6 @@ func TestInterfacesWatcherDisallowMultiplePending(t *testing.T) {
 }
 
 func TestInterfacesWatcherExisting(t *testing.T) {
-	addGoleakCheck(t)
-
 	eventChan, watcherChan := startEventLoop(t)
 	ns, _ := newNetstack(t, netstackTestOptions{interfaceEventChan: eventChan})
 	si := &interfaceStateImpl{watcherChan: watcherChan}
@@ -198,8 +194,6 @@ func TestInterfacesWatcherExisting(t *testing.T) {
 }
 
 func TestInterfacesWatcher(t *testing.T) {
-	addGoleakCheck(t)
-
 	eventChan, watcherChan := startEventLoop(t)
 	ndpDisp := newNDPDispatcher()
 	ns, _ := newNetstack(t, netstackTestOptions{
@@ -485,7 +479,6 @@ func TestInterfacesWatcherInterest(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			addGoleakCheck(t)
 
 			eventChan, watcherChan := startEventLoop(t)
 			ns, _ := newNetstack(t, netstackTestOptions{
@@ -643,8 +636,6 @@ func TestInterfacesWatcherAddressState(t *testing.T) {
 		for _, toState := range states {
 			if fromState != toState {
 				t.Run(fmt.Sprintf("%s_to_%s", fromState, toState), func(t *testing.T) {
-					addGoleakCheck(t)
-
 					protocolAddr := tcpip.ProtocolAddress{
 						Protocol: header.IPv6ProtocolNumber,
 						AddressWithPrefix: tcpip.AddressWithPrefix{

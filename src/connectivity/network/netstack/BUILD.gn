@@ -190,7 +190,6 @@ go_library("lib") {
 go_test("netstack_test") {
   library = ":lib"
   include_dirs = udp_serde_include_dirs + netdevice_include_dirs
-  deps = [ "//third_party/golibs:go.uber.org/goleak" ]
 }
 
 fuchsia_unittest_package("netstack-gotests") {

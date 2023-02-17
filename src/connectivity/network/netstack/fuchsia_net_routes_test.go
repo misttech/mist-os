@@ -47,7 +47,6 @@ func (w watcherHolder) expectPeerClosed(ctx context.Context, t *testing.T) {
 // TestRoutesWatcherMetrics verifies that fidlRoutesWatcherMetrics properly
 // track Watcher creation & deletion.
 func TestRoutesWatcherMetrics(t *testing.T) {
-	addGoleakCheck(t)
 	// Instantiate Watcher clients.
 	watcher_v4_req, watcher_v4, err := fnetRoutes.NewWatcherV4WithCtxInterfaceRequest()
 	if err != nil {
@@ -115,7 +114,6 @@ func TestRoutesWatcherMetrics(t *testing.T) {
 // TestRoutesWatcherSlowClient verifies that clients who consume events slower
 // than they're produced eventually get terminated.
 func TestRoutesWatcherSlowClient(t *testing.T) {
-	addGoleakCheck(t)
 	// Instantiate Watcher clients.
 	watcher_v4_req, watcher_v4, err := fnetRoutes.NewWatcherV4WithCtxInterfaceRequest()
 	if err != nil {

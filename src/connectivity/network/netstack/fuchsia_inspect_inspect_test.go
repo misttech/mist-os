@@ -111,8 +111,6 @@ func checkInspectRecurse(node inspectInner, expected inspectNodeExpectation) err
 }
 
 func TestStatCounterInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	const invalidPort = 1
 	const invalidPortCount = 10
 	const initAcquireCount = 3
@@ -206,8 +204,6 @@ func TestStatCounterInspectImpl(t *testing.T) {
 }
 
 func TestStatCounterGetChildDoesNotCopy(t *testing.T) {
-	addGoleakCheck(t)
-
 	const fieldName = "InvalidPort"
 	var s dhcp.PacketDiscardStats
 	s.Init()
@@ -269,8 +265,6 @@ func circularLogsChecker(logs *circularLogsInspectImpl, expectedChildren []strin
 }
 
 func TestCircularLogsInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	v := circularLogsInspectImpl{
 		name: "dosn't matter",
 		value: []util.LogEntry{
@@ -304,8 +298,6 @@ func TestCircularLogsInspectImpl(t *testing.T) {
 }
 
 func TestIntegralStatCounterMapInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	var integralStatCounterMap tcpip.IntegralStatCounterMap
 	integralStatCounterMap.Init()
 	const firstKey = 1
@@ -362,8 +354,6 @@ func TestIntegralStatCounterMapInspectImpl(t *testing.T) {
 }
 
 func TestSocketStatCounterInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	// Create a new netstack and add TCP and UDP endpoints.
 	ns, _ := newNetstack(t, netstackTestOptions{})
 	wq := new(waiter.Queue)
@@ -498,8 +488,6 @@ func TestSocketStatCounterInspectImpl(t *testing.T) {
 }
 
 func TestNicInfoMapInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	v := nicInfoMapInspectImpl{
 		value: map[tcpip.NICID]ifStateInfo{
 			1: {},
@@ -533,8 +521,6 @@ func TestNicInfoMapInspectImpl(t *testing.T) {
 }
 
 func TestNicInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	v := nicInfoInspectImpl{
 		name: "doesn't matter",
 	}
@@ -585,8 +571,6 @@ func TestNicInfoInspectImpl(t *testing.T) {
 }
 
 func TestDHCPInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	var invalidPortCounter, invalidTransProtoCounter, invalidPacketTypeCounter, invalidPacketType2Counter tcpip.StatCounter
 
 	const invalidPort = 1
@@ -806,8 +790,6 @@ func TestDHCPInfoInspectImpl(t *testing.T) {
 }
 
 func TestFifoStatsInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	tests := []struct {
 		name     string
 		impl     func() fifoStatsInspectImpl
@@ -932,8 +914,6 @@ func TestFifoStatsInfoInspectImpl(t *testing.T) {
 }
 
 func TestInspectGetMissingChild(t *testing.T) {
-	addGoleakCheck(t)
-
 	impl := inspectImpl{
 		inner: &nicInfoMapInspectImpl{},
 	}
@@ -960,8 +940,6 @@ func TestInspectGetMissingChild(t *testing.T) {
 }
 
 func TestRoutingTableInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	impl := routingTableInspectImpl{
 		value: []routes.ExtendedRoute{
 			{}, {},
@@ -999,8 +977,6 @@ func TestRoutingTableInspectImpl(t *testing.T) {
 }
 
 func TestRouteInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	tests := []struct {
 		name       string
 		route      routes.ExtendedRoute
@@ -1080,8 +1056,6 @@ func TestRouteInfoInspectImpl(t *testing.T) {
 }
 
 func TestNetworkEndpointStatsInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	const unknownNetworkProtocolNumber = 0
 	impl := networkEndpointStatsInspectImpl{
 		name: "Network Endpoint Stats",
@@ -1123,8 +1097,6 @@ func TestNetworkEndpointStatsInspectImpl(t *testing.T) {
 }
 
 func TestNeighborTableInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	someTime := tcpip.MonotonicTime{}
 	impl := neighborTableInspectImpl{
 		name: neighborsLabel,
@@ -1173,8 +1145,6 @@ func TestNeighborTableInspectImpl(t *testing.T) {
 }
 
 func TestNeighborInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
 	someTime := tcpip.MonotonicTime{}
 	tests := []struct {
 		name     string

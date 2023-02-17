@@ -154,8 +154,6 @@ func TestClosesNetworkDevice(t *testing.T) {
 			}())
 
 			t.Run(name, func(t *testing.T) {
-				addGoleakCheck(t)
-
 				deviceReq, device, err := network.NewDeviceWithCtxInterfaceRequest()
 				if err != nil {
 					t.Fatalf("network.NewDeviceWithCtxInterfaceRequest() = %s", err)

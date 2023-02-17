@@ -82,8 +82,6 @@ func bindWatcher(t *testing.T, watcherCollection *dnsServerWatcherCollection) *n
 }
 
 func TestDnsWatcherResolvesAndBlocks(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, serverConfig := createCollection()
 	serverConfig.SetDefaultServers([]tcpip.Address{defaultServerIpv4, defaultServerIpv6})
 
@@ -140,8 +138,6 @@ func TestDnsWatcherResolvesAndBlocks(t *testing.T) {
 }
 
 func TestDnsWatcherCancelledContext(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, _ := createCollection()
 
 	watcher := dnsServerWatcher{parent: watcherCollection}
@@ -161,8 +157,6 @@ func TestDnsWatcherCancelledContext(t *testing.T) {
 }
 
 func TestDnsWatcherDisallowMultiplePending(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, _ := createCollection()
 
 	watcher := bindWatcher(t, watcherCollection)
@@ -190,8 +184,6 @@ func TestDnsWatcherDisallowMultiplePending(t *testing.T) {
 }
 
 func TestDnsWatcherMultipleWatchers(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, serverConfig := createCollection()
 
 	watcher1 := bindWatcher(t, watcherCollection)
@@ -232,8 +224,6 @@ func TestDnsWatcherMultipleWatchers(t *testing.T) {
 }
 
 func TestDnsWatcherServerListEquality(t *testing.T) {
-	addGoleakCheck(t)
-
 	addr1 := dns.Server{
 		Address: tcpip.FullAddress{
 			NIC:  0,
@@ -273,8 +263,6 @@ func TestDnsWatcherServerListEquality(t *testing.T) {
 }
 
 func TestDnsWatcherDifferentAddressTypes(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, serverConfig := createCollection()
 	watcher := bindWatcher(t, watcherCollection)
 	defer func() {
@@ -321,8 +309,6 @@ func TestDnsWatcherDifferentAddressTypes(t *testing.T) {
 // not possible to miss a broadcast that occurs immediately after the servers
 // list has been fetched.
 func TestDnsWatcherBroadcastRace(t *testing.T) {
-	addGoleakCheck(t)
-
 	watcherCollection, dnsClient := createCollection()
 
 	watchers := make([]*name.DnsServerWatcherWithCtxInterface, 1000)

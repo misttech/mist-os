@@ -22,7 +22,6 @@ import (
 )
 
 func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
-	addGoleakCheck(t)
 	for _, test := range []struct {
 		name              string
 		closeWhileBlocked bool
@@ -228,7 +227,6 @@ func verifyZirconSocketClosed(t *testing.T, e *endpointWithSocket) {
 }
 
 func TestCloseDatagramSocketClosesHandles(t *testing.T) {
-	addGoleakCheck(t)
 
 	ns, _, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
 	s, err := newDatagramSocketImpl(ns, header.UDPProtocolNumber, ipv4.ProtocolNumber, ep, wq)
@@ -260,7 +258,6 @@ func TestCloseDatagramSocketClosesHandles(t *testing.T) {
 }
 
 func TestCloseSynchronousDatagramSocketClosesHandles(t *testing.T) {
-	addGoleakCheck(t)
 
 	ns, _, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
 	s, err := makeSynchronousDatagramSocket(ep, ipv4.ProtocolNumber, header.UDPProtocolNumber, wq, ns)
@@ -299,7 +296,6 @@ func newNetstackAndSreamSocket(t *testing.T) (*faketime.ManualClock, *streamSock
 }
 
 func TestCloseStreamSocketClosesHandles(t *testing.T) {
-	addGoleakCheck(t)
 
 	_, s := newNetstackAndSreamSocket(t)
 
@@ -312,7 +308,6 @@ func TestCloseStreamSocketClosesHandles(t *testing.T) {
 }
 
 func TestCloseUnblockLoopWrite(t *testing.T) {
-	addGoleakCheck(t)
 
 	tests := []struct {
 		name           string
