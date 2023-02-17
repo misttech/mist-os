@@ -1868,7 +1868,7 @@ pub(crate) fn receive_ipv6_packet<
                             Icmpv6ErrorKind::PacketTooBig {
                                 proto,
                                 header_len: meta.header_len(),
-                                mtu: mtu.get(),
+                                mtu,
                             },
                         );
                     }
@@ -3567,7 +3567,7 @@ mod tests {
             state: &StackState<C>,
             local_ip: Self::Addr,
             remote_ip: Self::Addr,
-        ) -> Option<u32>;
+        ) -> Option<Mtu>;
     }
 
     impl GetPmtuIpExt for Ipv4 {
@@ -3575,7 +3575,7 @@ mod tests {
             state: &StackState<C>,
             local_ip: Ipv4Addr,
             remote_ip: Ipv4Addr,
-        ) -> Option<u32> {
+        ) -> Option<Mtu> {
             state.ipv4.inner.pmtu_cache.lock().get_pmtu(local_ip, remote_ip)
         }
     }
@@ -3585,7 +3585,7 @@ mod tests {
             state: &StackState<C>,
             local_ip: Ipv6Addr,
             remote_ip: Ipv6Addr,
-        ) -> Option<u32> {
+        ) -> Option<Mtu> {
             state.ipv6.inner.pmtu_cache.lock().get_pmtu(local_ip, remote_ip)
         }
     }
@@ -3605,13 +3605,13 @@ mod tests {
 
         // Update PMTU from None.
 
-        let new_mtu1 = u32::from(I::MINIMUM_LINK_MTU) + 100;
+        let new_mtu1 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 100);
 
         // Create ICMP IP buf
         let packet_buf = create_packet_too_big_buf(
             fake_config.remote_ip.get(),
             fake_config.local_ip.get(),
-            u16::try_from(new_mtu1).unwrap(),
+            u16::try_from(u32::from(new_mtu1)).unwrap(),
             None,
         );
 
@@ -3635,14 +3635,14 @@ mod tests {
 
         // Don't update PMTU when current PMTU is less than reported MTU.
 
-        let new_mtu2 = u32::from(I::MINIMUM_LINK_MTU) + 200;
+        let new_mtu2 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 200);
 
         // Create IPv6 ICMPv6 packet too big packet with MTU larger than current
         // PMTU.
         let packet_buf = create_packet_too_big_buf(
             fake_config.remote_ip.get(),
             fake_config.local_ip.get(),
-            u16::try_from(new_mtu2).unwrap(),
+            u16::try_from(u32::from(new_mtu2)).unwrap(),
             None,
         );
 
@@ -3667,14 +3667,14 @@ mod tests {
 
         // Update PMTU when current PMTU is greater than the reported MTU.
 
-        let new_mtu3 = u32::from(I::MINIMUM_LINK_MTU) + 50;
+        let new_mtu3 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 50);
 
         // Create IPv6 ICMPv6 packet too big packet with MTU smaller than
         // current PMTU.
         let packet_buf = create_packet_too_big_buf(
             fake_config.remote_ip.get(),
             fake_config.local_ip.get(),
-            u16::try_from(new_mtu3).unwrap(),
+            u16::try_from(u32::from(new_mtu3)).unwrap(),
             None,
         );
 
@@ -3791,7 +3791,7 @@ mod tests {
                 fake_config.remote_ip.get()
             )
             .unwrap(),
-            508
+            Mtu::new(508),
         );
 
         // Don't Update when packet size is too small.
@@ -3820,7 +3820,7 @@ mod tests {
                 fake_config.remote_ip.get()
             )
             .unwrap(),
-            508
+            Mtu::new(508),
         );
 
         // Update to lower PMTU estimate based on original packet size.
@@ -3849,7 +3849,7 @@ mod tests {
                 fake_config.remote_ip.get()
             )
             .unwrap(),
-            68
+            Mtu::new(68),
         );
 
         // Should not update PMTU because the next low PMTU from this original
@@ -3880,7 +3880,7 @@ mod tests {
                 fake_config.remote_ip.get()
             )
             .unwrap(),
-            68
+            Mtu::new(68),
         );
     }
 

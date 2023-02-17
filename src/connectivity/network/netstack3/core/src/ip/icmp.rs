@@ -404,7 +404,7 @@ pub(crate) enum Icmpv6ErrorKind {
     ParameterProblem { code: Icmpv6ParameterProblemCode, pointer: u32, allow_dst_multicast: bool },
     TtlExpired { proto: Ipv6Proto, header_len: usize },
     NetUnreachable { proto: Ipv6Proto, header_len: usize },
-    PacketTooBig { proto: Ipv6Proto, header_len: usize, mtu: u32 },
+    PacketTooBig { proto: Ipv6Proto, header_len: usize, mtu: Mtu },
     ProtocolUnreachable { header_len: usize },
     PortUnreachable,
 }
@@ -1010,7 +1010,7 @@ impl<
                             ctx,
                             dst_ip.get(),
                             src_ip,
-                            u32::from(next_hop_mtu.get()),
+                            Mtu::new(u32::from(next_hop_mtu.get())),
                         );
                     } else {
                         // If the Next-Hop MTU from an incoming ICMP message is
@@ -1043,7 +1043,7 @@ impl<
 
                             trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU value from {}", total_len);
 
-                            sync_ctx.update_pmtu_next_lower(ctx, dst_ip.get(), src_ip, u32::from(total_len));
+                            sync_ctx.update_pmtu_next_lower(ctx, dst_ip.get(), src_ip, Mtu::new(u32::from(total_len)));
                         } else {
                             // Ok to silently ignore as RFC 792 requires nodes
                             // to send the original IP packet header + 64 bytes
@@ -1661,7 +1661,7 @@ impl<
                         ctx,
                         dst_ip.get(),
                         src_ip.get(),
-                        packet_too_big.message().mtu(),
+                        Mtu::new(packet_too_big.message().mtu()),
                     );
                 }
                 receive_icmpv6_error(
@@ -2235,7 +2235,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
     src_ip: UnicastAddr<Ipv6Addr>,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
     proto: Ipv6Proto,
-    mtu: u32,
+    mtu: Mtu,
     original_packet: B,
     header_len: usize,
 ) {
@@ -2254,7 +2254,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
         src_ip,
         dst_ip,
         IcmpUnusedCode,
-        Icmpv6PacketTooBig::new(mtu),
+        Icmpv6PacketTooBig::new(mtu.into()),
         original_packet,
         // As per RFC 4443 section 2.4.e,
         //
@@ -4946,7 +4946,7 @@ mod tests {
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
                 FAKE_CONFIG_V6.local_ip,
                 IpProto::Udp.into(),
-                0,
+                Mtu::new(0),
                 Buf::new(&mut [], ..),
                 0,
             );

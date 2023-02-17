@@ -10,7 +10,7 @@ use core::time::Duration;
 
 use derivative::Derivative;
 use log::trace;
-use net_types::ip::{Ip, IpAddress, IpVersionMarker};
+use net_types::ip::{Ip, IpAddress, IpVersionMarker, Mtu};
 
 use crate::context::{TimerContext, TimerHandler};
 
@@ -28,26 +28,6 @@ const MAINTENANCE_PERIOD: Duration = Duration::from_secs(3600);
 /// 3 hours.
 // TODO(ghanan): Make this value configurable by runtime options.
 const PMTU_STALE_TIMEOUT: Duration = Duration::from_secs(10800);
-
-/// Common MTU values taken from [RFC 1191 section 7.1].
-///
-/// This list includes lower bounds of groups of common MTU values that are
-/// relatively close to each other, sorted in descending order.
-///
-/// Note, the RFC does not actually include the value 1280 in the list of
-/// plateau values, but we include it here because it is the minimum IPv6 MTU
-/// value and is not expected to be an uncommon value for MTUs.
-///
-/// This list MUST be sorted in descending order; methods such as
-/// `next_lower_pmtu_plateau` assume `PMTU_PLATEAUS` has this property.
-///
-/// We use this list when estimating PMTU values when doing PMTU discovery with
-/// IPv4 on paths with nodes that do not implement RFC 1191. This list is useful
-/// as in practice, relatively few MTU values are in use.
-///
-/// [RFC 1191 section 7.1]: https://tools.ietf.org/html/rfc1191#section-7.1
-const PMTU_PLATEAUS: [u32; 12] =
-    [65535, 32000, 17914, 8166, 4352, 2002, 1492, 1280, 1006, 508, 296, 68];
 
 /// The timer ID for the path MTU cache.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Hash)]
@@ -81,11 +61,11 @@ pub(crate) trait PmtuHandler<I: Ip, C> {
     /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than
     /// the current PMTU and does not violate the minimum MTU size requirements
     /// for an IP.
-    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: u32);
+    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: Mtu);
 
     /// Updates the PMTU between `src_ip` and `dst_ip` to the next lower
     /// estimate from `from`.
-    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: u32);
+    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: Mtu);
 }
 
 fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(ctx: &mut C, cache_is_empty: bool) {
@@ -112,7 +92,7 @@ fn maybe_schedule_timer<I: Ip, C: PmtuNonSyncContext<I>>(ctx: &mut C, cache_is_e
 
 fn handle_update_result<I: Ip, C: PmtuNonSyncContext<I>>(
     ctx: &mut C,
-    result: Result<Option<u32>, Option<u32>>,
+    result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
 ) {
     // TODO(https://fxbug.dev/92599): Do something with this `Result`.
@@ -123,7 +103,7 @@ fn handle_update_result<I: Ip, C: PmtuNonSyncContext<I>>(
 }
 
 impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> for SC {
-    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: u32) {
+    fn update_pmtu_if_less(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, new_mtu: Mtu) {
         self.with_state_mut(|cache| {
             let now = ctx.now();
             let res = cache.update_pmtu_if_less(src_ip, dst_ip, new_mtu, now);
@@ -131,7 +111,7 @@ impl<I: Ip, C: PmtuNonSyncContext<I>, SC: PmtuContext<I, C>> PmtuHandler<I, C> f
         })
     }
 
-    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: u32) {
+    fn update_pmtu_next_lower(&mut self, ctx: &mut C, src_ip: I::Addr, dst_ip: I::Addr, from: Mtu) {
         self.with_state_mut(|cache| {
             let now = ctx.now();
             let res = cache.update_pmtu_next_lower(src_ip, dst_ip, from, now);
@@ -169,7 +149,7 @@ impl<A: IpAddress> PmtuCacheKey<A> {
 /// IP layer PMTU cache data.
 #[derive(Debug, PartialEq)]
 pub(crate) struct PmtuCacheData<I> {
-    pmtu: u32,
+    pmtu: Mtu,
     last_updated: I,
 }
 
@@ -177,7 +157,7 @@ impl<I: crate::Instant> PmtuCacheData<I> {
     /// Construct a new `PmtuCacheData`.
     ///
     /// `last_updated` will be set to `now`.
-    fn new(pmtu: u32, now: I) -> Self {
+    fn new(pmtu: Mtu, now: I) -> Self {
         Self { pmtu, last_updated: now }
     }
 }
@@ -191,7 +171,7 @@ pub(crate) struct PmtuCache<I: Ip, Instant> {
 
 impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
     /// Gets the PMTU between `src_ip` and `dst_ip`.
-    pub(crate) fn get_pmtu(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<u32> {
+    pub(crate) fn get_pmtu(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Mtu> {
         self.cache.get(&PmtuCacheKey::new(src_ip, dst_ip)).map(|x| x.pmtu)
     }
 
@@ -202,9 +182,9 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        new_mtu: u32,
+        new_mtu: Mtu,
         now: Instant,
-    ) -> Result<Option<u32>, Option<u32>> {
+    ) -> Result<Option<Mtu>, Option<Mtu>> {
         match self.get_pmtu(src_ip, dst_ip) {
             // No PMTU exists so update.
             None => self.update_pmtu(src_ip, dst_ip, new_mtu, now),
@@ -213,7 +193,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
             // A PMTU exists but it is less than or equal to `new_mtu` so no need to
             // update.
             Some(prev_mtu) => {
-                trace!("update_pmtu_if_less: Not updating the PMTU between src {} and dest {} to {}; is {}", src_ip, dst_ip, new_mtu, prev_mtu);
+                trace!("update_pmtu_if_less: Not updating the PMTU between src {} and dest {} to {:?}; is {:?}", src_ip, dst_ip, new_mtu, prev_mtu);
                 Ok(Some(prev_mtu))
             }
         }
@@ -230,12 +210,12 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        from: u32,
+        from: Mtu,
         now: Instant,
-    ) -> Result<Option<u32>, Option<u32>> {
+    ) -> Result<Option<Mtu>, Option<Mtu>> {
         if let Some(next_pmtu) = next_lower_pmtu_plateau(from) {
             trace!(
-                "update_pmtu_next_lower: Attempting to update PMTU between src {} and dest {} to {}",
+                "update_pmtu_next_lower: Attempting to update PMTU between src {} and dest {} to {:?}",
                 src_ip,
                 dst_ip,
                 next_pmtu
@@ -245,7 +225,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         } else {
             // TODO(ghanan): Should we make sure the current PMTU value is set
             //               to the IP specific minimum MTU value?
-            trace!("update_pmtu_next_lower: Not updating PMTU between src {} and dest {} as there is no lower PMTU value from {}", src_ip, dst_ip, from);
+            trace!("update_pmtu_next_lower: Not updating PMTU between src {} and dest {} as there is no lower PMTU value from {:?}", src_ip, dst_ip, from);
             Err(self.get_pmtu(src_ip, dst_ip))
         }
     }
@@ -262,11 +242,11 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        new_mtu: u32,
+        new_mtu: Mtu,
         now: Instant,
-    ) -> Result<Option<u32>, Option<u32>> {
+    ) -> Result<Option<Mtu>, Option<Mtu>> {
         // New MTU must not be smaller than the minimum MTU for an IP.
-        if new_mtu < I::MINIMUM_LINK_MTU.get() {
+        if new_mtu < I::MINIMUM_LINK_MTU {
             return Err(self.get_pmtu(src_ip, dst_ip));
         }
 
@@ -311,7 +291,39 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
 }
 
 /// Get next lower PMTU plateau value, if one exists.
-fn next_lower_pmtu_plateau(start_mtu: u32) -> Option<u32> {
+fn next_lower_pmtu_plateau(start_mtu: Mtu) -> Option<Mtu> {
+    /// Common MTU values taken from [RFC 1191 section 7.1].
+    ///
+    /// This list includes lower bounds of groups of common MTU values that are
+    /// relatively close to each other, sorted in descending order.
+    ///
+    /// Note, the RFC does not actually include the value 1280 in the list of
+    /// plateau values, but we include it here because it is the minimum IPv6
+    /// MTU value and is not expected to be an uncommon value for MTUs.
+    ///
+    /// This list MUST be sorted in descending order; methods such as
+    /// `next_lower_pmtu_plateau` assume `PMTU_PLATEAUS` has this property.
+    ///
+    /// We use this list when estimating PMTU values when doing PMTU discovery
+    /// with IPv4 on paths with nodes that do not implement RFC 1191. This list
+    /// is useful as in practice, relatively few MTU values are in use.
+    ///
+    /// [RFC 1191 section 7.1]: https://tools.ietf.org/html/rfc1191#section-7.1
+    const PMTU_PLATEAUS: [Mtu; 12] = [
+        Mtu::new(65535),
+        Mtu::new(32000),
+        Mtu::new(17914),
+        Mtu::new(8166),
+        Mtu::new(4352),
+        Mtu::new(2002),
+        Mtu::new(1492),
+        Mtu::new(1280),
+        Mtu::new(1006),
+        Mtu::new(508),
+        Mtu::new(296),
+        Mtu::new(68),
+    ];
+
     for i in 0..PMTU_PLATEAUS.len() {
         let pmtu = PMTU_PLATEAUS[i];
 
@@ -338,7 +350,7 @@ pub(crate) mod testutil {
     pub(crate) struct UpdatePmtuIfLessArgs<A: IpAddress> {
         pub(crate) src_ip: A,
         pub(crate) dst_ip: A,
-        pub(crate) new_mtu: u32,
+        pub(crate) new_mtu: Mtu,
     }
 
     // TODO(rheacock): remove `#[allow(dead_code)]` when the impl_pmtu_handler
@@ -347,7 +359,7 @@ pub(crate) mod testutil {
     pub(crate) struct UpdatePmtuNextLowerArgs<A: IpAddress> {
         pub(crate) src_ip: A,
         pub(crate) dst_ip: A,
-        pub(crate) from: u32,
+        pub(crate) from: Mtu,
     }
 
     #[derive(Default)]
@@ -370,7 +382,7 @@ pub(crate) mod testutil {
                     _ctx: &mut $ctx,
                     src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    new_mtu: u32,
+                    new_mtu: Mtu,
                 ) {
                     let state: &mut FakePmtuState<
                         <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
@@ -389,7 +401,7 @@ pub(crate) mod testutil {
                     _ctx: &mut $ctx,
                     src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    from: u32,
+                    from: Mtu,
                 ) {
                     let state: &mut FakePmtuState<
                         <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
@@ -414,6 +426,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
     use net_types::{SpecifiedAddr, Witness};
+    use test_case::test_case;
 
     use crate::{
         context::{
@@ -456,23 +469,23 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_next_lower_pmtu_plateau() {
-        assert_eq!(next_lower_pmtu_plateau(65536).unwrap(), 65535);
-        assert_eq!(next_lower_pmtu_plateau(65535).unwrap(), 32000);
-        assert_eq!(next_lower_pmtu_plateau(65534).unwrap(), 32000);
-        assert_eq!(next_lower_pmtu_plateau(32001).unwrap(), 32000);
-        assert_eq!(next_lower_pmtu_plateau(32000).unwrap(), 17914);
-        assert_eq!(next_lower_pmtu_plateau(31999).unwrap(), 17914);
-        assert_eq!(next_lower_pmtu_plateau(1281).unwrap(), 1280);
-        assert_eq!(next_lower_pmtu_plateau(1280).unwrap(), 1006);
-        assert_eq!(next_lower_pmtu_plateau(69).unwrap(), 68);
-        assert_eq!(next_lower_pmtu_plateau(68), None);
-        assert_eq!(next_lower_pmtu_plateau(67), None);
-        assert_eq!(next_lower_pmtu_plateau(0), None);
+    #[test_case(Mtu::new(65536) => Some(Mtu::new(65535)))]
+    #[test_case(Mtu::new(65535) => Some(Mtu::new(32000)))]
+    #[test_case(Mtu::new(65534) => Some(Mtu::new(32000)))]
+    #[test_case(Mtu::new(32001) => Some(Mtu::new(32000)))]
+    #[test_case(Mtu::new(32000) => Some(Mtu::new(17914)))]
+    #[test_case(Mtu::new(31999) => Some(Mtu::new(17914)))]
+    #[test_case(Mtu::new(1281)  => Some(Mtu::new(1280)))]
+    #[test_case(Mtu::new(1280)  => Some(Mtu::new(1006)))]
+    #[test_case(Mtu::new(69)    => Some(Mtu::new(68)))]
+    #[test_case(Mtu::new(68)    => None)]
+    #[test_case(Mtu::new(67)    => None)]
+    #[test_case(Mtu::new(0)     => None)]
+    fn test_next_lower_pmtu_plateau(start: Mtu) -> Option<Mtu> {
+        next_lower_pmtu_plateau(start)
     }
 
-    fn get_pmtu<I: Ip>(ctx: &FakeSyncCtxImpl<I>, src_ip: I::Addr, dst_ip: I::Addr) -> Option<u32> {
+    fn get_pmtu<I: Ip>(ctx: &FakeSyncCtxImpl<I>, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Mtu> {
         ctx.get_ref().cache.get_pmtu(src_ip, dst_ip)
     }
 
@@ -499,7 +512,7 @@ mod tests {
             None
         );
 
-        let new_mtu1 = u32::from(I::MINIMUM_LINK_MTU) + 50;
+        let new_mtu1 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 50);
         let start_time = non_sync_ctx.now();
         let duration = Duration::from_secs(1);
 
@@ -539,7 +552,7 @@ mod tests {
             start_time + duration
         );
 
-        let new_mtu2 = new_mtu1 - 1;
+        let new_mtu2 = Mtu::new(u32::from(new_mtu1) - 1);
 
         // Advance time to 3s.
         assert_empty(non_sync_ctx.trigger_timers_for(
@@ -577,7 +590,7 @@ mod tests {
             start_time + (duration * 3)
         );
 
-        let new_mtu3 = new_mtu2 - 1;
+        let new_mtu3 = Mtu::new(u32::from(new_mtu2) - 1);
 
         // Advance time to 5s.
         assert_empty(non_sync_ctx.trigger_timers_for(
@@ -616,7 +629,7 @@ mod tests {
             last_updated
         );
 
-        let new_mtu4 = new_mtu3 + 50;
+        let new_mtu4 = Mtu::new(u32::from(new_mtu3) + 50);
 
         // Advance time to 7s.
         assert_empty(non_sync_ctx.trigger_timers_for(
@@ -651,7 +664,7 @@ mod tests {
             last_updated
         );
 
-        let low_mtu = u32::from(I::MINIMUM_LINK_MTU) - 1;
+        let low_mtu = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) - 1);
 
         // Advance time to 9s.
         assert_empty(non_sync_ctx.trigger_timers_for(
@@ -695,7 +708,7 @@ mod tests {
         // Make sure there are no timers.
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
-        let new_mtu1 = u32::from(I::MINIMUM_LINK_MTU) + 50;
+        let new_mtu1 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 50);
         let start_time = non_sync_ctx.now();
         let duration = Duration::from_secs(1);
 
@@ -751,7 +764,7 @@ mod tests {
         // `new_mtu1` and last updated instant should be updated to the start of
         // the test + 1s.
         let other_ip = get_other_ip_address::<I>();
-        let new_mtu2 = u32::from(I::MINIMUM_LINK_MTU) + 100;
+        let new_mtu2 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 100);
         PmtuHandler::update_pmtu_if_less(
             &mut sync_ctx,
             &mut non_sync_ctx,
