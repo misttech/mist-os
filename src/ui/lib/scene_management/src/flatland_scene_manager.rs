@@ -13,7 +13,7 @@ use {
             self, PresentationMessage, PresentationSender, SceneManager, ViewportToken,
         },
     },
-    anyhow::Error,
+    anyhow::{Context, Error, Result},
     async_trait::async_trait,
     fidl,
     fidl::endpoints::create_proxy,
@@ -690,23 +690,27 @@ impl FlatlandSceneManager {
             cursor_transform_id: maybe_cursor_transform_id,
             cursor_visibility: true,
             display_metrics,
-            device_pixel_ratio: device_pixel_ratio,
+            device_pixel_ratio,
         })
     }
 
     async fn set_root_view_internal(
         &mut self,
         mut viewport_creation_token: ui_views::ViewportCreationToken,
-    ) -> Result<ui_views::ViewRef, Error> {
+    ) -> Result<ui_views::ViewRef> {
         // Remove any existing viewport.
         if let Some(ids) = &self.scene_root_viewport_ids {
             let locked = self.scene_flatland.flatland.lock();
-            locked.set_content(&mut ids.transform_id.clone(), &mut ContentId { value: 0 })?;
+            locked
+                .set_content(&mut ids.transform_id.clone(), &mut ContentId { value: 0 })
+                .context("could not set content")?;
             locked.remove_child(
                 &mut self.scene_flatland.root_transform_id.clone(),
                 &mut ids.transform_id.clone(),
             )?;
-            locked.release_transform(&mut ids.transform_id.clone())?;
+            locked
+                .release_transform(&mut ids.transform_id.clone())
+                .context("could not release transform")?;
             let _ = locked.release_viewport(&mut ids.content_id.clone());
             self.scene_root_viewport_ids = None;
         }
@@ -717,7 +721,8 @@ impl FlatlandSceneManager {
             content_id: self.id_generator.next_content_id(),
         };
         let (child_view_watcher, child_view_watcher_request) =
-            create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
+            create_proxy::<ui_comp::ChildViewWatcherMarker>()
+                .context("could not connect to ChildViewWatcher")?;
         {
             let locked = self.scene_flatland.flatland.lock();
             let viewport_properties = ui_comp::ViewportProperties {
@@ -730,12 +735,16 @@ impl FlatlandSceneManager {
                 viewport_properties,
                 child_view_watcher_request,
             )?;
-            locked.create_transform(&mut ids.transform_id.clone())?;
+            locked
+                .create_transform(&mut ids.transform_id.clone())
+                .context("could not create transform")?;
             locked.add_child(
                 &mut self.scene_flatland.root_transform_id.clone(),
                 &mut ids.transform_id.clone(),
             )?;
-            locked.set_content(&mut ids.transform_id.clone(), &mut ids.content_id.clone())?;
+            locked
+                .set_content(&mut ids.transform_id.clone(), &mut ids.content_id.clone())
+                .context("could not set content #2")?;
         }
         self.scene_root_viewport_ids = Some(ids);
 
@@ -743,12 +752,17 @@ impl FlatlandSceneManager {
         // of get_view_ref() below, because otherwise the view won't become attached to the global
         // scene graph topology, and the awaited ViewRef will never come.
         let mut pingback_channels = Vec::new();
-        pingback_channels
-            .push(request_present_with_pingback(&self.scene_flatland_presentation_sender)?);
+        pingback_channels.push(
+            request_present_with_pingback(&self.scene_flatland_presentation_sender)
+                .context("could not request present with pingback")?,
+        );
 
-        let _child_status = child_view_watcher.get_status().await?;
-        let mut child_view_ref = child_view_watcher.get_view_ref().await?;
-        let child_view_ref_copy = scenic::duplicate_view_ref(&child_view_ref)?;
+        let _child_status =
+            child_view_watcher.get_status().await.context("could not call get_status")?;
+        let mut child_view_ref =
+            child_view_watcher.get_view_ref().await.context("could not get view_ref")?;
+        let child_view_ref_copy =
+            scenic::duplicate_view_ref(&child_view_ref).context("could not duplicate view_ref")?;
 
         let request_focus_result =
             self.root_flatland.focuser.request_focus(&mut child_view_ref).await;
@@ -757,8 +771,10 @@ impl FlatlandSceneManager {
             Ok(Err(value)) => warn!("Request focus failed with err: {:?}", value),
             Ok(_) => {}
         }
-        pingback_channels
-            .push(request_present_with_pingback(&self.root_flatland_presentation_sender)?);
+        pingback_channels.push(
+            request_present_with_pingback(&self.root_flatland_presentation_sender)
+                .context("could not request present with pingback #2")?,
+        );
 
         // Wait for all pingbacks to ensure the scene is fully set up before returning.
         for receiver in pingback_channels {
