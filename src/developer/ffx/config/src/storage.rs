@@ -287,6 +287,10 @@ impl Config {
             .map(PathBuf::from)
     }
 
+    pub fn get_proxy_timeout(&self) -> Option<f64> {
+        self.get("proxy.timeout_secs", SelectMode::First).as_ref().and_then(Value::as_f64)
+    }
+
     fn iter(&self) -> PriorityIterator<'_> {
         PriorityIterator { curr: None, config: self }
     }

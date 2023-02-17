@@ -605,6 +605,19 @@ impl Environment {
         }
     }
 
+    /// Returns the proxy timeout as defined in the config under "proxy.timeout_secs"
+    ///
+    /// Will return an error if this value is not found in the config.
+    ///
+    /// Note: this loads the config and then derives the value from there. If you require
+    /// "proxy.timeout_secs" from an already-loaded config then you should instead use
+    /// [crate::storage::Config::get_proxy_timeout] with [Duration::from_secs_f64].
+    pub fn get_proxy_timeout(&self) -> Result<Duration> {
+        let config = crate::storage::Config::from_env(self)?;
+        let t = config.get_proxy_timeout().ok_or(ffx_error!("Unable to load proxy timeout"))?;
+        Ok(Duration::from_secs_f64(t))
+    }
+
     fn display_user(&self) -> String {
         self.files
             .user

@@ -18,11 +18,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
 use hoist::Hoist;
-use std::time::Duration;
 use timeout::timeout;
-
-// Config key for event timeout.
-const PROXY_TIMEOUT_SECS: &str = "proxy.timeout_secs";
 
 /// The different ways to check the daemon's version against the local process' information
 #[derive(Clone, Debug)]
@@ -77,7 +73,7 @@ impl Injection {
     async fn init_remote_proxy(&self) -> Result<RemoteControlProxy> {
         let daemon_proxy = self.daemon_factory().await?;
         let target = self.target.clone();
-        let proxy_timeout = proxy_timeout().await?;
+        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
         get_remote_proxy(target, self.is_default_target(), daemon_proxy, proxy_timeout).await
     }
 
@@ -89,7 +85,7 @@ impl Injection {
             target,
             self.is_default_target(),
             daemon_proxy.clone(),
-            proxy_timeout().await?,
+            self.env_context.load().await?.get_proxy_timeout()?,
         )?;
         target_proxy_fut.await?;
         let (fastboot_proxy, fastboot_server_end) = create_proxy::<FastbootMarker>()?;
@@ -105,7 +101,7 @@ impl Injection {
             target,
             self.is_default_target(),
             daemon_proxy.clone(),
-            proxy_timeout().await?,
+            self.env_context.load().await?.get_proxy_timeout()?,
         )?;
         target_proxy_fut.await?;
         Ok(target_proxy)
@@ -158,7 +154,8 @@ impl Injector for Injection {
     async fn fastboot_factory(&self) -> Result<FastbootProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        timeout(proxy_timeout().await?, self.fastboot_factory_inner()).await.map_err(|_| {
+        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        timeout(proxy_timeout, self.fastboot_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
             timeout_error
         })?
@@ -168,7 +165,8 @@ impl Injector for Injection {
     async fn target_factory(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        timeout(proxy_timeout().await?, self.target_factory_inner()).await.map_err(|_| {
+        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
             timeout_error
         })?
@@ -178,7 +176,8 @@ impl Injector for Injection {
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        timeout(proxy_timeout().await?, async {
+        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        timeout(proxy_timeout, async {
             self.remote_once
                 .get_or_try_init(self.init_remote_proxy())
                 .await
@@ -235,16 +234,17 @@ async fn init_daemon_proxy(
     // Spawn off the link task, so that FIDL functions can be called (link IO makes progress).
     let link_task = fuchsia_async::Task::local(link.map(|_| ()));
 
-    let daemon_version_info = timeout(proxy_timeout().await?, proxy.get_version_info())
-        .await
-        .context("timeout")
-        .map_err(|_| {
-            ffx_error!(
-                "ffx was unable to query the version of the running ffx daemon. \
+    let daemon_version_info =
+        timeout(context.load().await?.get_proxy_timeout()?, proxy.get_version_info())
+            .await
+            .context("timeout")
+            .map_err(|_| {
+                ffx_error!(
+                    "ffx was unable to query the version of the running ffx daemon. \
                                  Run `ffx doctor --restart-daemon` and try again."
-            )
-        })?
-        .context("Getting hash from daemon")?;
+                )
+            })?
+            .context("Getting hash from daemon")?;
 
     // Check the version against the given comparison scheme.
     tracing::debug!("Checking daemon version: {version_check:?}");
@@ -300,11 +300,6 @@ async fn init_daemon_proxy(
     Ok(proxy)
 }
 
-async fn proxy_timeout() -> Result<Duration> {
-    let proxy_timeout: f64 = ffx_config::get(PROXY_TIMEOUT_SECS).await?;
-    Ok(Duration::from_secs_f64(proxy_timeout))
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -319,6 +314,7 @@ mod test {
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, FutureExt, TryStreamExt};
     use hoist::OvernetInstance;
+    use std::time::Duration;
     use std::{path::PathBuf, sync::Arc};
 
     #[fuchsia_async::run_singlethreaded(test)]
