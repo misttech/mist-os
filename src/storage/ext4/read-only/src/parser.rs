@@ -492,7 +492,7 @@ impl<T: 'static + Reader> Parser<T> {
                         .map_err(|_| ParsingError::BadDirectory(path.join("/")))?;
                 }
                 _ => {
-                    // TODO(vfcc): Handle other types.
+                    // TODO(fxbug.dev/122152): Handle other types.
                 }
             }
             Ok(true)
