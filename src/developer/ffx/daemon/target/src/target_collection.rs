@@ -184,7 +184,7 @@ impl TargetCollection {
         if let Some(event_queue) = self.events.borrow().as_ref() {
             event_queue
                 .push(DaemonEvent::UpdatedTarget(new_target.target_info()))
-                .unwrap_or_else(|e| tracing::warn!("unalbe to push target update event: {}", e));
+                .unwrap_or_else(|e| tracing::warn!("unable to push target update event: {}", e));
         }
         to_update
     }
@@ -192,7 +192,7 @@ impl TargetCollection {
     /// wait_for_match attempts to find a target matching "matcher". If no
     /// matcher is provided, either the default target is matched, or, if there
     /// is no default a single target is returned iff it is the only target in
-    /// the collection. If there is neither a matcher or a defualt, and there are
+    /// the collection. If there is neither a matcher or a default, and there are
     /// several targets in the collection when the query starts, a
     /// DaemonError::TargetAmbiguous error is returned. The matcher is converted to a
     /// TargetQuery for matching, and follows the TargetQuery semantics.
