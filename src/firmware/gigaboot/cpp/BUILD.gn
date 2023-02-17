@@ -132,6 +132,11 @@ template("gigaboot_esp") {
       ":$_permanent_attributes_target",
       "//src/firmware/gigaboot/cpp:gigaboot-main",
     ]
+
+    # The LTO toolchain currently fails due to undefined "__chkstk", even though
+    # the function is defined in src/firmware/gigaboot/lib/stdlib.c. For now we
+    # simply disable the variant.
+    exclude_toolchain_tags = [ "lto" ]
   }
 
   esp(target_name) {

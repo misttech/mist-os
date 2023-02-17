@@ -11,14 +11,11 @@
 #include "backends.h"
 #include "fastboot_tcp.h"
 #include "gigaboot/src/netifc.h"
+#include "gigaboot/src/util.h"
 #include "lib/zircon_boot/zircon_boot.h"
 #include "utils.h"
 #include "xefi.h"
 #include "zircon_boot_ops.h"
-
-// TODO(b/235489025): The function comes from legacy gigaboot. Implement a
-// similar function in C++ and remove this.
-extern "C" char key_prompt(const char* valid_keys, int timeout_s);
 
 // This is necessary because the Fastboot class inherits from FastbootBase,
 // which is an abstract class with pure virtual functions.
@@ -86,6 +83,8 @@ int main(int argc, char** argv) {
     printf("Auto boot in 2 seconds. Press f to enter fastboot.\n");
     // If time out, the first char in the `valid_keys` argument will be returned. Thus
     // we put a random different char here, so that we don't always drop to fastboot.
+    // TODO(b/235489025): The function comes from legacy gigaboot. Implement a
+    // similar function in C++ and remove this.
     char key = key_prompt("0f", 2);
     enter_fastboot = key == 'f';
   }

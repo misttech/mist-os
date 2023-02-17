@@ -42,9 +42,7 @@ source_set("legacy_c_gigaboot") {
     "$dir_gigaboot/src/logo.c",
     "$dir_gigaboot/src/mdns.c",
     "$dir_gigaboot/src/misc.c",
-    "$dir_gigaboot/src/netboot.c",
     "$dir_gigaboot/src/netifc.c",
-    "$dir_gigaboot/src/osboot.c",
     "$dir_gigaboot/src/pci.c",
     "$dir_gigaboot/src/tcp.c",
     "$dir_gigaboot/src/utf_conversion.c",
@@ -63,7 +61,6 @@ source_set("legacy_c_gigaboot") {
     "//zircon/system/public",
     "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/gfx-font",
-    "//zircon/system/ulib/tftp",
     "//zircon/third_party/ulib/cksum",
   ]
 

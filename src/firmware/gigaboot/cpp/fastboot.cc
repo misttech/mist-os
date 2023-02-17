@@ -293,11 +293,11 @@ zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transpor
   }
 
   ZX_ASSERT(args.args[1].size() < fastboot::kMaxCommandPacketSize);
-
+  char part_name[fastboot::kMaxCommandPacketSize] = {0};
+  memcpy(part_name, args.args[1].data(), args.args[1].size());
   size_t write_size;
-  bool res =
-      zb_ops_.write_to_partition(&zb_ops_, std::string(args.args[1]).data(), 0,
-                                 total_download_size(), download_buffer_.data(), &write_size);
+  bool res = zb_ops_.write_to_partition(&zb_ops_, part_name, 0, total_download_size(),
+                                        download_buffer_.data(), &write_size);
 
   if (!res || write_size != total_download_size()) {
     return SendResponse(ResponseType::kFail, "Failed to write to partition", transport,

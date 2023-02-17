@@ -241,6 +241,9 @@ size_t image_getsize(void* image, size_t sz) {
   return ZBI_ALIGN(kernel->hdr_file.length) + sizeof(zbi_header_t);
 }
 
+size_t kernel_zone_size;
+efi_physical_addr kernel_zone_base;
+
 static int header_check(void* image, size_t sz, uint64_t* _entry, size_t* _flen, size_t* _klen) {
   zbi_header_t* bd = image;
   size_t flen, klen;

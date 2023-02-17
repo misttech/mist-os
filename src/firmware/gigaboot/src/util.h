@@ -36,6 +36,8 @@ uint64_t ntohll(uint64_t val);
 // Returns true on success and false on failure.
 bool uefi_realloc(void** buf, size_t old_size, size_t new_size);
 
+char key_prompt(const char* valid_keys, int timeout_s);
+
 __END_CDECLS
 
 #endif  // SRC_FIRMWARE_GIGABOOT_SRC_UTIL_H_
