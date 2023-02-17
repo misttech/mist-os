@@ -393,25 +393,35 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
     let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
         .expect("failed to connect to routes watcher");
-
     futures::pin_mut!(event_stream);
-    let existing = fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
-        .await
-        .expect("failed to collect existing routes");
 
-    // Assert that the existing routes contain exactly the expected routes.
-    assert_eq_unordered(existing, expected_routes);
-
-    // Verify that there are no more pending events in the stream.
-    event_stream
+    // Collect the routes installed in the Netstack.
+    let mut routes = Vec::new();
+    while let Some(event) = event_stream
         .next()
-        .map(Err)
         .on_timeout(
             fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
-            || Ok(()),
+            || None,
         )
         .await
-        .expect("Unexpected event in event stream");
+    {
+        match event.expect("unexpected error in event stream") {
+            // Treat 'Added' and 'Existing' events the same, since we have no
+            // mechanism to synchronize and ensure the Netstack has finished
+            // initialization before connecting the routes watcher.
+            fnet_routes_ext::Event::Existing(route) | fnet_routes_ext::Event::Added(route) => {
+                routes.push(route)
+            }
+            fnet_routes_ext::Event::Idle => continue,
+            fnet_routes_ext::Event::Removed(route) => {
+                panic!("unexpectedly observed route removal: {:?}", route)
+            }
+            fnet_routes_ext::Event::Unknown => panic!("unexpectedly observed unknown event"),
+        }
+    }
+
+    // Assert that the existing routes contain exactly the expected routes.
+    assert_eq_unordered(routes, expected_routes);
 }
 
 // Declare subnet routes for tests to add/delete. These are known to not collide
@@ -576,15 +586,11 @@ async fn watcher_outlives_state<
         .expect("failed to connect to routes watcher");
     futures::pin_mut!(event_stream);
 
-    // Skip all `existing` events.
-    let _existing_routes =
-        fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
-            .await
-            .expect("failed to collect existing routes");
-
     // Drop the state proxy and verify the event_stream stays open
     drop(state_proxy);
     event_stream
+        // Ignore `Ok` events; the stream closing will generate an `Err`.
+        .filter(|event| futures::future::ready(event.is_err()))
         .next()
         .map(Err)
         .on_timeout(
