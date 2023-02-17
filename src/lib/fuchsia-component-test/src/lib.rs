@@ -582,6 +582,11 @@ pub struct RealmInstance {
     // exists, so the ScopedInstance is bundled up into a struct along with the local component
     // runner's task.
     local_component_runner_task: Option<fasync::Task<()>>,
+
+    // When we launch in a nested component manager we need to keep two channels alive: the one
+    // used to set up the component manager realm, and the one used to set up the realm within
+    // component manager. This is for the former.
+    nested_component_manager_runner_task: Option<fasync::Task<()>>,
 }
 
 impl Drop for RealmInstance {
@@ -784,7 +789,11 @@ impl RealmBuilder {
             .map_err(Error::FailedToCreateChild)?;
         root.connect_to_binder().map_err(Error::FailedToBind)?;
 
-        Ok(RealmInstance { root, local_component_runner_task: Some(local_component_runner_task) })
+        Ok(RealmInstance {
+            root,
+            local_component_runner_task: Some(local_component_runner_task),
+            nested_component_manager_runner_task: None,
+        })
     }
 
     /// Creates this realm in a child component collection. By default this happens in the
@@ -802,7 +811,11 @@ impl RealmBuilder {
             .map_err(Error::FailedToCreateChild)?;
         root.connect_to_binder().map_err(Error::FailedToBind)?;
 
-        Ok(RealmInstance { root, local_component_runner_task: Some(local_component_runner_task) })
+        Ok(RealmInstance {
+            root,
+            local_component_runner_task: Some(local_component_runner_task),
+            nested_component_manager_runner_task: None,
+        })
     }
 
     /// Initializes the created realm under an instance of component manager, specified by the
@@ -818,6 +831,8 @@ impl RealmBuilder {
     /// Note that any routes with a target of `parent` from the root realm will result in exposing
     /// the capability to component manager, which is rather useless by itself. Component manager
     /// does expose the hub though, which could be traversed to find an exposed capability.
+    ///
+    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until realm teardown.
     pub async fn with_nested_component_manager(
         self,
         component_manager_fragment_only_url: &str,
@@ -917,7 +932,9 @@ impl RealmBuilder {
 
         // There are no local components alongside the nested component manager.
         // Replace that task with task of the nested local components.
-        cm_instance.local_component_runner_task.replace(nested_local_component_runner_task);
+        cm_instance
+            .nested_component_manager_runner_task
+            .replace(nested_local_component_runner_task);
 
         Ok(cm_instance)
     }

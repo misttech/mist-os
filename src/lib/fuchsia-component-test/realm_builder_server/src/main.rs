@@ -5,14 +5,14 @@
 use {
     anyhow::{self, Context},
     cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl::endpoints::{ProtocolMarker, ServerEnd},
+    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_config as fconfig,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
+    fuchsia_async as fasync,
     fuchsia_component::server as fserver,
-    fuchsia_fs, fuchsia_zircon_status as zx_status,
+    fuchsia_zircon_status as zx_status,
     futures::{future::BoxFuture, join, lock::Mutex, FutureExt, StreamExt, TryStreamExt},
     lazy_static::lazy_static,
     std::{
@@ -78,6 +78,51 @@ async fn main() {
     fs.take_and_serve_directory_handle().expect("Did not receive directory handle.");
 
     join!(execution_scope.wait(), fs.collect::<()>());
+}
+
+/// This struct tracks the contents of the realm, specifically the URLs for manifests in it and IDs
+/// for the local components in it. This data is then used after the realm becomes unusable to
+/// delete the realm's contents from the runner and resolver.
+#[derive(Debug, Default)]
+struct ManagedRealmContents {
+    urls: Vec<String>,
+    local_component_ids: Vec<runner::LocalComponentId>,
+}
+
+impl ManagedRealmContents {
+    fn add_url(&mut self, url: String) {
+        self.urls.push(url);
+    }
+
+    fn add_local_component_id(&mut self, local_component_id: runner::LocalComponentId) {
+        self.local_component_ids.push(local_component_id);
+    }
+
+    async fn delete(&self, registry: Arc<resolver::Registry>, runner: Arc<runner::Runner>) {
+        for url in &self.urls {
+            registry.delete_manifest(url).await;
+        }
+        for local_component_id in &self.local_component_ids {
+            runner.delete_component(local_component_id).await;
+        }
+    }
+
+    fn watch_channel_and_delete_on_peer_closed(
+        self_: Arc<Mutex<Self>>,
+        handle: fcrunner::ComponentRunnerProxy,
+        registry: Arc<resolver::Registry>,
+        runner: Arc<runner::Runner>,
+    ) {
+        fasync::Task::spawn(async move {
+            let on_closed = handle.as_channel().on_closed();
+            // The only possible return values are ok, deadline exceeded, or peer closed. Since
+            // we're already looking for peer closed, and we haven't set a deadline, we don't care
+            // about the actual contents of any error message here.
+            let _ = on_closed.await;
+            self_.lock().await.delete(registry, runner).await;
+        })
+        .detach();
+    }
 }
 
 struct RealmBuilderFactory {
@@ -188,6 +233,7 @@ impl RealmBuilderFactory {
         builder_server_end: ServerEnd<ftest::BuilderMarker>,
     ) -> Result<(), anyhow::Error> {
         let runner_proxy_placeholder = Arc::new(Mutex::new(None));
+        let realm_contents = Arc::new(Mutex::new(ManagedRealmContents::default()));
 
         let realm_stream = realm_server_end
             .into_stream()
@@ -204,6 +250,7 @@ impl RealmBuilderFactory {
             realm_path: vec![],
             execution_scope: self.execution_scope.clone(),
             realm_has_been_built: realm_has_been_built.clone(),
+            realm_contents: realm_contents.clone(),
         };
 
         self.execution_scope.spawn(async move {
@@ -220,8 +267,10 @@ impl RealmBuilderFactory {
             pkg_dir: Clone::clone(&pkg_dir),
             realm_node,
             registry: self.registry.clone(),
+            runner: self.runner.clone(),
             runner_proxy_placeholder: runner_proxy_placeholder.clone(),
             realm_has_been_built: realm_has_been_built,
+            realm_contents,
         };
         self.execution_scope.spawn(async move {
             if let Err(err) = builder.handle_stream(builder_stream).await {
@@ -236,14 +285,39 @@ struct Builder {
     pkg_dir: fio::DirectoryProxy,
     realm_node: RealmNode2,
     registry: Arc<resolver::Registry>,
+    runner: Arc<runner::Runner>,
     runner_proxy_placeholder: Arc<Mutex<Option<fcrunner::ComponentRunnerProxy>>>,
     realm_has_been_built: Arc<AtomicBool>,
+    realm_contents: Arc<Mutex<ManagedRealmContents>>,
 }
 
 impl Builder {
     async fn handle_stream(
         &self,
+        stream: ftest::BuilderRequestStream,
+    ) -> Result<(), anyhow::Error> {
+        let mut build_called_successfully = false;
+        let stream_handling_results =
+            self.handle_stream_helper(stream, &mut build_called_successfully).await;
+
+        // If we haven't had a successful call to `Build`, then the client hasn't been given a URL
+        // for any of the components in this realm and it's not possible for us to ever get
+        // resolver or runner requests for any of these components. We can safely clean up the data
+        // that's stored in the runner and resolver for this realm.
+        if !build_called_successfully {
+            self.realm_contents
+                .lock()
+                .await
+                .delete(self.registry.clone(), self.runner.clone())
+                .await;
+        }
+        stream_handling_results
+    }
+
+    async fn handle_stream_helper(
+        &self,
         mut stream: ftest::BuilderRequestStream,
+        build_called_successfully: &mut bool,
     ) -> Result<(), anyhow::Error> {
         while let Some(req) = stream.try_next().await? {
             match req {
@@ -257,13 +331,27 @@ impl Builder {
                     let runner_proxy = runner
                         .into_proxy()
                         .context("failed to convert runner ClientEnd into proxy")?;
-                    *self.runner_proxy_placeholder.lock().await = Some(runner_proxy);
+                    *self.runner_proxy_placeholder.lock().await = Some(Clone::clone(&runner_proxy));
                     let res = self
                         .realm_node
-                        .build(self.registry.clone(), vec![], Clone::clone(&self.pkg_dir))
+                        .build(
+                            self.registry.clone(),
+                            self.realm_contents.clone(),
+                            vec![],
+                            Clone::clone(&self.pkg_dir),
+                        )
                         .await;
                     match res {
-                        Ok(url) => responder.send(&mut Ok(url))?,
+                        Ok(url) => {
+                            responder.send(&mut Ok(url))?;
+                            *build_called_successfully = true;
+                            ManagedRealmContents::watch_channel_and_delete_on_peer_closed(
+                                self.realm_contents.clone(),
+                                runner_proxy,
+                                self.registry.clone(),
+                                self.runner.clone(),
+                            );
+                        }
                         Err(err) => {
                             warn!(method = "Builder.Build", message = %err);
                             responder.send(&mut Err(err.into()))?;
@@ -285,6 +373,7 @@ struct Realm {
     realm_has_been_built: Arc<AtomicBool>,
     realm_path: Vec<String>,
     execution_scope: ExecutionScope,
+    realm_contents: Arc<Mutex<ManagedRealmContents>>,
 }
 
 impl Realm {
@@ -517,6 +606,7 @@ impl Realm {
     ) -> Result<(), RealmBuilderError> {
         let local_component_id =
             self.runner.register_local_component(self.runner_proxy_placeholder.clone()).await;
+        self.realm_contents.lock().await.add_local_component_id(local_component_id.clone());
         let mut child_path = self.realm_path.clone();
         child_path.push(name.clone());
         let child_realm_node = RealmNode2::new_from_decl(
@@ -552,6 +642,7 @@ impl Realm {
             realm_path: child_path.clone(),
             execution_scope: self.execution_scope.clone(),
             realm_has_been_built: self.realm_has_been_built.clone(),
+            realm_contents: self.realm_contents.clone(),
         };
 
         let self_realm_node = self.realm_node.clone();
@@ -662,6 +753,7 @@ impl Realm {
                 .boxed()
             })
             .await;
+        self.realm_contents.lock().await.add_local_component_id(local_component_id.clone());
         let string_id: String = local_component_id.clone().into();
         let child_name = format!("read-only-directory-{}", string_id);
 
@@ -1092,6 +1184,7 @@ impl RealmNode2 {
     fn build(
         &self,
         registry: Arc<resolver::Registry>,
+        realm_contents: Arc<Mutex<ManagedRealmContents>>,
         walked_path: Vec<String>,
         package_dir: fio::DirectoryProxy,
     ) -> BoxFuture<'static, Result<String, RealmBuilderError>> {
@@ -1114,8 +1207,14 @@ impl RealmNode2 {
                 let mut new_path = walked_path.clone();
                 new_path.push(child_name.clone());
 
-                let child_url =
-                    node.build(registry.clone(), new_path, Clone::clone(&package_dir)).await?;
+                let child_url = node
+                    .build(
+                        registry.clone(),
+                        realm_contents.clone(),
+                        new_path,
+                        Clone::clone(&package_dir),
+                    )
+                    .await?;
                 state_guard.add_child_decl(child_name, child_url, child_options);
             }
 
@@ -1137,7 +1236,10 @@ impl RealmNode2 {
                 )
                 .await
             {
-                Ok(url) => Ok(url),
+                Ok(url) => {
+                    realm_contents.lock().await.add_url(url.clone());
+                    Ok(url)
+                }
                 Err(e) => Err(RealmBuilderError::InvalidComponentDeclWithName(
                     name,
                     to_tabulated_string(e),
@@ -1829,6 +1931,7 @@ mod tests {
         fidl_fuchsia_logger::LogSinkMarker,
         fidl_fuchsia_mem as fmem, fuchsia_async as fasync, fuchsia_zircon as zx,
         std::convert::TryInto,
+        std::time::Duration,
         test_case::test_case,
     };
 
@@ -1977,8 +2080,10 @@ mod tests {
     fn launch_builder_task(
         realm_node: RealmNode2,
         registry: Arc<resolver::Registry>,
+        runner: Arc<runner::Runner>,
         runner_proxy_placeholder: Arc<Mutex<Option<fcrunner::ComponentRunnerProxy>>>,
         realm_has_been_built: Arc<AtomicBool>,
+        realm_contents: Arc<Mutex<ManagedRealmContents>>,
     ) -> (ftest::BuilderProxy, fasync::Task<()>) {
         let pkg_dir =
             fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
@@ -1987,8 +2092,10 @@ mod tests {
             pkg_dir,
             realm_node,
             registry,
+            runner,
             runner_proxy_placeholder,
             realm_has_been_built,
+            realm_contents,
         };
 
         let (builder_proxy, builder_stream) =
@@ -2006,11 +2113,14 @@ mod tests {
         let realm_node = tree_to_realm_node(tree).await;
 
         let registry = resolver::Registry::new();
+        let runner = runner::Runner::new();
         let (builder_proxy, _builder_stream_task) = launch_builder_task(
             realm_node,
             registry.clone(),
+            runner,
             Arc::new(Mutex::new(None)),
             Arc::new(AtomicBool::new(false)),
+            Arc::new(Mutex::new(ManagedRealmContents::default())),
         );
 
         let (runner_client_end, runner_server_end) = create_endpoints();
@@ -2031,9 +2141,10 @@ mod tests {
         builder_proxy: ftest::BuilderProxy,
         registry: Arc<resolver::Registry>,
         runner: Arc<runner::Runner>,
-        _realm_and_builder_task: fasync::Task<()>,
+        realm_and_builder_task: Option<fasync::Task<()>>,
         runner_stream: fcrunner::ComponentRunnerRequestStream,
         runner_client_end: Option<ClientEnd<fcrunner::ComponentRunnerMarker>>,
+        realm_contents: Arc<Mutex<ManagedRealmContents>>,
     }
 
     impl RealmAndBuilderTask {
@@ -2050,14 +2161,17 @@ mod tests {
             let registry = resolver::Registry::new();
             let runner = runner::Runner::new();
             let runner_proxy_placeholder = Arc::new(Mutex::new(None));
+            let realm_contents = Arc::new(Mutex::new(ManagedRealmContents::default()));
 
             let realm_has_been_built = Arc::new(AtomicBool::new(false));
 
             let (builder_proxy, builder_task) = launch_builder_task(
                 realm_root.clone(),
                 registry.clone(),
+                runner.clone(),
                 runner_proxy_placeholder.clone(),
                 realm_has_been_built.clone(),
+                realm_contents.clone(),
             );
 
             let realm = Realm {
@@ -2069,6 +2183,7 @@ mod tests {
                 realm_path: vec![],
                 execution_scope: ExecutionScope::new(),
                 realm_has_been_built,
+                realm_contents: realm_contents.clone(),
             };
 
             let realm_and_builder_task = fasync::Task::local(async move {
@@ -2082,9 +2197,10 @@ mod tests {
                 builder_proxy,
                 registry,
                 runner,
-                _realm_and_builder_task: realm_and_builder_task,
+                realm_and_builder_task: Some(realm_and_builder_task),
                 runner_stream,
                 runner_client_end: Some(runner_client_end),
+                realm_contents,
             }
         }
 
@@ -2137,8 +2253,10 @@ mod tests {
         let (builder_proxy, _builder_stream_task) = launch_builder_task(
             realm_node,
             resolver::Registry::new(),
+            runner::Runner::new(),
             Arc::new(Mutex::new(None)),
             Arc::new(AtomicBool::new(false)),
+            Arc::new(Mutex::new(ManagedRealmContents::default())),
         );
 
         let (runner_client_end, runner_server_end) = create_endpoints();
@@ -3586,6 +3704,87 @@ mod tests {
         };
         expected_tree.add_auto_decls();
         assert_decls_eq!(tree_from_resolver, expected_tree);
+    }
+
+    #[fuchsia::test]
+    async fn realm_and_builder_exit_when_proxies_are_closed() {
+        let mut realm_and_builder_task = RealmAndBuilderTask::new();
+        realm_and_builder_task
+            .realm_proxy
+            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .await
+            .expect("failed to call AddChildFromDecl")
+            .expect("call failed");
+        let task = realm_and_builder_task.realm_and_builder_task.take();
+        drop(realm_and_builder_task);
+        task.unwrap().await;
+    }
+
+    #[fuchsia::test]
+    async fn close_before_build_removes_local_components() {
+        let mut realm_and_builder_task = RealmAndBuilderTask::new();
+        assert_eq!(0, realm_and_builder_task.realm_contents.lock().await.urls.len());
+        assert_eq!(0, realm_and_builder_task.realm_contents.lock().await.local_component_ids.len());
+        realm_and_builder_task
+            .realm_proxy
+            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .await
+            .expect("failed to call AddChildFromDecl")
+            .expect("call failed");
+        assert_eq!(1, realm_and_builder_task.realm_contents.lock().await.local_component_ids.len());
+        let runner = realm_and_builder_task.runner.clone();
+        assert_eq!(1, runner.local_component_proxies().await.len());
+        let task = realm_and_builder_task.realm_and_builder_task.take();
+        drop(realm_and_builder_task);
+        // Once the realm and builder tasks have finished executing, the state created by the
+        // `add_local_child` call should be deleted.
+        task.unwrap().await;
+        assert_eq!(0, runner.local_component_proxies().await.len());
+    }
+
+    #[fuchsia::test]
+    async fn closing_the_component_controller_removes_manifests_and_local_components() {
+        let mut realm_and_builder_task = RealmAndBuilderTask::new();
+
+        realm_and_builder_task
+            .realm_proxy
+            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .await
+            .expect("failed to call AddChildFromDecl")
+            .expect("call failed");
+        realm_and_builder_task
+            .add_child_or_panic(
+                "b",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::EMPTY,
+            )
+            .await;
+        realm_and_builder_task
+            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::EMPTY)
+            .await;
+
+        let runner = realm_and_builder_task.runner.clone();
+        let registry = realm_and_builder_task.registry.clone();
+        assert_eq!(1, runner.local_component_proxies().await.len());
+
+        let _ = realm_and_builder_task.call_build_and_get_tree().await;
+        assert_eq!(3, registry.get_component_urls().await.len());
+        // Dropping this closes the ComponentController channel we used when calling Build
+        let task = realm_and_builder_task.realm_and_builder_task.take();
+        drop(realm_and_builder_task);
+        task.unwrap().await;
+
+        // The work to garbage collect the manifests and local component we created happens
+        // asynchronously, it's not guaranteed to be completed within any specific deadline. To
+        // work around this, let's check every 100 milliseconds until the test times out.
+        loop {
+            if 0 == runner.local_component_proxies().await.len()
+                && 0 == registry.get_component_urls().await.len()
+            {
+                break;
+            }
+            fasync::Timer::new(Duration::from_millis(100)).await;
+        }
     }
 
     #[fuchsia::test]

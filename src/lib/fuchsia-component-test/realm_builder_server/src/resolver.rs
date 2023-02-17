@@ -64,8 +64,13 @@ impl Registry {
         component.map(|c| c.decl.fidl_into_native())
     }
 
-    // Validates the given decl, and returns a URL at which it can be resolved.
-    // Assumes the `package_dir` points to the root of the test package.
+    // Only used for unit tests
+    #[cfg(test)]
+    pub async fn get_component_urls(self: &Arc<Self>) -> Vec<Url> {
+        self.component_decls.lock().await.keys().cloned().collect()
+    }
+
+    // Validates the given decl, and returns a URL at which it can be resolved
     pub async fn validate_and_register(
         self: &Arc<Self>,
         decl: &fcdecl::Component,
@@ -91,6 +96,13 @@ impl Registry {
             },
         );
         Ok(url)
+    }
+
+    pub async fn delete_manifest(self: &Arc<Self>, url: &String) {
+        self.component_decls
+            .lock()
+            .await
+            .remove(&Url::parse(&url).expect("failed to parse component URL"));
     }
 
     pub fn run_resolver_service(self: &Arc<Self>, stream: fresolution::ResolverRequestStream) {
