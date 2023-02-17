@@ -132,18 +132,25 @@ pub fn dispatch_signal_handler(
     // If the signal handler is executed on the main stack, adjust the stack pointer to account for
     // the red zone.
     // https://en.wikipedia.org/wiki/Red_zone_%28computing%29
+    let main_stack = registers.rsp - RED_ZONE_SIZE;
     let mut stack_pointer = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
         match signal_state.alt_stack {
             Some(sigaltstack) => {
                 // Since the stack grows down, the size is added to the ss_sp when calculating the
                 // "bottom" of the stack.
-                (sigaltstack.ss_sp.ptr() + sigaltstack.ss_size) as u64
+                if let Some(sp) = sigaltstack.ss_sp.ptr().checked_add(sigaltstack.ss_size) {
+                    sp as u64
+                } else {
+                    // Use the main stack if sigaltstack overflows.
+                    main_stack
+                }
             }
-            None => registers.rsp - RED_ZONE_SIZE,
+            None => main_stack,
         }
     } else {
-        registers.rsp - RED_ZONE_SIZE
+        main_stack
     };
+
     stack_pointer -= SIG_STACK_SIZE as u64;
     stack_pointer = misalign_stack_pointer(stack_pointer);
 

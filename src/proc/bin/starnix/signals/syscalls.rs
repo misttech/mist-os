@@ -712,6 +712,82 @@ mod tests {
         assert_eq!(sys_sigaltstack(&current_task, user_ss, nullptr), error!(ENOMEM));
     }
 
+    #[::fuchsia::test]
+    fn test_sigaltstack_active_stack() {
+        let (_kernel, mut current_task) = create_kernel_and_task();
+        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let user_ss = UserRef::<sigaltstack_t>::new(addr);
+        let nullptr = UserRef::<sigaltstack_t>::default();
+
+        // Check that the initial state is disabled.
+        sys_sigaltstack(&current_task, nullptr, user_ss).expect("failed to call sigaltstack");
+        let mut ss = current_task.mm.read_object(user_ss).expect("failed to read struct");
+        assert!(ss.ss_flags & SS_DISABLE != 0);
+
+        // Try to install a sigaltstack.
+        let sigaltstack_addr_size =
+            round_up_to_system_page_size(MINSIGSTKSZ).expect("failed to round up");
+        let sigaltstack_addr =
+            map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
+        ss.ss_sp = sigaltstack_addr;
+        ss.ss_flags = 0;
+        ss.ss_size = sigaltstack_addr_size;
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
+
+        // Changing the sigaltstack while we are there should be an error.
+        current_task.registers.rsp = (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        ss.ss_flags = SS_DISABLE;
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        assert_eq!(sys_sigaltstack(&current_task, user_ss, nullptr), error!(EPERM));
+
+        // However, setting the rsp to a different value outside the alt stack should allow us to
+        // disable it.
+        current_task.registers.rsp =
+            (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
+        let ss = sigaltstack_t { ss_flags: SS_DISABLE, ..sigaltstack_t::default() };
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
+    }
+
+    #[::fuchsia::test]
+    fn test_sigaltstack_active_stack_saturates() {
+        let (_kernel, mut current_task) = create_kernel_and_task();
+        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let user_ss = UserRef::<sigaltstack_t>::new(addr);
+        let nullptr = UserRef::<sigaltstack_t>::default();
+
+        // Check that the initial state is disabled.
+        sys_sigaltstack(&current_task, nullptr, user_ss).expect("failed to call sigaltstack");
+        let mut ss = current_task.mm.read_object(user_ss).expect("failed to read struct");
+        assert!(ss.ss_flags & SS_DISABLE != 0);
+
+        // Try to install a sigaltstack that takes the whole memory.
+        let sigaltstack_addr_size =
+            round_up_to_system_page_size(MINSIGSTKSZ).expect("failed to round up");
+        let sigaltstack_addr =
+            map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
+        ss.ss_sp = sigaltstack_addr;
+        ss.ss_flags = 0;
+        ss.ss_size = usize::MAX;
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
+
+        // Changing the sigaltstack while we are there should be an error.
+        current_task.registers.rsp = (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        ss.ss_flags = SS_DISABLE;
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        assert_eq!(sys_sigaltstack(&current_task, user_ss, nullptr), error!(EPERM));
+
+        // However, setting the rsp to a low value should work (it doesn't wrap-around).
+        current_task.registers.rsp = 0u64;
+        let ss = sigaltstack_t { ss_flags: SS_DISABLE, ..sigaltstack_t::default() };
+        current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
+        sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
+    }
+
     /// It is invalid to call rt_sigprocmask with a sigsetsize that does not match the size of
     /// sigset_t.
     #[::fuchsia::test]

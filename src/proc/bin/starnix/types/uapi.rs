@@ -104,7 +104,7 @@ impl sigaltstack_t {
     /// Returns true if the passed in `ptr` is considered to be on this stack.
     pub fn contains_pointer(&self, ptr: u64) -> bool {
         let min = self.ss_sp.ptr() as u64;
-        let max = (self.ss_sp + self.ss_size).ptr() as u64;
+        let max = (self.ss_sp.ptr() as u64).saturating_add(self.ss_size as u64);
         ptr >= min && ptr <= max
     }
 }

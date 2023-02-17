@@ -47,6 +47,7 @@ test("syscalls_test_bin") {
     "prctl_test.cc",
     "read_write_test.cc",
     "restart_read_test.cc",
+    "signal_handling_test.cc",
     "socket_test.cc",
     "sw_breakpoint_test.cc",
     "task_test.cc",
