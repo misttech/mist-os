@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/kernel/cpp/fidl.h>
+#include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/net/virtualization/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
@@ -17,6 +18,7 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
 #include <fuchsia/ui/observation/geometry/cpp/fidl.h>
+#include <fuchsia/virtualization/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/result.h>
@@ -32,22 +34,12 @@
 #include <optional>
 #include <string>
 
-#include "fuchsia/logger/cpp/fidl.h"
-#include "fuchsia/virtualization/cpp/fidl.h"
-#include "src/lib/files/file.h"
-#include "src/lib/files/glob.h"
-#include "src/lib/fxl/strings/ascii.h"
+#include <fbl/unique_fd.h>
+
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/virtualization/lib/grpc/grpc_vsock_stub.h"
-#include "src/virtualization/lib/guest_config/guest_config.h"
-#include "src/virtualization/tests/lib/backtrace_watchdog.h"
 #include "src/virtualization/tests/lib/guest_constants.h"
 #include "src/virtualization/tests/lib/logger.h"
 #include "src/virtualization/tests/lib/periodic_logger.h"
-
-using ::fuchsia::virtualization::HostVsockEndpoint_Listen_Result;
-using ::fuchsia::virtualization::Listener;
 
 namespace {
 
@@ -61,7 +53,6 @@ constexpr auto kGuestManagerName = "guest_manager";
 
 // TODO(fxbug.dev/12589): Use consistent naming for the test utils here.
 constexpr char kDebianTestUtilDir[] = "/test_utils";
-constexpr zx::duration kLoopConditionStep = zx::msec(10);
 constexpr zx::duration kRetryStep = zx::msec(200);
 
 std::string JoinArgVector(const std::vector<std::string>& argv) {
@@ -144,8 +135,7 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithRealmBuilder(
     zx::time deadline, GuestLaunchInfo& guest_launch_info) {
   auto realm_builder = component_testing::RealmBuilder::Create();
   InstallInRealm(realm_builder.root(), guest_launch_info);
-  realm_root_ =
-      std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_.dispatcher()));
+  realm_root_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher_));
   return std::make_unique<sys::ServiceDirectory>(realm_root_->component().CloneExposedDir());
 }
 
@@ -527,18 +517,8 @@ zx_status_t EnclosedGuest::RunUtil(const std::string& util, const std::vector<st
 }
 
 bool EnclosedGuest::RunLoopUntil(fit::function<bool()> condition, zx::time deadline) {
-  while (zx::clock::get_monotonic() < deadline) {
-    // Check our condition.
-    if (condition()) {
-      return true;
-    }
-
-    // Wait until next polling interval.
-    GetLoop()->Run(zx::deadline_after(kLoopConditionStep));
-    GetLoop()->ResetQuit();
-  }
-
-  return condition();
+  zx::duration timeout = deadline - zx::clock::get_monotonic();
+  return run_loop_until_(std::move(condition), timeout);
 }
 
 zx_status_t ZirconEnclosedGuest::BuildLaunchInfo(GuestLaunchInfo* launch_info) {
@@ -644,9 +624,8 @@ zx_status_t DebianEnclosedGuest::WaitForSystemReady(zx::time deadline) {
     constexpr zx::duration kEchoWaitTime = zx::sec(1);
     return console.RepeatCommandTillSuccess("echo guest ready", ShellPrompt(), "guest ready",
                                             deadline, kEchoWaitTime);
-  } else {
-    return ZX_ERR_BAD_STATE;
   }
+  return ZX_ERR_BAD_STATE;
 }
 
 zx_status_t DebianEnclosedGuest::ShutdownAndWait(zx::time deadline) {

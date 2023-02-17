@@ -20,6 +20,7 @@
 
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/test/compatibility/file_backed_block_device.h"
+#include "src/virtualization/tests/lib/enclosed_guest.h"
 #include "src/virtualization/tests/lib/guest_test.h"
 
 namespace f2fs {
@@ -76,7 +77,7 @@ class LinuxTestFile : public TestFile {
 class FuchsiaTestFile : public TestFile {
  public:
   explicit FuchsiaTestFile(fbl::RefPtr<VnodeF2fs> vnode) : vnode_(std::move(vnode)) {}
-  ~FuchsiaTestFile() {
+  ~FuchsiaTestFile() override {
     if (vnode_ != nullptr) {
       vnode_->Close();
     }
@@ -165,7 +166,7 @@ class FuchsiaOperator : public CompatibilityTestOperator {
     }
     loop_.StartThread();
   }
-  ~FuchsiaOperator() {
+  ~FuchsiaOperator() override {
     loop_.RunUntilIdle();
     loop_.Quit();
     loop_.JoinThreads();
@@ -202,7 +203,8 @@ class FuchsiaOperator : public CompatibilityTestOperator {
 
 class F2fsDebianGuest : public DebianEnclosedGuest {
  public:
-  explicit F2fsDebianGuest(async::Loop& loop) : DebianEnclosedGuest(loop) {}
+  F2fsDebianGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : DebianEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
     zx_status_t status = DebianEnclosedGuest::BuildLaunchInfo(launch_info);

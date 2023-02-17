@@ -127,7 +127,9 @@ static void TestThread(fuchsia::net::MacAddress mac_addr, FakeNetstack* netstack
 
 class VirtioNetMultipleInterfacesZirconGuest : public ZirconEnclosedGuest {
  public:
-  explicit VirtioNetMultipleInterfacesZirconGuest(async::Loop& loop) : ZirconEnclosedGuest(loop) {}
+  VirtioNetMultipleInterfacesZirconGuest(async_dispatcher_t* dispatcher,
+                                         RunLoopUntilFunc run_loop_until)
+      : ZirconEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
     zx_status_t status = ZirconEnclosedGuest::BuildLaunchInfo(launch_info);
@@ -188,7 +190,9 @@ TEST_F(VirtioNetMultipleInterfacesZirconGuestTest, ReceiveAndSend) {
 #if __x86_64__
 class VirtioNetMultipleInterfacesDebianGuest : public DebianEnclosedGuest {
  public:
-  explicit VirtioNetMultipleInterfacesDebianGuest(async::Loop& loop) : DebianEnclosedGuest(loop) {}
+  VirtioNetMultipleInterfacesDebianGuest(async_dispatcher_t* dispatcher,
+                                         RunLoopUntilFunc run_loop_until)
+      : DebianEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(struct GuestLaunchInfo* launch_info) override {
     zx_status_t status = DebianEnclosedGuest::BuildLaunchInfo(launch_info);

@@ -7,6 +7,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/virtualization/tests/lib/enclosed_guest.h"
 #include "src/virtualization/tests/lib/guest_test.h"
 
 // Current Termina and Debian linux kernels do not support virtio-mem driver on arm64
@@ -40,7 +41,8 @@ constexpr uint64_t kLinuxMinimalDIMMSize = 128u * kOneMebibyte;
 
 class VirtioMemTerminaGuest : public TerminaEnclosedGuest {
  public:
-  explicit VirtioMemTerminaGuest(async::Loop& loop) : TerminaEnclosedGuest(loop) {}
+  VirtioMemTerminaGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : TerminaEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
     zx_status_t status = TerminaEnclosedGuest::BuildLaunchInfo(launch_info);
@@ -76,7 +78,8 @@ class VirtioMemTerminaGuest : public TerminaEnclosedGuest {
 
 class VirtioMemDebianGuest : public DebianEnclosedGuest {
  public:
-  explicit VirtioMemDebianGuest(async::Loop& loop) : DebianEnclosedGuest(loop) {}
+  VirtioMemDebianGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : DebianEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
     zx_status_t status = DebianEnclosedGuest::BuildLaunchInfo(launch_info);

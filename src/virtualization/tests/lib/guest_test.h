@@ -5,8 +5,6 @@
 #ifndef SRC_VIRTUALIZATION_TESTS_LIB_GUEST_TEST_H_
 #define SRC_VIRTUALIZATION_TESTS_LIB_GUEST_TEST_H_
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
@@ -15,12 +13,17 @@
 #include <fbl/type_info.h>
 #include <gtest/gtest.h>
 
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/virtualization/tests/lib/enclosed_guest.h"
 
 template <class T>
-class GuestTest : public ::testing::Test {
+class GuestTest : public gtest::RealLoopFixture {
  public:
-  GuestTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread), enclosed_guest_(loop_) {}
+  GuestTest()
+      : enclosed_guest_(dispatcher(),
+                        [this](fit::function<bool()> condition, zx::duration timeout) {
+                          return RunLoopWithTimeoutOrUntil(std::move(condition), timeout);
+                        }) {}
 
  protected:
   void SetUp() override {
@@ -33,7 +36,6 @@ class GuestTest : public ::testing::Test {
     FX_LOGS(INFO) << "Teardown Guest: " << fbl::TypeInfo<T>::Name();
     zx_status_t status = GetEnclosedGuest().Stop(zx::time::infinite());
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-    loop_.Quit();
   }
 
   zx_status_t Execute(const std::vector<std::string>& argv, std::string* result = nullptr,
@@ -77,7 +79,6 @@ class GuestTest : public ::testing::Test {
   T& GetEnclosedGuest() { return enclosed_guest_; }
 
  private:
-  async::Loop loop_;
   T enclosed_guest_;
 };
 

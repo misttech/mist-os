@@ -14,7 +14,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/files/path.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_realm.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/audio_core/testing/integration/virtual_device.h"
@@ -56,7 +55,10 @@ class VirtioSoundGuestTest : public HermeticAudioTest {
  protected:
   void SetUp() override {
     GuestLaunchInfo guest_launch_info;
-    enclosed_guest_.emplace(loop());
+    enclosed_guest_.emplace(dispatcher(),
+                            [this](fit::function<bool()> condition, zx::duration timeout) {
+                              return RunLoopWithTimeoutOrUntil(std::move(condition), timeout);
+                            });
 
     HermeticAudioTest::SetTestSuiteRealmOptions([this, &guest_launch_info] {
       return HermeticAudioRealm::Options{

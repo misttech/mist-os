@@ -51,7 +51,7 @@ TYPED_TEST(CoreGuestTest, VirtioConsole) {
 
   // Test large packets. Note that we must keep the total length below 4096,
   // which is the maximum line length for dash.
-  std::string test_data = "";
+  std::string test_data;
   for (size_t i = 0; i != kVirtioConsoleMessageCount; ++i) {
     test_data.append("Lorem ipsum dolor sit amet consectetur");
   }
@@ -97,7 +97,9 @@ TYPED_TEST(CoreGuestTest, RealTimeClock) {
 template <typename T>
 class CustomizableMemoryGuest : public T {
  public:
-  explicit CustomizableMemoryGuest(async::Loop& loop) : T(loop) {}
+  CustomizableMemoryGuest(async_dispatcher_t* dispatcher,
+                          typename T::RunLoopUntilFunc run_loop_until)
+      : T(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
     zx_status_t status = T::BuildLaunchInfo(launch_info);

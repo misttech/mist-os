@@ -17,7 +17,6 @@
 
 #include "lib/async/dispatcher.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
-#include "src/virtualization/lib/grpc/grpc_vsock_server.h"
 #include "src/virtualization/lib/vsh/command_runner.h"
 #include "src/virtualization/tests/lib/fake_memory_pressure_provider.h"
 #include "src/virtualization/tests/lib/fake_netstack.h"
@@ -42,10 +41,15 @@ struct GuestLaunchInfo {
 // override LaunchInfo only. EnclosedGuest is designed to be used with
 // GuestTest.
 class EnclosedGuest {
+ protected:
+  using RunLoopUntilFunc = fit::function<bool(fit::function<bool()>, zx::duration)>;
+
  public:
-  explicit EnclosedGuest(async::Loop& loop)
-      : loop_(loop), fake_memory_pressure_provider_(loop.dispatcher()) {}
-  virtual ~EnclosedGuest() {}
+  EnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : dispatcher_(dispatcher),
+        run_loop_until_(std::move(run_loop_until)),
+        fake_memory_pressure_provider_(dispatcher) {}
+  virtual ~EnclosedGuest() = default;
 
   // Start the guest. `Start` is the preferred way to start the guest. If the realm
   // needs to be customized, `Start` can be replaced by a call to `InstallInRealm`
@@ -155,8 +159,6 @@ class EnclosedGuest {
     return ZX_OK;
   }
 
-  async::Loop* GetLoop() { return &loop_; }
-
   fuchsia::virtualization::GuestPtr guest_;
   fuchsia::virtualization::HostVsockEndpointPtr vsock_;
 
@@ -169,7 +171,8 @@ class EnclosedGuest {
   std::unique_ptr<sys::ServiceDirectory> StartWithUITestManager(zx::time deadline,
                                                                 GuestLaunchInfo& guest_launch_info);
 
-  async::Loop& loop_;
+  async_dispatcher_t* const dispatcher_;
+  RunLoopUntilFunc run_loop_until_;
   FakeNetstack fake_netstack_;
   FakeMemoryPressureProvider fake_memory_pressure_provider_;
   fuchsia::virtualization::GuestManagerSyncPtr guest_manager_;
@@ -187,8 +190,8 @@ class EnclosedGuest {
 
 class ZirconEnclosedGuest : public EnclosedGuest {
  public:
-  explicit ZirconEnclosedGuest(async::Loop& loop)
-      : ZirconEnclosedGuest(loop, /* enable_gpu */ false) {}
+  ZirconEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : ZirconEnclosedGuest(dispatcher, std::move(run_loop_until), /* enable_gpu */ false) {}
 
   std::vector<std::string> GetTestUtilCommand(const std::string& util,
                                               const std::vector<std::string>& argv) override;
@@ -198,8 +201,9 @@ class ZirconEnclosedGuest : public EnclosedGuest {
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override;
 
  protected:
-  ZirconEnclosedGuest(async::Loop& loop, bool enable_gpu)
-      : EnclosedGuest(loop), enable_gpu_(enable_gpu) {}
+  ZirconEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until,
+                      bool enable_gpu)
+      : EnclosedGuest(dispatcher, std::move(run_loop_until)), enable_gpu_(enable_gpu) {}
 
   zx_status_t WaitForSystemReady(zx::time deadline) override;
   zx_status_t ShutdownAndWait(zx::time deadline) override;
@@ -211,14 +215,14 @@ class ZirconEnclosedGuest : public EnclosedGuest {
 
 class ZirconGpuEnclosedGuest : public ZirconEnclosedGuest {
  public:
-  explicit ZirconGpuEnclosedGuest(async::Loop& loop)
-      : ZirconEnclosedGuest(loop, /* enable_gpu */ true) {}
+  ZirconGpuEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : ZirconEnclosedGuest(dispatcher, std::move(run_loop_until), /* enable_gpu */ true) {}
 };
 
 class DebianEnclosedGuest : public EnclosedGuest {
  public:
-  explicit DebianEnclosedGuest(async::Loop& loop)
-      : DebianEnclosedGuest(loop, /* enable_gpu */ false) {}
+  DebianEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : DebianEnclosedGuest(dispatcher, std::move(run_loop_until), /* enable_gpu */ false) {}
 
   std::vector<std::string> GetTestUtilCommand(const std::string& util,
                                               const std::vector<std::string>& argv) override;
@@ -228,8 +232,9 @@ class DebianEnclosedGuest : public EnclosedGuest {
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override;
 
  protected:
-  DebianEnclosedGuest(async::Loop& loop, bool enable_gpu)
-      : EnclosedGuest(loop), enable_gpu_(enable_gpu) {}
+  DebianEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until,
+                      bool enable_gpu)
+      : EnclosedGuest(dispatcher, std::move(run_loop_until)), enable_gpu_(enable_gpu) {}
 
   zx_status_t WaitForSystemReady(zx::time deadline) override;
   zx_status_t ShutdownAndWait(zx::time deadline) override;
@@ -241,20 +246,21 @@ class DebianEnclosedGuest : public EnclosedGuest {
 
 class DebianGpuEnclosedGuest : public DebianEnclosedGuest {
  public:
-  explicit DebianGpuEnclosedGuest(async::Loop& loop)
-      : DebianEnclosedGuest(loop, /* enable_gpu */ true) {}
+  DebianGpuEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : DebianEnclosedGuest(dispatcher, std::move(run_loop_until), /* enable_gpu */ true) {}
 };
 
 class TerminaEnclosedGuest : public EnclosedGuest {
  public:
-  explicit TerminaEnclosedGuest(async::Loop& loop)
-      : TerminaEnclosedGuest(loop, fuchsia::virtualization::ContainerStatus::STARTING_VM) {}
+  TerminaEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : TerminaEnclosedGuest(dispatcher, std::move(run_loop_until),
+                             fuchsia::virtualization::ContainerStatus::STARTING_VM) {}
 
   GuestKernel GetGuestKernel() override { return GuestKernel::LINUX; }
 
   std::vector<std::string> GetTestUtilCommand(const std::string& util,
                                               const std::vector<std::string>& argv) override;
-  zx_status_t Execute(const std::vector<std::string>& argv,
+  zx_status_t Execute(const std::vector<std::string>& command,
                       const std::unordered_map<std::string, std::string>& env, zx::time deadline,
                       std::string* result, int32_t* return_code) override;
 
@@ -262,8 +268,11 @@ class TerminaEnclosedGuest : public EnclosedGuest {
   void InstallInRealm(component_testing::Realm& realm, GuestLaunchInfo& guest_launch_info) override;
 
  protected:
-  TerminaEnclosedGuest(async::Loop& loop, fuchsia::virtualization::ContainerStatus target_status)
-      : EnclosedGuest(loop), target_status_(target_status), executor_(loop.dispatcher()) {}
+  TerminaEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until,
+                       fuchsia::virtualization::ContainerStatus target_status)
+      : EnclosedGuest(dispatcher, std::move(run_loop_until)),
+        target_status_(target_status),
+        executor_(dispatcher) {}
 
   zx_status_t WaitForSystemReady(zx::time deadline) override;
   zx_status_t ShutdownAndWait(zx::time deadline) override;
@@ -278,8 +287,9 @@ class TerminaEnclosedGuest : public EnclosedGuest {
 
 class TerminaContainerEnclosedGuest : public TerminaEnclosedGuest {
  public:
-  explicit TerminaContainerEnclosedGuest(async::Loop& loop)
-      : TerminaEnclosedGuest(loop, fuchsia::virtualization::ContainerStatus::READY) {}
+  TerminaContainerEnclosedGuest(async_dispatcher_t* dispatcher, RunLoopUntilFunc run_loop_until)
+      : TerminaEnclosedGuest(dispatcher, std::move(run_loop_until),
+                             fuchsia::virtualization::ContainerStatus::READY) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override;
   void InstallInRealm(component_testing::Realm& realm, GuestLaunchInfo& guest_launch_info) override;
