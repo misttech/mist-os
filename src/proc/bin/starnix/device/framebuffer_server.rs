@@ -37,8 +37,8 @@ pub const IMAGE_WIDTH: u32 = 720;
 /// The height of the framebuffer image.
 pub const IMAGE_HEIGHT: u32 = 1200;
 
-/// The offset at which the framebuffer will be placed. Assume a display width of 1920.
-pub const TRANSLATION_X: i32 = 1920 / 2 - IMAGE_WIDTH as i32 / 2;
+/// The offset at which the framebuffer will be placed.
+pub const TRANSLATION_X: i32 = 0;
 
 /// The Flatland identifier for the framebuffer image.
 const IMAGE_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 2 };
