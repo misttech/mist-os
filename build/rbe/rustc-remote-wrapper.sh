@@ -264,6 +264,10 @@ debug_var() {
   test "$verbose" = 0 || print_var "$@"
 }
 
+vmsg() {
+  test "$verbose" = 0 || msg "$@"
+}
+
 # Examine the rustc compile command
 comma_remote_inputs=
 comma_remote_outputs=
@@ -972,9 +976,16 @@ remote_inputs=(
   "${libcxx_remote[@]}"
   "${rt_libdir_remote[@]}"
   "${link_arg_files[@]}"
-  "${sysroot_files[@]}"
   "${extra_inputs_rel_project_root[@]}"
 )
+
+# sysroot files are only used for linking binary crate types,
+# so ignore them in other cases.
+case "$crate_type" in
+  bin | proc-macro | dylib | cdylib ) remote_inputs+=( "${sysroot_files[@]}" ) ;;
+  *) test "${#sysroot_files[@]}" = 0 ||
+       vmsg "Warning: Ignoring sysroot files for crate type: $crate_type" ;;
+esac
 
 # List inputs in a file to avoid exceeding shell limit.
 inputs_file_list="$output".inputs
