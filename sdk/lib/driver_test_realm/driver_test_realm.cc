@@ -272,25 +272,6 @@ class FakePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageRe
 std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::RealmArgs& args) {
   std::map<std::string, std::string> boot_args;
 
-  bool is_dfv2 = false;
-  if (args.use_driver_framework_v2().has_value()) {
-    is_dfv2 = *args.use_driver_framework_v2();
-  }
-
-  boot_args["devmgr.require-system"] = "true";
-  if (is_dfv2) {
-    boot_args["driver_manager.use_driver_framework_v2"] = "true";
-  }
-  if (args.root_driver().has_value()) {
-    boot_args["driver_manager.root-driver"] = *args.root_driver();
-  } else {
-    if (is_dfv2) {
-      boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#meta/test-parent-sys.cm";
-    } else {
-      boot_args["driver_manager.root-driver"] = "fuchsia-boot:///#driver/test-parent-sys.so";
-    }
-  }
-
   if (args.driver_tests_enable_all().has_value() && *args.driver_tests_enable_all()) {
     boot_args["driver.tests.enable"] = "true";
   }
@@ -528,6 +509,17 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
                                   request.args().driver_bind_eager().value_or(kEmptyVec));
     realm_builder_.SetConfigValue("driver-index", "disabled_drivers",
                                   request.args().driver_disable().value_or(kEmptyVec));
+
+    // Set driver_manager config based on request.
+    realm_builder_.InitMutableConfigFromPackage("driver_manager");
+    const bool is_dfv2 = request.args().use_driver_framework_v2().value_or(false);
+    realm_builder_.SetConfigValue("driver_manager", "use_driver_framework_v2",
+                                  ConfigValue::Bool(is_dfv2));
+
+    const std::string default_root = is_dfv2 ? "fuchsia-boot:///#meta/test-parent-sys.cm"
+                                             : "fuchsia-boot:///#driver/test-parent-sys.so";
+    realm_builder_.SetConfigValue("driver_manager", "root_driver",
+                                  request.args().root_driver().value_or(default_root));
 
     realm_ = realm_builder_.SetRealmName("0").Build(dispatcher_);
 

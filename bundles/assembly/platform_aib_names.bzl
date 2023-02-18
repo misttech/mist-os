@@ -9,7 +9,6 @@ PLATFORM_AIB_NAMES = [
     "common_bringup",
     "common_minimal",
     "common_minimal_userdebug",
-    "driver_framework_v2",
     "empty_live_usb",
     "emulator_support",
     "fshost_fxfs",

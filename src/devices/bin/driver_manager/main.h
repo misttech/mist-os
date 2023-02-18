@@ -8,16 +8,6 @@
 #include "coordinator.h"
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 
-// These are helpers for getting sets of parameters over FIDL
-struct DriverManagerParams {
-  bool require_system;
-  bool suspend_timeout_fallback;
-  bool verbose;
-  DriverHostCrashPolicy crash_policy;
-  std::string root_driver;
-  bool use_dfv2;
-};
-
 // Get the root job from the root job service.
 zx::result<zx::job> get_root_job();
 
@@ -31,10 +21,10 @@ zx::result<zx::resource> get_root_resource();
 // be present.
 zx::result<zx::resource> get_mexec_resource();
 
-int RunDfv1(DriverManagerParams driver_manager_params, driver_manager_config::Config config,
+int RunDfv1(driver_manager_config::Config config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args);
 
-int RunDfv2(DriverManagerParams driver_manager_params,
+int RunDfv2(driver_manager_config::Config config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args);
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_MAIN_H_

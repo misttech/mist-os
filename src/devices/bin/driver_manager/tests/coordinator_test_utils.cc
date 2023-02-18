@@ -22,7 +22,7 @@ CoordinatorConfig DefaultConfig(async_dispatcher_t* bootargs_dispatcher,
     *boot_args = mock_boot_arguments::Server{{{"key1", "new-value"}, {"key2", "value2"}}};
     boot_args->CreateClient(bootargs_dispatcher, client);
   }
-  config.require_system = false;
+  config.delay_fallback_until_base_drivers_indexed = false;
   config.boot_args = client;
   config.fs_provider = &dummy_fs_provider;
   config.suspend_timeout = zx::sec(2);

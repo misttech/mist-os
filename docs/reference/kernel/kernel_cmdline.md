@@ -92,69 +92,6 @@ Add a tag to the deny list. Log entries with matching tags will be prevented
 from being printed the console. This takes precedent over tags passed via
 process args as well as the allow list.
 
-## devmgr.bind-eager=\<driver\>,\<driver\>...
-
-For each driver listed as an argument to this option, the driver manager will
-not wait for all other drivers to be loaded before attempting to bind it, even
-if the driver is marked as a fallback driver by including '*' at the start of
-its version string.
-
-## devmgr\.enable-ephemeral=\<bool\>
-
-Enables loading drivers ephemerally. This should only be used on eng builds for
-development purposes.
-
-## devmgr\.require-system=\<bool\>
-
-Instructs the devmgr that a /system volume is required. Without this, devmgr
-assumes this is a standalone Zircon build and not a full Fuchsia system.
-
-## devmgr\.suspend-timeout-fallback
-
-If this option is set, the system invokes kernel fallback to reboot or poweroff
-the device when the operation did not finish in 10 seconds.
-
-## devmgr\.devhost\.asan
-
-This option must be set if any drivers not included directly in /boot are built
-with `-fsanitize=address`. If there are `-fsanitize=address` drivers in /boot,
-then all `-fsanitize=address` drivers will be supported regardless of this
-option. If this option is not set and there are no such drivers in /boot, then
-drivers built with `-fsanitize=address` cannot be loaded and will be rejected.
-
-## devmgr\.log-to-debuglog
-
-If this option is set, devmgr and all drivers will output logs to debuglog, as
-opposed to syslog.
-
-## devmgr\.verbose
-
-If this option is set, devmgr will enable verbose logging.
-
-## driver-manager.driver-host-crash-policy
-
-Sets the policy for what action to take when a driver host crash is observed by
-the driver manager.
-
-Valid options include:
-
-*   `restart-driver-host` : Restarts the driver host (up to 3 times).
-*   `reboot-system` : Reboots the system.
-*   `do-nothing` : Take no action on observed crash.
-
-## driver.\<name>.compatibility-tests-enable
-
-If this option is set, devmgr will run compatibility tests for the driver.
-zircon\_driver\_info, and can be found as the first argument to the
-ZIRCON\_DRIVER\_BEGIN macro.
-
-## driver.\<name>.compatibility-tests-wait-time
-
-This timeout lets you configure the wait time in milliseconds for each of
-bind/unbind/suspend hooks to complete in compatibility tests.
-zircon\_driver\_info, and can be found as the first argument to the
-ZIRCON\_DRIVER\_BEGIN macro.
-
 ## driver.\<name>.disable
 
 Disables the driver with the given name. The driver name comes from the

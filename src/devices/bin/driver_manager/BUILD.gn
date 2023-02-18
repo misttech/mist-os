@@ -31,13 +31,6 @@ fuchsia_structured_config_cpp_elf_lib("driver_manager_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("production_config") {
-  cm_label = ":manifest"
-  values = {
-    set_root_driver_host_critical = true
-  }
-}
-
 # TODO(fxb/38132): Migrate to the new bind rules and delete the below
 source_set("binding") {
   sources = [
@@ -321,7 +314,6 @@ fuchsia_package("package") {
   package_name = "driver_manager"
   deps = [
     ":component",
-    ":production_config",
     "//src/devices/bin/driver_host",
     "//src/devices/internal/drivers/fragment",
     "//src/devices/internal/drivers/fragment:fragment.proxy",

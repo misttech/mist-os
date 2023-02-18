@@ -31,11 +31,12 @@ class DriverLoader {
   explicit DriverLoader(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         fidl::WireSharedClient<fdi::DriverIndex> driver_index,
                         internal::PackageResolverInterface* base_resolver,
-                        async_dispatcher_t* dispatcher, bool require_system,
+                        async_dispatcher_t* dispatcher,
+                        bool delay_fallback_until_base_drivers_indexed,
                         internal::PackageResolverInterface* universe_resolver)
       : base_resolver_(base_resolver),
         driver_index_(std::move(driver_index)),
-        include_fallback_drivers_(!require_system),
+        include_fallback_drivers_(!delay_fallback_until_base_drivers_indexed),
         universe_resolver_(universe_resolver) {}
 
   // This will schedule a task on the async_dispatcher that will return

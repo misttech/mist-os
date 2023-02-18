@@ -54,14 +54,8 @@
 // StdoutToDebuglog::Init();
 // fx_logger_set_min_severity
 // And boot arguments are obtained
-int RunDfv2(DriverManagerParams driver_manager_params,
+int RunDfv2(driver_manager_config::Config config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
-  zx_status_t status;
-  std::string root_driver = "fuchsia-boot:///#meta/platform-bus.cm";
-  if (!driver_manager_params.root_driver.empty()) {
-    root_driver = driver_manager_params.root_driver;
-  }
-
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
@@ -87,16 +81,13 @@ int RunDfv2(DriverManagerParams driver_manager_params,
     return driver_index_result.error_value();
   }
   fbl::unique_fd lib_fd;
-  {
-    status = fdio_open_fd("/boot/lib/",
-                          static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
-                                                fio::wire::OpenFlags::kRightReadable |
-                                                fio::wire::OpenFlags::kRightExecutable),
-                          lib_fd.reset_and_get_address());
-    if (status != ZX_OK) {
-      LOGF(ERROR, "Failed to open /boot/lib/ : %s", zx_status_get_string(status));
-      return status;
-    }
+  constexpr uint32_t kOpenFlags = static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
+                                                        fio::wire::OpenFlags::kRightReadable |
+                                                        fio::wire::OpenFlags::kRightExecutable);
+  if (zx_status_t status = fdio_open_fd("/boot/lib/", kOpenFlags, lib_fd.reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to open /boot/lib/ : %s", zx_status_get_string(status));
+    return status;
   }
   // The loader needs its own thread because DriverManager makes synchronous calls to the
   // DriverHosts, which make synchronous calls to load their shared libraries.
@@ -112,9 +103,8 @@ int RunDfv2(DriverManagerParams driver_manager_params,
   driver_runner.PublishComponentRunner(outgoing);
 
   // Find and load v2 Drivers.
-  LOGF(INFO, "Starting DriverRunner with root driver URL: %s", root_driver.c_str());
-  auto start = driver_runner.StartRootDriver(root_driver);
-  if (start.is_error()) {
+  LOGF(INFO, "Starting DriverRunner with root driver URL: %s", config.root_driver().c_str());
+  if (auto start = driver_runner.StartRootDriver(config.root_driver()); start.is_error()) {
     return start.error_value();
   }
 
@@ -210,7 +200,7 @@ int RunDfv2(DriverManagerParams driver_manager_params,
 
   async::PostTask(loop.dispatcher(), [] { LOGF(INFO, "driver_manager main loop is running"); });
 
-  status = loop.Run();
+  zx_status_t status = loop.Run();
   LOGF(ERROR, "Driver Manager exited unexpectedly: %s", zx_status_get_string(status));
   return status;
 }

@@ -115,6 +115,12 @@ fuchsia_structured_config_values("test_config") {
   cm_label = ":driver_manager_manifest"
   values = {
     set_root_driver_host_critical = false
+    delay_fallback_until_base_drivers_indexed = true
+    suspend_timeout_fallback = true
+    verbose = false
+    use_driver_framework_v2 = false
+    driver_host_crash_policy = "restart-driver-host"
+    root_driver = "fuchsia-boot:///#driver/test-parent-sys.so"
   }
 }
 

@@ -95,8 +95,8 @@ struct CoordinatorConfig {
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args;
   // Client for the DriverIndex.
   fidl::WireSharedClient<fdi::DriverIndex> driver_index;
-  // Whether we require /system.
-  bool require_system = false;
+  // Whether we should wait until base drivers are indexed before binding fallback drivers.
+  bool delay_fallback_until_base_drivers_indexed = false;
   // Whether to enable verbose logging.
   bool verbose = false;
   // Timeout for system wide suspend

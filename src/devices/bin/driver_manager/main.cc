@@ -53,51 +53,18 @@
 #include "system_instance.h"
 #include "v2/driver_runner.h"
 
-DriverManagerParams GetDriverManagerParams(fidl::WireSyncClient<fuchsia_boot::Arguments>& client) {
-  fuchsia_boot::wire::BoolPair bool_req[]{
-      {"devmgr.require-system", false},
-      {"devmgr.suspend-timeout-fallback", true},
-      {"devmgr.verbose", false},
-      {"driver_manager.use_driver_framework_v2", false},
-  };
-  auto bool_resp =
-      client->GetBools(fidl::VectorView<fuchsia_boot::wire::BoolPair>::FromExternal(bool_req));
-  if (!bool_resp.ok()) {
-    return {};
+DriverHostCrashPolicy CrashPolicyFromString(const std::string& crash_policy) {
+  if (crash_policy == "reboot-system") {
+    return DriverHostCrashPolicy::kRebootSystem;
+  } else if (crash_policy == "restart-driver-host") {
+    return DriverHostCrashPolicy::kRestartDriverHost;
+  } else if (crash_policy == "do-nothing") {
+    return DriverHostCrashPolicy::kDoNothing;
+  } else {
+    LOGF(ERROR, "Unexpected option for driver-manager.driver-host-crash-policy: %s",
+         crash_policy.c_str());
+    return DriverHostCrashPolicy::kRestartDriverHost;
   }
-
-  auto crash_policy = DriverHostCrashPolicy::kRestartDriverHost;
-  auto response = client->GetString("driver-manager.driver-host-crash-policy");
-  if (response.ok() && !response.value().value.is_null() && !response.value().value.empty()) {
-    std::string const crash_policy_str(response.value().value.get());
-    if (crash_policy_str == "reboot-system") {
-      crash_policy = DriverHostCrashPolicy::kRebootSystem;
-    } else if (crash_policy_str == "restart-driver-host") {
-      crash_policy = DriverHostCrashPolicy::kRestartDriverHost;
-    } else if (crash_policy_str == "do-nothing") {
-      crash_policy = DriverHostCrashPolicy::kDoNothing;
-    } else {
-      LOGF(ERROR, "Unexpected option for driver-manager.driver-host-crash-policy: %s",
-           crash_policy_str.c_str());
-    }
-  }
-
-  std::string root_driver;
-  {
-    auto response = client->GetString("driver_manager.root-driver");
-    if (response.ok() && !response.value().value.is_null() && !response.value().value.empty()) {
-      root_driver = std::string(response.value().value.data(), response.value().value.size());
-    }
-  }
-
-  return {
-      .require_system = bool_resp.value().values[0],
-      .suspend_timeout_fallback = bool_resp.value().values[1],
-      .verbose = bool_resp.value().values[2],
-      .crash_policy = crash_policy,
-      .root_driver = std::move(root_driver),
-      .use_dfv2 = bool_resp.value().values[3],
-  };
 }
 
 // Get the root job from the root job service.
@@ -155,30 +122,24 @@ int main(int argc, char** argv) {
     return args_result.error_value();
   }
 
-  auto boot_args = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(*args_result)};
-  auto driver_manager_params = GetDriverManagerParams(boot_args);
-
   auto config = driver_manager_config::Config::TakeFromStartupHandle();
 
-  if (driver_manager_params.verbose) {
+  if (config.verbose()) {
     fx_logger_t* logger = fx_log_get_logger();
     if (logger) {
       fx_logger_set_min_severity(logger, std::numeric_limits<fx_log_severity_t>::min());
     }
   }
-  if (driver_manager_params.use_dfv2) {
-    return RunDfv2(driver_manager_params, std::move(boot_args));
+
+  auto boot_args = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(*args_result)};
+  if (config.use_driver_framework_v2()) {
+    return RunDfv2(std::move(config), std::move(boot_args));
   }
-  return RunDfv1(driver_manager_params, std::move(config), std::move(boot_args));
+  return RunDfv1(std::move(config), std::move(boot_args));
 }
 
-int RunDfv1(DriverManagerParams driver_manager_params, driver_manager_config::Config dm_config,
+int RunDfv1(driver_manager_config::Config dm_config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
-  std::string root_driver = "fuchsia-boot:///#driver/platform-bus.so";
-  if (!driver_manager_params.root_driver.empty()) {
-    root_driver = driver_manager_params.root_driver;
-  }
-
   SuspendCallback suspend_callback = [](zx_status_t status) {
     if (status != ZX_OK) {
       // TODO(https://fxbug.dev/56208): Change this log back to error once isolated devmgr is fixed.
@@ -203,15 +164,16 @@ int RunDfv1(DriverManagerParams driver_manager_params, driver_manager_config::Co
   CoordinatorConfig config;
   SystemInstance system_instance;
   config.boot_args = &boot_args;
-  config.require_system = driver_manager_params.require_system;
-  config.verbose = driver_manager_params.verbose;
+  config.delay_fallback_until_base_drivers_indexed =
+      dm_config.delay_fallback_until_base_drivers_indexed();
+  config.verbose = dm_config.verbose();
   config.fs_provider = &system_instance;
   config.path_prefix = "/boot/";
-  config.crash_policy = driver_manager_params.crash_policy;
+  config.crash_policy = CrashPolicyFromString(dm_config.driver_host_crash_policy());
 
   // Waiting an infinite amount of time before falling back is effectively not
   // falling back at all.
-  if (!driver_manager_params.suspend_timeout_fallback) {
+  if (!dm_config.suspend_timeout_fallback()) {
     config.suspend_timeout = zx::duration::infinite();
   }
 
@@ -309,7 +271,7 @@ int RunDfv1(DriverManagerParams driver_manager_params, driver_manager_config::Co
     return status;
   }
 
-  coordinator.LoadV1Drivers(root_driver);
+  coordinator.LoadV1Drivers(dm_config.root_driver());
 
   if (dm_config.set_root_driver_host_critical()) {
     // Set root driver host as critical so the system reboots if it crashes. It houses an escrow for

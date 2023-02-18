@@ -519,11 +519,3 @@ assembly_input_bundle("fshost_fxfs") {
     "//src/storage/bin/blobfs:bootfs",
   ]
 }
-
-# AIB containing DFv2 support
-assembly_input_bundle("driver_framework_v2") {
-  kernel_cmdline = [
-    "driver_manager.root-driver=platform-bus.cm",
-    "driver_manager.use_driver_framework_v2=true",
-  ]
-}

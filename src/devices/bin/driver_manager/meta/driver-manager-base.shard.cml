@@ -103,6 +103,34 @@
         },
     ],
     config: {
+        // Whether to set the root driver host as critical or not.
         set_root_driver_host_critical: { type: "bool" },
+        // Whether or not fallback drivers should wait until base drivers have been indexed
+        // before bound.
+        delay_fallback_until_base_drivers_indexed: { type: "bool" },
+        // If this option is set, the system invokes kernel fallback to reboot or poweroff
+        // the device when the operation did not finish in 10 seconds.
+        suspend_timeout_fallback: { type: "bool" },
+        // If true, set the verbosity level to log all logs.
+        verbose: { type: "bool" },
+        // Enable v2 of the driver framework.
+        use_driver_framework_v2: { type: "bool" },
+        // Sets the policy for what action to take when a driver host crash is observed by
+        // the driver manager.
+        //
+        // Valid options include:
+        //
+        // * `restart-driver-host` : Restarts the driver host (up to 3 times).
+        // * `reboot-system` : Reboots the system.
+        // * `do-nothing` : Take no action on observed crash.
+        driver_host_crash_policy: {
+            type: "string",
+            max_size: 20,
+        },
+        // URL for the root driver to load.
+        root_driver: {
+            type: "string",
+            max_size: 100,
+        },
     },
 }

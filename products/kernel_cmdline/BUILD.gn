@@ -4,22 +4,6 @@
 
 import("//build/zbi/kernel_cmdline.gni")
 
-kernel_cmdline("devmgr.enable-ephemeral--true") {
-  args = [ "devmgr.enable-ephemeral=true" ]
-}
-
-kernel_cmdline("devmgr.enable-ephemeral--false") {
-  args = [ "devmgr.enable-ephemeral=false" ]
-}
-
-kernel_cmdline("driver_manager.root-meta--platform-bus.cm") {
-  args = [ "driver_manager.root-driver=fuchsia-boot:///#meta/platform-bus.cm" ]
-}
-
-kernel_cmdline("driver_manager.use_driver_framework_v2--true") {
-  args = [ "driver_manager.use_driver_framework_v2=true" ]
-}
-
 kernel_cmdline("kernel.bypass-debuglog--true") {
   args = [ "kernel.bypass-debuglog=true" ]
 }
