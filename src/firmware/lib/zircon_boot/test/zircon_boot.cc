@@ -429,45 +429,83 @@ void ValidateVerifiedBootedSlot(const MockZirconBootOps* dev,
   EXPECT_EQ(zbi_items_added, zbi_items_expected);
 }
 
-// Test logic pass verified boot logic and boot to expected slot.
-// Nullopt slot means slotless.
-void TestSuccessfulVerifiedBoot(AbrSlotIndex initial_active_slot,
-                                std::optional<AbrSlotIndex> expected_slot,
-                                ZirconBootMode boot_mode) {
+// Test OS ABR logic pass verified boot logic and boot to expected slot.
+struct VerifiedBootOsAbrTestCase {
+  AbrSlotIndex initial_active_slot;
+  std::optional<AbrSlotIndex> expected_slot;
+  ZirconBootMode boot_mode;
+  MockZirconBootOps::LockStatus lock_status;
+
+  std::string Name() const {
+    static char buffer[512];
+    snprintf(buffer, sizeof(buffer), "%s_to_%s_mode%d_lock%d",
+             AbrGetSlotSuffix(initial_active_slot),
+             expected_slot ? AbrGetSlotSuffix(*expected_slot) : "null", boot_mode, lock_status);
+    return std::string(buffer);
+  }
+};
+
+using VerifiedBootOsAbrTest = zxtest::TestWithParam<VerifiedBootOsAbrTestCase>;
+
+TEST_P(VerifiedBootOsAbrTest, TestSuccessfulVerifiedBootOsAbrParameterized) {
+  const VerifiedBootOsAbrTestCase& test_case = GetParam();
   std::unique_ptr<MockZirconBootOps> dev;
   ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  dev->SetDeviceLockStatus(test_case.lock_status);
   ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
   ops.firmware_can_boot_kernel_slot = nullptr;
-  MarkSlotActive(dev.get(), initial_active_slot);
+  MarkSlotActive(dev.get(), test_case.initial_active_slot);
   // If we're doing a slotless boot, nothing should touch the A/B/R metadata
   // during LoadAndBoot().
-  if (!expected_slot) {
+  if (!test_case.expected_slot) {
     dev->RemovePartition(GPT_DURABLE_BOOT_NAME);
   }
-  ASSERT_EQ(LoadAndBoot(&ops, boot_mode), kBootResultBootReturn);
-  ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(dev.get(), expected_slot));
+  ASSERT_EQ(LoadAndBoot(&ops, test_case.boot_mode), kBootResultBootReturn);
+  ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(dev.get(), test_case.expected_slot));
 }
 
-TEST(BootTests, TestSuccessfulVerifiedBoot) {
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexA, kAbrSlotIndexA, kZirconBootModeAbr));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexB, kAbrSlotIndexB, kZirconBootModeAbr));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeAbr));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexA, kAbrSlotIndexR, kZirconBootModeForceRecovery));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexB, kAbrSlotIndexR, kZirconBootModeForceRecovery));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeForceRecovery));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexA, std::nullopt, kZirconBootModeSlotless));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexB, std::nullopt, kZirconBootModeSlotless));
-  ASSERT_NO_FATAL_FAILURE(
-      TestSuccessfulVerifiedBoot(kAbrSlotIndexR, std::nullopt, kZirconBootModeSlotless));
-}
+INSTANTIATE_TEST_SUITE_P(
+    VerifiedBootOsAbrTests, VerifiedBootOsAbrTest,
+    zxtest::Values<VerifiedBootOsAbrTestCase>(
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, kAbrSlotIndexA, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, kAbrSlotIndexB, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kLocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kLocked},
+
+        // Test the same cases but with unlocked state
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, kAbrSlotIndexA, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, kAbrSlotIndexB, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeAbr,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, kAbrSlotIndexR, kZirconBootModeForceRecovery,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexA, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexB, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kUnlocked},
+        VerifiedBootOsAbrTestCase{kAbrSlotIndexR, std::nullopt, kZirconBootModeSlotless,
+                                  MockZirconBootOps::LockStatus::kUnlocked}),
+    [](const auto& info) { return info.param.Name(); });
 
 // Corrupts the kernel image in the given slot so that verification should fail.
 // Nullopt slot means corrupt the slotless image.
@@ -651,7 +689,7 @@ TEST(BootTests, RollbackIndexUpdatedOnSuccessfulSlot) {
   // Test vbmeta image A a has a rollback index of 5 at location 0. See generate_test_data.py.
   auto res = dev->ReadRollbackIndex(0);
   ASSERT_TRUE(res.is_ok());
-  ASSERT_EQ(res.value(), 5);
+  ASSERT_EQ(res.value(), 5ULL);
 }
 
 // Slotless boots should still provide anti-rollback support.

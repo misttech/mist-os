@@ -121,6 +121,11 @@ static AvbIOResult GetUniqueGuidForPartition(AvbOps* ops, const char* partition,
 static AvbIOResult GetSizeOfPartition(AvbOps* ops, const char* partition,
                                       uint64_t* out_size_num_bytes) {
   VBootContext* context = (VBootContext*)ops->user_data;
+  if (strncmp(partition, GPT_ZIRCON_SLOTLESS_NAME, strlen(GPT_ZIRCON_SLOTLESS_NAME)) == 0) {
+    *out_size_num_bytes = context->preloaded_image->length + sizeof(zbi_header_t);
+    return AVB_IO_RESULT_OK;
+  }
+
   ZirconBootOps* zb_ops = (ZirconBootOps*)context->ops;
   size_t out;
   if (!ZIRCON_BOOT_OPS_CALL(zb_ops, verified_boot_get_partition_size, partition, &out)) {
