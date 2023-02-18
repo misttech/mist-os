@@ -13,7 +13,6 @@
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/netstack/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
@@ -439,7 +438,6 @@ class WebEngineTest : public VirtualKeyboardBase {
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_},
-                          Protocol{fuchsia::netstack::Netstack::Name_},
                           Protocol{fuchsia::net::interfaces::State::Name_}},
          .source = ChildRef{kNetstack},
          .targets = {target}},

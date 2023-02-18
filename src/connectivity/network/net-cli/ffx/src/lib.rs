@@ -17,7 +17,6 @@ use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_stack as fstack;
-use fidl_fuchsia_netstack as fnetstack;
 
 const DEBUG_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.debug.Interfaces";
 const DHCPD_SELECTOR_SUFFIX: &str = "/dhcpd:expose:fuchsia.net.dhcp.Server";
@@ -29,7 +28,6 @@ const NEIGHBOR_CONTROLLER_SELECTOR_SUFFIX: &str =
 const NEIGHBOR_VIEW_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.neighbor.View";
 const LOG_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.stack.Log";
 const STACK_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.stack.Stack";
-const NETSTACK_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.netstack.Netstack";
 const NETWORK_REALM: &str = "core/network";
 
 struct FfxConnector<'a> {
@@ -131,15 +129,6 @@ impl net_cli::ServiceConnector<fstack::StackMarker> for FfxConnector<'_> {
         &self,
     ) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, anyhow::Error> {
         self.remotecontrol_connect::<fstack::StackMarker>(STACK_SELECTOR_SUFFIX).await
-    }
-}
-
-#[async_trait::async_trait]
-impl net_cli::ServiceConnector<fnetstack::NetstackMarker> for FfxConnector<'_> {
-    async fn connect(
-        &self,
-    ) -> Result<<fnetstack::NetstackMarker as ProtocolMarker>::Proxy, anyhow::Error> {
-        self.remotecontrol_connect::<fnetstack::NetstackMarker>(NETSTACK_SELECTOR_SUFFIX).await
     }
 }
 

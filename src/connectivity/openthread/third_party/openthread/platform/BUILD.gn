@@ -40,7 +40,6 @@ source_set("platform") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_hlcpp",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/connectivity/openthread/lib/ot-stack:ot-stack-callback",

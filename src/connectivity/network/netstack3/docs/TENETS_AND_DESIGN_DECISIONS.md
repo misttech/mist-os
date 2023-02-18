@@ -140,7 +140,7 @@ It should be noted that, on Fuchsia, adding an address with the
 an on-link route for the prefix. This is similar to adding an address on Linux
 using `ip-address(8)` with the `noprefixroute` flag. Note that previous
 (deprecated) iterations of network configuration FIDL libraries such as
-`fuchsia.netstack` and `fuchsia.net.stack` did not have the same opinion.
+`fuchsia.net.stack` did not have the same opinion.
 
 Given that the prefix of an address will not be used to implicitly manipulate
 on-link subnet routes or anycast addresses, there is no need to hold the prefix

@@ -16,7 +16,6 @@
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/netstack/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
@@ -387,7 +386,6 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
             // Uncomment the configuration below if you want to run chrome remote
             // devtools. See README.md for details.
             // Protocol{fuchsia::posix::socket::Provider::Name_},
-            // Protocol{fuchsia::netstack::Netstack::Name_},
             // Protocol{fuchsia::net::interfaces::State::Name_},
             Protocol{fuchsia::kernel::Stats::Name_},
             Protocol{fuchsia::sys::Environment::Name_},
@@ -647,7 +645,6 @@ class ChromiumInputTest : public ChromiumInputBase {
          .targets = {target}},
 
         {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_},
-                          Protocol{fuchsia::netstack::Netstack::Name_},
                           Protocol{fuchsia::net::interfaces::State::Name_}},
          .source = ChildRef{kNetstack},
          // Use the .source below instead of above,

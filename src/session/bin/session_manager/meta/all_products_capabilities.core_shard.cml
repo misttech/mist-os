@@ -115,7 +115,6 @@
                 "fuchsia.net.name.Lookup",
                 "fuchsia.net.reachability.Monitor",
                 "fuchsia.net.routes.State",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",
             ],
             from: "#network",

@@ -32,7 +32,7 @@ namespace run {
 //      "fuchsia.log.Log": "logger"
 //    },
 //    "system-services": [
-//      "fuchsia.netstack.Netstack"
+//      "fuchsia.posix.socket.Provider"
 //    ]
 //  }
 // }

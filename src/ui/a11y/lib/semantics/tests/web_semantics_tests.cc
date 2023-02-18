@@ -12,7 +12,6 @@
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/netstack/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
@@ -170,8 +169,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
                        .source = ChildRef{kMemoryPressureProvider},
                        .targets = {ChildRef{kWebView}}});
-    realm()->AddRoute({.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_},
-                                        Protocol{fuchsia::netstack::Netstack::Name_}},
+    realm()->AddRoute({.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
                        .source = ChildRef{kNetstack},
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},

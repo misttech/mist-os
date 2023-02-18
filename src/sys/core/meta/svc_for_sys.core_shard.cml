@@ -78,7 +78,6 @@
                 "fuchsia.net.name.Lookup",
                 "fuchsia.net.routes.State",
                 "fuchsia.net.stack.Stack",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",
             ],
             from: "#network",

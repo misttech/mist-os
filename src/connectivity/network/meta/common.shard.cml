@@ -192,7 +192,6 @@
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",
 
                 // TODO(https://fxbug.dev/93579): once product assembly supports product-specific

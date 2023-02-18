@@ -5391,14 +5391,14 @@ mod tests {
                 decl.exposes = Some(vec![
                     fdecl::Expose::Service(fdecl::ExposeService {
                         source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
-                        source_name: Some("fuchsia.netstack.Netstack".to_string()),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target_name: Some("foo".to_string()),
                         ..fdecl::ExposeService::EMPTY
                     }),
                     fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                         source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
-                        source_name: Some("fuchsia.netstack.Netstack".to_string()),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target_name: Some("bar".to_string()),
                         ..fdecl::ExposeProtocol::EMPTY
@@ -5430,8 +5430,14 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_capability("ExposeService", "source", "fuchsia.netstack.Netstack"),
-                Error::invalid_capability("ExposeProtocol", "source", "fuchsia.netstack.Netstack"),
+                Error::invalid_capability(
+                    "ExposeService",
+                    "source",
+                    "fuchsia.some.library.SomeProtocol"),
+                Error::invalid_capability(
+                    "ExposeProtocol",
+                    "source",
+                    "fuchsia.some.library.SomeProtocol"),
                 Error::invalid_capability("ExposeDirectory", "source", "dir"),
                 Error::invalid_capability("ExposeRunner", "source", "source_elf"),
                 Error::invalid_capability("ExposeResolver", "source", "source_pkg"),

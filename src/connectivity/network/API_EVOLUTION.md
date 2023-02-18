@@ -50,23 +50,11 @@ We prefer a different framing in Networking: separate your API into different
 roles by breaking it into multiple *protocols*; separate your API into different
 stabilization units by breaking into multiple *libraries*.
 
-Consider `fuchsia.netstack/Netstack` and `fuchsia.net.stack/Stack` as motivating
-examples: neither encode access roles, requiring that any agent that wishes to
-observe the system state is also granted access to modify it. In practice, this
-needlessly grants consumers such as Chromium write-access to networking
-internals.
-
 ### Cardinality
 
 Avoid introducing APIs that are non-orthogonal to existing APIs. Providing
 multiple entry points for the same purpose can lead to confusion for consumers
 and subtle behaviour differences.
-
-Consider `fuchsia.netstack/Netstack.GetInterfaces` and
-`fuchsia.netstack/Netstack.OnInterfacesChanged` as motivating examples:
-`OnInterfacesChanged` provides a superset of the functionality of
-`GetInterfaces` by emitting a synthetic event upon binding, yet consumers
-misunderstood and [misused the API][chromium_on_interfaces_changed].
 
 ### Prior Art and Compatibility
 
@@ -85,9 +73,7 @@ fully defined in FIDL.
 
 A less-obvious motivating example is [`netlink`]; networking management APIs are
 not standardized in POSIX, yet `netlink` is widely used in existing software to
-interact with Linux's networking subsystems. Both `fuchsia.netstack/Netstack`
-and `fuchsia.net.stack/Stack` were designed without considering equivalent
-functionality provided by `netlink`.
+interact with Linux's networking subsystems.
 
 ### Time Pressure
 
@@ -139,14 +125,9 @@ At present, these are the libraries considered in this document:
 - `fuchsia.net.tun`
    + not included in SDK
    + ownership-based
-- `fuchsia.netstack`
-   + not included in SDK
-   + removal tracked in https://fxbug.dev/21222
-   + contains few remaining methods, most have been moved to `fuchsia.net.stack`
 - `fuchsia.posix.socket`
    + not included in SDK
    + used via fdio which is included in SDK
 
 [library_structure]: /docs/concepts/api/fidl.md#library_structure
-[chromium_on_interfaces_changed]: https://chromium-review.googlesource.com/c/chromium/src/+/2331860
 [`netlink`]: https://man7.org/linux/man-pages/man7/netlink.7.html

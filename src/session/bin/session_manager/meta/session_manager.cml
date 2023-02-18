@@ -85,7 +85,6 @@
                 "fuchsia.net.mdns.Subscriber",
                 "fuchsia.net.reachability.Monitor",
                 "fuchsia.net.routes.State",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.button.Monitor",

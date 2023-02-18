@@ -24,7 +24,6 @@ use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
 use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_netstack as fnetstack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
@@ -89,7 +88,6 @@ impl NetstackVersion {
                 fnet_routes::StateV4Marker::PROTOCOL_NAME,
                 fnet_routes::StateV6Marker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
-                fnetstack::NetstackMarker::PROTOCOL_NAME,
             ),
             NetstackVersion::Netstack3 => &common_services_and!(),
         }

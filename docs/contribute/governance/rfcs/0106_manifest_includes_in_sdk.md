@@ -164,7 +164,6 @@ is not local and/or requires the network:
         "services": [
             "fuchsia.net.name.Lookup",
             "fuchsia.net.interfaces.State",
-            "fuchsia.netstack.Netstack",
             "fuchsia.posix.socket.Provider"
         ]
     }

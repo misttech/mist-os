@@ -28,7 +28,6 @@
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.interfaces.State",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.ui.composition.Allocator",

@@ -9,10 +9,7 @@
     include: [ "syslog/client.shard.cml" ],
     use: [
         {
-            protocol: [
-                "fuchsia.netstack.Netstack",
-                "fuchsia.posix.socket.Provider",
-            ],
+            protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "parent",
         },
     ],

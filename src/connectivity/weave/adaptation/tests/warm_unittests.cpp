@@ -7,7 +7,6 @@
 #include <fuchsia/net/interfaces/admin/cpp/fidl_test_base.h>
 #include <fuchsia/net/interfaces/cpp/fidl_test_base.h>
 #include <fuchsia/net/stack/cpp/fidl_test_base.h>
-#include <fuchsia/netstack/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -306,8 +305,7 @@ class FakeNetInterfaces : public fuchsia::net::interfaces::testing::State_TestBa
 
 // The minimal set of fuchsia networking protocols required for WARM to run.
 class FakeNetstack : public fuchsia::net::debug::testing::Interfaces_TestBase,
-                     public fuchsia::net::stack::testing::Stack_TestBase,
-                     public fuchsia::netstack::testing::Netstack_TestBase {
+                     public fuchsia::net::stack::testing::Stack_TestBase {
  private:
   // Default implementation for any API method not explicitly overridden.
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
@@ -454,14 +452,6 @@ class FakeNetstack : public fuchsia::net::debug::testing::Interfaces_TestBase,
     return it != route_table_.end();
   }
 
-  fidl::InterfaceRequestHandler<fuchsia::netstack::Netstack> GetNetstackHandler(
-      async_dispatcher_t* dispatcher) {
-    dispatcher_ = dispatcher;
-    return [this](fidl::InterfaceRequest<fuchsia::netstack::Netstack> request) {
-      netstack_binding_.Bind(std::move(request), dispatcher_);
-    };
-  }
-
   // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
   // on the debug API.
   fidl::InterfaceRequestHandler<fuchsia::net::debug::Interfaces> GetDebugHandler(
@@ -477,7 +467,6 @@ class FakeNetstack : public fuchsia::net::debug::testing::Interfaces_TestBase,
   // on the debug API.
   fidl::Binding<fuchsia::net::debug::Interfaces> debug_binding_{this};
   fidl::Binding<fuchsia::net::stack::Stack> stack_binding_{this};
-  fidl::Binding<fuchsia::netstack::Netstack> netstack_binding_{this};
   async_dispatcher_t* dispatcher_;
   std::vector<fuchsia::net::stack::ForwardingEntry> route_table_;
   std::vector<OwnedInterface> interfaces_;
@@ -494,8 +483,6 @@ class WarmTest : public testing::WeaveTestFixture<> {
     // Initialize everything needed for the test.
     context_provider_.service_directory_provider()->AddService(
         fake_net_interfaces_.GetHandler(dispatcher()));
-    context_provider_.service_directory_provider()->AddService(
-        fake_net_stack_.GetNetstackHandler(dispatcher()));
     context_provider_.service_directory_provider()->AddService(
         fake_net_stack_.GetStackHandler(dispatcher()));
     // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer

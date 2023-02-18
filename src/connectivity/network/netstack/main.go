@@ -39,7 +39,6 @@ import (
 	"fidl/fuchsia/net/neighbor"
 	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
-	"fidl/fuchsia/netstack"
 	"fidl/fuchsia/posix/socket"
 	packetsocket "fidl/fuchsia/posix/socket/packet"
 	rawsocket "fidl/fuchsia/posix/socket/raw"
@@ -549,22 +548,6 @@ func Main() {
 				go component.Serve(ctx, &stub, c, component.ServeOptions{
 					OnError: func(err error) {
 						_ = syslog.WarnTf(verify.NetstackVerifierName, "%s", err)
-					},
-				})
-
-				return nil
-			},
-		)
-	}
-
-	{
-		stub := netstack.NetstackWithCtxStub{Impl: &netstackImpl{ns: ns}}
-		componentCtx.OutgoingService.AddService(
-			netstack.NetstackName,
-			func(ctx context.Context, c zx.Channel) error {
-				go component.Serve(ctx, &stub, c, component.ServeOptions{
-					OnError: func(err error) {
-						_ = syslog.WarnTf(netstack.NetstackName, "%s", err)
 					},
 				})
 

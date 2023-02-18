@@ -23,7 +23,6 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.logger.LogSink",
                 "fuchsia.net.interfaces.State",
-                "fuchsia.netstack.Netstack",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sys.Environment",

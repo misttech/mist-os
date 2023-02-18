@@ -138,7 +138,6 @@ go_library("lib") {
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_go($go_toolchain)",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_go($go_toolchain)",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_go($go_toolchain)",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_go($go_toolchain)",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_go($go_toolchain)",
@@ -181,7 +180,6 @@ go_library("lib") {
     "ndp.go",
     "ndp_test.go",
     "netstack.go",
-    "netstack_service.go",
     "netstack_test.go",
     "noop_endpoint_test.go",
   ]

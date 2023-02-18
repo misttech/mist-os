@@ -11,7 +11,6 @@ use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_stack as fstack;
-use fidl_fuchsia_netstack as fnetstack;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path};
@@ -130,13 +129,6 @@ impl net_cli::ServiceConnector<fstack::LogMarker> for Connector {
 impl net_cli::ServiceConnector<fstack::StackMarker> for Connector {
     async fn connect(&self) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<fstack::StackMarker>(NETSTACK_MONIKER).await
-    }
-}
-
-#[async_trait::async_trait]
-impl net_cli::ServiceConnector<fnetstack::NetstackMarker> for Connector {
-    async fn connect(&self) -> Result<<fnetstack::NetstackMarker as ProtocolMarker>::Proxy, Error> {
-        self.connect_to_exposed_protocol::<fnetstack::NetstackMarker>(NETSTACK_MONIKER).await
     }
 }
 
