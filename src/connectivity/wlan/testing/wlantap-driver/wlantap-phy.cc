@@ -4,23 +4,27 @@
 
 #include "wlantap-phy.h"
 
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fuchsia/wlan/device/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include <array>
 #include <chrono>
+#include <memory>
 #include <mutex>
 
+#include <ddktl/device.h>
 #include <wlan/common/dispatcher.h>
 #include <wlan/common/phy.h>
 
-#include "src/connectivity/wlan/drivers/wlansoftmac/convert.h"
 #include "utils.h"
 #include "wlantap-mac.h"
 
@@ -72,10 +76,12 @@ wlan_tap::TxArgs ToTxArgs(const wlan_softmac::WlanTxPacket pkt) {
   return tx_args;
 }
 
+// Serves the fuchsia_wlan_tap::WlantapPhy protocol.
 struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, WlantapMac::Listener {
   WlantapPhy(zx_device_t* device, zx::channel user_channel,
              std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config)
-      : phy_config_(phy_config),
+      : device_(device),
+        phy_config_(phy_config),
         user_binding_loop_(std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread)),
         name_("wlantap-phy:" + std::string(phy_config_->name.get())),
         user_binding_(fidl::BindServer(
@@ -99,6 +105,10 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
               }
 
               zxlogf(INFO, "%s: Removing PHY device asynchronously.", name.c_str());
+
+              // Although WlantapPhy isn't part of the driver framework itself, it schedules the
+              // removal of the given device when this is unbound, which should allow Shutdown()
+              // to teardown all the sim drivers by calling user_binding_.Unbind().
               device_async_remove(device_);
 
               zxlogf(INFO, "%s: WlantapPhy FIDL server unbind complete.", name.c_str());
@@ -107,25 +117,18 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     ZX_ASSERT_MSG(status == ZX_OK, "%s: failed to start FIDL server loop: %d", __func__, status);
   }
 
-  static void DdkUnbind(void* ctx) {
-    auto self = static_cast<WlantapPhy*>(ctx);
-    auto name = self->name_;
-    zxlogf(INFO, "%s: Unbinding PHY device.", name.c_str());
-
+  void Unbind() {
+    zxlogf(INFO, "%s: Unbinding PHY device.", name_.c_str());
     // This call will be ignored by ServerBindingRef it is has
     // already been called, i.e., in the case that DdkUnbind precedes
     // normal shutdowns.
-    std::lock_guard<std::mutex> guard(self->fidl_server_lock_);
-    self->user_binding_.Unbind();
-
-    zxlogf(INFO, "%s: PHY device unbind complete.", name.c_str());
+    std::lock_guard<std::mutex> guard(fidl_server_lock_);
+    user_binding_.Unbind();
+    zxlogf(INFO, "%s: PHY device unbind complete.", name_.c_str());
   }
 
-  static void DdkRelease(void* ctx) {
-    auto self = static_cast<WlantapPhy*>(ctx);
-    auto name = self->name_;
-    zxlogf(INFO, "%s: DdkRelease", name.c_str());
-
+  void Release() {
+    zxlogf(INFO, "%s: Releasing PHY device.", name_.c_str());
     // Flush any remaining tasks in the event loop before destroying the iface.
     // Placed in a block to avoid m, lk, and cv from unintentionally escaping
     // their specific use here.
@@ -133,147 +136,59 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
       std::mutex m;
       std::unique_lock lk(m);
       std::condition_variable cv;
-      ::async::PostTask(self->user_binding_loop_->dispatcher(), [&lk, &cv]() mutable {
+      ::async::PostTask(user_binding_loop_->dispatcher(), [&lk, &cv]() mutable {
         lk.unlock();
         cv.notify_one();
       });
-      auto status = cv.wait_for(lk, self->kFidlServerShutdownTimeout);
+      auto status = cv.wait_for(lk, kFidlServerShutdownTimeout);
       if (status == std::cv_status::timeout) {
         zxlogf(ERROR, "%s: timed out waiting for FIDL server dispatcher to complete.",
-               name.c_str());
+               name_.c_str());
         zxlogf(WARNING, "%s: Deleting wlansoftmac devices while FIDL server dispatcher running.",
-               name.c_str());
+               name_.c_str());
       }
-    }
-
-    std::lock_guard<std::mutex> guard(self->wlantap_mac_lock_);
-    self->wlantap_mac_.reset();
-
-    delete self;
-    zxlogf(INFO, "%s: DdkRelease done", name.c_str());
-  }
-
-  // wlanphy-impl DDK interface
-
-  zx_status_t GetSupportedMacRoles(
-      wlan_mac_role_t out_supported_mac_roles_list[fuchsia_wlan_common_MAX_SUPPORTED_MAC_ROLES],
-      uint8_t* out_supported_mac_roles_count) {
-    zxlogf(INFO, "%s: received a 'GetSupportedMacRoles' DDK request", name_.c_str());
-    zx_status_t status = ConvertTapPhyConfig(out_supported_mac_roles_list,
-                                             out_supported_mac_roles_count, *phy_config_);
-    zxlogf(INFO, "%s: responded to 'GetSupportedMacRoles' with status %s", name_.c_str(),
-           zx_status_get_string(status));
-    return status;
-  }
-
-  template <typename V, typename T>
-  static bool contains(const V& v, const T& t) {
-    return std::find(v.cbegin(), v.cend(), t) != v.cend();
-  }
-
-  static std::string RoleToString(wlan_common::WlanMacRole role) {
-    switch (role) {
-      case wlan_common::WlanMacRole::kClient:
-        return "client";
-      case wlan_common::WlanMacRole::kAp:
-        return "ap";
-      case wlan_common::WlanMacRole::kMesh:
-        return "mesh";
-      default:
-        return "invalid";
-    }
-  }
-
-  zx_status_t CreateIface(const wlan_phy_impl_create_iface_req_t* req) {
-    zxlogf(INFO, "%s: received a 'CreateIface' DDK request", name_.c_str());
-    {
-      std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
-      if (wlantap_mac_) {
-        zxlogf(ERROR, "%s: CreateIface: only 1 iface supported per WlantapPhy", name_.c_str());
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-    }
-
-    wlan_common::WlanMacRole dev_role;
-    zx_status_t status = ConvertMacRole(req->role, &dev_role);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: ConvertMacRole failed: %s", name_.c_str(), zx_status_get_string(status));
-      return status;
-    }
-    auto role_str = RoleToString(dev_role);
-    if (phy_config_->mac_role != dev_role) {
-      zxlogf(ERROR, "%s: CreateIface(%s): role not supported", name_.c_str(), role_str.c_str());
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-
-    zx::channel mlme_channel = zx::channel(req->mlme_channel);
-    if (!mlme_channel.is_valid()) {
-      return ZX_ERR_IO_INVALID;
-    }
-    WlantapMac* wlantap_mac_ptr;
-    status = CreateWlantapMac(device_, dev_role, phy_config_, this, std::move(mlme_channel),
-                              &wlantap_mac_ptr);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: CreateIface(%s): maximum number of interfaces already reached",
-             name_.c_str(), role_str.c_str());
-      return ZX_ERR_NO_RESOURCES;
     }
 
     std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
-    auto deleter = [](WlantapMac* wlantap_mac_ptr) { wlantap_mac_ptr->RemoveDevice(); };
-    wlantap_mac_ =
-        std::unique_ptr<WlantapMac, std::function<void(WlantapMac*)>>(wlantap_mac_ptr, deleter);
+    wlantap_mac_.reset();
 
-    zxlogf(INFO, "%s: CreateIface(%s): success", name_.c_str(), role_str.c_str());
+    delete this;
+    zxlogf(INFO, "%s: Release done", name_.c_str());
+  }
+
+  // Helpers used by WlanPhyImplDevice
+  bool HasWlantapMac() const {
+    std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
+    return wlantap_mac_ != nullptr;
+  }
+
+  zx_status_t SetWlantapMac(WlantapMac::Ptr wlantap_mac) {
+    std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
+    if (wlantap_mac_ != nullptr) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    wlantap_mac_ = std::move(wlantap_mac);
     return ZX_OK;
   }
 
-  zx_status_t DestroyIface() {
-    zxlogf(INFO, "%s: received a 'DestroyIface' DDK request", name_.c_str());
+  zx_status_t DestroyWlantapMac() {
     std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
-    if (!wlantap_mac_) {
-      zxlogf(ERROR, "%s: DestroyIface: no iface exists", name_.c_str());
-      return ZX_ERR_NOT_SUPPORTED;
+    if (wlantap_mac_ == nullptr) {
+      return ZX_ERR_NOT_FOUND;
     }
     wlantap_mac_.reset();
-    zxlogf(DEBUG, "%s: DestroyIface: done", name_.c_str());
     return ZX_OK;
   }
 
-  zx_status_t SetCountry(const wlan_phy_country_t* country) {
-    if (country == nullptr) {
-      zxlogf(ERROR, "%s: SetCountry() received nullptr", name_.c_str());
-      return ZX_ERR_INVALID_ARGS;
-    }
-    zxlogf(INFO, "%s: SetCountry() to [%s]", name_.c_str(),
-           wlan::common::Alpha2ToStr(country->alpha2).c_str());
+  zx_status_t SetCountry(wlan_tap::SetCountryArgs args) {
     std::lock_guard<std::mutex> guard(fidl_server_lock_);
 
-    zxlogf(INFO, "%s: SetCountry() to [%s] received", name_.c_str(),
-           wlan::common::Alpha2ToStr(country->alpha2).c_str());
-
-    auto args = wlan_tap::SetCountryArgs{};
-    memcpy(&args.alpha2, country->alpha2, WLANPHY_ALPHA2_LEN);
     fidl::Status status = fidl::WireSendEvent(user_binding_)->SetCountry(args);
     if (!status.ok()) {
       zxlogf(ERROR, "%s: SetCountry() failed: user_binding not bound", status.status_string());
       return status.status();
     }
     return ZX_OK;
-  }
-
-  zx_status_t GetCountry(wlan_phy_country_t* out_country) {
-    if (out_country == nullptr) {
-      zxlogf(ERROR, "%s: GetCountry() received nullptr", name_.c_str());
-      return ZX_ERR_INVALID_ARGS;
-    }
-    zxlogf(ERROR, "GetCountry not implemented");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_status_t SetPowerSaveMode(const wlan_phy_ps_mode_t* ps_mode) {
-    zxlogf(ERROR, "SetPowerSaveMode not implemented");
-    return ZX_ERR_NOT_SUPPORTED;
   }
 
   // wlan_tap::WlantapPhy impl
@@ -470,9 +385,8 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
   zx_device_t* device_;
   const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config_;
   std::unique_ptr<async::Loop> user_binding_loop_;
-  std::mutex wlantap_mac_lock_;
-  std::unique_ptr<WlantapMac, std::function<void(WlantapMac*)>> wlantap_mac_
-      __TA_GUARDED(wlantap_mac_lock_);
+  mutable std::mutex wlantap_mac_lock_;
+  WlantapMac::Ptr wlantap_mac_ __TA_GUARDED(wlantap_mac_lock_);
   std::string name_;
   std::mutex fidl_server_lock_;
   fidl::ServerBindingRef<fuchsia_wlan_tap::WlantapPhy> user_binding_
@@ -481,59 +395,239 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
   const std::chrono::seconds kFidlServerShutdownTimeout = std::chrono::seconds(1);
   bool shutdown_called_ = false;
   size_t report_tx_status_count_ = 0;
-};  // namespace
+};
+
+class WlanPhyImplDevice : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable,
+                                               ::ddk::Unbindable, ::ddk::ServiceConnectable>,
+                          public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
+ public:
+  WlanPhyImplDevice(zx_device_t* parent, zx::channel user_channel,
+                    std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config)
+      : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
+                      ::ddk::ServiceConnectable>(parent),
+        phy_config_(std::move(phy_config)),
+        user_channel_(std::move(user_channel)) {
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create({}, "wlanphy-impl-server", [&](fdf_dispatcher_t*) {
+          if (unbind_txn_)
+            unbind_txn_->Reply();
+        });
+    server_dispatcher_ = std::move(*dispatcher);
+    driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  }
+
+  ~WlanPhyImplDevice() override = default;
+
+  void DdkInit(::ddk::InitTxn txn) {
+    wlantap_phy_ = std::make_unique<WlantapPhy>(zxdev(), std::move(user_channel_), phy_config_);
+    txn.Reply(ZX_OK);
+  }
+
+  void DdkUnbind(::ddk::UnbindTxn txn) {
+    unbind_txn_ = std::move(txn);
+    wlantap_phy_->Unbind();
+  }
+
+  void DdkRelease() {
+    wlantap_phy_->Release();
+    delete this;
+  }
+
+  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel) {
+    if (std::string_view(service_name) !=
+        fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
+      zxlogf(INFO, "Service name doesn't match. Connection request from a wrong device.");
+      return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
+    }
+    fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
+    fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
+    return ZX_OK;
+  }
+
+  void GetSupportedMacRoles(fdf::Arena& arena,
+                            GetSupportedMacRolesCompleter::Sync& completer) override {
+    // wlantap-phy only supports a single mac role determined by the config
+    wlan_common::WlanMacRole supported[1] = {phy_config_->mac_role};
+    auto reply_vec = fidl::VectorView<wlan_common::WlanMacRole>::FromExternal(supported, 1);
+
+    zxlogf(INFO, "%s: received a 'GetSupportedMacRoles' DDK request. Responding with roles = {%u}",
+           name_.c_str(), phy_config_->mac_role);
+
+    fidl::Arena fidl_arena;
+    auto response =
+        fuchsia_wlan_phyimpl::wire::WlanPhyImplGetSupportedMacRolesResponse::Builder(fidl_arena)
+            .supported_mac_roles(reply_vec)
+            .Build();
+    completer.buffer(arena).ReplySuccess(response);
+  }
+
+  void CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
+                   CreateIfaceCompleter::Sync& completer) override {
+    zxlogf(INFO, "%s: received a 'CreateIface' DDK request", name_.c_str());
+    if (wlantap_phy_->HasWlantapMac()) {
+      zxlogf(ERROR, "%s: CreateIface: only 1 iface supported per WlantapPhy", name_.c_str());
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
+    }
+
+    auto role_str = RoleToString(request->role());
+    zxlogf(INFO, "%s: received a 'CreateIface' for role: %s", name_.c_str(), role_str.c_str());
+    if (phy_config_->mac_role != request->role()) {
+      zxlogf(ERROR, "%s: CreateIface(%s): role not supported", name_.c_str(), role_str.c_str());
+      completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+
+    if (!request->mlme_channel().is_valid()) {
+      zxlogf(ERROR, "%s: CreateIface(%s): MLME channel in request is invalid", name_.c_str(),
+             role_str.c_str());
+      completer.buffer(arena).ReplyError(ZX_ERR_IO_INVALID);
+      return;
+    }
+
+    zx::result<WlantapMac::Ptr> result;
+    libsync::Completion served;
+
+    // CreateIface runs on the server dispatcher, but WlantapMac must be created on the driver
+    // runtime dispatcher.
+    async::PostTask(driver_async_dispatcher_, [&]() {
+      result = CreateWlantapMac(zxdev(), request->role(), phy_config_, wlantap_phy_.get(),
+                                std::move(request->mlme_channel()));
+      served.Signal();
+    });
+
+    constexpr zx::duration kCreateWlantapMacTimeout{ZX_SEC(10)};
+    if (served.Wait(kCreateWlantapMacTimeout) != ZX_OK) {
+      zxlogf(ERROR, "%s: CreateIface(%s): CreateWlantapMac timed out", name_.c_str(),
+             role_str.c_str());
+      completer.buffer(arena).ReplyError(ZX_ERR_TIMED_OUT);
+      return;
+    }
+
+    if (result.is_error()) {
+      zxlogf(ERROR, "%s: CreateIface(%s): Failed because %s", name_.c_str(), role_str.c_str(),
+             result.status_string());
+
+      completer.buffer(arena).ReplyError(result.status_value());
+      return;
+    }
+
+    // Transfer ownership of wlantap_mac_ptr to wlantap_phy_
+    zx_status_t status = wlantap_phy_->SetWlantapMac(std::move(result.value()));
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "%s: CreateIface(%s): Could not set WlantapMac: %s", name_.c_str(),
+             role_str.c_str(), zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    zxlogf(INFO, "%s: CreateIface(%s): success", name_.c_str(), role_str.c_str());
+
+    fidl::Arena fidl_arena;
+    auto resp = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena)
+                    .iface_id(0)
+                    .Build();
+
+    completer.buffer(arena).ReplySuccess(resp);
+  }
+
+  void DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
+                    DestroyIfaceCompleter::Sync& completer) override {
+    zxlogf(INFO, "%s: received a 'DestroyIface' DDK request", name_.c_str());
+    if (!wlantap_phy_->HasWlantapMac()) {
+      zxlogf(ERROR, "%s: DestroyIface: no iface exists", name_.c_str());
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+
+    zx_status_t status = wlantap_phy_->DestroyWlantapMac();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "%s: DestroyIface: Could not destroy WlantapMac: %s ", name_.c_str(),
+             zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    zxlogf(DEBUG, "%s: DestroyIface: done", name_.c_str());
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  void SetCountry(SetCountryRequestView request, fdf::Arena& arena,
+                  SetCountryCompleter::Sync& completer) override {
+    zxlogf(INFO, "%s: SetCountry() to [%s] received", name_.c_str(),
+           wlan::common::Alpha2ToStr(request->alpha2()).c_str());
+
+    wlan_tap::SetCountryArgs args{.alpha2 = request->alpha2()};
+    zx_status_t status = wlantap_phy_->SetCountry(args);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "SetCountry() failed: %s", zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  void ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) override {
+    zxlogf(WARNING, "%s: ClearCountry() not supported", name_.c_str());
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) override {
+    zxlogf(WARNING, "%s: GetCountry() not supported", name_.c_str());
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
+                        SetPowerSaveModeCompleter::Sync& completer) override {
+    zxlogf(WARNING, "%s: SetPowerSaveMode() not supported", name_.c_str());
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override {
+    zxlogf(WARNING, "%s: GetPowerSaveMode() not supported", name_.c_str());
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+ private:
+  const std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config_{};
+
+  // The FIDL server end dispatcher for fuchsia_wlan_wlanphyimpl::WlanPhyImpl protocol.
+  // All of the overridden FIDL functions run on this dispatcher.
+  fdf::SynchronizedDispatcher server_dispatcher_;
+
+  // The pointer of the default driver dispatcher in form of async_dispatcher_t.
+  // This is needed because calls to CreateIface need to create new drivers, which need to be on
+  // the default driver dispatcher.
+  async_dispatcher_t* driver_async_dispatcher_;
+
+  // The UnbindTxn provided by driver framework. It's used to call Reply() to synchronize the
+  // shutdown of server_dispatcher.
+  std::optional<::ddk::UnbindTxn> unbind_txn_;
+
+  // The channel which will be passed to wlantap_phy_ on initialization.
+  zx::channel user_channel_{};
+
+  // An instance of WlantapPhy which serves the fuchsia_wlan_tap::WlantapPhy protocol.
+  // This will be created on device init because this requires the zx_device_t that gets set when
+  // the device is added.
+  std::unique_ptr<WlantapPhy> wlantap_phy_{nullptr};
+};
 
 }  // namespace
-
-#define DEV(c) static_cast<WlantapPhy*>(c)
-static wlan_phy_impl_protocol_ops_t wlan_phy_impl_ops = {
-    .get_supported_mac_roles =
-        [](void* ctx,
-           wlan_mac_role_t
-               out_supported_mac_roles_list[fuchsia_wlan_common_MAX_SUPPORTED_MAC_ROLES],
-           uint8_t* out_supported_mac_roles_count) -> zx_status_t {
-      return DEV(ctx)->GetSupportedMacRoles(out_supported_mac_roles_list,
-                                            out_supported_mac_roles_count);
-    },
-    .create_iface = [](void* ctx, const wlan_phy_impl_create_iface_req_t* req,
-                       uint16_t* out_iface_id) -> zx_status_t {
-      *out_iface_id = 0;
-      return DEV(ctx)->CreateIface(req);
-    },
-    .destroy_iface = [](void* ctx, uint16_t id) -> zx_status_t {
-      ZX_ASSERT(id == 0);
-      return DEV(ctx)->DestroyIface();
-    },
-    .set_country = [](void* ctx, const wlan_phy_country_t* country) -> zx_status_t {
-      return DEV(ctx)->SetCountry(country);
-    },
-    .get_country = [](void* ctx, wlan_phy_country_t* out_country) -> zx_status_t {
-      return DEV(ctx)->GetCountry(out_country);
-    },
-    .set_power_save_mode = [](void* ctx, const wlan_phy_ps_mode_t* ps_mode) -> zx_status_t {
-      return DEV(ctx)->SetPowerSaveMode(ps_mode);
-    },
-};
-#undef DEV
 
 zx_status_t CreatePhy(zx_device_t* wlantapctl, zx::channel user_channel,
                       std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config) {
   zxlogf(INFO, "Creating phy");
-  auto phy = std::make_unique<WlantapPhy>(wlantapctl, std::move(user_channel), phy_config);
-  static zx_protocol_device_t device_ops = {.version = DEVICE_OPS_VERSION,
-                                            .unbind = &WlantapPhy::DdkUnbind,
-                                            .release = &WlantapPhy::DdkRelease};
-  device_add_args_t args = {.version = DEVICE_ADD_ARGS_VERSION,
-                            .name = phy->phy_config_->name.get().data(),
-                            .ctx = phy.get(),
-                            .ops = &device_ops,
-                            .proto_id = ZX_PROTOCOL_WLANPHY_IMPL,
-                            .proto_ops = &wlan_phy_impl_ops};
-  zx_status_t status = device_add(wlantapctl, &args, &phy->device_);
+  auto phy = std::make_unique<WlanPhyImplDevice>(wlantapctl, std::move(user_channel), phy_config);
+
+  zx_status_t status = phy->DdkAdd(
+      ::ddk::DeviceAddArgs(phy_config->name.get().data()).set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL));
+
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not add device: %d", __func__, status);
     return status;
   }
+
   // Transfer ownership to devmgr
   phy.release();
   zxlogf(INFO, "Phy successfully created");

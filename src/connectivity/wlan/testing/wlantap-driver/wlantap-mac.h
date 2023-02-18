@@ -18,6 +18,8 @@ namespace wlan {
 
 class WlantapMac {
  public:
+  using Ptr = std::unique_ptr<WlantapMac, std::function<void(WlantapMac*)>>;
+
   class Listener {
    public:
     virtual void WlantapMacStart() = 0;
@@ -40,10 +42,12 @@ class WlantapMac {
   virtual ~WlantapMac() = default;
 };
 
-zx_status_t CreateWlantapMac(zx_device_t* parent_phy, const wlan_common::WlanMacRole role,
-                             const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config,
-                             WlantapMac::Listener* listener, zx::channel sme_channel,
-                             WlantapMac** ret);
+// If successful, this returns a pointer to WlantapMac that schedules its removal through the driver
+// framework on destruction.
+zx::result<WlantapMac::Ptr> CreateWlantapMac(
+    zx_device_t* parent_phy, wlan_common::WlanMacRole role,
+    std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config, WlantapMac::Listener* listener,
+    zx::channel sme_channel);
 
 }  // namespace wlan
 

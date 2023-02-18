@@ -331,10 +331,10 @@ struct WlantapMacImpl : WlantapMac,
 
 }  // namespace
 
-zx_status_t CreateWlantapMac(zx_device_t* parent_phy, const wlan_common::WlanMacRole role,
-                             const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config,
-                             WlantapMac::Listener* listener, zx::channel sme_channel,
-                             WlantapMac** ret) {
+zx::result<WlantapMac::Ptr> CreateWlantapMac(
+    zx_device_t* parent_phy, const wlan_common::WlanMacRole role,
+    const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config,
+    WlantapMac::Listener* listener, zx::channel sme_channel) {
   static uint16_t n = 0;
   char name[ZX_MAX_NAME_LEN + 1];
   snprintf(name, sizeof(name), "wlansoftmac-%u", n++);
@@ -344,14 +344,14 @@ zx_status_t CreateWlantapMac(zx_device_t* parent_phy, const wlan_common::WlanMac
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     zxlogf(ERROR, "%s: failed to create endpoints: %s", __func__, endpoints.status_string());
-    return endpoints.status_value();
+    return zx::error(endpoints.status_value());
   }
 
   auto status = wlan_softmac->ServeWlanSoftmacProtocol(std::move(endpoints->server));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to serve wlan softmac service: %s", __func__,
            zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
   std::array offers = {
       fuchsia_wlan_softmac::Service::Name,
@@ -365,11 +365,11 @@ zx_status_t CreateWlantapMac(zx_device_t* parent_phy, const wlan_common::WlanMac
                                     .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not add device: %d", __func__, status);
-    return status;
+    return zx::error(status);
   }
   // Transfer ownership to devmgr
-  *ret = wlan_softmac.release();
-  return ZX_OK;
+  auto deleter = [](WlantapMac* wlantap_mac_ptr) { wlantap_mac_ptr->RemoveDevice(); };
+  return zx::ok(WlantapMac::Ptr(wlan_softmac.release(), deleter));
 }
 
 }  // namespace wlan
