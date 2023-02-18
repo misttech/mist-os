@@ -2085,12 +2085,12 @@ pub struct Use {
     /// - `strong`: a strong dependency, which is used to determine shutdown
     ///     ordering. Component manager is guaranteed to stop the target before the
     ///     source. This is the default.
-    /// - `weak_for_migration`: a weak dependency, which is ignored during
-    ///     shutdown. When component manager stops the parent realm, the source may
-    ///     stop before the clients. Clients of weak dependencies must be able to
-    ///     handle these dependencies becoming unavailable. This type exists to keep
-    ///     track of weak dependencies that resulted from migrations into v2
-    ///     components.
+    /// - `weak`: a weak dependency, which is ignored during shutdown. When component manager
+    ///     stops the parent realm, the source may stop before the clients. Clients of weak
+    ///     dependencies must be able to handle these dependencies becoming unavailable.
+    /// - `weak_for_migration`: this has the same runtime consequences as `weak`,
+    ///     but also implies this capability will be made strong after completion of the v2
+    ///     component migration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<DependencyType>,
 
@@ -2342,14 +2342,16 @@ pub struct Offer {
 
     /// `availability` _(optional)_: The expectations around this capability's availability. One
     /// of:
-    /// - `required` (default): a required dependency, the target of this offer must receive this
-    ///     capability.
-    /// - `optional`: an optional dependency, the target of this offer may or may not receive
-    ///     this capability, and the target must consume this capability as `optional`.
-    /// - `same_as_target`: the availability expectations of this capability will match whatever
-    ///     the target's. If the target requires the capability, then this field is set to
-    ///     `required`. If the target has an optional dependency on the capability, then the field
-    ///     is set to `optional`.
+    /// - `required` (default): a required dependency, the source must exist and provide it. Use
+    ///     this when the target of this offer requires this capability to function properly.
+    /// - `optional`: an optional dependency. Use this when the target of this will function
+    ///     properly if it does or does not not receive this capability. If the target consumes
+    ///     this capability, the target must do so as `optional`. The source of this capability
+    ///     may be void, and therefore not provide it.
+    /// - `same_as_target`: the availability expectations of this capability will match the
+    ///     target's. If the target requires the capability, then this field is set to `required`.
+    ///     If the target has an optional dependency on the capability, then the field is set to
+    ///     `optional`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
