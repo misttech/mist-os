@@ -2391,6 +2391,16 @@ From //.gn:82
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:18
 
+### dir_pw_third_party_googletest
+
+If compiling tests with googletest, this variable is set to the path to the
+googletest installation. When set, a pw_source_set for the googletest
+library is created at "$dir_pw_third_party/googletest".
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/third_party/googletest/googletest.gni:19
+
 ### dir_pw_third_party_nanopb
 
 If compiling protos for nanopb, this variable is set to the path to the
@@ -3694,7 +3704,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7676,13 +7686,13 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:19
+From //src/proc/bin/starnix/BUILD.gn:24
 
 ### starnix_restricted_mode
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:16
+From //src/proc/bin/starnix/BUILD.gn:20
 
 ### starnix_wayland_protocol_logging
 
@@ -7899,7 +7909,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
