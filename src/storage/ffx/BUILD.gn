@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 # ffx storage plugin, which houses useful local storage related developer tools. You can add
 # subcommands to this by creating a new `ffx_plugin` and adding it under `plugin_deps`.
@@ -13,4 +14,14 @@ ffx_plugin("ffx_storage") {
   args_sources = [ "src/args.rs" ]
 
   plugin_deps = [ "//tools/blackout:ffx_storage_blackout" ]
+}
+
+ffx_tool("ffx_storage_tool") {
+  edition = "2021"
+  output_name = "ffx-storage"
+  deps = [
+    ":ffx_storage_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

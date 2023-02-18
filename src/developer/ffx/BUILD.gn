@@ -65,7 +65,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/self-test:ffx_selftest",
       "//src/developer/ffx/plugins/test:ffx_test",
       "//src/developer/ffx/plugins/trace:ffx_trace",
-      "//src/storage/ffx:ffx_storage",
       "//src/virtualization/ffx:ffx_guest",
     ]
 
