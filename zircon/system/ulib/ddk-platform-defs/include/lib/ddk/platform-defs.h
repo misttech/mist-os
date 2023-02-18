@@ -44,7 +44,6 @@ __BEGIN_CDECLS
 #define PDEV_DID_DW_DSI                 0x1E  // Designware DSI
 #define PDEV_DID_USB_XHCI_COMPOSITE     0x1F  // XHCI USB Controller, as a composite device
 #define PDEV_DID_SSD1306                0x20  // Oled Display
-#define PDEV_DID_CAMERA_CONTROLLER      0x21  // Camera Controller
 #define PDEV_DID_CADENCE_HPNFC          0x22  // Cadence NAND Flash controller
 #define PDEV_DID_OT_RADIO               0x23  // OpenThread radio
 #define PDEV_DID_GOODIX_GTX8X           0x25  // Goodix GTx8X touch controllers

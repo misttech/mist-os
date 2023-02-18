@@ -6,12 +6,16 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
-#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gdc/cpp/bind.h>
+#include <bind/fuchsia/ge2d/cpp/bind.h>
+#include <bind/fuchsia/isp/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-gpio.h>
@@ -19,7 +23,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/camera-controller-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-gdc-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-ge2d-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-isp-bind.h"
@@ -305,24 +308,50 @@ zx_status_t Sherlock::CameraInit() {
     return result->error_value();
   }
 
-  constexpr zx_device_prop_t camera_controller_props[] = {
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_CAMERA_CONTROLLER},
+  const ddk::BindRule kIspRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_isp::BIND_PROTOCOL_DEVICE),
+
   };
 
-  const composite_device_desc_t camera_comp_desc = {
-      .props = camera_controller_props,
-      .props_count = std::size(camera_controller_props),
-      .fragments = camera_controller_fragments,
-      .fragments_count = std::size(camera_controller_fragments),
-      .primary_fragment = "isp",
-      .spawn_colocated = true,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
+  const ddk::BindRule kGdcRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gdc::BIND_PROTOCOL_DEVICE),
+
   };
 
-  zx_status_t status = DdkAddComposite("camera-controller", &camera_comp_desc);
+  const ddk::BindRule kGe2dRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_ge2d::BIND_PROTOCOL_DEVICE),
+
+  };
+
+  const ddk::BindRule kSysmemRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+
+  };
+
+  const device_bind_prop_t kIspProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_isp::BIND_PROTOCOL_DEVICE),
+  };
+
+  const device_bind_prop_t kGdcProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gdc::BIND_PROTOCOL_DEVICE),
+  };
+
+  const device_bind_prop_t kGe2dProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_ge2d::BIND_PROTOCOL_DEVICE),
+  };
+
+  const device_bind_prop_t kSysmemProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto node_group = ddk::CompositeNodeSpec(kIspRules, kIspProperties)
+                        .AddParentSpec(kGdcRules, kGdcProperties)
+                        .AddParentSpec(kGe2dRules, kGe2dProperties)
+                        .AddParentSpec(kSysmemRules, kSysmemProperties);
+
+  zx_status_t status = DdkAddCompositeNodeSpec("camera_controller", node_group);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Camera Controller DeviceAdd failed %d", __func__, status);
+    zxlogf(ERROR, "%s: Camera Controller DdkAddCompositeNodeSpec failed %d", __func__, status);
     return status;
   }
 

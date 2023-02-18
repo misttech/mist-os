@@ -368,19 +368,6 @@ driver_bind_rules("camera-isp-bind") {
   ]
 }
 
-driver_bind_rules("camera-controller-bind") {
-  rules = "bind/camera-controller.bind"
-  header_output = "camera-controller-bind.h"
-  bind_output = "camera-controller-bind.bc"
-  tests = "bind-tests/camera-controller-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.gdc",
-    "//src/devices/bind/fuchsia.ge2d",
-    "//src/devices/bind/fuchsia.isp",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 driver_bind_rules("sherlock-woofer-bind") {
   rules = "bind/sherlock-woofer.bind"
   header_output = "sherlock-woofer-bind.h"
@@ -459,7 +446,6 @@ template("sherlock_driver") {
     ]
 
     deps = [
-      ":camera-controller-bind_header",
       ":camera-gdc-bind_header",
       ":camera-ge2d-bind_header",
       ":camera-isp-bind_header",
@@ -509,9 +495,13 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia:fuchsia_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",
       "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
+      "//src/devices/bind/fuchsia.gdc:fuchsia.gdc_cpp",
+      "//src/devices/bind/fuchsia.ge2d:fuchsia.ge2d_cpp",
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+      "//src/devices/bind/fuchsia.isp:fuchsia.isp_cpp",
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+      "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",
       "//src/devices/lib/broadcom",
@@ -573,7 +563,6 @@ sherlock_driver("sherlock-dai-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":camera-controller-bind_test",
     ":camera-gdc-bind_test",
     ":camera-ge2d-bind_test",
     ":camera-isp-bind_test",

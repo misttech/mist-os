@@ -633,7 +633,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp",
-      "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp/arm-isp/camera-controller",
+      "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp/arm-isp/camera_controller",
       "sys/platform/05:04:e/aml-video",
       "sys/platform/05:04:23/aml-video-enc",
       "sys/platform/05:04:17/mali/aml-gpu",
