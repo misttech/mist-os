@@ -18,6 +18,26 @@ group("tests") {
   deps = [ ":driver-index-unittests" ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "driver-index"
+  manifest = "meta/driver-index.cml"
+}
+
+fuchsia_structured_config_rust_lib("driver_index_config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_structured_config_values("test_config") {
+  testonly = true
+  cm_label = ":manifest"
+  values = {
+    enable_ephemeral_drivers = true
+    delay_fallback_until_base_drivers_indexed = true
+    bind_eager = []
+    disabled_drivers = []
+  }
+}
+
 rustc_binary("bin") {
   edition = "2021"
   output_name = "driver_index"
@@ -29,7 +49,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    ":driver_index_config",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
@@ -69,8 +89,7 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "driver-index"
-  manifest = "meta/driver-index.cml"
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 

@@ -277,7 +277,6 @@ std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::Rea
     is_dfv2 = *args.use_driver_framework_v2();
   }
 
-  boot_args["devmgr.enable-ephemeral"] = "true";
   boot_args["devmgr.require-system"] = "true";
   if (is_dfv2) {
     boot_args["driver_manager.use_driver_framework_v2"] = "true";
@@ -324,15 +323,6 @@ std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::Rea
       auto string = fbl::StringPrintf("driver.%s.disable", driver.c_str());
       boot_args[string.data()] = "true";
     }
-    boot_args["devmgr.disabled-drivers"] = fxl::JoinStrings(drivers, ",");
-  }
-
-  if (args.driver_bind_eager().has_value() && args.driver_bind_eager()->size() > 0) {
-    std::vector<std::string_view> drivers(args.driver_bind_eager()->size());
-    for (const auto& driver : *args.driver_bind_eager()) {
-      drivers.emplace_back(driver.c_str());
-    }
-    boot_args["devmgr.bind-eager"] = fxl::JoinStrings(drivers, ",");
   }
 
   return boot_args;
@@ -526,6 +516,18 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
                                       .targets = {ParentRef()}});
       }
     }
+
+    // Set driver-index config based on request.
+    realm_builder_.InitMutableConfigFromPackage("driver-index");
+    realm_builder_.SetConfigValue("driver-index", "enable_ephemeral_drivers",
+                                  ConfigValue::Bool(true));
+    realm_builder_.SetConfigValue("driver-index", "delay_fallback_until_base_drivers_indexed",
+                                  ConfigValue::Bool(true));
+    const std::vector<std::string> kEmptyVec;
+    realm_builder_.SetConfigValue("driver-index", "bind_eager",
+                                  request.args().driver_bind_eager().value_or(kEmptyVec));
+    realm_builder_.SetConfigValue("driver-index", "disabled_drivers",
+                                  request.args().driver_disable().value_or(kEmptyVec));
 
     realm_ = realm_builder_.SetRealmName("0").Build(dispatcher_);
 

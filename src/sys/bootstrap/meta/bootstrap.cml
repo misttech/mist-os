@@ -285,11 +285,9 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
-
-                // This is only used when the kernel commandline flag devmgr.enable-ephemeral
+                // This is only used when the #driver-index |enable_ephemeral_drivers| config
                 // is set, which enables loading drivers ephemerally. This is intended for
-                // eng builds only.
+                // eng builds only and is set through product assembly.
                 "fuchsia.pkg.PackageResolver",
             ],
             from: "parent",

@@ -8,8 +8,9 @@ use {
     crate::resolved_driver::{load_driver, DriverPackageType, ResolvedDriver},
     anyhow::{self, Context},
     bind::interpreter::decode_bind_rules::DecodedRules,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
+    driver_index_config::Config,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_index as fdi,
     fidl_fuchsia_driver_index::{DriverIndexRequest, DriverIndexRequestStream},
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -120,9 +121,9 @@ struct Indexer {
     // specs are added after the driver index server has started.
     composite_node_spec_manager: RefCell<CompositeNodeSpecManager>,
 
-    // Whether /system is required. Used to determine if the indexer should
-    // return fallback drivers that match.
-    require_system: bool,
+    // Used to determine if the indexer should return fallback drivers that match or
+    // wait until based packaged drivers are indexed.
+    delay_fallback_until_base_drivers_indexed: bool,
 
     // Contains the ephemeral drivers. This is wrapped in a RefCell since the
     // ephemeral drivers are added after the driver index server has started
@@ -131,18 +132,22 @@ struct Indexer {
 }
 
 impl Indexer {
-    fn new(boot_repo: Vec<ResolvedDriver>, base_repo: BaseRepo, require_system: bool) -> Indexer {
+    fn new(
+        boot_repo: Vec<ResolvedDriver>,
+        base_repo: BaseRepo,
+        delay_fallback_until_base_drivers_indexed: bool,
+    ) -> Indexer {
         Indexer {
             boot_repo,
             base_repo: RefCell::new(base_repo),
             composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
-            require_system,
+            delay_fallback_until_base_drivers_indexed,
             ephemeral_drivers: RefCell::new(HashMap::new()),
         }
     }
 
     fn include_fallback_drivers(&self) -> bool {
-        !self.require_system
+        !self.delay_fallback_until_base_drivers_indexed
             || match *self.base_repo.borrow() {
                 BaseRepo::Resolved(_) => true,
                 _ => false,
@@ -650,15 +655,9 @@ async fn main() -> Result<(), anyhow::Error> {
         fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
             .unwrap();
 
-    let boot_args = client::connect_to_protocol::<fboot::ArgumentsMarker>()
-        .context("Failed to connect to boot arguments service")?;
+    let config = Config::take_from_startup_handle();
 
-    let enable_ephemeral = boot_args
-        .get_bool("devmgr.enable-ephemeral", false)
-        .await
-        .context("Failed to get devmgr.enable-ephemeral from boot arguments")?;
-
-    let universe_resolver = if enable_ephemeral {
+    let universe_resolver = if config.enable_ephemeral_drivers {
         let package_resolver_client =
             client::connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .context("Failed to connect to universe package resolver")?;
@@ -667,28 +666,18 @@ async fn main() -> Result<(), anyhow::Error> {
         None
     };
 
-    let eager_drivers: HashSet<url::Url> = boot_args
-        .get_string("devmgr.bind-eager")
-        .await
-        .context("Failed to get eager drivers from boot arguments")?
-        .unwrap_or_default()
-        .split(",")
+    let eager_drivers: HashSet<url::Url> = config
+        .bind_eager
+        .iter()
         .filter(|url| !url.is_empty())
         .filter_map(|url| url::Url::parse(url).ok())
         .collect();
-    let disabled_drivers: HashSet<url::Url> = boot_args
-        .get_string("devmgr.disabled-drivers")
-        .await
-        .context("Failed to get disabled drivers from boot arguments")?
-        .unwrap_or_default()
-        .split(",")
+    let disabled_drivers: HashSet<url::Url> = config
+        .disabled_drivers
+        .iter()
         .filter(|url| !url.is_empty())
         .filter_map(|url| url::Url::parse(url).ok())
         .collect();
-    let require_system: bool = boot_args
-        .get_bool("devmgr.require-system", false)
-        .await
-        .context("Failed to get value of `devmgr.require-system` from boot arguments")?;
     for driver in disabled_drivers.iter() {
         log::info!("Disabling driver {}", driver);
     }
@@ -712,7 +701,11 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    let index = Rc::new(Indexer::new(drivers, BaseRepo::NotResolved(std::vec![]), require_system));
+    let index = Rc::new(Indexer::new(
+        drivers,
+        BaseRepo::NotResolved(std::vec![]),
+        config.delay_fallback_until_base_drivers_indexed,
+    ));
     let (res1, res2, _) = futures::future::join3(
         async {
             package_resolver::serve(pkgfs_resolver_stream)

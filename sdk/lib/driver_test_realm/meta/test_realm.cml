@@ -119,11 +119,6 @@
             to: [ "#driver_manager" ],
         },
         {
-            protocol: [ "fuchsia.boot.Arguments" ],
-            from: "parent",
-            to: [ "#driver-index" ],
-        },
-        {
             protocol: [
                 "fuchsia.driver.development.DriverIndex",
                 "fuchsia.driver.index.DriverIndex",

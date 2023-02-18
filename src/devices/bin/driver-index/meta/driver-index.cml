@@ -31,9 +31,7 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
-
-                // This is only used when the kernel commandline flag devmgr.enable-ephemeral
+                // This is only used when the |enable_ephemeral_drivers| configuration option
                 // is set, which enables loading drivers ephemerally. This is intended for
                 // eng builds only.
                 "fuchsia.pkg.PackageResolver",
@@ -50,4 +48,30 @@
             from: "self",
         },
     ],
+    config: {
+        // Whether or not ephemeral drivers should be allowed to be registered dynamically.
+        enable_ephemeral_drivers: { type: "bool" },
+        // Whether or not fallback drivers should wait until base drivers have been indexed
+        // before bound.
+        delay_fallback_until_base_drivers_indexed: { type: "bool" },
+        // Specify drivers to bind 'eagerly'. This turns a driver that normally
+        // binds as a fallback driver into a driver that will be bound normally.
+        bind_eager: {
+            type: "vector",
+            max_count: 20,
+            element: {
+                type: "string",
+                max_size: 100,
+            }
+        },
+        // Disable specific drivers by URL. These drivers will not be bound or loaded.
+        disabled_drivers: {
+            type: "vector",
+            max_count: 20,
+            element: {
+                type: "string",
+                max_size: 100,
+            }
+        }
+    },
 }

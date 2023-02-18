@@ -15,6 +15,7 @@ group("driver_test_realm") {
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component",
     "//src/devices/bin/driver-index:component",
+    "//src/devices/bin/driver-index:test_config",
     "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_host2:component",
   ]
@@ -30,6 +31,7 @@ group("realm_builder_version") {
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component",
     "//src/devices/bin/driver-index:component",
+    "//src/devices/bin/driver-index:test_config",
     "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_host2:component",
   ]
