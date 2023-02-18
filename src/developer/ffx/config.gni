@@ -45,6 +45,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/triage:ffx_triage",
   "//src/developer/ffx/plugins/wlan:ffx_wlan",
   "//src/storage/ffx:ffx_storage",
+  "//src/virtualization/ffx:ffx_guest",
 ]
 
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to

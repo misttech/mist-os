@@ -65,7 +65,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/self-test:ffx_selftest",
       "//src/developer/ffx/plugins/test:ffx_test",
       "//src/developer/ffx/plugins/trace:ffx_trace",
-      "//src/virtualization/ffx:ffx_guest",
     ]
 
     # Any plugins that can be built in dual mode should be listed here, and that
