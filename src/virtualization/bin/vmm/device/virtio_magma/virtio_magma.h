@@ -65,6 +65,9 @@ class VirtioMagma : public VirtioMagmaGeneric,
   zx_status_t Handle_virt_connection_create_image(VirtioDescriptor* request_desc,
                                                   VirtioDescriptor* response_desc,
                                                   uint32_t* used_out) override;
+  zx_status_t Handle_virt_connection_create_image2(VirtioDescriptor* request_desc,
+                                                   VirtioDescriptor* response_desc,
+                                                   uint32_t* used_out) override;
   zx_status_t Handle_virt_connection_get_image_info(VirtioDescriptor* request_desc,
                                                     VirtioDescriptor* response_desc,
                                                     uint32_t* used_out) override;
@@ -89,6 +92,9 @@ class VirtioMagma : public VirtioMagmaGeneric,
   zx_status_t Handle_connection_import_buffer(
       const virtio_magma_connection_import_buffer_ctrl_t* request,
       virtio_magma_connection_import_buffer_resp_t* response) override;
+  zx_status_t Handle_connection_import_buffer2(
+      const virtio_magma_connection_import_buffer2_ctrl_t* request,
+      virtio_magma_connection_import_buffer2_resp_t* response) override;
 
   zx::vmar vmar_;
   VirtioQueue out_queue_;

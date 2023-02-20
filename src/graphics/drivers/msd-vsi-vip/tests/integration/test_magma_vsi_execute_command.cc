@@ -62,10 +62,11 @@ class MagmaExecuteMsdVsi : public testing::Test {
   std::shared_ptr<EtnaBuffer> CreateEtnaBuffer(uint32_t size) {
     auto etna_buffer = std::make_shared<EtnaBuffer>();
     uint64_t actual_size = 0;
+    magma_buffer_id_t buffer_id;
 
-    if (MAGMA_STATUS_OK != magma_connection_create_buffer(magma_vsi_.GetConnection(), size,
-                                                          &actual_size,
-                                                          &(etna_buffer->magma_buffer_)))
+    if (MAGMA_STATUS_OK !=
+        magma_connection_create_buffer2(magma_vsi_.GetConnection(), size, &actual_size,
+                                        &(etna_buffer->magma_buffer_), &buffer_id))
       return nullptr;
 
     EXPECT_EQ(actual_size, size);
@@ -78,7 +79,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
                              &etna_buffer->cpu_address_))
       return nullptr;
 
-    etna_buffer->size_ = magma_buffer_get_size(etna_buffer->magma_buffer_);
+    etna_buffer->size_ = actual_size;
 
     etna_buffer->gpu_address_ = next_gpu_addr_;
     next_gpu_addr_ += etna_buffer->size_;
@@ -90,7 +91,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     if (status != MAGMA_STATUS_OK)
       return nullptr;
 
-    etna_buffer->resource_.buffer_id = magma_buffer_get_id(etna_buffer->magma_buffer_);
+    etna_buffer->resource_.buffer_id = buffer_id;
     etna_buffer->resource_.offset = 0;
     etna_buffer->resource_.length = etna_buffer->size_;
 

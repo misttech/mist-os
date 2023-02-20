@@ -59,9 +59,10 @@ class TestConnection : public magma::TestDeviceBase {
 
     uint64_t buffer_size;
     magma_buffer_t batch_buffer;
+    magma_buffer_id_t batch_buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, PAGE_SIZE, &buffer_size, &batch_buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &buffer_size,
+                                                               &batch_buffer, &batch_buffer_id));
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, buffer_size, &vaddr));
 
@@ -79,8 +80,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_command_descriptor descriptor;
     magma_exec_command_buffer command_buffer;
     magma_exec_resource exec_resource;
-    EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, buffer_size,
-                            flags));
+    EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer_id,
+                            buffer_size, flags));
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection_, context_id_, &descriptor));
 
@@ -156,9 +157,9 @@ class TestConnection : public magma::TestDeviceBase {
   }
 
   bool InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
-                   magma_exec_resource* exec_resource, magma_buffer_t batch_buffer,
+                   magma_exec_resource* exec_resource, magma_buffer_id_t batch_buffer_id,
                    uint64_t batch_buffer_length, uint64_t flags) {
-    exec_resource->buffer_id = magma_buffer_get_id(batch_buffer);
+    exec_resource->buffer_id = batch_buffer_id;
     exec_resource->offset = 0;
     exec_resource->length = batch_buffer_length;
 
@@ -210,8 +211,11 @@ class TestConnection : public magma::TestDeviceBase {
   void SubmitAndDisconnect(uint64_t flags) {
     uint64_t size;
     magma_buffer_t batch_buffer;
+    magma_buffer_id_t batch_buffer_id;
 
-    ASSERT_EQ(magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer), 0);
+    ASSERT_EQ(magma_connection_create_buffer2(connection_, PAGE_SIZE, &size, &batch_buffer,
+                                              &batch_buffer_id),
+              0);
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, size, &vaddr));
 
@@ -221,7 +225,7 @@ class TestConnection : public magma::TestDeviceBase {
     magma_exec_command_buffer command_buffer;
     magma_exec_resource exec_resource;
     EXPECT_TRUE(
-        InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, size, flags));
+        InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer_id, size, flags));
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection_, context_id_, &descriptor));
 

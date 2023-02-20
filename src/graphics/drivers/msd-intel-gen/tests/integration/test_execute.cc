@@ -52,16 +52,22 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
     uint64_t size;
     magma_buffer_t wait_batch_buffer;
+    magma_buffer_id_t wait_batch_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, kSize, &size, &wait_batch_buffer));
+              magma_connection_create_buffer2(connection_, kSize, &size, &wait_batch_buffer,
+                                              &wait_batch_buffer_id));
 
     magma_buffer_t signal_batch_buffer;
+    magma_buffer_id_t signal_batch_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, kSize, &size, &signal_batch_buffer));
+              magma_connection_create_buffer2(connection_, kSize, &size, &signal_batch_buffer,
+                                              &signal_batch_buffer_id));
 
     magma_buffer_t semaphore_buffer;
+    magma_buffer_id_t semaphore_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, kSize, &size, &semaphore_buffer));
+              magma_connection_create_buffer2(connection_, kSize, &size, &semaphore_buffer,
+                                              &semaphore_buffer_id));
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_,
                                                            wait_batch_buffer, 0, size, kMapFlags));
@@ -78,15 +84,15 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
                                                            0, size, kMapFlags));
 
     // wait for memory location to be > 0
-    InitBatchSemaphoreWait(wait_batch_buffer, 0, gpu_addr_);
+    InitBatchSemaphoreWait(wait_batch_buffer, size, 0, gpu_addr_);
 
     // write the memory location
-    InitBatchMemoryWrite(signal_batch_buffer, kPattern, gpu_addr_);
+    InitBatchMemoryWrite(signal_batch_buffer, size, kPattern, gpu_addr_);
 
     gpu_addr_ += size + extra_page_count_ * PAGE_SIZE;
 
     // initialize semaphore location to 0
-    ClearBuffer(semaphore_buffer, 0);
+    ClearBuffer(semaphore_buffer, size, 0);
 
     magma::InflightList list;
 
@@ -96,8 +102,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_exec_command_buffer command_buffer;
       std::vector<magma_exec_resource> exec_resources;
 
-      InitCommand(&descriptor, &command_buffer, &exec_resources, wait_batch_buffer,
-                  semaphore_buffer);
+      InitCommand(&descriptor, &command_buffer, &exec_resources, wait_batch_buffer_id, kSize,
+                  semaphore_buffer_id, kSize);
       descriptor.flags = kMagmaIntelGenCommandBufferForRender;
 
       EXPECT_EQ(MAGMA_STATUS_OK,
@@ -115,8 +121,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_exec_command_buffer command_buffer;
       std::vector<magma_exec_resource> exec_resources;
 
-      InitCommand(&descriptor, &command_buffer, &exec_resources, signal_batch_buffer,
-                  semaphore_buffer);
+      InitCommand(&descriptor, &command_buffer, &exec_resources, signal_batch_buffer_id, kSize,
+                  semaphore_buffer_id, kSize);
       descriptor.flags = kMagmaIntelGenCommandBufferForRender;
 
       EXPECT_EQ(MAGMA_STATUS_OK,
@@ -134,8 +140,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_exec_command_buffer command_buffer;
       std::vector<magma_exec_resource> exec_resources;
 
-      InitCommand(&descriptor, &command_buffer, &exec_resources, signal_batch_buffer,
-                  semaphore_buffer);
+      InitCommand(&descriptor, &command_buffer, &exec_resources, signal_batch_buffer_id, kSize,
+                  semaphore_buffer_id, kSize);
       descriptor.flags = kMagmaIntelGenCommandBufferForVideo;
 
       uint32_t context = context_count == 2 ? context_ids_[1] : context_ids_[0];
@@ -179,21 +185,27 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     constexpr uint32_t kSize = PAGE_SIZE;
 
     std::vector<magma_buffer_t> batch_buffers;
+    std::vector<magma_buffer_id_t> batch_buffer_ids;
     std::vector<magma_buffer_t> result_buffers;
+    std::vector<magma_buffer_id_t> result_buffer_ids;
 
     ASSERT_TRUE(context_count == 1 || context_count == 2);
 
     for (uint32_t i = 0; i < count; i++) {
       uint64_t size;
       magma_buffer_t batch_buffer;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, kSize, &size, &batch_buffer));
+      magma_buffer_id_t batch_buffer_id;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, kSize, &size,
+                                                                 &batch_buffer, &batch_buffer_id));
       batch_buffers.push_back(batch_buffer);
+      batch_buffer_ids.push_back(batch_buffer_id);
 
       magma_buffer_t result_buffer;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, kSize, &size, &result_buffer));
+      magma_buffer_id_t result_buffer_id;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(
+                                     connection_, kSize, &size, &result_buffer, &result_buffer_id));
       result_buffers.push_back(result_buffer);
+      result_buffer_ids.push_back(result_buffer_id);
 
       EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_, batch_buffer,
                                                              0, size, kMapFlags));
@@ -203,11 +215,11 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_, result_buffer,
                                                              0, size, kMapFlags));
 
-      InitBatchMemoryWrite(batch_buffer, kPattern, gpu_addr_);
+      InitBatchMemoryWrite(batch_buffer, size, kPattern, gpu_addr_);
 
       gpu_addr_ += size + extra_page_count_ * PAGE_SIZE;
 
-      ClearBuffer(result_buffer, 0xfefefefe);
+      ClearBuffer(result_buffer, size, 0xfefefefe);
     }
 
     magma::InflightList list;
@@ -218,8 +230,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_exec_command_buffer command_buffer;
       std::vector<magma_exec_resource> exec_resources;
 
-      InitCommand(&descriptor, &command_buffer, &exec_resources, batch_buffers[i],
-                  result_buffers[i]);
+      InitCommand(&descriptor, &command_buffer, &exec_resources, batch_buffer_ids[i], kSize,
+                  result_buffer_ids[i], kSize);
 
       switch (mode) {
         case RENDER_ONLY:
@@ -262,7 +274,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
     for (uint32_t i = 0; i < count; i++) {
       uint32_t result;
-      ReadBufferAt(result_buffers[i], 0, &result);
+      ReadBufferAt(result_buffers[i], kSize, 0, &result);
 
       EXPECT_EQ(kPattern, result) << " expected: 0x" << std::hex << kPattern << " got: 0x"
                                   << result;
@@ -286,7 +298,9 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
     struct Submit {
       magma_buffer_t batch_buffer;
+      magma_buffer_id_t batch_buffer_id;
       magma_buffer_t result_buffer;
+      magma_buffer_id_t result_buffer_id;
       std::vector<magma_semaphore_t> wait_semaphores;
       std::vector<magma_semaphore_t> signal_semaphores;
       uint64_t command_buffer_flags;
@@ -298,10 +312,12 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
       uint64_t size;
       ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, kSize, &size, &submit.batch_buffer));
+                magma_connection_create_buffer2(connection_, kSize, &size, &submit.batch_buffer,
+                                                &submit.batch_buffer_id));
 
       ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, kSize, &size, &submit.result_buffer));
+                magma_connection_create_buffer2(connection_, kSize, &size, &submit.result_buffer,
+                                                &submit.result_buffer_id));
 
       EXPECT_EQ(MAGMA_STATUS_OK,
                 magma_connection_map_buffer(connection_, gpu_addr_, submit.batch_buffer, 0, size,
@@ -313,11 +329,11 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
                 magma_connection_map_buffer(connection_, gpu_addr_, submit.result_buffer, 0, size,
                                             kMapFlags));
 
-      InitBatchMemoryWrite(submit.batch_buffer, kPattern, gpu_addr_);
+      InitBatchMemoryWrite(submit.batch_buffer, size, kPattern, gpu_addr_);
 
       gpu_addr_ += size + extra_page_count_ * PAGE_SIZE;
 
-      ClearBuffer(submit.result_buffer, 0xfefefefe);
+      ClearBuffer(submit.result_buffer, size, 0xfefefefe);
 
       for (int i = 0; i < semaphore_count; i++) {
         magma_semaphore_t semaphore;
@@ -346,8 +362,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_exec_command_buffer command_buffer;
       std::vector<magma_exec_resource> exec_resources;
 
-      InitCommand(&descriptor, &command_buffer, &exec_resources, submits[i].batch_buffer,
-                  submits[i].result_buffer);
+      InitCommand(&descriptor, &command_buffer, &exec_resources, submits[i].batch_buffer_id, kSize,
+                  submits[i].result_buffer_id, kSize);
 
       std::vector<uint64_t> semaphore_ids;
       for (auto& semaphore : submits[i].wait_semaphores) {
@@ -451,7 +467,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     // Check results and cleanup
     for (size_t i = 0; i < submits.size(); i++) {
       uint32_t result;
-      ReadBufferAt(submits[i].result_buffer, 0, &result);
+      ReadBufferAt(submits[i].result_buffer, kSize, 0, &result);
 
       EXPECT_EQ(kPattern, result) << "submit " << i << " expected: 0x" << std::hex << kPattern
                                   << " got: 0x" << result;
@@ -468,9 +484,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     }
   }
 
-  void ReadBufferAt(magma_buffer_t buffer, uint32_t dword_offset, uint32_t* result_out) {
-    uint64_t size = magma_buffer_get_size(buffer);
-
+  void ReadBufferAt(magma_buffer_t buffer, size_t size, uint32_t dword_offset,
+                    uint32_t* result_out) {
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr));
 
@@ -479,22 +494,19 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     ASSERT_TRUE(magma::UnmapCpuHelper(vaddr, size));
   }
 
-  void ClearBuffer(magma_buffer_t buffer, uint32_t value) {
-    uint64_t size = magma_buffer_get_size(buffer);
-
+  void ClearBuffer(magma_buffer_t buffer, size_t size, uint32_t value) {
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr));
 
-    for (uint32_t i = 0; i < magma_buffer_get_size(buffer) / sizeof(uint32_t); i++) {
+    for (uint32_t i = 0; i < size / sizeof(uint32_t); i++) {
       reinterpret_cast<uint32_t*>(vaddr)[i] = value;
     }
 
     ASSERT_TRUE(magma::UnmapCpuHelper(vaddr, size));
   }
 
-  void InitBatchMemoryWrite(magma_buffer_t buffer, uint32_t pattern, uint64_t target_gpu_addr) {
-    uint64_t size = magma_buffer_get_size(buffer);
-
+  void InitBatchMemoryWrite(magma_buffer_t buffer, size_t size, uint32_t pattern,
+                            uint64_t target_gpu_addr) {
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr));
 
@@ -514,9 +526,8 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     ASSERT_TRUE(magma::UnmapCpuHelper(vaddr, size));
   }
 
-  void InitBatchSemaphoreWait(magma_buffer_t buffer, uint32_t pattern, uint64_t target_gpu_addr) {
-    uint64_t size = magma_buffer_get_size(buffer);
-
+  void InitBatchSemaphoreWait(magma_buffer_t buffer, size_t size, uint32_t pattern,
+                              uint64_t target_gpu_addr) {
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr));
 
@@ -540,17 +551,16 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
   }
 
   void InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
-                   std::vector<magma_exec_resource>* exec_resources, magma_buffer_t batch_buffer,
-                   magma_buffer_t result_buffer) {
+                   std::vector<magma_exec_resource>* exec_resources,
+                   magma_buffer_id_t batch_buffer_id, uint64_t batch_buffer_size,
+                   magma_buffer_id_t result_buffer_id, uint64_t result_buffer_size) {
     exec_resources->clear();
 
-    exec_resources->push_back({.buffer_id = magma_buffer_get_id(batch_buffer),
-                               .offset = 0,
-                               .length = magma_buffer_get_size(batch_buffer)});
+    exec_resources->push_back(
+        {.buffer_id = batch_buffer_id, .offset = 0, .length = batch_buffer_size});
 
-    exec_resources->push_back({.buffer_id = magma_buffer_get_id(result_buffer),
-                               .offset = 0,
-                               .length = magma_buffer_get_size(result_buffer)});
+    exec_resources->push_back(
+        {.buffer_id = result_buffer_id, .offset = 0, .length = result_buffer_size});
 
     command_buffer->resource_index = 0;
     command_buffer->start_offset = 0;

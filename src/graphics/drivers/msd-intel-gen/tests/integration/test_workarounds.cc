@@ -46,12 +46,14 @@ class TestConnection : public magma::TestDeviceBase {
 
     uint64_t size;
     magma_buffer_t batch_buffer;
+    magma_buffer_id_t batch_buffer_id;
     magma_buffer_t result_buffer;
+    magma_buffer_id_t result_buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer));
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &result_buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &size,
+                                                               &batch_buffer, &batch_buffer_id));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &size,
+                                                               &result_buffer, &result_buffer_id));
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_, batch_buffer, 0,
                                                            magma::page_size(), kMapFlags));
@@ -67,8 +69,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_command_descriptor descriptor;
     magma_exec_command_buffer command_buffer;
     std::vector<magma_exec_resource> exec_resources;
-    EXPECT_TRUE(
-        InitCommand(&descriptor, &command_buffer, &exec_resources, batch_buffer, result_buffer));
+    EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resources, batch_buffer_id,
+                            PAGE_SIZE, result_buffer_id, PAGE_SIZE));
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection_, context_id, &descriptor));
@@ -112,7 +114,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (!magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr))
       return DRETF(false, "CpuMapHelper failed");
 
-    for (uint32_t i = 0; i < magma_buffer_get_size(buffer) / sizeof(uint32_t); i++) {
+    for (uint32_t i = 0; i < size / sizeof(uint32_t); i++) {
       reinterpret_cast<uint32_t*>(vaddr)[i] = value;
     }
 
@@ -128,7 +130,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (!magma::MapCpuHelper(buffer, 0 /*offset*/, size, &vaddr))
       return DRETF(false, "MapCpuHelper failed");
 
-    memset(vaddr, 0, magma_buffer_get_size(buffer));
+    memset(vaddr, 0, size);
 
     {
       auto batch_ptr = reinterpret_cast<uint32_t*>(vaddr);
@@ -150,17 +152,16 @@ class TestConnection : public magma::TestDeviceBase {
   }
 
   bool InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
-                   std::vector<magma_exec_resource>* exec_resources, magma_buffer_t batch_buffer,
-                   magma_buffer_t result_buffer) {
+                   std::vector<magma_exec_resource>* exec_resources,
+                   magma_buffer_id_t batch_buffer_id, uint64_t batch_buffer_size,
+                   magma_buffer_id_t result_buffer_id, uint64_t result_buffer_size) {
     exec_resources->clear();
 
-    exec_resources->push_back({.buffer_id = magma_buffer_get_id(batch_buffer),
-                               .offset = 0,
-                               .length = magma_buffer_get_size(batch_buffer)});
+    exec_resources->push_back(
+        {.buffer_id = batch_buffer_id, .offset = 0, .length = batch_buffer_size});
 
-    exec_resources->push_back({.buffer_id = magma_buffer_get_id(result_buffer),
-                               .offset = 0,
-                               .length = magma_buffer_get_size(result_buffer)});
+    exec_resources->push_back(
+        {.buffer_id = result_buffer_id, .offset = 0, .length = result_buffer_size});
 
     command_buffer->resource_index = 0;
     command_buffer->start_offset = 0;

@@ -97,6 +97,13 @@ void magma_connection_release_context(magma_connection_t connection, uint32_t co
 
 magma_status_t magma_connection_create_buffer(magma_connection_t connection, uint64_t size,
                                               uint64_t* size_out, magma_buffer_t* buffer_out) {
+  magma_buffer_id_t buffer_id;
+  return magma_connection_create_buffer2(connection, size, size_out, buffer_out, &buffer_id);
+}
+
+magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
+                                               uint64_t* size_out, magma_buffer_t* buffer_out,
+                                               magma_buffer_id_t* buffer_id_out) {
   auto platform_buffer = magma::PlatformBuffer::Create(size, "magma_create_buffer");
   if (!platform_buffer)
     return DRET(MAGMA_STATUS_MEMORY_ERROR);
@@ -114,6 +121,7 @@ magma_status_t magma_connection_create_buffer(magma_connection_t connection, uin
     return DRET_MSG(result, "ImportObject failed");
 
   *size_out = platform_buffer->size();
+  *buffer_id_out = platform_buffer->id();
   *buffer_out = reinterpret_cast<magma_buffer_t>(platform_buffer.release());  // Ownership passed
 
   return MAGMA_STATUS_OK;
@@ -172,6 +180,15 @@ magma_status_t magma_buffer_clean_cache(magma_buffer_t buffer, uint64_t offset, 
 
 magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
                                               magma_buffer_t* buffer_out) {
+  uint64_t size;
+  magma_buffer_id_t buffer_id;
+  return magma_connection_import_buffer2(connection, buffer_handle, &size, buffer_out, &buffer_id);
+}
+
+magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
+                                               uint32_t buffer_handle, uint64_t* size_out,
+                                               magma_buffer_t* buffer_out,
+                                               magma_buffer_id_t* buffer_id_out) {
   auto platform_buffer = magma::PlatformBuffer::Import(buffer_handle);
   if (!platform_buffer)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "PlatformBuffer::Import failed");
@@ -188,6 +205,8 @@ magma_status_t magma_connection_import_buffer(magma_connection_t connection, uin
   if (result != MAGMA_STATUS_OK)
     return DRET_MSG(result, "ImportObject failed");
 
+  *size_out = platform_buffer->size();
+  *buffer_id_out = platform_buffer->id();
   *buffer_out = reinterpret_cast<magma_buffer_t>(platform_buffer.release());
 
   return MAGMA_STATUS_OK;
@@ -606,6 +625,13 @@ magma_status_t magma_buffer_get_handle(magma_buffer_t buffer, magma_handle_t* ha
 magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
                                                   magma_image_create_info_t* create_info,
                                                   magma_buffer_t* image_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+magma_status_t magma_virt_connection_create_image2(magma_connection_t connection,
+                                                   magma_image_create_info_t* create_info,
+                                                   uint64_t* size_out, magma_buffer_t* image_out,
+                                                   magma_buffer_id_t* buffer_id_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 

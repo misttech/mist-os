@@ -80,6 +80,16 @@ magma_status_t magma_connection_create_buffer(magma_connection_t connection, uin
   return MAGMA_STATUS_OK;
 }
 
+magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
+                                               uint64_t* size_out, magma_buffer_t* buffer_out,
+                                               magma_buffer_id_t* id_out) {
+  auto buffer = magma::PlatformBuffer::Create(size, "magma-alloc");
+  *id_out = buffer->id();
+  *buffer_out = reinterpret_cast<magma_buffer_t>(buffer.release());
+  *size_out = size;
+  return MAGMA_STATUS_OK;
+}
+
 void magma_connection_release_buffer(magma_connection_t connection, magma_buffer_t buffer) {
   delete reinterpret_cast<magma::PlatformBuffer*>(buffer);
 }
@@ -121,6 +131,18 @@ magma_status_t magma_connection_export_buffer(magma_connection_t connection, mag
 magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
                                               magma_buffer_t* buffer_out) {
   *buffer_out = reinterpret_cast<magma_buffer_t>(exported_buffers[buffer_handle]);
+  exported_buffers.erase(buffer_handle);
+  return MAGMA_STATUS_OK;
+}
+
+magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
+                                               uint32_t buffer_handle, uint64_t* size_out,
+                                               magma_buffer_t* buffer_out,
+                                               magma_buffer_id_t* id_out) {
+  auto buffer = reinterpret_cast<magma::PlatformBuffer*>(exported_buffers[buffer_handle]);
+  *id_out = buffer->id();
+  *size_out = buffer->size();
+  *buffer_out = reinterpret_cast<magma_buffer_t>(buffer);
   exported_buffers.erase(buffer_handle);
   return MAGMA_STATUS_OK;
 }

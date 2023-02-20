@@ -221,6 +221,10 @@ typedef uint64_t magma_sysmem_connection_t;
 // Corresponds to a zx_handle_t on Fuchsia.
 typedef uint32_t magma_handle_t;
 
+// An ID for a buffer that can be used to refer to it when submitting command buffers. Only valid
+// within a single connection.
+typedef uint64_t magma_buffer_id_t;
+
 typedef struct magma_poll_item {
   union {
     magma_semaphore_t semaphore;
@@ -234,7 +238,7 @@ typedef struct magma_poll_item {
 
 // A buffer referenced by a command buffer descriptor
 typedef struct magma_exec_resource {
-  uint64_t buffer_id;
+  magma_buffer_id_t buffer_id;
   uint64_t offset;
   uint64_t length;
 } magma_exec_resource_t;

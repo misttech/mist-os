@@ -54,7 +54,9 @@ class TestConnection : public magma::TestDeviceBase {
 
     uint64_t size;
     magma_buffer_t batch_buffer;
-    status = magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer);
+    magma_buffer_id_t batch_buffer_id;
+    status = magma_connection_create_buffer2(connection_, PAGE_SIZE, &size, &batch_buffer,
+                                             &batch_buffer_id);
     if (!status.ok()) {
       magma_connection_release_context(connection_, context_id);
       return DRET(status.get());
@@ -78,7 +80,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_command_descriptor descriptor;
     magma_exec_command_buffer command_buffer;
     magma_exec_resource exec_resource;
-    EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, size));
+    EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer,
+                            batch_buffer_id, size));
 
     status = magma_connection_execute_command(connection_, context_id, &descriptor);
     if (!status.ok()) {
@@ -115,8 +118,8 @@ class TestConnection : public magma::TestDeviceBase {
 
   bool InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
                    magma_exec_resource* exec_resource, magma_buffer_t batch_buffer,
-                   uint64_t batch_buffer_length) {
-    exec_resource->buffer_id = magma_buffer_get_id(batch_buffer);
+                   magma_buffer_id_t batch_buffer_id, uint64_t batch_buffer_length) {
+    exec_resource->buffer_id = batch_buffer_id;
     exec_resource->offset = 0;
     exec_resource->length = batch_buffer_length;
 

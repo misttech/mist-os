@@ -274,7 +274,7 @@ class TestConnection {
     EXPECT_EQ(false, more_data);
   }
 
-  void Buffer() {
+  void BufferOld() {
     ASSERT_TRUE(connection_);
 
     uint64_t size = page_size() + 16;
@@ -289,15 +289,46 @@ class TestConnection {
     magma_connection_release_buffer(connection_, buffer);
   }
 
+  void Buffer() {
+    ASSERT_TRUE(connection_);
+
+    uint64_t size = page_size() + 16;
+    uint64_t actual_size = 0;
+    magma_buffer_t buffer = 0;
+    magma_buffer_id_t buffer_id = 0;
+
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                               &buffer, &buffer_id));
+    EXPECT_GE(actual_size, size);
+    EXPECT_NE(buffer, 0u);
+
+    {
+      uint64_t size2 = page_size() + 16;
+      uint64_t actual_size2 = 0;
+      magma_buffer_t buffer2 = 0;
+      magma_buffer_id_t buffer_id2 = 0;
+
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size2, &actual_size2,
+                                                                 &buffer2, &buffer_id2));
+      EXPECT_GE(actual_size2, size2);
+      EXPECT_NE(buffer2, 0u);
+      EXPECT_NE(buffer_id2, buffer_id);
+      magma_connection_release_buffer(connection_, buffer2);
+    }
+
+    magma_connection_release_buffer(connection_, buffer);
+  }
+
   void BufferMap() {
     ASSERT_TRUE(connection_);
 
     uint64_t size = page_size();
     uint64_t actual_size;
     magma_buffer_t buffer = 0;
+    magma_buffer_id_t buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                               &buffer, &buffer_id));
     EXPECT_NE(buffer, 0u);
 
     constexpr uint64_t kGpuAddress = 0x1000;
@@ -334,14 +365,16 @@ class TestConnection {
 
     {
       uint64_t actual_size;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, size, &actual_size, &buffer[0]));
+      uint64_t buffer_id;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                                 &buffer[0], &buffer_id));
       EXPECT_NE(buffer[0], 0u);
     }
     {
       uint64_t actual_size;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer(connection_, size, &actual_size, &buffer[1]));
+      uint64_t buffer_id;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                                 &buffer[1], &buffer_id));
       EXPECT_NE(buffer[1], 0u);
     }
 
@@ -385,9 +418,10 @@ class TestConnection {
     uint64_t size = page_size();
     uint64_t actual_size;
     magma_buffer_t buffer;
+    magma_buffer_id_t buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                               &buffer, &buffer_id));
 
     // Check that we can map the same underlying memory object many times
     std::vector<magma_buffer_t> imported_buffers;
@@ -399,9 +433,15 @@ class TestConnection {
       magma_handle_t handle;
       ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, &handle));
 
+      magma_buffer_id_t buffer_id2;
+      uint64_t buffer_size2;
       magma_buffer_t buffer2;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer2))
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer2(connection_, handle, &buffer_size2,
+                                                                 &buffer2, &buffer_id2))
           << "i " << i;
+
+      EXPECT_EQ(actual_size, buffer_size2);
+      EXPECT_NE(buffer_id, buffer_id2);
 
       ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_address, buffer2, 0,
                                                              size, MAGMA_MAP_FLAG_READ))
@@ -440,9 +480,10 @@ class TestConnection {
     uint64_t size = page_size();
     uint64_t actual_size;
     magma_buffer_t buffer;
+    uint64_t buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, size, &actual_size,
+                                                               &buffer, &buffer_id));
 
     // Invalid page offset, remote error
     constexpr uint64_t kInvalidPageOffset = 1024;
@@ -459,10 +500,12 @@ class TestConnection {
 
     uint64_t size = page_size();
     magma_buffer_t buffer;
+    uint64_t buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, size, &size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer2(connection_, size, &size, &buffer, &buffer_id));
 
-    *id_out = magma_buffer_get_id(buffer);
+    *id_out = buffer_id;
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, handle_out));
 
@@ -479,16 +522,33 @@ class TestConnection {
 #elif defined(__linux__)
     constexpr magma_status_t kExpectedStatus = MAGMA_STATUS_INTERNAL_ERROR;
 #endif
+    uint64_t size;
+    magma_buffer_id_t id;
     ASSERT_EQ(kExpectedStatus,
               magma_connection_import_buffer(connection_, kInvalidHandle, &buffer));
+    ASSERT_EQ(kExpectedStatus,
+              magma_connection_import_buffer2(connection_, kInvalidHandle, &size, &buffer, &id));
+  }
+
+  void BufferImportOld(uint32_t handle, uint64_t exported_id) {
+    ASSERT_TRUE(connection_);
+
+    magma_buffer_t buffer;
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer));
+    EXPECT_NE(magma_buffer_get_id(buffer), exported_id);
+
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferImport(uint32_t handle, uint64_t exported_id) {
     ASSERT_TRUE(connection_);
 
     magma_buffer_t buffer;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer));
-    EXPECT_NE(magma_buffer_get_id(buffer), exported_id);
+    uint64_t buffer_size;
+    magma_buffer_id_t buffer_id;
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer2(connection_, handle, &buffer_size,
+                                                               &buffer, &buffer_id));
+    EXPECT_NE(buffer_id, exported_id);
 
     magma_connection_release_buffer(connection_, buffer);
   }
@@ -1124,7 +1184,9 @@ class TestConnection {
     ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
     uint64_t size = page_size();
     magma_buffer_t buffer;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, size, &size, &buffer));
+    magma_buffer_id_t buffer_id;
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer2(connection_, size, &size, &buffer, &buffer_id));
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_enable_performance_counters(connection_, &counter, 1));
@@ -1284,6 +1346,11 @@ TEST_F(Magma, TracingInitFake) {
   test.TracingInitFake();
 }
 
+TEST_F(Magma, BufferOld) {
+  TestConnection test;
+  test.BufferOld();
+}
+
 TEST_F(Magma, Buffer) {
   TestConnection test;
   test.Buffer();
@@ -1330,6 +1397,19 @@ TEST_F(Magma, BufferMapDuplicates) {
 }
 
 TEST_F(Magma, BufferImportInvalid) { TestConnection().BufferImportInvalid(); }
+
+TEST_F(Magma, BufferImportExportOld) {
+  TestConnection test1;
+  TestConnection test2;
+
+  if (test1.is_virtmagma())
+    GTEST_SKIP();  // TODO(fxbug.dev/13278)
+
+  uint32_t handle;
+  uint64_t exported_id;
+  test1.BufferExport(&handle, &exported_id);
+  test2.BufferImportOld(handle, exported_id);
+}
 
 TEST_F(Magma, BufferImportExport) {
   TestConnection test1;
@@ -1422,8 +1502,9 @@ TEST_F(Magma, CommitBuffer) {
   magma_buffer_t buffer;
   uint64_t size_out;
   uint64_t buffer_size = page_size() * 10;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection.connection(), buffer_size,
-                                                            &size_out, &buffer));
+  uint64_t buffer_id;
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection.connection(), buffer_size,
+                                                             &size_out, &buffer, &buffer_id));
   magma_buffer_info_t info;
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(info.size, buffer_size);
@@ -1469,9 +1550,10 @@ TEST_F(Magma, MapWithBufferHandle2) {
   magma_buffer_t buffer;
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 10;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_connection_create_buffer(
-                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
+  uint64_t buffer_id;
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection.connection(),
+                                                             kBufferSizeInPages * page_size(),
+                                                             &actual_size, &buffer, &buffer_id));
 
   magma_handle_t handle;
   ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_get_handle(buffer, &handle));
@@ -1525,9 +1607,10 @@ TEST_F(Magma, MaxBufferHandle2) {
   magma_buffer_t buffer;
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 1;
-  ASSERT_EQ(MAGMA_STATUS_OK,
-            magma_connection_create_buffer(
-                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
+  uint64_t buffer_id;
+  ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection.connection(),
+                                                             kBufferSizeInPages * page_size(),
+                                                             &actual_size, &buffer, &buffer_id));
 
   std::unordered_set<magma_handle_t> handles;
 
@@ -1564,9 +1647,10 @@ TEST_F(Magma, MaxBufferMappings) {
   magma_buffer_t buffer;
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 1;
-  ASSERT_EQ(MAGMA_STATUS_OK,
-            magma_connection_create_buffer(
-                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
+  uint64_t buffer_id;
+  ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection.connection(),
+                                                             kBufferSizeInPages * page_size(),
+                                                             &actual_size, &buffer, &buffer_id));
 
   std::unordered_set<void*> maps;
 

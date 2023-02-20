@@ -63,9 +63,11 @@ class TestConnection : public magma::TestDeviceBase {
 
     magma_buffer_t buffer;
     uint64_t buffer_size;
+    magma_buffer_id_t buffer_id;
     constexpr uint32_t kPerfCountBufferSize = 2048;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, kPerfCountBufferSize * 2,
-                                                              &buffer_size, &buffer));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer2(connection_, kPerfCountBufferSize * 2, &buffer_size,
+                                              &buffer, &buffer_id));
 
     magma_perf_count_pool_t pool;
     magma_handle_t notification_handle;
@@ -86,10 +88,10 @@ class TestConnection : public magma::TestDeviceBase {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_enable_performance_counters(connection_, &perf_counter_id, 1));
     magma_buffer_offset offsets[2];
-    offsets[0].buffer_id = magma_buffer_get_id(buffer);
+    offsets[0].buffer_id = buffer_id;
     offsets[0].offset = 0;
     offsets[0].length = kPerfCountBufferSize;
-    offsets[1].buffer_id = magma_buffer_get_id(buffer);
+    offsets[1].buffer_id = buffer_id;
     offsets[1].offset = kPerfCountBufferSize;
     offsets[1].length = kPerfCountBufferSize;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_add_performance_counter_buffer_offsets_to_pool(
@@ -117,15 +119,15 @@ class TestConnection : public magma::TestDeviceBase {
       uint64_t last_possible_time = zx::clock::get_monotonic().get();
 
       uint32_t trigger_id;
-      uint64_t buffer_id;
+      uint64_t result_buffer_id;
       uint32_t buffer_offset;
       uint64_t time;
       uint32_t result_flags;
       EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_read_performance_counter_completion(
-                                     connection_, pool, &trigger_id, &buffer_id, &buffer_offset,
-                                     &time, &result_flags));
+                                     connection_, pool, &trigger_id, &result_buffer_id,
+                                     &buffer_offset, &time, &result_flags));
 
-      EXPECT_EQ(magma_buffer_get_id(buffer), buffer_id);
+      EXPECT_EQ(buffer_id, result_buffer_id);
       EXPECT_TRUE(trigger_id == kTriggerId || trigger_id == kTriggerId + 1);
       bool expected_discontinuous = i == 0;
       uint32_t expected_result_flags =
@@ -146,12 +148,12 @@ class TestConnection : public magma::TestDeviceBase {
     }
 
     uint32_t trigger_id;
-    uint64_t buffer_id;
+    uint64_t result_buffer_id;
     uint32_t buffer_offset;
     uint64_t time;
     uint32_t result_flags;
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, magma_connection_read_performance_counter_completion(
-                                          connection_, pool, &trigger_id, &buffer_id,
+                                          connection_, pool, &trigger_id, &result_buffer_id,
                                           &buffer_offset, &time, &result_flags));
 
     magma_connection_release_performance_counter_buffer_pool(connection_, pool);
