@@ -99,7 +99,6 @@ rustc_library("input_pipeline") {
     "src/focus_listener.rs",
     "src/gestures/args.rs",
     "src/gestures/gesture_arena.rs",
-    "src/gestures/inspect_keys.rs",
     "src/gestures/mod.rs",
     "src/gestures/motion.rs",
     "src/gestures/one_finger_button.rs",

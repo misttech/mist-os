@@ -4,8 +4,7 @@
 
 use {
     super::{
-        args, inspect_keys, motion, one_finger_button, primary_tap, scroll, secondary_button,
-        secondary_tap,
+        args, motion, one_finger_button, primary_tap, scroll, secondary_button, secondary_tap,
     },
     crate::{input_device, input_handler::InputHandler, mouse_binding, touch_binding, utils::Size},
     anyhow::{format_err, Context, Error},
@@ -364,7 +363,7 @@ impl GestureArena {
             contender_factory,
             mutable_state: RefCell::new(MutableState::Idle),
             inspect_log: RefCell::new(BoundedListNode::new(
-                inspect_node.create_child(inspect_keys::ARENA_LOG_ROOT),
+                inspect_node.create_child("gestures_event_log"),
                 max_inspect_log_entries,
             )),
         }
@@ -381,13 +380,12 @@ impl GestureArena {
 
 impl TouchpadEvent {
     fn log_inspect(&self, log_entry_node: &InspectNode) {
-        use inspect_keys::*;
         log_entry_node.atomic_update(|log_entry_node| {
-            let touchpad_event_node = log_entry_node.create_child(&*TOUCHPAD_EVENT_NODE);
+            let touchpad_event_node = log_entry_node.create_child("touchpad_event");
 
             // Create an inspect array from the pressed buttons.
             let pressed_buttons_node = touchpad_event_node
-                .create_uint_array(&*PRESSED_BUTTONS_PROP, self.pressed_buttons.len());
+                .create_uint_array("pressed_buttons", self.pressed_buttons.len());
             self.pressed_buttons.iter().enumerate().for_each(|(i, &button_id)| {
                 pressed_buttons_node.set(i, button_id);
             });
@@ -395,28 +393,26 @@ impl TouchpadEvent {
             // Populate the touchpad event details
             log_common(&touchpad_event_node, self.timestamp);
             touchpad_event_node.record(pressed_buttons_node);
-            touchpad_event_node.record_child(&*CONTACT_STATE_PROP, |contact_set_node| {
+            touchpad_event_node.record_child("contacts", |contact_set_node| {
                 self.contacts.iter().for_each(|contact| {
                     contact_set_node.record_child(contact.id.to_string(), |contact_node| {
-                        contact_node.record_double(&*X_POS_PROP, f64::from(contact.position.x));
-                        contact_node.record_double(&*Y_POS_PROP, f64::from(contact.position.y));
+                        contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
+                        contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
                         if let Some(contact_size) = contact.contact_size {
-                            contact_node.record_double(&*WIDTH_PROP, f64::from(contact_size.width));
-                            contact_node
-                                .record_double(&*HEIGHT_PROP, f64::from(contact_size.height));
+                            contact_node.record_double("width_mm", f64::from(contact_size.width));
+                            contact_node.record_double("height_mm", f64::from(contact_size.height));
                         }
                     })
                 })
             });
-            touchpad_event_node.record_child(&*PALM_CONTACT_STATE_PROP, |contact_set_node| {
+            touchpad_event_node.record_child("filtered_palm_contacts", |contact_set_node| {
                 self.filtered_palm_contacts.iter().for_each(|contact| {
                     contact_set_node.record_child(contact.id.to_string(), |contact_node| {
-                        contact_node.record_double(&*X_POS_PROP, f64::from(contact.position.x));
-                        contact_node.record_double(&*Y_POS_PROP, f64::from(contact.position.y));
+                        contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
+                        contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
                         if let Some(contact_size) = contact.contact_size {
-                            contact_node.record_double(&*WIDTH_PROP, f64::from(contact_size.width));
-                            contact_node
-                                .record_double(&*HEIGHT_PROP, f64::from(contact_size.height));
+                            contact_node.record_double("width_mm", f64::from(contact_size.width));
+                            contact_node.record_double("height_mm", f64::from(contact_size.height));
                         }
                     })
                 })
@@ -443,10 +439,9 @@ impl RecognizedGesture {
 }
 
 fn log_common(inspect_node: &InspectNode, driver_timestamp: zx::Time) {
-    use inspect_keys::*;
-    inspect_node.record_int(&*EVENT_TIME_PROP, driver_timestamp.into_nanos());
+    inspect_node.record_int("driver_monotonic_nanos", driver_timestamp.into_nanos());
     inspect_node.record_int(
-        &*ENTRY_LATENCY_PROP,
+        "entry_latency_micros",
         // Use lower precision for latency, to minimize space.
         (fuchsia_async::Time::now().into_zx() - driver_timestamp).into_micros(),
     );
@@ -1143,52 +1138,46 @@ fn get_position_divisor_to_mm(
 }
 
 fn log_keyboard_event_timestamp(log_entry_node: &InspectNode, driver_timestamp: zx::Time) {
-    use inspect_keys::*;
     log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child(&*KEY_EVENT_NODE, |key_event_node| {
+        log_entry_node.record_child("key_event", |key_event_node| {
             log_common(key_event_node, driver_timestamp);
         })
     });
 }
 
 fn log_basic_reason(reason_node: &InspectNode, text: &'static str) {
-    reason_node.record_string(&*inspect_keys::REASON_PROP, text);
+    reason_node.record_string("reason", text);
 }
 
 fn log_detailed_reason_uint(reason_node: &InspectNode, reason_details: DetailedReasonUint) {
-    use inspect_keys::*;
-    reason_node.record_string(&*CRITERION_PROP, reason_details.criterion);
-    reason_node
-        .record_uint(&*ACTUAL_VALUE_PROP, u64::try_from(reason_details.actual).unwrap_or(u64::MAX));
-    reason_details.min.map(|min| reason_node.record_uint(&*MIN_VALUE_PROP, min));
-    reason_details.max.map(|max| reason_node.record_uint(&*MAX_VALUE_PROP, max));
+    reason_node.record_string("criterion", reason_details.criterion);
+    reason_node.record_uint("actual", u64::try_from(reason_details.actual).unwrap_or(u64::MAX));
+    reason_details.min.map(|min| reason_node.record_uint("min_allowed", min));
+    reason_details.max.map(|max| reason_node.record_uint("max_allowed", max));
 }
 
 fn log_detailed_reason_float(reason_node: &InspectNode, reason_details: DetailedReasonFloat) {
-    use inspect_keys::*;
-    reason_node.record_string(&*CRITERION_PROP, reason_details.criterion);
-    reason_node.record_double(&*ACTUAL_VALUE_PROP, f64::from(reason_details.actual));
-    reason_details.min.map(|min| reason_node.record_double(&*MIN_VALUE_PROP, f64::from(min)));
-    reason_details.max.map(|max| reason_node.record_double(&*MAX_VALUE_PROP, f64::from(max)));
+    reason_node.record_string("criterion", reason_details.criterion);
+    reason_node.record_double("actual", f64::from(reason_details.actual));
+    reason_details.min.map(|min| reason_node.record_double("min_allowed", f64::from(min)));
+    reason_details.max.map(|max| reason_node.record_double("max_allowed", f64::from(max)));
 }
 
 fn log_detailed_reason_int(reason_node: &InspectNode, reason_details: DetailedReasonInt) {
-    use inspect_keys::*;
-    reason_node.record_string(&*CRITERION_PROP, reason_details.criterion);
-    reason_node.record_int(&*ACTUAL_VALUE_PROP, reason_details.actual);
-    reason_details.min.map(|min| reason_node.record_int(&*MIN_VALUE_PROP, min));
-    reason_details.max.map(|max| reason_node.record_int(&*MAX_VALUE_PROP, max));
+    reason_node.record_string("criterion", reason_details.criterion);
+    reason_node.record_int("actual", reason_details.actual);
+    reason_details.min.map(|min| reason_node.record_int("min_allowed", min));
+    reason_details.max.map(|max| reason_node.record_int("max_allowed", max));
 }
 
 fn log_reason(reason_node: &InspectNode, contender_name: &'static str, reason: Reason) {
-    use inspect_keys::*;
     // E.g. "input_pipeline_lib_test::gestures::gesture_arena::tests::utils::StubContender"
     // -> "utils::StubContender".
     let contender_name = match contender_name.rmatch_indices("::").nth(1) {
         Some((i, _matched_substr)) => &contender_name[i + 2..],
         None => contender_name,
     };
-    reason_node.record_string(&*CONTENDER_PROP, contender_name);
+    reason_node.record_string("contender", contender_name);
     match reason {
         Reason::Basic(text) => log_basic_reason(reason_node, text),
         Reason::DetailedUint(mismatch_details) => {
@@ -1204,10 +1193,9 @@ fn log_reason(reason_node: &InspectNode, contender_name: &'static str, reason: R
 }
 
 fn log_mismatch_reason(log_entry_node: &InspectNode, contender_name: &'static str, reason: Reason) {
-    use inspect_keys::*;
     fx_log_debug!("touchpad: {} mismatched: {:?}", contender_name, reason);
     log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child(&*MISMATCH_EVENT_NODE, |mismatch_event_node| {
+        log_entry_node.record_child("mismatch_event", |mismatch_event_node| {
             log_reason(mismatch_event_node, contender_name, reason);
         })
     })
@@ -1219,18 +1207,17 @@ fn log_gesture_start(
     num_previous_events: usize,
     elapsed_from_first_event: zx::Duration,
 ) {
-    use inspect_keys::*;
     fx_log_debug!("touchpad: recognized start {:?}", recognized_gesture);
     log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child(&*GESTURE_START_NODE, |gesture_start_node| {
-            gesture_start_node.record_string(&*NAME_PROP, recognized_gesture.to_str());
+        log_entry_node.record_child("gesture_start", |gesture_start_node| {
+            gesture_start_node.record_string("gesture_name", recognized_gesture.to_str());
             gesture_start_node.record_int(
-                &*TIME_LATENCY_PROP,
+                "latency_micros",
                 // Reduce precision, to minimize space.
                 elapsed_from_first_event.into_micros(),
             );
             gesture_start_node.record_uint(
-                &*EVENT_LATENCY_PROP,
+                "latency_event_count",
                 u64::try_from(num_previous_events).unwrap_or(u64::MAX),
             );
         })
@@ -1245,18 +1232,17 @@ fn log_gesture_end(
     num_events: usize,
     elapsed_from_gesture_start: zx::Duration,
 ) {
-    use inspect_keys::*;
     fx_log_debug!("touchpad: recognized end {:?}", current_gesture);
     log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child(&*GESTURE_END_NODE, |gesture_end_node| {
-            gesture_end_node.record_string(&*NAME_PROP, current_gesture.to_str());
+        log_entry_node.record_child("gesture_end", |gesture_end_node| {
+            gesture_end_node.record_string("gesture_name", current_gesture.to_str());
             gesture_end_node.record_int(
-                &*TIME_DURATION_PROP,
+                "duration_micros",
                 // Reduce precision, to minimize space.
                 elapsed_from_gesture_start.into_micros(),
             );
             gesture_end_node
-                .record_uint(&*EVENT_DURATION_PROP, u64::try_from(num_events).unwrap_or(u64::MAX));
+                .record_uint("event_count", u64::try_from(num_events).unwrap_or(u64::MAX));
             log_reason(gesture_end_node, contender_name, reason)
         })
     })
@@ -3730,7 +3716,7 @@ mod tests {
             );
 
             // Uncomment this block to generate a new example for the
-            // documentation in [`inspect_keys`].
+            // documentation found at the bottom of this file.
             /*
             {
                 use fuchsia_inspect::hierarchy::testing::JsonGetter;
@@ -4109,3 +4095,257 @@ mod tests {
         }
     }
 }
+
+// Example JSON dump of inspect tree generated by `gesture_arena`, from a unit test:
+//
+// ```json
+// {
+//   "root": {
+//     "gestures_event_log": {
+//       "0": {
+//         "touchpad_event": {
+//           "driver_monotonic_nanos": 12300,
+//           "entry_latency_micros": 9987,
+//           "pressed_buttons": [
+//             1
+//           ],
+//           "contacts": {
+//             "1": {
+//               "pos_x_mm": 2.0,
+//               "pos_y_mm": 3.0
+//             },
+//             "2": {
+//               "pos_x_mm": 40.0,
+//               "pos_y_mm": 50.0
+//             }
+//           }
+//         }
+//       },
+//       "1": {
+//         "mismatch_event": {
+//           "contender": "utils::StubContender",
+//           "reason": "some reason"
+//         }
+//       },
+//       "2": {
+//         "mismatch_event": {
+//           "actual": 42,
+//           "contender": "utils::StubContender",
+//           "criterion": "num_goats_teleported",
+//           "max_allowed": 30,
+//           "min_allowed": 10
+//         }
+//       },
+//       "3": {
+//         "mismatch_event": {
+//           "actual": 42.0,
+//           "contender": "utils::StubContender",
+//           "criterion": "teleportation_distance_kilometers",
+//           "max_allowed": 30.5,
+//           "min_allowed": 10.125
+//         }
+//       },
+//       "4": {
+//         "mismatch_event": {
+//           "actual": -42,
+//           "contender": "utils::StubContender",
+//           "criterion": "budget_surplus_trillions",
+//           "max_allowed": 1,
+//           "min_allowed": -10
+//         }
+//       },
+//       "5": {
+//         "key_event": {
+//           "driver_monotonic_nanos": 11000000,
+//           "entry_latency_micros": 1000
+//         }
+//       },
+//       "6": {
+//         "key_event": {
+//           "driver_monotonic_nanos": 13000000,
+//           "entry_latency_micros": 1000
+//         }
+//       },
+//       "7": {
+//         "touchpad_event": {
+//           "driver_monotonic_nanos": 18000000,
+//           "entry_latency_micros": 1000,
+//           "pressed_buttons": [],
+//           "contacts": {
+//             "1": {
+//               "height_mm": 4.0,
+//               "pos_x_mm": 2.0,
+//               "pos_y_mm": 3.0,
+//               "width_mm": 3.0
+//             }
+//           }
+//         }
+//       },
+//       "8": {
+//         "gesture_start": {
+//           "gesture_name": "click",
+//           "latency_event_count": 1,
+//           "latency_micros": 17987
+//         }
+//       },
+//       "9": {
+//         "gesture_end": {
+//           "contender": "utils::StubMatchedContender",
+//           "duration_micros": 0,
+//           "event_count": 0,
+//           "gesture_name": "click",
+//           "reason": "discrete-recognizer"
+//         }
+//       }
+//     }
+//   }
+// }
+// ```
+
+// Example `iquery` excerpt from a live device:
+//
+// ```json5
+// core/ui/scene_manager:
+//   metadata:
+//     filename = fuchsia.inspect.Tree
+//     component_url = fuchsia-pkg://fuchsia.com/scene_manager#meta/scene_manager.cm
+//     timestamp = 375999103371
+//   payload:
+//     root:
+//       fuchsia.inspect.Stats:
+//         allocated_blocks = 9998
+//         current_size = 163840
+//         deallocated_blocks = 0
+//         failed_allocations = 0
+//         maximum_size = 307200
+//         total_dynamic_children = 1
+//       input_pipeline:
+//         gestures_event_log:
+//           0:
+//             key_event:
+//               driver_monotonic_nanos = 297873226402
+//               entry_latency_micros = 32908
+//           1:
+//             key_event:
+//               driver_monotonic_nanos = 297955554861
+//               entry_latency_micros = 1403
+//           /* ...many entries omitted... */
+//           150:
+//             touchpad_event:
+//               driver_monotonic_nanos = 361816423302
+//               entry_latency_micros = 14432
+//               pressed_buttons = []
+//               contacts:
+//                 0:
+//                   height_mm = 2.5840000
+//                   pos_x_mm = 26.528000
+//                   pos_y_mm = 23.712999
+//                   width_mm = 2.9530000
+//           /* mismatches on u64 properties */
+//           151:
+//             mismatch_event:
+//               actual = 0
+//               contender = one_finger_drag::InitialContender
+//               criterion = num_pressed_buttons
+//               max_allowed = 1
+//               min_allowed = 1
+//           152:
+//             mismatch_event:
+//               actual = 1
+//               contender = scroll::InitialContender
+//               criterion = num_contacts
+//               max_allowed = 2
+//               min_allowed = 2
+//           /* ... many entries omitted ... */
+//           159:
+//             touchpad_event:
+//               driver_monotonic_nanos = 361871136901
+//               entry_latency_micros = 4745
+//               pressed_buttons = []
+//               contacts:
+//                 0:
+//                   height_mm = 2.5840000
+//                   pos_x_mm = 27.162001
+//                   pos_y_mm = 24.061001
+//                   width_mm = 2.9530000
+//           /* mismatches on float properties */
+//           160:
+//             mismatch_event:
+//               actual = 0.723230
+//               contender = click::UnpressedContender
+//               criterion = displacement_mm
+//               max_allowed = 0.500000
+//           161:
+//             mismatch_event:
+//               actual = 0.723230
+//               contender = primary_tap::FingerContactContender
+//               criterion = displacement_mm
+//               max_allowed = 0.500000
+//           162:
+//             mismatch_event:
+//               actual = 0.723230
+//               contender = secondary_tap::OneFingerContactContender
+//               criterion = displacement_mm
+//               max_allowed = 0.500000
+//           /* gesture start */
+//           163:
+//             gesture_start:
+//               gesture_name = motion
+//               latency_event_count = 7
+//               latency_micros = 54713
+//           /* ... many entries omitted ... */
+//           295:
+//             touchpad_event:
+//               driver_monotonic_nanos = 362903529428
+//               entry_latency_micros = 3603
+//               pressed_buttons = []
+//               contacts:
+//           /* gesture end */
+//           296:
+//             gesture_end:
+//               actual = 0
+//               contender = motion::Winner
+//               criterion = num_contacts
+//               duration_micros = 1032392
+//               event_count = 132
+//               gesture_name = motion
+//               max_allowed = 1
+//               min_allowed = 1
+//           /* ... many entries omitted ... */
+//           596:
+//             touchpad_event:
+//               driver_monotonic_nanos = 370902306135
+//               entry_latency_micros = 4630
+//               pressed_buttons = []
+//               contacts:
+//                 0:
+//                   height_mm = 2.5840000
+//                   pos_x_mm = 76.887001
+//                   pos_y_mm = 25.962999
+//                   width_mm = 2.9530000
+//           /* ... many entries omitted ... */
+//           752:
+//             touchpad_event:
+//               driver_monotonic_nanos = 372106779670
+//               entry_latency_micros = 4607
+//               pressed_buttons = []
+//               contacts:
+//                 0:
+//                   height_mm = 3.2300000
+//                   pos_x_mm = 76.949997
+//                   pos_y_mm = 26.184999
+//                   width_mm = 2.9530000
+//           /* mismatches on i64 properties */
+//           753:
+//             mismatch_event:
+//               actual = 1204473
+//               contender = primary_tap::FingerContactContender
+//               criterion = elapsed_time_micros
+//               max_allowed = 1200000
+//           754:
+//             mismatch_event:
+//               actual = 1204473
+//               contender = secondary_tap::OneFingerContactContender
+//               criterion = elapsed_time_micros
+//               max_allowed = 1200000
+// ```
