@@ -125,8 +125,8 @@ bool LocalComponentInstance::IsRunning() {
 void LocalComponentInstance::Stop() {
   if (on_stop_) {
     on_stop_();
-    Exit(ZX_OK);
   }
+  Exit(ZX_OK);
   // The component should exit the loop, if any, or should have already
   // terminated. When it terminates, it should close the ComponentController.
   // If it doesn't, component manager will call Kill(), which can force close
