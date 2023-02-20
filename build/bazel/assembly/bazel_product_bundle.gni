@@ -1,0 +1,104 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+import("//bundles/assembly/platform_aibs.gni")
+
+# A GN wrapper for a Bazel product bundle target. From GN's perspective, the
+# output product bundle is opaque (only a manifest file containing paths to the
+# Bazel output base). This template only useful if you have a downstream target
+# in GN that is capable of consuming a product bundle built by Bazel in its
+# entirety.
+#
+# Parameters
+#
+#  bazel_product_bundle_target (required)
+#    The Bazel product bundle target to build.
+#    Type: label (from BUILD.bazel)
+#
+#  bazel_inputs_from_gn (required)
+#    The Bazel input targets (defined by bazel_input_xxx GN templates) used to
+#    plumb outputs from GN/Ninja to Bazel. This list should include all GN
+#    targets producing outputs used in the Bazel product bundle. This is usually
+#    legacy images configurations, legacy AIBs, prebuilt packages from GN, etc.
+#
+#    For example:
+#
+#      * //build/images/fuchsia:fuchsia.bazel_images_config_inputs
+#      * //build/images/fuchsia:fuchsia.legacy_aib_bazel_inputs
+#
+#    Type: list(label)
+#
+#  allow_eng_platform_bundle_use (optional; default=false)
+#    If true, allow the 'eng' platform bundles to be used by the assembled
+#    system. (This is only a check made by GN, assembly itself may still access
+#    them)
+#    Type: bool
+#    Default: false
+#
+#  deps
+#  testonly
+#  visibility
+#
+template("bazel_product_bundle") {
+  assert(defined(invoker.bazel_product_bundle_target),
+         "bazel_product_bundle_target is required")
+  assert(defined(invoker.bazel_inputs_from_gn),
+         "bazel_inputs_from_gn is required")
+
+  _bazel_action_target = "${target_name}_bazel_action"
+  bazel_action(_bazel_action_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                           ])
+
+    no_output_dir_leaks = false
+
+    command = "build"
+    bazel_targets = [ invoker.bazel_product_bundle_target ]
+
+    bazel_inputs = invoker.bazel_inputs_from_gn
+
+    # Make sure AIBs are built before Bazel assembly.
+    if (defined(invoker.allow_eng_platform_bundle_use) &&
+        invoker.allow_eng_platform_bundle_use) {
+      _aibs_to_use = eng_platform_aib_labels
+    } else {
+      _aibs_to_use = platform_aib_labels
+    }
+    foreach(_aib, _aibs_to_use) {
+      bazel_inputs += [ "${_aib}_bazel_inputs" ]
+    }
+
+    _product_bundle_name =
+        get_label_info(invoker.bazel_product_bundle_target, "name")
+    _bazel_product_bundle_out_dir =
+        rebase_path(get_label_info(invoker.bazel_product_bundle_target, "dir"),
+                    "//")
+    _bazel_product_bundle_out_dir += "/" + _product_bundle_name + "_out"
+
+    bazel_outputs = [
+      "bazel-bin/${_bazel_product_bundle_out_dir}/product_bundle.json",
+      "bazel-bin/" + get_path_info(_bazel_product_bundle_out_dir, "dir") +
+          "/pave.sh",
+    ]
+    ninja_outputs = [
+      "${_product_bundle_name}/product_bundle.json",
+      "pave.sh",
+    ]
+  }
+
+  # A convenience group for easy `fx build` invocation.
+  group(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":${_bazel_action_target}" ]
+  }
+}
