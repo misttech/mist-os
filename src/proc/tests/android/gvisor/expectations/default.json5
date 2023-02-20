@@ -323,7 +323,6 @@
 
                 // lseek_test
                 "LseekTest.ProcFile",
-                "LseekTest.SysDir",
                 "LseekTest.ProcStatTwice",
                 "LseekTest.EtcPasswdDup",
 

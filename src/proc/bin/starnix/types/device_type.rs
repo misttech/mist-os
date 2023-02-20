@@ -31,6 +31,7 @@ impl DeviceType {
     pub const TTY: DeviceType = DeviceType::new(5, 0);
     pub const PTMX: DeviceType = DeviceType::new(5, 2);
     pub const FB0: DeviceType = DeviceType::new(29, 0);
+    pub const DEVICE_MAPPER: DeviceType = DeviceType::new(10, 236);
 
     pub const fn new(major: u32, minor: u32) -> DeviceType {
         // This encoding is part of the Linux UAPI. The encoded value is
