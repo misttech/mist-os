@@ -19,8 +19,8 @@ use fuchsia_zircon::{
 use linux_uapi::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_void};
 use std::{ffi::CStr, pin::Pin};
 use zxio::{
-    msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_storage_t,
-    ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
+    msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_seek_origin_t,
+    zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
 };
 
 pub mod zxio;
@@ -58,6 +58,22 @@ bitflags! {
 
 const_assert_eq!(ZxioShutdownFlags::WRITE.bits(), ZXIO_SHUTDOWN_OPTIONS_WRITE);
 const_assert_eq!(ZxioShutdownFlags::READ.bits(), ZXIO_SHUTDOWN_OPTIONS_READ);
+
+pub enum SeekOrigin {
+    Start,
+    Current,
+    End,
+}
+
+impl From<SeekOrigin> for zxio_seek_origin_t {
+    fn from(origin: SeekOrigin) -> Self {
+        match origin {
+            SeekOrigin::Start => zxio::ZXIO_SEEK_ORIGIN_START,
+            SeekOrigin::Current => zxio::ZXIO_SEEK_ORIGIN_CURRENT,
+            SeekOrigin::End => zxio::ZXIO_SEEK_ORIGIN_END,
+        }
+    }
+}
 
 // TODO: We need a more comprehensive error strategy.
 // Our dependencies create elaborate error objects, but Starnix would prefer
@@ -178,6 +194,12 @@ pub struct Zxio {
 impl Default for Zxio {
     fn default() -> Self {
         Self { inner: Box::pin(ZxioStorage::default()) }
+    }
+}
+
+impl std::fmt::Debug for Zxio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Zxio").finish()
     }
 }
 
@@ -378,6 +400,14 @@ impl Zxio {
         Ok(())
     }
 
+    pub fn seek(&self, seek_origin: SeekOrigin, offset: i64) -> Result<usize, zx::Status> {
+        let mut result = 0;
+        let status =
+            unsafe { zxio::zxio_seek(self.as_ptr(), seek_origin.into(), offset, &mut result) };
+        zx::ok(status)?;
+        Ok(result)
+    }
+
     pub fn vmo_get(&self, flags: zx::VmarFlags) -> Result<zx::Vmo, zx::Status> {
         let mut vmo = 0;
         let status = unsafe { zxio::zxio_vmo_get(self.as_ptr(), flags.bits(), &mut vmo) };
@@ -391,6 +421,12 @@ impl Zxio {
         let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
         zx::ok(status)?;
         Ok(attributes)
+    }
+
+    pub fn attr_set(&self, attributes: &zxio_node_attributes_t) -> Result<(), zx::Status> {
+        let status = unsafe { zxio::zxio_attr_set(self.as_ptr(), attributes) };
+        zx::ok(status)?;
+        Ok(())
     }
 
     pub fn wait_begin(

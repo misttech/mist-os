@@ -25,6 +25,7 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --allowlist-function "zxio_.*" \
   --allowlist-var "ZXIO_SHUTDOWN.*" \
   --allowlist-var "ZXIO_NODE_PROTOCOL.*" \
+  --allowlist-var "ZXIO_SEEK_ORIGIN.*" \
   --allowlist-var "E[A-Z]*" \
   --raw-line "${RAW_LINES}" \
   -o src/proc/lib/syncio/src/zxio.rs \
