@@ -29,16 +29,18 @@ pub struct PerThreadData {
     local_stats: HeapdumpThreadLocalStats,
 }
 
-impl Profiler {
-    pub fn new() -> Profiler {
+impl Default for Profiler {
+    fn default() -> Profiler {
         let inner = ProfilerInner {
-            allocations_table: AllocationsTable::new(),
+            allocations_table: Default::default(),
             global_stats: Default::default(),
         };
 
         Profiler { inner: Mutex::new(inner) }
     }
+}
 
+impl Profiler {
     pub fn get_global_stats(&self) -> HeapdumpGlobalStats {
         self.inner.lock().unwrap().global_stats
     }

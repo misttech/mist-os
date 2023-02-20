@@ -23,7 +23,7 @@ rustc_staticlib("core") {
   deps = [
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/heapdump/vmo_types",
-    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:once_cell",
   ]
 }
 

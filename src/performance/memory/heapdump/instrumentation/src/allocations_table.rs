@@ -20,15 +20,17 @@ pub struct AllocationsTable {
     writer: AllocationsTableWriter,
 }
 
-impl AllocationsTable {
-    pub fn new() -> AllocationsTable {
+impl Default for AllocationsTable {
+    fn default() -> AllocationsTable {
         let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("failed to create allocations VMO");
         vmo.set_name(VMO_NAME).expect("failed to set VMO name");
 
         let writer = AllocationsTableWriter::new(&vmo).expect("failed to create writer");
         AllocationsTable { vmo, writer }
     }
+}
 
+impl AllocationsTable {
     pub fn record_allocation(&mut self, address: u64, size: u64) {
         let inserted = self.writer.insert_allocation(address, size).expect("out of space");
         assert!(inserted, "Block 0x{:x} was already allocated", address);

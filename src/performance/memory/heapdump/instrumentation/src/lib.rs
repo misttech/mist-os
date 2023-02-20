@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::ffi::c_void;
 
@@ -11,9 +11,7 @@ mod profiler;
 
 use crate::profiler::{PerThreadData, Profiler};
 
-lazy_static! {
-    static ref PROFILER: Profiler = Profiler::new();
-}
+static PROFILER: Lazy<Profiler> = Lazy::new(Default::default);
 
 thread_local! {
     static THREAD_DATA: RefCell<PerThreadData> = RefCell::new(Default::default());
