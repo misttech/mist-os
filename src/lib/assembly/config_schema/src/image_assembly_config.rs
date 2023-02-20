@@ -553,9 +553,9 @@ pub enum FvmFilesystemEntry {
         attributes: FilesystemAttributes,
     },
 
-    /// A MinFS filesystem.
-    MinFS {
-        /// The filesystem attributes of minfs.
+    /// A data filesystem (Minfs, Fxfs, F2fs, etc).
+    Data {
+        /// The filesystem attributes of the data partition.
         #[serde(flatten)]
         attributes: FilesystemAttributes,
     },
@@ -702,7 +702,7 @@ mod tests {
                 "reserved_slices": 100,
                 "filesystems": [
                   {
-                    "MinFS": {
+                    "Data": {
                       "path": "path/to/data.blk",
                       "name": "data",
                       "minimum_inodes": 100,

@@ -1094,8 +1094,6 @@ template("assembled_system") {
           }
           vbmeta = {
           }
-          minfs = {
-          }
           blobfs = {
           }
           fvm = {
