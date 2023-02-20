@@ -5,37 +5,40 @@ library fuchsia.component.decl;
 
 /// Statically declares a component instance collection.
 type Collection = table {
-    /// The name of the collection. Instances created in the collection are
-    /// scoped to this name.
+    /// (Required) The name of the collection. Instances created in the
+    /// collection are scoped to this name.
     1: name name;
 
-    /// The durability of instances in the collection.
+    /// (Required) The durability of instances in the collection.
     2: durability Durability;
 
-    /// The environment assigned to child instances in this collection.
+    /// (Optional) The environment assigned to child instances in this
+    /// collection.
     ///
-    /// Must be non-empty, reference an environment defined in the containing
-    /// `ComponentDecl`, and contain only the following characters:
-    /// [a-z0-9-_.].
+    /// May be unset, in which case children in this collection will inherit the
+    /// parent component's environment. If set, the name must reference an
+    /// environment defined in the `ComponentDecl` and it must contain only the
+    /// following characters: [a-z0-9-_.].
     3: environment name;
 
-    /// The kinds of offers that can target the child instances in this
-    /// collection. The default value is `STATIC_ONLY`.
+    /// (Optional, defaults to `STATIC_ONLY`) The kinds of offers that can
+    /// target the child instances in this collection.
     ///
     /// Only components using the `dynamic_offers` restricted feature may set
     /// this field.
     4: allowed_offers AllowedOffers;
 
-    /// Whether child instances in this collection can have names longer than
-    /// the default length limit of 100.
+    /// (Optional, defaults to `false`) Whether child instances in this
+    /// collection can have names longer than the default length limit of 100.
     ///
     /// Only components using the `allow_long_names` restricted feature may set
     /// this field.
     5: allow_long_names bool;
 
-    /// Whether the data in isolated storage used by dynamic child instances and
-    /// their descendants will persist after the instances are destroyed. New
-    /// dynamic instances inherit the previous instances' data stores.
+    /// (Optional) Whether the data in isolated storage used by dynamic child
+    /// instances and their descendants will persist after the instances are
+    /// destroyed. New dynamic instances inherit the previous instances' data
+    /// stores.
     ///
     /// This setting can be overridden by a lower-level collection that is a
     /// descendant of a collection that enables/disables this setting.

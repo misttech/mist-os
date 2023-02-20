@@ -5,8 +5,9 @@ library fuchsia.component.decl;
 
 using fuchsia.io;
 
-/// Declares a capability exposed to either a component's containing realm or to the framework.
-/// For example, a legacy service exposed by the component at runtime.
+/// Declares a capability exposed to either a component's containing realm or to
+/// the framework. For example, a legacy service exposed by the component at
+/// runtime.
 type Expose = flexible union {
     1: service ExposeService;
     2: protocol ExposeProtocol;
@@ -22,22 +23,23 @@ type Expose = flexible union {
 /// To learn more about services, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#service
 type ExposeService = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `self` or `child`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`.
     1: source Ref;
 
-    /// Name identifying the service, by which it was presented to this
-    /// component.
+    /// (Required) Name identifying the service, by which it was presented to
+    /// this component.
     2: source_name name;
 
-    /// The destination to which the service is exposed: either the component's realm or the
-    /// framework.
+    /// (Required) The destination to which the service is exposed: either the
+    /// component's realm or the framework.
     3: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     4: target_name name;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     5: availability Availability;
 };
@@ -48,22 +50,23 @@ type ExposeService = table {
 /// To learn more about protocols, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#protocol
 type ExposeProtocol = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `self` or `child`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`.
     1: source Ref;
 
-    /// Name identifying the protocol, by which it was presented to this
-    /// component.
+    /// (Required) Name identifying the protocol, by which it was presented to
+    /// this component.
     2: source_name name;
 
-    /// The destination to which the protocol is exposed: either the component's
-    /// realm or the framework.
+    /// (Required) The destination to which the protocol is exposed: either the
+    /// component's realm or the framework.
     3: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     4: target_name name;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     5: availability Availability;
 };
@@ -71,29 +74,31 @@ type ExposeProtocol = table {
 /// Declares a directory exposed to a component's containing realm, such as a
 /// directory exposed by the component or one of its children at runtime.
 type ExposeDirectory = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `self` or `child`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`.
     1: source Ref;
 
-    /// Name identifying the directory, by which it was presented to this
-    /// component.
+    /// (Required) Name identifying the directory, by which it was presented to
+    /// this component.
     2: source_name name;
 
-    /// The destination to which the directory is exposed: either the component's realm or the
-    /// framework.
+    /// (Required) The destination to which the directory is exposed: either the
+    /// component's realm or the framework.
     3: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     4: target_name name;
 
-    /// The maximum rights that can be set by a component using this directory,
-    /// required iff `source == self`.
+    /// (Optional) The maximum rights that can be set by a component using this
+    /// directory. If unset, the rights are inherited from `source`.
     5: rights fuchsia.io.Rights;
 
-    /// The subdirectory of this directory to expose instead of the root. Optional.
+    /// (Optional) The subdirectory of this directory to expose instead of the
+    /// root.
     6: subdir string:MAX_PATH_LENGTH;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     7: availability Availability;
 };
@@ -101,21 +106,23 @@ type ExposeDirectory = table {
 /// Declares a runner exposed to a component's containing realm, such as a
 /// runner exposed by the component or one of its children at runtime.
 type ExposeRunner = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `self` or `child`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`.
     1: source Ref;
 
-    /// The name of the runner, by which it was presented to this component.
+    /// (Required) The name of the runner, by which it was presented to this
+    /// component.
     2: source_name name;
 
-    /// The destination to which the runner is exposed: either the component's realm or the
-    /// framework.
+    /// (Required) The destination to which the runner is exposed: either the
+    /// component's realm or the framework.
     3: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     4: target_name name;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     5: availability Availability;
 };
@@ -123,20 +130,22 @@ type ExposeRunner = table {
 /// Declares a resolver exposed to a component's containing realm, such as a
 /// resolver exposed by the component or one of its children at runtime.
 type ExposeResolver = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `self` or `child`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`.
     1: source Ref;
 
-    /// The name of the resolver, by which it was presented to this component.
+    /// (Required) The name of the resolver, by which it was presented to this
+    /// component.
     2: source_name name;
 
-    /// The destination to which the resolver is exposed
+    /// (Required) The destination to which the resolver is exposed
     3: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     4: target_name name;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     5: availability Availability;
 };
@@ -144,25 +153,26 @@ type ExposeResolver = table {
 /// Declares an event stream exposed to a component's containing realm, such as
 /// an event stream exposed by the component or one of its children at runtime.
 type ExposeEventStream = table {
-    /// The provider of the capability relative to the component itself. Must
-    /// be `child`, or `framework`.
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `child`, or `framework`.
     1: source Ref;
 
-    /// The name of the event stream
+    /// (Required) The name of the event stream
     2: source_name name;
 
-    /// When an event is exposed from framework,
-    /// the scope is required and allows one to define the
-    /// child (or array of children) which the event is about.
+    /// (Required) When an event is exposed from framework, the scope is
+    /// required and allows one to define the child (or array of children) which
+    /// the event is about.
     3: scope vector<Ref>:MAX;
 
-    /// The destination to which the event stream is exposed.
+    /// (Required) The destination to which the event stream is exposed.
     4: target Ref;
 
-    /// The name by which the capability is being exposed.
+    /// (Required) The name by which the capability is being exposed.
     5: target_name name;
 
-    /// The availability of this capability. See [`Availability`].
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
     @available(added=11)
     6: availability Availability;
 };

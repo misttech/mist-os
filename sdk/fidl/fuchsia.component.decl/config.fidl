@@ -19,29 +19,29 @@ type ConfigChecksum = flexible union {
 
 /// The schema of a component's configuration interface.
 type ConfigSchema = table {
-    /// Ordered fields of the component's configuration interface.
+    /// (Required) Ordered fields of the component's configuration interface.
     1: fields vector<ConfigField>:MAX;
 
-    /// Checksum over the config declaration.
+    /// (Required) Checksum over the config declaration.
     2: checksum ConfigChecksum;
 
-    /// Strategy used to resolve config values.
+    /// (Required) Strategy used to resolve config values.
     3: value_source ConfigValueSource;
 };
 
 /// Strategies available for resolving configuration values.
 type ConfigValueSource = flexible union {
-    /// The path within the component's package at which to find config value files.
+    /// (Required) The path within the component's package at which to find config value files.
     1: package_path string:MAX;
 };
 
 /// Declares a single config field (key + type)
 type ConfigField = table {
-    /// The identifier for this config field.
+    /// (Required) The identifier for this config field.
     /// This key will be used to match overrides.
     1: key ConfigKey;
 
-    /// The type of config values. Config values are verified
+    /// (Required) The type of config values. Config values are verified
     /// against this layout at build time and run time.
     2: type ConfigType;
 };

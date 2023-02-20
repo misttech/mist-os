@@ -8,6 +8,6 @@ const MAX_NUM_EVENT_STREAM_SUBSCRIPTIONS uint64 = 100;
 
 /// Indicates the event name to subscribe to with a given event mode.
 type EventSubscription = table {
-    // The event names to subscribe to.
+    /// (Required) The event names to subscribe to.
     1: event_name name;
 };

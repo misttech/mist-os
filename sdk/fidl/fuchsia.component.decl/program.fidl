@@ -13,13 +13,13 @@ using fuchsia.data;
 /// To learn more about runners, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#runner
 type Program = table {
-    /// The name of the runner to use to run the component. Must match a
-    /// `RunnerRegistration` in the component's environment.
+    /// (Required) The name of the runner to use to run the component. Must
+    /// match a `RunnerRegistration` in the component's environment.
     1: runner name;
 
-    /// Information about the program to run when the component is executed. The
-    /// component manager provides the contents of this dictionary to the runner
-    /// when executing this program.
+    /// (Required) Information about the program to run when the component is
+    /// executed. The component manager provides the contents of this dictionary
+    /// to the runner when executing this program.
     ///
     /// For instance, this might contain a path to the program's executable
     /// image, or program arguments.

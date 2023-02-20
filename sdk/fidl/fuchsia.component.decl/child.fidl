@@ -7,23 +7,23 @@ using fuchsia.url;
 
 /// Statically declares a child component instance.
 type Child = table {
-    /// The name assigned to the child by its parent.
+    /// (Required) The name assigned to the child by its parent.
     ///
     /// Must be non-empty, unique among all siblings, and contain only the
     /// following characters: [a-z0-9-_.].
     1: name child_name;
 
-    /// The child component's URL.
+    /// (Required) The child component's URL.
     ///
     /// Must be non-empty and a well-formed URL.
     2: url fuchsia.url.Url;
 
-    /// The startup mode for the component instance.
+    /// (Required) The startup mode for the component instance.
     ///
     /// Must be set.
     3: startup StartupMode;
 
-    /// The environment assigned to this child.
+    /// (Optional) The environment assigned to this child.
     ///
     /// May be unset, in which case the child will inherit the parent component's
     /// environment. If set, the name must reference an environment defined in
@@ -31,9 +31,8 @@ type Child = table {
     /// [a-z0-9-_.].
     4: environment name;
 
-    /// The action to take if this component instance terminates unexpectedly.
-    ///
-    /// May be unset, in which case defaults to `NONE`.
+    /// (Optional, defaults to `NONE`) The action to take if this component
+    /// instance terminates unexpectedly.
     5: on_terminate OnTerminate;
 };
 

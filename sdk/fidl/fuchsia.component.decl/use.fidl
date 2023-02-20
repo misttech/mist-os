@@ -22,22 +22,22 @@ type Use = flexible union {
 /// To learn more about services, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#service
 type UseService = table {
-    /// The provider of the service relative to the component itself. Must
-    /// be `parent` or `framework`. If the availability is set to `optional`,
-    /// then this must be set to `parent`.
+    /// (Required) The provider of the service relative to the component itself.
+    /// Must be `parent` or `framework`. If the availability is set to
+    /// `optional`, then this must be set to `parent`.
     1: source Ref;
 
-    /// Name identifying the service, by which it was presented to this
-    /// component.
+    /// (Required) Name identifying the service, by which it was presented to
+    /// this component.
     2: source_name name;
 
-    /// The path where the capability should be installed in the component's
-    /// namespace.
+    /// (Required) The path where the capability should be installed in the
+    /// component's namespace.
     ///
     /// Must be an absolute path starting with /.
     3: target_path string:MAX_PATH_LENGTH;
 
-    /// The dependency type this use represents.
+    /// (Required) The dependency type this use represents.
     ///
     /// A component which offers a capability to a child from itself and uses a
     /// capability from the same child, must mark the dependency as `weak`.  A
@@ -47,9 +47,10 @@ type UseService = table {
     /// dependency, the parent shuts down before the child.
     4: dependency_type DependencyType;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     5: availability Availability;
 };
 
@@ -58,22 +59,22 @@ type UseService = table {
 /// A protocol is a service with a single instance, provided by a single FIDL
 /// protocol.
 type UseProtocol = table {
-    /// The provider of the protocol relative to the component itself.
+    /// (Required) The provider of the protocol relative to the component itself.
     /// Must be `parent`, `framework`, `debug`, `capability`, or `child`. If the
     /// availability is set to `optional`, then this must be set to `parent`.
     1: source Ref;
 
-    /// Name identifying the protocol, by which it was presented to this
+    /// (Required) Name identifying the protocol, by which it was presented to this
     /// component.
     2: source_name name;
 
-    /// The path where the capability should be installed in the component's
+    /// (Required) The path where the capability should be installed in the component's
     /// namespace.
     ///
     /// Must be an absolute path starting with /.
     3: target_path string:MAX_PATH_LENGTH;
 
-    /// The dependency type this use represents.
+    /// (Required) The dependency type this use represents.
     ///
     /// A component which offers a capability to a child from itself and uses a
     /// capability from the same child, must mark the dependency as `weak`.  A
@@ -83,36 +84,38 @@ type UseProtocol = table {
     /// dependency, the parent shuts down before the child.
     4: dependency_type DependencyType;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     5: availability Availability;
 };
 
 /// Declares a directory used by a component, which was offered to it.
 type UseDirectory = table {
-    /// The provider of the directory relative to the component itself. Must
-    /// be `parent`, `framework`, or `child`. If the availability is set to
-    /// `optional`, then this must be set to `parent`.
+    /// (Required) The provider of the directory relative to the component
+    /// itself. Must be `parent`, `framework`, or `child`. If the availability
+    /// is set to `optional`, then this must be set to `parent`.
     1: source Ref;
 
-    /// Name identifying the directory, by which it was presented to this
-    /// component.
+    /// (Required) Name identifying the directory, by which it was presented to
+    /// this component.
     2: source_name name;
 
-    /// The path where the capability should be installed in the component's
-    /// namespace.
+    /// (Required) The path where the capability should be installed in the
+    /// component's namespace.
     ///
     /// Must be an absolute path starting with /.
     3: target_path string:MAX_PATH_LENGTH;
 
-    /// The rights required by the component to use this directory.
+    /// (Required) The rights required by the component to use this directory.
     4: rights fuchsia.io.Rights;
 
-    /// The subdirectory of this directory to use instead of the root. Optional.
+    /// (Optional) The subdirectory of this directory to use instead of the
+    /// root.
     5: subdir string:MAX_PATH_LENGTH;
 
-    /// The dependency type this use represents.
+    /// (Required) The dependency type this use represents.
     ///
     /// A component which offers a capability to a child from itself and uses a
     /// capability from the same child, must mark the dependency as `weak`.  A
@@ -122,48 +125,52 @@ type UseDirectory = table {
     /// dependency, the parent shuts down before the child.
     6: dependency_type DependencyType;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     7: availability Availability;
 };
 
 /// Declares storage used by a component, which was offered to it.
 type UseStorage = table {
-    /// Name identifying the storage, by which it was presented to this
-    /// component. If the availability is set to `optional`, then this must
+    /// (Required) Name identifying the storage, by which it was presented to
+    /// this component. If the availability is set to `optional`, then this must
     /// be set to `parent`.
     1: source_name name;
 
-    /// The path where the capability should be installed in the component's
-    /// namespace.
+    /// (Required) The path where the capability should be installed in the
+    /// component's namespace.
     ///
     /// Must be an absolute path starting with /.
     2: target_path string:MAX_PATH_LENGTH;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     3: availability Availability;
 };
 
 /// Declares an event used by a component, which was offered to it.
 type UseEvent = table {
-    /// The provider of the event. Must be `realm` or `framework`. If the
-    /// availability is set to `optional`, then this must be set to `parent`.
+    /// (Required) The provider of the event. Must be `realm` or `framework`. If
+    /// the availability is set to `optional`, then this must be set to
+    /// `parent`.
     1: source Ref;
 
-    /// Name identifying the event which was presented to this component.
+    /// (Required) Name identifying the event which was presented to this
+    /// component.
     2: source_name name;
 
-    /// The name which the component will use to refer to this event.
+    /// (Required) The name which the component will use to refer to this event.
     3: target_name name;
 
-    /// Filter for the event. The structure of the filter depends on the event type. May be absent
-    /// for some events.
+    /// (Optional) Filter for the event. The structure of the filter depends on
+    /// the event type. May be absent for some events. (TODO: which ones?)
     4: filter fuchsia.data.Dictionary;
 
-    /// The dependency type this use represents.
+    /// (Required) The dependency type this use represents.
     ///
     /// A component which offers a capability to a child from itself and uses a
     /// capability from the same child, must mark the dependency as `weak`.  A
@@ -173,55 +180,59 @@ type UseEvent = table {
     /// dependency, the parent shuts down before the child.
     5: dependency_type DependencyType;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     6: availability Availability;
 };
 
 /// Declares a static EventStream used by a component.
 type UseEventStreamDeprecated = table {
-    /// The name of the event stream.
+    /// (Required) The name of the event stream.
     1: name name;
 
-    /// The set of events to which this EventStream is subscribed.
+    /// (Required) The set of events to which this EventStream is subscribed.
     /// Note: This vector must be non-empty.
     2: subscriptions vector<EventSubscription>:MAX_NUM_EVENT_STREAM_SUBSCRIPTIONS;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     3: availability Availability;
 };
 
 /// Declares an EventStream used by a component.
 type UseEventStream = table {
-    /// The names of the event streams.
+    /// (Required) The names of the event streams.
     1: source_name name;
 
-    /// The provider of the event. Must be `parent`, `framework`, or `child`. If
+    /// (Required) The provider of the event. Must be `parent`, `framework`, or `child`. If
     /// the availability is set to `optional`, then this must be set to
     /// `parent`.
     2: source Ref;
 
-    /// When an event is used from framework, the scope is required to specify
-    /// the child (or array of children) which the event will be about.
-    /// When the event is used from parent, the scope can be used to downscope
-    /// the event to a certain child scope, otherwise the event will carry the
-    /// scope coming from the parent.
+    /// (Optional) When an event is used from framework, the scope is required
+    /// to specify the child (or array of children) which the event will be
+    /// about. When the event is used from parent, the scope can be used to
+    /// downscope the event to a certain child scope, otherwise the event will
+    /// carry the scope coming from the parent.
     3: scope vector<Ref>:MAX;
 
-    /// The path where the capability should be installed in the component's namespace.
-    /// Must be an absolute path starting with /.
+    /// (Required) The path where the capability should be installed in the
+    /// component's namespace. Must be an absolute path starting with /.
     4: target_path name;
 
-    /// The availability of this capability. If set to `required`, the component
-    /// is likely to malfunction if this capability is not provided. If set to
-    /// `optional`, the component can handle the capability's absence.
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the component is likely to malfunction if this
+    /// capability is not provided. If set to `optional`, the component can
+    /// handle the capability's absence.
     5: availability Availability;
 
-    /// Filter for the event stream. The structure of the filter depends on the event stream type.
-    /// May be absent for some events.
+    /// (Optional) Filter for the event stream. The structure of the filter
+    /// depends on the event stream type. Only supported for the
+    /// `DirectoryReady` and `CapabilityRequested` event types.
     @available(added=9)
     6: filter fuchsia.data.Dictionary;
 };
