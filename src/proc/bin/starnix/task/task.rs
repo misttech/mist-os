@@ -713,6 +713,9 @@ impl Task {
             zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }
+            zx::sys::ZX_EXCP_UNDEFINED_INSTRUCTION => {
+                ExceptionResult::Signal(SignalInfo::default(SIGILL))
+            }
             zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
             _ => ExceptionResult::Unhandled,
         }

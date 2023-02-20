@@ -286,11 +286,26 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                         // TODO(https://fxbug.dev/117302): Remove this mechanism once the execution model is evolved
                         // such that we can handle exceptions in the thread that entered restricted mode.
                         task.destroy_do_not_use_outside_of_drop_if_possible();
-                        let exception_state = match task.read().dump_on_exit {
-                            true => &zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT, // Let crashsvc or the debugger handle the exception.
-                            false => &zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT,
+                        let exception_state = if task.read().dump_on_exit {
+                            // Let crashsvc or the debugger handle the exception.
+                            &zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT
+                        } else {
+                            &zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT
                         };
                         exception.set_exception_state(exception_state).unwrap();
+
+                        unsafe {
+                            // The task reference that lives in the syscall dispatch loop will never
+                            // be dropped, so `task`'s reference count is decremented twice here.
+                            // Once for this reference, and once for the one in the syscall dispatch
+                            // loop.
+                            // TODO(https://fxbug.dev/117302): Remove this hack.
+                            let t = Arc::into_raw(task);
+                            Arc::decrement_strong_count(t);
+                            Arc::decrement_strong_count(t);
+                        }
+
+                        return;
                     } else {
                         thread.write_state_general_regs(registers.into()).unwrap();
                         exception
