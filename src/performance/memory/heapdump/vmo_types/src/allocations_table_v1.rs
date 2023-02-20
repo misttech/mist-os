@@ -36,16 +36,16 @@ unsafe impl MemoryMappable for Node {}
 
 /// Computes the capacity (number of nodes) of a memory region given its size (bytes).
 fn compute_nodes_count(num_bytes: usize) -> Result<usize, crate::Error> {
-    if let Some(nodes_size) = num_bytes.checked_sub(size_of::<BucketHeads>()) {
-        let num_nodes = nodes_size / size_of::<Node>();
-        if num_nodes <= NODE_INVALID as usize {
-            Ok(num_nodes)
-        } else {
-            Err(crate::Error::BufferTooBig)
-        }
-    } else {
-        Err(crate::Error::BufferTooSmall)
+    let Some(nodes_size) = num_bytes.checked_sub(size_of::<BucketHeads>()) else {
+        return Err(crate::Error::BufferTooSmall);
+    };
+
+    let num_nodes = nodes_size / size_of::<Node>();
+    if num_nodes > NODE_INVALID as usize {
+        return Err(crate::Error::BufferTooBig);
     }
+
+    Ok(num_nodes)
 }
 
 /// Mediates write access to a VMO containing an hash table of allocated blocks indexed by block
