@@ -105,6 +105,8 @@ async fn main() -> Result<(), Error> {
         .detach();
     });
 
+    fs.add_remote("linux_root", execution::expose_root(&galaxy)?);
+
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
     fs.take_and_serve_directory_handle()?;

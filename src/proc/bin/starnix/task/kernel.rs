@@ -10,6 +10,8 @@ use std::sync::Arc;
 
 use crate::device::framebuffer::Framebuffer;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
+use crate::dynamic_thread_pool::DynamicThreadPool;
+use crate::fs::file_server::FileServer;
 use crate::fs::socket::SocketAddress;
 use crate::fs::{FileOps, FileSystemHandle, FsNode};
 use crate::lock::RwLock;
@@ -81,6 +83,12 @@ pub struct Kernel {
 
     /// The futexes shared across processes.
     pub shared_futexes: FutexTable,
+
+    /// The server allowing starnix to expose file and directory to fuchsia component.
+    pub file_server: FileServer,
+
+    /// The thread pool to dispatch blocking calls to.
+    pub thread_pool: DynamicThreadPool,
 }
 
 impl Kernel {
@@ -94,7 +102,7 @@ impl Kernel {
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
 
-        Ok(Arc::new(Kernel {
+        Ok(Arc::<Kernel>::new_cyclic(|kernel| Kernel {
             job,
             starnix_process: fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
@@ -119,6 +127,8 @@ impl Kernel {
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
+            file_server: FileServer::new(kernel.clone()),
+            thread_pool: DynamicThreadPool::new(2),
         }))
     }
 

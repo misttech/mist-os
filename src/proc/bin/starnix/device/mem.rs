@@ -50,7 +50,7 @@ impl FileOps for DevNull {
         Ok(0)
     }
 
-    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+    fn to_handle(&self, _file: &FileHandle, _kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
         Ok(None)
     }
 }

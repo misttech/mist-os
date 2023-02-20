@@ -311,7 +311,6 @@ impl<'a> InputBuffer for UserBuffersInputBuffer<'a> {
     }
 }
 
-#[cfg(test)]
 /// An OutputBuffer that write data to an internal buffer.
 #[derive(Debug)]
 pub struct VecOutputBuffer {
@@ -319,18 +318,24 @@ pub struct VecOutputBuffer {
     bytes_written: usize,
 }
 
-#[cfg(test)]
 impl VecOutputBuffer {
     pub fn new(capacity: usize) -> Self {
         Self { buffer: vec![0; capacity], bytes_written: 0 }
     }
 
+    #[cfg(test)]
     pub fn data(&self) -> &[u8] {
         &self.buffer[0..self.bytes_written]
     }
 }
 
-#[cfg(test)]
+impl From<VecOutputBuffer> for Vec<u8> {
+    fn from(mut data: VecOutputBuffer) -> Self {
+        data.buffer.resize(data.bytes_written, 0);
+        data.buffer
+    }
+}
+
 impl OutputBuffer for VecOutputBuffer {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         let written = callback(&mut self.buffer.as_mut_slice()[self.bytes_written..])?;
@@ -350,7 +355,6 @@ impl OutputBuffer for VecOutputBuffer {
     }
 }
 
-#[cfg(test)]
 /// An OutputBuffer that read data from an internal buffer.
 #[derive(Debug)]
 pub struct VecInputBuffer {
@@ -358,14 +362,12 @@ pub struct VecInputBuffer {
     bytes_read: usize,
 }
 
-#[cfg(test)]
 impl VecInputBuffer {
     pub fn new(buffer: &[u8]) -> Self {
         Self { buffer: buffer.to_vec(), bytes_read: 0 }
     }
 }
 
-#[cfg(test)]
 impl InputBuffer for VecInputBuffer {
     fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
         let read = callback(&self.buffer[self.bytes_read..])?;
@@ -557,6 +559,8 @@ mod tests {
         assert_eq!(output_buffer.available(), 0);
         assert_eq!(output_buffer.data(), b"helloworld");
         assert!(matches!(output_buffer.write_all(b"foo"), Err(_)));
+        let data: Vec<u8> = output_buffer.into();
+        assert_eq!(data, b"helloworld".to_vec());
     }
 
     #[::fuchsia::test]

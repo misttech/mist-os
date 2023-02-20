@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use std::fmt;
 use std::sync::Arc;
@@ -235,8 +236,8 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Return a handle that allows access to this file descritor through the zxio protocols.
     ///
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
-    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
-        error!(ENOENT)
+    fn to_handle(&self, file: &FileHandle, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+        kernel.file_server.serve(file).map(|c| Some(c.into_handle()))
     }
 }
 
@@ -821,8 +822,8 @@ impl FileObject {
         self.ops().fcntl(self, current_task, cmd, arg)
     }
 
-    pub fn to_handle(self: &Arc<Self>) -> Result<Option<zx::Handle>, Errno> {
-        self.ops().to_handle(self)
+    pub fn to_handle(self: &Arc<Self>, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
+        self.ops().to_handle(self, kernel)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

@@ -7,7 +7,6 @@
 use crate::auth::Credentials;
 use crate::device::mem::new_null_file;
 use crate::device::DeviceOps;
-use crate::dynamic_thread_pool::DynamicThreadPool;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::new_remote_file;
@@ -72,11 +71,6 @@ pub struct BinderDriver {
 
     /// The identifier to use for the next created `BinderProcess`.
     next_identifier: AtomicU64,
-
-    /// The thread pool to dispatch remote ioctl calls to. This is necessary because these calls
-    /// can block waiting from data from another process.
-    #[derivative(Default(value = "DynamicThreadPool::new(2)"))]
-    thread_pool: DynamicThreadPool,
 }
 
 impl DeviceOps for Arc<BinderDriver> {
@@ -2225,8 +2219,7 @@ impl BinderTask for RemoteBinderTask {
 
     fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         let flags: fbinder::FileFlags = file.flags().into();
-        // TODO(qsr): Bubble the error up when all fd can be wrapped into a handle.
-        let handle = file.to_handle().unwrap_or(None);
+        let handle = file.to_handle(self.kernel())?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..fbinder::FileRequest::EMPTY
@@ -2341,7 +2334,8 @@ impl BinderDriver {
             async move {
                 let process_accessor =
                     fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
-                let binder_process = driver.create_process(kernel.pids.write().allocate_pid());
+                let pid = kernel.pids.write().allocate_pid();
+                let binder_process = driver.create_process(pid);
                 let identifier = binder_process.identifier;
                 let remote_binder_task =
                     Arc::new(RemoteBinderTask { process_accessor, kernel: kernel.clone() });
@@ -2371,7 +2365,7 @@ impl BinderDriver {
                             let cloned_remote_binder_task = remote_binder_task.clone();
                             let cloned_binder_process = binder_process.clone();
 
-                            driver.thread_pool.dispatch(move || {
+                            kernel.thread_pool.dispatch(move || {
                                 let mut result = cloned_driver
                                     .ioctl(
                                         &*cloned_remote_binder_task,

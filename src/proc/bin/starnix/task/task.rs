@@ -895,6 +895,21 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
     ) -> Result<FileHandle, Errno> {
+        if path.is_empty() {
+            return error!(ENOENT);
+        }
+
+        let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
+        self.open_namespace_node_at(dir, path, flags, mode)
+    }
+
+    pub fn open_namespace_node_at(
+        &self,
+        dir: NamespaceNode,
+        path: &FsStr,
+        flags: OpenFlags,
+        mode: FileMode,
+    ) -> Result<FileHandle, Errno> {
         let mut flags = flags;
         if flags.contains(OpenFlags::PATH) {
             // When O_PATH is specified in flags, flag bits other than O_CLOEXEC,
@@ -914,11 +929,6 @@ impl CurrentTask {
         let symlink_mode =
             if nofollow || must_create { SymlinkMode::NoFollow } else { SymlinkMode::Follow };
 
-        if path.is_empty() {
-            return error!(ENOENT);
-        }
-
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
         let mut context = LookupContext::new(symlink_mode);
         context.must_be_directory = flags.contains(OpenFlags::DIRECTORY);
         let (name, created) = self.resolve_open_path(&mut context, dir, path, mode, flags)?;
@@ -990,7 +1000,7 @@ impl CurrentTask {
     /// returned along with the parent.
     ///
     /// The returned parent might not be a directory.
-    fn lookup_parent<'a>(
+    pub fn lookup_parent<'a>(
         &self,
         context: &mut LookupContext,
         dir: NamespaceNode,

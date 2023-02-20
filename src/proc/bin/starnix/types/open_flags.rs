@@ -5,6 +5,7 @@
 use bitflags::bitflags;
 
 use crate::types::uapi;
+use fidl_fuchsia_io as fio;
 
 bitflags! {
     pub struct OpenFlags: u32 {
@@ -49,9 +50,72 @@ impl OpenFlags {
     }
 }
 
+impl From<fio::OpenFlags> for OpenFlags {
+    fn from(fio_flags: fio::OpenFlags) -> Self {
+        let mut result = if fio_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            if fio_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                OpenFlags::RDWR
+            } else {
+                OpenFlags::WRONLY
+            }
+        } else {
+            OpenFlags::RDONLY
+        };
+        if fio_flags.contains(fio::OpenFlags::CREATE) {
+            result |= OpenFlags::CREAT;
+        }
+        if fio_flags.contains(fio::OpenFlags::CREATE_IF_ABSENT) {
+            result |= OpenFlags::EXCL;
+        }
+        if fio_flags.contains(fio::OpenFlags::TRUNCATE) {
+            result |= OpenFlags::TRUNC;
+        }
+        if fio_flags.contains(fio::OpenFlags::APPEND) {
+            result |= OpenFlags::APPEND;
+        }
+        if fio_flags.contains(fio::OpenFlags::DIRECTORY) {
+            result |= OpenFlags::DIRECTORY;
+        }
+        result
+    }
+}
+
+impl From<OpenFlags> for fio::OpenFlags {
+    fn from(flags: OpenFlags) -> fio::OpenFlags {
+        let mut result = fio::OpenFlags::empty();
+        if flags.can_read() {
+            result |= fio::OpenFlags::RIGHT_READABLE;
+        }
+        if flags.can_write() {
+            result |= fio::OpenFlags::RIGHT_WRITABLE;
+        }
+        if flags.contains(OpenFlags::CREAT) {
+            result |= fio::OpenFlags::CREATE;
+        }
+        if flags.contains(OpenFlags::EXCL) {
+            result |= fio::OpenFlags::CREATE_IF_ABSENT;
+        }
+        if flags.contains(OpenFlags::TRUNC) {
+            result |= fio::OpenFlags::TRUNCATE;
+        }
+        if flags.contains(OpenFlags::APPEND) {
+            result |= fio::OpenFlags::APPEND;
+        }
+        if flags.contains(OpenFlags::DIRECTORY) {
+            result |= fio::OpenFlags::DIRECTORY;
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_flags_equals(flags: OpenFlags, fio_flags: fio::OpenFlags) {
+        assert_eq!(flags, fio_flags.into());
+        assert_eq!(fio_flags, flags.into());
+    }
 
     #[::fuchsia::test]
     fn test_access() {
@@ -66,5 +130,15 @@ mod tests {
         let read_write = OpenFlags::from_bits_truncate(uapi::O_RDWR);
         assert!(read_write.can_read());
         assert!(read_write.can_write());
+    }
+
+    #[::fuchsia::test]
+    fn test_conversion() {
+        assert_flags_equals(OpenFlags::RDONLY, fio::OpenFlags::RIGHT_READABLE);
+        assert_flags_equals(OpenFlags::WRONLY, fio::OpenFlags::RIGHT_WRITABLE);
+        assert_flags_equals(
+            OpenFlags::RDWR,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        );
     }
 }

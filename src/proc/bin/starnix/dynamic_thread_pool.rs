@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 
 use crate::lock::Mutex;
+use crate::types::{errno, Errno};
+use futures::channel::oneshot;
+use futures::TryFutureExt;
+use std::future::Future;
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -29,6 +33,24 @@ impl DynamicThreadPool {
                 ..Default::default()
             })),
         }
+    }
+
+    /// Dispatch the given closure to the thread pool and returns a Future that will resolve to the
+    /// return value of the closure.
+    ///
+    /// This method will use an idle thread in the pool if one is available, otherwise it will
+    /// start a new thread. When this method returns, it is guaranteed that a thread is
+    /// responsible to start running the closure.
+    pub fn dispatch_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
+    where
+        R: Send + 'static,
+        F: FnOnce() -> R + Send + 'static,
+    {
+        let (sender, receiver) = oneshot::channel::<R>();
+        self.dispatch(move || {
+            let _ = sender.send(f());
+        });
+        receiver.map_err(|_| errno!(EINTR))
     }
 
     /// Dispatch the given closure to the thread pool.
@@ -185,5 +207,11 @@ mod tests {
         // Drop the pool. This will wait for all thread to finish.
         std::mem::drop(pool);
         assert!(*executed.lock());
+    }
+
+    #[fuchsia::test]
+    async fn run_dispatch_and_get_result() {
+        let pool = DynamicThreadPool::new(2);
+        assert_eq!(pool.dispatch_and_get_result(|| 3).await, Ok(3));
     }
 }

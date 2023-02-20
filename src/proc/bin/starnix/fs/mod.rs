@@ -31,6 +31,7 @@ pub mod devpts;
 pub mod devtmpfs;
 pub mod eventfd;
 pub mod ext4;
+pub mod file_server;
 pub mod fuchsia;
 pub mod layeredfs;
 pub mod path;

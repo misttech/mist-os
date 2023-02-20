@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::ControlHandle;
+use fidl::{endpoints::ControlHandle, AsyncChannel};
 use fidl_fuchsia_component_runner as fcrunner;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use fuchsia_async::{self as fasync, DurationExt};
@@ -14,10 +15,16 @@ use std::sync::Arc;
 use crate::execution::Galaxy;
 use crate::fs::fuchsia::create_fuchsia_pipe;
 use crate::logging::log_error;
-use crate::types::errno;
-use crate::types::OpenFlags;
+use crate::types::{errno, OpenFlags};
 
 use super::*;
+
+/// Returns a DirectoryProxy to the root of the initial namespace of the galaxy.
+pub fn expose_root(galaxy: &Arc<Galaxy>) -> Result<fio::DirectoryProxy, Error> {
+    let dir_fd = galaxy.root_fs.root().open(&galaxy.system_task, OpenFlags::RDWR, false)?;
+    let client = galaxy.kernel.file_server.serve(&dir_fd)?;
+    Ok(fio::DirectoryProxy::new(AsyncChannel::from_channel(client.into_channel())?))
+}
 
 pub async fn serve_component_runner(
     mut request_stream: fcrunner::ComponentRunnerRequestStream,

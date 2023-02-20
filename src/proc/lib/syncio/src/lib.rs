@@ -97,6 +97,16 @@ pub struct DirentIterator {
     finished: bool,
 }
 
+impl DirentIterator {
+    /// Rewind the iterator to the beginning.
+    pub fn rewind(&mut self) -> Result<(), zx::Status> {
+        let status = unsafe { zxio::zxio_dirent_iterator_rewind(&mut *self.iterator) };
+        zx::ok(status)?;
+        self.finished = false;
+        Ok(())
+    }
+}
+
 /// It is important that all methods here are &mut self, to require the client
 /// to obtain exclusive access to the object, externally locking it.
 impl Iterator for DirentIterator {
@@ -429,6 +439,29 @@ impl Zxio {
         Ok(())
     }
 
+    pub fn rename(
+        &self,
+        old_path: &str,
+        new_directory: &Zxio,
+        new_path: &str,
+    ) -> Result<(), zx::Status> {
+        let mut handle = zx::sys::ZX_HANDLE_INVALID;
+        let status = unsafe { zxio::zxio_token_get(new_directory.as_ptr(), &mut handle) };
+        zx::ok(status)?;
+        let status = unsafe {
+            zxio::zxio_rename(
+                self.as_ptr(),
+                old_path.as_ptr() as *const ::std::os::raw::c_char,
+                old_path.len(),
+                handle,
+                new_path.as_ptr() as *const ::std::os::raw::c_char,
+                new_path.len(),
+            )
+        };
+        zx::ok(status)?;
+        Ok(())
+    }
+
     pub fn wait_begin(
         &self,
         zxio_signals: zxio_signals_t,
@@ -452,8 +485,8 @@ impl Zxio {
     pub fn create_dirent_iterator(&self) -> Result<DirentIterator, zx::Status> {
         let mut zxio_iterator = Box::default();
         let status = unsafe { zxio::zxio_dirent_iterator_init(&mut *zxio_iterator, self.as_ptr()) };
-        let iterator = DirentIterator { iterator: zxio_iterator, finished: false };
         zx::ok(status)?;
+        let iterator = DirentIterator { iterator: zxio_iterator, finished: false };
         Ok(iterator)
     }
 
