@@ -92,3 +92,32 @@ pub trait FileIo: Send + Sync {
     /// this time.  Otherwise, no attributes should be updated, other than size as needed.
     async fn append(&self, content: &[u8]) -> Result<(u64, u64), Status>;
 }
+
+/// Trait for dispatching read, write, and seek FIDL requests for a given connection. The
+/// implementater of this trait is responsible for maintaning the per connection state.
+///
+/// Files that support Streams should handle reads and writes via a Pager instead of implementing
+/// this trait.
+#[async_trait]
+pub trait RawFileIoConnection: Send + Sync {
+    /// Reads at most `count` bytes from the file starting at the connection's seek offset and
+    /// advances the seek offset.
+    async fn read(&self, count: u64) -> Result<Vec<u8>, zx::Status>;
+
+    /// Reads `count` bytes from the file starting at `offset`.
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status>;
+
+    /// Writes `data` to the file starting at the connect's seek offset and advances the seek
+    /// offset. If the connection is in append mode then the seek offset is moved to the end of the
+    /// file before writing. Returns the number of bytes written.
+    async fn write(&self, data: &[u8]) -> Result<u64, zx::Status>;
+
+    /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status>;
+
+    /// Modifies the connection's seek offset. Returns the connections new seek offset.
+    async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status>;
+
+    /// Notifies the `IoOpHandler` that the flags of the connection have changed.
+    fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status;
+}

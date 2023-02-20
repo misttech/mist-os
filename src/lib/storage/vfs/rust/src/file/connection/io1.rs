@@ -12,7 +12,7 @@ use {
                 get_backing_memory_validate_flags, io1_rights_to_io2_operations,
                 new_connection_validate_flags,
             },
-            File, FileIo,
+            File, FileIo, RawFileIoConnection,
         },
         path::Path,
     },
@@ -70,6 +70,26 @@ pub async fn create_connection_async<U: 'static + File + FileIo + DirectoryEntry
     shutdown: oneshot::Receiver<()>,
 ) {
     let file = FidlIoFile { file, seek: 0, is_append: flags.intersects(fio::OpenFlags::APPEND) };
+    create_connection_async_impl(
+        scope, file, flags, server_end, readable, writable, executable, shutdown,
+    )
+    .await
+}
+
+/// Same as create_connection, but does not spawn a new task.
+pub async fn create_raw_connection_async<
+    U: 'static + File + RawFileIoConnection + DirectoryEntry,
+>(
+    scope: ExecutionScope,
+    file: Arc<U>,
+    flags: fio::OpenFlags,
+    server_end: ServerEnd<fio::NodeMarker>,
+    readable: bool,
+    writable: bool,
+    executable: bool,
+    shutdown: oneshot::Receiver<()>,
+) {
+    let file = RawIoFile { file };
     create_connection_async_impl(
         scope, file, flags, server_end, readable, writable, executable, shutdown,
     )
@@ -393,6 +413,54 @@ impl<T: 'static + File + FileIo + DirectoryEntry> AsFile for FidlIoFile<T> {
 }
 
 impl<T: 'static + File + FileIo + DirectoryEntry> CloneFile for FidlIoFile<T> {
+    fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
+        self.file.clone()
+    }
+}
+
+struct RawIoFile<T: 'static + File + RawFileIoConnection + DirectoryEntry> {
+    file: Arc<T>,
+}
+
+#[async_trait]
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoFile<T> {
+    async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
+        self.file.read(count).await
+    }
+
+    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
+        self.file.read_at(offset, count).await
+    }
+
+    async fn write(&mut self, data: &[u8]) -> Result<u64, zx::Status> {
+        self.file.write(data).await
+    }
+
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status> {
+        self.file.write_at(offset, data).await
+    }
+
+    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
+        self.file.seek(offset, origin).await
+    }
+
+    fn update_flags(&mut self, flags: fio::OpenFlags) -> zx::Status {
+        self.file.update_flags(flags)
+    }
+
+    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status> {
+        Ok(None)
+    }
+}
+
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> AsFile for RawIoFile<T> {
+    type FileType = T;
+    fn as_file(&self) -> &Self::FileType {
+        self.file.as_ref()
+    }
+}
+
+impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> CloneFile for RawIoFile<T> {
     fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
         self.file.clone()
     }
