@@ -20,7 +20,6 @@
                     "/usr/local/google/home/jcecil/fuchsia/src/sys/component_manager/testing",
                     "src/sys/component_manager/src/elf_runner/tests",
                     "scripts/fxtest/test",
-                    "zircon/system/ulib/elfload/test",
                     "zircon/system/ulib/bitmap/test",
                     "tools/devshell/tests",
                     "src/tests",
