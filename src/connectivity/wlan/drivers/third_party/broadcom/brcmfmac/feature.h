@@ -45,6 +45,7 @@
  * DHIST: Detailed histograms for station and antenna metrics.
  * EXTSAE: External supplicant version of SAE authentication.
  * ROAM_ENGINE: Firmware offload of roaming decisions.
+ * WNM_BTM: Firmware offload of BSS Transition Management request handling.
  */
 #define BRCMF_FEAT_LIST           \
   BRCMF_FEAT_DEF(AP)              \
@@ -70,7 +71,8 @@
   BRCMF_FEAT_DEF(FWSUP)           \
   BRCMF_FEAT_DEF(DHIST)           \
   BRCMF_FEAT_DEF(EXTSAE)          \
-  BRCMF_FEAT_DEF(ROAM_ENGINE)
+  BRCMF_FEAT_DEF(ROAM_ENGINE)     \
+  BRCMF_FEAT_DEF(WNM_BTM)
 
 /*
  * Quirks:

@@ -189,6 +189,16 @@ pub fn convert_connect_confirm(
     }
 }
 
+pub fn convert_roam_confirm(
+    conf: banjo_wlan_fullmac::WlanFullmacRoamConfirm,
+) -> fidl_mlme::RoamConfirm {
+    fidl_mlme::RoamConfirm {
+        target_bssid: conf.target_bssid,
+        result_code: convert_status_code(conf.result_code),
+        selected_bss: convert_bss_description(conf.selected_bss),
+    }
+}
+
 pub fn convert_authenticate_indication(
     ind: banjo_wlan_fullmac::WlanFullmacAuthInd,
 ) -> fidl_mlme::AuthenticateIndication {

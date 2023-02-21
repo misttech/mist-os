@@ -21,6 +21,7 @@ typedef struct {
   void (*on_scan_result)(void *ctx, const wlan_fullmac_scan_result_t *result);
   void (*on_scan_end)(void *ctx, const wlan_fullmac_scan_end_t *end);
   void (*connect_conf)(void *ctx, const wlan_fullmac_connect_confirm_t *resp);
+  void (*roam_conf)(void *ctx, const wlan_fullmac_roam_confirm_t *resp);
   void (*auth_ind)(void *ctx, const wlan_fullmac_auth_ind_t *ind);
   void (*deauth_conf)(void *ctx, const wlan_fullmac_deauth_confirm_t *resp);
   void (*deauth_ind)(void *ctx, const wlan_fullmac_deauth_indication_t *ind);
@@ -52,7 +53,7 @@ typedef struct {
 } rust_wlan_fullmac_ifc_protocol_copy_t;
 
 /**
- * A `Device` allows transmitting frames and MLME messages.
+ * A `FullmacDeviceInterface` allows transmitting frames and MLME messages.
  */
 typedef struct {
   void *device;
@@ -62,17 +63,8 @@ typedef struct {
   zx_status_t (*start)(void *device, const rust_wlan_fullmac_ifc_protocol_copy_t *ifc,
                        zx_handle_t *out_sme_channel);
   wlan_fullmac_query_info_t (*query_device_info)(void *device);
-  /**
-   * Get MAC sublayer features supported by this WLAN interface
-   */
   mac_sublayer_support_t (*query_mac_sublayer_support)(void *device);
-  /**
-   * Get security features supported by this WLAN interface
-   */
   security_support_t (*query_security_support)(void *device);
-  /**
-   * Get spectrum management features supported by this WLAN interface
-   */
   spectrum_management_support_t (*query_spectrum_management_support)(void *device);
   void (*start_scan)(void *device, wlan_fullmac_scan_req_t *req);
   void (*connect_req)(void *device, wlan_fullmac_connect_req_t *req);

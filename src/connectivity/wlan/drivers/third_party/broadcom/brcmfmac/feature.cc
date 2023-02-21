@@ -43,12 +43,13 @@ struct brcmf_feat_fwcap {
 };
 
 static const struct brcmf_feat_fwcap brcmf_fwcap_map[] = {
-    {BRCMF_FEAT_AP, "ap"},         {BRCMF_FEAT_STA, "sta"},
-    {BRCMF_FEAT_MBSS, "mbss"},     {BRCMF_FEAT_MCHAN, "mchan"},
-    {BRCMF_FEAT_P2P, "p2p"},       {BRCMF_FEAT_PNO, "pno"},
-    {BRCMF_FEAT_EPNO, "epno"},     {BRCMF_FEAT_DFS, "802.11h"},
-    {BRCMF_FEAT_TPC, "802.11h"},   {BRCMF_FEAT_DOT11H, "802.11h"},
-    {BRCMF_FEAT_EXTSAE, "extsae"}, {BRCMF_FEAT_ROAM_ENGINE, "roam_engine"},
+    {BRCMF_FEAT_AP, "ap"},           {BRCMF_FEAT_STA, "sta"},
+    {BRCMF_FEAT_MBSS, "mbss"},       {BRCMF_FEAT_MCHAN, "mchan"},
+    {BRCMF_FEAT_P2P, "p2p"},         {BRCMF_FEAT_PNO, "pno"},
+    {BRCMF_FEAT_EPNO, "epno"},       {BRCMF_FEAT_DFS, "802.11h"},
+    {BRCMF_FEAT_TPC, "802.11h"},     {BRCMF_FEAT_DOT11H, "802.11h"},
+    {BRCMF_FEAT_EXTSAE, "extsae"},   {BRCMF_FEAT_ROAM_ENGINE, "roam_engine"},
+    {BRCMF_FEAT_WNM_BTM, "wnm_btm"},
 };
 
 /**
@@ -197,6 +198,10 @@ void brcmf_feat_attach(struct brcmf_pub* drvr) {
   // Note: ROAM_ENGINE support is experimental, and currently only enabled in tests.
   // ROAM_ENGINE would be enabled via this intentionally commented line:
   // brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_ROAM_ENGINE, "roam_off");
+
+  // Note: WNM_BTM is an experimental feature, currently only enabled in tests.
+  // WNM_BTM would be enabled via this intentionally commented line:
+  // brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_WNM_BTM, "wnm");
 
   // Check FW version and if it contains WLTEST then we are operating with manufacturing
   // firmware

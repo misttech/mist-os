@@ -873,6 +873,13 @@ impl ClientState {
                     state.on_wmm_status_resp(status, resp);
                     state.into()
                 }
+                MlmeEvent::RoamConf { resp } => {
+                    warn!("Roaming is an experimental feature that can place wlanfullmac in an unrecoverable state: fxbug.dev/120899.");
+                    if resp.result_code != fidl_ieee80211::StatusCode::Success {
+                        error!("Roaming failed! Client will not reconnect until AP deauthenticates or disassociates: {:?}", resp);
+                    }
+                    state.into()
+                }
                 _ => state.into(),
             },
             Self::Disconnecting(state) => match event {

@@ -62,6 +62,7 @@ pub enum FullmacDriverEvent {
     OnScanResult { result: fidl_mlme::ScanResult },
     OnScanEnd { end: fidl_mlme::ScanEnd },
     ConnectConf { resp: fidl_mlme::ConnectConfirm },
+    RoamConf { resp: fidl_mlme::RoamConfirm },
     AuthInd { ind: fidl_mlme::AuthenticateIndication },
     DeauthConf { resp: fidl_mlme::DeauthenticateConfirm },
     DeauthInd { ind: fidl_mlme::DeauthenticateIndication },
@@ -463,6 +464,10 @@ impl FullmacMlme {
                     self.device.set_link_state(fidl_mlme::ControlledPortState::Open);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::ConnectConf { resp });
+            }
+            FullmacDriverEvent::RoamConf { resp } => {
+                // TODO(fxbug.dev/120899) Implement RoamConf handling in MLME.
+                self.mlme_event_sink.send(fidl_mlme::MlmeEvent::RoamConf { resp });
             }
             FullmacDriverEvent::AuthInd { ind } => {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::AuthenticateInd { ind });

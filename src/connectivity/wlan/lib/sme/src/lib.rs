@@ -101,6 +101,7 @@ fn mlme_event_name(event: &MlmeEvent) -> &str {
         MlmeEvent::OnScanResult { .. } => "OnScanResult",
         MlmeEvent::OnScanEnd { .. } => "OnScanEnd",
         MlmeEvent::ConnectConf { .. } => "ConnectConf",
+        MlmeEvent::RoamConf { .. } => "RoamConf",
         MlmeEvent::AuthenticateInd { .. } => "AuthenticateInd",
         MlmeEvent::DeauthenticateConf { .. } => "DeauthenticateConf",
         MlmeEvent::DeauthenticateInd { .. } => "DeauthenticateInd",

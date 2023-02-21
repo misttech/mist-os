@@ -36,6 +36,10 @@ pub struct WlanFullmacIfcProtocolOps {
         ctx: &mut FullmacDriverEventSink,
         resp: *const banjo_wlan_fullmac::WlanFullmacConnectConfirm,
     ),
+    pub(crate) roam_conf: extern "C" fn(
+        ctx: &mut FullmacDriverEventSink,
+        resp: *const banjo_wlan_fullmac::WlanFullmacRoamConfirm,
+    ),
     pub(crate) auth_ind: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
         ind: *const banjo_wlan_fullmac::WlanFullmacAuthInd,
@@ -128,6 +132,14 @@ extern "C" fn connect_conf(
 ) {
     let resp = banjo_to_fidl::convert_connect_confirm(unsafe { *resp });
     ctx.0.send(FullmacDriverEvent::ConnectConf { resp });
+}
+#[no_mangle]
+extern "C" fn roam_conf(
+    ctx: &mut FullmacDriverEventSink,
+    resp: *const banjo_wlan_fullmac::WlanFullmacRoamConfirm,
+) {
+    let resp = banjo_to_fidl::convert_roam_confirm(unsafe { *resp });
+    ctx.0.send(FullmacDriverEvent::RoamConf { resp });
 }
 #[no_mangle]
 extern "C" fn auth_ind(
@@ -265,6 +277,7 @@ const PROTOCOL_OPS: WlanFullmacIfcProtocolOps = WlanFullmacIfcProtocolOps {
     on_scan_result: on_scan_result,
     on_scan_end: on_scan_end,
     connect_conf: connect_conf,
+    roam_conf: roam_conf,
     auth_ind: auth_ind,
     deauth_conf: deauth_conf,
     deauth_ind: deauth_ind,

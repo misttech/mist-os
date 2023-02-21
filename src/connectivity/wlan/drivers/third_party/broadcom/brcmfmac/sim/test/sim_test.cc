@@ -32,6 +32,10 @@ wlan_fullmac_impl_ifc_protocol_ops_t SimInterface::default_sme_dispatch_tbl_ = {
         [](void* ctx, const wlan_fullmac_connect_confirm_t* resp) {
           static_cast<SimInterface*>(ctx)->OnConnectConf(resp);
         },
+    .roam_conf =
+        [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) {
+          static_cast<SimInterface*>(ctx)->OnRoamConf(resp);
+        },
     .auth_ind =
         [](void* ctx, const wlan_fullmac_auth_ind_t* resp) {
           static_cast<SimInterface*>(ctx)->OnAuthInd(resp);
@@ -106,6 +110,17 @@ void SimInterface::OnConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
 
   if (resp->result_code == STATUS_CODE_SUCCESS) {
     assoc_ctx_.state = AssocContext::kAssociated;
+    stats_.connect_successes++;
+  } else {
+    assoc_ctx_.state = AssocContext::kNone;
+  }
+}
+
+void SimInterface::OnRoamConf(const wlan_fullmac_roam_confirm_t* resp) {
+  ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
+
+  if (resp->result_code == STATUS_CODE_SUCCESS) {
+    std::memcpy(assoc_ctx_.bssid.byte, resp->target_bssid, ETH_ALEN);
     stats_.connect_successes++;
   } else {
     assoc_ctx_.state = AssocContext::kNone;

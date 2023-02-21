@@ -143,6 +143,15 @@ type ReconnectRequest = struct {
     peer_sta_address ieee80211.MacAddr;
 };
 
+/// Result of a roam attempt.
+type RoamConfirm = struct {
+    target_bssid ieee80211.MacAddr;
+    result_code ieee80211.StatusCode;
+    /// Full BSS description.
+    /// This field is only valid if the result is success.
+    selected_bss internal.BssDescription;
+};
+
 type AuthenticationTypes = strict enum {
     OPEN_SYSTEM = 1;
     SHARED_KEY = 2;
@@ -498,6 +507,14 @@ protocol MLME {
     });
     ReconnectReq(struct {
         req ReconnectRequest;
+    });
+
+    /// Result of a roam attempt.
+    /// Note that an unsuccessful roam attempt does not imply disassociation. Where a roam
+    /// failure causes underlying driver (e.g. fullmac) to disassociate, the underlying
+    /// driver must explicitly disassociate.
+    -> RoamConf(struct {
+        resp RoamConfirm;
     });
 
     -> AuthenticateInd(struct {

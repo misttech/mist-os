@@ -246,6 +246,18 @@ type WlanFullmacConnectConfirm = struct {
     association_ies vector<uint8>:MAX;
 };
 
+/// Result of a roam attempt.
+/// Note that an unsuccessful roam attempt does not imply disassociation. Where a roam
+/// failure causes a fullmac driver to disassociate, the fullmac driver must explicitly
+/// disassociate.
+type WlanFullmacRoamConfirm = struct {
+    target_bssid ieee80211.MacAddr;
+    result_code ieee80211.StatusCode;
+    /// Full BSS description.
+    /// This field is only valid if the result is success.
+    selected_bss fuchsia.wlan.internal.BssDescription;
+};
+
 type WlanAuthResult = strict enum : uint8 {
     SUCCESS = 0;
     REFUSED = 1;
@@ -592,6 +604,10 @@ protocol WlanFullmacImplIfc {
     }) -> ();
     ConnectConf(struct {
         resp WlanFullmacConnectConfirm;
+    }) -> ();
+    /// Result of a roam attempt.
+    RoamConf(struct {
+        resp WlanFullmacRoamConfirm;
     }) -> ();
     AuthInd(struct {
         resp WlanFullmacAuthInd;

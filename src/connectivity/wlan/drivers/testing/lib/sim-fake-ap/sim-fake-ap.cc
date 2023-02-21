@@ -457,8 +457,8 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
         // Add the client in initial state.
         client->status_ = Client::NOT_AUTHENTICATED;
       }
-      // We only test the happy reassociation path now, so skip right to ASSOCIATED.
-      // When we test the other reassociation paths, this is where we might differentiate which
+      // We only test the happy reassociation path here now, so skip right to ASSOCIATED.
+      // When we test more complicated reassociation paths, we might differentiate which
       // state the STA lands in.
       client->status_ = Client::ASSOCIATED;
       ScheduleReassocResp(StatusCode::SUCCESS, reassoc_req_frame->src_addr_);

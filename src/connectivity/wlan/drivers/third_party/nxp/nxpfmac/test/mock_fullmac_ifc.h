@@ -31,6 +31,9 @@ class MockFullmacIfc : public ::ddk::WlanFullmacImplIfcProtocol<MockFullmacIfc> 
   void WlanFullmacImplIfcConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
     on_connect_conf.Call(resp);
   }
+  void WlanFullmacImplIfcRoamConf(const wlan_fullmac_roam_confirm_t* resp) {
+    on_roam_conf.Call(resp);
+  }
   void WlanFullmacImplIfcAuthInd(const wlan_fullmac_auth_ind_t* ind) { on_auth_ind_conf.Call(ind); }
   void WlanFullmacImplIfcDeauthConf(const wlan_fullmac_deauth_confirm_t* resp) {
     on_deauth_conf.Call(resp);
@@ -67,6 +70,7 @@ class MockFullmacIfc : public ::ddk::WlanFullmacImplIfcProtocol<MockFullmacIfc> 
   mock_function::MockFunction<void, const wlan_fullmac_scan_result_t*> on_scan_result;
   mock_function::MockFunction<void, const wlan_fullmac_scan_end_t*> on_scan_end;
   mock_function::MockFunction<void, const wlan_fullmac_connect_confirm_t*> on_connect_conf;
+  mock_function::MockFunction<void, const wlan_fullmac_roam_confirm_t*> on_roam_conf;
   mock_function::MockFunction<void, const wlan_fullmac_start_confirm_t*> on_start_conf;
   mock_function::MockFunction<void, const wlan_fullmac_stop_confirm_t*> on_stop_conf;
   mock_function::MockFunction<void, const wlan_fullmac_auth_ind_t*> on_auth_ind_conf;

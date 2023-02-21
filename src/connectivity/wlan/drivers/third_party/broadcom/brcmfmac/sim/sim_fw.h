@@ -452,6 +452,9 @@ class SimFirmware {
   void RxDisassocReq(std::shared_ptr<const simulation::SimDisassocReqFrame> frame);
   void RxAssocReq(std::shared_ptr<const simulation::SimAssocReqFrame> frame);
   void RxReassocResp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
+  void RxActionFrame(std::shared_ptr<const simulation::SimActionFrame> action_frame);
+  void RxWnmActionFrame(std::shared_ptr<const simulation::SimWnmActionFrame> wnm_frame);
+  void RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame> btm_req_frame);
   void RxProbeResp(const wlan_channel_t& channel,
                    std::shared_ptr<const simulation::SimProbeRespFrame> frame,
                    double signal_strength);
@@ -562,11 +565,12 @@ class SimFirmware {
   uint32_t mchan_ = 1;  // This feature is enabled by default in firmware.
   uint32_t ampdu_ba_wsize_ = 64;
   uint32_t fakefrag_ = 0;
-  int32_t stbc_tx_ = 0;         // 0 = disabled, 1 = enabled, -1 = auto
-  uint32_t txstreams_ = 1;      // Number of Tx streams
-  uint32_t wnm_ = 1;            // This feature is enabled by default in firmware.
-  uint32_t roam_off_ = 0;       // Roam engine is enabled by default.
-  uint32_t buf_key_b4_m4_ = 0;  // Buffer key until EAPOL 4th frame is sent out
+  int32_t stbc_tx_ = 0;               // 0 = disabled, 1 = enabled, -1 = auto
+  uint32_t txstreams_ = 1;            // Number of Tx streams
+  uint32_t wnm_ = 1;                  // This feature is enabled by default in firmware.
+  uint32_t wnm_bsstrans_resp_ = 0x5;  // Default seen in real firmware.
+  uint32_t roam_off_ = 0;             // Roam engine is enabled by default.
+  uint32_t buf_key_b4_m4_ = 0;        // Buffer key until EAPOL 4th frame is sent out
 
   std::unordered_map<std::string, SimIovar> iovar_table_;
 };

@@ -92,6 +92,7 @@ class SimInterface {
   virtual void OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp);
   virtual void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
   virtual void OnConnectConf(const wlan_fullmac_connect_confirm_t* resp);
+  virtual void OnRoamConf(const wlan_fullmac_roam_confirm_t* resp);
   virtual void OnAssocInd(const wlan_fullmac_assoc_ind_t* ind);
   virtual void OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp) {}
   virtual void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);

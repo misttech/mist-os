@@ -35,6 +35,7 @@
 #include <atomic>
 #include <list>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 
 #include <wlan/drivers/components/frame.h>
@@ -208,6 +209,11 @@ enum brcmf_netif_stop_reason {
   BRCMF_NETIF_STOP_REASON_DISCONNECTED = BIT(2)
 };
 
+// Holds information used during an in-progress reassociation.
+using reassoc_context_t = struct {
+  wlan::common::MacAddr bssid;
+};
+
 /**
  * struct brcmf_if - interface control information.
  *
@@ -223,6 +229,10 @@ enum brcmf_netif_stop_reason {
  * @netif_stop: bitmap indicates reason why netif queues are stopped.
  * //@netif_stop_lock: spinlock for update netif_stop from multiple sources.
  *  (replaced by irq_callback_lock)
+ * @roam_req: request for a roam attempt, populated if a roam is requested from
+ *   above the driver.
+ * @roam_req_lock: guards roam_req.
+ * @reassoc_context: holds info used during an in-progress reassociation (roam).
  * @bss: information on current bss.
  * @ies: ies of the current bss.
  * @pend_8021x_cnt: tracks outstanding number of 802.1x frames.
@@ -242,6 +252,7 @@ struct brcmf_if {
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
   wlan_fullmac_connect_req_t connect_req;
+  reassoc_context_t reassoc_context;
   uint8_t ies[fuchsia::wlan::ieee80211::WLAN_MSDU_MAX_LEN];
   uint8_t wep_key_bytes[MAX_SUPPORTED_WEP_KEY_LEN];
   uint8_t security_ie[fuchsia::wlan::ieee80211::WLAN_IE_MAX_LEN];

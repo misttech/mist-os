@@ -59,6 +59,7 @@ constexpr uint8_t kJoinScanMaxProbes = 10;
 #define BRCMF_CONNECT_LOG_DUR             ZX_SEC(30) /* 30 seconds */
 // Connect log will be printed out in the Signal report timer handler every 5 minutes.
 #define BRCMF_CONNECT_LOG_COUNT           (BRCMF_CONNECT_LOG_DUR / BRCMF_SIGNAL_REPORT_TIMER_DUR_MS)
+#define BRCMF_ROAM_TIMER_DUR              ZX_SEC(1) /* Roam timer duration */
 // The time threshold to distinguish whether the device encounters an rx freeze.
 #define BRCMF_RX_FREEZE_THRESHOLD         ZX_MIN(1)
 // Maximum number of times we can trigger a deauth for an rx freeze per hour
@@ -203,7 +204,8 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status, std::string* out_
   X(LINK_FAILED)                  \
   X(CONNECTING_TIMEOUT)           \
   X(AUTHENTICATION_FAILED)        \
-  X(ASSOC_REQ_FAILED)
+  X(ASSOC_REQ_FAILED)             \
+  X(REASSOC_REQ_FAILED)
 
 #define X(CONNECT_STATUS) CONNECT_STATUS,
 enum class brcmf_connect_status_t : uint8_t { BRCMF_CONNECT_STATUS_LIST };
@@ -259,9 +261,10 @@ struct brcmf_cfg80211_profile {
  * @CONNECTING: connect/join in progress.
  * @CONNECTED: connected/joined successfully.
  * @DISCONNECTING: disconnect/disable in progress.
+ * @ROAMING: roam in progress.
  * @AP_START_PENDING: AP start pending.
  * @AP_CREATED: AP operation started.
- * @EAP_SUCCUSS: EAPOL handshake successful.
+ * @EAP_SUCCESS: EAPOL handshake successful.
  * @ASSOC_SUCCESS: successful SET_SSID received.
  */
 #define BRCMF_VIF_STATUS_LIST \
@@ -269,6 +272,7 @@ struct brcmf_cfg80211_profile {
   X(CONNECTING)               \
   X(CONNECTED)                \
   X(DISCONNECTING)            \
+  X(ROAMING)                  \
   X(AP_START_PENDING)         \
   X(AP_CREATED)               \
   X(EAP_SUCCESS)              \
@@ -427,6 +431,9 @@ enum brcmf_disconnect_mode {
  * @ap_start_timeout_work: Work structure for ap start timer
  * @next_sync_id: Counter for sync_ids used in firmware scan requests.
  * @connect_log_cnt: Count used to determine when stats are logged.
+ * @roam_timer: timer for firmware response of roam.
+ * @roam_timeout_work: associated work structure for roam timer.
+ * @capability: BSS description capability field.
  */
 struct brcmf_cfg80211_info {
   struct brcmf_cfg80211_conf* conf;
@@ -467,6 +474,9 @@ struct brcmf_cfg80211_info {
   WorkItem ap_start_timeout_work;
   std::atomic<uint16_t> next_sync_id;
   uint32_t connect_log_cnt;
+  Timer* roam_timer;
+  WorkItem roam_timeout_work;
+  uint16_t capability;
 };
 
 /**
