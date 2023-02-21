@@ -390,7 +390,7 @@ class Operation<Args...>::FlowToken : OperationBase::FlowTokenBase {
 //   SetTimeout(kill_agent, 1);
 //
 ///////////
-// TODO(richkadel): There isn't a unit test for the above use case, nor for the
+// TODO(fxbug.dev/122228): There isn't a unit test for the above use case, nor for the
 // FlowTokenHolder class (and probably should be, likely in
 // operation_unittest.cc. But since this whole approach to modular calls is
 // deprecated (see go/fit-promise-guide), I'm just making a note of this; not
