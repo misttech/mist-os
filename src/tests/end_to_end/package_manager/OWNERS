@@ -1,3 +1,4 @@
-vfcc@google.com
+include /src/sys/pkg/OWNERS
+
 dschuyler@google.com
 jeremymanson@google.com
