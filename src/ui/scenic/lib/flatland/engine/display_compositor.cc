@@ -753,7 +753,6 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
                                     scheduling::FramePresentedCallback callback) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
-  TRACE_FLOW_STEP("gfx", "scenic_frame", frame_number);
   std::scoped_lock lock(lock_);
 
   // Config should be reset before doing anything new.

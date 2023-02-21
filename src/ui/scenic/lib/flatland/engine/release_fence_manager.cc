@@ -6,6 +6,7 @@
 
 #include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 namespace {
 
@@ -226,6 +227,11 @@ ReleaseFenceManager::FrameRecordIterator ReleaseFenceManager::FindFrameRecord(
 }
 
 void ReleaseFenceManager::OnRenderFinished(uint64_t frame_number, zx::time timestamp) {
+  // NOTE: this name is important for benchmarking.  Do not remove or modify it
+  // without also updating the "process_gfx_trace.go" script.
+  TRACE_DURATION("gfx", "ReleaseFenceManager::OnRenderFinished", "frame number", frame_number);
+  TRACE_FLOW_END("gfx", "scenic_frame", frame_number);
+
   auto it = FindFrameRecord(frame_number);
 
   // Signal fences and do bookkeeping/cleanup associated with render-finished.

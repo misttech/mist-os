@@ -71,7 +71,12 @@ void Engine::InitializeInspectObjects() {
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                                   const FlatlandDisplay& display,
                                   scheduling::FramePresentedCallback callback) {
-  TRACE_DURATION("gfx", "flatland::Engine::RenderScheduledFrame");
+  // NOTE: this name is important for benchmarking.  Do not remove or modify it
+  // without also updating the "process_gfx_trace.go" script.
+  TRACE_DURATION("gfx", "RenderFrame", "frame_number", frame_number, "time",
+                 presentation_time.get());
+  TRACE_FLOW_STEP("gfx", "scenic_frame", frame_number);
+
   // NOTE: This is a temporary situation; soon FlatlandDisplay will be the only way to connect
   // content to a display.
   FX_CHECK(frame_number == last_rendered_frame_ + 1);

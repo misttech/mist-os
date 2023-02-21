@@ -317,6 +317,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
                                    /*present_received_time=*/zx::time(async_now(dispatcher())));
 
   TRACE_FLOW_BEGIN("gfx", "ScheduleUpdate", present_id);
+  TRACE_FLOW_BEGIN("gfx", "wait_for_fences", SESSION_TRACE_ID(session_id_, present_id));
 
   // Safe to capture |this| because the Flatland is guaranteed to outlive |fence_queue_|,
   // Flatland is non-movable and FenceQueue does not fire closures after destruction.
@@ -326,7 +327,12 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
        unsquashable = args.unsquashable(), uber_struct = std::move(uber_struct),
        link_operations = std::move(pending_link_operations_),
        release_fences = std::move(*args.mutable_release_fences())]() mutable {
-        TRACE_DURATION("gfx", "Flatland::Present[QueueTask]");
+        // NOTE: this name is important for benchmarking.  Do not remove or modify it
+        // without also updating the "process_gfx_trace.go" script.
+        TRACE_DURATION("gfx", "scenic_impl::Session::ScheduleNextPresent", "session_id",
+                       session_id_, "requested_presentation_time", requested_presentation_time);
+        TRACE_FLOW_END("gfx", "wait_for_fences", SESSION_TRACE_ID(session_id_, present_id));
+
         // Push the UberStruct, then schedule the associated Present that will eventually publish
         // it to the InstanceMap used for rendering.
         uber_struct_queue_->Push(present_id, std::move(uber_struct));
