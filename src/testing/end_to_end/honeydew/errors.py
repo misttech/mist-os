@@ -9,8 +9,10 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 
-class HostCommandError(Exception):
-    """Basic exception for errors raised by commands running on host machine.
+class HoneyDewError(Exception):
+    """Base exception for honeydew module.
+
+    More specific exceptions will be created by inheriting from this exception.
 
     Attributes:
         err_code (int): numeric code of the error.
@@ -18,7 +20,7 @@ class HostCommandError(Exception):
     err_code = 1
 
     def __init__(self, msg):
-        """Inits HostError with 'msg' (an error message string).
+        """Inits HoneyDewError with 'msg' (an error message string).
 
         Args:
             msg (str or Exception): an error message string or an Exception
@@ -30,10 +32,19 @@ class HostCommandError(Exception):
         _LOGGER.debug(repr(self))
 
 
-class FfxCommandError(HostCommandError):
+class FfxCommandError(HoneyDewError):
     """Exception for errors raised by ffx commands running on host machine.
 
     Attributes:
         err_code (int): numeric code of the error.
     """
-    err_code = 2
+    err_code = 10
+
+
+class FuchsiaDeviceError(HoneyDewError):
+    """Base exception for errors raised by fuchsia device.
+
+    Attributes:
+        err_code (int): numeric code of the error.
+    """
+    err_code = 20
