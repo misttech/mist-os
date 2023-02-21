@@ -4,7 +4,7 @@
 
 use {
     crate::MetaPackage,
-    anyhow::Result,
+    anyhow::{Context as _, Result},
     camino::Utf8PathBuf,
     fuchsia_merkle::Hash,
     fuchsia_url::RelativePackageUrl,
@@ -31,14 +31,15 @@ impl SubpackagesBuildManifest {
             let url = match &entry.kind {
                 SubpackagesBuildManifestEntryKind::Url(url) => url.clone(),
                 SubpackagesBuildManifestEntryKind::MetaPackageFile(path) => {
-                    let f = fs::File::open(path)?;
+                    let f = fs::File::open(path).with_context(|| format!("opening {path}"))?;
                     let meta_package = MetaPackage::deserialize(io::BufReader::new(f))?;
                     meta_package.name().clone().into()
                 }
             };
 
             // The merkle file is a hex encoded string.
-            let merkle = fs::read_to_string(&entry.merkle_file)?;
+            let merkle = fs::read_to_string(&entry.merkle_file)
+                .with_context(|| format!("reading {}", &entry.merkle_file))?;
             let package_hash = merkle.parse()?;
 
             entries.push((url, package_hash, entry.package_manifest_file.clone()));
