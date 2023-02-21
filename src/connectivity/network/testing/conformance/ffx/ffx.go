@@ -119,22 +119,21 @@ func NewFfxInstance(
 	}
 	rootBuildDir := filepath.Dir(hostOutDir)
 
-	if err := wrapperFfxInstance.ConfigSet(ctx, "sdk.root", rootBuildDir); err != nil {
-		return nil, fmt.Errorf(
-			"wrapperFfxInstance.ConfigSet(_, %q, %q) = %w",
-			"sdk.root",
-			rootBuildDir,
-			err,
-		)
+	cfgs := map[string]string{
+		"sdk.root":              rootBuildDir,
+		"sdk.type":              "in-tree",
+		"proactive_log.enabled": "true",
 	}
 
-	if err := wrapperFfxInstance.ConfigSet(ctx, "sdk.type", "in-tree"); err != nil {
-		return nil, fmt.Errorf(
-			"wrapperFfxInstance.ConfigSet(_, %q, %q) = %w",
-			"sdk.type",
-			"in-tree",
-			err,
-		)
+	for key, value := range cfgs {
+		if err := wrapperFfxInstance.ConfigSet(ctx, key, value); err != nil {
+			return nil, fmt.Errorf(
+				"wrapperFfxInstance.ConfigSet(_, %q, %q) = %w",
+				key,
+				value,
+				err,
+			)
+		}
 	}
 
 	fmt.Printf("====== Choosing FFX target: %s ======\n", options.Target)
