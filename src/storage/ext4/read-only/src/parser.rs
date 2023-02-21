@@ -428,6 +428,10 @@ impl<T: 'static + Reader> Parser<T> {
             self.read_extent_data(&extent, &mut data, &mut size_remaining)?;
         }
 
+        // If there are zero pages at the end of the file, they won't appear in the extents list.
+        // Pad the data with zeroes to the full file length.
+        // TODO(fxbug.dev/122237): Add a test for this behavior, once better test infra exists.
+        data.resize(inode.size().try_into().unwrap(), 0);
         Ok(data)
     }
 
