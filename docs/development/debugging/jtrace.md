@@ -130,16 +130,16 @@ Here is an example of using tracing, when configured for large entries.
 #include <lib/jtrace/jtrace.h>
 
 struct MyStruct {
-  void* ptr1, ptr2;
+  void *ptr1, *ptr2;
   uint32_t foo, bar;
-}
+};
 
 void MyFunction(const MyStruct* args, uint32_t num_args) {
   JTRACE("(num_args, args)", num_args, 0, 0, 0, args);
 
   for (uint32_t i = 0; i < num_args; ++i) {
     const auto& a = args[i];
-    JTRACE("Before (i, foo, bar, ptr1, ptr2)", i, a.foo, a.bar, 0, a.ptr1, a.ptr2);
+    JTRACE("Before (i, foo, bar, 0, ptr1, ptr2)", i, a.foo, a.bar, 0, a.ptr1, a.ptr2);
     zx_status_t status = DoAThingWithMyStruct(a);
     JTRACE("After (status)", status);
   }
@@ -147,6 +147,30 @@ void MyFunction(const MyStruct* args, uint32_t num_args) {
   JTRACE("Finished");
 }
 ```
+
+And here is what one of the "Before" tagged trace statements would look like
+when the trace buffer is eventually displayed.
+
+```
+[   7.718998976][cpu 2 tid     3702] : 00000002 00000006 00000001 00000000 ffffffff0024c720 ffffff9519077e60 : (       0.308 uSec) : jtrace_example.cc:MyFunction:12 (Before (i, foo, bar, 0, ptr1, ptr2))
+```
+
+Breaking this down by field, we have:
+
+| Field                                   | Description                                                                     |
+|-----------------------------------------|---------------------------------------------------------------------------------|
+| `[   7.718998976]`                      | The clock monotonic timestamp of the trace entry                                |
+| `[cpu 2 tid     3702]`                  | The ID of the CPU and thread which was active when the trace entry was recorded |
+| `00000002`                              | The value of the 1st 32-bit argument (`i`)                                      |
+| `00000006`                              | The value of the 2nd 32-bit argument (`foo`)                                    |
+| `00000001`                              | The value of the 3rd 32-bit argument (`bar`)                                    |
+| `00000000`                              | The value of the 4th 32-bit argument (0)                                        |
+| `ffffffff0024c720`                      | The value of the 1st 64-bit argument (`ptr1`)                                   |
+| `ffffff9519077e60`                      | The value of the 2nd 64-bit argument (`ptr2`)                                   |
+| `(       0.308 uSec)`                   | The time since the last displayed trace entry                                   |
+| `jtrace_example.cc:MyFunction:12`       | The filename, function name, and line number of the trace entry                 |
+| `(Before (i, foo, bar, 0, ptr1, ptr2))` | The user's string literal tag                                                   |
+
 
 ## Displaying the contents of a trace buffer
 
