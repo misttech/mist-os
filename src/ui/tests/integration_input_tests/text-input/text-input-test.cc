@@ -195,8 +195,7 @@ constexpr auto kTextInputFlutter = "text_input_flutter";
 constexpr auto kTextInputFlutterUrl = "#meta/text-input-flutter-realm.cm";
 
 constexpr auto kTestUIStack = "ui";
-constexpr auto kTestUIStackUrl =
-    "fuchsia-pkg://fuchsia.com/flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
+constexpr auto kTestUIStackUrl = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
 
 class TextInputTest : public gtest::RealLoopFixture {
  protected:

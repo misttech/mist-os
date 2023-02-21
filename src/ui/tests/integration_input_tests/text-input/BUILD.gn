@@ -100,6 +100,8 @@ fuchsia_component("text-input-test-component") {
 
 fuchsia_test_package("text-input-test") {
   test_components = [ ":text-input-test-component" ]
+  subpackages =
+      [ "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack" ]
   deps = [
     ":single-font-collection",
     "text-input-chromium:text-input-chromium-component",

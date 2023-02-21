@@ -48,7 +48,6 @@
         "fuchsia.test": {
             type: "chromium",
             "deprecated-allowed-packages": [
-                "flatland-scene-manager-test-ui-stack",
                 "flutter_aot_runner",
                 "flutter_jit_runner",
                 "web_engine",

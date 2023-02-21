@@ -28,12 +28,10 @@ use {
 };
 
 const TEST_UI_STACK: &str = "ui";
-const ROOT_PRESENTER_UI_STACK_URL: &str =
-    "fuchsia-pkg://fuchsia.com/gfx-root-presenter-test-ui-stack#meta/test-ui-stack.cm";
+const ROOT_PRESENTER_UI_STACK_URL: &str = "gfx-root-presenter-test-ui-stack#meta/test-ui-stack.cm";
 const GFX_SCENE_MANAGER_UI_STACK_URL: &str =
-    "fuchsia-pkg://fuchsia.com/gfx-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
-const FLATLAND_UI_STACK_URL: &str =
-    "fuchsia-pkg://fuchsia.com/flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
+    "gfx-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
+const FLATLAND_UI_STACK_URL: &str = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
 
 // Set a maximum bound test timeout.
 const TEST_TIMEOUT: Duration = Duration::from_minutes(2);

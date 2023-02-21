@@ -8,10 +8,7 @@ import("//src/graphics/lib/magma/include/virtio/virtmagma_debug.gni")
 
 group("tests") {
   testonly = true
-  deps = [
-    ":virtio_magma_unittests",
-    "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack",
-  ]
+  deps = [ ":virtio_magma_unittests" ]
 }
 
 action("virtio_magma_generic") {
@@ -103,7 +100,6 @@ executable("unittests_bin") {
 }
 
 fuchsia_test_component("unittest_component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtio_magma_unittests"
   deps = [ ":unittests_bin" ]
   manifest = "meta/virtio_magma_unittests.cml"
@@ -111,6 +107,8 @@ fuchsia_test_component("unittest_component") {
 
 fuchsia_test_package("virtio_magma_unittests") {
   test_components = [ ":unittest_component" ]
+  subpackages =
+      [ "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack" ]
   test_specs = {
     environments = guest_vulkan_envs
     log_settings = {

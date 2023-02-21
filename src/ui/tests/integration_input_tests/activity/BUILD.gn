@@ -41,7 +41,6 @@ rustc_test("activity_manager_test") {
 }
 
 fuchsia_component("activity-manager-test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/activity-manager-test.cml"
   deps = [ ":activity_manager_test" ]
@@ -49,6 +48,11 @@ fuchsia_component("activity-manager-test-component") {
 
 fuchsia_test_package("activity-manager-test") {
   test_components = [ ":activity-manager-test-component" ]
+  subpackages = [
+    "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack",
+    "//src/ui/testing/test_ui_stack:gfx-root-presenter-test-ui-stack",
+    "//src/ui/testing/test_ui_stack:gfx-scene-manager-test-ui-stack",
+  ]
   test_specs = {
     # Run all tests in parallel.
     parallel = 12

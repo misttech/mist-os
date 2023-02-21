@@ -14,7 +14,7 @@
     children: [
         {
             name: "test_ui_stack",
-            url: "fuchsia-pkg://fuchsia.com/flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm",
+            url: "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm",
         },
     ],
     use: [
@@ -41,9 +41,4 @@
             to: "#test_ui_stack",
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "flatland-scene-manager-test-ui-stack" ],
-        },
-    },
 }
