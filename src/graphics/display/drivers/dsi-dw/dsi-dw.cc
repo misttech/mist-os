@@ -878,26 +878,22 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
 void DsiDw::DdkRelease() { delete this; }
 
 zx_status_t DsiDw::Bind() {
-  zx_status_t status = device_get_protocol(parent_, ZX_PROTOCOL_PDEV, &pdev_proto_);
-  if (status != ZX_OK) {
-    DSI_ERROR("Could not get parent protocol (%d)\n", status);
-    return status;
+  ddk::PDev pdev{parent_};
+  if (!pdev.is_valid()) {
+    zxlogf(ERROR, "aml-thermal: failed to get platform device");
+    return ZX_ERR_INTERNAL;
   }
 
   // Map DSI registers
-  mmio_buffer_t mmio;
-  status = pdev_map_mmio_buffer(&pdev_proto_, 0, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
-  if (status != ZX_OK) {
+  if (zx_status_t status = pdev.MapMmio(0, &dsi_mmio_); status != ZX_OK) {
     DSI_ERROR("Could not map DSI mmio (%d)\n", status);
     return status;
   }
 
-  dsi_mmio_ = fdf::MmioBuffer(mmio);
   last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value();
   DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
 
-  status = DdkAdd("dw-dsi");
-  if (status != ZX_OK) {
+  if (zx_status_t status = DdkAdd("dw-dsi"); status != ZX_OK) {
     DSI_ERROR("could not add device %d\n", status);
   }
 
@@ -908,13 +904,12 @@ zx_status_t DsiDw::Bind() {
     return ZX_ERR_NO_MEMORY;
   }
 
-  status = dw_base->Bind();
-  if (status != ZX_OK) {
+  if (zx_status_t status = dw_base->Bind(); status != ZX_OK) {
     DSI_ERROR("Dsi Base Initialization failed (%d)", status);
     return status;
   }
   [[maybe_unused]] auto ptr = dw_base.release();
-  return status;
+  return ZX_OK;
 }
 
 // main bind function called from dev manager

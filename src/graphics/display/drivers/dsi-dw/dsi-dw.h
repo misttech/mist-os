@@ -69,7 +69,7 @@ using DeviceType = ddk::Device<DsiDw>;
 
 class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_protocol> {
  public:
-  DsiDw(zx_device_t* parent) : DeviceType(parent), pdev_(parent) {}
+  DsiDw(zx_device_t* parent) : DeviceType(parent) {}
 
   // This function is called from the c-bind function upon driver matching
   zx_status_t Bind();
@@ -127,8 +127,6 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   zx_status_t GetColorCode(color_code_t c, bool& packed, uint8_t& code);
   zx_status_t GetVideoMode(video_mode_t v, uint8_t& mode);
   std::optional<fdf::MmioBuffer> dsi_mmio_;
-  pdev_protocol_t pdev_proto_ = {nullptr, nullptr};
-  ddk::PDev pdev_;
 
   // Save video config to enable seamless switching between command and video modes.
   uint32_t last_vidmode_ = 0;
