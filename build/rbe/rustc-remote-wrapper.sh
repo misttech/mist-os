@@ -973,16 +973,20 @@ remote_inputs=(
   "${envvar_files[@]}"
   "${remote_linker[@]}"
   "${lld_remote[@]}"
-  "${libcxx_remote[@]}"
-  "${rt_libdir_remote[@]}"
   "${link_arg_files[@]}"
   "${extra_inputs_rel_project_root[@]}"
 )
 
-# sysroot files are only used for linking binary crate types,
+# sysroot and runtime libraries are only used for linking binary crate types,
 # so ignore them in other cases.
 case "$crate_type" in
-  bin | proc-macro | dylib | cdylib ) remote_inputs+=( "${sysroot_files[@]}" ) ;;
+  bin | proc-macro | dylib | cdylib )
+    remote_inputs+=(
+      "${sysroot_files[@]}"
+      "${rt_libdir_remote[@]}"
+      "${libcxx_remote[@]}"
+    )
+    ;;
   *) test "${#sysroot_files[@]}" = 0 ||
        vmsg "Warning: Ignoring sysroot files for crate type: $crate_type" ;;
 esac
