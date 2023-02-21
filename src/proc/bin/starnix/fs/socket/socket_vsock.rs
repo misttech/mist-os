@@ -73,8 +73,8 @@ impl SocketOps for VsockSocket {
     fn connect(
         &self,
         _socket: &SocketHandle,
+        _current_task: &CurrentTask,
         _peer: SocketPeer,
-        _credentials: ucred,
     ) -> Result<(), Errno> {
         error!(EPROTOTYPE)
     }
@@ -142,7 +142,12 @@ impl SocketOps for VsockSocket {
         }
     }
 
-    fn bind(&self, _socket: &Socket, socket_address: SocketAddress) -> Result<(), Errno> {
+    fn bind(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
         match socket_address {
             SocketAddress::Vsock(_) => {}
             _ => return error!(EINVAL),
@@ -304,7 +309,7 @@ mod tests {
                 .expect("Failed to create socket.");
         current_task
             .abstract_vsock_namespace
-            .bind(VSOCK_PORT, &listen_socket)
+            .bind(&current_task, VSOCK_PORT, &listen_socket)
             .expect("Failed to bind socket.");
         listen_socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
 

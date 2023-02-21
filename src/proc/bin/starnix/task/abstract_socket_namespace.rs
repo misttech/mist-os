@@ -8,6 +8,7 @@ use std::sync::{Arc, Weak};
 
 use crate::fs::socket::*;
 use crate::lock::Mutex;
+use crate::task::CurrentTask;
 use crate::types::*;
 
 /// A registry of abstract sockets.
@@ -35,11 +36,16 @@ where
         Arc::new(AbstractSocketNamespace::<K> { table: Mutex::new(HashMap::new()), address_maker })
     }
 
-    pub fn bind(&self, address: K, socket: &SocketHandle) -> Result<(), Errno> {
+    pub fn bind(
+        &self,
+        current_task: &CurrentTask,
+        address: K,
+        socket: &SocketHandle,
+    ) -> Result<(), Errno> {
         let mut table = self.table.lock();
         match table.entry(address.clone()) {
             Entry::Vacant(entry) => {
-                socket.bind((self.address_maker)(address))?;
+                socket.bind(current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
             Entry::Occupied(mut entry) => {
@@ -47,7 +53,7 @@ where
                 if occupant.is_some() {
                     return error!(EADDRINUSE);
                 }
-                socket.bind((self.address_maker)(address))?;
+                socket.bind(current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
         }

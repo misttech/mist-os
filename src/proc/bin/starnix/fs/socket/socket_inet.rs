@@ -107,8 +107,8 @@ impl SocketOps for InetSocket {
     fn connect(
         &self,
         _socket: &SocketHandle,
+        _current_task: &CurrentTask,
         peer: SocketPeer,
-        _credentials: ucred,
     ) -> Result<(), Errno> {
         match peer {
             SocketPeer::Address(SocketAddress::Inet(addr))
@@ -148,7 +148,12 @@ impl SocketOps for InetSocket {
         Ok(())
     }
 
-    fn bind(&self, _socket: &Socket, socket_address: SocketAddress) -> Result<(), Errno> {
+    fn bind(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
         match socket_address {
             SocketAddress::Inet(addr) | SocketAddress::Inet6(addr) => self
                 .zxio

@@ -18,9 +18,11 @@ pub const SOCKET_MIN_SIZE: usize = 4 << 10;
 pub const SOCKET_DEFAULT_SIZE: usize = 16 * 1024;
 pub const SOCKET_MAX_SIZE: usize = 4 << 20;
 
-pub struct NetlinkSocket {
+pub fn new_netlink_socket(
+    socket_type: SocketType,
     family: NetlinkFamily,
-    inner: Mutex<NetlinkSocketInner>,
+) -> Result<Box<dyn SocketOps>, Errno> {
+    Ok(Box::new(NetlinkSocket::new(socket_type, family)?))
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -111,8 +113,13 @@ impl NetlinkFamily {
     }
 }
 
+struct NetlinkSocket {
+    family: NetlinkFamily,
+    inner: Mutex<NetlinkSocketInner>,
+}
+
 #[allow(dead_code)]
-pub struct NetlinkSocketInner {
+struct NetlinkSocketInner {
     /// The `MessageQueue` that contains messages sent to this socket.
     messages: MessageQueue,
 
@@ -130,7 +137,11 @@ pub struct NetlinkSocketInner {
 }
 
 impl NetlinkSocketInner {
-    pub fn bind(&mut self, netlink_address: NetlinkAddress) -> Result<(), Errno> {
+    pub fn bind(
+        &mut self,
+        _current_task: &CurrentTask,
+        netlink_address: NetlinkAddress,
+    ) -> Result<(), Errno> {
         if self.address.is_some() {
             return error!(EINVAL);
         }
@@ -223,21 +234,21 @@ impl NetlinkSocket {
     fn lock(&self) -> crate::lock::MutexGuard<'_, NetlinkSocketInner> {
         self.inner.lock()
     }
-
-    pub fn bind_if_not_bound(&self, pid: i32) {
-        // Ignore error if this socket is already bound.
-        let _ = self.lock().bind(NetlinkAddress { pid: pid as u32, groups: 0 });
-    }
 }
 
 impl SocketOps for NetlinkSocket {
     fn connect(
         &self,
-        _socket: &SocketHandle,
-        _peer: SocketPeer,
-        _credentials: ucred,
+        socket: &SocketHandle,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
     ) -> Result<(), Errno> {
-        not_implemented!("?", "NetlinkSocket::connect is stubbed");
+        let address = match peer {
+            SocketPeer::Address(address) => address,
+            _ => return error!(EINVAL),
+        };
+        // Connect is equivalent to bind, but error are ignored.
+        let _ = self.bind(socket, current_task, address);
         Ok(())
     }
 
@@ -254,9 +265,18 @@ impl SocketOps for NetlinkSocket {
         Ok(())
     }
 
-    fn bind(&self, _socket: &Socket, socket_address: SocketAddress) -> Result<(), Errno> {
+    fn bind(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
         match socket_address {
-            SocketAddress::Netlink(netlink_address) => self.lock().bind(netlink_address),
+            SocketAddress::Netlink(mut netlink_address) => {
+                // TODO: Support distinct IDs for processes with multiple netlink sockets.
+                netlink_address.set_pid_if_zero(current_task.get_pid());
+                self.lock().bind(current_task, netlink_address)
+            }
             _ => error!(EINVAL),
         }
     }

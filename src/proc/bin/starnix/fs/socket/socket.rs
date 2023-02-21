@@ -27,8 +27,8 @@ pub trait SocketOps: Send + Sync + AsAny {
     fn connect(
         &self,
         socket: &SocketHandle,
+        current_task: &CurrentTask,
         peer: SocketPeer,
-        credentials: ucred,
     ) -> Result<(), Errno>;
 
     /// Start listening at the bound address for `connect` calls.
@@ -51,7 +51,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Binds this socket to a `socket_address`.
     ///
     /// Returns an error if the socket could not be bound.
-    fn bind(&self, socket: &Socket, socket_address: SocketAddress) -> Result<(), Errno>;
+    fn bind(
+        &self,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno>;
 
     /// Reads the specified number of bytes from the socket, if possible.
     ///
@@ -230,7 +235,7 @@ fn create_socket_ops(
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
-            Ok(Box::new(NetlinkSocket::new(socket_type, netlink_family)?))
+            new_netlink_socket(socket_type, netlink_family)
         }
     }
 }
@@ -360,12 +365,20 @@ impl Socket {
         self.ops.ioctl(self, current_task, request, address)
     }
 
-    pub fn bind(&self, socket_address: SocketAddress) -> Result<(), Errno> {
-        self.ops.bind(self, socket_address)
+    pub fn bind(
+        &self,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
+        self.ops.bind(self, current_task, socket_address)
     }
 
-    pub fn connect(self: &SocketHandle, peer: SocketPeer, credentials: ucred) -> Result<(), Errno> {
-        self.ops.connect(self, peer, credentials)
+    pub fn connect(
+        self: &SocketHandle,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno> {
+        self.ops.connect(self, current_task, peer)
     }
 
     pub fn listen(&self, backlog: i32, credentials: ucred) -> Result<(), Errno> {
@@ -483,14 +496,16 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let socket = Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
             .expect("Failed to create socket.");
-        socket.bind(SocketAddress::Unix(b"\0".to_vec())).expect("Failed to bind socket.");
+        socket
+            .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
+            .expect("Failed to bind socket.");
         socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
         assert_eq!(FdEvents::empty(), socket.query_events(&current_task));
         let connecting_socket =
             Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
                 .expect("Failed to create socket.");
         connecting_socket
-            .connect(SocketPeer::Handle(socket.clone()), current_task.as_ucred())
+            .connect(&current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
         assert_eq!(FdEvents::POLLIN, socket.query_events(&current_task));
         let server_socket = socket.accept().unwrap();
@@ -531,16 +546,14 @@ mod tests {
         let opt_buf = UserBuffer { address: user_address, length: opt_size };
         rec_dgram.setsockopt(&current_task, SOL_SOCKET, SO_PASSCRED, opt_buf).unwrap();
 
-        rec_dgram.bind(bind_address).expect("failed to bind datagram socket");
+        rec_dgram.bind(&current_task, bind_address).expect("failed to bind datagram socket");
 
         let xfer_value: u64 = 1234567819;
         let xfer_bytes = xfer_value.to_ne_bytes();
 
         let send = Socket::new(SocketDomain::Unix, SocketType::Datagram, SocketProtocol::default())
             .expect("Failed to connect socket.");
-        let task_pid = current_task.get_pid();
-        let credentials = ucred { pid: task_pid, uid: 0, gid: 0 };
-        send.connect(SocketPeer::Handle(rec_dgram.clone()), credentials.clone()).unwrap();
+        send.connect(&current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
         let no_write = send
             .write(&current_task, &mut VecInputBuffer::new(&xfer_bytes), &mut None, &mut vec![])
             .unwrap();
@@ -557,7 +570,11 @@ mod tests {
         assert_eq!(1, read_info.ancillary_data.len());
         assert_eq!(
             read_info.ancillary_data[0],
-            AncillaryData::Unix(UnixControlData::Credentials(credentials))
+            AncillaryData::Unix(UnixControlData::Credentials(ucred {
+                pid: current_task.get_pid(),
+                uid: 0,
+                gid: 0
+            }))
         );
 
         rec_dgram.close();

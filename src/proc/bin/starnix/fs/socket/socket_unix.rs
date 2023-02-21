@@ -211,12 +211,7 @@ impl UnixSocket {
         Ok(())
     }
 
-    fn connect_datagram(
-        &self,
-        socket: &SocketHandle,
-        peer: &SocketHandle,
-        _credentials: ucred,
-    ) -> Result<(), Errno> {
+    fn connect_datagram(&self, socket: &SocketHandle, peer: &SocketHandle) -> Result<(), Errno> {
         {
             let unix_socket = socket.downcast_socket::<UnixSocket>().unwrap();
             let peer_inner = unix_socket.lock();
@@ -419,8 +414,8 @@ impl SocketOps for UnixSocket {
     fn connect(
         &self,
         socket: &SocketHandle,
+        current_task: &CurrentTask,
         peer: SocketPeer,
-        credentials: ucred,
     ) -> Result<(), Errno> {
         let peer = match peer {
             SocketPeer::Handle(handle) => handle,
@@ -428,11 +423,9 @@ impl SocketOps for UnixSocket {
         };
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {
-                self.connect_stream(socket, &peer, credentials)
+                self.connect_stream(socket, &peer, current_task.as_ucred())
             }
-            SocketType::Datagram | SocketType::Raw => {
-                self.connect_datagram(socket, &peer, credentials)
-            }
+            SocketType::Datagram | SocketType::Raw => self.connect_datagram(socket, &peer),
             _ => error!(EINVAL),
         }
     }
@@ -476,7 +469,12 @@ impl SocketOps for UnixSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn bind(&self, _socket: &Socket, socket_address: SocketAddress) -> Result<(), Errno> {
+    fn bind(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
         match socket_address {
             SocketAddress::Unix(_) => {}
             _ => return error!(EINVAL),
@@ -970,13 +968,15 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let socket = Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
             .expect("Failed to create socket.");
-        socket.bind(SocketAddress::Unix(b"\0".to_vec())).expect("Failed to bind socket.");
+        socket
+            .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
+            .expect("Failed to bind socket.");
         socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
         let connecting_socket =
             Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
                 .expect("Failed to connect socket.");
         connecting_socket
-            .connect(SocketPeer::Handle(socket.clone()), current_task.as_ucred())
+            .connect(&current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
         assert_eq!(FdEvents::POLLIN, socket.query_events(&current_task));
         let server_socket = socket.accept().unwrap();

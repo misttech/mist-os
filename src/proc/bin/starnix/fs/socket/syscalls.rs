@@ -122,7 +122,7 @@ pub fn sys_bind(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
-    let mut address = parse_socket_address(current_task, user_socket_address, address_length)?;
+    let address = parse_socket_address(current_task, user_socket_address, address_length)?;
     if !address.valid_for_domain(socket.domain) {
         return error!(EINVAL);
     }
@@ -137,7 +137,7 @@ pub fn sys_bind(
             // If there is a null byte at the start of the sun_path, then the
             // address is abstract.
             if name[0] == b'\0' {
-                current_task.abstract_socket_namespace.bind(name, socket)?;
+                current_task.abstract_socket_namespace.bind(current_task, name, socket)?;
             } else {
                 let mode = file.node().info().mode;
                 let mode = current_task.fs().apply_umask(mode).with_type(FileMode::IFSOCK);
@@ -158,13 +158,10 @@ pub fn sys_bind(
             }
         }
         SocketAddress::Vsock(port) => {
-            current_task.abstract_vsock_namespace.bind(port, socket)?;
+            current_task.abstract_vsock_namespace.bind(current_task, port, socket)?;
         }
-        SocketAddress::Inet(_) | SocketAddress::Inet6(_) => socket.bind(address)?,
-        SocketAddress::Netlink(ref mut addr) => {
-            // TODO: Support distinct IDs for processes with multiple netlink sockets.
-            addr.set_pid_if_zero(current_task.get_pid());
-            socket.bind(address)?
+        SocketAddress::Inet(_) | SocketAddress::Inet6(_) | SocketAddress::Netlink(_) => {
+            socket.bind(current_task, address)?
         }
     }
 
@@ -262,19 +259,13 @@ pub fn sys_connect(
             );
             SocketPeer::Address(address)
         }
-        SocketAddress::Netlink(_) => {
-            // Connect automatically binds netlink sockets if not already bound.
-            if let Some(netlink_socket) = client_socket.downcast_socket::<NetlinkSocket>() {
-                netlink_socket.bind_if_not_bound(current_task.get_pid());
-            }
-            SocketPeer::Address(address)
-        }
+        SocketAddress::Netlink(_) => SocketPeer::Address(address),
     };
 
     // TODO(tbodt): Support blocking when the UNIX domain socket queue fills up. This one's weird
     // because as far as I can tell, removing a socket from the queue does not actually trigger
     // FdEvents on anything.
-    client_socket.connect(peer, current_task.as_ucred())?;
+    client_socket.connect(current_task, peer)?;
     Ok(())
 }
 
