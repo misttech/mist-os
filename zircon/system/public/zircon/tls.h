@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_TLS_
-#define SYSROOT_ZIRCON_TLS_
+#ifndef SYSROOT_ZIRCON_TLS_H_
+#define SYSROOT_ZIRCON_TLS_H_
 
 // These constants are part of the C/C++ ABI known to compilers for
 // *-fuchsia targets.  These are offsets from the thread pointer.
@@ -15,7 +15,7 @@
 #define ZX_TLS_STACK_GUARD_OFFSET 0x10
 #define ZX_TLS_UNSAFE_SP_OFFSET 0x18
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
 
 #define ZX_TLS_STACK_GUARD_OFFSET (-0x10)
 #define ZX_TLS_UNSAFE_SP_OFFSET (-0x8)
@@ -26,4 +26,4 @@
 
 #endif
 
-#endif  // SYSROOT_ZIRCON_TLS_
+#endif  // SYSROOT_ZIRCON_TLS_H_
