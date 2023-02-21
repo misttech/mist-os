@@ -89,9 +89,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_USB_MODE_SWITCH:
       proto->ops = &usb_mode_switch_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_DSI:
-      proto->ops = &dsi_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_PCI:
       proto->ops = &pci_protocol_ops_;
       return ZX_OK;
@@ -882,15 +879,6 @@ zx_status_t FragmentProxy::UsbModeSwitchSetMode(usb_mode_t mode) {
   req.mode = mode;
 
   return Rpc(&req.header, sizeof(req), &resp, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::DsiConnect(zx::channel server) {
-  DsiProxyRequest req = {};
-  ProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_DSI;
-  req.op = DsiOp::CONNECT;
-  zx_handle_t handle = server.release();
-  return Rpc(&req.header, sizeof(req), &resp, sizeof(resp), &handle, 1, nullptr, 0, nullptr);
 }
 
 zx_status_t FragmentProxy::PowerSensorConnectServer(zx::channel server) {

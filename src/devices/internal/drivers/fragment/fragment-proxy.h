@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
-#include <fuchsia/hardware/dsi/cpp/banjo.h>
 #include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/hdmi/cpp/banjo.h>
@@ -54,7 +53,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::TeeProtocol<FragmentProxy>,
                       public ddk::UsbModeSwitchProtocol<FragmentProxy>,
                       public ddk::VregProtocol<FragmentProxy>,
-                      public ddk::DsiProtocol<FragmentProxy>,
                       // TODO(fxbug.dev/32978): PciProxyBase implements
                       // ddk::PciProtocol so it can be shared between the two
                       // PCI drivers until migration is complete.
@@ -144,9 +142,6 @@ class FragmentProxy : public FragmentProxyBase,
 
   // USB Mode Switch
   zx_status_t UsbModeSwitchSetMode(usb_mode_t mode);
-
-  // DSI
-  zx_status_t DsiConnect(zx::channel server);
 
   zx_status_t CodecConnect(zx::channel chan);
   zx_status_t DaiConnect(zx::channel chan);

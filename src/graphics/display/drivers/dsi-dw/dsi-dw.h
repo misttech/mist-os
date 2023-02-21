@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DSI_DW_H_
 
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
-#include <fuchsia/hardware/dsi/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>

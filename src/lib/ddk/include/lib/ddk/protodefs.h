@@ -162,7 +162,7 @@ DDK_PROTOCOL_DEF(DISPLAY_CLAMP_RGB_IMPL,  144, "display-clamprgb-impl", PF_NOPUB
 DDK_PROTOCOL_DEF(TEMPERATURE,             145, "temperature", 0)
 DDK_PROTOCOL_DEF(VREG,                    146, "vreg", 0)
 DDK_PROTOCOL_DEF(ADC,                     147, "adc", 0)
-DDK_PROTOCOL_DEF(DSI,                     148, "dsi", PF_NOPUB)
+// 148 was dsi
 DDK_PROTOCOL_DEF(BT_VENDOR,               149, "bt-vendor", 0)
 DDK_PROTOCOL_DEF(DSI_BASE,                150, "dsi-base", 0)
 DDK_PROTOCOL_DEF(POWER_SENSOR,            151, "power-sensor", 0)
