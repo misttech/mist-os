@@ -35,7 +35,6 @@
 #include "src/ui/scenic/lib/screen_capture/screen_capture_manager.h"
 #include "src/ui/scenic/lib/screen_capture2/screen_capture2_manager.h"
 #include "src/ui/scenic/lib/screenshot/screenshot_manager.h"
-#include "src/ui/scenic/lib/shutdown/lifecycle_controller_impl.h"
 #include "src/ui/scenic/lib/shutdown/shutdown_manager.h"
 #include "src/ui/scenic/lib/utils/metrics_impl.h"
 #include "src/ui/scenic/lib/view_tree/geometry_provider.h"
@@ -161,8 +160,6 @@ class App {
   AnnotationRegistry annotation_registry_;
 
   async_watchdog::Watchdog watchdog_;
-
-  LifecycleControllerImpl lifecycle_controller_impl_;
 
   const bool enable_snapshot_dump_ = false;
 };

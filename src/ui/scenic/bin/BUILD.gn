@@ -34,7 +34,6 @@ executable("bin") {
     "//src/ui/scenic/lib/screen_capture2",
     "//src/ui/scenic/lib/screenshot",
     "//src/ui/scenic/lib/shutdown",
-    "//src/ui/scenic/lib/shutdown:lifecycle_controller",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/view_tree:geometry_provider",
     "//src/ui/scenic/lib/view_tree:observer_registry",

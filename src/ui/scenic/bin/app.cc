@@ -36,6 +36,8 @@ namespace {
 // fsl::DeviceWatcher on it.
 static const char* kDependencyPath = "/gpu-manifest-fs";
 
+static constexpr zx::duration kShutdownTimeout{1000000000};  // 1 second
+
 // Populates a ConfigValues struct by reading a config file and retrieving
 // overrides from the stash.
 scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
@@ -262,7 +264,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           app_context_.get(), inspect_node_, frame_scheduler_,
           [weak = std::weak_ptr<ShutdownManager>(shutdown_manager_)] {
             if (auto strong = weak.lock()) {
-              strong->Shutdown(LifecycleControllerImpl::kShutdownTimeout);
+              strong->Shutdown(kShutdownTimeout);
             }
           },
           config_values_.i_can_haz_flatland),
@@ -321,9 +323,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       scoped_observer_registry_(geometry_provider_),
       annotation_registry_(app_context_.get()),
       watchdog_("Scenic main thread", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-                async_get_default_dispatcher()),
-      lifecycle_controller_impl_(app_context_.get(),
-                                 std::weak_ptr<ShutdownManager>(shutdown_manager_)) {
+                async_get_default_dispatcher()) {
   fpromise::bridge<escher::EscherUniquePtr> escher_bridge;
   fpromise::bridge<std::shared_ptr<display::Display>> display_bridge;
 
@@ -397,13 +397,13 @@ void App::InitializeServices(escher::EscherUniquePtr escher,
 
   if (!display) {
     FX_LOGS(ERROR) << "No default display, Graphics system exiting";
-    shutdown_manager_->Shutdown(LifecycleControllerImpl::kShutdownTimeout);
+    shutdown_manager_->Shutdown(kShutdownTimeout);
     return;
   }
 
   if (!escher || !escher->device()) {
     FX_LOGS(ERROR) << "No Vulkan on device, Graphics system exiting.";
-    shutdown_manager_->Shutdown(LifecycleControllerImpl::kShutdownTimeout);
+    shutdown_manager_->Shutdown(kShutdownTimeout);
     return;
   }
 
