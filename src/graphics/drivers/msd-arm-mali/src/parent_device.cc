@@ -25,14 +25,14 @@ bool ParentDevice::GetProtocol(uint32_t proto_id, void* proto_out) {
 }
 
 zx::bti ParentDevice::GetBusTransactionInitiator() const {
-  zx_handle_t bti_handle;
-  zx_status_t status = pdev_get_bti(&pdev_, 0, &bti_handle);
+  zx::bti bti;
+  zx_status_t status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK) {
     DMESSAGE("failed to get bus transaction initiator");
     return zx::bti();
   }
 
-  return zx::bti(bti_handle);
+  return bti;
 }
 
 std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(
@@ -40,20 +40,20 @@ std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(
   DLOG("CpuMapMmio index %d", index);
 
   zx_status_t status;
-  mmio_buffer_t mmio_buffer;
-
-  status = pdev_map_mmio_buffer(&pdev_, index, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_buffer);
+  std::optional<fdf::MmioBuffer> mmio_buffer;
+  status = pdev_.MapMmio(index, &mmio_buffer);
   if (status != ZX_OK) {
     DRETP(nullptr, "mapping resource failed");
   }
 
-  std::unique_ptr<magma::ZirconPlatformMmio> mmio(new magma::ZirconPlatformMmio(mmio_buffer));
-
   DLOG("map_mmio index %d cache_policy %d returned: 0x%x", index, static_cast<int>(cache_policy),
-       mmio_buffer.vmo);
+       mmio_buffer.value().get_vmo()->get());
+
+  std::unique_ptr<magma::ZirconPlatformMmio> mmio(
+      new magma::ZirconPlatformMmio(mmio_buffer.value().release()));
 
   zx::bti bti_handle;
-  status = pdev_get_bti(&pdev_, 0, bti_handle.reset_and_get_address());
+  status = pdev_.GetBti(0, &bti_handle);
   if (status != ZX_OK)
     return DRETP(nullptr, "failed to get bus transaction initiator for pinning mmio: %d", status);
 
@@ -64,12 +64,12 @@ std::unique_ptr<magma::PlatformMmio> ParentDevice::CpuMapMmio(
 }
 
 std::unique_ptr<magma::PlatformInterrupt> ParentDevice::RegisterInterrupt(unsigned int index) {
-  zx_handle_t interrupt_handle;
-  zx_status_t status = pdev_get_interrupt(&pdev_, index, 0, &interrupt_handle);
+  zx::interrupt interrupt;
+  zx_status_t status = pdev_.GetInterrupt(index, 0, &interrupt);
   if (status != ZX_OK)
     return DRETP(nullptr, "register interrupt failed");
 
-  return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(interrupt_handle));
+  return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(interrupt.release()));
 }
 
 // static

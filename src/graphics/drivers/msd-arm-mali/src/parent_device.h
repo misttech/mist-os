@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/device-protocol/pdev.h>
 
 #include <chrono>
 #include <memory>
@@ -24,7 +25,8 @@ msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device);
 
 class ParentDevice {
  public:
-  explicit ParentDevice(zx_device_t* parent, pdev_protocol_t pdev) : parent_(parent), pdev_(pdev) {}
+  explicit ParentDevice(zx_device_t* parent, pdev_protocol_t pdev)
+      : parent_(parent), pdev_(&pdev) {}
 
   virtual ~ParentDevice() { DLOG("ParentDevice dtor"); }
 
@@ -48,7 +50,7 @@ class ParentDevice {
 
  private:
   zx_device_t* parent_;
-  pdev_protocol_t pdev_;
+  ddk::PDev pdev_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_

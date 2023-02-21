@@ -69,6 +69,12 @@ class MmioBuffer {
     return *this;
   }
 
+  __attribute__((warn_unused_result)) mmio_buffer_t release() {
+    mmio_buffer_t result = mmio_;
+    memset(&mmio_, 0, sizeof(mmio_));
+    return result;
+  }
+
   static zx_status_t Create(zx_off_t offset, size_t size, zx::vmo vmo, uint32_t cache_policy,
                             std::optional<MmioBuffer>* mmio_buffer) {
     mmio_buffer_t mmio;

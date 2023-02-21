@@ -58,7 +58,7 @@ class PDev : public PDevProtocolClient {
     return PDevProtocolClient::GetInterrupt(index, flags, out);
   }
 
-  zx_status_t GetBti(uint32_t index, zx::bti* out) {
+  zx_status_t GetBti(uint32_t index, zx::bti* out) const {
     return PDevProtocolClient::GetBti(index, out);
   }
 };
