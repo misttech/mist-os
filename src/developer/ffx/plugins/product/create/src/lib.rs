@@ -195,9 +195,9 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
     let product_bundle = ProductBundleV2 {
         product_name,
         partitions,
-        system_a,
-        system_b,
-        system_r,
+        system_a: system_a.map(|s| s.images),
+        system_b: system_b.map(|s| s.images),
+        system_r: system_r.map(|s| s.images),
         repositories,
         update_package_hash,
         virtual_devices_path,
@@ -247,11 +247,8 @@ fn load_assembly_manifest(
         // Make sure `out_dir` is created.
         std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-        let file =
-            File::open(path).with_context(|| format!("Opening assembly manifest: {}", path))?;
-        let manifest: AssemblyManifest = serde_json::from_reader(file)
-            .with_context(|| format!("Parsing assembly manifest: {}", path))?;
-        let manifest = manifest.derelativize(path.parent().context("Invalid path")?)?;
+        let manifest = AssemblyManifest::try_load_from(path)
+            .with_context(|| format!("Loading assembly manifest: {}", path))?;
 
         // Filter out the base package, and the blobfs contents.
         let mut images = Vec::new();
@@ -365,8 +362,7 @@ mod test {
         let pb_dir = tempdir.join("pb");
 
         let manifest_path = tempdir.join("manifest.json");
-        let manifest_file = File::create(&manifest_path).unwrap();
-        serde_json::to_writer(&manifest_file, &AssemblyManifest::default()).unwrap();
+        AssemblyManifest::default().write(&manifest_path).unwrap();
 
         let error_path = tempdir.join("error.json");
         let mut error_file = File::create(&error_path).unwrap();
@@ -440,8 +436,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        let system_file = File::create(&system_path).unwrap();
-        serde_json::to_writer(&system_file, &AssemblyManifest::default()).unwrap();
+        AssemblyManifest::default().write(&system_path).unwrap();
 
         let tools = FakeToolProvider::default();
         pb_create_with_tools(
@@ -469,9 +464,9 @@ mod test {
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
                 partitions: PartitionsConfig::default(),
-                system_a: Some(AssemblyManifest::default()),
+                system_a: Some(vec![]),
                 system_b: None,
-                system_r: Some(AssemblyManifest::default()),
+                system_r: Some(vec![]),
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: None,
@@ -490,8 +485,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        let system_file = File::create(&system_path).unwrap();
-        serde_json::to_writer(&system_file, &AssemblyManifest::default()).unwrap();
+        AssemblyManifest::default().write(&system_path).unwrap();
 
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
@@ -522,9 +516,9 @@ mod test {
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
                 partitions: PartitionsConfig::default(),
-                system_a: Some(AssemblyManifest::default()),
+                system_a: Some(AssemblyManifest::default().images),
                 system_b: None,
-                system_r: Some(AssemblyManifest::default()),
+                system_r: Some(AssemblyManifest::default().images),
                 repositories: vec![Repository {
                     name: "fuchsia.com".into(),
                     metadata_path: pb_dir.join("repository"),

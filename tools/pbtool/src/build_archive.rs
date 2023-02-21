@@ -9,7 +9,6 @@ use argh::FromArgs;
 use assembly_manifest::{AssemblyManifest, Image};
 use camino::Utf8PathBuf;
 use sdk_metadata::ProductBundle;
-use std::fs::File;
 
 /// Generate a build archive using the specified `args`.
 #[derive(FromArgs, PartialEq, Debug)]
@@ -51,7 +50,7 @@ impl GenerateBuildArchive {
         let mut images = vec![];
 
         // Pull out the relevant files.
-        for image in assembly.images {
+        for image in assembly.iter() {
             let entry = match &image {
                 Image::ZBI { path, signed: _ } => Some((path, "zircon-a.zbi")),
                 Image::FVM(path) => Some((path, "storage-full.blk")),
@@ -66,17 +65,15 @@ impl GenerateBuildArchive {
 
                 // Create a new Image with the new path.
                 let mut new_image = image.clone();
-                new_image.set_source(name);
+                new_image.set_source(destination);
                 images.push(new_image);
             }
         }
 
         // Write the images manifest with the rebased image paths.
         let images_manifest = AssemblyManifest { images };
-        let images_manifest_file =
-            File::create(self.out_dir.join("images.json")).context("Creating images manifest")?;
-        serde_json::to_writer(images_manifest_file, &images_manifest)
-            .context("Writing images manifest")?;
+        let images_manifest_path = self.out_dir.join("images.json");
+        images_manifest.write(images_manifest_path).context("Writing images manifest")?;
 
         Ok(())
     }
@@ -90,6 +87,8 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
     use sdk_metadata::ProductBundleV2;
+    use serde_json::Value;
+    use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -111,13 +110,11 @@ mod tests {
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             partitions: PartitionsConfig::default(),
-            system_a: Some(AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: tempdir.join("zbi"), signed: false },
-                    Image::FVM(tempdir.join("fvm")),
-                    Image::QemuKernel(tempdir.join("kernel")),
-                ],
-            }),
+            system_a: Some(vec![
+                Image::ZBI { path: tempdir.join("zbi"), signed: false },
+                Image::FVM(tempdir.join("fvm")),
+                Image::QemuKernel(tempdir.join("kernel")),
+            ]),
             system_b: None,
             system_r: None,
             repositories: vec![],
@@ -138,17 +135,32 @@ mod tests {
         assert!(ba_path.join("qemu-kernel.kernel").exists());
 
         let images_manifest_file = File::open(ba_path.join("images.json")).unwrap();
-        let images_manifest: AssemblyManifest =
-            serde_json::from_reader(images_manifest_file).unwrap();
+        let images_manifest: Value = serde_json::from_reader(images_manifest_file).unwrap();
         assert_eq!(
             images_manifest,
-            AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: "zircon-a.zbi".into(), signed: false },
-                    Image::FVM("storage-full.blk".into()),
-                    Image::QemuKernel("qemu-kernel.kernel".into()),
-                ],
-            }
+            serde_json::from_str::<Value>(
+                r#"
+            [
+                {
+                    "name": "zircon-a",
+                    "type": "zbi",
+                    "path": "zircon-a.zbi",
+                    "signed": false
+                },
+                {
+                    "type": "blk",
+                    "name": "storage-full",
+                    "path": "storage-full.blk"
+                },
+                {
+                    "type": "kernel",
+                    "name": "qemu-kernel",
+                    "path": "qemu-kernel.kernel"
+                }
+            ]
+            "#
+            )
+            .unwrap()
         );
     }
 }

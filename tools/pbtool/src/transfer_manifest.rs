@@ -6,7 +6,7 @@
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
-use assembly_manifest::AssemblyManifest;
+use assembly_manifest::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 use sdk_metadata::{ProductBundle, VirtualDevice, VirtualDeviceManifest};
@@ -111,9 +111,9 @@ impl GenerateTransferManifest {
         }
 
         // Add the images from the systems.
-        let mut system = |system: &Option<AssemblyManifest>| -> Result<()> {
+        let mut system = |system: &Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
-                for image in &system.images {
+                for image in system.iter() {
                     product_bundle_entries.push(ArtifactEntry {
                         name: diff_utf8_paths(image.source(), &canonical_product_bundle_path)
                             .context("rebasing system image")?,
@@ -214,7 +214,7 @@ impl GenerateTransferManifest {
         } else {
             bail!("The product bundle does not have any assembly systems");
         };
-        for image in &mut assembly.images {
+        for image in assembly.iter_mut() {
             image.set_source(
                 diff_utf8_paths(image.source(), canonical_out_dir)
                     .context("rebasing image path")?,
@@ -252,6 +252,7 @@ mod tests {
     use sdk_metadata::virtual_device::Hardware;
     use sdk_metadata::{ProductBundleV2, Repository, VirtualDeviceV1};
     use serde_json::json;
+    use serde_json::Value;
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -298,13 +299,11 @@ mod tests {
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             partitions: PartitionsConfig::default(),
-            system_a: Some(AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: create_temp_file("zbi"), signed: false },
-                    Image::FVM(create_temp_file("fvm")),
-                    Image::QemuKernel(create_temp_file("kernel")),
-                ],
-            }),
+            system_a: Some(vec![
+                Image::ZBI { path: create_temp_file("zbi"), signed: false },
+                Image::FVM(create_temp_file("fvm")),
+                Image::QemuKernel(create_temp_file("kernel")),
+            ]),
             system_b: None,
             system_r: None,
             repositories: vec![Repository {
@@ -414,17 +413,33 @@ mod tests {
         );
 
         let images_path = tempdir.join("images.json");
-        let images_file = File::open(&images_path).unwrap();
-        let images: AssemblyManifest = serde_json::from_reader(images_file).unwrap();
+        let images_manifest_file = File::open(images_path).unwrap();
+        let images: Value = serde_json::from_reader(images_manifest_file).unwrap();
         assert_eq!(
             images,
-            AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: "product_bundle/zbi".into(), signed: false },
-                    Image::FVM("product_bundle/fvm".into()),
-                    Image::QemuKernel("product_bundle/kernel".into()),
-                ],
-            },
+            serde_json::from_str::<Value>(
+                r#"
+            [
+                {
+                    "name": "zircon-a",
+                    "type": "zbi",
+                    "path": "product_bundle/zbi",
+                    "signed": false
+                },
+                {
+                    "type": "blk",
+                    "name": "storage-full",
+                    "path": "product_bundle/fvm"
+                },
+                {
+                    "type": "kernel",
+                    "name": "qemu-kernel",
+                    "path": "product_bundle/kernel"
+                }
+            ]
+            "#
+            )
+            .unwrap()
         );
 
         let targets_path = tempdir.join("targets.json");

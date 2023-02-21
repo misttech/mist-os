@@ -274,7 +274,6 @@ fn convert_v2_bundle_to_configs(
         .ok_or(anyhow!("No systems to boot in the product bundle"))?;
 
     let kernel_image = system
-        .images
         .iter()
         .find_map(|i| match i {
             Image::QemuKernel(path) => Some(path.clone().into()),
@@ -282,13 +281,12 @@ fn convert_v2_bundle_to_configs(
         })
         .ok_or(anyhow!("No emulator kernels specified in the product bundle"))?;
 
-    let fvm_image: Option<PathBuf> = system.images.iter().find_map(|i| match i {
+    let fvm_image: Option<PathBuf> = system.iter().find_map(|i| match i {
         Image::FVM(path) => Some(path.clone().into()),
         _ => None,
     });
 
     let zbi_image: PathBuf = system
-        .images
         .iter()
         .find_map(|i| match i {
             Image::ZBI { path, .. } => Some(path.clone().into()),
@@ -304,7 +302,6 @@ fn convert_v2_bundle_to_configs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::AssemblyManifest;
     use assembly_partitions_config::PartitionsConfig;
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
@@ -457,14 +454,12 @@ mod tests {
         let mut pb = ProductBundleV2 {
             product_name: String::default(),
             partitions: PartitionsConfig::default(),
-            system_a: Some(AssemblyManifest {
-                images: vec![
-                    // By the time we call convert_, these should be canonicalized.
-                    Image::ZBI { path: expected_zbi.clone(), signed: false },
-                    Image::QemuKernel(expected_kernel.clone()),
-                    Image::FVM(expected_fvm.clone()),
-                ],
-            }),
+            system_a: Some(vec![
+                // By the time we call convert_, these should be canonicalized.
+                Image::ZBI { path: expected_zbi.clone(), signed: false },
+                Image::QemuKernel(expected_kernel.clone()),
+                Image::FVM(expected_fvm.clone()),
+            ]),
             system_b: None,
             system_r: None,
             repositories: vec![],
@@ -513,13 +508,11 @@ mod tests {
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
-        pb.system_a = Some(AssemblyManifest {
-            images: vec![
-                Image::ZBI { path: expected_zbi.clone(), signed: false },
-                Image::QemuKernel(expected_kernel.clone()),
-                Image::FVM(expected_fvm.clone()),
-            ],
-        });
+        pb.system_a = Some(vec![
+            Image::ZBI { path: expected_zbi.clone(), signed: false },
+            Image::QemuKernel(expected_kernel.clone()),
+            Image::FVM(expected_fvm.clone()),
+        ]);
         device.hardware = Hardware {
             cpu: Cpu { arch: CpuArchitecture::Arm64 },
             audio: AudioDevice { model: AudioModel::None },

@@ -5,12 +5,10 @@
 use anyhow::{Context, Result};
 use assembly_manifest::AssemblyManifest;
 use assembly_partitions_config::PartitionsConfig;
-use camino::Utf8Path;
 use ffx_assembly_args::CreateFlashManifestArgs;
 use ffx_fastboot::manifest::FlashManifestVersion;
 use sdk_metadata::{ProductBundle, ProductBundleV2};
 use std::fs::File;
-use std::io::BufReader;
 
 /// Create a flash manifest that can be used to flash the partitions of a target device.
 pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
@@ -23,9 +21,29 @@ pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
     let product_bundle = ProductBundle::V2(ProductBundleV2 {
         product_name: "unused.product-name".to_string(),
         partitions: partitions_config,
-        system_a: args.system_a.as_ref().map(manifest_from_file).transpose()?,
-        system_b: args.system_b.as_ref().map(manifest_from_file).transpose()?,
-        system_r: args.system_r.as_ref().map(manifest_from_file).transpose()?,
+        system_a: args
+            .system_a
+            .as_ref()
+            .map(AssemblyManifest::try_load_from)
+            .transpose()?
+            // Relativize to the outdir since the product bundle
+            // should be portable and stored in the same directory as
+            // the flashing process occurs.
+            .map(|m| m.relativize(&args.outdir).unwrap().images),
+        system_b: args
+            .system_b
+            .as_ref()
+            .map(AssemblyManifest::try_load_from)
+            .transpose()?
+            // Relativize to the outdir as above.
+            .map(|m| m.relativize(&args.outdir).unwrap().images),
+        system_r: args
+            .system_r
+            .as_ref()
+            .map(AssemblyManifest::try_load_from)
+            .transpose()?
+            // Relativize to the outdir as above.
+            .map(|m| m.relativize(&args.outdir).unwrap().images),
         repositories: vec![],
         update_package_hash: None,
         virtual_devices_path: None,
@@ -43,20 +61,11 @@ pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
     Ok(())
 }
 
-/// Read an AssemblyManifest from a file.
-fn manifest_from_file(path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
-    let path = path.as_ref();
-    let file = File::open(path)
-        .with_context(|| format!("Failed to open the system images file: {path}"))?;
-    serde_json::from_reader(BufReader::new(file))
-        .with_context(|| format!("Failed to parse the system images file: {path}"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::util::{read_config, write_json_file};
-    use camino::Utf8PathBuf;
+    use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
     use std::fs;
     use tempfile::TempDir;

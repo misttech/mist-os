@@ -20,7 +20,7 @@
 //! downloaded on another machine).
 
 use anyhow::{anyhow, Context, Result};
-use assembly_manifest::AssemblyManifest;
+use assembly_manifest::Image;
 use assembly_partitions_config::PartitionsConfig;
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_developer_ffx::ListFields;
@@ -42,15 +42,15 @@ pub struct ProductBundleV2 {
 
     /// An assembled system that should be placed in slot A on the target.
     #[serde(default)]
-    pub system_a: Option<AssemblyManifest>,
+    pub system_a: Option<Vec<Image>>,
 
     /// An assembled system that should be placed in slot B on the target.
     #[serde(default)]
-    pub system_b: Option<AssemblyManifest>,
+    pub system_b: Option<Vec<Image>>,
 
     /// An assembled system that should be placed in slot R on the target.
     #[serde(default)]
-    pub system_r: Option<AssemblyManifest>,
+    pub system_r: Option<Vec<Image>>,
 
     /// The repositories that hold the TUF metadata, packages, and blobs.
     #[serde(default)]
@@ -135,9 +135,9 @@ impl ProductBundleV2 {
         }
 
         // Canonicalize the systems.
-        let canonicalize_system = |system: &mut Option<AssemblyManifest>| -> Result<()> {
+        let canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
-                for image in &mut system.images {
+                for image in system.iter_mut() {
                     image.set_source(product_bundle_dir.join(image.source()).canonicalize_utf8()?);
                 }
             }
@@ -199,9 +199,9 @@ impl ProductBundleV2 {
         }
 
         // Relativize the systems.
-        let relativize_system = |system: &mut Option<AssemblyManifest>| -> Result<()> {
+        let relativize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
-                for image in &mut system.images {
+                for image in system.iter_mut() {
                     let path = diff_utf8_paths(&image.source(), &product_bundle_dir)
                         .ok_or(anyhow!("failed to rebase the file"))?;
                     image.set_source(path);
@@ -310,13 +310,11 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec!["unlock_credentials".into()],
             },
-            system_a: Some(AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: "zbi".into(), signed: false },
-                    Image::VBMeta("vbmeta".into()),
-                    Image::FVM("fvm".into()),
-                ],
-            }),
+            system_a: Some(vec![
+                Image::ZBI { path: "zbi".into(), signed: false },
+                Image::VBMeta("vbmeta".into()),
+                Image::FVM("fvm".into()),
+            ]),
             system_b: None,
             system_r: None,
             repositories: vec![],
@@ -377,13 +375,11 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec![tempdir.join("unlock_credentials")],
             },
-            system_a: Some(AssemblyManifest {
-                images: vec![
-                    Image::ZBI { path: tempdir.join("zbi"), signed: false },
-                    Image::VBMeta(tempdir.join("vbmeta")),
-                    Image::FVM(tempdir.join("fvm")),
-                ],
-            }),
+            system_a: Some(vec![
+                Image::ZBI { path: tempdir.join("zbi"), signed: false },
+                Image::VBMeta(tempdir.join("vbmeta")),
+                Image::FVM(tempdir.join("fvm")),
+            ]),
             system_b: None,
             system_r: None,
             repositories: vec![],

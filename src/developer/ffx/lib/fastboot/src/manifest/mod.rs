@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Context, Result};
-use assembly_manifest::AssemblyManifest;
+use assembly_manifest::Image as AssemblyManifestImage;
 use assembly_partitions_config::{Partition, Slot};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -251,19 +251,19 @@ impl FlashManifestVersion {
 /// all images other than the ZBI, VBMeta, and fastboot FVM.
 fn add_images_to_map(
     image_map: &mut ImageMap,
-    manifest: &AssemblyManifest,
+    manifest: &Vec<AssemblyManifestImage>,
     slot: Slot,
 ) -> Result<()> {
     let slot_entry = image_map.entry(slot).or_insert(BTreeMap::new());
-    for image in &manifest.images {
+    for image in manifest.iter() {
         match image {
-            assembly_manifest::Image::ZBI { path, .. } => {
+            AssemblyManifestImage::ZBI { path, .. } => {
                 slot_entry.insert(ImageType::ZBI, path.to_string())
             }
-            assembly_manifest::Image::VBMeta(path) => {
+            AssemblyManifestImage::VBMeta(path) => {
                 slot_entry.insert(ImageType::VBMeta, path.to_string())
             }
-            assembly_manifest::Image::FVMFastboot(path) => {
+            AssemblyManifestImage::FVMFastboot(path) => {
                 if let Slot::R = slot {
                     // Recovery should not include a separate FVM, because it is embedded into the
                     // ZBI as a ramdisk.
@@ -596,16 +596,14 @@ mod test {
     #[test]
     fn test_add_images_to_map() {
         let mut image_map: ImageMap = BTreeMap::new();
-        let manifest = AssemblyManifest {
-            images: vec![
-                assembly_manifest::Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false },
-                assembly_manifest::Image::VBMeta("path/to/fuchsia.vbmeta".into()),
-                assembly_manifest::Image::FVMFastboot("path/to/fvm.fastboot.blk".into()),
-                // These should be ignored.
-                assembly_manifest::Image::FVM("path/to/fvm.blk".into()),
-                assembly_manifest::Image::BasePackage("path/to/base".into()),
-            ],
-        };
+        let manifest = vec![
+            AssemblyManifestImage::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false },
+            AssemblyManifestImage::VBMeta("path/to/fuchsia.vbmeta".into()),
+            AssemblyManifestImage::FVMFastboot("path/to/fvm.fastboot.blk".into()),
+            // These should be ignored.
+            AssemblyManifestImage::FVM("path/to/fvm.blk".into()),
+            AssemblyManifestImage::BasePackage("path/to/base".into()),
+        ];
         add_images_to_map(&mut image_map, &manifest, Slot::A).unwrap();
         assert_eq!(image_map.len(), 1);
         assert_eq!(image_map[&Slot::A].len(), 3);

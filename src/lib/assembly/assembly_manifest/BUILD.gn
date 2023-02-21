@@ -18,15 +18,13 @@ rustc_library("assembly_manifest") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
   ]
   sources = [
     "src/assembly_manifest.rs",
     "src/lib.rs",
   ]
-  test_deps = [
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tempfile",
-  ]
+  test_deps = [ "//third_party/rust_crates:tempfile" ]
 }
 
 group("host_tests") {

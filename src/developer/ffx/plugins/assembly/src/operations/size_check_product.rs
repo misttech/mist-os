@@ -4,17 +4,16 @@
 
 use crate::operations::size_check::PackageSizeInfo;
 use crate::operations::size_check::PackageSizeInfos;
-use crate::util::read_config;
 use anyhow::{format_err, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
+use camino::Utf8Path;
+use camino::Utf8PathBuf;
 use ffx_assembly_args::{AuthMode, ProductSizeCheckArgs};
 use fuchsia_hash::Hash;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use super::size_check::PackageBlobSizeInfo;
@@ -60,9 +59,8 @@ struct VisualizationBlobNode {
 
 /// Verifies that the product budget is not exceeded.
 pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
-    let assembly_manifest: AssemblyManifest = read_config(&args.assembly_manifest)?;
-    let assembly_manifest = assembly_manifest
-        .derelativize(args.assembly_manifest.parent().context("Invalid manifest path")?)?;
+    let assembly_manifest: AssemblyManifest =
+        AssemblyManifest::try_load_from(&args.assembly_manifest)?;
 
     let blobfs_contents = match extract_blobfs_contents(&assembly_manifest) {
         Some(contents) => contents,
@@ -97,9 +95,9 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
             let output_path = gcs_download(bucket, object, args.auth)
                 .await
                 .context("download base assembly manifest")?;
-            read_config(output_path)?
+            AssemblyManifest::try_load_from(output_path)?
         } else {
-            read_config(&base_assembly_manifest)?
+            AssemblyManifest::try_load_from(&base_assembly_manifest)?
         };
 
         let other_blobfs_contents =
@@ -209,9 +207,9 @@ async fn get_gcs_client_with_auth(auth_mode: AuthMode) -> Result<Client> {
     Ok(client)
 }
 
-async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result<PathBuf> {
+async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result<Utf8PathBuf> {
     let client = get_gcs_client_with_auth(auth_mode).await.context("getting gcs client")?;
-    let output_path = Path::new("/tmp/fuchsia.json");
+    let output_path = Utf8Path::new("/tmp/fuchsia.json");
     client.fetch_without_progress(bucket, object, &output_path).await.context("Downloading")?;
     Ok(output_path.to_path_buf())
 }

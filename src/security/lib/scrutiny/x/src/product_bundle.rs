@@ -389,7 +389,6 @@ mod tests {
     use crate::api::DataSourceKind;
     use crate::blob::BlobDirectoryBlobSetBuilderError;
     use crate::blob::BlobSet;
-    use assembly_manifest::AssemblyManifest;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
     use camino::Utf8PathBuf;
@@ -425,7 +424,7 @@ mod tests {
         SdkProductBundle::V2(SdkProductBundleV2 {
             product_name: String::default(),
             partitions: PartitionsConfig::default(),
-            system_a: Some(AssemblyManifest::default()),
+            system_a: Some(Vec::<assembly_manifest::Image>::default()),
             system_b: None,
             system_r: None,
             repositories: vec![Repository {

@@ -9,7 +9,6 @@ use assembly_tool::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util::from_reader;
-use camino::Utf8Path;
 use epoch::EpochFile;
 use ffx_assembly_args::CreateUpdateArgs;
 use std::fs::File;
@@ -54,23 +53,19 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     }
 
     // Set the images to update in the primary slot.
-    if let Some(manifest) = args.system_a.as_ref().map(manifest_from_file).transpose()? {
+    if let Some(manifest) =
+        args.system_a.as_ref().map(AssemblyManifest::try_load_from).transpose()?
+    {
         builder.add_slot_images(Slot::Primary(manifest));
     }
 
     // Set the images to update in the recovery slot.
-    if let Some(manifest) = args.system_r.as_ref().map(manifest_from_file).transpose()? {
+    if let Some(manifest) =
+        args.system_r.as_ref().map(AssemblyManifest::try_load_from).transpose()?
+    {
         builder.add_slot_images(Slot::Recovery(manifest));
     }
 
     builder.build()?;
     Ok(())
-}
-
-fn manifest_from_file(path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
-    let file = File::open(path.as_ref())
-        .context(format!("Failed to open the system images file: {}", path.as_ref()))?;
-    let manifest: AssemblyManifest = serde_json::from_reader(file)
-        .context(format!("Failed to parse the system images file: {}", path.as_ref()))?;
-    manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
 }

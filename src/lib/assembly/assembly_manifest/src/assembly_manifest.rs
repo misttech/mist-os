@@ -9,6 +9,7 @@ use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
+use std::fs::File;
 use utf8_path::path_relative_from;
 
 /// A manifest containing a list of images produced by the Image Assembler.
@@ -30,11 +31,19 @@ use utf8_path::path_relative_from;
 /// println!("{:?}", serde_json::to_value(manifest).unwrap());
 /// ```
 ///
-#[derive(Clone, Deserialize, Serialize, Eq, PartialEq, Debug, Default)]
-#[serde(transparent)]
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct AssemblyManifest {
     /// List of images in the manifest.
     pub images: Vec<Image>,
+}
+
+/// Private helper for serializing the AssemblyManifest. An AssemblyManifest cannot be deserialized
+/// without going through `try_from_path` in order to require that we use this helper
+/// which ensure that the paths get relativized/derelativized properly
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(transparent)]
+struct SerializationHelper {
+    images: Vec<Image>,
 }
 
 /// An item in the AssemblyManifest.
@@ -190,6 +199,39 @@ impl AssemblyManifest {
         self.images = images;
 
         Ok(self)
+    }
+
+    /// Load an AssemblyManifest from a path on disk, handling path
+    /// relativization
+    pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
+        let file = File::open(path.as_ref()).with_context(|| {
+            format!("Failed to open the assembly manifest file: {}", path.as_ref())
+        })?;
+        let deserialized: SerializationHelper =
+            serde_json::from_reader(file).with_context(|| {
+                format!("Failed to parse the assembly manifest file: {}", path.as_ref())
+            })?;
+        let manifest = AssemblyManifest { images: deserialized.images };
+        manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
+    }
+
+    /// Write a product bundle to a directory on disk at `path`.
+    /// Make the paths recorded in the file relative to the file's location
+    /// so it is portable.
+    pub fn write(self, path: impl AsRef<Utf8Path>) -> Result<()> {
+        let path = path.as_ref();
+        // Relativize the paths in the Assembly Manifest
+        let assembly_manifest =
+            self.relativize(path.parent().with_context(|| format!("Invalid output path {path}"))?)?;
+
+        // Write the images manifest.
+        let images_json = File::create(path).context("Creating assembly manifest")?;
+        serde_json::to_writer(
+            images_json,
+            &SerializationHelper { images: assembly_manifest.images },
+        )
+        .context("Writing assembly manifest")?;
+        Ok(())
     }
 }
 
@@ -514,10 +556,7 @@ mod tests {
         };
 
         let relativized_manifest =
-            serde_json::from_value::<AssemblyManifest>(generate_test_value())
-                .unwrap()
-                .relativize(Utf8PathBuf::from("path/to"))
-                .unwrap();
+            generate_test_manifest().relativize(Utf8PathBuf::from("path/to")).unwrap();
         assert_eq!(relativized_manifest, manifest);
     }
 
@@ -538,7 +577,7 @@ mod tests {
         };
 
         let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
-        let manifest = serde_json::from_value::<AssemblyManifest>(generate_test_value()).unwrap();
+        let manifest = generate_test_manifest();
         assert_eq!(manifest, derelativized_manifest);
     }
 
@@ -558,7 +597,10 @@ mod tests {
             ],
         };
 
-        assert_eq!(generate_test_value(), serde_json::to_value(manifest).unwrap());
+        assert_eq!(
+            generate_test_value(),
+            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+        );
     }
 
     #[test]
@@ -575,7 +617,10 @@ mod tests {
                 "signed": false,
             }
         ]);
-        assert_eq!(value, serde_json::to_value(manifest).unwrap());
+        assert_eq!(
+            value,
+            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+        );
     }
 
     #[test]
@@ -587,13 +632,13 @@ mod tests {
                 "path": "path/to/fuchsia.zbi",
             }
         ]);
-        let result: Result<AssemblyManifest, _> = serde_json::from_value(invalid);
+        let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
         assert!(result.unwrap_err().is_data());
     }
 
     #[test]
     fn deserialize() {
-        let manifest: AssemblyManifest = serde_json::from_value(generate_test_value()).unwrap();
+        let manifest: AssemblyManifest = generate_test_manifest();
         assert_eq!(manifest.images.len(), 9);
 
         for image in &manifest.images {
@@ -627,7 +672,7 @@ mod tests {
                 "path": "path/to/base.far",
             },
         ]);
-        let result: Result<AssemblyManifest, _> = serde_json::from_value(invalid);
+        let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
         assert!(result.unwrap_err().is_data());
     }
 
@@ -721,6 +766,14 @@ mod tests {
         }
         "#;
         content.to_string()
+    }
+
+    fn generate_test_manifest() -> AssemblyManifest {
+        AssemblyManifest {
+            images: serde_json::from_value::<SerializationHelper>(generate_test_value())
+                .unwrap()
+                .images,
+        }
     }
 
     fn generate_test_value() -> Value {
