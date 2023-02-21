@@ -110,6 +110,12 @@ def _googletest_repository_impl(repo_ctx):
     """Create a @com_google_googletest repository that supports Fuchsia."""
     workspace_dir = str(workspace_root_path(repo_ctx))
 
+    # IMPORTANT: keep this function in sync with the computation of
+    # generated_repository_inputs['com_google_googletest'] in
+    # //build/bazel/update-workspace.py.
+    if hasattr(repo_ctx.attr, "content_hash_file"):
+        repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.content_hash_file)
+
     # This uses a git bundle to ensure that we can always work from a
     # Jiri-managed clone of //third_party/googletest/src/. This is more reliable
     # than the previous approach that relied on patching.
@@ -132,4 +138,10 @@ googletest_repository = repository_rule(
     implementation = _googletest_repository_impl,
     doc = "A repository rule used to create a googletest repository that " +
           "properly supports Fuchsia through local patching.",
+    attrs = {
+        "content_hash_file": attr.string(
+            doc = "Path to content hash file for this repository, relative to workspace root.",
+            mandatory = False,
+        ),
+    },
 )
