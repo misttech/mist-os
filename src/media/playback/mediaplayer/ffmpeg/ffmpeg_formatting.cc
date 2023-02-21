@@ -261,9 +261,6 @@ std::ostream& operator<<(std::ostream& os, AVFMTFlags value) {
   if (value.flags_ & AVFMT_FLAG_SORT_DTS) {
     os << fostr::NewLine << "AVFMT_FLAG_SORT_DTS";
   }
-  if (value.flags_ & AVFMT_FLAG_PRIV_OPT) {
-    os << fostr::NewLine << "AVFMT_FLAG_PRIV_OPT";
-  }
   if (value.flags_ & AVFMT_FLAG_FAST_SEEK) {
     os << fostr::NewLine << "AVFMT_FLAG_FAST_SEEK";
   }
