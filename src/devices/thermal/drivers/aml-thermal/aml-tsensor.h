@@ -48,7 +48,6 @@ class AmlTSensor {
   void UpdateFallThresholdIrq(uint32_t irq);
   void UpdateRiseThresholdIrq(uint32_t irq);
   uint32_t trim_info_;
-  pdev_protocol_t pdev_;
   std::optional<fdf::MmioBuffer> sensor_base_mmio_;
   std::optional<fdf::MmioBuffer> trim_mmio_;
   std::optional<fdf::MmioBuffer> hiu_mmio_;
