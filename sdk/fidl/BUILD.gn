@@ -9,6 +9,7 @@ import("//build/sdk/sdk.gni")
 sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture",
   "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics",
+  "//sdk/fidl/fuchsia.accessibility.tts:fuchsia.accessibility.tts",
   "//sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard",
   "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects",
   "//sdk/fidl/fuchsia.auth:fuchsia.auth",

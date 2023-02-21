@@ -12,6 +12,7 @@ sdk://docs/sdk_notice
 sdk://docs/vulkan_license
 sdk://fidl/fuchsia.accessibility.gesture
 sdk://fidl/fuchsia.accessibility.semantics
+sdk://fidl/fuchsia.accessibility.tts
 sdk://fidl/fuchsia.accessibility.virtualkeyboard
 sdk://fidl/fuchsia.audio.effects
 sdk://fidl/fuchsia.auth
@@ -56,9 +57,9 @@ sdk://fidl/fuchsia.fonts
 sdk://fidl/fuchsia.gpu.agis
 sdk://fidl/fuchsia.gpu.magma
 sdk://fidl/fuchsia.hardware.adc
-sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.audio
 sdk://fidl/fuchsia.hardware.audio.signalprocessing
+sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.light
 sdk://fidl/fuchsia.hardware.network
 sdk://fidl/fuchsia.hardware.power.statecontrol
@@ -206,8 +207,7 @@ sdk://pkg/vfs_cpp
 sdk://pkg/vulkan
 sdk://pkg/vulkan_layers
 sdk://pkg/zx
-?sdk://tools/arm64/aemu_internal
-?sdk://tools/arm64/qemu_internal
+sdk://tools/arm64/aemu_internal
 sdk://tools/arm64/blobfs-compression
 sdk://tools/arm64/blobfs_do_not_depend
 sdk://tools/arm64/bootserver
@@ -231,6 +231,7 @@ sdk://tools/arm64/fvm
 sdk://tools/arm64/merkleroot
 sdk://tools/arm64/minfs
 sdk://tools/arm64/pm
+sdk://tools/arm64/qemu_internal
 sdk://tools/arm64/symbolizer
 sdk://tools/arm64/zbi
 sdk://tools/arm64/zxdb

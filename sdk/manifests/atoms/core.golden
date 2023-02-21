@@ -2,6 +2,7 @@
 //sdk/docs:docs
 //sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture_sdk
 //sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_sdk
+//sdk/fidl/fuchsia.accessibility.tts:fuchsia.accessibility.tts_sdk
 //sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard_sdk
 //sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_sdk
 //sdk/fidl/fuchsia.auth.oldtokens:fuchsia.auth.oldtokens_sdk
