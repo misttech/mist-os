@@ -169,8 +169,6 @@ template("bazel_action") {
       "//.git/index",
     ]
 
-    depfile = "$target_gen_dir/$target_name.d"
-
     outputs = _outputs
     args = [
              "--bazel-launcher",
@@ -184,13 +182,7 @@ template("bazel_action") {
              "--bazel-inputs",
            ] + _inputs + [ "--bazel-outputs" ] + invoker.bazel_outputs +
            [ "--bazel-targets" ] + invoker.bazel_targets +
-           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
-           [
-             "--fuchsia-dir",
-             rebase_path("//", root_build_dir),
-             "--depfile",
-             rebase_path(depfile, root_build_dir),
-           ]
+           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir)
 
     # Ensure that the default platform is set correctly when this build action
     # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains

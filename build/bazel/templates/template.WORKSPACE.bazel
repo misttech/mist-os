@@ -150,9 +150,6 @@ load(
 
 googletest_repository(
     name = "com_google_googletest",
-    # LINT.IfChange
-    content_hash_file = "generated_repository_hashes/com_google_googletest.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
 )
 
 bazel_inputs_repository(
@@ -173,18 +170,14 @@ rules_fuchsia_deps()
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
     local_paths = ["{ninja_output_dir}/sdk/exported/core"],
-    # LINT.IfChange
-    local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    local_sdk_version_file = "//:fuchsia_sdk_hash",
     fuchsia_api_level_override = "HEAD",
 )
 
 fuchsia_sdk_repository(
     name = "internal_sdk",
     local_paths = ["{ninja_output_dir}/sdk/exported/platform"],
-    # LINT.IfChange
-    local_sdk_version_file = "//:generated_repository_hashes/internal_sdk.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
+    local_sdk_version_file = "//:internal_sdk_hash",
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["{ninja_output_dir}/sdk/exported/core"],
     fuchsia_api_level_override = "HEAD",
@@ -226,9 +219,6 @@ generate_prebuilt_llvm_repository(
 generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
     clang_install_dir = "prebuilt/third_party/clang/{host_tag}",
-    # LINT.IfChange
-    repository_version_file = "generated_repository_hashes/prebuilt_clang.hash",
-    # LINT.ThenChange(../scripts/update-workspace.py)
 )
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_x64_cc_toolchain")
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_arm64_cc_toolchain")

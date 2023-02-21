@@ -1,1 +1,0 @@
-gen/build/bazel/tests/build_action/01_input_resource_from_source/foo.ninja.out: ../../build/bazel/tests/build_action/01_input_resource_from_source/BUILD.bazel ../../build/bazel/tests/build_action/01_input_resource_from_source/foo.in.txt gen/build/bazel/legacy_ninja_build_outputs.inputs_manifest.json

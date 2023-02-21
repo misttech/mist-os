@@ -117,17 +117,9 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/.bazelrc",
     "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
     "${bazel_main_top_dir}/workspace/fuchsia_build_config.bzl",
+    "${bazel_main_top_dir}/workspace/fuchsia_sdk_hash",
+    "${bazel_main_top_dir}/workspace/internal_sdk_hash",
     "${bazel_main_top_dir}/workspace/platform_mappings",
-
-    # The list of content hash files
-    # LINT.IfChange
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/com_google_googletest.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_clang.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/fuchsia_sdk.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/internal_sdk.hash",
-    "${bazel_main_top_dir}/workspace/generated_repository_hashes/prebuilt_clang.hash",
-
-    # LINT.ThenChange(scripts/update-workspace.py)
   ]
 
   args = [
