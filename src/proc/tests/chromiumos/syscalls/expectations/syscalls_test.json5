@@ -22,6 +22,9 @@
             matchers: [
                 // TODO(https://fxbug.dev/121778)
                 "MMapProcTest.AdjacentFileMappings",
+
+                // TODO(https://fxbug.dev/122142)
+                "UdevTest.AddDevMapper",
             ],
         },
     ],
