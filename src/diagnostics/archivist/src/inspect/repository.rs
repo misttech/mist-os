@@ -73,40 +73,59 @@ impl InspectRepository {
         identity: Arc<ComponentIdentity>,
         proxy_handle: impl Into<InspectHandle>,
     ) {
+        // Hold the lock while we insert and update pipelines.
         let mut guard = self.inner.write().await;
+        // insert_inspect_artifact_container returns None when we were already tracking the
+        // directory for this component. If that's the case we can return early.
+        let Some(on_closed_fut) = guard.insert_inspect_artifact_container(
+            Arc::clone(&identity), proxy_handle)  else {
+            return;
+        };
 
-        if let Some(on_closed_fut) =
-            guard.insert_inspect_artifact_container(Arc::clone(&identity), proxy_handle)
-        {
-            let this_weak = Arc::downgrade(self);
-            guard
-                .diagnostics_dir_closed_snd
-                .send(fasync::Task::spawn(async move {
-                    if let Ok(koid_to_remove) = on_closed_fut.await {
-                        match this_weak.upgrade() {
-                            None => {}
-                            Some(this) => {
-                                let guard = &mut this.inner.write().await.diagnostics_containers;
+        let identity_clone = Arc::clone(&identity);
+        let this_weak = Arc::downgrade(self);
+        guard
+            .diagnostics_dir_closed_snd
+            .send(fasync::Task::spawn(async move {
+                if let Ok(koid_to_remove) = on_closed_fut.await {
+                    if let Some(this) = this_weak.upgrade() {
+                        // Hold the lock while we remove and update pipelines.
+                        let mut guard = this.inner.write().await;
 
-                                if let Some((_, container)) = guard.get(&identity.unique_key()) {
-                                    if container.remove_handle(koid_to_remove).await != 0 {
-                                        return;
-                                    }
-                                }
+                        if let Some((_, container)) =
+                            guard.diagnostics_containers.get(&identity_clone.unique_key())
+                        {
+                            if container.remove_handle(koid_to_remove).await != 0 {
+                                return;
+                            }
+                        }
 
-                                guard.remove(&identity.unique_key());
+                        guard.diagnostics_containers.remove(&identity_clone.unique_key());
 
-                                for pipeline_weak in &this.pipelines {
-                                    if let Some(pipeline) = pipeline_weak.upgrade() {
-                                        pipeline.write().await.remove(&identity.relative_moniker);
-                                    }
-                                }
+                        for pipeline_weak in &this.pipelines {
+                            if let Some(pipeline) = pipeline_weak.upgrade() {
+                                pipeline.write().await.remove(&identity_clone.relative_moniker);
                             }
                         }
                     }
-                }))
-                .await
-                .unwrap(); // this can't fail unless `self` has been destroyed.
+                }
+            }))
+            .await
+            .unwrap(); // this can't fail unless `self` has been destroyed.
+
+        // Let each pipeline know that a new component arrived, and allow the pipeline
+        // to eagerly bucket static selectors based on that component's moniker.
+        for pipeline_weak in self.pipelines.iter() {
+            if let Some(pipeline) = pipeline_weak.upgrade() {
+                pipeline
+                    .write()
+                    .await
+                    .add_inspect_artifacts(&identity.relative_moniker)
+                    .unwrap_or_else(|e| {
+                        warn!(%identity, ?e,
+                            "Failed to add inspect artifacts to pipeline wrapper");
+                    });
+            }
         }
     }
 
@@ -119,21 +138,6 @@ impl InspectRepository {
         if let Some(handle) = handle {
             // Update the central repository to reference the new diagnostics source.
             self.add_inspect_artifacts(Arc::clone(&component), handle).await;
-
-            // Let each pipeline know that a new component arrived, and allow the pipeline
-            // to eagerly bucket static selectors based on that component's moniker.
-            for pipeline_weak in self.pipelines.iter() {
-                if let Some(pipeline) = pipeline_weak.upgrade() {
-                    pipeline
-                        .write()
-                        .await
-                        .add_inspect_artifacts(&component.relative_moniker)
-                        .unwrap_or_else(|e| {
-                            warn!(identity = %component, ?e,
-                            "Failed to add inspect artifacts to pipeline wrapper");
-                        });
-                }
-            }
         }
     }
 
