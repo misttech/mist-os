@@ -73,7 +73,7 @@ pub async fn handle_suite_requests(
                 test_start_info.program = Some(program);
 
                 match test_type {
-                    TestType::Gtest | TestType::Gunit => {
+                    _ if test_type.is_gtest_like() => {
                         run_gtest_cases(
                             tests,
                             test_start_info,
