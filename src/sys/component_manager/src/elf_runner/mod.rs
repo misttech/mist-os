@@ -791,7 +791,7 @@ mod tests {
         (job.into_inner(), component)
     }
 
-    // TODO(fsamuel): A variation of this is used in a couple of places. We should consider
+    // TODO(fxbug.dev/122225): A variation of this is used in a couple of places. We should consider
     // refactoring this into a test util file.
     async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
         let file_proxy = fuchsia_fs::directory::open_file_no_describe(

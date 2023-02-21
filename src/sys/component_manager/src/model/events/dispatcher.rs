@@ -147,7 +147,7 @@ impl EventDispatcherScope {
             return false;
         }
 
-        // TODO(fsamuel): Creating hashmaps on every lookup is not ideal, but in practice this
+        // TODO(fxbug/122227): Creating hashmaps on every lookup is not ideal, but in practice this
         // likely doesn't happen too often.
         let filterable_fields = match &event.payload {
             EventPayload::CapabilityRequested { name, .. } => Some(hashmap! {
