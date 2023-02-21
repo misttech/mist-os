@@ -38,6 +38,7 @@ async fn serve_fidl(
     watcher_service: watcher_service::WatcherService<device::PhyDevice, device::IfaceDevice>,
     dev_svc: fidl_svc::DeviceServiceProxy,
     new_iface_sink: mpsc::UnboundedSender<device::NewIface>,
+    iface_counter: Arc<service::IfaceCounter>,
     cfg: wlandevicemonitor_config::Config,
 ) -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(move |reqs| {
@@ -48,6 +49,7 @@ async fn serve_fidl(
             watcher_service.clone(),
             dev_svc.clone(),
             new_iface_sink.clone(),
+            iface_counter.clone(),
             wlandevicemonitor_config::Config { ..cfg },
         )
         .unwrap_or_else(|e| error!("error serving device monitor API: {}", e));
@@ -95,9 +97,19 @@ async fn main() -> Result<(), Error> {
 
     let phy_server = serve_phys(phys.clone(), inspect_tree.clone());
 
+    let iface_counter = Arc::new(service::IfaceCounter::new());
+
     let (new_iface_sink, new_iface_stream) = mpsc::unbounded();
-    let fidl_fut =
-        serve_fidl(fs, phys.clone(), ifaces.clone(), watcher_service, dev_svc, new_iface_sink, cfg);
+    let fidl_fut = serve_fidl(
+        fs,
+        phys.clone(),
+        ifaces.clone(),
+        watcher_service,
+        dev_svc,
+        new_iface_sink,
+        iface_counter,
+        cfg,
+    );
 
     let new_iface_fut =
         service::handle_new_iface_stream(phys.clone(), ifaces.clone(), new_iface_stream);

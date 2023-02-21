@@ -39,9 +39,9 @@ pub(crate) async fn serve_monitor_requests(
     watcher_service: watcher_service::WatcherService<PhyDevice, IfaceDevice>,
     dev_svc: fidl_svc::DeviceServiceProxy,
     new_iface_sink: mpsc::UnboundedSender<NewIface>,
+    iface_counter: Arc<IfaceCounter>,
     cfg: wlandevicemonitor_config::Config,
 ) -> Result<(), Error> {
-    let iface_counter = Arc::new(IfaceCounter::new());
     while let Some(req) = req_stream.try_next().await.context("error running DeviceService")? {
         match req {
             DeviceMonitorRequest::ListPhys { responder } => responder.send(&mut list_phys(&phys)),
@@ -599,6 +599,7 @@ mod tests {
         watcher_fut: BoxFuture<'static, Result<Infallible, Error>>,
         new_iface_stream: mpsc::UnboundedReceiver<NewIface>,
         new_iface_sink: mpsc::UnboundedSender<NewIface>,
+        iface_counter: Arc<IfaceCounter>,
     }
 
     fn test_setup() -> TestValues {
@@ -619,6 +620,8 @@ mod tests {
 
         let (new_iface_sink, new_iface_stream) = mpsc::unbounded();
 
+        let iface_counter = Arc::new(IfaceCounter::new());
+
         TestValues {
             monitor_proxy,
             monitor_req_stream,
@@ -630,6 +633,7 @@ mod tests {
             watcher_fut: Box::pin(watcher_fut),
             new_iface_stream: new_iface_stream,
             new_iface_sink,
+            iface_counter,
         }
     }
 
@@ -665,6 +669,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -729,6 +734,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -787,6 +793,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -819,6 +826,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -851,6 +859,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -895,6 +904,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -930,6 +940,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -985,6 +996,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1043,6 +1055,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1104,6 +1117,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy,
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1681,6 +1695,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy.clone(),
             test_values.new_iface_sink,
+            test_values.iface_counter,
             fake_wlandevicemonitor_config(),
         );
         pin_mut!(service_fut);
@@ -1763,6 +1778,7 @@ mod tests {
             test_values.watcher_service,
             test_values.dev_proxy.clone(),
             test_values.new_iface_sink,
+            test_values.iface_counter,
             wlandevicemonitor_config::Config {
                 wlanstack_supported: true,
                 ..fake_wlandevicemonitor_config()
