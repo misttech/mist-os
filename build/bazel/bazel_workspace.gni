@@ -19,3 +19,7 @@ bazel_launcher = bazel_main_top_dir + "/bazel"
 
 # Location of the Bazel workspace, relative to the source root.
 bazel_workspace_dir = bazel_main_top_dir + "/workspace"
+
+# Symlink to the Bazel execRoot, where commands for Bazel actions are executed.
+# See https://bazel.build/remote/output-directories#layout-diagram
+bazel_exec_root = bazel_main_top_dir + "/workspace/bazel-workspace"
