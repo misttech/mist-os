@@ -23,7 +23,6 @@ group("tests") {
 }
 
 tests = [
-  "device",
   "dhcp",
   "dns",
   "fidl",
@@ -38,7 +37,10 @@ tests = [
   "sys",
 ]
 
-tests_with_expectations = [ "bridge" ]
+tests_with_expectations = [
+  "bridge",
+  "device",
+]
 
 long_tests = [ "multicast-forwarding" ]
 

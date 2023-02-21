@@ -10,7 +10,7 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_tun as fnet_tun;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
-use netstack_testing_common::realms::{Netstack, Netstack2, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::icmp::MessageBody as _;
@@ -198,7 +198,7 @@ fn icmp_event_stream<'a>(
     possible_icmp_payload_length(FULLY_USABLE_MTU);
     "fully used mtu"
 )]
-async fn ping_succeeds_with_expected_payload(
+async fn ping_succeeds_with_expected_payload<N: Netstack>(
     name: &str,
     sub_name: &str,
     mtu: usize,
@@ -214,10 +214,10 @@ async fn ping_succeeds_with_expected_payload(
         .await
         .expect("failed to create network");
     let source_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("source_{}_{}", name, sub_name))
+        .create_netstack_realm::<N, _>(format!("source_{}_{}", name, sub_name))
         .expect("failed to create source realm");
     let target_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("target_{}_{}", name, sub_name))
+        .create_netstack_realm::<N, _>(format!("target_{}_{}", name, sub_name))
         .expect("failed to reate target realm");
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
 
