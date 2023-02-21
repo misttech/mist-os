@@ -29,6 +29,17 @@ struct Driver : public ns8250::PioDriver {
   explicit Driver(zbi_dcfg_simple_pio_t cfg = ns8250::kLegacyConfig) : ns8250::PioDriver(cfg) {}
 };
 
+#elif defined(__riscv)
+
+struct Driver : public ns8250::MmioDriver {
+  static constexpr zbi_dcfg_simple_t kQemuConfig = {
+      .mmio_phys = 0x10000000,
+      .irq = 10,
+  };
+
+  explicit Driver(zbi_dcfg_simple_t cfg = kQemuConfig) : ns8250::MmioDriver(cfg) {}
+};
+
 #else
 
 using Driver = null::Driver;
