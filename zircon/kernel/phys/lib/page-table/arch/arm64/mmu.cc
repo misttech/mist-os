@@ -54,6 +54,7 @@ GranuleSize GranuleForPageSize(PageSize page_size) {
     case PageSize::k512MiB:
       return GranuleSize::k64KiB;
   }
+  ZX_PANIC("Unknown value for PageSize enum class (%u)", static_cast<unsigned int>(page_size));
 }
 
 }  // namespace page_table::arm64

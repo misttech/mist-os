@@ -24,6 +24,7 @@ constexpr int8_t LevelForPageSize(PageSize size) {
     case PageSize::k1GiB:
       return 2;
   }
+  ZX_PANIC("Unknown value for PageSize enum class (%u)", static_cast<unsigned int>(size));
 }
 
 }  // namespace

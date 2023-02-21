@@ -267,7 +267,7 @@ class DriverImpl
     auto lcr = LineControlRegister::Get().FromValue(0).set_divisor_latch_access(false);
 
     if (data_bits) {
-      uint8_t word_length = [bits = *data_bits]() {
+      const uint8_t word_length = [bits = *data_bits]() {
         switch (bits) {
           case DataBits::k5:
             return LineControlRegister::kWordLength5;
@@ -278,6 +278,7 @@ class DriverImpl
           case DataBits::k8:
             return LineControlRegister::kWordLength8;
         }
+        ZX_PANIC("Unknown value for DataBits enum class (%u)", static_cast<unsigned int>(bits));
       }();
       lcr.set_word_length(word_length);
     }
@@ -287,13 +288,14 @@ class DriverImpl
     }
 
     if (stop_bits) {
-      uint8_t num_stop_bits = [bits = *stop_bits]() {
+      const uint8_t num_stop_bits = [bits = *stop_bits]() {
         switch (bits) {
           case StopBits::k1:
             return LineControlRegister::kStopBits1;
           case StopBits::k2:
             return LineControlRegister::kStopBits2;
         }
+        ZX_PANIC("Unknown value for StopBits enum class (%u)", static_cast<unsigned int>(bits));
       }();
       lcr.set_stop_bits(num_stop_bits);
     }

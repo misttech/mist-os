@@ -54,6 +54,8 @@ constexpr PageSize GetLargestPageSize(PageTableLayout layout, Vaddr vaddr, Paddr
     case GranuleSize::k64KiB:
       return GetLargestPageSize({PageSize::k512MiB, PageSize::k64KiB}, vaddr, paddr, size);
   }
+  ZX_PANIC("Unknown value for GranuleSize enum class (%u)",
+           static_cast<unsigned int>(layout.granule_size));
 }
 
 // Allocate a granule of the given size, and set it to zero.
