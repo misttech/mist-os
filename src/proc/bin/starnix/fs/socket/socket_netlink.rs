@@ -22,7 +22,7 @@ pub fn new_netlink_socket(
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
-    Ok(Box::new(NetlinkSocket::new(socket_type, family)?))
+    Ok(Box::new(BaseNetlinkSocket::new(socket_type, family)?))
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -113,13 +113,15 @@ impl NetlinkFamily {
     }
 }
 
-struct NetlinkSocket {
-    family: NetlinkFamily,
+struct BaseNetlinkSocket {
     inner: Mutex<NetlinkSocketInner>,
 }
 
 #[allow(dead_code)]
 struct NetlinkSocketInner {
+    /// The specific type of netlink socket.
+    family: NetlinkFamily,
+
     /// The `MessageQueue` that contains messages sent to this socket.
     messages: MessageQueue,
 
@@ -139,12 +141,21 @@ struct NetlinkSocketInner {
 impl NetlinkSocketInner {
     pub fn bind(
         &mut self,
-        _current_task: &CurrentTask,
-        netlink_address: NetlinkAddress,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
     ) -> Result<(), Errno> {
         if self.address.is_some() {
             return error!(EINVAL);
         }
+
+        let netlink_address = match socket_address {
+            SocketAddress::Netlink(mut netlink_address) => {
+                // TODO: Support distinct IDs for processes with multiple netlink sockets.
+                netlink_address.set_pid_if_zero(current_task.get_pid());
+                netlink_address
+            }
+            _ => return error!(EINVAL),
+        };
 
         self.address = Some(netlink_address);
         Ok(())
@@ -157,11 +168,7 @@ impl NetlinkSocketInner {
         self.messages.set_capacity(capacity).unwrap();
     }
 
-    fn read(
-        &mut self,
-        data: &mut dyn OutputBuffer,
-        _flags: SocketMessageFlags,
-    ) -> Result<MessageReadInfo, Errno> {
+    fn read_from_queue(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
         let msg = self.messages.read_message();
         match msg {
             Some(message) => {
@@ -185,7 +192,7 @@ impl NetlinkSocketInner {
         }
     }
 
-    fn write(
+    fn write_to_queue(
         &mut self,
         data: &mut dyn InputBuffer,
         address: Option<NetlinkAddress>,
@@ -202,25 +209,118 @@ impl NetlinkSocketInner {
         Ok(bytes_written)
     }
 
+    fn wait_async(&mut self, waiter: &Waiter, events: FdEvents, handler: EventHandler) -> WaitKey {
+        self.waiters.wait_async_mask(waiter, events.bits(), handler)
+    }
+
+    fn cancel_wait(&mut self, key: WaitKey) {
+        self.waiters.cancel_wait(key);
+    }
+
     fn query_events(&self) -> FdEvents {
-        let mut events = FdEvents::empty();
-        let local_events = self.messages.query_events();
-        if local_events.contains(FdEvents::POLLIN) {
-            events = FdEvents::POLLIN;
+        self.messages.query_events()
+    }
+
+    fn getsockname(&self) -> Vec<u8> {
+        match &self.address {
+            Some(addr) => addr.to_bytes(),
+            _ => vec![],
         }
-        events
+    }
+
+    fn getpeername(&self) -> Result<Vec<u8>, Errno> {
+        match &self.address {
+            Some(addr) => Ok(addr.to_bytes()),
+            None => {
+                let addr = sockaddr_nl { nl_family: AF_NETLINK, ..Default::default() };
+                Ok(addr.as_bytes().to_vec())
+            }
+        }
+    }
+
+    fn getsockopt(&self, level: u32, optname: u32) -> Result<Vec<u8>, Errno> {
+        let opt_value = match level {
+            SOL_SOCKET => match optname {
+                SO_PASSCRED => (self.passcred as u32).as_bytes().to_vec(),
+                SO_TIMESTAMP => (self.timestamp as u32).as_bytes().to_vec(),
+                SO_SNDBUF => (self.messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_RCVBUF => (self.messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_SNDBUFFORCE => (self.messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_RCVBUFFORCE => (self.messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
+                SO_PROTOCOL => self.family.as_raw().as_bytes().to_vec(),
+                _ => return error!(ENOSYS),
+            },
+            _ => vec![],
+        };
+
+        Ok(opt_value)
+    }
+
+    fn setsockopt(
+        &mut self,
+        task: &Task,
+        level: u32,
+        optname: u32,
+        user_opt: UserBuffer,
+    ) -> Result<(), Errno> {
+        fn read<T: Default + AsBytes + FromBytes>(
+            task: &Task,
+            user_opt: UserBuffer,
+        ) -> Result<T, Errno> {
+            let user_ref = UserRef::<T>::from_buf(user_opt).ok_or_else(|| errno!(EINVAL))?;
+            task.mm.read_object(user_ref)
+        }
+
+        match level {
+            SOL_SOCKET => match optname {
+                SO_SNDBUF => {
+                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
+                    self.set_capacity(requested_capacity * 2);
+                }
+                SO_RCVBUF => {
+                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
+                    self.set_capacity(requested_capacity);
+                }
+                SO_PASSCRED => {
+                    let passcred = read::<u32>(task, user_opt)?;
+                    self.passcred = passcred != 0;
+                }
+                SO_TIMESTAMP => {
+                    let timestamp = read::<u32>(task, user_opt)?;
+                    self.timestamp = timestamp != 0;
+                }
+                SO_SNDBUFFORCE => {
+                    if !task.creds().has_capability(CAP_NET_ADMIN) {
+                        return error!(EPERM);
+                    }
+                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
+                    self.set_capacity(requested_capacity * 2);
+                }
+                SO_RCVBUFFORCE => {
+                    if !task.creds().has_capability(CAP_NET_ADMIN) {
+                        return error!(EPERM);
+                    }
+                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
+                    self.set_capacity(requested_capacity);
+                }
+                _ => return error!(ENOSYS),
+            },
+            _ => return error!(ENOSYS),
+        }
+
+        Ok(())
     }
 }
 
-impl NetlinkSocket {
-    pub fn new(socket_type: SocketType, family: NetlinkFamily) -> Result<NetlinkSocket, Errno> {
+impl BaseNetlinkSocket {
+    pub fn new(socket_type: SocketType, family: NetlinkFamily) -> Result<BaseNetlinkSocket, Errno> {
         if socket_type != SocketType::Datagram && socket_type != SocketType::Raw {
             return error!(ESOCKTNOSUPPORT);
         }
 
-        Ok(NetlinkSocket {
-            family,
+        Ok(BaseNetlinkSocket {
             inner: Mutex::new(NetlinkSocketInner {
+                family,
                 messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
                 waiters: WaitQueue::default(),
                 address: None,
@@ -236,7 +336,7 @@ impl NetlinkSocket {
     }
 }
 
-impl SocketOps for NetlinkSocket {
+impl SocketOps for BaseNetlinkSocket {
     fn connect(
         &self,
         socket: &SocketHandle,
@@ -261,7 +361,7 @@ impl SocketOps for NetlinkSocket {
     }
 
     fn remote_connection(&self, _socket: &Socket, _file: FileHandle) -> Result<(), Errno> {
-        not_implemented!("?", "NetlinkSocket::remote_connection is stubbed");
+        not_implemented!("?", "BaseNetlinkSocket::remote_connection is stubbed");
         Ok(())
     }
 
@@ -271,14 +371,7 @@ impl SocketOps for NetlinkSocket {
         current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
-        match socket_address {
-            SocketAddress::Netlink(mut netlink_address) => {
-                // TODO: Support distinct IDs for processes with multiple netlink sockets.
-                netlink_address.set_pid_if_zero(current_task.get_pid());
-                self.lock().bind(current_task, netlink_address)
-            }
-            _ => error!(EINVAL),
-        }
+        self.lock().bind(current_task, socket_address)
     }
 
     fn read(
@@ -286,9 +379,9 @@ impl SocketOps for NetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-        flags: SocketMessageFlags,
+        _flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.lock().read(data, flags)
+        self.lock().read_from_queue(data)
     }
 
     fn write(
@@ -314,11 +407,11 @@ impl SocketOps for NetlinkSocket {
         };
 
         if destination.groups != 0 {
-            not_implemented!("?", "NetlinkSockets multicasting is stubbed");
+            not_implemented!("?", "BaseNetlinkSockets multicasting is stubbed");
             return Ok(data.drain());
         }
 
-        self.lock().write(data, Some(NetlinkAddress::default()), ancillary_data)
+        self.lock().write_to_queue(data, Some(NetlinkAddress::default()), ancillary_data)
     }
 
     fn wait_async(
@@ -329,7 +422,7 @@ impl SocketOps for NetlinkSocket {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitKey {
-        self.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
+        self.lock().wait_async(waiter, events, handler)
     }
 
     fn cancel_wait(
@@ -337,38 +430,35 @@ impl SocketOps for NetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
-        _key: WaitKey,
+        key: WaitKey,
     ) {
+        self.lock().cancel_wait(key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        self.lock().query_events()
+        let mut events = FdEvents::empty();
+        let local_events = self.lock().query_events();
+        if local_events.contains(FdEvents::POLLIN) {
+            events = FdEvents::POLLIN;
+        }
+        events
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("?", "NetlinkSocket::shutdown is stubbed");
+        not_implemented!("?", "BaseNetlinkSocket::shutdown is stubbed");
         Ok(())
     }
 
     fn close(&self, _socket: &Socket) {
-        not_implemented!("?", "NetlinkSocket::close is stubbed");
+        not_implemented!("?", "BaseNetlinkSocket::close is stubbed");
     }
 
     fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
-        match &self.lock().address {
-            Some(addr) => addr.to_bytes(),
-            _ => vec![],
-        }
+        self.lock().getsockname()
     }
 
     fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
-        match &self.lock().address {
-            Some(addr) => Ok(addr.to_bytes()),
-            None => {
-                let addr = sockaddr_nl { nl_family: AF_NETLINK, ..Default::default() };
-                Ok(addr.as_bytes().to_vec())
-            }
-        }
+        self.lock().getpeername()
     }
 
     fn getsockopt(
@@ -378,25 +468,7 @@ impl SocketOps for NetlinkSocket {
         optname: u32,
         _optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
-        let opt_value = match level {
-            SOL_SOCKET => match optname {
-                SO_PASSCRED => (self.lock().passcred as u32).as_bytes().to_vec(),
-                SO_TIMESTAMP => (self.lock().timestamp as u32).as_bytes().to_vec(),
-                SO_SNDBUF => (self.lock().messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
-                SO_RCVBUF => (self.lock().messages.capacity() as socklen_t).to_ne_bytes().to_vec(),
-                SO_SNDBUFFORCE => {
-                    (self.lock().messages.capacity() as socklen_t).to_ne_bytes().to_vec()
-                }
-                SO_RCVBUFFORCE => {
-                    (self.lock().messages.capacity() as socklen_t).to_ne_bytes().to_vec()
-                }
-                SO_PROTOCOL => self.family.as_raw().as_bytes().to_vec(),
-                _ => return error!(ENOSYS),
-            },
-            _ => vec![],
-        };
-
-        Ok(opt_value)
+        self.lock().getsockopt(level, optname)
     }
 
     fn setsockopt(
@@ -407,51 +479,6 @@ impl SocketOps for NetlinkSocket {
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        fn read<T: Default + AsBytes + FromBytes>(
-            task: &Task,
-            user_opt: UserBuffer,
-        ) -> Result<T, Errno> {
-            let user_ref = UserRef::<T>::from_buf(user_opt).ok_or_else(|| errno!(EINVAL))?;
-            task.mm.read_object(user_ref)
-        }
-
-        match level {
-            SOL_SOCKET => match optname {
-                SO_SNDBUF => {
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.lock().set_capacity(requested_capacity * 2);
-                }
-                SO_RCVBUF => {
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.lock().set_capacity(requested_capacity);
-                }
-                SO_PASSCRED => {
-                    let passcred = read::<u32>(task, user_opt)?;
-                    self.lock().passcred = passcred != 0;
-                }
-                SO_TIMESTAMP => {
-                    let timestamp = read::<u32>(task, user_opt)?;
-                    self.lock().timestamp = timestamp != 0;
-                }
-                SO_SNDBUFFORCE => {
-                    if !task.creds().has_capability(CAP_NET_ADMIN) {
-                        return error!(EPERM);
-                    }
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.lock().set_capacity(requested_capacity * 2);
-                }
-                SO_RCVBUFFORCE => {
-                    if !task.creds().has_capability(CAP_NET_ADMIN) {
-                        return error!(EPERM);
-                    }
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.lock().set_capacity(requested_capacity);
-                }
-                _ => return error!(ENOSYS),
-            },
-            _ => return error!(ENOSYS),
-        }
-
-        Ok(())
+        self.lock().setsockopt(task, level, optname, user_opt)
     }
 }
