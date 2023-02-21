@@ -24,15 +24,23 @@ import sys
 
 ELF_MAGIC = b"\x7fELF"
 
-TARGETS = ["x86_64-unknown-fuchsia", "aarch64-unknown-fuchsia"]
+TARGETS = [
+    "x86_64-unknown-fuchsia",
+    "aarch64-unknown-fuchsia",
+    "riscv64-unknown-fuchsia",
+]
 TRIPLE_TO_TARGET = {
     "x86_64-unknown-fuchsia": "x64",
     "aarch64-unknown-fuchsia": "arm64",
+    "riscv64-unknown-fuchsia": "riscv64",
 }
 
 # TODO(phosek): use `clang --target=... -print-multi-lib` instead of hardcoding
 # these once it supports all variants.
-CFLAGS = [[], ["-fsanitize=address"], ["-fsanitize=undefined"], ["-fsanitize=hwaddress"]]
+CFLAGS = [
+    [], ["-fsanitize=address"], ["-fsanitize=undefined"],
+    ["-fsanitize=hwaddress"]
+]
 LDFLAGS = [[], ["-static-libstdc++"]]
 
 
@@ -153,8 +161,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--clang-prefix", required=True, help="path to Clang toolchain")
-    parser.add_argument(
-        "--sdk-dir", required=True, help="path to Fuchsia SDK")
+    parser.add_argument("--sdk-dir", required=True, help="path to Fuchsia SDK")
     parser.add_argument("--build-id-dir", help="path .build-id directory")
     parser.add_argument(
         "--dump-syms", help="path to Breakpad dump_syms utility")

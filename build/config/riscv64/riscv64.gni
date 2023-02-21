@@ -1,0 +1,159 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# These are the formal definitions of the profiles. RV32 details are omitted
+# here.  cf https://github.com/riscv/riscv-profiles/blob/main/profiles.adoc
+#
+# Each member of the scope is itself a scope, with members `u64` and `s64`,
+# each of which has these members:
+#
+#  * base
+#    - Required: the "mandatory base" ISA feature set, "rv64" with a suffix of
+#    single letters.  This also includes all the single-letter extensions
+#    listed in "mandatory extensions". It may use the shorthands like G.
+#    - Type: string
+#
+#  * u64_mandatory, s64_mandatory
+#     - Required: List of extension names: the profile "mandatory extensions".
+#     This omits the single-letter extensions, which are included in $base.
+#     - Type: list(string)
+#
+#  * u64_optional, s64_optional
+#     - Required: List of extension names: the profile "optional extensions".
+#     - Type: list(string)
+#
+# **Note:** Extensions that Clang doesn't parse in `-march` syntax are
+# commented out from u64_*, but here for reference and documentation purposes.
+# The extension lists are kept in the order found in the riscv-profiles spec.
+#
+riscv_profiles = {
+  rvi20 = {
+    u64 = {
+      base = "rv64i"
+      u64_mandtaory = []
+      u64_optional = [
+        "m",
+        "a",
+        "f",
+        "d",
+        "c",
+        "zifencei",
+        "zicntr",
+        "zihpm",
+      ]
+    }
+    # There is no RVI20S64 profile.
+  }
+
+  rva20 = {
+    base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
+    u64_mandatory = [
+      # These are mandatory extensions, but they're implied by G.
+      #
+      # "zicsr"
+      # "zifencei"
+
+      # These are in the official profile list, but Clang doesn't handle them
+      # as "_<feature>" in the `-march` syntax because they don't add new
+      # opcodes, only new CSRs.  The compiler doesn't use those at all, and
+      # the assembler always accepts the known CSR names (and the
+      # pseudo-instructions that translate to reads of them) without feature
+      # checks.
+      #
+      # "zicntr",
+
+      # These are just characteristics of how the CPU behaves, not new
+      # instructions or CSRs (e.g. memory and cache semantics).
+      #
+      # "ziccif",
+      # "ziccrse",
+      # "ziccamoa",
+      # "za128rs",
+      # "ziccism",
+    ]
+    u64_optional = [
+      # Clang doesn't understand this, but it's just CSRs.
+      "zihpm",
+    ]
+
+    # The s64 details aren't relevant to the compiler, since they are all just
+    # CSRs, features in CSRs, or characteristics of CPU behavior.
+    s64_mandatory = [
+      "zifenci",
+      "ss1p11",
+      "svbare",
+      "sv39",
+      "svade",
+      "ssccptr",
+      "sstvecd",
+      "sstvala",
+    ]
+    s64_optional = [
+      "zihpm",
+      "sv48",
+      "ssu64xl",
+    ]
+  }
+
+  rva22 = {
+    u64 = {
+      base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
+      u64_mandatory = rva20.u64_mandatory + [
+                        "zihintpause",
+                        "zba",
+                        "zbb",
+                        "zbs",
+                        "zicbom",
+                        "zicbop",
+                        "zicboz",
+                        "zfhmin",
+                        "zkt",
+                      ]
+      u64_optional = rva20.u64_optional + u64_mandatory - u64_mandatory + [
+                       "zfh",
+                       "v",
+                       "zkn",
+                       "zks",
+                     ]
+    }
+    s64_mandatory = [
+      "zifencei",
+      "ss1p12",
+      "svbare",
+      "sv39",
+      "svade",
+      "ssccptr",
+      "sstvecd",
+      "sstvala",
+      "sscounternw",
+      "svpbmt",
+      "svinval",
+    ]
+    s64_optional = [
+      "sv48",
+      "sv57",
+      "svnapot",
+      "ssu64xl",
+      "sstc",
+      "sscofpmf",
+      "zkr",
+      "h",
+      "ssstateen",  # This is mandatory when H is implemented.
+      "shcounterenw",
+      "shvstvala",
+      "shtvala",
+      "shvstvecd",
+      "shvsatpa",
+      "shgatpa",
+    ]
+  }
+}
+
+# This is the profile matching Fuchsia's policy for riscv64 user code.
+# `-march` strings are generated from this.
+fuchsia_riscv_profile = riscv_profiles.rva20
+
+# This is the basic machine ABI that's standard for fuchsia-riscv64 user code.
+# This sets the `-mabi` string.
+fuchsia_riscv_abi = "lp64d"

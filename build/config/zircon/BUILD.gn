@@ -136,7 +136,7 @@ config("compiler") {
       # cause the presumption of executable stack as they do in GCC.
       ldflags += [ "-Wl,-z,noexecstack" ]
 
-      if (current_cpu == "arm64") {
+      if (current_cpu == "arm64" || current_cpu == "riscv64") {
         # x18 is reserved in the Fuchsia ABI so it can be used
         # for things like -fsanitize=shadow-call-stack.
         cflags += [ "-ffixed-x18" ]

@@ -137,10 +137,8 @@ config("compiler") {
 }
 
 config("cpu_baseline") {
-  if (current_cpu == "arm64") {
-    configs = [ "//build/config/arm64" ]
-  } else if (current_cpu == "x64") {
-    configs = [ "//build/config/x64" ]
+  if (current_cpu != "wasm32") {
+    configs = [ "//build/config/$current_cpu" ]
   }
 }
 
