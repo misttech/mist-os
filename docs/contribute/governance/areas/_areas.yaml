@@ -263,7 +263,7 @@
 
 - name: 'Netstack'
   api_primary: 'brunodalbo@google.com'
-  api_secondary: ''
+  api_secondary: 'ghanan@google.com'
   description: |
     The set of APIs enabling networking in Fuchsia. Encompasses APIs that drive
     the data, control, and management planes of networking ranging from
