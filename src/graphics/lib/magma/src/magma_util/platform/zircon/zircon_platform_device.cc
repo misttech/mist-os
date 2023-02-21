@@ -47,24 +47,24 @@ std::unique_ptr<PlatformMmio> ZirconPlatformDevice::CpuMapMmio(
   DLOG("CpuMapMmio index %d", index);
 
   zx_status_t status;
-  mmio_buffer_t mmio_buffer;
 
-  status = pdev_map_mmio_buffer(&pdev_, index, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_buffer);
+  std::optional<fdf::MmioBuffer> mmio_buffer;
+  status = pdev_.MapMmio(index, &mmio_buffer);
   if (status != ZX_OK) {
     DRETP(nullptr, "mapping resource failed");
   }
 
-  std::unique_ptr<ZirconPlatformMmio> mmio(new ZirconPlatformMmio(mmio_buffer));
-
   DLOG("map_mmio index %d cache_policy %d returned: 0x%x", index, static_cast<int>(cache_policy),
-       mmio_buffer.vmo);
+       mmio_buffer->get_vmo()->get());
 
-  zx::bti bti_handle;
-  status = pdev_get_bti(&pdev_, 0, bti_handle.reset_and_get_address());
+  std::unique_ptr<ZirconPlatformMmio> mmio(new ZirconPlatformMmio(mmio_buffer.value().release()));
+
+  zx::bti bti;
+  status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK)
     return DRETP(nullptr, "failed to get bus transaction initiator for pinning mmio: %d", status);
 
-  if (!mmio->Pin(bti_handle.get()))
+  if (!mmio->Pin(bti.get()))
     return DRETP(nullptr, "Failed to pin mmio");
 
   return mmio;
@@ -72,8 +72,7 @@ std::unique_ptr<PlatformMmio> ZirconPlatformDevice::CpuMapMmio(
 
 std::unique_ptr<PlatformBuffer> ZirconPlatformDevice::GetMmioBuffer(unsigned int index) {
   pdev_mmio_t mmio;
-
-  zx_status_t status = pdev_get_mmio(&pdev_, index, &mmio);
+  zx_status_t status = pdev_.GetMmio(index, &mmio);
   if (status != ZX_OK)
     return DRETP(nullptr, "pdev_get_mmio failed: %d", status);
 
@@ -81,21 +80,21 @@ std::unique_ptr<PlatformBuffer> ZirconPlatformDevice::GetMmioBuffer(unsigned int
 }
 
 std::unique_ptr<PlatformInterrupt> ZirconPlatformDevice::RegisterInterrupt(unsigned int index) {
-  zx_handle_t interrupt_handle;
-  zx_status_t status = pdev_get_interrupt(&pdev_, index, 0, &interrupt_handle);
+  zx::interrupt interrupt;
+  zx_status_t status = pdev_.GetInterrupt(index, 0, &interrupt);
   if (status != ZX_OK)
     return DRETP(nullptr, "register interrupt failed");
 
-  return std::make_unique<ZirconPlatformInterrupt>(zx::handle(interrupt_handle));
+  return std::make_unique<ZirconPlatformInterrupt>(zx::handle(interrupt.release()));
 }
 
 std::unique_ptr<PlatformHandle> ZirconPlatformDevice::GetBusTransactionInitiator() const {
-  zx_handle_t bti_handle;
-  zx_status_t status = pdev_get_bti(&pdev_, 0, &bti_handle);
+  zx::bti bti;
+  zx_status_t status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK)
     return DRETP(nullptr, "failed to get bus transaction initiator");
 
-  return std::make_unique<ZirconPlatformHandle>(zx::handle(bti_handle));
+  return std::make_unique<ZirconPlatformHandle>(zx::handle(bti.release()));
 }
 
 std::unique_ptr<PlatformDevice> PlatformDevice::Create(void* device_handle) {

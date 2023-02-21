@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/device-protocol/pdev.h>
 
 #include "platform_device.h"
 
@@ -51,7 +52,7 @@ class ZirconPlatformDeviceWithoutProtocol : public PlatformDevice {
 class ZirconPlatformDevice : public ZirconPlatformDeviceWithoutProtocol {
  public:
   ZirconPlatformDevice(zx_device_t* zx_device, pdev_protocol_t pdev, uint32_t mmio_count)
-      : ZirconPlatformDeviceWithoutProtocol(zx_device), pdev_(pdev), mmio_count_(mmio_count) {}
+      : ZirconPlatformDeviceWithoutProtocol(zx_device), pdev_(&pdev), mmio_count_(mmio_count) {}
 
   std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const override;
 
@@ -65,7 +66,7 @@ class ZirconPlatformDevice : public ZirconPlatformDeviceWithoutProtocol {
   std::unique_ptr<PlatformInterrupt> RegisterInterrupt(unsigned int index) override;
 
  private:
-  pdev_protocol_t pdev_;
+  ddk::PDev pdev_;
   uint32_t mmio_count_;
 };
 
