@@ -45,7 +45,6 @@
     facets: {
         "fuchsia.test": {
             "deprecated-allowed-packages": [
-                "cursor",
                 "intl_property_manager",
                 "web_engine",
             ],

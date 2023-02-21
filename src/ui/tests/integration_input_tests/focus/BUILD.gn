@@ -37,8 +37,6 @@ executable("focus-input-test-bin") {
 }
 
 fuchsia_test_component("focus-input-test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
-
   manifest = "meta/focus-input-test.cml"
   deps = [ ":focus-input-test-bin" ]
 }

@@ -25,9 +25,4 @@
             to: "#realm_builder",
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "cursor" ],
-        },
-    },
 }

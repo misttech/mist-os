@@ -14,7 +14,7 @@
     children: [
         {
             name: "cursor",
-            url: "fuchsia-pkg://fuchsia.com/cursor#meta/cursor.cm",
+            url: "cursor#meta/cursor.cm",
         },
     ],
     capabilities: [

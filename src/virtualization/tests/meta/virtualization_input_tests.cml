@@ -8,10 +8,7 @@
     },
     facets: {
         "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "cursor",
-                "debian_guest",
-            ],
+            "deprecated-allowed-packages": [ "debian_guest" ],
         },
     },
 }

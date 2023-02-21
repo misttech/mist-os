@@ -25,7 +25,6 @@ executable("presentation_test_bin") {
 }
 
 fuchsia_test_component("presentation-test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/presentation_test.cml"
   deps = [ ":presentation_test_bin" ]
 }

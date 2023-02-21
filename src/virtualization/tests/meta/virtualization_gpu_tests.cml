@@ -9,7 +9,6 @@
     facets: {
         "fuchsia.test": {
             "deprecated-allowed-packages": [
-                "cursor",
                 "debian_guest",
                 "zircon_guest",
             ],

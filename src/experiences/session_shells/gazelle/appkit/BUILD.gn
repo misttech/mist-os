@@ -55,7 +55,6 @@ rustc_library("appkit") {
 }
 
 fuchsia_unittest_package("appkit-tests") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "appkit_lib_test"
   manifest = "meta/appkit_lib_test.cml"
   deps = [

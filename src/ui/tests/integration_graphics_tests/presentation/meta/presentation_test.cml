@@ -9,9 +9,4 @@
     program: {
         binary: "bin/presentation_test_bin",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "cursor" ],
-        },
-    },
 }

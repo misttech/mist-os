@@ -59,7 +59,6 @@ rustc_binary("bin") {
 }
 
 fuchsia_unittest_package("wm-tests") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/wm_test.cml"
   deps = [
     ":bin_test",
