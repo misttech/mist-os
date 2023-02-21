@@ -125,6 +125,8 @@ void dump_stats() {
   }
 }
 
+inline bool is_size_in_range(size_t size) { return size > 0 && size <= kHeapMaxAllocSize; }
+
 }  // namespace
 
 void heap_init() {
@@ -158,7 +160,7 @@ void* malloc(size_t size) {
     printf("caller %p malloc %zu -> %p\n", __GET_CALLER(), size, ptr);
   }
 
-  if (HEAP_PANIC_ON_ALLOC_FAIL && unlikely(!ptr)) {
+  if (HEAP_PANIC_ON_ALLOC_FAIL && unlikely((!ptr) && is_size_in_range(size))) {
     panic("malloc of size %zu failed\n", size);
   }
 
@@ -178,7 +180,7 @@ void* memalign(size_t alignment, size_t size) {
     printf("caller %p memalign %zu, %zu -> %p\n", __GET_CALLER(), alignment, size, ptr);
   }
 
-  if (HEAP_PANIC_ON_ALLOC_FAIL && unlikely(!ptr)) {
+  if (HEAP_PANIC_ON_ALLOC_FAIL && unlikely((!ptr) && is_size_in_range(size))) {
     panic("memalign of size %zu align %zu failed\n", size, alignment);
   }
 
