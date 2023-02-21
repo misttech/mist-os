@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -54,35 +54,45 @@ def main():
         help="Don't run `fx update-rustc-third-party` after updating crate versions.",
     )
     parser.add_argument(
-        "--cmake-dir",
+        "--fuchsia-dir",
         action="store",
         required=True,
-        help="IGNORE: Inherited via `fx update-rust-3p-outdated` helper script.",
+        help="IGNORE: Inherited via `update-rust-3p-outdated` helper script.",
+    )
+    parser.add_argument(
+        "--update-crates-bin",
+        action="store",
+        required=True,
+        help="IGNORE: Inherited via `update-rust-3p-outdated` helper script.",
+    )
+    parser.add_argument(
+        "--prebuilt-cmake-dir",
+        action="store",
+        required=True,
+        help="IGNORE: Inherited via `update-rust-3p-outdated` helper script.",
     )
     parser.add_argument(
         "--prebuilt-rust-dir",
         action="store",
         required=True,
-        help="IGNORE: Inherited via `fx update-rust-3p-outdated` helper script.",
+        help="IGNORE: Inherited via `update-rust-3p-outdated` helper script.",
     )
     parser.add_argument(
         "--prebuilt-rust-cargo-outdated-dir",
         action="store",
         required=True,
-        help="IGNORE: Inherited via `fx update-rust-3p-outdated` helper script.",
+        help="IGNORE: Inherited via `update-rust-3p-outdated` helper script.",
     )
     args = parser.parse_args()
 
     UPDATE_CRATES_TARGET = "host-tools/update_crates"
-    update_crates_bin = os.path.join(
-        os.environ["FUCHSIA_BUILD_DIR"], UPDATE_CRATES_TARGET
-    )
     skip_build_arg = "--no-build" if args.no_build else ""
+    os.environ["PATH"] += os.path.join(args.prebuilt_cmake_dir)
 
-    os.environ["PATH"] += os.path.join(args.cmake_dir, "cmake", "bin")
-
-    if args.no_build and not os.path.exists(update_crates_bin):
-        error(f"--no-build was specified, but `{update_crates_bin}` does not exist.")
+    if args.no_build and not os.path.exists(args.update_crates_bin):
+        error(
+            f"--no-build was specified, but `{args.update_crates_bin}` does not exist."
+        )
         error("Rerun without --no-build to build update_crates.")
         return 1
 
@@ -100,20 +110,20 @@ def main():
     try:
         subprocess.check_call(
             [
-                update_crates_bin,
+                args.update_crates_bin,
                 "--manifest-path",
-                f"{os.environ['FUCHSIA_DIR']}/third_party/rust_crates/Cargo.toml",
+                f"{args.fuchsia_dir}/third_party/rust_crates/Cargo.toml",
                 "--overrides",
-                f"{os.environ['FUCHSIA_DIR']}/third_party/rust_crates/outdated.toml",
+                f"{args.fuchsia_dir}/third_party/rust_crates/outdated.toml",
                 "update",
                 "--cargo",
                 f"{args.prebuilt_rust_dir}/bin/cargo",
                 "--outdated-dir",
                 args.prebuilt_rust_cargo_outdated_dir,
                 "--config-path",
-                f"{os.environ['FUCHSIA_DIR']}/third_party/rust_crates/.cargo/config.toml",
+                f"{args.fuchsia_dir}/third_party/rust_crates/.cargo/config.toml",
             ],
-            cwd=os.environ["FUCHSIA_DIR"],
+            cwd=args.fuchsia_dir,
         )
     except subprocess.CalledProcessError:
         error("Failed to update crates.")
@@ -133,21 +143,18 @@ def main():
     try:
         subprocess.check_call(
             [
-                update_crates_bin,
+                args.update_crates_bin,
                 "--manifest-path",
-                f"{os.environ['FUCHSIA_DIR']}/third_party/rust_crates/Cargo.toml",
+                f"{args.fuchsia_dir}/third_party/rust_crates/Cargo.toml",
                 "--overrides",
-                f"{os.environ['FUCHSIA_DIR']}/third_party/rust_crates/outdated.toml",
+                f"{args.fuchsia_dir}/third_party/rust_crates/outdated.toml",
                 "check",
             ],
-            cwd=os.environ["FUCHSIA_DIR"],
+            cwd=args.fuchsia_dir,
         )
     except subprocess.CalledProcessError:
         error("Failed to check crates post update.")
         return 1
-
-    # TODO: License check
-    # TODO: Upload CL with required changes
 
     return 0
 
