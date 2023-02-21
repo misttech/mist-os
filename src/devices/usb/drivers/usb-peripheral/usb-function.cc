@@ -15,7 +15,9 @@ namespace usb_peripheral {
 void UsbFunction::DdkRelease() {
   peripheral_->FunctionCleared();
   // Release the reference now that devmgr no longer has a pointer to the function.
-  [[maybe_unused]] bool dummy = Release();
+  if (Release()) {
+    delete this;
+  }
 }
 
 // UsbFunctionProtocol implementation.
