@@ -317,13 +317,13 @@ mod test {
             self.do_something();
         }
 
-        #[allow(dead_code)]
+        #[allow(dead_code, clippy::needless_lifetimes)]
         pub fn with_lifecycle<'a>(&self, _n: &'a u32) {}
         #[allow(dead_code)]
         pub fn with_type<T>(&self, _n: &T) {}
-        #[allow(dead_code)]
+        #[allow(dead_code, clippy::needless_lifetimes)]
         pub fn with_lifecycle_and_type<'a, T>(&self, _n: &'a T) {}
-        #[allow(dead_code)]
+        #[allow(dead_code, clippy::needless_lifetimes)]
         pub fn with_lifecycle_on_self<'a, T>(&'a self, _n: &'a T) {}
     }
 
