@@ -95,9 +95,9 @@ zx_status_t UsbPeripheralConfig::ParseBootArgs(zx_device_t *platform_bus) {
 
   config_->vid = GOOGLE_USB_VID;
   config_->pid = pid_;
-  std::strncpy(config_->manufacturer, kManufacturer, sizeof(kManufacturer));
-  std::strncpy(config_->serial, kSerial, sizeof(kSerial));
-  std::strncpy(config_->product, product_desc_.c_str(), product_desc_.size());
+  std::strncpy(config_->manufacturer, kManufacturer, sizeof(config_->manufacturer));
+  std::strncpy(config_->serial, kSerial, sizeof(config_->serial));
+  std::strncpy(config_->product, product_desc_.c_str(), sizeof(config_->product));
   for (uint32_t idx = 0; idx < function_configs_.size(); idx++) {
     config_->functions[idx] = function_configs_[idx];
   }
