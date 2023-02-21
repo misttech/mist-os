@@ -120,8 +120,10 @@ pub trait ResolvedInstanceInterfaceExt: ResolvedInstanceInterface {
     /// child that exists, a declared collection, etc.
     fn offer_source_exists(&self, source: &OfferSource) -> bool {
         match source {
-            OfferSource::Framework | OfferSource::Self_ | OfferSource::Parent => true,
-            OfferSource::Void => false,
+            OfferSource::Framework
+            | OfferSource::Self_
+            | OfferSource::Parent
+            | OfferSource::Void => true,
             OfferSource::Child(cm_rust::ChildRef { name, collection }) => {
                 let child_moniker = match ChildMoniker::try_new(name, collection.as_ref()) {
                     Ok(m) => m,
