@@ -4,15 +4,18 @@
 
 # ubsan-trap is pure instrumentation with no runtime.
 config("ubsan-trap") {
-  compiler_flags = [ "-fsanitize=undefined" ]
-  if (is_gcc) {
-    compiler_flags += [ "-fsanitize-undefined-trap-on-error" ]
-  } else {
-    compiler_flags += [ "-fsanitize-trap=undefined" ]
+  # TODO(fxbug.dev/121737): Reenable ubsan-trap for GCC.
+  if (!is_gcc) {
+    compiler_flags = [ "-fsanitize=undefined" ]
+    if (is_gcc) {
+      compiler_flags += [ "-fsanitize-undefined-trap-on-error" ]
+    } else {
+      compiler_flags += [ "-fsanitize-trap=undefined" ]
+    }
+    asmflags = compiler_flags
+    cflags = compiler_flags
+    ldflags = compiler_flags
   }
-  asmflags = compiler_flags
-  cflags = compiler_flags
-  ldflags = compiler_flags
 }
 
 config("instrumented-stack-size") {
