@@ -26,11 +26,7 @@
         },
     ],
     offer: [
-        {
-            protocol: [ "fuchsia.media.sounds.Player" ],
-            from: "#soundplayer",
-            to: "#ui",
-        },
+        // Routes to session-manager.
         {
             protocol: [ "fuchsia.ui.policy.Presenter" ],
             from: "#ui",
@@ -42,9 +38,14 @@
             to: "#session-manager",
             availability: "optional",
         },
+
+        // Routes from optional shards.
+        // All of these routes should be marked `source_availability: "unknown"`
+        //
+        // PLEASE KEEP THESE ALPHABETICAL IN TERMS OF "FROM".
         {
-            protocol: [ "fuchsia.settings.Light" ],
-            from: "#setui_service",
+            protocol: [ "fuchsia.ui.brightness.Control" ],
+            from: "#brightness_manager",
             to: "#ui",
             source_availability: "unknown",
         },
@@ -55,8 +56,14 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.ui.brightness.Control" ],
-            from: "#brightness_manager",
+            protocol: [ "fuchsia.settings.Light" ],
+            from: "#setui_service",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.media.sounds.Player" ],
+            from: "#soundplayer",
             to: "#ui",
             source_availability: "unknown",
         },

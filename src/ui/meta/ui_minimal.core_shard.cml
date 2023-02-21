@@ -26,16 +26,7 @@
         },
     ],
     offer: [
-        {
-            protocol: [ "fuchsia.settings.Keyboard" ],
-            from: "#setui_service",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.media.sounds.Player" ],
-            from: "#soundplayer",
-            to: "#ui",
-        },
+        // Routes to session-manager.
         {
             protocol: [ "fuchsia.session.scene.Manager" ],
             from: "#ui",
@@ -47,20 +38,37 @@
             to: "#session-manager",
             availability: "optional",
         },
-        {
-            protocol: [ "fuchsia.factory.MiscFactoryStoreProvider" ],
-            from: "#factory_store_providers",
-            to: "#ui",
-        },
+
+        // Routes from optional shards.
+        // All of these routes should be marked `source_availability: "unknown"`
+        //
+        // PLEASE KEEP THESE ALPHABETICAL IN TERMS OF "FROM".
         {
             protocol: [ "fuchsia.ui.brightness.Control" ],
             from: "#brightness_manager",
             to: "#ui",
+            source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.settings.Light" ],
+            protocol: [ "fuchsia.factory.MiscFactoryStoreProvider" ],
+            from: "#factory_store_providers",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.settings.Keyboard",
+                "fuchsia.settings.Light",
+            ],
             from: "#setui_service",
             to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.media.sounds.Player" ],
+            from: "#soundplayer",
+            to: "#ui",
+            source_availability: "unknown",
         },
     ],
 }

@@ -51,59 +51,13 @@
         },
     ],
     offer: [
+        // Routes from boostrap realm.  These are all offered from "parent".
         {
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",
             ],
             from: "parent",
-            to: "#ui",
-        },
-        {
-            protocol: "fuchsia.intl.PropertyProvider",
-            from: "#intl",
-            to: "#ui",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#ui",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#cobalt",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.recovery.FactoryReset" ],
-            from: "#factory_reset",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.feedback.LastRebootInfoProvider" ],
-            from: "#feedback",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.settings.Accessibility" ],
-            from: "#setui_service",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.stash.Store" ],
-            from: "#stash",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#sysmem_connector",
-            to: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.vulkan.loader.Loader" ],
-            from: "#vulkan_loader",
             to: "#ui",
         },
         {
@@ -125,14 +79,73 @@
             to: [ "#ui" ],
             subdir: "input-report",
         },
+
+        // Routes from core or required shards.
+        //
+        // PLEASE KEEP THESE ALPHABETICAL IN TERMS OF "FROM", WITH "SELF" FIRST.
         {
             storage: [ "tmp" ],
             from: "self",
             to: "#ui",
         },
         {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#cobalt",
+            to: "#ui",
+        },
+        {
+            protocol: [ "fuchsia.stash.Store" ],
+            from: "#stash",
+            to: "#ui",
+        },
+        {
+            protocol: [ "fuchsia.sysmem.Allocator" ],
+            from: "#sysmem_connector",
+            to: "#ui",
+        },
+        {
+            protocol: [ "fuchsia.vulkan.loader.Loader" ],
+            from: "#vulkan_loader",
+            to: "#ui",
+        },
+
+        // Routes from optional shards.
+        // All of these routes should be marked `source_availability: "unknown"`
+        //
+        // PLEASE KEEP THESE ALPHABETICAL IN TERMS OF "FROM".
+        {
             protocol: [ "fuchsia.media.ProfileProvider" ],
             from: "#audio_core",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.recovery.FactoryReset" ],
+            from: "#factory_reset",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.feedback.LastRebootInfoProvider" ],
+            from: "#feedback",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.intl.PropertyProvider",
+            from: "#intl",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.settings.Accessibility" ],
+            from: "#setui_service",
+            to: "#ui",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "#trace_manager",
             to: "#ui",
             source_availability: "unknown",
         },
