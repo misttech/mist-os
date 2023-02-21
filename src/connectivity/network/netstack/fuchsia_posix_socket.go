@@ -3152,7 +3152,7 @@ func newStreamSocket(s streamSocketImpl) (socket.StreamSocketWithCtxInterface, e
 		return socket.StreamSocketWithCtxInterface{}, err
 	}
 	s.addConnection(context.Background(), localC)
-	_ = syslog.DebugTf("NewStream", "%p", s)
+	_ = syslog.DebugTf("NewStream", "%p", &s)
 	return socket.StreamSocketWithCtxInterface{Channel: peerC}, nil
 }
 
