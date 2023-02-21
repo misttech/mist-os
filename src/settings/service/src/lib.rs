@@ -81,8 +81,6 @@ use crate::job::source::Seeder;
 use crate::keyboard::keyboard_controller::KeyboardController;
 use crate::light::light_controller::LightController;
 use crate::night_mode::night_mode_controller::NightModeController;
-use crate::policy::policy_handler_factory_impl::PolicyHandlerFactoryImpl;
-use crate::policy::policy_proxy::PolicyProxy;
 use crate::policy::PolicyType;
 use crate::privacy::privacy_controller::PrivacyController;
 use crate::service::message::Delegate;
@@ -452,16 +450,13 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
         let mut settings = HashSet::new();
         settings.extend(self.settings);
 
-        let mut policies = HashSet::new();
+        let policies = HashSet::new();
 
         for registrant in &self.registrants {
             for dependency in registrant.get_dependencies() {
                 match dependency {
                     Dependency::Entity(Entity::Handler(setting_type)) => {
                         let _ = settings.insert(*setting_type);
-                    }
-                    Dependency::Entity(Entity::PolicyHandler(policy_type)) => {
-                        let _ = policies.insert(*policy_type);
                     }
                 }
             }
@@ -530,21 +525,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             context_id_counter.clone(),
         );
 
-        // Create the policy handler factory and register policy handlers.
-        let mut policy_handler_factory = PolicyHandlerFactoryImpl::new(
-            policies.clone(),
-            settings.clone(),
-            self.storage_factory.clone(),
-            context_id_counter,
-        );
-
-        EnvironmentBuilder::register_policy_handlers(
-            &policies,
-            Arc::clone(&self.storage_factory),
-            &mut policy_handler_factory,
-        )
-        .await;
-
         EnvironmentBuilder::register_setting_handlers(
             &settings,
             Arc::clone(&self.storage_factory),
@@ -580,7 +560,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             self.event_subscriber_blueprints,
             service_context,
             Arc::new(Mutex::new(handler_factory)),
-            Arc::new(Mutex::new(policy_handler_factory)),
             self.storage_factory,
             fidl_storage_factory,
             self.setting_proxy_inspect_info.unwrap_or_else(|| component::inspector().root()),
@@ -633,16 +612,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
         let environment = self.spawn_nested(env_name).await?;
 
         environment.connector.ok_or_else(|| format_err!("connector not created"))
-    }
-
-    /// Initializes storage and registers handler generation functions for the configured policy
-    /// types.
-    async fn register_policy_handlers(
-        _policies: &HashSet<PolicyType>,
-        _storage_factory: Arc<T>,
-        _policy_handler_factory: &mut PolicyHandlerFactoryImpl<T>,
-    ) {
-        // There currently aren't any policies supported.
     }
 
     /// Initializes storage and registers handler generation functions for the configured setting
@@ -846,7 +815,6 @@ async fn create_environment<'a, T, F>(
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     service_context: Arc<ServiceContext>,
     handler_factory: Arc<Mutex<SettingHandlerFactoryImpl>>,
-    policy_handler_factory: Arc<Mutex<PolicyHandlerFactoryImpl<T>>>,
     device_storage_factory: Arc<T>,
     fidl_storage_factory: Arc<F>,
     setting_proxies_node: &'static fuchsia_inspect::Node,
@@ -877,16 +845,6 @@ where
         .await?;
 
         let _ = entities.insert(Entity::Handler(*setting_type));
-    }
-
-    for policy_type in &policies {
-        if let Some(setting_type) = policy_type.setting_type() {
-            if components.contains(&setting_type) {
-                PolicyProxy::create(*policy_type, policy_handler_factory.clone(), delegate.clone())
-                    .await?;
-                let _ = entities.insert(Entity::PolicyHandler(*policy_type));
-            }
-        }
     }
 
     let mut agent_authority =

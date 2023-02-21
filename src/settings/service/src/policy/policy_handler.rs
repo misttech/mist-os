@@ -210,21 +210,17 @@ mod tests {
     use crate::base::SettingType;
     use crate::handler::base::{Payload as HandlerPayload, Request};
     use crate::message::base::MessengerType;
-    use crate::policy::PolicyType;
     use crate::service;
     use crate::tests::message_utils::verify_payload;
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_client_proxy_send_setting_request() {
-        let policy_type = PolicyType::Unknown;
         let setting_request = Request::Get;
         let target_setting_type = SettingType::Unknown;
 
         let service_delegate = service::MessageHub::create_hub();
         let (_, mut setting_proxy_receptor) = service_delegate
-            .create(MessengerType::Addressable(service::Address::Handler(
-                policy_type.setting_type().unwrap(),
-            )))
+            .create(MessengerType::Addressable(service::Address::Handler(target_setting_type)))
             .await
             .expect("setting proxy messenger created");
 

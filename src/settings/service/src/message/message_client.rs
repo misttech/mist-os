@@ -90,6 +90,7 @@ impl MessageClient {
     }
 
     /// Propagates a derived message on the path of the original message.
+    #[cfg(test)]
     pub(crate) fn propagate(&self, payload: crate::Payload) -> Receptor {
         self.send(
             payload,

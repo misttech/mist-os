@@ -41,6 +41,7 @@ impl Builder {
 
     /// Includes the specified role in the list of roles to be associated with
     /// the new messenger.
+    #[cfg(test)]
     pub(crate) fn add_role(mut self, role: crate::Role) -> Self {
         let _ = self.roles.insert(role);
         self
