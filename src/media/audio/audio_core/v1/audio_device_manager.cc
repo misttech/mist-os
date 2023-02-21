@@ -11,6 +11,7 @@
 
 #include <string>
 
+#include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/reporter.h"
 #include "src/media/audio/audio_core/v1/audio_core_impl.h"
 #include "src/media/audio/audio_core/v1/base_capturer.h"
@@ -99,9 +100,8 @@ fpromise::promise<void, fuchsia::media::audio::UpdateEffectError> AudioDeviceMan
         }
         if (found) {
           return fpromise::ok();
-        } else {
-          return fpromise::error(fuchsia::media::audio::UpdateEffectError::NOT_FOUND);
         }
+        return fpromise::error(fuchsia::media::audio::UpdateEffectError::NOT_FOUND);
       });
 }
 
@@ -408,8 +408,10 @@ void AudioDeviceManager::OnDeviceUnplugged(const std::shared_ptr<AudioDevice>& d
                                            zx::time plug_time) {
   TRACE_DURATION("audio", "AudioDeviceManager::OnDeviceUnplugged");
   FX_DCHECK(device);
-  FX_LOGS(INFO) << "Unplugged " << (device->is_input() ? "input" : "output") << " '"
-                << device->name() << "' (" << device.get() << ") at t=" << plug_time.get();
+  if constexpr (kLogDevicePlugUnplug) {
+    FX_LOGS(INFO) << "Unplugged " << (device->is_input() ? "input" : "output") << " '"
+                  << device->name() << "' (" << device.get() << ") at t=" << plug_time.get();
+  }
 
   device->UpdatePlugState(/*plugged=*/false, plug_time);
 
@@ -423,8 +425,10 @@ void AudioDeviceManager::OnDevicePlugged(const std::shared_ptr<AudioDevice>& dev
                                          zx::time plug_time) {
   TRACE_DURATION("audio", "AudioDeviceManager::OnDevicePlugged");
   FX_DCHECK(device);
-  FX_LOGS(INFO) << "Plugged " << (device->is_input() ? "input" : "output") << " '" << device->name()
-                << "' (" << device.get() << ") at t=" << plug_time.get();
+  if constexpr (kLogDevicePlugUnplug) {
+    FX_LOGS(INFO) << "Plugged " << (device->is_input() ? "input" : "output") << " '"
+                  << device->name() << "' (" << device.get() << ") at t=" << plug_time.get();
+  }
 
   device->UpdatePlugState(/*plugged=*/true, plug_time);
 
@@ -452,11 +456,13 @@ void AudioDeviceManager::UpdateDefaultDevice(bool input) {
   uint64_t& old_id = input ? default_input_token_ : default_output_token_;
 
   if (old_id != new_id) {
-    if (new_default) {
-      FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": '" << new_default->name()
-                    << "' (" << new_default.get() << ")";
-    } else {
-      FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": NONE";
+    if constexpr (kLogDevicePlugUnplug || kLogRoutingChanges) {
+      if (new_default) {
+        FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": '" << new_default->name()
+                      << "' (" << new_default.get() << ")";
+      } else {
+        FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": NONE";
+      }
     }
 
     for (auto& client : bindings_.bindings()) {
@@ -470,7 +476,9 @@ void AudioDeviceManager::AddDeviceByChannel(
     std::string device_name, bool is_input,
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) {
   TRACE_DURATION("audio", "AudioDeviceManager::AddDeviceByChannel");
-  FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name << "'";
+  if constexpr (kLogAddDevice) {
+    FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name << "'";
+  }
 
   // Hand the stream off to the proper type of class to manage.
   std::shared_ptr<AudioDevice> new_device;
@@ -491,8 +499,10 @@ void AudioDeviceManager::AddDeviceByChannel(
     return;
   }
 
-  FX_LOGS(INFO) << __FUNCTION__ << " instantiated audio " << (is_input ? "input '" : "output '")
-                << device_name << "': " << new_device.get();
+  if constexpr (kLogAddDevice) {
+    FX_LOGS(INFO) << __FUNCTION__ << " instantiated audio " << (is_input ? "input '" : "output '")
+                  << device_name << "': " << new_device.get();
+  }
 
   AddDevice(std::move(new_device));
 }

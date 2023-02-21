@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_V1_LOGGING_FLAGS_H_
-#define SRC_MEDIA_AUDIO_AUDIO_CORE_V1_LOGGING_FLAGS_H_
+#ifndef SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_LOGGING_FLAGS_H_
+#define SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_LOGGING_FLAGS_H_
 
 #include <lib/zx/time.h>
 
@@ -65,6 +65,7 @@ inline constexpr bool kLogSetDeviceGainMuteActions = true;
 //
 inline constexpr bool kLogAudioDevice = false;
 inline constexpr bool kLogDevicePlugUnplug = true;
+inline constexpr bool kLogAddDevice = true;
 
 // Values retrieved from the audio driver related to delay, and associated calculations.
 inline constexpr bool kLogDriverDelayProperties = false;
@@ -123,4 +124,4 @@ inline constexpr bool kLogThermalStateChanges = true;
 
 }  // namespace media::audio
 
-#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_V1_LOGGING_FLAGS_H_
+#endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_LOGGING_FLAGS_H_
