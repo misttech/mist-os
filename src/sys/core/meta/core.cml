@@ -169,12 +169,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
-            from: "#diagnostics-persistence",
-            to: "#network",
-            source_availability: "unknown",
-        },
-        {
             protocol: [ "fuchsia.kernel.DebugResource" ],
             from: "parent",
             to: "#debug_serial",
