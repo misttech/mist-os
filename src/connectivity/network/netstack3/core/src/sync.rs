@@ -19,4 +19,4 @@ pub use netstack3_sync_not_instrumented::{
     rc, LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
 
-pub use rc::{Killable as KillableRc, Weak as WeakRc};
+pub use rc::{Killable as KillableRc, Strong as StrongRc, Weak as WeakRc};

@@ -59,7 +59,7 @@ use crate::{
         types::{AddableEntry, AddableEntryEither},
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
     },
-    sync::{KillableRc, RwLock, WeakRc},
+    sync::{KillableRc, RwLock, StrongRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -143,17 +143,9 @@ fn with_ethernet_state<
     L,
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
-    EthernetDeviceId(_id, state_ref): &EthernetDeviceId<NonSyncCtx::Instant>,
+    EthernetDeviceId(_id, state): &EthernetDeviceId<NonSyncCtx::Instant>,
     cb: F,
 ) -> O {
-    // We assume that the device ID is always valid and that it is a programmer
-    // error to provide an ID which is invalid (e.g. removed) so we `.unwrap()`
-    // here.
-    //
-    // TODO(https://fxbug.dev/100759): Allow device IDs to be invalid and return
-    // appropriate errors instead of panicking.
-    let state = state_ref.upgrade().unwrap();
-
     // Make sure that the pointer belongs to this `sync_ctx`.
     assert_eq!(
         *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
@@ -173,17 +165,9 @@ fn with_loopback_state<
     L,
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
-    LoopbackDeviceId(state_ref): &LoopbackDeviceId<NonSyncCtx::Instant>,
+    LoopbackDeviceId(state): &LoopbackDeviceId<NonSyncCtx::Instant>,
     cb: F,
 ) -> O {
-    // We assume that the device ID is always valid and that it is a programmer
-    // error to provide an ID which is invalid (e.g. removed) so we `.unwrap()`
-    // here.
-    //
-    // TODO(https://fxbug.dev/100759): Allow device IDs to be invalid and return
-    // appropriate errors instead of panicking.
-    let state = state_ref.upgrade().unwrap();
-
     // Make sure that the pointer belongs to this `sync_ctx`.
     assert_eq!(
         *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
@@ -290,9 +274,9 @@ impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
         ethernet
-            .map(|(id, state)| EthernetDeviceId(id, KillableRc::downgrade(state)).into())
+            .map(|(id, state)| EthernetDeviceId(id, KillableRc::clone_strong(state)).into())
             .chain(loopback.map(|state| {
-                DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
+                DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::clone_strong(state))).into()
             }))
             .next()
     }
@@ -357,7 +341,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
     fn loopback_id(&self) -> Option<Self::DeviceId> {
         let devices = self.state.device.devices.read();
         devices.loopback.as_ref().map(|state| {
-            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
+            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::clone_strong(state))).into()
         })
     }
 }
@@ -548,7 +532,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
     fn loopback_id(&self) -> Option<Self::DeviceId> {
         let devices = self.state.device.devices.read();
         devices.loopback.as_ref().map(|state| {
-            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
+            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::clone_strong(state))).into()
         })
     }
 }
@@ -650,13 +634,13 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub(crate) struct EthernetDeviceId<I: Instant>(
     usize,
-    WeakRc<IpLinkDeviceState<I, EthernetDeviceState>>,
+    StrongRc<IpLinkDeviceState<I, EthernetDeviceState>>,
 );
 
 impl<I: Instant> PartialEq for EthernetDeviceId<I> {
     fn eq(&self, EthernetDeviceId(other_id, other_ptr): &EthernetDeviceId<I>) -> bool {
         let EthernetDeviceId(me_id, me_ptr) = self;
-        other_id == me_id && me_ptr.ptr_eq(other_ptr)
+        other_id == me_id && StrongRc::ptr_eq(me_ptr, other_ptr)
     }
 }
 
@@ -920,10 +904,10 @@ impl<I: Instant> DeviceLayerState<I> {
             EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
             self.origin.clone(),
         ));
-        let weak_ptr = KillableRc::downgrade(&ptr);
+        let strong_ptr = KillableRc::clone_strong(&ptr);
         let id = ethernet.push(ptr);
         debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
-        EthernetDeviceId(id, weak_ptr).into()
+        EthernetDeviceId(id, strong_ptr).into()
     }
 
     /// Adds a new loopback device to the device layer.
@@ -938,7 +922,7 @@ impl<I: Instant> DeviceLayerState<I> {
             LoopbackDeviceState::new(mtu),
             self.origin.clone(),
         ));
-        let id = KillableRc::downgrade(&ptr);
+        let id = KillableRc::clone_strong(&ptr);
 
         *loopback = Some(ptr);
 
@@ -1029,14 +1013,12 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
                 .ethernet
                 .remove(*id)
                 .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
-            let ptr = ptr.upgrade().unwrap();
             assert!(KillableRc::ptr_eq(&removed, &ptr));
             debug!("removing Ethernet device with ID {}", id);
         }
         DeviceIdInner::Loopback(LoopbackDeviceId(ptr)) => {
             let removed: KillableRc<IpLinkDeviceState<_, _>> =
                 devices.loopback.take().expect("loopback device does not exist");
-            let ptr = ptr.upgrade().unwrap();
             assert!(KillableRc::ptr_eq(&removed, &ptr));
             debug!("removing Loopback device");
         }
