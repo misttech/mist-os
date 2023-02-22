@@ -39,8 +39,6 @@ class Speaker {
     // If true, this task will interrupt any playing tts and cancels pending utterances to be
     // spoken. It starts right away.
     bool interrupt = true;
-    // Delay before utterance is vocalized.
-    zx::duration delay = zx::msec(0);
     // Whether the utterance of the task is saved for later inspection.
     bool save_utterance = true;
   };

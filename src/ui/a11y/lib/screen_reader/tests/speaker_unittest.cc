@@ -165,8 +165,8 @@ TEST_F(SpeakerTest, TaskWaitsInQueueWhenNotInterrupting) {
   // If the second task waited in the queue before speaking, all three messages will be presente,
   // meaning that the third one did not trump the second.
   EXPECT_TRUE(mock_tts_engine_.ReceivedSpeak());
-  EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[0].message(), "foo");
   ASSERT_EQ(mock_tts_engine_.ExamineUtterances().size(), 3u);
+  EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[0].message(), "foo");
   EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[1].message(), "button");
   EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[2].message(), "foo");
 }

@@ -348,7 +348,7 @@ std::optional<SemanticTransform> SemanticTree::GetNodeToRootTransform(uint32_t n
   auto* node = GetNode(node_id);
 
   if (!node) {
-    FX_LOGS(ERROR) << "No node found iwth id: " << node_id;
+    FX_LOGS(ERROR) << "No node found with id: " << node_id;
     return std::nullopt;
   }
 
