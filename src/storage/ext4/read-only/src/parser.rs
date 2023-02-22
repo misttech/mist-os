@@ -1,4 +1,4 @@
-/*-
+/*
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012, 2010 Zheng Liu <lz@freebsd.org>
@@ -32,25 +32,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::structs::MINIMUM_INODE_SIZE;
+
 use {
     crate::{
         readers::Reader,
         structs::{
             BlockGroupDesc32, DirEntry2, DirEntryHeader, EntryType, Extent, ExtentHeader,
             ExtentIndex, ExtentTreeNode, INode, InvalidAddressErrorType, ParseToStruct,
-            ParsingError, SuperBlock, FIRST_BG_PADDING, MIN_EXT4_SIZE, ROOT_INODE_NUM,
+            ParsingError, SuperBlock, XattrEntryHeader, XattrHeader, FIRST_BG_PADDING,
+            MIN_EXT4_SIZE, ROOT_INODE_NUM,
         },
     },
     once_cell::sync::OnceCell,
     std::{
+        collections::BTreeMap,
         convert::TryInto,
-        mem::size_of,
+        mem::{size_of, size_of_val},
         path::{Component, Path},
         str,
         sync::Arc,
     },
     vfs::{directory::immutable, file::vmo::read_only, tree_builder::TreeBuilder},
-    zerocopy::ByteSlice,
+    zerocopy::{byteorder::little_endian::U32 as LEU32, AsBytes, ByteSlice},
 };
 
 // Assuming/ensuring that we are on a 64bit system where u64 == usize.
@@ -60,6 +64,8 @@ pub struct Parser<T: Reader> {
     reader: T,
     super_block: OnceCell<SuperBlock>,
 }
+
+pub type XattrMap = BTreeMap<Vec<u8>, Vec<u8>>;
 
 /// EXT4 Parser
 ///
@@ -109,8 +115,8 @@ impl<T: 'static + Reader> Parser<T> {
         Ok(data.into_boxed_slice())
     }
 
-    /// Reads the INode at the given inode number.
-    pub fn inode(&self, inode_number: u32) -> Result<INode, ParsingError> {
+    /// Returns the address of the given `inode_number` within `self.reader`.
+    fn inode_addr(&self, inode_number: u32) -> Result<u64, ParsingError> {
         if inode_number < 1 {
             // INode number 0 is not allowed per ext4 spec.
             return Err(ParsingError::InvalidInode(inode_number));
@@ -155,8 +161,12 @@ impl<T: 'static + Reader> Parser<T> {
                 MIN_EXT4_SIZE,
             ));
         }
+        Ok(inode_addr)
+    }
 
-        INode::from_reader_with_offset(&self.reader, inode_addr)
+    /// Reads the INode at the given inode number.
+    pub fn inode(&self, inode_number: u32) -> Result<INode, ParsingError> {
+        INode::from_reader_with_offset(&self.reader, self.inode_addr(inode_number)?)
     }
 
     /// Helper function to get the root directory INode.
@@ -478,6 +488,149 @@ impl<T: 'static + Reader> Parser<T> {
         Ok(true)
     }
 
+    /// Returns the xattrs associated with `inode_number`.
+    pub fn inode_xattrs(&self, inode_number: u32) -> Result<XattrMap, ParsingError> {
+        let mut xattrs = BTreeMap::new();
+
+        let inode_addr = self.inode_addr(inode_number).expect("Couldn't get inode address");
+        let inode =
+            INode::from_reader_with_offset(&self.reader, inode_addr).expect("Failed reader");
+
+        let sb = self.super_block().expect("No super block for inode");
+        let xattr_magic_addr =
+            inode_addr + MINIMUM_INODE_SIZE + u64::from(inode.e4di_extra_isize(sb));
+
+        let mut magic = LEU32::ZERO;
+        self.reader.read(xattr_magic_addr, magic.as_bytes_mut()).expect("Failed to read xattr");
+        if magic.get() == Self::XATTR_MAGIC {
+            let first_entry = xattr_magic_addr + size_of_val(&magic) as u64;
+            self.read_xattr_entries_from_inode(
+                first_entry,
+                inode_addr + (sb.e2fs_inode_size.get() as u64),
+                &mut xattrs,
+            )?;
+        }
+
+        let block_number: u64 = inode.facl();
+        if block_number > 0 {
+            let block = self.block(block_number).expect("Couldn't find block");
+            Self::read_xattr_entries_from_block(&block, &mut xattrs)?;
+        }
+
+        Ok(xattrs)
+    }
+
+    const XATTR_ALIGNMENT: u64 = 4;
+    const XATTR_MAGIC: u32 = 0xea020000;
+
+    fn round_up_to_align(x: u64, align: u64) -> u64 {
+        let spare = x % align;
+        if spare > 0 {
+            x.checked_add(align - spare).expect("Overflow when aligning")
+        } else {
+            x
+        }
+    }
+
+    fn is_valid_xattr_entry_header(header: &XattrEntryHeader) -> bool {
+        !(header.e_name_len == 0
+            && header.e_name_index == 0
+            && header.e_value_offs.get() == 0
+            && header.e_value_inum.get() == 0)
+    }
+
+    fn xattr_prefix_for_name_index(header: &XattrEntryHeader) -> Vec<u8> {
+        match header.e_name_index {
+            1 => b"user.".to_vec(),
+            2 => b"system.posix_acl_access.".to_vec(),
+            3 => b"system.posix_acl_default.".to_vec(),
+            4 => b"trusted.".to_vec(),
+            6 => b"security.".to_vec(),
+            7 => b"system.".to_vec(),
+            8 => b"system.richacl".to_vec(),
+            _ => b"".to_vec(),
+        }
+    }
+
+    /// Reads all the xattr entries, stored in the inode, from `entries_addr` into `xattrs`.
+    fn read_xattr_entries_from_inode(
+        &self,
+        mut entries_addr: u64,
+        inode_end: u64,
+        xattrs: &mut XattrMap,
+    ) -> Result<(), ParsingError> {
+        let value_base_addr = entries_addr;
+        while entries_addr + (std::mem::size_of::<XattrEntryHeader>() as u64) < inode_end {
+            let head = XattrEntryHeader::from_reader_with_offset(&self.reader, entries_addr)?;
+            if !Self::is_valid_xattr_entry_header(&head) {
+                break;
+            }
+
+            let prefix = Self::xattr_prefix_for_name_index(&head);
+            let mut name = Vec::with_capacity(prefix.len() + head.e_name_len as usize);
+            name.extend_from_slice(&prefix);
+            name.resize(prefix.len() + head.e_name_len as usize, 0);
+
+            self.reader.read(
+                entries_addr + size_of::<XattrEntryHeader>() as u64,
+                &mut name[prefix.len()..],
+            )?;
+
+            let mut value = vec![0u8; head.e_value_size.get() as usize];
+            self.reader.read(value_base_addr + u64::from(head.e_value_offs), &mut value)?;
+            xattrs.insert(name, value);
+
+            entries_addr += size_of::<XattrEntryHeader>() as u64 + head.e_name_len as u64;
+            entries_addr = Self::round_up_to_align(entries_addr, Self::XATTR_ALIGNMENT);
+        }
+        Ok(())
+    }
+
+    /// Reads all the xattr entries, stored in the inode, from `entries_addr` into `xattrs`.
+    fn read_xattr_entries_from_block(
+        block: &[u8],
+        xattrs: &mut XattrMap,
+    ) -> Result<(), ParsingError> {
+        let head = XattrHeader::to_struct_ref(
+            &block[..std::mem::size_of::<XattrHeader>()],
+            ParsingError::Incompatible("Invalid XattrHeader".to_string()),
+        )?;
+
+        if head.e_magic.get() != Self::XATTR_MAGIC {
+            return Ok(());
+        }
+
+        let mut offset = Self::round_up_to_align(
+            std::mem::size_of::<XattrHeader>() as u64,
+            Self::XATTR_ALIGNMENT * 2,
+        ) as usize;
+
+        while offset + std::mem::size_of::<XattrEntryHeader>() < block.len() {
+            let head = XattrEntryHeader::to_struct_ref(
+                &block[offset..offset + std::mem::size_of::<XattrEntryHeader>()],
+                ParsingError::Incompatible("Invalid XattrEntryHeader".to_string()),
+            )?;
+
+            if !Self::is_valid_xattr_entry_header(&head) {
+                break;
+            }
+
+            let name_start = offset + std::mem::size_of::<XattrEntryHeader>();
+            let name_end = name_start + head.e_name_len as usize;
+            let mut name = Self::xattr_prefix_for_name_index(&head);
+            name.extend_from_slice(&block[name_start..name_end]);
+
+            let value_start = head.e_value_offs.get() as usize;
+            let value_end = value_start + head.e_value_size.get() as usize;
+            let value = block[value_start..value_end].to_vec();
+            xattrs.insert(name, value);
+
+            offset = Self::round_up_to_align(name_end as u64, 4) as usize;
+        }
+
+        Ok(())
+    }
+
     /// Returns a `Simple` filesystem as built by `TreeBuilder.build()`.
     pub fn build_fuchsia_tree(&self) -> Result<Arc<immutable::Simple>, ParsingError> {
         let root_inode = self.root_inode()?;
@@ -618,6 +771,63 @@ mod tests {
             .expect("Index");
 
         assert_eq!(count, 4);
+    }
+
+    #[fuchsia::test]
+    fn xattr() {
+        let data = fs::read("/pkg/data/xattr.img").expect("Unable to read file");
+        let parser = Parser::new(VecReader::new(data));
+        assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
+        let root_inode = parser.root_inode().expect("Root inode");
+        let mut found_files = HashSet::new();
+
+        parser
+            .index(root_inode, Vec::new(), &mut |_, _, entry| {
+                let name = entry.e2d_name;
+                let inode = entry.e2d_ino.get();
+                let attributes = parser.inode_xattrs(inode).expect("Extended attributes");
+                match name {
+                    name if &name[0..10] == b"lost+found" => {
+                        assert_eq!(attributes.len(), 0);
+                        found_files.insert("lost+found");
+                    }
+                    name if &name[0..5] == b"file1" => {
+                        assert_eq!(attributes.len(), 1);
+                        assert_eq!(attributes[&b"user.test".to_vec()], b"test value".to_vec());
+                        found_files.insert("file1");
+                    }
+                    name if &name[0..9] == b"file_many" => {
+                        assert_eq!(attributes.len(), 6);
+                        assert_eq!(
+                            attributes[&b"user.long".to_vec()],
+                            b"vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv".to_vec()
+                        );
+                        found_files.insert("file_many");
+                    }
+                    name if &name[0..6] == b"subdir" => {
+                        assert_eq!(attributes.len(), 1);
+                        assert_eq!(attributes[&b"user.type".to_vec()], b"dir".to_vec());
+                        found_files.insert("subdir");
+                    }
+                    name if &name[0..5] == b"file2" => {
+                        assert_eq!(attributes.len(), 2);
+                        assert_eq!(
+                            attributes[&b"user.test_one".to_vec()],
+                            b"test value 1".to_vec()
+                        );
+                        assert_eq!(
+                            attributes[&b"user.test_two".to_vec()],
+                            b"test value 2".to_vec()
+                        );
+                        found_files.insert("file2");
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            })
+            .expect("Index");
+
+        assert_eq!(found_files.len(), 5);
     }
 
     #[test_case(

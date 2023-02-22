@@ -87,3 +87,27 @@ Test that we can walk into a sub-directory.
 │   └── file2
 └── lost+found/
 ```
+
+## xattr.img
+
+Test that we can read extended attributes, both from the inode and a separate block.
+
+### Properties
+
+* `1 KiB` Block Size
+* Single block group
+
+#### Flags
+
+* 32 bit
+
+### Directory Tree
+
+```
+/
+├── file1
+├── file_many
+├── subdir/
+│   └── file2
+└── lost+found/
+```

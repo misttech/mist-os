@@ -52,6 +52,8 @@ pub const SB_MAGIC: u16 = 0xEF53;
 pub const EH_MAGIC: u16 = 0xF30A;
 // Any smaller would not even fit the first copy of the ext4 Super Block.
 pub const MIN_EXT4_SIZE: u64 = FIRST_BG_PADDING + size_of::<SuperBlock>() as u64;
+/// The smallest supported INode size.
+pub const MINIMUM_INODE_SIZE: u64 = 128;
 
 #[derive(FromBytes, Unaligned)]
 #[repr(C)]
@@ -434,29 +436,44 @@ pub struct INode {
     /// High bits for INode checksum.
     pub e2di_chksum_lo: LEU16,
     pub e2di_lx_reserved: LEU16,
+    // Note: The fields below are not always present, depending on the size of the inode. Users are
+    // expected to access them via methods on `INode`, which verify that the data is valid.
+    /// Size of the fields in the inode struct after and including this one.
+    e4di_extra_isize: LEU16,
+    e4di_chksum_hi: LEU16,
+    e4di_ctime_extra: LEU32,
+    e4di_mtime_extra: LEU32,
+    e4di_atime_extra: LEU32,
+    e4di_crtime: LEU32,
+    e4di_crtime_extra: LEU32,
+    e4di_version_hi: LEU32,
+    e4di_projid: LEU32,
 }
 // Make sure our struct's size matches the Ext4 spec.
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
-assert_eq_size!(INode, [u8; 128]);
+assert_eq_size!(INode, [u8; 160]);
 
-// TODO(fxbug.dev/122152): There are more fields in the INode table, but they depend on
-// e2di_extra_isize.
-// Uncomment this if, at a later date, we add support for these fields.
-// pub struct INodeExtra {
-//     pub base: INode,
-//     pub e2di_extra_isize: LEU16,
-//     pub e2di_chksum_hi: LEU16,
-//     pub e2di_ctime_extra: LEU32,
-//     pub e2di_mtime_extra: LEU32,
-//     pub e2di_atime_extra: LEU32,
-//     pub e2di_crtime: LEU32,
-//     pub e2di_crtime_extra: LEU32,
-//     pub e2di_version_hi: LEU32,
-//     pub e2di_projid: LEU32,
-// }
-// Make sure our struct's size matches the Ext4 spec.
-// https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
-// assert_eq_size!(INodeExtra, [u8; 160]);
+#[derive(FromBytes, Unaligned, Debug)]
+#[repr(C)]
+pub struct XattrHeader {
+    pub e_magic: LEU32,
+    pub e_refcount: LEU32,
+    pub e_blocks: LEU32,
+    pub e_hash: LEU32,
+    pub e_checksum: LEU32,
+    e_reserved: [u8; 8],
+}
+
+#[derive(FromBytes, Unaligned, Debug)]
+#[repr(C)]
+pub struct XattrEntryHeader {
+    pub e_name_len: u8,
+    pub e_name_index: u8,
+    pub e_value_offs: LEU16,
+    pub e_value_inum: LEU32,
+    pub e_value_size: LEU32,
+    pub e_hash: LEU32,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum InvalidAddressErrorType {
@@ -479,6 +496,8 @@ pub enum ParsingError {
     InvalidSuperBlock(u64),
     #[error("Invalid Super Block magic number {} should be 0xEF53", _0)]
     InvalidSuperBlockMagic(u16),
+    #[error("Invalid Super Block inode size {} should be {}", _0, std::mem::size_of::<INode>())]
+    InvalidInodeSize(u16),
     #[error("Block number {} out of bounds.", _0)]
     BlockNumberOutOfBounds(u64),
     #[error("SuperBlock e2fs_log_bsize value invalid: {}", _0)]
@@ -683,6 +702,7 @@ impl SuperBlock {
         let sb = SuperBlock::from_reader_with_offset(reader, FIRST_BG_PADDING)?;
         sb.check_magic()?;
         sb.feature_check()?;
+        sb.check_inode_size()?;
         Ok(sb)
     }
 
@@ -691,6 +711,15 @@ impl SuperBlock {
             Ok(())
         } else {
             Err(ParsingError::InvalidSuperBlockMagic(self.e2fs_magic.get()))
+        }
+    }
+
+    pub fn check_inode_size(&self) -> Result<(), ParsingError> {
+        let inode_size: u64 = self.e2fs_inode_size.into();
+        if inode_size < MINIMUM_INODE_SIZE {
+            Err(ParsingError::InvalidInodeSize(self.e2fs_inode_size.get()))
+        } else {
+            Ok(())
         }
     }
 
@@ -741,6 +770,60 @@ impl INode {
     /// Size of the file/directory/entry represented by this INode.
     pub fn size(&self) -> u64 {
         (self.e2di_size_high.get() as u64) << 32 | self.e2di_size.get() as u64
+    }
+
+    pub fn facl(&self) -> u64 {
+        (self.e2di_facl_high.get() as u64) << 32 | self.e2di_facl.get() as u64
+    }
+
+    fn assert_inode_size(sb: &SuperBlock) {
+        let inode_size: usize = sb.e2fs_inode_size.into();
+        assert!(inode_size >= std::mem::size_of::<INode>());
+    }
+
+    pub fn e4di_extra_isize(&self, sb: &SuperBlock) -> LEU16 {
+        INode::assert_inode_size(sb);
+        self.e4di_extra_isize
+    }
+
+    pub fn e4di_chksum_hi(&self, sb: &SuperBlock) -> LEU16 {
+        INode::assert_inode_size(sb);
+        self.e4di_chksum_hi
+    }
+
+    pub fn e4di_ctime_extra(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_ctime_extra
+    }
+
+    pub fn e4di_mtime_extra(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_mtime_extra
+    }
+
+    pub fn e4di_atime_extra(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_atime_extra
+    }
+
+    pub fn e4di_crtime(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_crtime
+    }
+
+    pub fn e4di_crtime_extra(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_crtime_extra
+    }
+
+    pub fn e4di_version_hi(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_version_hi
+    }
+
+    pub fn e4di_projid(&self, sb: &SuperBlock) -> LEU32 {
+        INode::assert_inode_size(sb);
+        self.e4di_projid
     }
 }
 
