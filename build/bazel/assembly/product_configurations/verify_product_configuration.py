@@ -81,6 +81,8 @@ def normalize_product(
                     p = os.path.join(root_dir, config_data["source"])
                     config_data.pop("source", None)
                     config_data["package_name"] = pkg["name"]
+                    # Follow links for depfile entry.
+                    p = os.path.relpath(os.path.realpath(p))
                     config_data["source_sha1"] = file_sha1(p)
                     extra_files_read.append(p)
                     new_config_data.append(config_data)

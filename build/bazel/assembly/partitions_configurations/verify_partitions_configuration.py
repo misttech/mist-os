@@ -19,8 +19,22 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
+def rewrite_legacy_ninja_build_outputs_path(p):
+    return p.replace(
+        'workspace/external/legacy_ninja_build_outputs',
+        'output_base/external/legacy_ninja_build_outputs',
+    )
+
+
 def replace_with_file_hash(dict, key, root_dir, extra_files_read):
     p = os.path.join(root_dir, dict[key])
+    # Note this is only necessary in partitions config verification because it
+    # references file from legacy_ninja_build_outputs. A find-and-replace is
+    # sufficnet since these verifications are meant to be temporary until we
+    # finish GN->Bazel migration for assembly.
+    p = rewrite_legacy_ninja_build_outputs_path(p)
+    # Follow links for depfile entry.
+    p = os.path.relpath(os.path.realpath(p))
     dict[key] = file_sha1(p)
     extra_files_read.append(p)
 

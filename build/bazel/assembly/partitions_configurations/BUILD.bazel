@@ -1,0 +1,94 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "PARTITION_TYPE",
+    "SLOT",
+    "fuchsia_bootloader_partition",
+    "fuchsia_partition",
+    "fuchsia_partitions_configuration",
+)
+
+package(default_visibility = [
+    "//build/bazel/assembly:__pkg__",
+    "//vendor/google:__subpackages__",
+])
+
+fuchsia_partition(
+    name = "zircon_a",
+    partition_name = "zircon-a",
+    slot = SLOT.A,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "zircon_b",
+    partition_name = "zircon-b",
+    slot = SLOT.B,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "zircon_r",
+    partition_name = "zircon-r",
+    slot = SLOT.R,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "vbmeta_a",
+    partition_name = "vbmeta_a",
+    slot = SLOT.A,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "vbmeta_b",
+    partition_name = "vbmeta_b",
+    slot = SLOT.B,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "vbmeta_r",
+    partition_name = "vbmeta_r",
+    slot = SLOT.R,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "fvm",
+    partition_name = "fvm",
+    type = PARTITION_TYPE.FVM,
+)
+
+fuchsia_bootloader_partition(
+    name = "fuchsia_esp",
+    image = "@legacy_ninja_build_outputs//:fuchsia.esp.blk",
+    partition_name = "fuchsia-esp",
+    type = "esp",
+)
+
+fuchsia_partitions_configuration(
+    name = "x64",
+    bootloader_partitions = [
+        ":fuchsia_esp",
+    ],
+    hardware_revision = "x64",
+    partitions = [
+        ":zircon_a",
+        ":zircon_b",
+        ":zircon_r",
+        ":vbmeta_a",
+        ":vbmeta_b",
+        ":vbmeta_r",
+        ":fvm",
+    ],
+)
+
+fuchsia_partitions_configuration(
+    name = "qemu-x64",
+    hardware_revision = "qemu-x64",
+)

@@ -1,0 +1,37 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import(
+    "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.gni")
+import("//build/board.gni")
+
+# NOTE: These targets are intentionally grouped in a subdir under
+# //boards/partitions so we can allow them to be non-hermetic (all Bazel actions
+# are non-hermetic) without accidentally including other partitions targets.
+
+_gn_x64_partitions_config_target = "//boards/partitions:x64"
+verify_partitions_configuration("x64") {
+  testonly = true
+  gn_partitions_config_target = _gn_x64_partitions_config_target
+  bazel_partitions_config_target =
+      "//build/bazel/assembly/partitions_configurations:x64"
+  bazel_inputs = [ "//build/images/flash:esp.bazel_input" ]
+}
+
+verify_partitions_configuration("qemu-x64") {
+  testonly = true
+  gn_partitions_config_target = "//boards/partitions:qemu-x64"
+  bazel_partitions_config_target =
+      "//build/bazel/assembly/partitions_configurations:qemu-x64"
+}
+
+group("verifications") {
+  testonly = true
+  deps = [ ":qemu-x64" ]
+
+  # Avoid building ESP in other configurations.
+  if (partitions_config_label == _gn_x64_partitions_config_target) {
+    deps += [ ":x64" ]
+  }
+}

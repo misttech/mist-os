@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/board.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/flash/parts.gni")
@@ -44,6 +45,13 @@ esp("esp") {
       },
     ]
   }
+}
+
+bazel_input_resource("esp.bazel_input") {
+  testonly = true
+  sources = [ "${root_build_dir}/fuchsia.esp.blk" ]
+  outputs = [ "fuchsia.esp.blk" ]
+  deps = [ ":esp" ]
 }
 
 if (use_gigaboot) {
