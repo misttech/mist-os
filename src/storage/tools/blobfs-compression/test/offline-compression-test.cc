@@ -1,0 +1,169 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include <array>
+
+#include <gtest/gtest.h>
+
+#include "src/lib/chunked-compression/chunked-decompressor.h"
+#include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/tools/blobfs-compression/blobfs-compression.h"
+
+namespace blobfs_compress {
+
+using namespace blobfs;
+
+TEST(OfflineCompressionTest, UncompressedEmptyBlob) {
+  const zx::result<std::vector<uint8_t>> delivery_blob =
+      GenerateDeliveryBlob({}, DeliveryBlobType::kUncompressed);
+  ASSERT_TRUE(delivery_blob.is_ok());
+  // Data should only contain headers and no payload.
+  ASSERT_EQ(delivery_blob->size(), sizeof(DeliveryBlobHeader) + sizeof(UncompressedMetadata));
+
+  // Decode headers/metadata and validate.
+  const cpp20::span<const uint8_t> buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
+  ASSERT_TRUE(header.is_ok());
+  ASSERT_TRUE(header->IsValid());
+  ASSERT_EQ(header->type, DeliveryBlobType::kUncompressed);
+  EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(UncompressedMetadata));
+
+  const zx::result<UncompressedMetadata> metadata =
+      UncompressedMetadata::FromBuffer(buffer.subspan(sizeof(DeliveryBlobHeader)), *header);
+  ASSERT_TRUE(metadata.is_ok());
+  ASSERT_TRUE(metadata->IsValid(*header));
+  EXPECT_EQ(metadata->payload_length, 0u);
+}
+
+TEST(OfflineCompressionTest, UncompressedBlobData) {
+  const std::array<uint8_t, 4> blob_data = {1, 2, 3, 4};
+
+  const zx::result<std::vector<uint8_t>> delivery_blob =
+      GenerateDeliveryBlob({blob_data.data(), blob_data.size()}, DeliveryBlobType::kUncompressed);
+  ASSERT_TRUE(delivery_blob.is_ok());
+  ASSERT_EQ(delivery_blob->size(),
+            sizeof(DeliveryBlobHeader) + sizeof(UncompressedMetadata) + blob_data.size());
+
+  // Decode headers/metadata and validate.
+  const cpp20::span buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
+  ASSERT_TRUE(header.is_ok());
+  ASSERT_TRUE(header->IsValid());
+  ASSERT_EQ(header->type, DeliveryBlobType::kUncompressed);
+  EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(UncompressedMetadata));
+
+  const cpp20::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
+  const zx::result<UncompressedMetadata> metadata =
+      UncompressedMetadata::FromBuffer(metadata_buffer, *header);
+  ASSERT_TRUE(metadata.is_ok());
+  ASSERT_TRUE(metadata->IsValid(*header));
+  EXPECT_EQ(metadata->payload_length, blob_data.size());
+
+  // Validate payload itself.
+  const cpp20::span payload_buffer = metadata_buffer.subspan(sizeof(UncompressedMetadata));
+  ASSERT_EQ(payload_buffer.size(), blob_data.size());
+  ASSERT_TRUE(std::equal(payload_buffer.begin(), payload_buffer.end(), blob_data.cbegin()));
+}
+
+TEST(OfflineCompressionTest, ZstdChunkedEmptyBlob) {
+  const zx::result<std::vector<uint8_t>> delivery_blob =
+      GenerateDeliveryBlob({}, DeliveryBlobType::kZstdChunked);
+  ASSERT_TRUE(delivery_blob.is_ok());
+  // Data should only contain headers and no payload.
+  ASSERT_EQ(delivery_blob->size(), sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata));
+
+  // Decode headers/metadata and validate.
+  const cpp20::span<const uint8_t> buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
+  ASSERT_TRUE(header.is_ok());
+  ASSERT_TRUE(header->IsValid());
+  ASSERT_EQ(header->type, DeliveryBlobType::kZstdChunked);
+  EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata));
+
+  const zx::result<ZstdChunkedMetadata> metadata =
+      ZstdChunkedMetadata::FromBuffer(buffer.subspan(sizeof(DeliveryBlobHeader)), *header);
+  ASSERT_TRUE(metadata.is_ok());
+  ASSERT_TRUE(metadata->IsValid(*header));
+  EXPECT_EQ(metadata->payload_length, 0u);
+  EXPECT_EQ(metadata->flags & ~ZstdChunkedMetadata::kValidFlagsMask, 0u);
+  // There should be no payload to decompress, so the IsCompressed bit should be zero.
+  EXPECT_FALSE(metadata->flags & ZstdChunkedMetadata::kIsCompressed);
+}
+
+TEST(OfflineCompressionTest, ZstdChunkedShouldNotCompress) {
+  // If we have less data to compress than the zstd-chunked header, we shouldn't use compression
+  // as the result would always be larger than the original.
+  constexpr size_t kSmallPayloadSize = 4u;
+  const std::vector<uint8_t> blob_data(kSmallPayloadSize);
+
+  const zx::result<std::vector<uint8_t>> delivery_blob =
+      GenerateDeliveryBlob({blob_data.data(), blob_data.size()}, DeliveryBlobType::kZstdChunked);
+  ASSERT_TRUE(delivery_blob.is_ok());
+  ASSERT_EQ(delivery_blob->size(),
+            sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata) + blob_data.size());
+
+  // Decode headers/metadata and validate.
+  const cpp20::span buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
+  ASSERT_TRUE(header.is_ok());
+  ASSERT_TRUE(header->IsValid());
+  ASSERT_EQ(header->type, DeliveryBlobType::kZstdChunked);
+  EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata));
+
+  const cpp20::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
+  const zx::result<ZstdChunkedMetadata> metadata =
+      ZstdChunkedMetadata::FromBuffer(metadata_buffer, *header);
+  ASSERT_TRUE(metadata.is_ok());
+  ASSERT_TRUE(metadata->IsValid(*header));
+  EXPECT_EQ(metadata->payload_length, blob_data.size());
+
+  // Validate payload itself.
+  const cpp20::span payload_buffer = metadata_buffer.subspan(sizeof(ZstdChunkedMetadata));
+  ASSERT_EQ(payload_buffer.size(), blob_data.size());
+  ASSERT_TRUE(std::equal(payload_buffer.begin(), payload_buffer.end(), blob_data.cbegin()));
+}
+
+TEST(OfflineCompressionTest, ZstdChunkedShouldCompress) {
+  constexpr size_t kLargePayloadSize = 1ul << 16;
+  const std::vector<uint8_t> blob_data(kLargePayloadSize);
+
+  const zx::result<std::vector<uint8_t>> delivery_blob =
+      GenerateDeliveryBlob({blob_data.data(), blob_data.size()}, DeliveryBlobType::kZstdChunked);
+  ASSERT_TRUE(delivery_blob.is_ok());
+  ASSERT_LE(delivery_blob->size(),
+            sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata) + blob_data.size());
+
+  // Decode headers/metadata and validate.
+  const cpp20::span buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
+  ASSERT_TRUE(header.is_ok());
+  ASSERT_TRUE(header->IsValid());
+  ASSERT_EQ(header->type, DeliveryBlobType::kZstdChunked);
+  EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata));
+
+  const cpp20::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
+  const zx::result<ZstdChunkedMetadata> metadata =
+      ZstdChunkedMetadata::FromBuffer(metadata_buffer, *header);
+  ASSERT_TRUE(metadata.is_ok());
+  ASSERT_TRUE(metadata->IsValid(*header));
+  // The payload length should be less than the actual data as it should be compressed.
+  EXPECT_LE(metadata->payload_length, blob_data.size());
+  EXPECT_TRUE((metadata->flags & ZstdChunkedMetadata::kValidFlagsMask) != 0u);
+
+  // Ensure that we can correctly decompress the payload.
+  const cpp20::span payload_buffer = metadata_buffer.subspan(sizeof(ZstdChunkedMetadata));
+  std::vector<uint8_t> aligned_payload(payload_buffer.size());
+  std::memcpy(aligned_payload.data(), payload_buffer.data(), payload_buffer.size());
+  fbl::Array<uint8_t> decompressed_result;
+  size_t unused;
+  ASSERT_EQ(chunked_compression::ChunkedDecompressor::DecompressBytes(
+                aligned_payload.data(), payload_buffer.size(), &decompressed_result, &unused),
+            chunked_compression::kStatusOk);
+  // Verify the decompressed result.
+  ASSERT_EQ(decompressed_result.size(), blob_data.size());
+  ASSERT_TRUE(
+      std::equal(decompressed_result.begin(), decompressed_result.end(), blob_data.cbegin()));
+}
+
+}  // namespace blobfs_compress

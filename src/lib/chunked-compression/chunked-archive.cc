@@ -279,7 +279,6 @@ HeaderWriter::HeaderWriter(void* dst, size_t dst_len, size_t num_frames)
   ZX_DEBUG_ASSERT(num_frames <= kChunkArchiveMaxFrames);
 
   num_frames_ = static_cast<ChunkCountType>(num_frames);
-  entries_ = reinterpret_cast<SeekTableEntry*>(dst_ + kChunkArchiveSeekTableOffset);
 
   dst_length_ = MetadataSizeForNumFrames(num_frames);
   ZX_DEBUG_ASSERT(dst_len >= dst_length_);
@@ -291,17 +290,27 @@ Status HeaderWriter::AddEntry(const SeekTableEntry& entry) {
     return kStatusErrBadState;
   }
 
+  std::optional<SeekTableEntry> prev = std::nullopt;
+  if (current_frame_ > 0) {
+    prev = SeekTableEntry{};
+    const uint8_t* prev_data =
+        dst_ + kChunkArchiveSeekTableOffset + (current_frame_ - 1) * sizeof(SeekTableEntry);
+    std::memcpy(&*prev, prev_data, sizeof(SeekTableEntry));
+  }
+
   size_t header_end = kChunkArchiveSeekTableOffset + (num_frames_ * sizeof(SeekTableEntry));
-  const SeekTableEntry* prev = current_frame_ > 0 ? &entries_[current_frame_ - 1] : nullptr;
   // Since we don't know yet how long the compressed file will be, simply pass UINT64_MAX
   // as the upper bound for the file length. This effectively disables checking compressed frames
   // against the file size.
-  Status status = HeaderReader::CheckSeekTableEntry(entry, prev, header_end, UINT64_MAX);
+  Status status = HeaderReader::CheckSeekTableEntry(entry, prev.has_value() ? &*prev : nullptr,
+                                                    header_end, UINT64_MAX);
   if (status != kStatusOk) {
     return kStatusErrInvalidArgs;
   }
 
-  entries_[current_frame_] = entry;
+  uint8_t* next_entry =
+      dst_ + kChunkArchiveSeekTableOffset + (current_frame_ * sizeof(SeekTableEntry));
+  std::memcpy(next_entry, &entry, sizeof(SeekTableEntry));
   ++current_frame_;
   return kStatusOk;
 }

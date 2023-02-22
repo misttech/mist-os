@@ -11,6 +11,7 @@ static_library("common") {
   deps = [ "//src/storage/blobfs" ]
   public_deps = [
     "//src/lib/chunked-compression",
+    "//src/storage/blobfs/compression/configs",
     "//zircon/third_party/ulib/safemath",
   ]
 }

@@ -267,7 +267,6 @@ class HeaderWriter {
 
   uint8_t* dst_ = nullptr;
   size_t dst_length_;
-  SeekTableEntry* entries_ = nullptr;
   size_t current_frame_ = 0;
   ChunkCountType num_frames_;
 };

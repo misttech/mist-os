@@ -11,11 +11,15 @@ group("tests") {
 }
 
 test("blobfs-compression-test") {
-  sources = [ "blobfs-compression-test.cc" ]
+  sources = [
+    "blobfs-compression-test.cc",
+    "offline-compression-test.cc",
+  ]
   deps = [
     "//src/lib/chunked-compression",
     "//src/lib/digest",
     "//src/lib/fxl/test:gtest_main",
+    "//src/storage/blobfs:blobfs",
     "//src/storage/blobfs/compression/configs",
     "//src/storage/tools/blobfs-compression:common",
     "//zircon/system/ulib/fbl",
