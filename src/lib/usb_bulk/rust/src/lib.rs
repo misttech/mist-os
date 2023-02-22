@@ -80,7 +80,7 @@ lazy_static! {
 /// writing.
 pub struct AsyncInterface {
     serial: String,
-    task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
+    task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>> + Send>>>,
 }
 
 impl Interface {
