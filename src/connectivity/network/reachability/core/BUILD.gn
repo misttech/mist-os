@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//third_party/cobalt/metrics_registry.gni")
 
 rustc_library("lib") {
   name = "reachability_core"
@@ -12,7 +13,9 @@ rustc_library("lib") {
   with_unit_tests = true
 
   deps = [
+    ":network_policy_metrics_registry_rustlib",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
@@ -33,6 +36,8 @@ rustc_library("lib") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:parking_lot",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
@@ -51,6 +56,8 @@ rustc_library("lib") {
     "src/neighbor_cache.rs",
     "src/ping.rs",
     "src/route_table.rs",
+    "src/telemetry/convert.rs",
+    "src/telemetry/mod.rs",
     "src/testutil.rs",
     "src/watchdog.rs",
   ]
@@ -65,4 +72,11 @@ fuchsia_unittest_package("reachability-core-lib-test") {
 group("tests") {
   testonly = true
   deps = [ ":reachability-core-lib-test" ]
+}
+
+metrics_registry("network_policy_metrics_registry") {
+  # This must match the ID of our Cobalt project as specified in:
+  # //third_party/cobalt_config/projects.yaml
+  project_id = 18
+  generate_rust = true  # Generates a rust target with '_rustlib' appended
 }

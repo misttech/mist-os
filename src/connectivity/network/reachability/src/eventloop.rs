@@ -20,11 +20,13 @@ use {
     futures::{future::FusedFuture, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
     reachability_core::{
-        route_table::RouteTable, watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID,
+        route_table::RouteTable,
+        telemetry::{self, TelemetryEvent, TelemetrySender},
+        watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID,
     },
     reachability_handler::ReachabilityHandler,
     std::collections::{HashMap, HashSet},
-    tracing::{debug, error},
+    tracing::{debug, error, warn},
 };
 
 const REPORT_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
@@ -147,6 +149,7 @@ pub struct EventLoop {
     neighbor_cache: NeighborCache,
     routes: RouteTable,
     latest_dns_addresses: Vec<fnet::IpAddress>,
+    telemetry_sender: Option<TelemetrySender>,
 }
 
 impl EventLoop {
@@ -161,12 +164,38 @@ impl EventLoop {
             neighbor_cache: Default::default(),
             routes: Default::default(),
             latest_dns_addresses: Vec::new(),
+            telemetry_sender: None,
         }
     }
 
     /// `run` starts the event loop.
     pub async fn run(&mut self) -> Result<(), anyhow::Error> {
         use fuchsia_component::client::connect_to_protocol;
+
+        let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
+            fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
+        >()
+        .context("connect to metrics service")?;
+
+        let cobalt_proxy = match telemetry::create_metrics_logger(cobalt_svc).await {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                warn!("Metrics logging is unavailable: {}", e);
+
+                // If it is not possible to acquire a metrics logging proxy, create a disconnected
+                // proxy and attempt to serve the policy API with metrics disabled.
+                let (proxy, _) = fidl::endpoints::create_proxy::<
+                    fidl_fuchsia_metrics::MetricEventLoggerMarker,
+                >()
+                .context("failed to create MetricEventLoggerMarker endponts")?;
+                proxy
+            }
+        };
+
+        let (telemetry_sender, telemetry_fut) = telemetry::serve_telemetry(cobalt_proxy);
+        let telemetry_fut = telemetry_fut.fuse();
+        self.telemetry_sender = Some(telemetry_sender.clone());
+        self.monitor.set_telemetry_sender(telemetry_sender);
 
         let if_watcher_stream = {
             let interface_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -230,7 +259,8 @@ impl EventLoop {
             dns_lookup_fut,
             dns_interval_timer,
             ipv4_route_event_stream,
-            ipv6_route_event_stream
+            ipv6_route_event_stream,
+            telemetry_fut,
         );
 
         // Establish the current routing table state.
@@ -265,6 +295,11 @@ impl EventLoop {
                                     .push(fasync::Interval::new(PROBE_PERIOD)
                                     .map(move |()| id)
                                     .into_future());
+                            }
+                            if let Some(telemetry_sender) = &self.telemetry_sender {
+                                let has_default_ipv4_route = self.interface_properties.values().any(|p| p.has_default_ipv4_route);
+                                let has_default_ipv6_route = self.interface_properties.values().any(|p| p.has_default_ipv6_route);
+                                telemetry_sender.send(TelemetryEvent::NetworkConfig { has_default_ipv4_route, has_default_ipv6_route });
                             }
                         }
                         Ok(None) => {
@@ -347,10 +382,17 @@ impl EventLoop {
                             self.latest_dns_addresses = Vec::new();
                         }
                     }
+                    let dns_active = !self.latest_dns_addresses.is_empty();
                     self.handler.update_state(|state| {
-                        state.dns_active = !self.latest_dns_addresses.is_empty();
+                        state.dns_active = dns_active;
                     }).await;
-                }
+                    if let Some(telemetry_sender) = &self.telemetry_sender {
+                        telemetry_sender.send(TelemetryEvent::DnsProbe { dns_active });
+                    }
+                },
+                () = telemetry_fut => {
+                    error!("unspectedly stopped serving telemetry");
+                },
             }
         }
     }

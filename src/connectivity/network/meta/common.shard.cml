@@ -77,6 +77,11 @@
             to: [ "#netstack" ],
         },
         {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "parent",
+            to: [ "#reachability" ],
+        },
+        {
             protocol: [ "fuchsia.net.dhcp.Server" ],
             from: "#dhcpd",
             to: [ "#netcfg" ],

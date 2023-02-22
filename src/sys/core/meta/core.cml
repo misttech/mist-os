@@ -169,6 +169,12 @@
     ],
     offer: [
         {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#cobalt",
+            to: "#network",
+            dependency: "weak",
+        },
+        {
             protocol: [ "fuchsia.kernel.DebugResource" ],
             from: "parent",
             to: "#debug_serial",

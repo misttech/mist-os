@@ -6,6 +6,7 @@ mod inspect;
 mod neighbor_cache;
 mod ping;
 pub mod route_table;
+pub mod telemetry;
 pub mod watchdog;
 
 #[cfg(test)]
@@ -14,6 +15,7 @@ mod testutil;
 use {
     crate::ping::Ping,
     crate::route_table::{Route, RouteTable},
+    crate::telemetry::{TelemetryEvent, TelemetrySender},
     fidl_fuchsia_hardware_network, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
@@ -74,6 +76,29 @@ pub enum State {
     WalledGarden,
     /// Expected response seen from reachability test URL.
     Internet,
+}
+
+impl State {
+    fn has_interface_up(&self) -> bool {
+        match self {
+            State::None | State::Removed | State::Down => false,
+            State::Up
+            | State::LinkLayerUp
+            | State::NetworkLayerUp
+            | State::Local
+            | State::Gateway
+            | State::WalledGarden
+            | State::Internet => true,
+        }
+    }
+
+    fn has_internet(&self) -> bool {
+        *self == State::Internet
+    }
+
+    fn has_gateway(&self) -> bool {
+        *self == State::Gateway || *self == State::Internet
+    }
 }
 
 impl Default for State {
@@ -220,6 +245,36 @@ impl<T> IpVersions<T> {
     }
 }
 
+impl IpVersions<Option<SystemState>> {
+    fn state(&self) -> IpVersions<Option<State>> {
+        IpVersions {
+            ipv4: self.ipv4.map(|s| s.state.state),
+            ipv6: self.ipv6.map(|s| s.state.state),
+        }
+    }
+}
+
+impl IpVersions<Option<State>> {
+    fn has_interface_up(&self) -> bool {
+        self.satisfies(State::has_interface_up)
+    }
+
+    fn has_internet(&self) -> bool {
+        self.satisfies(State::has_internet)
+    }
+
+    fn has_gateway(&self) -> bool {
+        self.satisfies(State::has_gateway)
+    }
+
+    fn satisfies<F>(&self, f: F) -> bool
+    where
+        F: Fn(&State) -> bool,
+    {
+        return [self.ipv4, self.ipv6].iter().filter_map(|state| state.as_ref()).any(f);
+    }
+}
+
 type Id = u64;
 
 // NB PartialEq is derived only for tests to avoid unintentionally making a comparison that
@@ -291,24 +346,16 @@ impl StateInfo {
         })
     }
 
+    fn get_system(&self) -> IpVersions<Option<SystemState>> {
+        IpVersions { ipv4: self.get_system_ipv4(), ipv6: self.get_system_ipv6() }
+    }
+
     pub fn system_has_internet(&self) -> bool {
-        self.system_has_state(&State::Internet)
+        self.get_system().state().has_internet()
     }
 
-    // A system is considered to have gateway reachability if it has State::Gateway
-    // or State::Internet.
     pub fn system_has_gateway(&self) -> bool {
-        self.system_has_state(&State::Gateway) || self.system_has_state(&State::Internet)
-    }
-
-    fn system_has_state(&self, want_state: &State) -> bool {
-        let v4_state = self.get_system_ipv4();
-        let v6_state = self.get_system_ipv6();
-
-        return [v4_state, v6_state]
-            .iter()
-            .filter_map(|state| state.as_ref())
-            .any(|state| &state.state.state == want_state);
+        self.get_system().state().has_gateway()
     }
 
     /// Report the duration of the current state for each interface and each protocol.
@@ -401,6 +448,7 @@ pub struct Monitor {
     inspector: Option<&'static Inspector>,
     system_node: Option<InspectInfo>,
     nodes: HashMap<Id, InspectInfo>,
+    telemetry_sender: Option<TelemetrySender>,
 }
 
 impl Monitor {
@@ -412,6 +460,7 @@ impl Monitor {
             inspector: None,
             system_node: None,
             nodes: HashMap::new(),
+            telemetry_sender: None,
         })
     }
 
@@ -431,6 +480,10 @@ impl Monitor {
 
         let system_node = InspectInfo::new(inspector.root(), "system", "");
         self.system_node = Some(system_node);
+    }
+
+    pub fn set_telemetry_sender(&mut self, telemetry_sender: TelemetrySender) {
+        self.telemetry_sender = Some(telemetry_sender);
     }
 
     fn interface_node(&mut self, id: Id, name: &str) -> Option<&mut InspectInfo> {
@@ -485,9 +538,24 @@ impl Monitor {
         &mut self,
         InterfaceView { properties, routes, neighbors }: InterfaceView<'_>,
     ) {
-        if let Some(info) = compute_state(properties, routes, &ping::Pinger, neighbors).await {
+        if let Some(info) = compute_state(
+            properties,
+            routes,
+            &ping::Pinger,
+            neighbors,
+            self.telemetry_sender.as_mut(),
+        )
+        .await
+        {
             let id = Id::from(properties.id);
             let () = self.update_state(id, &properties.name, info);
+        }
+        if let Some(telemetry_sender) = &mut self.telemetry_sender {
+            telemetry_sender.send(TelemetryEvent::SystemStateUpdate {
+                update: telemetry::SystemStateUpdate {
+                    system_state: self.state.get_system().state(),
+                },
+            });
         }
     }
 
@@ -524,6 +592,7 @@ async fn compute_state(
     routes: &RouteTable,
     pinger: &dyn Ping,
     neighbors: Option<&InterfaceNeighborCache>,
+    telemetry_sender: Option<&mut TelemetrySender>,
 ) -> Option<IpVersions<StateEvent>> {
     if PortType::from(device_class) == PortType::Loopback {
         return None;
@@ -539,27 +608,38 @@ async fn compute_state(
     // TODO(https://fxbug.dev/74517) Check if packet count has increased, and if so upgrade the
     // state to LinkLayerUp.
 
-    let (ipv4, ipv6) = futures::join!(
+    let ((ipv4, event1), (ipv6, event2)) = futures::join!(
         network_layer_state(
             &name,
             id,
             routes,
             pinger,
             neighbors,
-            IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS
+            IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
         )
-        .map(|state| StateEvent { state, time: fasync::Time::now() }),
+        .map(|s| (StateEvent { state: s.state, time: fasync::Time::now() }, s.telemetry_event)),
         network_layer_state(
             &name,
             id,
             routes,
             pinger,
             neighbors,
-            IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS
+            IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
         )
-        .map(|state| StateEvent { state, time: fasync::Time::now() })
+        .map(|s| (StateEvent { state: s.state, time: fasync::Time::now() }, s.telemetry_event)),
     );
+
+    if let Some(telemetry_sender) = telemetry_sender {
+        telemetry_sender.send(event1);
+        telemetry_sender.send(event2);
+    }
+
     Some(IpVersions { ipv4, ipv6 })
+}
+
+struct StateComputation {
+    state: State,
+    telemetry_event: TelemetryEvent,
 }
 
 // `network_layer_state` determines the L3 reachability state.
@@ -570,7 +650,7 @@ async fn network_layer_state(
     p: &dyn Ping,
     neighbors: Option<&InterfaceNeighborCache>,
     internet_ping_address: std::net::IpAddr,
-) -> State {
+) -> StateComputation {
     use std::convert::TryInto as _;
 
     let device_routes: Vec<_> = routes.device_routes(interface_id).collect();
@@ -697,20 +777,22 @@ async fn network_layer_state(
     // |            |            |          | else Gateway.                        |
     // -----------------------------------------------------------------------------
 
-    return match (discovered_healthy_neighbors, discovered_healthy_gateway, gateway_pingable) {
+    let state = match (discovered_healthy_neighbors, discovered_healthy_gateway, gateway_pingable) {
         // TODO(fxbug.dev/120510): Add metrics for tracking abnormal states
         (false, false, false) => {
             if device_routes.is_empty() {
-                return State::Up;
+                State::Up
+            } else {
+                State::Local
             }
-            State::Local
         }
         (false, false, true) => {
             if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
-                return State::Gateway;
+                State::Gateway
+            } else {
+                tracing::info!("gateway ARP/ND failing with internet available");
+                State::Internet
             }
-            tracing::info!("gateway ARP/ND  failing with internet available");
-            return State::Internet;
         }
         (false, true, _) => {
             error!(
@@ -723,28 +805,39 @@ async fn network_layer_state(
             if relevant_routes.is_empty()
                 || !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await
             {
-                return State::Local;
+                State::Local
+            } else {
+                tracing::info!("gateway ARP/ND and ping failing with internet available");
+                State::Internet
             }
-            tracing::info!("gateway ARP/ND and ping failing with internet available");
-            State::Internet
         }
         (true, false, true) => {
             if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
-                return State::Gateway;
+                State::Gateway
+            } else {
+                tracing::info!("gateway ARP/ND failing with internet available");
+                State::Internet
             }
-            tracing::info!("gateway ARP/ND failing with internet available");
-            State::Internet
         }
         (true, true, gateway_pingable) => {
             if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
-                return State::Gateway;
+                State::Gateway
+            } else {
+                if !gateway_pingable {
+                    tracing::info!("gateway ping failing with internet available");
+                }
+                State::Internet
             }
-            if !gateway_pingable {
-                tracing::info!("gateway ping failing with internet available");
-            }
-            State::Internet
         }
     };
+
+    let telemetry_event = TelemetryEvent::GatewayProbe {
+        internet_available: state.has_internet(),
+        gateway_discoverable: discovered_healthy_gateway,
+        gateway_pingable,
+    };
+
+    StateComputation { state, telemetry_event }
 }
 
 #[cfg(test)]
@@ -957,7 +1050,8 @@ mod tests {
                 None,
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Internet,
             "All is good. Can reach internet"
         );
@@ -983,9 +1077,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Internet,
             "Can reach internet, gateway responding via ARP/ND"
         );
@@ -1013,7 +1108,8 @@ mod tests {
                 }),
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Internet,
             "Gateway not responding via ping or ARP/ND. Can reach internet"
         );
@@ -1041,7 +1137,8 @@ mod tests {
                 }),
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Internet,
             "No default route, but healthy gateway with internet/gateway response"
         );
@@ -1059,7 +1156,8 @@ mod tests {
                 None,
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Gateway,
             "Can reach gateway via ping"
         );
@@ -1081,9 +1179,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Gateway,
             "Can reach gateway via ARP/ND"
         );
@@ -1101,7 +1200,8 @@ mod tests {
                 None,
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "Local only, Cannot reach gateway"
         );
@@ -1115,7 +1215,8 @@ mod tests {
                 None,
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "No default route"
         );
@@ -1133,7 +1234,8 @@ mod tests {
                 None,
                 ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "No default route, with only gateway response"
         );
@@ -1155,9 +1257,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "Local only, neighbors responsive with no default route"
         );
@@ -1181,7 +1284,8 @@ mod tests {
                 }),
                 ping_internet_addr
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "Local only, neighbors responsive with a default route"
         );
@@ -1203,9 +1307,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "Local only, neighbors responsive with no routes"
         );
@@ -1233,9 +1338,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Local,
             "Local only, gateway unhealthy with healthy neighbor"
         );
@@ -1255,9 +1361,10 @@ mod tests {
                     .cloned()
                     .collect::<HashMap<fnet::IpAddress, NeighborState>>()
                 }),
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Up,
             "No routes and unhealthy gateway"
         );
@@ -1269,11 +1376,12 @@ mod tests {
                 &route_table_3,
                 &FakePing::default(),
                 None,
-                ping_internet_addr
+                ping_internet_addr,
             )
-            .await,
+            .await
+            .state,
             State::Up,
-            "No routes"
+            "No routes",
         );
     }
 
@@ -1341,7 +1449,7 @@ mod tests {
             routes: &RouteTable,
             pinger: &dyn Ping,
         ) -> Result<Option<IpVersions<StateEvent>>, anyhow::Error> {
-            let fut = compute_state(&properties, routes, pinger, None);
+            let fut = compute_state(&properties, routes, pinger, None, None);
             futures::pin_mut!(fut);
             match exec.run_until_stalled(&mut fut) {
                 Poll::Ready(got) => Ok(got),
