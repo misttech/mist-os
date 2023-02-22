@@ -41,6 +41,15 @@ class FfxCommandError(HoneyDewError):
     err_code = 10
 
 
+class HttpRequestError(HoneyDewError):
+    """Exception for errors raised by HTTP requests running on host machine.
+
+    Attributes:
+        err_code (int): numeric code of the error.
+    """
+    err_code = 11
+
+
 class FuchsiaDeviceError(HoneyDewError):
     """Base exception for errors raised by fuchsia device.
 

@@ -34,7 +34,7 @@ def ffx_target_show(
         Output of `ffx -t {target} target show`.
 
     Raises:
-        FfxCommandError: In case of failure.
+        errors.FfxCommandError: In case of failure.
     """
     try:
         cmd = _CMDS["FUCHSIA_TARGETS_SHOW"].format(
@@ -60,7 +60,7 @@ def get_target_address(
         Target IP address.
 
     Raises:
-        FfxCommandError: In case of failure.
+        errors.FfxCommandError: In case of failure.
     """
     # Sample ffx_target_show_info containing ssh_address:
     # [
@@ -108,7 +108,7 @@ def get_target_type(target: str, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
         Target type.
 
     Raises:
-        FfxCommandError: In case of failure.
+        errors.FfxCommandError: In case of failure.
     """
     # Sample ffx_target_show_info containing product type (board):
     # [
