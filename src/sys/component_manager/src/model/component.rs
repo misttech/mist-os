@@ -3152,4 +3152,148 @@ pub mod tests {
         n2r(InstanceState::New, new_resolved().await),
         n2n(InstanceState::New, InstanceState::New),
     ]);
+
+    #[fuchsia::test]
+    async fn validate_and_convert_dynamic_offers() {
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new()
+                .add_collection(CollectionDecl {
+                    name: "col".to_string(),
+                    durability: fdecl::Durability::Transient,
+                    environment: None,
+                    allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
+                    allow_long_names: false,
+                    persistent_storage: Some(false),
+                })
+                .build(),
+        )];
+        let test = ActionsTest::new("root", components, None).await;
+        let _root = test
+            .model
+            .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
+            .await
+            .expect("failed to start root");
+        test.runner.wait_for_urls(&["test:///root_resolved"]).await;
+
+        let root_component = test.look_up(AbsoluteMoniker::root()).await;
+
+        let collection_decl = root_component
+            .lock_resolved_state()
+            .await
+            .expect("failed to get resolved state")
+            .decl
+            .collections
+            .iter()
+            .find(|c| &c.name == "col")
+            .expect("unable to find collection decl")
+            .clone();
+
+        let validate_and_convert = |offers: Vec<fdecl::Offer>| async {
+            root_component
+                .lock_resolved_state()
+                .await
+                .expect("failed to get resolved state")
+                .validate_and_convert_dynamic_offers(
+                    Some(offers),
+                    &ChildDecl {
+                        name: "foo".to_string(),
+                        url: "http://foo".to_string(),
+                        startup: fdecl::StartupMode::Lazy,
+                        on_terminate: None,
+                        environment: None,
+                    },
+                    Some(&collection_decl),
+                )
+        };
+
+        assert_eq!(
+            validate_and_convert(vec![]).await.expect("failed to validate/convert dynamic offers"),
+            vec![],
+        );
+
+        assert_eq!(
+            validate_and_convert(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                source_name: Some("fuchsia.example.Echo".to_string()),
+                target: None,
+                target_name: Some("fuchsia.example.Echo".to_string()),
+                dependency_type: Some(fdecl::DependencyType::Strong),
+                availability: Some(fdecl::Availability::Required),
+                ..fdecl::OfferProtocol::EMPTY
+            })])
+            .await
+            .expect("failed to validate/convert dynamic offers"),
+            vec![OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::Parent,
+                source_name: "fuchsia.example.Echo".into(),
+                target: OfferTarget::Child(ChildRef {
+                    name: "foo".into(),
+                    collection: Some("col".into()),
+                }),
+                target_name: "fuchsia.example.Echo".into(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }),],
+        );
+
+        assert_eq!(
+            validate_and_convert(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
+                source_name: Some("fuchsia.example.Echo".to_string()),
+                target: None,
+                target_name: Some("fuchsia.example.Echo".to_string()),
+                dependency_type: Some(fdecl::DependencyType::Strong),
+                availability: Some(fdecl::Availability::Optional),
+                ..fdecl::OfferProtocol::EMPTY
+            })])
+            .await
+            .expect("failed to validate/convert dynamic offers"),
+            vec![OfferDecl::Protocol(OfferProtocolDecl {
+                source: OfferSource::Void,
+                source_name: "fuchsia.example.Echo".into(),
+                target: OfferTarget::Child(ChildRef {
+                    name: "foo".into(),
+                    collection: Some("col".into()),
+                }),
+                target_name: "fuchsia.example.Echo".into(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Optional,
+            }),],
+        );
+
+        assert_matches!(
+            validate_and_convert(vec![
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "doesnt-exist".to_string(),
+                            collection: Some("col".to_string()),
+                        })),
+                        source_name: Some("fuchsia.example.Echo".to_string()),
+                        target: None,
+                        target_name: Some("fuchsia.example.Echo".to_string()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        availability: Some(fdecl::Availability::Optional),
+                        ..fdecl::OfferProtocol::EMPTY
+                    })
+                ])
+                .await
+                .expect_err("unexpected succeess in validate/convert dynamic offers"),
+            DynamicOfferError::SourceNotFound { offer }
+                if offer == OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Child(ChildRef {
+                        name: "doesnt-exist".into(),
+                        collection: Some("col".into()),
+                    }),
+                    source_name: "fuchsia.example.Echo".into(),
+                    target: OfferTarget::Child(ChildRef {
+                        name: "foo".into(),
+                        collection: Some("col".into()),
+                    }),
+                    target_name: "fuchsia.example.Echo".into(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                })
+        );
+    }
 }
