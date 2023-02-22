@@ -88,14 +88,14 @@ class FocusInputTest : public gtest::RealLoopFixture,
   ~FocusInputTest() override = default;
 
   void SetUp() override {
+    auto config = GetParam();
+
     FX_LOGS(INFO) << "Setting up test case";
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(GetParam());
+    ui_test_manager_.emplace(config);
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
-
-    auto config = GetParam();
+    realm_ = ui_test_manager_->AddSubrealm();
 
     // Add a test view provider.
     component_testing::LocalComponentFactory test_view;
@@ -135,13 +135,20 @@ class FocusInputTest : public gtest::RealLoopFixture,
     FX_LOGS(INFO) << "Finished setup";
   }
 
-  ui_testing::UITestManager* ui_test_manager() { return ui_test_manager_.get(); }
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
+  std::optional<ui_testing::UITestManager>& ui_test_manager() { return ui_test_manager_; }
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
 
  private:
   // Configures a RealmBuilder realm and manages scene on behalf of the test
   // fixture.
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
 
   // Exposed services directory for the realm owned by `ui_test_manager_`.
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
@@ -150,7 +157,7 @@ class FocusInputTest : public gtest::RealLoopFixture,
 
   // Configured by the test fixture, and attached as a subrealm to ui test
   // manager's realm.
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 };
 
 INSTANTIATE_TEST_SUITE_P(FocusInputTestWithParams, FocusInputTest,

@@ -8,6 +8,7 @@
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
+#include <lib/fit/defer.h>
 #include <lib/sys/component/cpp/testing/internal/errors.h>
 #include <lib/sys/component/cpp/testing/internal/realm.h>
 #include <lib/sys/component/cpp/testing/scoped_child.h>
@@ -83,38 +84,16 @@ ScopedChild::~ScopedChild() {
     return;
   }
 
-  if (dispatcher_) {
-    fuchsia::component::RealmPtr async_realm_proxy;
-    svc_->Connect(async_realm_proxy.NewRequest(dispatcher_));
-    internal::DestroyChild(async_realm_proxy.get(), child_ref_,
-                           [callback = std::move(teardown_callback_),
-                            // We have to move the proxy into the callback so that the channel
-                            // connection doesn't prematurely close.
-                            _proxy = std::move(async_realm_proxy)](
-                               fuchsia::component::Realm_DestroyChild_Result result) {
-                             if (callback == nullptr) {
-                               return;
-                             }
-
-                             if (result.is_err()) {
-                               callback(result.err());
-                             } else {
-                               callback(cpp17::nullopt);
-                             }
-                           });
-  } else {
-    fuchsia::component::RealmSyncPtr sync_realm_proxy;
-    svc_->Connect(sync_realm_proxy.NewRequest());
-    internal::DestroyChild(sync_realm_proxy.get(), child_ref_);
-  }
+  fuchsia::component::RealmSyncPtr sync_realm_proxy;
+  ZX_COMPONENT_ASSERT_STATUS_OK("sys::ServiceDirectory/Connect",
+                                svc_->Connect(sync_realm_proxy.NewRequest()));
+  internal::DestroyChild(sync_realm_proxy.get(), child_ref_);
 }
 
 ScopedChild::ScopedChild(ScopedChild&& other) noexcept
     : svc_(std::move(other.svc_)),
       child_ref_(std::move(other.child_ref_)),
-      exposed_dir_(std::move(other.exposed_dir_)),
-      dispatcher_(other.dispatcher_),
-      teardown_callback_(std::move(other.teardown_callback_)) {
+      exposed_dir_(std::move(other.exposed_dir_)) {
   other.has_moved_ = true;
 }
 
@@ -122,19 +101,44 @@ ScopedChild& ScopedChild::operator=(ScopedChild&& other) noexcept {
   this->svc_ = std::move(other.svc_);
   this->child_ref_ = std::move(other.child_ref_);
   this->exposed_dir_ = std::move(other.exposed_dir_);
-  this->dispatcher_ = other.dispatcher_;
-  this->teardown_callback_ = std::move(other.teardown_callback_);
   other.has_moved_ = true;
   return *this;
 }
 
-void ScopedChild::MakeTeardownAsync(async_dispatcher_t* dispatcher, TeardownCallback callback) {
-  if (dispatcher == nullptr) {
-    dispatcher = async_get_default_dispatcher();
-  }
+void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback callback) {
+  fuchsia::component::RealmPtr async_realm_proxy;
+  ZX_COMPONENT_ASSERT_STATUS_OK("sys::ServiceDirectory/Connect",
+                                svc_->Connect(async_realm_proxy.NewRequest()));
 
-  dispatcher_ = dispatcher;
-  teardown_callback_ = std::move(callback);
+  internal::DestroyChild(
+      async_realm_proxy.get(), child_ref_,
+      [callback = std::move(callback),
+       // Stash a panic-on-drop callback into the closure; this asserts that callers do not shut
+       // down the dispatcher before the async call completes.
+       forbid_drop = fit::deferred_callback(
+           []() { ZX_PANIC("async callback dropped without being called"); }),
+       // We have to move the proxy into the callback so that the channel
+       // connection doesn't prematurely close.
+       _proxy = std::move(async_realm_proxy)](
+          fuchsia::component::Realm_DestroyChild_Result result) mutable {
+        forbid_drop.cancel();
+        if (callback == nullptr) {
+          return;
+        }
+        switch (result.Which()) {
+          case fuchsia::component::Realm_DestroyChild_Result::kResponse:
+            callback(fit::ok());
+            break;
+          case fuchsia::component::Realm_DestroyChild_Result::kErr:
+            callback(fit::error(result.err()));
+            break;
+          case fuchsia::component::Realm_DestroyChild_Result::Invalid:
+            ZX_PANIC("Realm/DestroyChild returned invalid response");
+        }
+      });
+
+  // Prevent the destructor from calling DestroyChild again.
+  has_moved_ = true;
 }
 
 zx_status_t ScopedChild::Connect(const std::string& interface_name, zx::channel request) const {

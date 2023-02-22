@@ -518,7 +518,11 @@ void UITestRealm::Build() {
   realm_builder_.AddRoute(Route{
       .capabilities = {Storage{"tmp"}}, .source = ParentRef(), .targets = {ChildRef{kScenicName}}});
 
-  realm_root_ = std::make_unique<component_testing::RealmRoot>(realm_builder_.Build());
+  realm_root_ = realm_builder_.Build();
+}
+
+void UITestRealm::Teardown(component_testing::ScopedChild::TeardownCallback on_teardown_complete) {
+  realm_root_->Teardown(std::move(on_teardown_complete));
 }
 
 std::unique_ptr<sys::ServiceDirectory> UITestRealm::CloneExposedServicesDirectory() {

@@ -139,8 +139,8 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
   void PlayNoReply(int64_t reference_time, int64_t media_time) override { UNEXPECTED_METHOD_CALL; }
   void Pause(PauseCallback callback) override { UNEXPECTED_METHOD_CALL; }
   void GetMinLeadTime(GetMinLeadTimeCallback callback) override { UNEXPECTED_METHOD_CALL; }
-  void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
-                           gain_control_request) override {
+  void BindGainControl(
+      fidl::InterfaceRequest<::fuchsia::media::audio::GainControl> gain_control_request) override {
     UNEXPECTED_METHOD_CALL;
   }
 
@@ -243,8 +243,8 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
   void StartAsyncCapture(uint32_t frames_per_packet) override { UNEXPECTED_METHOD_CALL; }
   void StopAsyncCapture(StopAsyncCaptureCallback callback) override { UNEXPECTED_METHOD_CALL; }
   void StopAsyncCaptureNoReply() override { UNEXPECTED_METHOD_CALL; }
-  void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
-                           gain_control_request) override {
+  void BindGainControl(
+      fidl::InterfaceRequest<::fuchsia::media::audio::GainControl> gain_control_request) override {
     UNEXPECTED_METHOD_CALL;
   }
   void GetReferenceClock(GetReferenceClockCallback callback) override { UNEXPECTED_METHOD_CALL; }
@@ -383,7 +383,7 @@ class VirtioSoundTestBase : public TestWithDevice {
                         .source = ChildRef{kComponentName},
                         .targets = {ParentRef()}});
 
-    realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
+    realm_ = realm_builder.Build(dispatcher());
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(phys_mem_size_, &start_info);
@@ -418,6 +418,12 @@ class VirtioSoundTestBase : public TestWithDevice {
 
     // Wait until virtio_sound has connected to the mock object
     RunLoopWithTimeoutOrUntil([&]() { return audio_service_.HasStarted(); }, kTimeout);
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   FakeAudioRenderer* get_audio_renderer(size_t k) {
@@ -564,7 +570,7 @@ class VirtioSoundTestBase : public TestWithDevice {
   size_t phys_mem_size_;
   FakeAudio audio_service_;
   std::unordered_map<VirtioQueueFake*, std::unordered_set<uint32_t>> used_descriptors_;
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
 };
 
 using VirtioSoundTest = VirtioSoundTestBase<true>;

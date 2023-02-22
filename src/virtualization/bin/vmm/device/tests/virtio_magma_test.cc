@@ -215,7 +215,7 @@ class VirtioMagmaTest : public TestWithDevice {
                         .source = ChildRef{kComponentName},
                         .targets = {ParentRef()}});
 
-    realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
+    realm_ = realm_builder.Build(dispatcher());
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(out_queue_.end(), &start_info);
@@ -249,6 +249,12 @@ class VirtioMagmaTest : public TestWithDevice {
     magma_->Ready(0, [&] { QuitLoop(); });
 
     RunLoop();
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   std::optional<VirtioQueueFake::UsedElement> NextUsed(VirtioQueueFake* queue) {
@@ -480,7 +486,7 @@ class VirtioMagmaTest : public TestWithDevice {
       wayland_importer_mock_binding_;
   async::Loop wayland_importer_mock_loop_;
   ScenicAllocatorFake scenic_allocator_fake_;
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
 };
 
 TEST_F(VirtioMagmaTest, HandleQuery) {

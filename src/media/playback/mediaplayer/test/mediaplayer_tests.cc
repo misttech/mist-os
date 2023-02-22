@@ -104,7 +104,6 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
                                  .targets = {ChildRef{"mediaplayer"}}});
 
     realm_ = realm_builder.Build(dispatcher());
-    teardown_callback_ = realm_->TeardownCallback();
 
     zx_status_t const status = realm_->component().Connect(player_.NewRequest());
 
@@ -126,9 +125,10 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
   void TearDown() override {
     EXPECT_FALSE(player_connection_closed_);
     player_ = nullptr;
-    realm_.reset();
     // Wait for realm to teardown before fakes, so we don't end up with crashes that lead to flakes.
-    RunLoopUntil(std::move(teardown_callback_));
+    bool done = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> err) { done = true; });
+    RunLoopUntil([&]() { return done; });
   }
 
   zx::vmo CreateVmo(size_t size) {
@@ -172,7 +172,6 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
 
   fuchsia::media::playback::PlayerPtr player_;
   bool player_connection_closed_ = false;
-  fit::function<bool()> teardown_callback_;
 
   fuchsia::ui::views::ViewHolderToken view_holder_token_;
   bool sink_connection_closed_ = false;

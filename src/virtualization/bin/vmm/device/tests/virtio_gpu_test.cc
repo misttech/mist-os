@@ -90,7 +90,7 @@ class DISABLED_VirtioGpuTest : public TestWithDevice,
                                        fuchsia::ui::composition::Allocator::Name_};
     ui_config.exposed_client_services = {fuchsia::virtualization::hardware::VirtioGpu::Name_};
 
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(ui_config));
+    ui_test_manager_.emplace(std::move(ui_config));
 
     constexpr auto kComponentName = "virtio_gpu";
     constexpr auto kGraphicalPresenterComponentName = "graphical_presenter";
@@ -168,6 +168,13 @@ class DISABLED_VirtioGpuTest : public TestWithDevice,
     // Finish negotiating features.
     status = gpu_->Ready(0);
     ASSERT_EQ(ZX_OK, status);
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   std::optional<fuchsia::ui::observation::geometry::ViewDescriptor> FindGpuView() {
@@ -265,7 +272,7 @@ class DISABLED_VirtioGpuTest : public TestWithDevice,
     EXPECT_EQ(response_type, response->type);
   }
 
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
 
   // Note: use of sync can be problematic here if the test environment needs to handle
   // some incoming FIDL requests.

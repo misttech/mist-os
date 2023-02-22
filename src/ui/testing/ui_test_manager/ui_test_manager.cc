@@ -85,6 +85,11 @@ void UITestManager::BuildRealm() {
   Watch();
 }
 
+void UITestManager::TeardownRealm(
+    component_testing::ScopedChild::TeardownCallback on_teardown_complete) {
+  realm_.Teardown(std::move(on_teardown_complete));
+}
+
 std::unique_ptr<sys::ServiceDirectory> UITestManager::CloneExposedServicesDirectory() {
   return realm_.CloneExposedServicesDirectory();
 }

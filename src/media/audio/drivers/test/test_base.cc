@@ -46,6 +46,15 @@ void TestBase::SetUp() {
 void TestBase::TearDown() {
   stream_config_.Unbind();
 
+  if (realm_.has_value()) {
+    // We're about to shut down the realm; unbind to unhook the error handler.
+    audio_binder_.Unbind();
+    bool complete = false;
+    realm_.value().Teardown(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   // Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
   // the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
   // opening and closing channels. If we create a StreamConfig channel before the previous one is
@@ -84,11 +93,12 @@ void TestBase::ConnectToBluetoothDevice() {
       .capabilities = {Protocol{.name = fuchsia::component::Binder::Name_, .as = "audio-binder"}},
       .source = ChildRef{"audio-device-output-harness"},
       .targets = {ParentRef{}}});
-  realm_ = std::make_unique<RealmRoot>(builder.Build());
+  realm_ = builder.Build();
   ASSERT_EQ(ZX_OK,
             realm_->component().Connect("audio-binder", audio_binder_.NewRequest().TakeChannel()));
-  audio_binder_.set_error_handler(
-      [](zx_status_t status) { FAIL() << "audio-device-output-harness exited"; });
+  audio_binder_.set_error_handler([](zx_status_t status) {
+    FAIL() << "audio-device-output-harness exited: " << zx_status_get_string(status);
+  });
 
   // Wait for the Bluetooth harness to AddDeviceByChannel, then pass it on
   RunLoopUntil([impl = audio_device_enumerator_impl_ptr]() {

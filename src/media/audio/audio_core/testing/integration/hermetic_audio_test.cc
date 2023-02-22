@@ -114,7 +114,11 @@ void HermeticAudioTest::SetUpRealm() {
   realm_->Connect(thermal_test_client_state_control_sync_.NewRequest());
 }
 
-void HermeticAudioTest::TearDownRealm() { realm_ = nullptr; }
+void HermeticAudioTest::TearDownRealm() {
+  bool complete = false;
+  realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+  RunLoopUntil([&]() { return complete; });
+}
 
 void HermeticAudioTest::SetUp() {
   TRACE_DURATION_BEGIN("audio", "HermeticAudioTest::RunTest");

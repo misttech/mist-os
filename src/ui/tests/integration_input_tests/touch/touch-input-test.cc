@@ -522,23 +522,22 @@ class TouchInputBase : public ui_testing::PortableUITest,
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    realm_builder()->AddLocalChild(kMockResponseListener,
-                                   [d = dispatcher(), s = response_state_]() {
-                                     return std::make_unique<ResponseListenerServer>(d, s);
-                                   });
+    realm_builder().AddLocalChild(kMockResponseListener, [d = dispatcher(), s = response_state_]() {
+      return std::make_unique<ResponseListenerServer>(d, s);
+    });
 
-    realm_builder()->AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-                               .source = kTestUIStackRef,
-                               .targets = {ParentRef()}});
+    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
+                              .source = kTestUIStackRef,
+                              .targets = {ParentRef()}});
 
     // Add components specific for this test case to the realm.
     for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder()->AddChild(name, component);
+      realm_builder().AddChild(name, component);
     }
 
     // Add the necessary routing for each of the extra components added above.
     for (const auto& route : GetTestRoutes()) {
-      realm_builder()->AddRoute(route);
+      realm_builder().AddRoute(route);
     }
   }
 

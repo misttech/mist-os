@@ -55,11 +55,11 @@ class MagnificationPixelTest
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.use_input = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(config));
+    ui_test_manager_.emplace(std::move(config));
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
     // Add a test view provider.
@@ -84,6 +84,13 @@ class MagnificationPixelTest
     fake_magnifier_ = realm_exposed_services_->Connect<test::accessibility::Magnifier>();
   }
 
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   void SetClipSpaceTransform(float scale, float x, float y) {
     fake_magnifier_->SetMagnification(scale, x, y, [this]() { QuitLoop(); });
 
@@ -93,10 +100,10 @@ class MagnificationPixelTest
   ui_testing::Screenshot TakeScreenshot() { return ui_test_manager_->TakeScreenshot(); }
 
  private:
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 
   test::accessibility::MagnifierPtr fake_magnifier_;
 };

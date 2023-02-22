@@ -51,6 +51,8 @@ class HermeticAudioRealm {
   static void Create(Options options, async_dispatcher* dispatcher,
                      std::unique_ptr<HermeticAudioRealm>& realm_out);
 
+  void Teardown(component_testing::ScopedChild::TeardownCallback on_teardown_complete);
+
   // Connect to a discoverable service exposed by a child component.
   template <typename Interface>
   zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const {

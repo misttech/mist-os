@@ -209,11 +209,11 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
 
   void SetUp() override {
     FX_LOGS(INFO) << "Setting up test case";
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(GetParam());
+    ui_test_manager_.emplace(GetParam());
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
     BuildRealm(this->GetTestComponents(), this->GetTestRoutes());
 
     // Get display dimensions.
@@ -224,6 +224,13 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
                   << " and display_height = " << *display_height_;
 
     RegisterInjectionDevice();
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   // Subclass should implement this method to add components to the test realm
@@ -311,7 +318,7 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
   uint32_t display_width() const { return *display_width_; }
   uint32_t display_height() const { return *display_height_; }
 
-  ui_testing::UITestManager* ui_test_manager() { return ui_test_manager_.get(); }
+  std::optional<ui_testing::UITestManager>& ui_test_manager() { return ui_test_manager_; }
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
 
  private:
@@ -338,7 +345,7 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
 
   // Configures a RealmBuilder realm and manages scene on behalf of the test
   // fixture.
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
 
   // Exposed services directory for the realm owned by `ui_test_manager_`.
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
@@ -348,7 +355,7 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
 
   // Configured by the test fixture, and attached as a subrealm to ui test
   // manager's realm.
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 
   int injection_count_ = 0;
 

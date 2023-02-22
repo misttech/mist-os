@@ -12,11 +12,15 @@
 #include "src/cobalt/bin/testapp/cobalt_testapp.h"
 
 #include <fuchsia/cobalt/cpp/fidl.h>
+#include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/synchronous_interface_ptr.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
+#include <lib/sys/component/cpp/testing/scoped_child.h>
+#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -24,24 +28,12 @@
 #include <string>
 #include <thread>
 
-#include "fuchsia/component/cpp/fidl.h"
-#include "lib/fidl/cpp/binding.h"
-#include "lib/fidl/cpp/synchronous_interface_ptr.h"
-#include "lib/sys/component/cpp/testing/scoped_child.h"
-#include "lib/sys/cpp/component_context.h"
 #include "src/cobalt/bin/testapp/cobalt_testapp_logger.h"
 #include "src/cobalt/bin/testapp/prober_metrics_registry.cb.h"
 #include "src/cobalt/bin/testapp/testapp_metrics_registry.cb.h"
 #include "src/cobalt/bin/testapp/tests.h"
-#include "src/cobalt/bin/utils/status_utils.h"
-#include "src/lib/fsl/vmo/file.h"
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/log_settings_command_line.h"
-#include "src/lib/fxl/macros.h"
 
 namespace cobalt::testapp {
-
-using ::cobalt::StatusToString;
 
 constexpr char kCobaltWithEventAggregatorWorker[] = "#meta/cobalt_with_event_aggregator_worker.cm";
 constexpr char kCobaltNoEventAggregatorWorker[] = "#meta/cobalt_no_event_aggregator_worker.cm";
@@ -49,54 +41,36 @@ constexpr char kCobaltNoEventAggregatorWorker[] = "#meta/cobalt_no_event_aggrega
 constexpr uint32_t kControlId = 48954961;
 constexpr uint32_t kExperimentId = 48954962;
 
-#define TRY_TEST(test) \
-  if (!(test)) {       \
-    return false;      \
-  }
-
-#define CONNECT_AND_TRY_TEST_TWICE(test, variant)                                 \
-  {                                                                               \
-    std::unique_ptr<component_testing::ScopedChild> child =                       \
-        std::make_unique<component_testing::ScopedChild>(Connect(variant));       \
-    if (!(test)) {                                                                \
-      child->MakeTeardownAsync(loop_->dispatcher());                              \
-      child = std::make_unique<component_testing::ScopedChild>(Connect(variant)); \
-      if (!(test)) {                                                              \
-        return false;                                                             \
-      }                                                                           \
-    }                                                                             \
-    child->MakeTeardownAsync(loop_->dispatcher());                                \
-  }
-
 bool CobaltTestApp::RunTests() {
-  std::unique_ptr<component_testing::ScopedChild> child =
-      std::make_unique<component_testing::ScopedChild>(Connect(kCobaltWithEventAggregatorWorker));
-
-  child->MakeTeardownAsync(loop_->dispatcher());
+  { component_testing::ScopedChild child = Connect(kCobaltWithEventAggregatorWorker); }
 
   return DoLocalAggregationTests(kEventAggregatorBackfillDays, kCobaltNoEventAggregatorWorker);
 }
 
 bool CobaltTestApp::DoLocalAggregationTests(const size_t backfill_days,
                                             const std::string &variant) {
-  uint32_t project_id =
+  const uint32_t project_id =
       (test_for_prober_ ? cobalt_prober_registry::kProjectId : cobalt_registry::kProjectId);
+
+  constexpr std::array fns = {
+      TestLogInteger,
+      TestLogIntegerHistogram,
+      TestLogOccurrence,
+      TestLogString,
+  };
+
   // TODO(fxbug.dev/52750): We try each of these tests twice in case the failure
   // reason is that the calendar date has changed mid-test.
-  CONNECT_AND_TRY_TEST_TWICE(
-      TestLogInteger(&logger_, clock_.get(), &cobalt_controller_, backfill_days, project_id),
-      variant);
-  CONNECT_AND_TRY_TEST_TWICE(
-      TestLogOccurrence(&logger_, clock_.get(), &cobalt_controller_, backfill_days, project_id),
-      variant);
-  CONNECT_AND_TRY_TEST_TWICE(TestLogIntegerHistogram(&logger_, clock_.get(), &cobalt_controller_,
-                                                     backfill_days, project_id),
-                             variant);
-  CONNECT_AND_TRY_TEST_TWICE(
-      TestLogString(&logger_, clock_.get(), &cobalt_controller_, backfill_days, project_id),
-      variant);
-
-  return true;
+  for (size_t i = 0; i < 2; ++i) {
+    if (std::all_of(fns.begin(), fns.end(), [&](auto fn) {
+          // Each function expects to run against a fresh instance.
+          component_testing::ScopedChild child = Connect(variant);
+          return fn(&logger_, clock_.get(), &cobalt_controller_, backfill_days, project_id);
+        })) {
+      return true;
+    }
+  }
+  return false;
 }
 
 component_testing::ScopedChild CobaltTestApp::Connect(const std::string &variant) {

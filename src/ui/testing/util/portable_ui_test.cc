@@ -80,7 +80,13 @@ void PortableUITest::SetUp() {
 
   ExtendRealm();
 
-  realm_ = std::make_unique<RealmRoot>(realm_builder_.Build());
+  realm_ = realm_builder_.Build();
+}
+
+void PortableUITest::TearDown() {
+  bool complete = false;
+  realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+  RunLoopUntil([&]() { return complete; });
 }
 
 void PortableUITest::ProcessViewGeometryResponse(

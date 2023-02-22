@@ -137,7 +137,7 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithRealmBuilder(
     zx::time deadline, GuestLaunchInfo& guest_launch_info) {
   auto realm_builder = component_testing::RealmBuilder::Create();
   InstallInRealm(realm_builder.root(), guest_launch_info);
-  realm_root_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher_));
+  realm_root_ = realm_builder.Build(dispatcher_);
   return std::make_unique<sys::ServiceDirectory>(realm_root_->component().CloneExposedDir());
 }
 
@@ -182,13 +182,32 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(
   };
 
   // Now create and install the virtualization components into a new sub-realm.
-  ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(ui_config));
+  ui_test_manager_.emplace(std::move(ui_config));
   auto guest_realm = ui_test_manager_->AddSubrealm();
   InstallInRealm(guest_realm, guest_launch_info);
   InstallTestGraphicalPresenter(guest_realm);
   ui_test_manager_->BuildRealm();
   ui_test_manager_->InitializeScene();
   return ui_test_manager_->CloneExposedServicesDirectory();
+}
+
+EnclosedGuest::~EnclosedGuest() {
+  bool ui_test_manager_teardown_complete = false;
+  if (ui_test_manager_.has_value()) {
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error>) { ui_test_manager_teardown_complete = true; });
+  } else {
+    ui_test_manager_teardown_complete = true;
+  }
+  bool realm_root_teardown_complete = false;
+  if (realm_root_.has_value()) {
+    realm_root_->Teardown(
+        [&](fit::result<fuchsia::component::Error>) { realm_root_teardown_complete = true; });
+  } else {
+    realm_root_teardown_complete = true;
+  }
+  RunLoopUntil([&]() { return ui_test_manager_teardown_complete && realm_root_teardown_complete; },
+               zx::time::infinite());
 }
 
 zx_status_t EnclosedGuest::Start(zx::time deadline) {

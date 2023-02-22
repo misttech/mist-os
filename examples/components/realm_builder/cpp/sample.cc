@@ -123,15 +123,17 @@ TEST_F(RealmBuilderTest, RoutesFromMockEcho) {
                          .targets = {ParentRef()}});
 
   auto realm = builder.Build(dispatcher());
-
-  auto echo = realm.component().Connect<fidl::examples::routing::echo::Echo>();
-  fidl::StringPtr response;
-  echo->EchoString("hello", [&](fidl::StringPtr response) {
-    // Use EXPECT here so the loop can still quit if the test fails
-    EXPECT_EQ(response, "hello");
-    QuitLoop();
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   });
 
-  // Wait for async callback to complete
-  RunLoop();
+  auto echo = realm.component().Connect<fidl::examples::routing::echo::Echo>();
+  bool was_called = false;
+  echo->EchoString("hello", [&](const fidl::StringPtr& response) {
+    was_called = true;
+    ASSERT_EQ(response, "hello");
+  });
+  RunLoopUntil([&]() { return was_called; });
 }

@@ -102,7 +102,7 @@ class AdbRebootTest : public gtest::RealLoopFixture {
     builder.AddRoute(Route{.capabilities = {Protocol{fuchsia::hardware::adb::Provider::Name_}},
                            .source = ChildRef{"adb-reboot"},
                            .targets = {ParentRef()}});
-    realm_ = std::make_unique<RealmRoot>(builder.Build(dispatcher()));
+    realm_ = builder.Build(dispatcher());
 
     ASSERT_EQ(realm_->component().Connect<fuchsia::hardware::adb::Provider>(
                   reboot_.NewRequest(dispatcher())),
@@ -112,10 +112,14 @@ class AdbRebootTest : public gtest::RealLoopFixture {
         [](zx_status_t status) { FX_LOGS(INFO) << "adb reboot could not connect " << status; });
   }
 
-  void TearDown() override { realm_.reset(); }
+  void TearDown() override {
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
 
  protected:
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
   fidl::InterfacePtr<fuchsia::hardware::adb::Provider> reboot_;
   LocalPowerStateControl* local_power_state_control_ptr_ = nullptr;
 };

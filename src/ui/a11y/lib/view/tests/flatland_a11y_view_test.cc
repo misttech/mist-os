@@ -68,11 +68,11 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
                                     fuchsia::ui::composition::Flatland::Name_};
     config.exposed_client_services = {fuchsia::accessibility::scene::Provider::Name_,
                                       fuchsia::ui::app::ViewProvider::Name_};
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(config));
+    ui_test_manager_.emplace(std::move(config));
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<component_testing::Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     test_view_access_ = std::make_shared<ui_testing::FlatlandTestViewAccess>();
     // Add a test view provider.
@@ -114,11 +114,16 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
     SetUpScene();
   }
 
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   void SetUpScene() {
     flatland_display_ =
         realm_exposed_services()->template Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    auto proxy_flatland =
-        realm_exposed_services()->template Connect<fuchsia::ui::composition::Flatland>();
 
     a11y_view_ = std::make_unique<a11y::FlatlandAccessibilityView>(
         realm_exposed_services()->template Connect<fuchsia::ui::composition::Flatland>(),
@@ -174,9 +179,9 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
 
  protected:
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<component_testing::Realm> realm_;
+  std::optional<component_testing::Realm> realm_;
   std::shared_ptr<ui_testing::FlatlandTestViewAccess> test_view_access_;
   std::shared_ptr<ui_testing::TestViewAccess> nested_view_access_;
   std::unique_ptr<a11y::FlatlandAccessibilityView> a11y_view_;

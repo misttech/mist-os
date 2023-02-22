@@ -108,7 +108,7 @@ class TestBase : public media::audio::test::TestFixture {
   void ValidateGetFormats();
   void SetMinMaxFormats();
 
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
   fuchsia::component::BinderPtr audio_binder_;
 
   const DeviceEntry& device_entry_;

@@ -408,88 +408,23 @@ RealmBuilder::RealmBuilder(std::shared_ptr<sys::ServiceDirectory> svc,
 RealmRoot::RealmRoot(std::unique_ptr<internal::LocalComponentRunner> local_component_runner,
                      ScopedChild root, async_dispatcher_t* dispatcher)
     : local_component_runner_(std::move(local_component_runner)),
-      root_(std::make_unique<ScopedChild>(std::move(root))),
-      dispatcher_(dispatcher),
-      teardown_status_(std::make_shared<RealmRoot::TeardownStatus>(false)),
-      weak_teardown_status_(teardown_status_) {
-  root_->MakeTeardownAsync(dispatcher_);
-}
+      root_(std::move(root)),
+      dispatcher_(dispatcher) {}
 
-RealmRoot::~RealmRoot() {
-  if (!teardown_status_ && weak_teardown_status_.use_count() > 0) {
-    // The user called `TeardownCallback()` but did not call `Teardown()`.
-    // Register a callback to update the `teardown_status_`
-    root_->MakeTeardownAsync(
-        dispatcher_, [weak_teardown_status = std::move(weak_teardown_status_)](
-                         cpp17::optional<fuchsia::component::Error> optional_err) {
-          if (std::shared_ptr<RealmRoot::TeardownStatus> const p = weak_teardown_status.lock()) {
-            if (optional_err.has_value()) {
-              *p = *optional_err;
-            } else {
-              *p = true;
-            }
-          }
-        });
-  }
-}
+RealmRoot::~RealmRoot() = default;
 
 zx_status_t RealmRoot::Connect(const std::string& interface_name, zx::channel request) const {
-  ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
-  return root_->Connect(interface_name, std::move(request));
+  return root_.Connect(interface_name, std::move(request));
 }
 
-std::string RealmRoot::GetChildName() const {
-  ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
-  return root_->GetChildName();
-}
-
-fit::function<bool()> RealmRoot::TeardownCallback() {
-  ZX_ASSERT_MSG(teardown_status_,
-                "RealmRoot::TeardownCallback() has already been called or RealmRoot was moved");
-  return [teardown_status = std::move(teardown_status_)] {
-    ZX_ASSERT_MSG(!cpp17::holds_alternative<fuchsia::component::Error>(*teardown_status),
-                  "Realm teardown failed");
-    return cpp17::get<bool>(*teardown_status);
-  };
-}
+std::string RealmRoot::GetChildName() const { return root_.GetChildName(); }
 
 void RealmRoot::Teardown(ScopedChild::TeardownCallback on_teardown_complete) {
-  // Register an optional, caller-provided callback to be invoked when the
-  // `root_` ScopedChild (realm component) has been destroyed. If the user had
-  // previously called the `TeardownCallback()` method to get a function that
-  // returns `true` on shutdown, also update the status value when the component
-  // has been destroyed.
-  root_->MakeTeardownAsync(
-      dispatcher_, [on_teardown_complete = std::move(on_teardown_complete),
-                    weak_teardown_status = std::move(weak_teardown_status_)](
-                       cpp17::optional<fuchsia::component::Error> optional_err) {
-        if (on_teardown_complete) {
-          on_teardown_complete(optional_err);
-        }
-        if (std::shared_ptr<RealmRoot::TeardownStatus> const p = weak_teardown_status.lock()) {
-          if (optional_err.has_value()) {
-            *p = *optional_err;
-          } else {
-            *p = true;
-          }
-        }
-      });
-
-  // Destruct the `RealmRoot`'s component. The `root_` ScopedChild destructor
-  // calls `Realm::DestroyChild()` to ask component manager to destroy the
-  // child realm corresponding to the `RealmRoot`. DestroyChild will invoke
-  // the callback on completion of that request.
-  root_.reset(nullptr);
+  root_.Teardown(dispatcher_, std::move(on_teardown_complete));
 }
 
-ScopedChild& RealmRoot::component() {
-  ZX_ASSERT_MSG(root_ != nullptr, "RealmRoot::component() invoked after |Teardown|");
-  return *root_;
-}
+ScopedChild& RealmRoot::component() { return root_; }
 
-const ScopedChild& RealmRoot::component() const {
-  ZX_ASSERT_MSG(root_ != nullptr, "RealmRoot::component() invoked after |Teardown|");
-  return *root_;
-}
+const ScopedChild& RealmRoot::component() const { return root_; }
 
 }  // namespace component_testing

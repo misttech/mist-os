@@ -186,6 +186,11 @@ TEST_F(RealmBuilderTest, RouteServiceToComponent) {
                          .targets = {ParentRef()}});
 
   auto realm = builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
   fuchsia::process::explorer::QueryPtr explorer;
   ASSERT_EQ(realm.component().Connect(explorer.NewRequest()), ZX_OK);
   zx::socket socket[2];

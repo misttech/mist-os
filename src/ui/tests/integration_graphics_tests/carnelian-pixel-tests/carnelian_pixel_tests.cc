@@ -97,16 +97,16 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
  private:
   void ExtendRealm() override {
     // Add the carnelian component.
-    realm_builder()->AddChild(kCarnelianClient, kCarnelianClientUrl);
+    realm_builder().AddChild(kCarnelianClient, kCarnelianClientUrl);
 
     // Add routes between components.
-    realm_builder()->AddRoute(
+    realm_builder().AddRoute(
         {.capabilities = {Protocol{fuchsia::ui::composition::Screenshot::Name_},
                           Protocol{fuchsia::ui::display::singleton::Info::Name_}},
          .source = kTestUIStackRef,
          .targets = {ParentRef{}}});
 
-    realm_builder()->AddRoute(
+    realm_builder().AddRoute(
         {.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
                           Protocol{fuchsia::sysmem::Allocator::Name_},
                           Protocol{fuchsia::tracing::provider::Registry::Name_},
@@ -114,17 +114,16 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
          .source = ParentRef(),
          .targets = {ChildRef{kCarnelianClient}}});
 
-    realm_builder()->AddRoute(
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_},
-                          Protocol{fuchsia::ui::scenic::Scenic::Name_},
-                          Protocol{fuchsia::ui::input3::Keyboard::Name_}},
-         .source = kTestUIStackRef,
-         .targets = {ChildRef{kCarnelianClient}}});
+    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
+                                               Protocol{fuchsia::ui::composition::Allocator::Name_},
+                                               Protocol{fuchsia::ui::scenic::Scenic::Name_},
+                                               Protocol{fuchsia::ui::input3::Keyboard::Name_}},
+                              .source = kTestUIStackRef,
+                              .targets = {ChildRef{kCarnelianClient}}});
 
-    realm_builder()->AddRoute({.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                               .source = ChildRef{kCarnelianClient},
-                               .targets = {ParentRef()}});
+    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
+                              .source = ChildRef{kCarnelianClient},
+                              .targets = {ParentRef()}});
   }
 
   static constexpr auto kCarnelianClient = "carnelian_client";

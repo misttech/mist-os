@@ -15,7 +15,8 @@
 #include <memory>
 
 #include <gtest/gtest.h>
-#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace {
 
@@ -68,6 +69,11 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
   });
 
   auto realm = realm_builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
 
   RunLoopUntil([&called]() { return called; });
 }
@@ -88,6 +94,11 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
   });
 
   auto realm = realm_builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
 
   RunLoopUntil([&called]() { return called; });
 }

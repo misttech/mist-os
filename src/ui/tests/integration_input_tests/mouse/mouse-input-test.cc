@@ -183,6 +183,8 @@ class MouseInputBase : public ui_testing::PortableUITest {
   }
 
   void TearDown() override {
+    ui_testing::PortableUITest::TearDown();
+
     // at the end of test, ensure event queue is empty.
     ASSERT_EQ(mouse_state_->SizeOfEvents(), 0u);
   }
@@ -242,22 +244,22 @@ class MouseInputBase : public ui_testing::PortableUITest {
     // Key part of service setup: have this test component vend the
     // |MouseInputListener| service in the constructed realm.
     auto* d = dispatcher();
-    realm_builder()->AddLocalChild(kMouseInputListener, [d, s = mouse_state_]() {
+    realm_builder().AddLocalChild(kMouseInputListener, [d, s = mouse_state_]() {
       return std::make_unique<MouseInputListenerServer>(d, s);
     });
 
     // Expose scenic to the test fixture.
-    realm_builder()->AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-                               .source = kTestUIStackRef,
-                               .targets = {ParentRef()}});
+    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
+                              .source = kTestUIStackRef,
+                              .targets = {ParentRef()}});
 
     for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder()->AddChild(name, component);
+      realm_builder().AddChild(name, component);
     }
 
     // Add the necessary routing for each of the extra components added above.
     for (const auto& route : GetTestRoutes()) {
-      realm_builder()->AddRoute(route);
+      realm_builder().AddRoute(route);
     }
   }
 

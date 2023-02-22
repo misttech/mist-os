@@ -85,11 +85,11 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
 
   // |testing::Test|
   void SetUp() override {
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(config_);
+    ui_test_manager_.emplace(config_);
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
 
@@ -133,6 +133,13 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
     display_height_ = height;
     FX_LOGS(INFO) << "Got display_width = " << display_width_
                   << " and display_height = " << display_height_;
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   ui_testing::Screenshot TakeScreenshot() { return ui_test_manager_->TakeScreenshot(); }
@@ -192,9 +199,9 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
 
  private:
   ui_testing::UITestRealm::Config config_;
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 };
 
 class LandscapeModeTest : public DisplayRotationPixelTestBase,

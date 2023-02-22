@@ -134,15 +134,22 @@ void SemanticsIntegrationTestV2::SetUp() {
   FX_LOGS(INFO) << "Setting up test fixture";
 
   // Initialize ui test manager.
-  ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(GetParam());
+  ui_test_manager_.emplace(GetParam());
 
   // Initialize ui test realm.
   BuildRealm();
 }
 
+void SemanticsIntegrationTestV2::TearDown() {
+  bool complete = false;
+  ui_test_manager_->TeardownRealm(
+      [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+  RunLoopUntil([&]() { return complete; });
+}
+
 void SemanticsIntegrationTestV2::BuildRealm() {
   FX_LOGS(INFO) << "Building realm";
-  realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+  realm_ = ui_test_manager_->AddSubrealm();
 
   view_manager_ = std::make_unique<a11y::ViewManager>(
       std::make_unique<a11y::SemanticTreeServiceFactory>(),

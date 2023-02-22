@@ -241,7 +241,7 @@ class AdbFileSyncTest : public gtest::RealLoopFixture {
                            .targets = {ParentRef()}});
     builder.InitMutableConfigToEmpty("adb-file-sync");
     builder.SetConfigValue("adb-file-sync", "filesync_moniker", std::move(default_moniker));
-    realm_ = std::make_unique<RealmRoot>(builder.Build(dispatcher()));
+    realm_ = builder.Build(dispatcher());
 
     ASSERT_EQ(realm_->component().Connect<fuchsia::hardware::adb::Provider>(
                   file_sync_.NewRequest(dispatcher())),
@@ -262,7 +262,9 @@ class AdbFileSyncTest : public gtest::RealLoopFixture {
   }
 
   void TearDown() override {
-    realm_.reset();
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
     directory_.TearDown();
   }
 
@@ -279,7 +281,7 @@ class AdbFileSyncTest : public gtest::RealLoopFixture {
   }
 
  private:
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
   fidl::InterfacePtr<fuchsia::hardware::adb::Provider> file_sync_;
 
  protected:

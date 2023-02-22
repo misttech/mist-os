@@ -352,7 +352,9 @@ class AdbRealmTest : public AdbTest, public loop_fixture::RealLoop {
   }
 
   void TearDown() override {
-    realm_.reset();
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
     AdbTest::TearDown();
   }
 
@@ -399,12 +401,12 @@ class AdbRealmTest : public AdbTest, public loop_fixture::RealLoop {
     builder.AddRoute(Route{.capabilities = {Protocol{fuchsia::hardware::adb::Provider::Name_}},
                            .source = ChildRef{std::string(kShellService)},
                            .targets = {ParentRef()}});
-    realm_ = std::make_unique<RealmRoot>(builder.Build(dispatcher()));
+    realm_ = builder.Build(dispatcher());
     RunLoopUntil([&]() { return dev_ptr_->IsStarted(); });
   }
 
  protected:
-  std::unique_ptr<RealmRoot> realm_;
+  std::optional<RealmRoot> realm_;
   FakeAdbServiceProvider* service_provider_ptr_ = nullptr;
   FakeAdb* dev_ptr_ = nullptr;
 };

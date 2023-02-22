@@ -8,6 +8,7 @@
 #include <fuchsia/sysinfo/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fit/defer.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/vfs/cpp/remote_dir.h>
 
@@ -17,6 +18,7 @@
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 // NOLINTNEXTLINE
 using namespace component_testing;
@@ -79,8 +81,8 @@ class FakeMagmaDevice : public fuchsia::gpu::magma::testing::CombinedDevice_Test
 
 class MockGpuComponent : public LocalComponent {
  public:
-  explicit MockGpuComponent(async::Loop& loop, FakeMagmaDevice& magma_device)
-      : loop_(loop), magma_device_(magma_device) {}
+  explicit MockGpuComponent(async_dispatcher_t* dispatcher, FakeMagmaDevice& magma_device)
+      : magma_device_(magma_device), gpu_vfs_(dispatcher), mediacodec_vfs_(dispatcher) {}
 
   void Start(std::unique_ptr<LocalComponentHandles> mock_handles) override {
     mock_handles_ = std::move(mock_handles);
@@ -115,18 +117,17 @@ class MockGpuComponent : public LocalComponent {
   }
 
  private:
-  async::Loop& loop_;
   FakeMagmaDevice& magma_device_;
   std::unique_ptr<LocalComponentHandles> mock_handles_;
-  fs::SynchronousVfs gpu_vfs_{loop_.dispatcher()};
-  fs::SynchronousVfs mediacodec_vfs_{loop_.dispatcher()};
+  fs::SynchronousVfs gpu_vfs_;
+  fs::SynchronousVfs mediacodec_vfs_;
 };
 
 constexpr auto kCodecFactoryName = "codec_factory";
 constexpr auto kMockGpuName = "mock_gpu";
 constexpr auto kSysInfoName = "mock_sys_info";
 
-class Integration : public testing::Test {
+class Integration : public gtest::RealLoopFixture {
  protected:
   Integration() = default;
 
@@ -169,22 +170,23 @@ class Integration : public testing::Test {
     });
   }
 
-  async::Loop loop_{&kAsyncLoopConfigAttachToCurrentThread};
   FakeMagmaDevice magma_device_;
-  MockGpuComponent mock_gpu_{loop_, magma_device_};
+  MockGpuComponent mock_gpu_{dispatcher(), magma_device_};
   MockSysInfoComponent mock_sys_info_;
 };
 
 TEST_F(Integration, MagmaDevice) {
   auto builder = RealmBuilder::Create();
   InitializeRoutes(builder);
-  auto realm = builder.Build(loop_.dispatcher());
+  auto realm = builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
   auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
-  factory.set_error_handler([&](zx_status_t status) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
-  });
+  factory.set_error_handler([&](zx_status_t status) { FAIL() << zx_status_get_string(status); });
 
   fuchsia::mediacodec::CreateDecoder_Params params;
   fuchsia::media::FormatDetails input_details;
@@ -193,24 +195,20 @@ TEST_F(Integration, MagmaDevice) {
   params.set_require_hw(true);
   fuchsia::media::StreamProcessorPtr processor;
   factory->CreateDecoder(std::move(params), processor.NewRequest());
-  processor.set_error_handler([&](zx_status_t status) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
-  });
+  processor.set_error_handler([&](zx_status_t status) { FAIL() << zx_status_get_string(status); });
 
+  bool on_input_constraints_called = false;
   processor.events().OnInputConstraints = [&](fuchsia::media::StreamBufferConstraints constraints) {
-    loop_.Quit();
+    on_input_constraints_called = true;
     processor.Unbind();
   };
 
-  loop_.Run();
+  RunLoopUntil([&]() { return on_input_constraints_called || HasFailure(); });
 
   magma_device_.CloseAll();
 
   // Eventually codecs from the device should disappear.
   while (true) {
-    loop_.ResetQuit();
-
     fuchsia::mediacodec::CreateDecoder_Params params;
     fuchsia::media::FormatDetails input_details;
     input_details.set_mime_type("video/h264");
@@ -218,23 +216,21 @@ TEST_F(Integration, MagmaDevice) {
     params.set_require_hw(true);
     fuchsia::media::StreamProcessorPtr processor;
     factory->CreateDecoder(std::move(params), processor.NewRequest());
-    bool processor_failed = false;
-    processor.set_error_handler([&](zx_status_t status) {
-      loop_.Quit();
-      processor_failed = true;
-    });
 
+    bool processor_failed = false;
+    processor.set_error_handler([&](zx_status_t status) { processor_failed = true; });
+
+    bool on_input_constraints_called = false;
     processor.events().OnInputConstraints =
         [&](fuchsia::media::StreamBufferConstraints constraints) {
-          // Ignore this success and try again.
-          loop_.Quit();
+          on_input_constraints_called = true;
           processor.Unbind();
         };
-
-    loop_.Run();
-    if (processor_failed)
+    RunLoopUntil([&]() { return processor_failed || on_input_constraints_called; });
+    if (processor_failed) {
       break;
-    sleep(1);
+    }
+    // Ignore this success and try again.
   }
 }
 
@@ -244,13 +240,15 @@ TEST_F(Integration, MagmaDeviceNoIcd) {
   InitializeRoutes(builder);
   magma_device_.set_has_icds(false);
 
-  auto realm = builder.Build(loop_.dispatcher());
+  auto realm = builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
   auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
-  factory.set_error_handler([&](zx_status_t status) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
-  });
+  factory.set_error_handler([&](zx_status_t status) { FAIL() << zx_status_get_string(status); });
 
   fuchsia::mediacodec::CreateDecoder_Params params;
   fuchsia::media::FormatDetails input_details;
@@ -259,29 +257,34 @@ TEST_F(Integration, MagmaDeviceNoIcd) {
   params.set_require_hw(true);
   fuchsia::media::StreamProcessorPtr processor;
   factory->CreateDecoder(std::move(params), processor.NewRequest());
+  bool processor_failed = false;
   processor.set_error_handler([&](zx_status_t status) {
     // This should error out.
-    loop_.Quit();
+    processor_failed = true;
   });
 
   processor.events().OnInputConstraints = [&](fuchsia::media::StreamBufferConstraints constraints) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
+    if (constraints.has_buffer_constraints_version_ordinal()) {
+      FAIL() << constraints.buffer_constraints_version_ordinal();
+    }
+    FAIL() << "fuchsia::media::StreamBufferConstraints{}";
   };
 
-  loop_.Run();
+  RunLoopUntil([&]() { return processor_failed || HasFailure(); });
 }
 
 TEST_F(Integration, MagmaEncoder) {
   auto builder = RealmBuilder::Create();
   InitializeRoutes(builder);
-  auto realm = builder.Build(loop_.dispatcher());
+  auto realm = builder.Build(dispatcher());
+  auto cleanup = fit::defer([&]() {
+    bool complete = false;
+    realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  });
   auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
-  factory.set_error_handler([&](zx_status_t status) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
-  });
+  factory.set_error_handler([&](zx_status_t status) { FAIL() << zx_status_get_string(status); });
 
   fuchsia::mediacodec::CreateEncoder_Params params;
   fuchsia::media::FormatDetails input_details;
@@ -291,27 +294,22 @@ TEST_F(Integration, MagmaEncoder) {
   input_details.set_encoder_settings(std::move(encoder_settings));
   params.set_input_details(std::move(input_details));
   params.set_require_hw(true);
-  ;
   fuchsia::media::StreamProcessorPtr processor;
   factory->CreateEncoder(std::move(params), processor.NewRequest());
-  processor.set_error_handler([&](zx_status_t status) {
-    EXPECT_TRUE(false);
-    loop_.Quit();
-  });
+  processor.set_error_handler([&](zx_status_t status) { FAIL() << zx_status_get_string(status); });
 
+  bool on_input_constraints_called = false;
   processor.events().OnInputConstraints = [&](fuchsia::media::StreamBufferConstraints constraints) {
-    loop_.Quit();
+    on_input_constraints_called = true;
     processor.Unbind();
   };
 
-  loop_.Run();
+  RunLoopUntil([&]() { return on_input_constraints_called || HasFailure(); });
 
   magma_device_.CloseAll();
 
   // Eventually codecs from the device should disappear.
   while (true) {
-    loop_.ResetQuit();
-
     fuchsia::mediacodec::CreateEncoder_Params params;
     fuchsia::media::FormatDetails input_details;
     input_details.set_mime_type("video/h264");
@@ -322,22 +320,20 @@ TEST_F(Integration, MagmaEncoder) {
     params.set_require_hw(true);
     fuchsia::media::StreamProcessorPtr processor;
     factory->CreateEncoder(std::move(params), processor.NewRequest());
-    bool processor_failed = false;
-    processor.set_error_handler([&](zx_status_t status) {
-      loop_.Quit();
-      processor_failed = true;
-    });
 
+    bool processor_failed = false;
+    processor.set_error_handler([&](zx_status_t status) { processor_failed = true; });
+
+    bool on_input_constraints_called = false;
     processor.events().OnInputConstraints =
         [&](fuchsia::media::StreamBufferConstraints constraints) {
-          // Ignore this success and try again.
-          loop_.Quit();
+          on_input_constraints_called = true;
           processor.Unbind();
         };
-
-    loop_.Run();
-    if (processor_failed)
+    RunLoopUntil([&]() { return processor_failed || on_input_constraints_called; });
+    if (processor_failed) {
       break;
-    sleep(1);
+    }
+    // Ignore this success and try again.
   }
 }

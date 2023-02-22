@@ -300,7 +300,7 @@ class TextInputTest : public gtest::RealLoopFixture {
               .source = ChildRef{kResponseListener},
               .targets = {ChildRef{kTextInputFlutter}}});
 
-    realm_root_ = std::make_unique<RealmRoot>(realm_builder_.Build());
+    realm_root_ = realm_builder_.Build();
   }
 
   void SetUp() override {
@@ -313,6 +313,12 @@ class TextInputTest : public gtest::RealLoopFixture {
     BuildRealm();
     RegisterKeyboard();
     InitializeScene();
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    realm_root_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   bool HasViewConnected(
@@ -340,7 +346,7 @@ class TextInputTest : public gtest::RealLoopFixture {
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
 
   RealmBuilder realm_builder_ = RealmBuilder::Create();
-  std::unique_ptr<RealmRoot> realm_root_;
+  std::optional<RealmRoot> realm_root_;
 };
 
 TEST_F(TextInputTest, FlutterTextFieldEntry) {
@@ -400,7 +406,7 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
         fuchsia::ui::input::ImeService::Name_,
         fuchsia::ui::scenic::Scenic::Name_,
     };
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(config));
+    ui_test_manager_.emplace(std::move(config));
     AssembleRealm(GetTestComponents(), GetTestRoutes());
 
     // Get the display dimensions.
@@ -421,6 +427,15 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
 
     RegisterTouchScreen();
     RegisterKeyboard();
+  }
+
+  void TearDown() override {
+    // We're about to shut down the realm; unbind to unhook the error handler.
+    input_registry_.Unbind();
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   // Subclass should implement this method to add v2 components to the test realm
@@ -488,7 +503,7 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
   void AssembleRealm(const std::vector<std::pair<ChildName, std::string>>& components,
                      const std::vector<Route>& routes) {
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
@@ -527,13 +542,13 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     return display_height_.value();
   }
 
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
 
   // Needs to outlive realm_ below.
   std::shared_ptr<KeyboardInputState> keyboard_input_state_;
 
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 
   // The registry for registering various fake devices.
   fuchsia::ui::test::input::RegistryPtr input_registry_;

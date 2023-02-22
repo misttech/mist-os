@@ -213,7 +213,7 @@ class PointerInjectorConfigTest
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(config));
+    ui_test_manager_.emplace(std::move(config));
 
     // Assemble realm.
     BuildRealm();
@@ -237,6 +237,13 @@ class PointerInjectorConfigTest
 
     realm_exposed_services_->Connect<test::accessibility::Magnifier>(
         this->fake_magnifier_.NewRequest());
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   // Waits for one or more pointer events; calls QuitLoop once one meets expectations.
@@ -322,14 +329,14 @@ class PointerInjectorConfigTest
   float display_height() const { return static_cast<float>(display_height_); }
 
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
-  Realm* realm() { return realm_.get(); }
+  std::optional<Realm>& realm() { return realm_; }
 
   std::shared_ptr<ResponseState> response_state() { return response_state_; }
 
  private:
   void BuildRealm() {
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
@@ -355,9 +362,9 @@ class PointerInjectorConfigTest
     realm_exposed_services_ = ui_test_manager_->CloneExposedServicesDirectory();
   }
 
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
 

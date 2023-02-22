@@ -33,12 +33,15 @@
 #include "src/media/playback/mediaplayer/test/fakes/fake_audio.h"
 #include "src/media/playback/mediaplayer/test/sink_feeder.h"
 #include "zircon/status.h"
+
 namespace media_player {
 namespace test {
+
 static constexpr uint16_t kSamplesPerFrame = 2;      // Stereo
 static constexpr uint32_t kFramesPerSecond = 48000;  // 48kHz
 static constexpr size_t kVmoSize = 1024;
 static constexpr uint32_t kNumVmos = 4;
+
 // Base class for audio consumer tests.
 class AudioConsumerTests : public gtest::RealLoopFixture {
  protected:
@@ -98,7 +101,6 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
                                  .targets = {ChildRef{"mediaplayer"}, ChildRef{"audiocore"}}});
     // services->AllowParentService("fuchsia.logger.LogSink");
     realm_ = realm_builder.Build(dispatcher());
-    teardown_callback_ = realm_->TeardownCallback();
     auto session_audio_consumer_factory =
         realm_->component().ConnectSync<fuchsia::media::SessionAudioConsumerFactory>();
     ASSERT_EQ(ZX_OK, session_audio_consumer_factory->CreateAudioConsumer(
@@ -114,9 +116,10 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
 
   void TearDown() override {
     EXPECT_FALSE(audio_consumer_connection_closed_);
-    realm_.reset();
     // Wait for realm to teardown before fakes, so we don't end up with crashes that lead to flakes.
-    RunLoopUntil(std::move(teardown_callback_));
+    bool done = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> err) { done = true; });
+    RunLoopUntil([&]() { return done; });
   }
 
   void StartWatcher() {
@@ -129,7 +132,6 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
 
   fuchsia::media::AudioConsumerPtr audio_consumer_;
   bool audio_consumer_connection_closed_ = false;
-  fit::function<bool()> teardown_callback_;
   bool got_status_ = false;
   fuchsia::media::AudioConsumerStatus last_status_;
   std::unique_ptr<FakeAudioCore> fake_audio_core_owned_{
@@ -138,6 +140,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
   std::unique_ptr<FakeAudio> fake_audio_owned_{std::make_unique<FakeAudio>(dispatcher())};
   std::optional<component_testing::RealmRoot> realm_;
 };
+
 // Test that factory channel is closed and we still have a connection to the created AudioConsumer
 TEST_F(AudioConsumerTests, FactoryClosed) {
   got_status_ = false;
@@ -147,6 +150,7 @@ TEST_F(AudioConsumerTests, FactoryClosed) {
   // FX_LOGS(ERROR) << "-------RunLoopUntil function has been ran-------";
   EXPECT_FALSE(audio_consumer_connection_closed_);
 }
+
 TEST_F(AudioConsumerTests, ConsumerClosed) {
   bool factory_closed = false;
   fuchsia::media::AudioConsumerPtr audio_consumer2;
@@ -201,6 +205,7 @@ TEST_F(AudioConsumerTests, ConsumerClosed) {
   RunLoopUntil([this]() { return got_status_; });
   EXPECT_FALSE(factory_closed);
 }
+
 // // Test packet flow of AudioConsumer interface by using a synthetic environment
 // // to push a packet through and checking that it is processed.
 TEST_F(AudioConsumerTests, CreateStreamSink) {
@@ -248,6 +253,7 @@ TEST_F(AudioConsumerTests, CreateStreamSink) {
   EXPECT_TRUE(sent_packet);
   EXPECT_FALSE(sink_connection_closed);
 }
+
 TEST_F(AudioConsumerTests, SetRate) {
   fuchsia::media::StreamSinkPtr sink;
   fuchsia::media::AudioStreamType stream_type;
@@ -301,6 +307,7 @@ TEST_F(AudioConsumerTests, SetRate) {
   got_status_ = false;
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // // Test that error is generated when unsupported codec is specified
 TEST_F(AudioConsumerTests, UnsupportedCodec) {
   fuchsia::media::StreamSinkPtr sink;
@@ -325,6 +332,7 @@ TEST_F(AudioConsumerTests, UnsupportedCodec) {
   });
   RunLoopUntil([&sink_connection_closed]() { return sink_connection_closed; });
 }
+
 // // Test expected behavior of AudioConsumer interface when no compression type is
 // // set when creating a StreamSink
 TEST_F(AudioConsumerTests, NoCompression) {
@@ -352,6 +360,7 @@ TEST_F(AudioConsumerTests, NoCompression) {
   EXPECT_TRUE(got_status_);
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // Test that creating multiple StreamSink's back to back results in both
 // returned sinks functioning correctly
 TEST_F(AudioConsumerTests, MultipleSinks) {
@@ -416,6 +425,7 @@ TEST_F(AudioConsumerTests, MultipleSinks) {
     EXPECT_TRUE(got_status_);
   }
 }
+
 // Test that multiple stream sinks can be created at the same time, but packets
 // can only be sent on the most recently active one. Also test that packets can
 // be queued on the 'pending' sink.
@@ -471,6 +481,7 @@ TEST_F(AudioConsumerTests, OverlappingStreamSink) {
   RunLoopUntil([&sink2_packet]() { return sink2_packet; });
   EXPECT_TRUE(sink2_packet);
 }
+
 // Test that packet timestamps are properly transformed from input rate of
 // nanoseconds to the renderer rate of frames
 TEST_F(AudioConsumerTests, CheckPtsRate) {
@@ -511,6 +522,7 @@ TEST_F(AudioConsumerTests, CheckPtsRate) {
   RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // Test that packet buffers are consumed in the order they were supplied
 TEST_F(AudioConsumerTests, BufferOrdering) {
   fuchsia::media::StreamSinkPtr sink;
@@ -552,6 +564,7 @@ TEST_F(AudioConsumerTests, BufferOrdering) {
   RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // Test that status reports flow correctly when client always requeues watch requests
 TEST_F(AudioConsumerTests, StatusLoop) {
   fuchsia::media::StreamSinkPtr sink;
@@ -580,6 +593,7 @@ TEST_F(AudioConsumerTests, StatusLoop) {
   EXPECT_EQ(last_status_.presentation_timeline().subject_delta, 1u);
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // Test that packet discard returns packets to client
 TEST_F(AudioConsumerTests, DiscardAllPackets) {
   fuchsia::media::StreamSinkPtr sink;
@@ -612,6 +626,7 @@ TEST_F(AudioConsumerTests, DiscardAllPackets) {
   RunLoopUntil([&sent_packet]() { return sent_packet; });
   EXPECT_FALSE(sink_connection_closed);
 }
+
 // Test that packets are rendered even if timeline is started before Start is called. Use media time
 // offset from zero to expose issues with an initial internal media time of 0.
 TEST_F(AudioConsumerTests, SetRateBeforeStart) {
@@ -659,6 +674,7 @@ TEST_F(AudioConsumerTests, SetRateBeforeStart) {
   RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
+
 TEST_F(AudioConsumerTests, VolumeControl) {
   fuchsia::media::StreamSinkPtr sink;
   fuchsia::media::audio::VolumeControlPtr volume_control;
@@ -683,5 +699,6 @@ TEST_F(AudioConsumerTests, VolumeControl) {
   EXPECT_EQ(fake_audio_core_->renderer().gain(), -20.0f);
   EXPECT_EQ(fake_audio_core_->renderer().mute(), true);
 }
+
 }  // namespace test
 }  // namespace media_player

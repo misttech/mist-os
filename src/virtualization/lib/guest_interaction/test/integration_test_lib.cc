@@ -31,7 +31,7 @@ static fit::closure MakeRecurringTask(async_dispatcher_t* dispatcher, fit::closu
 }
 
 void GuestInteractionTest::GetHostVsockEndpoint(
-    ::fidl::InterfaceRequest<::fuchsia::virtualization::HostVsockEndpoint> endpoint) {
+    fidl::InterfaceRequest<::fuchsia::virtualization::HostVsockEndpoint> endpoint) {
   std::optional<fuchsia::virtualization::Guest_GetHostVsockEndpoint_Result> vsock_result;
   guest_->GetHostVsockEndpoint(
       std::move(endpoint),
@@ -92,7 +92,7 @@ void GuestInteractionTest::SetUp() {
                       .source = ChildRef{kGuestManagerName},
                       .targets = {ParentRef()}});
 
-  realm_root_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
+  realm_root_ = realm_builder.Build(dispatcher());
   fuchsia::virtualization::GuestManager_Launch_Result res;
   guest_manager_ =
       realm_root_->component().ConnectSync<fuchsia::virtualization::DebianGuestManager>();
@@ -107,19 +107,18 @@ void GuestInteractionTest::SetUp() {
   // receives some sensible output from the guest to ensure that the guest is
   // usable.
   FX_LOGS(INFO) << "Getting Serial Console";
-  std::optional<zx_status_t> guest_error;
-  guest_.set_error_handler([&guest_error](zx_status_t status) { guest_error = status; });
+  guest_.set_error_handler([](zx_status_t status) { FAIL() << zx_status_get_string(status); });
   std::optional<fuchsia::virtualization::Guest_GetConsole_Result> get_console_result;
   guest_->GetConsole(
       [&get_console_result](fuchsia::virtualization::Guest_GetConsole_Result result) {
         get_console_result = std::move(result);
       });
   FX_LOGS(INFO) << "Waiting for Serial Console";
-  RunLoopUntil([&guest_error, &get_console_result]() {
-    return guest_error.has_value() || get_console_result.has_value();
-  });
+  RunLoopUntil([&get_console_result]() { return get_console_result.has_value() || HasFailure(); });
   FX_LOGS(INFO) << "Serial Console Received";
-  ASSERT_FALSE(guest_error.has_value()) << zx_status_get_string(guest_error.value());
+  if (HasFailure()) {
+    return;
+  }
   fuchsia::virtualization::Guest_GetConsole_Result& result = get_console_result.value();
   switch (result.Which()) {
     case fuchsia::virtualization::Guest_GetConsole_Result::Tag::kResponse: {
@@ -154,4 +153,12 @@ void GuestInteractionTest::SetUp() {
     case fuchsia::virtualization::Guest_GetConsole_Result::Tag::Invalid:
       FAIL() << "fuchsia.virtualization/Guest.GetConsole: invalid FIDL tag";
   }
+}
+
+void GuestInteractionTest::TearDown() {
+  // We're about to shut down the realm; unbind to unhook the error handler.
+  guest_.Unbind();
+  bool complete = false;
+  realm_root_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+  RunLoopUntil([&]() { return complete; });
 }

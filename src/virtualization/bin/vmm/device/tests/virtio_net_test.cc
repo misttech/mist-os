@@ -176,7 +176,7 @@ class VirtioNetTest : public TestWithDevice {
                         .source = ChildRef{kComponentName},
                         .targets = {ParentRef()}});
 
-    realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
+    realm_ = realm_builder.Build(dispatcher());
     net_ = realm_->component().Connect<fuchsia::virtualization::hardware::VirtioNet>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
@@ -250,11 +250,17 @@ class VirtioNetTest : public TestWithDevice {
     }
   }
 
+  void TearDown() override {
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   fuchsia::virtualization::hardware::VirtioNetPtr net_;
   VirtioQueueFake rx_queue_;
   VirtioQueueFake tx_queue_;
   FakeNetwork fake_network_;
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
 };
 
 TEST_F(VirtioNetTest, ConnectDisconnect) {
@@ -266,6 +272,7 @@ TEST_F(VirtioNetTest, ConnectDisconnect) {
   bool done = false;
   fake_network_.device_client()->SetErrorCallback([&](zx_status_t status) { done = true; });
   RunLoopUntil([&] { return done; });
+  fake_network_.device_client()->SetErrorCallback(nullptr);
 
   // Ensure the session completed.
   ASSERT_FALSE(fake_network_.device_client()->HasSession());

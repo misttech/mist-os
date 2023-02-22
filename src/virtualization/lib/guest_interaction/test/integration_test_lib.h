@@ -27,12 +27,13 @@ static constexpr char kHostOuputCopyLocation[] = "/tmp/copy";
 class GuestInteractionTest : public gtest::RealLoopFixture {
  protected:
   void SetUp() override;
+  void TearDown() override;
 
   void GetHostVsockEndpoint(
-      ::fidl::InterfaceRequest<::fuchsia::virtualization::HostVsockEndpoint> endpoint);
+      fidl::InterfaceRequest<::fuchsia::virtualization::HostVsockEndpoint> endpoint);
 
  private:
-  std::unique_ptr<component_testing::RealmRoot> realm_root_;
+  std::optional<component_testing::RealmRoot> realm_root_;
   fuchsia::virtualization::DebianGuestManagerSyncPtr guest_manager_;
   fuchsia::virtualization::GuestPtr guest_;
   FakeNetstack fake_netstack_;

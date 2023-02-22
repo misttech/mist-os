@@ -195,6 +195,13 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
     realm_exposed_services_ = ui_test_manager_->CloneExposedServicesDirectory();
   }
 
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   virtual ui_testing::UITestRealm::SceneOwnerType SceneOwner() = 0;
 
  protected:

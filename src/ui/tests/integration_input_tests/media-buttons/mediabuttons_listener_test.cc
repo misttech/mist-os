@@ -85,10 +85,17 @@ class MediaButtonsListenerTest
     ui_testing::UITestRealm::Config config;
     config.scene_owner = GetParam();
     config.use_input = true;
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(std::move(config));
+    ui_test_manager_.emplace(std::move(config));
 
     ui_test_manager_->BuildRealm();
     realm_exposed_services_ = ui_test_manager_->CloneExposedServicesDirectory();
+  }
+
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
   }
 
   void RegisterInjectionDevice() {
@@ -128,12 +135,12 @@ class MediaButtonsListenerTest
   }
 
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
-  Realm* realm() { return realm_.get(); }
+  const std::optional<Realm>& realm() const { return realm_; }
 
  private:
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 
   fuchsia::input::injection::InputDeviceRegistryPtr registry_;
   std::unique_ptr<fake_input_report_device::FakeInputDevice> fake_input_device_;

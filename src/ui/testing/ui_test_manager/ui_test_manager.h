@@ -91,7 +91,7 @@ namespace ui_testing {
 class UITestManager : public fuchsia::ui::focus::FocusChainListener {
  public:
   explicit UITestManager(UITestRealm::Config config);
-  ~UITestManager() = default;
+  ~UITestManager() override = default;
 
   // Adds a child to the realm under construction, and returns the new child.
   // Must NOT be called after BuildRealm().
@@ -99,6 +99,9 @@ class UITestManager : public fuchsia::ui::focus::FocusChainListener {
 
   // Calls realm_builder_.Build();
   void BuildRealm();
+
+  // Calls realm_.Teardown();
+  void TeardownRealm(component_testing::ScopedChild::TeardownCallback on_teardown_complete);
 
   // Returns a clone of the realm's exposed services directory.
   // Clients should call this method once, and retain the handle returned.

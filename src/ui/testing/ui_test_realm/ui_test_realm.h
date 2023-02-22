@@ -185,13 +185,16 @@ class UITestRealm {
   // Calls realm_builder_.Build();
   void Build();
 
+  // Calls realm_builder_.Teardown();
+  void Teardown(component_testing::ScopedChild::TeardownCallback on_teardown_complete);
+
   // Returns a clone of the realm's exposed services directory.
   // Clients should call this method once, and retain the handle returned.
   //
   // MUST be called AFTER Build().
   std::unique_ptr<sys::ServiceDirectory> CloneExposedServicesDirectory();
 
-  component_testing::RealmRoot* realm_root() { return realm_root_.get(); }
+  const std::optional<component_testing::RealmRoot>& realm_root() const { return realm_root_; }
 
   const Config& config() { return config_; }
 
@@ -216,7 +219,7 @@ class UITestRealm {
   Config config_;
   component_testing::RealmBuilder realm_builder_ =
       component_testing::RealmBuilder::CreateFromRelativeUrl(CalculateBaseRealmUrl());
-  std::shared_ptr<component_testing::RealmRoot> realm_root_;
+  std::optional<component_testing::RealmRoot> realm_root_;
 
   // Some tests may not need a dedicated subrealm. Those clients will not call
   // AddSubrealm(), so UITestManager will crash if it tries to add routes

@@ -75,6 +75,7 @@ class SemanticsIntegrationTestV2
   ~SemanticsIntegrationTestV2() override = default;
 
   void SetUp() override;
+  void TearDown() override;
 
   virtual void ConfigureRealm() {}
 
@@ -89,7 +90,7 @@ class SemanticsIntegrationTestV2
   sys::ComponentContext* context() { return context_.get(); }
   a11y::ViewManager* view_manager() { return view_manager_.get(); }
   SemanticsManagerProxy* semantics_manager_proxy() { return semantics_manager_proxy_.get(); }
-  Realm* realm() { return realm_.get(); }
+  std::optional<Realm>& realm() { return realm_; }
   sys::ServiceDirectory* svc() { return realm_exposed_services_.get(); }
   zx_koid_t view_ref_koid() const { return view_ref_koid_; }
 
@@ -130,11 +131,11 @@ class SemanticsIntegrationTestV2
 
   zx_koid_t view_ref_koid_;
   std::unique_ptr<sys::ComponentContext> context_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::unique_ptr<a11y::ViewManager> view_manager_;
   std::unique_ptr<SemanticsManagerProxy> semantics_manager_proxy_;
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
 };
 
 }  // namespace accessibility_test

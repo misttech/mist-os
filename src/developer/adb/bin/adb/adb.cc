@@ -21,18 +21,29 @@ constexpr char kAdbDirectory[] = "/dev/class/adb";
 
 void Adb::ReceiveCallback(
     fidl::WireUnownedResult<fuchsia_hardware_adb::UsbAdbImpl::Receive>& result) {
-  if (!result.ok() || (result->is_error() && result->error_value() == ZX_ERR_BAD_STATE)) {
-    FX_LOGS(ERROR) << "Connection to underlying UsbAdbImpl failed. Quitting.";
+  if (!result.ok()) {
+    // TODO(https://fxbug.dev/122045): improve the graceful shutdown story in tests and remove this.
+    if (result.is_peer_closed()) {
+      FX_PLOGS(WARNING, result.status()) << "Connection to underlying UsbAdbImpl failed. Quitting.";
+      return;
+    }
+    FX_PLOGS(ERROR, result.status()) << "Connection to underlying UsbAdbImpl failed. Quitting.";
+    return;
+  }
+  fit::result response = result.value();
+  if (response.is_error() && response.error_value() == ZX_ERR_BAD_STATE) {
+    FX_PLOGS(ERROR, response.error_value())
+        << "Connection to underlying UsbAdbImpl failed. Quitting.";
     return;
   }
 
   impl_->Receive().Then(fit::bind_member<&Adb::ReceiveCallback>(this));
-  if (result->is_error()) {
-    FX_LOGS(ERROR) << "Failed result " << result->error_value();
+  if (response.is_error()) {
+    FX_PLOGS(ERROR, response.error_value()) << "Failed result";
     return;
   }
 
-  size_t data_left = result->value()->data.count();
+  size_t data_left = response.value()->data.count();
   size_t offset = 0;
   size_t copy_len = 0;
   bool complete = false;
@@ -67,7 +78,7 @@ void Adb::ReceiveCallback(
         FX_LOGS(DEBUG) << "Short header";
       }
 
-      memcpy((&packet->msg) + write_len, result->value()->data.data() + offset, copy_len);
+      memcpy((&packet->msg) + write_len, response->data.data() + offset, copy_len);
       data_left -= copy_len;
       offset += copy_len;
       write_len += copy_len;
@@ -89,8 +100,8 @@ void Adb::ReceiveCallback(
         complete = false;
         copy_len = data_left;
       }
-      memcpy((&packet->payload[0]) + write_len - sizeof(packet->msg),
-             result->value()->data.data() + offset, copy_len);
+      memcpy(packet->payload.data() + write_len - sizeof(packet->msg),
+             response->data.data() + offset, copy_len);
       data_left -= copy_len;
       offset += copy_len;
       write_len += copy_len;
@@ -217,8 +228,8 @@ zx::result<std::unique_ptr<Adb>> Adb::Create(async_dispatcher_t* dispatcher) {
           kAdbDirectory,
           [&](int dir_fd, const std::string& filename) {
             fdio_cpp::UnownedFdioCaller caller(dir_fd);
-            auto client_end = component::ConnectAt<fuchsia_hardware_adb::Device>(caller.directory(),
-                                                                                 filename.c_str());
+            auto client_end =
+                component::ConnectAt<fuchsia_hardware_adb::Device>(caller.directory(), filename);
             if (client_end.is_ok() && !client.is_valid()) {
               client = std::move(client_end.value());
               loop.Quit();

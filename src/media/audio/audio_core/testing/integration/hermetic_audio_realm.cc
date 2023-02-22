@@ -139,6 +139,11 @@ void HermeticAudioRealm::Create(Options options, async_dispatcher* dispatcher,
   ASSERT_NO_FATAL_FAILURE(ConnectToVirtualAudio(realm, realm_out->virtual_audio_control_));
 }
 
+void HermeticAudioRealm::Teardown(
+    component_testing::ScopedChild::TeardownCallback on_teardown_complete) {
+  root_.Teardown(std::move(on_teardown_complete));
+}
+
 HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
                                                             async_dispatcher* dispatcher) {
   auto builder = component_testing::RealmBuilder::Create();

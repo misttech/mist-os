@@ -119,18 +119,17 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
   void ExtendRealm() override {
     // Add child components.
     for (auto [child, url] : GetTestComponents()) {
-      realm_builder()->AddChild(child, url,
-                                {.startup_mode = component_testing::StartupMode::EAGER});
+      realm_builder().AddChild(child, url, {.startup_mode = component_testing::StartupMode::EAGER});
     }
 
     // Add routes between components.
     for (auto route : GetWebEngineRoutes(ChildRef{kWebClient})) {
-      realm_builder()->AddRoute(route);
+      realm_builder().AddRoute(route);
     }
 
     // Route the html code to the chromium client.
-    realm_builder()->InitMutableConfigToEmpty(kWebClient);
-    realm_builder()->SetConfigValue(kWebClient, "html", HtmlForTestCase());
+    realm_builder().InitMutableConfigToEmpty(kWebClient);
+    realm_builder().SetConfigValue(kWebClient, "html", HtmlForTestCase());
   }
 
   virtual std::string HtmlForTestCase() = 0;

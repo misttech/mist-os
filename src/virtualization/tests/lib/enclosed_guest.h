@@ -49,7 +49,7 @@ class EnclosedGuest {
       : dispatcher_(dispatcher),
         run_loop_until_(std::move(run_loop_until)),
         fake_memory_pressure_provider_(dispatcher) {}
-  virtual ~EnclosedGuest() = default;
+  virtual ~EnclosedGuest();
 
   // Start the guest. `Start` is the preferred way to start the guest. If the realm
   // needs to be customized, `Start` can be replaced by a call to `InstallInRealm`
@@ -181,8 +181,8 @@ class EnclosedGuest {
   uint32_t guest_cid_;
   // Only one of |ui_test_manager_| and |realm_root_| will be non-null, depending on if graphics
   // APIs are used.
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
-  std::unique_ptr<component_testing::RealmRoot> realm_root_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<component_testing::RealmRoot> realm_root_;
   // The exposed services directory for the test realm.
   std::unique_ptr<sys::ServiceDirectory> realm_services_;
   std::optional<zx_status_t> guest_error_;

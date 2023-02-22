@@ -24,6 +24,7 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   static constexpr auto kTestUIStackRef = component_testing::ChildRef{kTestUIStack};
 
   void SetUp() override;
+  void TearDown() override;
 
   // Attaches a client view to the scene, and waits for it to render.
   void LaunchClient();
@@ -83,8 +84,8 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
                            int scroll_x, int scroll_y, bool use_physical_units = false);
 
  protected:
-  component_testing::RealmBuilder* realm_builder() { return &realm_builder_; }
-  component_testing::RealmRoot* realm_root() { return realm_.get(); }
+  component_testing::RealmBuilder& realm_builder() { return realm_builder_; }
+  std::optional<component_testing::RealmRoot>& realm_root() { return realm_; }
 
   const std::optional<zx_koid_t>& client_root_view_ref_koid() { return client_root_view_ref_koid_; }
 
@@ -118,7 +119,7 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
 
   component_testing::RealmBuilder realm_builder_ = component_testing::RealmBuilder::Create();
-  std::unique_ptr<component_testing::RealmRoot> realm_;
+  std::optional<component_testing::RealmRoot> realm_;
 
   // Counts the number of completed requests to inject touch reports into input
   // pipeline.

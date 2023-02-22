@@ -95,11 +95,11 @@ class DisplayPixelRatioTest
   // |testing::Test|
   void SetUp() override {
     auto config = GetParam();
-    ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(config);
+    ui_test_manager_.emplace(config);
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
-    realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
+    realm_ = ui_test_manager_->AddSubrealm();
 
     test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
 
@@ -145,6 +145,13 @@ class DisplayPixelRatioTest
                   << " and display_height = " << display_height_;
   }
 
+  void TearDown() override {
+    bool complete = false;
+    ui_test_manager_->TeardownRealm(
+        [&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+  }
+
   float ClientViewScaleFactor() { return ui_test_manager_->ClientViewScaleFactor(); }
 
   ui_testing::Screenshot TakeScreenshot() { return ui_test_manager_->TakeScreenshot(); }
@@ -155,10 +162,10 @@ class DisplayPixelRatioTest
   double display_height_ = 0;
 
  private:
-  std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
+  std::optional<ui_testing::UITestManager> ui_test_manager_;
 
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<Realm> realm_;
+  std::optional<Realm> realm_;
 };
 
 INSTANTIATE_TEST_SUITE_P(DisplayPixelRatioTestWithParams, DisplayPixelRatioTest,
