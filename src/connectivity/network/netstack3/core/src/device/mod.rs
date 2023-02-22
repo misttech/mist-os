@@ -14,7 +14,6 @@ mod state;
 
 use core::{
     fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
     marker::PhantomData,
 };
 
@@ -648,7 +647,7 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
 
 /// Device IDs identifying Ethernet devices.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
+#[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub(crate) struct EthernetDeviceId<I: Instant>(
     usize,
     WeakReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>,
@@ -662,13 +661,6 @@ impl<I: Instant> PartialEq for EthernetDeviceId<I> {
 }
 
 impl<I: Instant> Eq for EthernetDeviceId<I> {}
-
-impl<I: Instant> Hash for EthernetDeviceId<I> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let EthernetDeviceId(_id, me) = self;
-        me.as_ptr().hash(state)
-    }
-}
 
 impl<I: Instant> Debug for EthernetDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1038,14 +1030,14 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
                 .remove(*id)
                 .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
             let ptr = ptr.upgrade().unwrap();
-            assert!(ReferenceCounted::ptr_eq(&ptr, &removed));
+            assert!(ReferenceCounted::ptr_eq(&removed, &ptr));
             debug!("removing Ethernet device with ID {}", id);
         }
         DeviceIdInner::Loopback(LoopbackDeviceId(ptr)) => {
             let removed: ReferenceCounted<IpLinkDeviceState<_, _>> =
                 devices.loopback.take().expect("loopback device does not exist");
             let ptr = ptr.upgrade().unwrap();
-            assert!(ReferenceCounted::ptr_eq(&ptr, &removed));
+            assert!(ReferenceCounted::ptr_eq(&removed, &ptr));
             debug!("removing Loopback device");
         }
     }

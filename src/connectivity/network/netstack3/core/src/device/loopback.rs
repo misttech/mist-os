@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use core::{
     convert::Infallible as Never,
     fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
 };
 use lock_order::{lock::LockFor, Locked};
 
@@ -35,7 +34,7 @@ use crate::{
 };
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
+#[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub(crate) struct LoopbackDeviceId<I: Instant>(
     pub(super) WeakReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>,
 );
@@ -48,13 +47,6 @@ impl<I: Instant> PartialEq for LoopbackDeviceId<I> {
 }
 
 impl<I: Instant> Eq for LoopbackDeviceId<I> {}
-
-impl<I: Instant> Hash for LoopbackDeviceId<I> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let LoopbackDeviceId(me) = self;
-        me.as_ptr().hash(state)
-    }
-}
 
 impl<I: Instant> Debug for LoopbackDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

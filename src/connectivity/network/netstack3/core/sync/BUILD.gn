@@ -5,7 +5,11 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-_sources = [ "src/lib.rs" ]
+_sources = [
+  "src/lib.rs",
+  "src/rc.rs",
+]
+_deps = [ "//third_party/rust_crates:derivative" ]
 
 rustc_library("netstack3_sync_instrumented") {
   version = "0.0.1"
@@ -15,6 +19,7 @@ rustc_library("netstack3_sync_instrumented") {
   features = [ "recursive-lock-panic" ]
 
   sources = _sources
+  deps = _deps
 }
 
 rustc_library("netstack3_sync_not_instrumented") {
@@ -25,6 +30,7 @@ rustc_library("netstack3_sync_not_instrumented") {
   features = []
 
   sources = _sources
+  deps = _deps
 }
 
 fuchsia_unittest_package("netstack3-sync-instrumented-package") {

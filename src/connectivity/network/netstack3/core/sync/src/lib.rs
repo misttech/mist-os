@@ -4,7 +4,11 @@
 
 //! Synchronization primitives for Netstack3.
 
-#![deny(missing_docs, unreachable_patterns)]
+#![deny(missing_docs, unreachable_patterns, unused)]
+
+extern crate alloc;
+
+pub mod rc;
 
 /// A [`std::sync::Mutex`] assuming lock poisoning will never occur.
 #[derive(Debug, Default)]
