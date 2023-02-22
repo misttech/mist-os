@@ -46,7 +46,7 @@ before the test completes, increase the amount of time in the `--duration` flag.
 
 ## Play with clients
 
-You can use [`tiles-session`](/src/session/examples/tiles-session/README.md) to manually run and
+You can use [`tiles-session`](/src/ui/bin/tiles-session/README.md) to manually run and
 interact with any of the child clients under test.
 
 ### Play with the Flutter client

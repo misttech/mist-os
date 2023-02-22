@@ -35,6 +35,6 @@ fuchsia_test_package("appkit_system_validation_test_pkg") {
   test_components = [ ":bouncing_box_system_validation_component" ]
   subpackages = [
     "//src/experiences/session_shells/gazelle/examples/bouncing_box",
-    "//src/session/examples/tiles-session",
+    "//src/ui/bin/tiles-session",
   ]
 }

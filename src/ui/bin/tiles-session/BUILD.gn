@@ -59,7 +59,7 @@ fuchsia_component("tiles_component") {
 
 fuchsia_structured_config_values("tiles_config_values") {
   cm_label = ":tiles_manifest"
-  values_source = "//src/session/examples/tiles-session/meta/config.json5"
+  values_source = "//src/ui/bin/tiles-session/meta/config.json5"
 }
 
 fuchsia_package("tiles-session") {
