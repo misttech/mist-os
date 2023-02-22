@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
+use emulator_instance::AccelerationMode;
 use ffx_config::FfxConfigBacked;
 use ffx_core::ffx_command;
 use ffx_emulator_common::host_is_mac;
-use ffx_emulator_config::AccelerationMode;
 use std::path::PathBuf;
 
 #[ffx_command()]

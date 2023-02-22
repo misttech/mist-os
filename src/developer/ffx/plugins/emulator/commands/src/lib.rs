@@ -4,10 +4,10 @@
 
 //! This library contains the shared functions that are specific to commands.
 
-use anyhow::{anyhow, Context, Result};
-use ffx_emulator_common::instances::{get_all_instances, get_instance_dir};
+use anyhow::{anyhow, bail, Context, Result};
+use emulator_instance::{get_all_instances, EmulatorInstanceInfo};
 use ffx_emulator_config::EmulatorEngine;
-use ffx_emulator_engines::serialization::read_from_disk;
+use ffx_emulator_engines::serialization::read_engine_from_disk;
 
 pub enum EngineOption {
     DoesExist(Box<dyn EmulatorEngine>),
@@ -23,7 +23,7 @@ pub async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOptio
             }
         };
         if all_instances.len() == 1 {
-            *name = all_instances.pop();
+            *name = Some(all_instances.pop().unwrap().get_name().to_string());
         } else if all_instances.len() == 0 {
             return Err(anyhow!("No emulators are running."));
         } else {
@@ -36,17 +36,12 @@ pub async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOptio
     }
 
     // If we got this far, name is set to either what the user asked for, or the only one running.
-    let local_name = name.clone().unwrap();
-    let instance_dir = get_instance_dir(&local_name, false).await?;
-    if !instance_dir.exists() {
-        Ok(EngineOption::DoesNotExist(format!(
-            "{:?} isn't a valid instance. Please check your spelling and try again. \
-                You can use `ffx emu list` to see currently available instances.",
-            local_name
-        )))
-    } else {
-        read_from_disk(&instance_dir)
+    if let Some(local_name) = name {
+        read_engine_from_disk(&local_name)
+            .await
             .map(|engine| EngineOption::DoesExist(engine))
             .context("Couldn't read the emulator information from disk.")
+    } else {
+        bail!("instance name not known")
     }
 }

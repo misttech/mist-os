@@ -2,219 +2,101 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FemuEngine, QemuEngine, SERIALIZE_FILE_NAME};
-use anyhow::{anyhow, Context, Result};
+use crate::{FemuEngine, QemuEngine};
+use anyhow::{Context, Result};
 use ffx_emulator_config::EmulatorEngine;
-use serde::{Deserialize, Serialize};
-use std::{fs::File, path::PathBuf};
 
-pub fn read_from_disk(instance_directory: &PathBuf) -> Result<Box<dyn EmulatorEngine>> {
-    let value = read_from_disk_untyped(instance_directory)
-        .context("Failed to read engine configuration from disk.")?;
+use emulator_instance::{read_from_disk, EmulatorInstanceInfo, EngineType};
 
-    let filepath = instance_directory.join(SERIALIZE_FILE_NAME);
-    if let Some(engine_type) = value.get("engine_type") {
-        match engine_type.as_str() {
-            Some("femu") => Ok(Box::new(<FemuEngine as Deserialize>::deserialize(value).context(
-                format!("Expected a FEMU engine in {:?}, but deserialization failed.", filepath),
-            )?) as Box<dyn EmulatorEngine>),
-            Some("qemu") => Ok(Box::new(<QemuEngine as Deserialize>::deserialize(value).context(
-                format!("Expected a QEMU engine in {:?}, but deserialization failed.", filepath),
-            )?) as Box<dyn EmulatorEngine>),
-            _ => Err(anyhow!("Not a valid engine type.")),
-        }
-    } else {
-        Err(anyhow!("Deserialized data doesn't contain an engine type value."))
-    }
-}
+pub async fn read_engine_from_disk(name: &str) -> Result<Box<dyn EmulatorEngine>> {
+    let data =
+        read_from_disk(name).await.context("Failed to read engine configuration from disk.")?;
 
-pub fn read_from_disk_untyped(instance_directory: &PathBuf) -> Result<serde_json::Value> {
-    // Get the engine's location, which is in the instance directory.
-    let filepath = instance_directory.join(SERIALIZE_FILE_NAME);
+    let engine: Box<dyn EmulatorEngine> = match data.get_engine_type() {
+        EngineType::Femu => Box::new(FemuEngine::new(data)),
+        EngineType::Qemu => Box::new(QemuEngine::new(data)),
+    };
 
-    // Read the engine.json file and deserialize it from disk into a new TypedEngine instance
-    if filepath.exists() {
-        let file = File::open(&filepath)
-            .context(format!("Unable to open file {:?} for deserialization", filepath))?;
-        let value: serde_json::Value = serde_json::from_reader(file)
-            .context(format!("Invalid JSON syntax in {:?}", filepath))?;
-        Ok(value)
-    } else {
-        Err(anyhow!("Engine file doesn't exist at {:?}", filepath))
-    }
-}
-
-pub trait SerializingEngine: Serialize {
-    fn write_to_disk(&self, instance_directory: &PathBuf) -> Result<()> {
-        // The engine's serialized form will be saved in ${EMU_INSTANCE_ROOT_DIR}/${runtime.name}.
-        // This is the path set up by the EngineBuilder, so it's expected to already exist.
-        let filepath = instance_directory.join(SERIALIZE_FILE_NAME);
-
-        // Create the engine.json file to hold the serialized data, and write it out to disk,
-        let file = File::create(&filepath)
-            .context(format!("Unable to create file {:?} for serialization", filepath))?;
-        tracing::debug!("Writing serialized engine out to {:?}", filepath);
-        match serde_json::to_writer(file, self) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
-    }
+    Ok(engine)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::qemu_based::qemu::QemuEngine;
-    use ffx_emulator_config::EngineType;
-    use regex::Regex;
-    use std::{
-        fs::{create_dir_all, remove_file},
-        io::{Read, Write},
-    };
+    use emulator_instance::{get_instance_dir, EmulatorInstanceData, EngineState, EngineType};
+    use ffx_config::{query, ConfigLevel};
+    use ffx_emulator_common::config::EMU_INSTANCE_ROOT_DIR;
+    use serde_json::json;
+    use std::{fs::File, io::Write};
     use tempfile::tempdir;
 
-    #[test]
-    fn test_write_then_read() -> Result<()> {
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_write_then_read() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let temp_dir = tempdir()
+            .expect("Couldn't get a temporary directory for testing.")
+            .path()
+            .to_str()
+            .expect("Couldn't convert Path to str")
+            .to_string();
+        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+
         // Create a test directory in TempFile::tempdir.
-        let name = "test_write_then_read";
-        let temp_path = PathBuf::from(tempdir().unwrap().path()).join(name);
-        let file_path = temp_path.join(SERIALIZE_FILE_NAME);
-        create_dir_all(&temp_path)?;
+        let qemu_name = "qemu_test_write_then_read";
+        let femu_name = "femu_test_write_then_read";
 
         // Set up some test data.
-        let q_engine = QemuEngine { engine_type: EngineType::Qemu, ..Default::default() };
-        let f_engine = FemuEngine { engine_type: EngineType::Femu, ..Default::default() };
+        let mut qemu_instance_data =
+            EmulatorInstanceData::new_with_state(qemu_name, EngineState::New);
+        qemu_instance_data.set_engine_type(EngineType::Qemu);
+        let q_engine = QemuEngine::new(qemu_instance_data);
+        let mut femu_instance_data =
+            EmulatorInstanceData::new_with_state(femu_name, EngineState::New);
+        femu_instance_data.set_engine_type(EngineType::Qemu);
+        let f_engine = FemuEngine::new(femu_instance_data);
 
         // Serialize the QEMU engine to disk.
-        q_engine.write_to_disk(&temp_path).expect("Problem serializing QEMU engine to disk.");
+        q_engine.save_to_disk().await.expect("Problem serializing QEMU engine to disk.");
 
-        // Deserialize it from the expected file location.
-        let file = File::open(&file_path).unwrap_or_else(|e| {
-            panic!("Unable to open file {:?} for deserialization: {:?}", file_path, e)
-        });
-        let engine_copy: QemuEngine = serde_json::from_reader(file)?;
-        assert_eq!(engine_copy, q_engine);
+        let qemu_copy =
+            read_engine_from_disk(qemu_name).await.expect("Problem reading QEMU engine from disk.");
 
-        // Also deserialize with read_from_disk, to make sure that succeeds.
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_ok(), "Read from disk failed for QEMU: {:?}", box_engine.err());
-
-        // Clean up for the next test.
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
+        assert_eq!(qemu_copy.get_instance_data(), q_engine.get_instance_data());
 
         // Serialize the FEMU engine to disk.
-        f_engine.write_to_disk(&temp_path).expect("Problem serializing FEMU engine to disk.");
-        let box_engine = read_from_disk(&temp_path);
+        f_engine.save_to_disk().await.expect("Problem serializing FEMU engine to disk.");
+        let box_engine = read_engine_from_disk(femu_name).await;
         assert!(box_engine.is_ok(), "Read from disk failed for FEMU: {:?}", box_engine.err());
-
-        // Now that we know the file is ok, we intentionally corrupt the FEMU engine file.
-        let mut file = File::open(&file_path).unwrap_or_else(|e| {
-            panic!("Unable to open file {:?} for manual read: {:?}", &file_path, e)
-        });
-        let mut text = String::new();
-        file.read_to_string(&mut text).unwrap_or_else(|e| {
-            panic!("Couldn't read contents of {:?} to memory: {:?}", &file_path, e)
-        });
-        let re = Regex::new("femu")?;
-        let unsupported = re.replace_all(&text, "unsupported").into_owned();
-
-        // Reset the file with the corrupted contents, then attempt a read_from_disk,
-        // expecting it to fail because the engine type is invalid.
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &unsupported)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_err());
-
-        // Go back to a known engine type, but corrupt one of the data fields.
-        let re = Regex::new("memory")?;
-        let unsupported = re.replace_all(&text, "unsupported").into_owned();
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &unsupported)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_err());
 
         Ok(())
     }
 
-    #[test]
-    fn test_broken_reads() -> Result<()> {
-        // Create a test directory in TempFile::tempdir.
-        let name = "test_write_then_read";
-        let temp_path = PathBuf::from(tempdir().unwrap().path()).join(name);
-        let file_path = temp_path.join(SERIALIZE_FILE_NAME);
-        create_dir_all(&temp_path)?;
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_read_unknown_engine_type() -> Result<()> {
+        let unknown_engine_type = include_str!("../test_data/unknown_engine_type_engine.json");
+        let _env = ffx_config::test_init().await.unwrap();
+        let temp_dir = tempdir()
+            .expect("Couldn't get a temporary directory for testing.")
+            .path()
+            .to_str()
+            .expect("Couldn't convert Path to str")
+            .to_string();
+        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
 
-        let bad_json = "This is not valid JSON";
-        let no_pid = r#"{ "engine_type":"femu" }"#;
-        let bad_pid = r#"{ "engine_type":"femu","pid":"string" }"#;
-        let has_pid = r#"{ "engine_type":"femu","pid":123456 }"#;
+        let name = "unknown-type";
 
-        // Note: This string is a currently valid and complete instance of a FEMU config as it
-        // would be serialized to disk. The test on this string should fail if a change (to the
-        // EmulatorConfiguration data structure, for example) would break deserialization of
-        // existing emulation instances. If your change causes this test to fail, consider wrapping
-        // the fields you changed in Option<foo>, or providing a default value for the field to
-        // deserialize with. Do not simply update this text to match your change, or users will
-        // see [Broken] emulators on their next update. Wait until the field has had time to "bake"
-        // before updating this text for your changes.
-        let valid_femu = r#"{"emulator_configuration":{"device":{"audio":{"model":"hda"},"cpu":{
-            "architecture":"x64","count":0},"memory":{"quantity":8192,"units":"megabytes"},
-            "pointing_device":"mouse","screen":{"height":800,"width":1280,"units":"pixels"},
-            "storage":{"quantity":2,"units":"gigabytes"}},"flags":{"args":[],"envs":{},"features":[],
-            "kernel_args":[],"options":[]},"guest":{"fvm_image":"/path/to/fvm.blk","kernel_image":
-            "/path/to/multiboot.bin","zbi_image":"/path/to/fuchsia.zbi"},"host":{"acceleration":
-            "hyper","architecture":"x64","gpu":"auto","log":"/path/to/emulator.log","networking"
-            :"tap","os":"linux","port_map":{}},"runtime":{"console":"none","debugger":false,
-            "dry_run":false,"headless":true,"hidpi_scaling":false,"instance_directory":"/some/dir",
-            "log_level":"info","mac_address":"52:54:47:5e:82:ef","name":"fuchsia-emulator",
-            "startup_timeout":{"secs":60,"nanos":0},"template":"/path/to/config","upscript":null}},
-            "pid":657042,"engine_type":"femu"}"#;
+        {
+            // stage the instance data since we can't write it via the emulator_instance API.
 
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &bad_json)?;
-        let box_engine = read_from_disk(&temp_path);
+            let instance_path = get_instance_dir(name, true).await?;
+            let data_path = instance_path.join("engine.json");
+            let mut file = File::create(&data_path)?;
+            write!(file, "{}", &unknown_engine_type)?;
+        }
+
+        let box_engine = read_from_disk(name).await;
         assert!(box_engine.is_err());
-        let value = read_from_disk_untyped(&temp_path);
-        assert!(value.is_err());
-
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &no_pid)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_err());
-        let value = read_from_disk_untyped(&temp_path);
-        assert!(value.is_ok(), "{:?}", value);
-        assert!(value.unwrap().get("pid").is_none());
-
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &bad_pid)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_err());
-        let value = read_from_disk_untyped(&temp_path);
-        assert!(value.is_ok(), "{:?}", value);
-        assert!(value.as_ref().unwrap().get("pid").is_some());
-        assert!(value.unwrap().get("pid").unwrap().as_i64().is_none());
-
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &has_pid)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_err());
-        let value = read_from_disk_untyped(&temp_path);
-        assert!(value.is_ok(), "{:?}", value);
-        assert!(value.as_ref().unwrap().get("pid").is_some());
-        assert!(value.as_ref().unwrap().get("pid").unwrap().as_i64().is_some());
-        assert_eq!(value.unwrap().get("pid").unwrap().as_i64().unwrap(), 123456);
-
-        remove_file(&file_path).expect("Problem removing serialized file during test.");
-        let mut file = File::create(&file_path)?;
-        write!(file, "{}", &valid_femu)?;
-        let box_engine = read_from_disk(&temp_path);
-        assert!(box_engine.is_ok(), "{:?}", box_engine.err());
-        assert_eq!(box_engine.unwrap().engine_type(), EngineType::Femu);
 
         Ok(())
     }

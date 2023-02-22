@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use emulator_instance::{clean_up_instance_dir, get_all_instances, EmulatorInstanceInfo};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_emulator_commands::{get_engine_by_name, EngineOption};
-use ffx_emulator_common::instances::{clean_up_instance_dir, get_all_instances, get_instance_dir};
 use ffx_emulator_stop_args::StopCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
@@ -15,7 +15,7 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
     let mut names = vec![cmd.name];
     if cmd.all {
         names = match get_all_instances().await {
-            Ok(list) => list.into_iter().map(|v| Some(v)).collect(),
+            Ok(list) => list.into_iter().map(|v| Some(v.get_name().to_string())).collect(),
             Err(e) => ffx_bail!("Error encountered looking up emulator instances: {:?}", e),
         };
     }
@@ -50,15 +50,13 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
         }
 
         if !cmd.persist {
-            if let Ok(path) = get_instance_dir(&name, false).await {
-                let cleanup = clean_up_instance_dir(&path).await;
-                if cleanup.is_err() {
-                    eprintln!(
-                        "Cleanup of '{}' failed with the following error: {:?}",
-                        name,
-                        cleanup.unwrap_err()
-                    );
-                }
+            let cleanup = clean_up_instance_dir(&name).await;
+            if cleanup.is_err() {
+                eprintln!(
+                    "Cleanup of '{}' failed with the following error: {:?}",
+                    name,
+                    cleanup.unwrap_err()
+                );
             }
         }
     }

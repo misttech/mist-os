@@ -5,7 +5,7 @@
 //! Handlebars helper functions for working with an EmulatorConfiguration.
 
 use anyhow::{Context as anyhow_context, Result};
-use ffx_emulator_config::{DataUnits, EmulatorConfiguration, FlagData};
+use emulator_instance::{DataUnits, EmulatorConfiguration, FlagData};
 use handlebars::{
     no_escape, Context, Handlebars, Helper, HelperDef, HelperResult, JsonRender, Output,
     RenderContext, RenderError,

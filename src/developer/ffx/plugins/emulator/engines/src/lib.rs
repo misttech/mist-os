@@ -10,18 +10,16 @@ mod qemu_based;
 pub mod serialization;
 mod show_output;
 
-use arg_templates::process_flag_template;
-use qemu_based::femu::FemuEngine;
-use qemu_based::qemu::QemuEngine;
-use serialization::read_from_disk;
-
 use anyhow::{bail, Context, Result};
-use ffx_emulator_common::instances::{get_instance_dir, SERIALIZE_FILE_NAME};
-use ffx_emulator_config::{
-    DeviceConfig, EmulatorConfiguration, EmulatorEngine, EngineState, EngineType, FlagData,
-    GuestConfig, HostConfig, LogLevel, RuntimeConfig,
+use arg_templates::process_flag_template;
+use emulator_instance::{
+    get_instance_dir, read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
+    EmulatorInstanceInfo, EngineState, EngineType, FlagData, GuestConfig, HostConfig, LogLevel,
+    RuntimeConfig,
 };
+use ffx_emulator_config::EmulatorEngine;
 use port_picker::{is_free_tcp_port, pick_unused_port};
+use qemu_based::{femu::FemuEngine, qemu::QemuEngine};
 
 /// The EngineBuilder is used to create and configure an EmulatorEngine, while ensuring the
 /// configuration will result in a valid emulation instance.
@@ -112,18 +110,8 @@ impl EngineBuilder {
             get_instance_dir(name, true).await?;
 
         // Make sure we don't overwrite an existing instance.
-        let filepath =
-            self.emulator_configuration.runtime.instance_directory.join(SERIALIZE_FILE_NAME);
-        if filepath.exists() {
-            let mut engine = read_from_disk(
-                &self.emulator_configuration.runtime.instance_directory,
-            )
-            .context(format!(
-                "Found an existing emulator with the name {}, but couldn't load it from disk. \
-                    Use `ffx emu stop {}` to terminate and clean up the existing emulator.",
-                name, name
-            ))?;
-            if engine.is_running() {
+        if let Ok(instance_data) = read_from_disk(name).await {
+            if instance_data.is_running() {
                 bail!(
                     "An emulator named {} is already running. \
                     Use a different name, or run `ffx emu stop {}` \
@@ -133,22 +121,17 @@ impl EngineBuilder {
                 );
             }
         }
-        tracing::debug!("Serialized engine file will be created at {:?}", filepath);
 
         // Build and complete configuration on the engine, then pass it back to the caller.
+        let instance_data = EmulatorInstanceData::new(
+            self.emulator_configuration,
+            self.engine_type,
+            EngineState::Configured,
+        );
+
         let mut engine: Box<dyn EmulatorEngine> = match self.engine_type {
-            EngineType::Femu => Box::new(FemuEngine {
-                emulator_configuration: self.emulator_configuration,
-                engine_type: self.engine_type,
-                engine_state: EngineState::Configured,
-                ..Default::default()
-            }),
-            EngineType::Qemu => Box::new(QemuEngine {
-                emulator_configuration: self.emulator_configuration,
-                engine_type: self.engine_type,
-                engine_state: EngineState::Configured,
-                ..Default::default()
-            }),
+            EngineType::Femu => Box::new(FemuEngine::new(instance_data)),
+            EngineType::Qemu => Box::new(QemuEngine::new(instance_data)),
         };
         engine.configure()?;
 
@@ -158,9 +141,9 @@ impl EngineBuilder {
 
         engine.emu_config_mut().flags = process_flag_template(engine.emu_config())
             .context("Failed to process the flags template file.")?;
-
         engine
             .save_to_disk()
+            .await
             .context("Failed to write the emulation configuration file to disk.")?;
 
         Ok(engine)

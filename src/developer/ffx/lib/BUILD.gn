@@ -10,6 +10,7 @@ libs = [
   "daemonize",
   "diagnostics",
   "doctor_utils",
+  "emulator_instance",
   "errors",
   "fastboot",
   "fho",

@@ -5,14 +5,19 @@
 //! The qemu_base module encapsulates traits and functions specific
 //! for engines using QEMU as the emulator platform.
 
-use crate::arg_templates::process_flag_template;
-use crate::finalize_port_mapping;
-use crate::qemu_based::comms::{spawn_pipe_thread, QemuSocket};
-use crate::serialization::SerializingEngine;
-use crate::show_output;
+use crate::{
+    arg_templates::process_flag_template,
+    finalize_port_mapping,
+    qemu_based::comms::{spawn_pipe_thread, QemuSocket},
+    show_output,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use cfg_if::cfg_if;
+use emulator_instance::{
+    AccelerationMode, ConsoleType, EmulatorConfiguration, EngineState, GuestConfig, HostConfig,
+    NetworkingMode,
+};
 use errors::ffx_bail;
 use ffx_config::SshKeyFiles;
 use ffx_emulator_common::{
@@ -22,23 +27,22 @@ use ffx_emulator_common::{
     target::{add_target, is_active, remove_target, TargetAddress},
     tuntap::{tap_ready, TAP_INTERFACE_NAME},
 };
-use ffx_emulator_config::{
-    AccelerationMode, ConsoleType, EmulatorConfiguration, EmulatorEngine, EngineConsoleType,
-    EngineState, GuestConfig, HostConfig, NetworkingMode, ShowDetail,
-};
+use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::Serialize;
 use shared_child::SharedChild;
-use std::env;
-use std::fs::{self, File};
-use std::io::{stderr, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown};
-use std::ops::Sub;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::str;
-use std::sync::{mpsc::channel, Arc};
-use std::time::Duration;
+use std::{
+    env,
+    fs::{self, File},
+    io::{stderr, Write},
+    net::{IpAddr, Ipv4Addr, Shutdown},
+    ops::Sub,
+    path::{Path, PathBuf},
+    process::Command,
+    str,
+    sync::{mpsc::channel, Arc},
+    time::Duration,
+};
 
 #[cfg(test)]
 use mockall::automock;
@@ -152,7 +156,7 @@ impl MDNSInfo {
 /// This allows the implementation to be shared
 /// across multiple engine types.
 #[async_trait]
-pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
+pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// Checks that the required files are present
     fn check_required_files(&self, guest: &GuestConfig) -> Result<()> {
         let kernel_path = &guest.kernel_image;
@@ -425,7 +429,9 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
         self.set_pid(child_arc.id());
         self.set_engine_state(EngineState::Running);
 
-        self.save_to_disk().context("Failed to write the emulation configuration file to disk.")?;
+        self.save_to_disk()
+            .await
+            .context("Failed to write the emulation configuration file to disk.")?;
 
         let ssh = self.emu_config().host.port_map.get("ssh");
         let ssh_port = if let Some(ssh) = ssh { ssh.host } else { None };
@@ -464,7 +470,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
                         // Even if we can't remove it, still continue shutting down.
                         tracing::warn!("Couldn't remove target from ffx during shutdown: {:?}", e);
                     }
-                    if let Some(stop_error) = self.stop_emulator().err() {
+                    if let Some(stop_error) = self.stop_emulator().await.err() {
                         tracing::debug!(
                             "Error encountered in stop when handling failed launch: {:?}",
                             stop_error
@@ -496,7 +502,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
 
                     // Perform a check to make sure the process is still alive, otherwise report
                     // failure to launch.
-                    if !self.is_running() {
+                    if !self.is_running().await {
                         tracing::error!(
                             "Emulator process failed to launch, but we don't know the cause. \
                             Check the emulator log, or look for a crash log."
@@ -528,6 +534,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
 
                         self.set_engine_state(EngineState::Staged);
                         self.save_to_disk()
+                            .await
                             .context("Failed to write the emulation configuration file to disk.")?;
 
                         return Ok(1);
@@ -540,7 +547,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
                             "After {} seconds, the emulator has not responded to network queries.",
                             self.emu_config().runtime.startup_timeout.as_secs()
                         );
-                        if self.is_running() {
+                        if self.is_running().await {
                             eprintln!(
                                 "The emulator process is still running (pid {}).",
                                 self.get_pid()
@@ -625,15 +632,15 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
         }
     }
 
-    fn stop_emulator(&mut self) -> Result<()> {
-        if self.is_running() {
+    async fn stop_emulator(&mut self) -> Result<()> {
+        if self.is_running().await {
             println!("Terminating running instance {:?}", self.get_pid());
             if let Some(terminate_error) = process::terminate(self.get_pid()).err() {
                 tracing::warn!("Error encountered terminating process: {:?}", terminate_error);
             }
         }
         self.set_engine_state(EngineState::Staged);
-        self.save_to_disk()
+        self.save_to_disk().await
     }
 
     /// Access to the engine's pid field.
@@ -678,8 +685,8 @@ mod tests {
 
     use super::*;
     use async_trait::async_trait;
+    use emulator_instance::EngineType;
     use ffx_config::{query, ConfigLevel};
-    use ffx_emulator_config::EngineType;
     use serde::Serialize;
     use serde_json::json;
     use tempfile::{tempdir, TempDir};
@@ -704,12 +711,10 @@ mod tests {
         fn engine_type(&self) -> EngineType {
             EngineType::default()
         }
-        fn is_running(&mut self) -> bool {
+        async fn is_running(&mut self) -> bool {
             false
         }
     }
-    impl SerializingEngine for TestEngine {}
-
     const ORIGINAL: &str = "THIS_STRING";
     const UPDATED: &str = "THAT_VALUE*";
 

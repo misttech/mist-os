@@ -5,8 +5,8 @@
 //! The show_output module contains print routines for the Show subcommand.
 
 use camino::Utf8PathBuf;
+use emulator_instance::{EmulatorConfiguration, NetworkingMode};
 use ffx_emulator_common::tuntap::TAP_INTERFACE_NAME;
-use ffx_emulator_config::{EmulatorConfiguration, NetworkingMode};
 use sdk_metadata::{
     virtual_device::{Cpu, Hardware},
     ElementType, InputDevice, VirtualDeviceV1,

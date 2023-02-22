@@ -18,6 +18,7 @@ if (is_host) {
       "//build/sdk/meta:rust",
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/fms",
       "//src/developer/ffx/lib/pbms:lib",
       "//src/lib/assembly/assembly_manifest",

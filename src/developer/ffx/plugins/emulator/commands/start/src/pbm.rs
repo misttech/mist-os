@@ -5,16 +5,16 @@
 //! Utilities for Product Bundle Metadata (PBM).
 
 use anyhow::{bail, Context, Result};
+use emulator_instance::{
+    get_instance_dir, AccelerationMode, ConsoleType, EmulatorConfiguration, GpuType, LogLevel,
+    NetworkingMode, OperatingSystem,
+};
 use ffx_emulator_common::{
     config::{EMU_UPSCRIPT_FILE, KVM_PATH},
-    instances::get_instance_dir,
     split_once,
     tuntap::tap_available,
 };
-use ffx_emulator_config::{
-    convert_bundle_to_configs, AccelerationMode, ConsoleType, EmulatorConfiguration, GpuType,
-    LogLevel, NetworkingMode, OperatingSystem,
-};
+use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use pbms::{load_product_bundle, ListingMode};
 use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
@@ -87,6 +87,7 @@ async fn apply_command_line_options(
         // expect the log file to exist ahead of time.
         emu_config.host.log = PathBuf::from(env::current_dir()?).join(log);
     } else {
+        // TODO(http://fxbug.dev/116262): Move logs to ffx log dir so `ffx doctor` collects them.
         let instance = get_instance_dir(&cmd.name, false).await?;
         emu_config.host.log = instance.join("emulator.log");
     }
@@ -166,6 +167,8 @@ async fn apply_command_line_options(
     emu_config.runtime.hidpi_scaling = cmd.hidpi_scaling;
     emu_config.runtime.addl_kernel_args = cmd.kernel_args.clone();
     emu_config.runtime.name = cmd.name.clone();
+    emu_config.runtime.instance_directory =
+        get_instance_dir(&emu_config.runtime.name, true).await?;
     emu_config.runtime.reuse = cmd.reuse;
 
     // Collapsing multiple binary options into related fields.
@@ -264,14 +267,14 @@ fn generate_mac_address(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use emulator_instance::{
+        AccelerationMode, ConsoleType, CpuArchitecture, EmulatorConfiguration, GpuType, LogLevel,
+        NetworkingMode, PortMapping,
+    };
     use ffx_config::{query, ConfigLevel};
     use ffx_emulator_common::config::{
         EMU_DEFAULT_DEVICE, EMU_DEFAULT_ENGINE, EMU_DEFAULT_GPU, EMU_INSTANCE_ROOT_DIR,
         EMU_START_TIMEOUT,
-    };
-    use ffx_emulator_config::{
-        AccelerationMode, ConsoleType, CpuArchitecture, EmulatorConfiguration, GpuType, LogLevel,
-        NetworkingMode, PortMapping,
     };
     use regex::Regex;
     use serde_json::json;

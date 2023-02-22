@@ -5,44 +5,43 @@
 //! The femu module encapsulates the interactions with the emulator instance
 //! started via the Fuchsia emulator, Femu.
 
-use crate::{qemu_based::QemuBasedEngine, serialization::SerializingEngine};
+use super::get_host_tool;
+use crate::qemu_based::QemuBasedEngine;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use ffx_emulator_common::{config, process, target::remove_target};
-use ffx_emulator_config::{
-    EmulatorConfiguration, EmulatorEngine, EngineConsoleType, EngineState, EngineType, ShowDetail,
+use emulator_instance::{
+    get_instance_dir, EmulatorConfiguration, EmulatorInstanceData, EmulatorInstanceInfo,
+    EngineState, EngineType,
 };
+use ffx_emulator_common::{config, target::remove_target};
+use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fidl_fuchsia_developer_ffx as ffx;
-use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, process::Command};
+use std::process::Command;
 
-use super::get_host_tool;
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FemuEngine {
-    #[serde(default)]
-    pub(crate) emulator_binary: PathBuf,
-    pub(crate) emulator_configuration: EmulatorConfiguration,
-    pub(crate) pid: u32,
-    pub(crate) engine_type: EngineType,
-    #[serde(default)]
-    pub(crate) engine_state: EngineState,
+    data: EmulatorInstanceData,
 }
 
 impl FemuEngine {
+    pub(crate) fn new(data: EmulatorInstanceData) -> Self {
+        Self { data }
+    }
+
     fn validate_configuration(&self) -> Result<()> {
-        if !self.emulator_configuration.runtime.headless && std::env::var("DISPLAY").is_err() {
+        let emulator_configuration = self.data.get_emulator_configuration();
+        if !emulator_configuration.runtime.headless && std::env::var("DISPLAY").is_err() {
             eprintln!(
                 "DISPLAY not set in the local environment, try running with --headless if you \
                 encounter failures related to display or Qt.",
             );
         }
-        self.validate_network_flags(&self.emulator_configuration)
-            .and_then(|()| self.check_required_files(&self.emulator_configuration.guest))
+        self.validate_network_flags(emulator_configuration)
+            .and_then(|()| self.check_required_files(&emulator_configuration.guest))
     }
 
     fn validate_staging(&self) -> Result<()> {
-        self.check_required_files(&self.emulator_configuration.guest)
+        self.check_required_files(&self.data.get_emulator_configuration().guest)
     }
 }
 
@@ -53,11 +52,11 @@ impl EmulatorEngine for FemuEngine {
             .await
             .and_then(|()| self.validate_staging());
         if result.is_ok() {
-            self.engine_state = EngineState::Staged;
-            self.save_to_disk()
+            self.data.set_engine_state(EngineState::Staged);
+            self.save_to_disk().await
         } else {
-            self.engine_state = EngineState::Error;
-            self.save_to_disk().with_context(|| format!("{:?}", result.unwrap_err()))
+            self.data.set_engine_state(EngineState::Error);
+            self.save_to_disk().await.with_context(|| format!("{:?}", result.unwrap_err()))
         }
     }
 
@@ -79,7 +78,7 @@ impl EmulatorEngine for FemuEngine {
             // Even if we can't remove it, still continue shutting down.
             tracing::warn!("Couldn't remove target from ffx during shutdown: {:?}", e);
         }
-        self.stop_emulator()
+        self.stop_emulator().await
     }
 
     fn configure(&mut self) -> Result<()> {
@@ -90,9 +89,9 @@ impl EmulatorEngine for FemuEngine {
             self.validate_configuration()
         };
         if result.is_ok() {
-            self.engine_state = EngineState::Configured;
+            self.data.set_engine_state(EngineState::Configured);
         } else {
-            self.engine_state = EngineState::Error;
+            self.data.set_engine_state(EngineState::Error);
         }
         result
     }
@@ -102,14 +101,14 @@ impl EmulatorEngine for FemuEngine {
     }
 
     fn engine_type(&self) -> EngineType {
-        self.engine_type
+        self.data.get_engine_type()
     }
 
-    fn is_running(&mut self) -> bool {
-        let running = process::is_running(self.pid);
+    async fn is_running(&mut self) -> bool {
+        let running = self.data.is_running();
         if self.engine_state() == EngineState::Running && running == false {
             self.set_engine_state(EngineState::Staged);
-            if self.save_to_disk().is_err() {
+            if self.save_to_disk().await.is_err() {
                 tracing::warn!("Problem saving serialized emulator to disk during state update.");
             }
         }
@@ -117,14 +116,14 @@ impl EmulatorEngine for FemuEngine {
     }
 
     fn attach(&self, console: EngineConsoleType) -> Result<()> {
-        self.attach_to(&self.emulator_configuration.runtime.instance_directory, console)
+        self.attach_to(&self.data.get_emulator_configuration().runtime.instance_directory, console)
     }
 
     /// Build the Command to launch Android emulator running Fuchsia.
     fn build_emulator_cmd(&self) -> Command {
-        let mut cmd = Command::new(&self.emulator_binary);
-        let feature_arg = self
-            .emulator_configuration
+        let mut cmd = Command::new(&self.data.get_emulator_binary());
+        let emulator_configuration = self.data.get_emulator_configuration();
+        let feature_arg = emulator_configuration
             .flags
             .features
             .iter()
@@ -134,11 +133,10 @@ impl EmulatorEngine for FemuEngine {
         if feature_arg.len() > 0 {
             cmd.arg("-feature").arg(feature_arg);
         }
-        cmd.args(&self.emulator_configuration.flags.options)
+        cmd.args(&emulator_configuration.flags.options)
             .arg("-fuchsia")
-            .args(&self.emulator_configuration.flags.args);
-        let extra_args = self
-            .emulator_configuration
+            .args(&emulator_configuration.flags.args);
+        let extra_args = emulator_configuration
             .flags
             .kernel_args
             .iter()
@@ -148,15 +146,15 @@ impl EmulatorEngine for FemuEngine {
         if extra_args.len() > 0 {
             cmd.args(["-append", &extra_args]);
         }
-        if self.emulator_configuration.flags.envs.len() > 0 {
-            cmd.envs(&self.emulator_configuration.flags.envs);
+        if self.data.get_emulator_configuration().flags.envs.len() > 0 {
+            cmd.envs(&emulator_configuration.flags.envs);
         }
         cmd
     }
 
     /// Get the AEMU binary path from the SDK manifest and verify it exists.
     async fn load_emulator_binary(&mut self) -> Result<()> {
-        self.emulator_binary = match get_host_tool(config::FEMU_TOOL).await {
+        let emulator_binary = match get_host_tool(config::FEMU_TOOL).await {
             Ok(aemu_path) => aemu_path.canonicalize().context(format!(
                 "Failed to canonicalize the path to the emulator binary: {:?}",
                 aemu_path
@@ -166,41 +164,43 @@ impl EmulatorEngine for FemuEngine {
             }
         };
 
-        if !self.emulator_binary.exists() || !self.emulator_binary.is_file() {
-            bail!("Giving up finding emulator binary. Tried {:?}", self.emulator_binary)
+        if !emulator_binary.exists() || !emulator_binary.is_file() {
+            bail!("Giving up finding emulator binary. Tried {:?}", emulator_binary)
         }
+        self.data.set_emulator_binary(emulator_binary);
         Ok(())
     }
 
     fn emu_config(&self) -> &EmulatorConfiguration {
-        return &self.emulator_configuration;
+        self.data.get_emulator_configuration()
     }
 
     fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
-        return &mut self.emulator_configuration;
+        self.data.get_emulator_configuration_mut()
     }
 
-    fn save_to_disk(&self) -> Result<()> {
-        self.write_to_disk(&self.emu_config().runtime.instance_directory)
+    async fn save_to_disk(&self) -> Result<()> {
+        emulator_instance::write_to_disk(
+            &self.data,
+            &get_instance_dir(self.data.get_name(), true).await?,
+        )
     }
 }
 
-impl SerializingEngine for FemuEngine {}
-
 impl QemuBasedEngine for FemuEngine {
     fn set_pid(&mut self, pid: u32) {
-        self.pid = pid;
+        self.data.set_pid(pid)
     }
 
     fn get_pid(&self) -> u32 {
-        self.pid
+        self.data.get_pid()
     }
 
     fn set_engine_state(&mut self, state: EngineState) {
-        self.engine_state = state;
+        self.data.set_engine_state(state);
     }
 
     fn get_engine_state(&self) -> EngineState {
-        self.engine_state
+        self.data.get_engine_state()
     }
 }

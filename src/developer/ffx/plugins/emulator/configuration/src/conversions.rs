@@ -6,10 +6,12 @@
 //! interface types. We perform the conversion here to keep dependencies on the sdk_metadata
 //! to a minimum, while improving our ability to fully test the conversion code.
 
-use crate::{DeviceConfig, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu};
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_manifest::Image;
 use camino::Utf8PathBuf;
+use emulator_instance::{
+    DeviceConfig, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
+};
 use pbms::{
     fms_entries_from, get_images_dir, load_product_bundle, select_product_bundle, ListingMode,
 };
@@ -306,9 +308,9 @@ mod tests {
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, EmuManifest,
-        InputDevice, Manifests, PointingDevice, Screen, ScreenUnits,
+        InputDevice, Manifests, PointingDevice, ProductBundleV1, Screen, ScreenUnits,
+        VirtualDeviceV1,
     };
-    use sdk_metadata::{ProductBundleV1, VirtualDeviceV1};
     use std::{collections::HashMap, fs::File, io::Write};
 
     const VIRTUAL_DEVICE_VALID: &str =

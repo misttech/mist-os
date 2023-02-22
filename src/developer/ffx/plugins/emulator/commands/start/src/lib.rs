@@ -5,15 +5,15 @@
 use crate::pbm::{list_virtual_devices, make_configs};
 use anyhow::{Context, Result};
 use cfg_if::cfg_if;
+use emulator_instance::{EmulatorConfiguration, EngineType};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_emulator_commands::EngineOption;
-use ffx_emulator_config::{EmulatorConfiguration, EmulatorEngine, EngineType};
+use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use std::str::FromStr;
-
 mod editor;
 mod pbm;
 
@@ -116,13 +116,13 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
         emulator_cmd = engine.build_emulator_cmd();
     }
 
-    if cmd.verbose {
+    if cmd.verbose || cmd.dry_run {
         println!("\n[emulator] Final Command line: {:?}\n", emulator_cmd);
         println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
     }
 
     if cmd.dry_run {
-        engine.save_to_disk()?;
+        engine.save_to_disk().await?;
         return Ok(());
     }
 
@@ -165,7 +165,8 @@ mod tests {
     use super::*;
     use anyhow::bail;
     use async_trait::async_trait;
-    use ffx_emulator_config::{EmulatorEngine, RuntimeConfig};
+    use emulator_instance::RuntimeConfig;
+    use ffx_emulator_config::EmulatorEngine;
     use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
     use std::process::Command;
 
@@ -199,7 +200,7 @@ mod tests {
 
     #[async_trait]
     impl EmulatorEngine for TestEngine {
-        fn save_to_disk(&self) -> Result<()> {
+        async fn save_to_disk(&self) -> Result<()> {
             Ok(())
         }
         fn build_emulator_cmd(&self) -> Command {

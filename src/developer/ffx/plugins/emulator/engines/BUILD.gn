@@ -22,6 +22,7 @@ if (is_host) {
       "//build/sdk/meta:rust",
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/port_picker:lib",
       "//src/developer/ffx/plugins/emulator/common:ffx_emulator_common",
@@ -40,10 +41,10 @@ if (is_host) {
     test_deps = [
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:mockall",
-      "//third_party/rust_crates:regex",
       "//third_party/rust_crates:serial_test",
       "//third_party/rust_crates:tempfile",
     ]
+    inputs = [ "test_data/unknown_engine_type_engine.json" ]
   }
 
   group("tests") {
