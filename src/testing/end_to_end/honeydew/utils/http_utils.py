@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 _TIMEOUTS = {
     "HTTP_RESPONSE": 30,
 }
+
 _DEFAULTS = {
     "ATTEMPTS": 3,
     "INTERVAL": 1,

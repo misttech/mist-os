@@ -33,6 +33,7 @@ _PARAMS = {
     "interval": http_utils._DEFAULTS["INTERVAL"] + 5,
     "exceptions_to_skip": []
 }
+
 _MOCK_ARGS = {
     "urlopen_resp": b'{"id": "", "result": "fuchsia-emulator", "error": null}'
 }
