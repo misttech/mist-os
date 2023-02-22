@@ -127,6 +127,11 @@ std::vector<uint8_t> ReadbackTest::ReadbackFromColorAttachment(const FramePtr& f
                    vk::AccessFlagBits::eTransferWrite | vk::AccessFlagBits::eTransferRead |
                        vk::AccessFlagBits::eColorAttachmentWrite);
 
+  // Perform a memory domain operation from device to host domain.
+  cb->BufferBarrier(readback_buffer_, vk::PipelineStageFlagBits::eTransfer,
+                    vk::AccessFlagBits::eTransferWrite, vk::PipelineStageFlagBits::eHost,
+                    vk::AccessFlagBits::eHostRead);
+
   // Submit the commands, wait for them to finish, and then copy and return the
   // data to the caller.
   frame->SubmitPartialFrame(SemaphorePtr());
