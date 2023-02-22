@@ -37,6 +37,9 @@ type GetManifestError = flexible enum {
 
     /// The component manifest is only available when the instance is resolved.
     INSTANCE_NOT_RESOLVED = 3;
+
+    /// The component manifest could not be encoded into its persistable format.
+    ENCODE_FAILED = 4;
 };
 
 /// Errors that can be returned by the GetStructuredConfig call.
@@ -115,6 +118,10 @@ type ConnectToStorageAdminError = flexible enum {
 };
 
 /// Describes a component instance under a realm.
+///
+/// Note: This structure is expected to fit in a single Zircon channel message.
+///       Do not add fields that have the potential to violate that constraint.
+///       Prefer to create dedicated methods and iterators instead.
 @available(added=11)
 type Instance = table {
     /// The path to this instance relative to the scope root.
@@ -176,11 +183,16 @@ protocol RealmQuery {
     }) error GetInstanceError;
 
     /// Gets the manifest of an instance identified by its relative moniker.
+    ///
+    /// The manifest is encoded in its standalone persistable format per RFC-0120 and
+    /// is sent across using an iterator. Some manifests are too large to send over a
+    /// Zircon channel and we can't use a VMO because we need an approach that is
+    /// compatible with overnet.
     @available(added=11)
     GetManifest(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (struct {
-        manifest fuchsia.component.decl.Component;
+    }) -> (resource struct {
+        iterator client_end:ManifestBytesIterator;
     }) error GetManifestError;
 
     /// Gets the structured config of an instance identified by its relative moniker.
@@ -259,6 +271,14 @@ protocol RealmQuery {
 protocol InstanceIterator {
     Next() -> (struct {
         infos vector<Instance>:MAX;
+    });
+};
+
+/// An iterator over the bytes of an instance's manifest
+@available(added=11)
+protocol ManifestBytesIterator {
+    Next() -> (struct {
+        infos vector<uint8>:MAX;
     });
 };
 

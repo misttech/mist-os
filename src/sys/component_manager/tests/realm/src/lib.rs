@@ -4,9 +4,27 @@
 
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
+use fidl_fuchsia_component_decl as fcdecl;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::*;
+
+async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
+    let iterator = query.get_manifest(moniker).await.unwrap().unwrap();
+    let iterator = iterator.into_proxy().unwrap();
+
+    let mut bytes = vec![];
+
+    loop {
+        let mut batch = iterator.next().await.unwrap();
+        if batch.is_empty() {
+            break;
+        }
+        bytes.append(&mut batch);
+    }
+
+    fidl::encoding::unpersist::<fcdecl::Component>(&bytes).unwrap()
+}
 
 #[fuchsia::test]
 pub async fn get_instance_self() {
@@ -26,7 +44,7 @@ pub async fn get_instance_self() {
 pub async fn get_manifest_self() {
     let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let decl = query.get_manifest("./").await.unwrap().unwrap();
+    let decl = get_manifest(&query, "./").await;
 
     let program = decl.program.unwrap();
     program.runner.unwrap();
@@ -90,7 +108,7 @@ pub async fn echo_server() {
     let execution = resolved.execution_info.unwrap();
     execution.start_reason.unwrap();
 
-    let decl = query.get_manifest("./echo_server").await.unwrap().unwrap();
+    let decl = get_manifest(&query, "./echo_server").await;
     let program = decl.program.unwrap();
     program.runner.unwrap();
 

@@ -5,7 +5,7 @@
 use {
     crate::io::Directory,
     cm_rust::{ComponentDecl, FidlIntoNative},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys,
     moniker::{
         AbsoluteMoniker, AbsoluteMonikerBase, MonikerError, RelativeMoniker, RelativeMonikerBase,
     },
@@ -55,6 +55,9 @@ pub enum GetManifestError {
 
     #[error("component manager could not parse {0}")]
     BadMoniker(AbsoluteMoniker),
+
+    #[error("component manager failed to encode the manifest")]
+    EncodeFailed,
 
     #[error("component manager responded with an unknown error code")]
     UnknownError,
@@ -194,10 +197,9 @@ pub async fn get_manifest(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetManifestError> {
-    // Parse the runtime directory and add it into the State object
     let moniker_str = format!(".{}", moniker.to_string());
-    match realm_query.get_manifest(&moniker_str).await? {
-        Ok(decl) => Ok(decl.fidl_into_native()),
+    let iterator = match realm_query.get_manifest(&moniker_str).await? {
+        Ok(iterator) => Ok(iterator),
         Err(fsys::GetManifestError::InstanceNotFound) => {
             Err(GetManifestError::InstanceNotFound(moniker.clone()))
         }
@@ -207,14 +209,32 @@ pub async fn get_manifest(
         Err(fsys::GetManifestError::BadMoniker) => {
             Err(GetManifestError::BadMoniker(moniker.clone()))
         }
+        Err(fsys::GetManifestError::EncodeFailed) => Err(GetManifestError::EncodeFailed),
         Err(_) => Err(GetManifestError::UnknownError),
+    }?;
+
+    let iterator = iterator.into_proxy().unwrap();
+    let mut bytes = vec![];
+
+    loop {
+        let mut batch = iterator.next().await?;
+        if batch.is_empty() {
+            break;
+        }
+        bytes.append(&mut batch);
     }
+
+    let manifest = fidl::encoding::unpersist::<fcdecl::Component>(&bytes)?;
+    let manifest = manifest.fidl_into_native();
+    Ok(manifest)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::*;
+    use fidl_fuchsia_component_decl as fdecl;
+    use std::collections::HashMap;
 
     #[fuchsia::test]
     async fn test_get_all_instances() {
@@ -248,5 +268,40 @@ mod tests {
 
         let execution_info = resolved.execution_info.unwrap();
         assert_eq!(execution_info.start_reason, "Debugging Workflow".to_string());
+    }
+
+    #[fuchsia::test]
+    async fn test_get_manifest() {
+        let query = serve_realm_query(
+            vec![],
+            HashMap::from([(
+                "./my_foo".to_string(),
+                fdecl::Component {
+                    uses: Some(vec![fdecl::Use::Protocol(fdecl::UseProtocol {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                        source_name: Some("fuchsia.foo.bar".to_string()),
+                        target_path: Some("/svc/fuchsia.foo.bar".to_string()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        availability: Some(fdecl::Availability::Required),
+                        ..fdecl::UseProtocol::EMPTY
+                    })]),
+                    exposes: Some(vec![fdecl::Expose::Protocol(fdecl::ExposeProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef)),
+                        source_name: Some("fuchsia.bar.baz".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                        target_name: Some("fuchsia.bar.baz".to_string()),
+                        ..fdecl::ExposeProtocol::EMPTY
+                    })]),
+                    ..fdecl::Component::EMPTY
+                },
+            )]),
+            HashMap::new(),
+        );
+
+        let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
+        let manifest = get_manifest(&moniker, &query).await.unwrap();
+
+        assert_eq!(manifest.uses.len(), 1);
+        assert_eq!(manifest.exposes.len(), 1);
     }
 }

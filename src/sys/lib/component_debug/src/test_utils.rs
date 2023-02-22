@@ -45,6 +45,24 @@ fn serve_instance_iterator(
     client
 }
 
+fn serve_manifest_bytes_iterator(
+    mut manifest: fcdecl::Component,
+) -> ClientEnd<fsys::ManifestBytesIteratorMarker> {
+    let bytes = fidl::encoding::persist(&mut manifest).unwrap();
+    let (client, mut stream) =
+        create_request_stream::<fsys::ManifestBytesIteratorMarker>().unwrap();
+    Task::spawn(async move {
+        let fsys::ManifestBytesIteratorRequest::Next { responder } =
+            stream.next().await.unwrap().unwrap();
+        responder.send(&bytes).unwrap();
+        let fsys::ManifestBytesIteratorRequest::Next { responder } =
+            stream.next().await.unwrap().unwrap();
+        responder.send(&[]).unwrap();
+    })
+    .detach();
+    client
+}
+
 pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::RealmQueryProxy {
     serve_realm_query(instances, HashMap::new(), HashMap::new())
 }
@@ -69,7 +87,8 @@ pub fn serve_realm_query(
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
                     eprintln!("GetManifest call for {}", moniker);
                     if let Some(manifest) = manifests.get(&moniker) {
-                        responder.send(&mut Ok(manifest.clone())).unwrap();
+                        let iterator = serve_manifest_bytes_iterator(manifest.clone());
+                        responder.send(&mut Ok(iterator)).unwrap();
                     } else {
                         responder.send(&mut Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
                     }

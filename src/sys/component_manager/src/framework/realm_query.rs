@@ -22,9 +22,8 @@ use {
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_component_config as fcconfig, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component_config as fcconfig, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::lock::Mutex,
     futures::StreamExt,
@@ -52,6 +51,11 @@ const FIDL_VECTOR_HEADER_BYTES: usize = 16;
 // Number of bytes the header of a fidl message occupies.
 // TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
 const FIDL_HEADER_BYTES: usize = 16;
+
+// Number of bytes of a manifest that can fit in a single message
+// sent on a zircon channel.
+const FIDL_MANIFEST_MAX_MSG_BYTES: usize =
+    (ZX_CHANNEL_MAX_MSG_BYTES as usize) - (FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES);
 
 // Serves the fuchsia.sys2.RealmQuery protocol.
 pub struct RealmQuery {
@@ -124,9 +128,7 @@ impl RealmQuery {
                     responder.send(&mut result)
                 }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {
-                    let mut result = snapshot_instances(&self.model, &scope_moniker)
-                        .await
-                        .map(|instances| serve_instance_iterator(instances));
+                    let mut result = get_all_instances(&self.model, &scope_moniker).await;
                     responder.send(&mut result)
                 }
                 fsys::RealmQueryRequest::ConstructNamespace { moniker, responder } => {
@@ -315,12 +317,12 @@ pub async fn get_instance(
     })
 }
 
-/// Get the component manifest of an instance
+/// Encode the component manifest of an instance into a standalone persistable FIDL format.
 pub async fn get_manifest(
     model: &Arc<Model>,
     scope_moniker: &AbsoluteMoniker,
     moniker_str: &str,
-) -> Result<fcdecl::Component, fsys::GetManifestError> {
+) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetManifestError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker =
         RelativeMoniker::try_from(moniker_str).map_err(|_| fsys::GetManifestError::BadMoniker)?;
@@ -331,12 +333,28 @@ pub async fn get_manifest(
 
     let state = instance.lock_state().await;
 
-    let decl = match &*state {
+    let mut decl = match &*state {
         InstanceState::Resolved(r) => r.decl().clone().native_into_fidl(),
         _ => return Err(fsys::GetManifestError::InstanceNotResolved),
     };
 
-    Ok(decl)
+    let bytes = fidl::encoding::persist(&mut decl).map_err(|error| {
+        warn!(%moniker, %error, "RealmQuery failed to encode manifest");
+        fsys::GetManifestError::EncodeFailed
+    })?;
+
+    // Attach the iterator task to the scope root.
+    let scope_root =
+        model.find(scope_moniker).await.ok_or(fsys::GetManifestError::InstanceNotFound)?;
+
+    let (client_end, server_end) =
+        fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
+
+    // Attach the iterator task to the scope root.
+    let task_scope = scope_root.nonblocking_task_scope();
+    task_scope.add_task(serve_manifest_bytes_iterator(server_end, bytes)).await;
+
+    Ok(client_end)
 }
 
 /// Get the structured config of an instance
@@ -520,19 +538,19 @@ async fn connect_to_storage_admin(
     Ok(())
 }
 
-/// Take a snapshot of all instances in the given scope and create the Instance
-/// FIDL object for each.
-async fn snapshot_instances(
+/// Take a snapshot of all instances in the given scope and serves an instance iterator
+/// over the snapshots.
+async fn get_all_instances(
     model: &Arc<Model>,
     scope_moniker: &AbsoluteMoniker,
-) -> Result<Vec<fsys::Instance>, fsys::GetAllInstancesError> {
+) -> Result<ClientEnd<fsys::InstanceIteratorMarker>, fsys::GetAllInstancesError> {
     let mut instances = vec![];
 
     // Only take instances contained within the scope realm
     let scope_root =
         model.find(scope_moniker).await.ok_or(fsys::GetAllInstancesError::InstanceNotFound)?;
 
-    let mut queue = vec![scope_root];
+    let mut queue = vec![scope_root.clone()];
 
     while !queue.is_empty() {
         let cur = queue.pop().unwrap();
@@ -543,7 +561,14 @@ async fn snapshot_instances(
         queue.append(&mut children);
     }
 
-    Ok(instances)
+    let (client_end, server_end) =
+        fidl::endpoints::create_endpoints::<fsys::InstanceIteratorMarker>();
+
+    // Attach the iterator task to the scope root.
+    let task_scope = scope_root.nonblocking_task_scope();
+    task_scope.add_task(serve_instance_iterator(server_end, instances)).await;
+
+    Ok(client_end)
 }
 
 /// Create the detailed instance info matching the given moniker string in this scope
@@ -599,39 +624,64 @@ async fn get_fidl_instance_and_children(
     )
 }
 
-fn serve_instance_iterator(
+async fn serve_instance_iterator(
+    server_end: ServerEnd<fsys::InstanceIteratorMarker>,
     mut instances: Vec<fsys::Instance>,
-) -> ClientEnd<fsys::InstanceIteratorMarker> {
-    let (client_end, server_end) =
-        fidl::endpoints::create_endpoints::<fsys::InstanceIteratorMarker>();
-    fasync::Task::spawn(async move {
-        let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
-        while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await
-        {
-            let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
-            let mut instance_count = 0;
+) {
+    let mut stream: fsys::InstanceIteratorRequestStream = server_end.into_stream().unwrap();
+    while let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await {
+        let mut bytes_used: usize = FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES;
+        let mut instance_count = 0;
 
-            // Determine how many info objects can be sent in a single FIDL message.
-            // TODO(https://fxbug.dev/98653): This logic should be handled by FIDL.
-            for instance in &instances {
-                bytes_used += instance.measure().num_bytes;
-                if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
-                    break;
-                }
-                instance_count += 1;
-            }
-
-            let batch: Vec<fsys::Instance> = instances.drain(0..instance_count).collect();
-
-            let result = responder.send(&mut batch.into_iter());
-            if let Err(error) = result {
-                warn!(?error, "RealmQuery encountered error sending instance batch");
+        // Determine how many info objects can be sent in a single FIDL message.
+        // TODO(https://fxbug.dev/98653): This logic should be handled by FIDL.
+        for instance in &instances {
+            bytes_used += instance.measure().num_bytes;
+            if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
                 break;
             }
+            instance_count += 1;
         }
-    })
-    .detach();
-    client_end
+
+        let batch: Vec<fsys::Instance> = instances.drain(0..instance_count).collect();
+        let batch_size = batch.len();
+
+        let result = responder.send(&mut batch.into_iter());
+        if let Err(error) = result {
+            warn!(?error, "RealmQuery encountered error sending instance batch");
+            break;
+        }
+
+        // Close the iterator because all the data was sent.
+        if batch_size == 0 {
+            break;
+        }
+    }
+}
+
+async fn serve_manifest_bytes_iterator(
+    server_end: ServerEnd<fsys::ManifestBytesIteratorMarker>,
+    mut bytes: Vec<u8>,
+) {
+    let mut stream: fsys::ManifestBytesIteratorRequestStream = server_end.into_stream().unwrap();
+
+    while let Some(Ok(fsys::ManifestBytesIteratorRequest::Next { responder })) = stream.next().await
+    {
+        let bytes_to_drain = std::cmp::min(FIDL_MANIFEST_MAX_MSG_BYTES, bytes.len());
+        let batch: Vec<u8> = bytes.drain(0..bytes_to_drain).collect();
+        let batch_size = batch.len();
+
+        let result = responder.send(&batch);
+        if let Err(error) = result {
+            warn!(?error, "RealmQuery encountered error sending manifest bytes");
+            break;
+        }
+
+        // Close the iterator because all the data was sent.
+        if batch_size == 0 {
+            break;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -644,7 +694,8 @@ mod tests {
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
-        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         routing_test_helpers::component_id_index::make_index_file,
     };
 
@@ -703,25 +754,33 @@ mod tests {
 
     #[fuchsia::test]
     async fn manifest_test() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Framework,
-            source_name: "foo".into(),
-            target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        // Try to create a manifest that will exceed the size of a Zircon channel message.
+        let mut manifest = ComponentDeclBuilder::new();
 
-        let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "bar".into(),
-            target: ExposeTarget::Parent,
-            target_name: "bar".into(),
-        });
+        for i in 0..10000 {
+            let use_name = format!("use_{}", i);
+            let expose_name = format!("expose_{}", i);
+            let capability_path = format!("/svc/capability_{}", i);
 
-        let components = vec![(
-            "root",
-            ComponentDeclBuilder::new().use_(use_decl.clone()).expose(expose_decl.clone()).build(),
-        )];
+            let use_decl = UseDecl::Protocol(UseProtocolDecl {
+                source: UseSource::Framework,
+                source_name: use_name.into(),
+                target_path: CapabilityPath::try_from(capability_path.as_str()).unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            });
+
+            let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+                source: ExposeSource::Self_,
+                source_name: expose_name.clone().into(),
+                target: ExposeTarget::Parent,
+                target_name: expose_name.into(),
+            });
+
+            manifest = manifest.use_(use_decl).expose(expose_decl);
+        }
+
+        let components = vec![("root", manifest.build())];
 
         let TestModelResult { model, builtin_environment, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
@@ -740,15 +799,38 @@ mod tests {
 
         model.start().await;
 
-        let manifest = query.get_manifest("./").await.unwrap().unwrap();
+        let iterator = query.get_manifest("./").await.unwrap().unwrap();
+        let iterator = iterator.into_proxy().unwrap();
 
-        // Component should have one use and one expose decl
+        let mut bytes = vec![];
+
+        loop {
+            let mut batch = iterator.next().await.unwrap();
+            if batch.is_empty() {
+                break;
+            }
+            bytes.append(&mut batch);
+        }
+
+        let manifest = fidl::encoding::unpersist::<fcdecl::Component>(&bytes).unwrap();
+
+        // Component should have 10000 use and expose decls
         let uses = manifest.uses.unwrap();
         let exposes = manifest.exposes.unwrap();
-        assert_eq!(uses.len(), 1);
-        assert_eq!(uses[0], use_decl.native_into_fidl());
-        assert_eq!(exposes.len(), 1);
-        assert_eq!(exposes[0], expose_decl.native_into_fidl());
+        assert_eq!(uses.len(), 10000);
+
+        for use_ in uses {
+            let use_ = use_.fidl_into_native();
+            assert!(use_.source_name().str().starts_with("use_"));
+            assert!(use_.path().unwrap().to_string().starts_with("/svc/capability_"));
+        }
+
+        assert_eq!(exposes.len(), 10000);
+
+        for expose in exposes {
+            let expose = expose.fidl_into_native();
+            assert!(expose.source_name().str().starts_with("expose_"));
+        }
     }
 
     #[fuchsia::test]
