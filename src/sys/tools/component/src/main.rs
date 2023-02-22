@@ -67,25 +67,20 @@ pub async fn exec() -> Result<()> {
                     args.capability,
                     copy_args.source_path,
                     copy_args.destination_path,
-                    lifecycle_controller,
+                    realm_query,
                 )
                 .await
             }
             StorageSubcommand::Delete(delete_args) => {
-                storage_delete_cmd(
-                    args.provider,
-                    args.capability,
-                    delete_args.path,
-                    lifecycle_controller,
-                )
-                .await
+                storage_delete_cmd(args.provider, args.capability, delete_args.path, realm_query)
+                    .await
             }
             StorageSubcommand::List(list_args) => {
                 storage_list_cmd(
                     args.provider,
                     args.capability,
                     list_args.path,
-                    lifecycle_controller,
+                    realm_query,
                     writer,
                 )
                 .await
@@ -95,7 +90,7 @@ pub async fn exec() -> Result<()> {
                     args.provider,
                     args.capability,
                     make_dir_args.path,
-                    lifecycle_controller,
+                    realm_query,
                 )
                 .await
             }

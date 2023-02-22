@@ -10,7 +10,7 @@ use {
 };
 
 async fn get_storage_admin(
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    realm_query: fsys::RealmQueryProxy,
     storage_provider_moniker: String,
     storage_capability_name: String,
 ) -> Result<fsys::StorageAdminProxy> {
@@ -27,8 +27,8 @@ async fn get_storage_admin(
     let storage_provider_moniker =
         RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &storage_provider_moniker).unwrap();
 
-    lifecycle_controller
-        .get_storage_admin(
+    realm_query
+        .connect_to_storage_admin(
             &storage_provider_moniker.to_string(),
             &storage_capability_name,
             server_end,
@@ -51,11 +51,10 @@ pub async fn storage_copy_cmd(
     storage_capability_name: String,
     source_path: String,
     destination_path: String,
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    realm_query: fsys::RealmQueryProxy,
 ) -> Result<()> {
     let storage_admin =
-        get_storage_admin(lifecycle_controller, storage_provider_moniker, storage_capability_name)
-            .await?;
+        get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
     copy(storage_admin, source_path, destination_path).await
 }
 
@@ -63,12 +62,11 @@ pub async fn storage_list_cmd<W: std::io::Write>(
     storage_provider_moniker: String,
     storage_capability_name: String,
     path: String,
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    realm_query: fsys::RealmQueryProxy,
     mut writer: W,
 ) -> Result<()> {
     let storage_admin =
-        get_storage_admin(lifecycle_controller, storage_provider_moniker, storage_capability_name)
-            .await?;
+        get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
     let entries = list(storage_admin, path).await?;
 
     for entry in entries {
@@ -81,11 +79,10 @@ pub async fn storage_make_directory_cmd(
     storage_provider_moniker: String,
     storage_capability_name: String,
     path: String,
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    realm_query: fsys::RealmQueryProxy,
 ) -> Result<()> {
     let storage_admin =
-        get_storage_admin(lifecycle_controller, storage_provider_moniker, storage_capability_name)
-            .await?;
+        get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
     make_directory(storage_admin, path).await
 }
 
@@ -93,10 +90,9 @@ pub async fn storage_delete_cmd(
     storage_provider_moniker: String,
     storage_capability_name: String,
     path: String,
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    realm_query: fsys::RealmQueryProxy,
 ) -> Result<()> {
     let storage_admin =
-        get_storage_admin(lifecycle_controller, storage_provider_moniker, storage_capability_name)
-            .await?;
+        get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
     delete(storage_admin, path).await
 }
