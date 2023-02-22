@@ -43,12 +43,11 @@ ScopedChild ScopedChild::New(fuchsia::component::RealmSyncPtr realm_proxy, std::
 ScopedChild ScopedChild::New(fuchsia::component::RealmSyncPtr realm_proxy, std::string collection,
                              std::string name, std::string url) {
   internal::CreateChild(realm_proxy.get(), collection, name, std::move(url));
+  fuchsia::component::decl::ChildRef child_ref{.name = std::move(name),
+                                               .collection = std::move(collection)};
   fuchsia::io::DirectorySyncPtr exposed_dir;
-  exposed_dir.Bind(internal::OpenExposedDir(
-      realm_proxy.get(),
-      fuchsia::component::decl::ChildRef{.name = name, .collection = collection}));
-  return ScopedChild(sys::ServiceDirectory::CreateFromNamespace(),
-                     fuchsia::component::decl::ChildRef{.name = name, .collection = collection},
+  exposed_dir.Bind(internal::OpenExposedDir(realm_proxy.get(), child_ref));
+  return ScopedChild(sys::ServiceDirectory::CreateFromNamespace(), std::move(child_ref),
                      std::move(exposed_dir));
 }
 
@@ -57,13 +56,11 @@ ScopedChild ScopedChild::New(std::string collection, std::string name, std::stri
   fuchsia::component::RealmSyncPtr realm_proxy;
   svc->Connect(realm_proxy.NewRequest());
   internal::CreateChild(realm_proxy.get(), collection, name, std::move(url));
+  fuchsia::component::decl::ChildRef child_ref{.name = std::move(name),
+                                               .collection = std::move(collection)};
   fuchsia::io::DirectorySyncPtr exposed_dir;
-  exposed_dir.Bind(internal::OpenExposedDir(
-      realm_proxy.get(),
-      fuchsia::component::decl::ChildRef{.name = name, .collection = collection}));
-  return ScopedChild(svc,
-                     fuchsia::component::decl::ChildRef{.name = name, .collection = collection},
-                     std::move(exposed_dir));
+  exposed_dir.Bind(internal::OpenExposedDir(realm_proxy.get(), child_ref));
+  return ScopedChild(std::move(svc), std::move(child_ref), std::move(exposed_dir));
 }
 
 ScopedChild ScopedChild::New(std::string collection, std::string url,
