@@ -1,11 +1,7 @@
 # Updates to Security policy should be reviewed by one of the owners below.
 set noparent
 
-aarongreen@google.com
-benwright@google.com
-jsankey@google.com
-markdittmer@google.com
-zarvox@google.com
+include /src/security/OWNERS
 
 per-file build_info_allowlist_* = file: /src/sys/appmgr/OWNERS
 per-file package_resolver_allowlist_* = file: /src/sys/pkg/OWNERS
