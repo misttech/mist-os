@@ -20,8 +20,8 @@ namespace magma {
 bool SimpleAllocator::CheckGap(SimpleAllocator::Region* prev, SimpleAllocator::Region* next,
                                uint64_t align, size_t size, uint64_t* addr_out,
                                bool* continue_search_out) {
-  DASSERT(addr_out);
-  DASSERT(continue_search_out);
+  MAGMA_DASSERT(addr_out);
+  MAGMA_DASSERT(continue_search_out);
 
   uint64_t gap_begin = prev ? (prev->base + prev->size) : base();
   uint64_t gap_end;  // last byte of a gap
@@ -57,8 +57,8 @@ bool SimpleAllocator::CheckGap(SimpleAllocator::Region* prev, SimpleAllocator::R
 //////////////////////////////////////////////////////////////////////////////
 
 SimpleAllocator::Region::Region(uint64_t base_in, size_t size_in) : base(base_in), size(size_in) {
-  DASSERT(size > 0);
-  DASSERT(base + size - 1 >= base);
+  MAGMA_DASSERT(size > 0);
+  MAGMA_DASSERT(base + size - 1 >= base);
 }
 
 std::unique_ptr<SimpleAllocator> SimpleAllocator::Create(uint64_t base, size_t size) {
@@ -69,13 +69,13 @@ SimpleAllocator::SimpleAllocator(uint64_t base, size_t size) : AddressSpaceAlloc
 
 bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out) {
   DLOG("Alloc size 0x%zx align_pow2 0x%x", size, align_pow2);
-  DASSERT(addr_out);
+  MAGMA_DASSERT(addr_out);
 
   size = magma::round_up(size, magma::page_size());
   if (size == 0)
-    return DRETF(false, "can't allocate size zero");
+    return MAGMA_DRETF(false, "can't allocate size zero");
 
-  DASSERT(magma::is_page_aligned(size));
+  MAGMA_DASSERT(magma::is_page_aligned(size));
 
   const auto page_shift = magma::page_shift();
 
@@ -104,7 +104,7 @@ bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out)
     }
   }
 
-  return DRETF(false, "failed to alloc");
+  return MAGMA_DRETF(false, "failed to alloc");
 }
 
 bool SimpleAllocator::Free(uint64_t addr) {
@@ -112,7 +112,7 @@ bool SimpleAllocator::Free(uint64_t addr) {
 
   auto iter = FindRegion(addr);
   if (iter == regions_.end())
-    return DRETF(false, "couldn't find region to free");
+    return MAGMA_DRETF(false, "couldn't find region to free");
 
   regions_.erase(iter);
 
@@ -122,7 +122,7 @@ bool SimpleAllocator::Free(uint64_t addr) {
 bool SimpleAllocator::GetSize(uint64_t addr, size_t* size_out) {
   auto iter = FindRegion(addr);
   if (iter == regions_.end())
-    return DRETF(false, "couldn't find region");
+    return MAGMA_DRETF(false, "couldn't find region");
 
   *size_out = iter->size;
   return true;

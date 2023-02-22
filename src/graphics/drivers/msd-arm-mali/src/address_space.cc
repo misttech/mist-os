@@ -4,7 +4,7 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 enum LpaeEntryType : mali_pte_t {
   kLpaeEntryTypeMask = 0x3,

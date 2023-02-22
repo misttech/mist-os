@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 #include "platform_buffer.h"
 #include "platform_event.h"

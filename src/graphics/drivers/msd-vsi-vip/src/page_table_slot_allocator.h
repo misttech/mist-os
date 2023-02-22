@@ -9,7 +9,7 @@
 #include <mutex>
 #include <vector>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 // Thread-safe.
 class PageTableSlotAllocator {

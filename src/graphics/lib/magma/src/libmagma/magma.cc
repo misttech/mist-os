@@ -10,6 +10,7 @@
 
 #include "magma/magma_common_defs.h"
 #include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_connection_client.h"
 #include "platform_device_client.h"
 #include "platform_handle.h"

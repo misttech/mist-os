@@ -6,7 +6,7 @@
 #define REGISTERS_H
 
 #include "hwreg/bitfields.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "mali_register_io.h"
 #include "src/graphics/lib/magma/src/magma_util/register_io.h"
 

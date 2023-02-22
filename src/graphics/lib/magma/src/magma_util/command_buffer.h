@@ -67,7 +67,7 @@ class CommandBuffer : public MappedBatch<Context, typename GpuMapping::BufferTyp
   uint64_t GetLength() const override {
     if (batch_buffer_index() < exec_resources_.size())
       return exec_resources_[batch_buffer_index()].length;
-    DASSERT(false);
+    MAGMA_DASSERT(false);
     return 0;
   }
 
@@ -77,7 +77,7 @@ class CommandBuffer : public MappedBatch<Context, typename GpuMapping::BufferTyp
       return BufferAccessor<Buffer>::platform_buffer(
                  exec_resources_[batch_buffer_index()].buffer.get())
           ->id();
-    DASSERT(false);
+    MAGMA_DASSERT(false);
     return 0;
   }
 
@@ -88,13 +88,13 @@ class CommandBuffer : public MappedBatch<Context, typename GpuMapping::BufferTyp
 
   // Returns the GPU address of the batch buffer.
   uint64_t GetGpuAddress() const override {
-    DASSERT(prepared_to_execute_);
+    MAGMA_DASSERT(prepared_to_execute_);
     return exec_resource_mappings_[batch_buffer_index()]->gpu_addr() + batch_start_offset();
   }
 
   // Returns a read only view of the batch buffer's GPU mapping.
   const GpuMappingView* GetBatchMapping() const override {
-    DASSERT(prepared_to_execute_);
+    MAGMA_DASSERT(prepared_to_execute_);
     return exec_resource_mappings_[batch_buffer_index()].get();
   }
 
@@ -153,13 +153,13 @@ bool CommandBuffer<Context, GpuMapping>::InitializeResources(
   TRACE_DURATION("magma", "InitializeResources");
 
   if (num_resources() != resources.size())
-    return DRETF(false, "resources size mismatch");
+    return MAGMA_DRETF(false, "resources size mismatch");
 
   if (wait_semaphores.size() != wait_semaphore_count())
-    return DRETF(false, "wait semaphore count mismatch");
+    return MAGMA_DRETF(false, "wait semaphore count mismatch");
 
   if (signal_semaphores.size() != signal_semaphore_count())
-    return DRETF(false, "wait semaphore count mismatch");
+    return MAGMA_DRETF(false, "wait semaphore count mismatch");
 
   exec_resources_ = std::move(resources);
   wait_semaphores_ = std::move(wait_semaphores);
@@ -172,7 +172,7 @@ template <typename Context, typename GpuMapping>
 bool CommandBuffer<Context, GpuMapping>::PrepareForExecution() {
   locked_context_ = context_.lock();
   if (!locked_context_)
-    return DRETF(false, "context has already been deleted, aborting");
+    return MAGMA_DRETF(false, "context has already been deleted, aborting");
 
   exec_resource_mappings_.clear();
   exec_resource_mappings_.reserve(exec_resources_.size());
@@ -182,7 +182,7 @@ bool CommandBuffer<Context, GpuMapping>::PrepareForExecution() {
   if (!MapResourcesGpu(ContextAccessor<Context, AddressSpace<GpuMapping>>::exec_address_space(
                            locked_context_.get()),
                        exec_resource_mappings_))
-    return DRETF(false, "failed to map execution resources");
+    return MAGMA_DRETF(false, "failed to map execution resources");
 
   prepared_to_execute_ = true;
 
@@ -201,7 +201,7 @@ bool CommandBuffer<Context, GpuMapping>::MapResourcesGpu(
     std::shared_ptr<GpuMapping> mapping =
         address_space->FindGpuMapping(platform_buffer, res.offset, res.length);
     if (!mapping)
-      return DRETF(false, "failed to find gpu mapping for buffer %lu", platform_buffer->id());
+      return MAGMA_DRETF(false, "failed to find gpu mapping for buffer %lu", platform_buffer->id());
     DLOG("MapResourcesGpu aspace %p buffer 0x%" PRIx64 " offset 0x%" PRIx64 " length 0x%" PRIx64
          " gpu_addr 0x%" PRIx64,
          address_space.get(), platform_buffer->id(), res.offset, res.length, mapping->gpu_addr());
@@ -216,8 +216,8 @@ CommandBuffer<Context, GpuMapping>::~CommandBuffer() {
   if (!prepared_to_execute_)
     return;
 
-  uint64_t ATTRIBUTE_UNUSED current_ticks = magma::PlatformTrace::GetCurrentTicks();
-  uint64_t ATTRIBUTE_UNUSED buffer_id = GetBatchBufferId();
+  uint64_t MAGMA_ATTRIBUTE_UNUSED current_ticks = magma::PlatformTrace::GetCurrentTicks();
+  uint64_t MAGMA_ATTRIBUTE_UNUSED buffer_id = GetBatchBufferId();
 
   TRACE_DURATION("magma", "Command Buffer End");
   TRACE_VTHREAD_FLOW_STEP("magma", "command_buffer", "GPU", connection_id_, buffer_id,

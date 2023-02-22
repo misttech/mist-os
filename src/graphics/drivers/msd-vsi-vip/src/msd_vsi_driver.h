@@ -5,7 +5,7 @@
 #ifndef MSD_VSI_DRIVER_H
 #define MSD_VSI_DRIVER_H
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 
 class MsdVsiDriver : public msd_driver_t {

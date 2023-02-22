@@ -7,7 +7,7 @@
 #include "magma/magma.h"
 #include "magma/magma_sysmem.h"
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_buffer.h"
 #include "platform_semaphore.h"
 

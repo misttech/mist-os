@@ -11,9 +11,9 @@
 #include <deque>
 #include <mutex>
 
-#include <magma_util/macros.h>
 #include <magma_util/register_io.h>
 
+#include "magma_util/short_macros.h"
 #include "mali_register_io.h"
 #include "platform_semaphore.h"
 

@@ -4,7 +4,7 @@
 
 #include "render_init_batch.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 static inline uint32_t read_src(const uint32_t* batch, uint32_t offset, uint32_t batch_size) {
   DASSERT(offset < batch_size);

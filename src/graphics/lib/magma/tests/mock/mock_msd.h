@@ -26,8 +26,8 @@ class MsdMockBuffer : public msd_buffer_t {
   virtual ~MsdMockBuffer() {}
 
   static MsdMockBuffer* cast(msd_buffer_t* buf) {
-    DASSERT(buf);
-    DASSERT(buf->magic_ == kMagic);
+    MAGMA_DASSERT(buf);
+    MAGMA_DASSERT(buf->magic_ == kMagic);
     return static_cast<MsdMockBuffer*>(buf);
   }
 
@@ -55,8 +55,8 @@ class MsdMockContext : public msd_context_t {
   }
 
   static MsdMockContext* cast(msd_context_t* ctx) {
-    DASSERT(ctx);
-    DASSERT(ctx->magic_ == kMagic);
+    MAGMA_DASSERT(ctx);
+    MAGMA_DASSERT(ctx->magic_ == kMagic);
     return static_cast<MsdMockContext*>(ctx);
   }
 
@@ -81,8 +81,8 @@ class MsdMockConnection : public msd_connection_t {
   virtual void DestroyContext(MsdMockContext* ctx) {}
 
   static MsdMockConnection* cast(msd_connection_t* connection) {
-    DASSERT(connection);
-    DASSERT(connection->magic_ == kMagic);
+    MAGMA_DASSERT(connection);
+    MAGMA_DASSERT(connection->magic_ == kMagic);
     return static_cast<MsdMockConnection*>(connection);
   }
 
@@ -99,8 +99,8 @@ class MsdMockDevice : public msd_device_t {
   virtual uint32_t GetDeviceId() { return 0; }
 
   static MsdMockDevice* cast(msd_device_t* dev) {
-    DASSERT(dev);
-    DASSERT(dev->magic_ == kMagic);
+    MAGMA_DASSERT(dev);
+    MAGMA_DASSERT(dev->magic_ == kMagic);
     return static_cast<MsdMockDevice*>(dev);
   }
 
@@ -118,8 +118,8 @@ class MsdMockDriver : public msd_driver_t {
   virtual void DestroyDevice(MsdMockDevice* dev) { delete dev; }
 
   static MsdMockDriver* cast(msd_driver_t* drv) {
-    DASSERT(drv);
-    DASSERT(drv->magic_ == kMagic);
+    MAGMA_DASSERT(drv);
+    MAGMA_DASSERT(drv->magic_ == kMagic);
     return static_cast<MsdMockDriver*>(drv);
   }
 

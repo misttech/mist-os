@@ -4,7 +4,7 @@
 
 #include "zircon_platform_event.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 namespace magma {
 

@@ -5,7 +5,7 @@
 #ifndef MSD_ARM_SEMAPHORE_H
 #define MSD_ARM_SEMAPHORE_H
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_cc.h"
 #include "platform_semaphore.h"
 

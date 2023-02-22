@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 #include <magma_util/instruction_writer.h>
-#include <magma_util/macros.h>
+#include <magma_util/short_macros.h>
 
 #include "types.h"
 

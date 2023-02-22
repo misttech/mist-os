@@ -4,7 +4,7 @@
 
 #include "ppgtt.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_buffer.h"
 #include "platform_logger.h"
 #include "registers.h"

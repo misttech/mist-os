@@ -13,8 +13,8 @@ class AddressSpaceAllocator {
  public:
   // Constructs an address space ranging from address base to address base + size.
   AddressSpaceAllocator(uint64_t base, size_t size) : base_(base), size_(size) {
-    DASSERT(size > 0);
-    DASSERT(size <= UINT64_MAX - base);
+    MAGMA_DASSERT(size > 0);
+    MAGMA_DASSERT(size <= UINT64_MAX - base);
   }
 
   virtual ~AddressSpaceAllocator() = default;

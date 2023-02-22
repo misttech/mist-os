@@ -5,7 +5,7 @@
 #include <lib/mmio/mmio-buffer.h>
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_mmio.h"
 
 namespace magma {

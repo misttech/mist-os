@@ -25,9 +25,9 @@ class MsdMockBuffer : public msd::Buffer {
   ~MsdMockBuffer() override;
 
   static MsdMockBuffer* cast(msd::Buffer* buf) {
-    DASSERT(buf);
+    MAGMA_DASSERT(buf);
     auto buffer = static_cast<MsdMockBuffer*>(buf);
-    DASSERT(buffer->magic_ == kMagic);
+    MAGMA_DASSERT(buffer->magic_ == kMagic);
     return buffer;
   }
 
@@ -61,9 +61,9 @@ class MsdMockContext : public msd::Context {
   }
 
   static MsdMockContext* cast(msd::Context* ctx) {
-    DASSERT(ctx);
+    MAGMA_DASSERT(ctx);
     auto context = static_cast<MsdMockContext*>(ctx);
-    DASSERT(context->magic_ == kMagic);
+    MAGMA_DASSERT(context->magic_ == kMagic);
     return context;
   }
 
@@ -171,9 +171,9 @@ class MsdMockDriver : public msd::Driver {
                                  std::unique_ptr<msd::Semaphore>* out) override;
 
   static MsdMockDriver* cast(Driver* drv) {
-    DASSERT(drv);
+    MAGMA_DASSERT(drv);
     auto driver = static_cast<MsdMockDriver*>(drv);
-    DASSERT(driver->magic_ == kMagic);
+    MAGMA_DASSERT(driver->magic_ == kMagic);
     return driver;
   }
 

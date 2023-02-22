@@ -21,6 +21,7 @@ source_set("magma_system_tests") {
 
   deps = [
     "$magma_build_root/src/magma_util:macros",
+    "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:connection_client",
     "$magma_build_root/src/magma_util/platform:event",
     "$magma_build_root/src/sys_driver_cpp",

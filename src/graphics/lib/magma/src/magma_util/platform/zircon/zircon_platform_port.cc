@@ -7,7 +7,7 @@
 #include <lib/zx/time.h>
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "zircon/syscalls/port.h"
 
 namespace magma {

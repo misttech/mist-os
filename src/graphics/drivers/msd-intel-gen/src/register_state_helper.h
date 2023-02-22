@@ -7,7 +7,7 @@
 
 #include "device_id.h"
 #include "instructions.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "types.h"
 
 // Helper classes for initializing the register state in a context state buffer.

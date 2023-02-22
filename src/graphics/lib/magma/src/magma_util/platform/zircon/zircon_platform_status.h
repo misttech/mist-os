@@ -35,8 +35,8 @@ inline zx_status_t ToZxStatus(magma_status_t status) {
     case MAGMA_STATUS_BAD_STATE:
       return ZX_ERR_BAD_STATE;
     default:
-      DMESSAGE("No match for magma status %d", status);
-      DASSERT(false);
+      MAGMA_DMESSAGE("No match for magma status %d", status);
+      MAGMA_DASSERT(false);
       return ZX_ERR_INTERNAL;
   }
 }
@@ -65,8 +65,8 @@ inline Status FromZxStatus(zx_status_t zx_status) {
     case ZX_ERR_BAD_STATE:
       return MAGMA_STATUS_BAD_STATE;
     default:
-      DMESSAGE("No match for zx status %d", zx_status);
-      DASSERT(false);
+      MAGMA_DMESSAGE("No match for zx status %d", zx_status);
+      MAGMA_DASSERT(false);
       return MAGMA_STATUS_INTERNAL_ERROR;
   }
 }

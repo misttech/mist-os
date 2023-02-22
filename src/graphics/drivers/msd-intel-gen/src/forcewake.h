@@ -7,7 +7,7 @@
 
 #include <optional>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_intel_register_io.h"
 #include "registers.h"
 

@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "magma_util/short_macros.h"
 #include "msd.h"
 #include "platform_handle.h"
 #include "platform_semaphore.h"

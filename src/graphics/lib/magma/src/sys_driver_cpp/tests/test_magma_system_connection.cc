@@ -7,10 +7,10 @@
 #include <gtest/gtest.h>
 
 #include "magma/magma.h"
+#include "magma_util/short_macros.h"
 #include "mock/mock_msd_cc.h"
 #include "sys_driver_cpp/magma_system_connection.h"
 #include "sys_driver_cpp/magma_system_device.h"
-
 #ifdef __Fuchsia__
 #include <src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_buffer.h>
 #endif

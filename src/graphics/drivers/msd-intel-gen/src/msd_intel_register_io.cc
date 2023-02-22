@@ -5,7 +5,7 @@
 #include "msd_intel_register_io.h"
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_trace.h"
 #include "registers.h"
 

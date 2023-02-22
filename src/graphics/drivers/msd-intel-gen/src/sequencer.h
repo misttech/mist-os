@@ -5,7 +5,7 @@
 #ifndef SEQUENCER_H
 #define SEQUENCER_H
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 class Sequencer {
  public:

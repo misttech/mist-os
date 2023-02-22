@@ -4,7 +4,7 @@
 
 #include "msd_intel_semaphore.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 
 magma_status_t msd_semaphore_import(uint32_t handle, uint64_t client_id,

@@ -7,7 +7,7 @@
 
 #include <lib/zx/handle.h>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_handle.h"
 
 namespace magma {

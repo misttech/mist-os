@@ -100,7 +100,7 @@ bool GpuMappingView<Buffer>::Copy(std::vector<uint32_t>* buffer_out) const {
 
   void* data;
   if (!platform_buffer->MapCpu(&data))
-    return DRETF(false, "couldn't map buffer");
+    return MAGMA_DRETF(false, "couldn't map buffer");
 
   buffer_out->resize(platform_buffer->size());
   std::memcpy(buffer_out->data(), data, buffer_out->size());
@@ -117,13 +117,13 @@ bool GpuMapping<Buffer>::Release(
   bool success = true;
   if (address_space) {
     uint64_t addr = GpuMappingView<Buffer>::gpu_addr();
-    DASSERT(bus_mappings_.size());
+    MAGMA_DASSERT(bus_mappings_.size());
     if (!bus_mappings_[0]) {
       if (!address_space->Clear(addr, nullptr))
         success = false;
     } else {
       for (auto& bus_mapping : bus_mappings_) {
-        DASSERT(bus_mapping);
+        MAGMA_DASSERT(bus_mapping);
         if (!address_space->Clear(addr, bus_mapping.get()))
           success = false;
         addr += bus_mapping->page_count() * magma::page_size();

@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "magma/magma_common_defs.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_sysmem_connection.h"
 #include "platform_thread.h"
 

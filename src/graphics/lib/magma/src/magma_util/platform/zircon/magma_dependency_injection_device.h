@@ -12,7 +12,6 @@
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 
-#include "magma_util/macros.h"
 #include "src/graphics/lib/magma/include/msd/msd_defs.h"
 
 namespace magma {

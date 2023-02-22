@@ -6,8 +6,8 @@
 
 #include <gtest/gtest.h>
 
-#include "magma_util/macros.h"
 #include "magma_util/register_io.h"
+#include "magma_util/short_macros.h"
 #include "src/graphics/lib/magma/tests/mock/mock_mmio.h"
 
 namespace {

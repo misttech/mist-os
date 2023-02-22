@@ -27,7 +27,7 @@ class InflightList {
 
   void release(uint64_t buffer_id) {
     auto iter = std::find(buffers_.begin(), buffers_.end(), buffer_id);
-    DASSERT(iter != buffers_.end());
+    MAGMA_DASSERT(iter != buffers_.end());
     buffers_.erase(iter);
   }
 
@@ -61,9 +61,9 @@ class InflightList {
       }
       if (bytes_available == 0)
         return;
-      DASSERT(bytes_available % sizeof(uint64_t) == 0);
+      MAGMA_DASSERT(bytes_available % sizeof(uint64_t) == 0);
       for (uint32_t i = 0; i < bytes_available / sizeof(uint64_t); i++) {
-        DASSERT(is_inflight(buffer_ids[i]));
+        MAGMA_DASSERT(is_inflight(buffer_ids[i]));
         release(buffer_ids[i]);
       }
       if (!more_data)

@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 
 class MsdIntelDriver : public msd_driver_t {

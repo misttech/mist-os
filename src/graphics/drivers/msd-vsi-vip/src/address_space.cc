@@ -4,7 +4,7 @@
 
 #include "address_space.h"
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 const AddressSpace::pte_t AddressSpace::kInvalidPte =
     AddressSpace::pte_encode_unsafe(0xdead1000, false, false, true);

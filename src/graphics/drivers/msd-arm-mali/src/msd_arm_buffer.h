@@ -7,7 +7,7 @@
 
 #include <unordered_set>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_cc.h"
 #include "platform_buffer.h"
 #include "platform_event.h"

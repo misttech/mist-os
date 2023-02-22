@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#include "macros.h"
+#include "magma_util/short_macros.h"
 
 class AddressSpaceLayout {
  public:

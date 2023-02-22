@@ -6,7 +6,7 @@
 
 #include <fbl/string_printf.h>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_trace.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 

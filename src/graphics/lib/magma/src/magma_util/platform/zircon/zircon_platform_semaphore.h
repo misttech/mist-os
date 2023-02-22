@@ -7,7 +7,7 @@
 
 #include <lib/zx/event.h>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_semaphore.h"
 #include "platform_trace.h"
 

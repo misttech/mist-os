@@ -13,7 +13,7 @@
 #include <zircon/process.h>
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_mmio.h"
 #include "zircon_platform_handle.h"
 #include "zircon_platform_interrupt.h"

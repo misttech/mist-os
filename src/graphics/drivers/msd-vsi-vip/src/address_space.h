@@ -12,6 +12,7 @@
 #include "gpu_mapping.h"
 #include "macros.h"
 #include "magma_util/address_space.h"
+#include "magma_util/short_macros.h"
 #include "platform_buffer.h"
 #include "platform_bus_mapper.h"
 

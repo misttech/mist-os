@@ -40,6 +40,7 @@ source_set("src") {
     "../include",
     "//sdk/lib/fit",
     "//src/graphics/lib/magma/include:msd",
+    "//src/graphics/lib/magma/src/magma_util:short_macros",
     "//zircon/system/ulib/hwreg",
   ]
   deps = [

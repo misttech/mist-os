@@ -4,7 +4,7 @@
 
 #include "page_table_arrays.h"
 
-#include "macros.h"
+#include "magma_util/short_macros.h"
 #include "registers.h"
 
 std::unique_ptr<PageTableArrays> PageTableArrays::Create(magma::PlatformBusMapper* bus_mapper) {

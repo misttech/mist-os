@@ -6,6 +6,7 @@
 #include <lib/zx/channel.h>
 
 #include "magma_util/dlog.h"
+#include "magma_util/short_macros.h"
 #include "platform_connection_client.h"
 #include "platform_device_client.h"
 

@@ -32,26 +32,26 @@ class PlatformMmio {
   virtual uint64_t physical_address() = 0;
 
   void Write32(uint32_t val, uint64_t offset) {
-    DASSERT(offset < size());
-    DASSERT((offset & 0x3) == 0);
+    MAGMA_DASSERT(offset < size());
+    MAGMA_DASSERT((offset & 0x3) == 0);
     *reinterpret_cast<volatile uint32_t*>(addr(offset)) = val;
   }
 
   uint32_t Read32(uint64_t offset) {
-    DASSERT(offset < size());
-    DASSERT((offset & 0x3) == 0);
+    MAGMA_DASSERT(offset < size());
+    MAGMA_DASSERT((offset & 0x3) == 0);
     return *reinterpret_cast<volatile uint32_t*>(addr(offset));
   }
 
   void Write64(uint64_t val, uint64_t offset) {
-    DASSERT(offset < size());
-    DASSERT((offset & 0x7) == 0);
+    MAGMA_DASSERT(offset < size());
+    MAGMA_DASSERT((offset & 0x7) == 0);
     *reinterpret_cast<volatile uint64_t*>(addr(offset)) = val;
   }
 
   uint64_t Read64(uint64_t offset) {
-    DASSERT(offset < size());
-    DASSERT((offset & 0x7) == 0);
+    MAGMA_DASSERT(offset < size());
+    MAGMA_DASSERT((offset & 0x7) == 0);
     return *reinterpret_cast<volatile uint64_t*>(addr(offset));
   }
 
@@ -64,7 +64,7 @@ class PlatformMmio {
 
  private:
   void* addr(uint64_t offset) {
-    DASSERT(offset < size_);
+    MAGMA_DASSERT(offset < size_);
     return reinterpret_cast<uint8_t*>(addr_) + offset;
   }
 

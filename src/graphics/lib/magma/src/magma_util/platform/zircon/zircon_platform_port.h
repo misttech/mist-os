@@ -5,7 +5,7 @@
 #include <lib/zx/port.h>
 #include <zircon/syscalls/port.h>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_port.h"
 
 namespace magma {

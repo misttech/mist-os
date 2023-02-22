@@ -15,7 +15,7 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
   if (!status.ok())
     return 0;
 
-  DASSERT(result >> 32 == 0);
+  MAGMA_DASSERT(result >> 32 == 0);
   return static_cast<uint32_t>(result);
 }
 
@@ -25,7 +25,7 @@ std::shared_ptr<magma::PlatformConnection> MagmaSystemDevice::Open(
     std::unique_ptr<magma::PlatformHandle> server_notification_endpoint) {
   msd_connection_t* msd_connection = msd_device_open(device->msd_dev(), client_id);
   if (!msd_connection)
-    return DRETP(nullptr, "msd_device_open failed");
+    return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
   return magma::PlatformConnection::Create(
       std::make_unique<MagmaSystemConnection>(std::move(device),
@@ -102,12 +102,12 @@ magma_status_t MagmaSystemDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_li
   uint64_t list_size;
   magma_status_t status = msd_device_get_icd_list(msd_dev(), 0, nullptr, &list_size);
   if (status != MAGMA_STATUS_OK)
-    return DRET(status);
+    return MAGMA_DRET(status);
   icd_list_out->resize(list_size);
   status =
       msd_device_get_icd_list(msd_dev(), icd_list_out->size(), icd_list_out->data(), &list_size);
   if (status != MAGMA_STATUS_OK)
-    return DRET(status);
-  DASSERT(list_size == icd_list_out->size());
+    return MAGMA_DRET(status);
+  MAGMA_DASSERT(list_size == icd_list_out->size());
   return MAGMA_STATUS_OK;
 }

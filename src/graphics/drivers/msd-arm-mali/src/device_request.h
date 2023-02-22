@@ -10,7 +10,7 @@
 #include <memory>
 #include <optional>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "magma_util/status.h"
 #include "platform_event.h"
 

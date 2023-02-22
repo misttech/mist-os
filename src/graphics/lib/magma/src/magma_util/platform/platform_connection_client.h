@@ -90,9 +90,9 @@ class PlatformConnectionClient {
   static std::unique_ptr<magma::PlatformHandle> RetrieveAccessToken(magma::PlatformHandle* channel);
 
   static PlatformConnectionClient* cast(magma_connection_t connection) {
-    DASSERT(connection);
+    MAGMA_DASSERT(connection);
     auto client = reinterpret_cast<PlatformConnectionClient*>(connection);
-    DASSERT(client->magic_ == kMagic);
+    MAGMA_DASSERT(client->magic_ == kMagic);
     return client;
   }
 

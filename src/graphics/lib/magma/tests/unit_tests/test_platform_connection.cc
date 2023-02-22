@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "magma_util/short_macros.h"
 #include "platform_connection.h"
 #include "platform_connection_client.h"
 #include "platform_handle.h"

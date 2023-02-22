@@ -11,7 +11,7 @@
 #include <list>
 #include <vector>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/performance_counters.h"

@@ -28,16 +28,16 @@ namespace magma {
 
 static constexpr bool kDebug = MAGMA_DEBUG_INTERNAL_USE_ONLY;
 
-#define DASSERT(x)                                                                     \
+#define MAGMA_DASSERT(x)                                                               \
   do {                                                                                 \
     if (magma::kDebug && !(x)) {                                                       \
       magma::PlatformLogger::Log(magma::PlatformLogger::LOG_ERROR, __FILE__, __LINE__, \
-                                 "DASSERT: %s", #x);                                   \
+                                 "MAGMA_DASSERT: %s", #x);                             \
       abort();                                                                         \
     }                                                                                  \
   } while (0)
 
-#define DMESSAGE(format, ...)                                                                 \
+#define MAGMA_DMESSAGE(format, ...)                                                           \
   do {                                                                                        \
     if (magma::kDebug) {                                                                      \
       magma::PlatformLogger::Log(magma::PlatformLogger::LOG_INFO, __FILE__, __LINE__, format, \
@@ -47,41 +47,41 @@ static constexpr bool kDebug = MAGMA_DEBUG_INTERNAL_USE_ONLY;
 
 static constexpr bool kMagmaDretEnable = kDebug;
 
-#define DRET(ret)                                                                     \
+#define MAGMA_DRET(ret)                                                               \
   (magma::kMagmaDretEnable && (ret) != 0                                              \
    ? magma::PlatformLogger::Log(magma::PlatformLogger::LOG_ERROR, __FILE__, __LINE__, \
                                 "Returning error %" PRId64, (int64_t)(ret)),          \
    (ret) : (ret))
 
-#define DRET_MSG(ret, format, ...)                                                      \
+#define MAGMA_DRET_MSG(ret, format, ...)                                                \
   (magma::kMagmaDretEnable && (ret) != 0                                                \
    ? magma::PlatformLogger::Log(magma::PlatformLogger::LOG_ERROR, __FILE__, __LINE__,   \
                                 "Returning error %" PRId64 ": " format, (int64_t)(ret), \
                                 ##__VA_ARGS__),                                         \
    (ret) : (ret))
 
-#define DRETF(ret, format, ...)                                                       \
+#define MAGMA_DRETF(ret, format, ...)                                                 \
   (magma::kMagmaDretEnable && !(ret)                                                  \
    ? magma::PlatformLogger::Log(magma::PlatformLogger::LOG_ERROR, __FILE__, __LINE__, \
                                 "Returning false: " format, ##__VA_ARGS__),           \
    (ret) : (ret))
 
-#define DRETP(ret, format, ...)                                                       \
+#define MAGMA_DRETP(ret, format, ...)                                                 \
   (magma::kMagmaDretEnable && ((ret) == nullptr)                                      \
    ? magma::PlatformLogger::Log(magma::PlatformLogger::LOG_ERROR, __FILE__, __LINE__, \
                                 "Returning null: " format, ##__VA_ARGS__),            \
    (ret) : (ret))
 
-#define UNIMPLEMENTED(...)                \
+#define MAGMA_UNIMPLEMENTED(...)          \
   do {                                    \
     DLOG("UNIMPLEMENTED: " #__VA_ARGS__); \
-    DASSERT(false);                       \
+    MAGMA_DASSERT(false);                 \
   } while (0)
 
-#define ATTRIBUTE_UNUSED __attribute__((unused))
+#define MAGMA_ATTRIBUTE_UNUSED __attribute__((unused))
 
 static inline uint32_t to_uint32(uint64_t val) {
-  DASSERT(val <= std::numeric_limits<uint32_t>::max());
+  MAGMA_DASSERT(val <= std::numeric_limits<uint32_t>::max());
   return static_cast<uint32_t>(val);
 }
 
@@ -90,7 +90,7 @@ static inline uint32_t page_size() {
   return PAGE_SIZE;
 #else
   long page_size = sysconf(_SC_PAGESIZE);
-  DASSERT(page_size > 0);
+  MAGMA_DASSERT(page_size > 0);
   return to_uint32(page_size);
 #endif
 }
@@ -111,7 +111,7 @@ static inline uint32_t lower_32_bits(uint64_t n) { return static_cast<uint32_t>(
 
 static inline bool get_pow2(uint64_t val, uint64_t* pow2_out) {
   if (val == 0)
-    return DRETF(false, "zero is not a power of two");
+    return MAGMA_DRETF(false, "zero is not a power of two");
 
   uint64_t result = 0;
   while ((val & 1) == 0) {
@@ -119,7 +119,7 @@ static inline bool get_pow2(uint64_t val, uint64_t* pow2_out) {
     result++;
   }
   if (val >> 1)
-    return DRETF(false, "not a power of 2");
+    return MAGMA_DRETF(false, "not a power of 2");
 
   *pow2_out = result;
   return true;
@@ -133,7 +133,7 @@ static inline bool is_pow2(uint64_t val) {
 // Note, alignment must be a power of 2
 template <class T, class U>
 static inline T round_up(T val, U alignment) {
-  DASSERT(is_pow2(alignment));
+  MAGMA_DASSERT(is_pow2(alignment));
   return ((val - 1) | (alignment - 1)) + 1;
 }
 
@@ -148,7 +148,7 @@ static inline int64_t ms_to_signed_ns(uint64_t ms) {
 static inline uint64_t get_monotonic_ns() {
   timespec time;
   if (clock_gettime(CLOCK_MONOTONIC, &time) != 0) {
-    DASSERT(false);
+    MAGMA_DASSERT(false);
     return 0;
   }
   return static_cast<uint64_t>(time.tv_sec) * 1000000000ull + time.tv_nsec;

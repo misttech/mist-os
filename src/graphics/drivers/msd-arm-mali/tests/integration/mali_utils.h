@@ -9,7 +9,7 @@
 #include "magma/magma.h"
 #include "magma_arm_mali_types.h"
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 
 namespace mali_utils {

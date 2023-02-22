@@ -9,7 +9,7 @@
 
 #include "address_space.h"
 #include "gpu_mapping.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "types.h"
 
 // There is a global HWSP for each engine command streamer, and a per-process

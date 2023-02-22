@@ -9,7 +9,7 @@
 
 #include <vector>
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_buffer.h"
 #include "platform_bus_mapper.h"
 #include "src/graphics/drivers/msd-arm-mali/src/types.h"

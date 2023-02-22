@@ -16,7 +16,7 @@
 #include "forcewake.h"
 #include "magma_intel_gen_defs.h"
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_intel_semaphore.h"
 #include "platform_trace.h"
 #include "registers.h"

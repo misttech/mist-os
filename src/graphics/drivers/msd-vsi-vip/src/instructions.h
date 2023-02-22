@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 #include <magma_util/instruction_writer.h>
-#include <magma_util/macros.h>
+
+#include "magma_util/short_macros.h"
 
 // The number of dwords per instruction.
 static const uint32_t kInstructionDwords = 2;

@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev.h>
 
+#include "magma_util/short_macros.h"
 #include "platform_device.h"
 
 namespace magma {

@@ -10,7 +10,7 @@
 
 #include "command_buffer.h"
 #include "engine_command_streamer.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd.h"
 #include "msd_intel_pci_device.h"
 

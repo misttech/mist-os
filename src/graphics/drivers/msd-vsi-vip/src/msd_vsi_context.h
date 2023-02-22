@@ -8,7 +8,7 @@
 #include <memory>
 
 #include "address_space.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "mapped_batch.h"
 #include "msd.h"
 #include "msd_vsi_connection.h"

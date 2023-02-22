@@ -27,8 +27,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
   // validate batch buffer index
   if (cmd_buf->resource_count > 0 &&
       cmd_buf->batch_buffer_resource_index >= cmd_buf->resource_count)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                    "ExecuteCommandBuffer: batch buffer resource index invalid");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                          "ExecuteCommandBuffer: batch buffer resource index invalid");
 
   if (cmd_buf->resource_count == 0) {
     // These shouldn't be used.
@@ -42,8 +42,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
 
     auto buf = owner_->LookupBufferForContext(id);
     if (!buf)
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                      "ExecuteCommandBuffer: exec resource has invalid buffer handle");
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                            "ExecuteCommandBuffer: exec resource has invalid buffer handle");
 
     system_resources.push_back(buf);
     msd_resources.push_back(buf->msd_buf());
@@ -51,8 +51,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
     if (i == cmd_buf->batch_buffer_resource_index) {
       // validate batch start
       if (cmd_buf->batch_start_offset >= buf->size())
-        return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "invalid batch start offset 0x%lx",
-                        cmd_buf->batch_start_offset);
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "invalid batch start offset 0x%lx",
+                              cmd_buf->batch_start_offset);
     }
   }
 
@@ -64,16 +64,16 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
   for (uint32_t i = 0; i < cmd_buf->wait_semaphore_count; i++) {
     auto semaphore = owner_->LookupSemaphoreForContext(semaphores[i]);
     if (!semaphore)
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "wait semaphore id not found 0x%" PRIx64,
-                      semaphores[i]);
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "wait semaphore id not found 0x%" PRIx64,
+                            semaphores[i]);
     msd_wait_semaphores[i] = semaphore->msd_semaphore();
   }
   for (uint32_t i = 0; i < cmd_buf->signal_semaphore_count; i++) {
     auto semaphore =
         owner_->LookupSemaphoreForContext(semaphores[cmd_buf->wait_semaphore_count + i]);
     if (!semaphore)
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "signal semaphore id not found 0x%" PRIx64,
-                      semaphores[cmd_buf->wait_semaphore_count + i]);
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "signal semaphore id not found 0x%" PRIx64,
+                            semaphores[cmd_buf->wait_semaphore_count + i]);
     msd_signal_semaphores[i] = semaphore->msd_semaphore();
   }
 
@@ -82,8 +82,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
       msd_ctx(), cmd_buf.get(), resources.data(), msd_resources.data(), msd_wait_semaphores.data(),
       msd_signal_semaphores.data());
 
-  return DRET_MSG(result, "ExecuteCommandBuffer: msd_context_execute_command_buffer failed: %d",
-                  result);
+  return MAGMA_DRET_MSG(
+      result, "ExecuteCommandBuffer: msd_context_execute_command_buffer failed: %d", result);
 }
 
 magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_size, void* commands,
@@ -94,8 +94,8 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
   for (uint32_t i = 0; i < semaphore_count; i++) {
     auto semaphore = owner_->LookupSemaphoreForContext(semaphore_ids[i]);
     if (!semaphore)
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id not found 0x%" PRIx64,
-                      semaphore_ids[i]);
+      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id not found 0x%" PRIx64,
+                            semaphore_ids[i]);
     msd_semaphores[i] = semaphore->msd_semaphore();
     // This is used to connect with command submission in
     // src/ui/scenic/lib/gfx/engine/engine.cc and
@@ -105,7 +105,7 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
   magma_status_t result = msd_context_execute_immediate_commands(
       msd_ctx(), commands_size, commands, semaphore_count, msd_semaphores.data());
 
-  return DRET_MSG(result,
-                  "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",
-                  result);
+  return MAGMA_DRET_MSG(
+      result, "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",
+      result);
 }

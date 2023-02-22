@@ -15,7 +15,7 @@
 #include "forcewake.h"
 #include "gtt.h"
 #include "interrupt_manager.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "magma_util/thread.h"
 #include "msd.h"
 #include "msd_intel_connection.h"

@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "magma_util/dlog.h"
+#include "magma_util/short_macros.h"
 #include "magma_util/simple_allocator.h"
 
 #define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))

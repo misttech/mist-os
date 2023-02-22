@@ -51,7 +51,7 @@ class PlatformSemaphore : public PlatformObject {
   std::unique_ptr<PlatformSemaphore> Clone() {
     uint32_t handle;
     if (!duplicate_handle(&handle))
-      return DRETP(nullptr, "failed to duplicate handle");
+      return MAGMA_DRETP(nullptr, "failed to duplicate handle");
     return Import(handle);
   }
 

@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "address_space.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "mapped_batch.h"
 #include "msd.h"
 #include "ringbuffer.h"

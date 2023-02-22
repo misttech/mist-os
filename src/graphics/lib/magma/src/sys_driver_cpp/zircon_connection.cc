@@ -79,7 +79,7 @@ class ZirconPlatformPerfCountPool : public PlatformPerfCountPool {
 
 void ZirconConnection::SetError(fidl::CompleterBase* completer, magma_status_t error) {
   if (!error_) {
-    error_ = DRET_MSG(error, "ZirconConnection encountered dispatcher error");
+    error_ = MAGMA_DRET_MSG(error, "ZirconConnection encountered dispatcher error");
     if (completer) {
       completer->Close(magma::ToZxStatus(error));
     } else {
@@ -165,7 +165,7 @@ void ZirconConnection::ContextKilled() {
 }
 
 void ZirconConnection::PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) {
-  DASSERT(false);
+  MAGMA_DASSERT(false);
 }
 
 void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
@@ -173,7 +173,7 @@ void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
                                   void* wait_context, zx::unowned_handle handle) {
   async::PostTask(async_loop_.dispatcher(), [this, starter, completer, wait_context,
                                              handle = handle->get()]() mutable {
-    DASSERT(handle != ZX_HANDLE_INVALID);
+    MAGMA_DASSERT(handle != ZX_HANDLE_INVALID);
 
     auto wait_ptr = std::make_unique<AsyncHandleWait>(completer, wait_context, handle);
 
@@ -190,7 +190,7 @@ void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
 void ZirconConnection::HandleWaitCancel(void* cancel_token) {
   async::PostTask(async_loop_.dispatcher(), [this, cancel_token]() {
     auto wait_ptr = reinterpret_cast<AsyncHandleWait*>(cancel_token);
-    DASSERT(wait_ptr);
+    MAGMA_DASSERT(wait_ptr);
 
     zx_status_t status = async_cancel_wait(async_loop()->dispatcher(), wait_ptr);
     if (status != ZX_OK) {
@@ -220,7 +220,8 @@ void ZirconConnection::FlowControl(uint64_t size) {
     if (result.ok()) {
       messages_consumed_ = 0;
     } else if (!result.is_canceled() && !result.is_peer_closed()) {
-      DMESSAGE("SendOnNotifyMessagesConsumedEvent failed: %s", result.FormatDescription().c_str());
+      MAGMA_DMESSAGE("SendOnNotifyMessagesConsumedEvent failed: %s",
+                     result.FormatDescription().c_str());
     }
   }
 
@@ -230,7 +231,8 @@ void ZirconConnection::FlowControl(uint64_t size) {
     if (result.ok()) {
       bytes_imported_ = 0;
     } else if (!result.is_canceled() && !result.is_peer_closed()) {
-      DMESSAGE("SendOnNotifyMemoryImportedEvent failed: %s", result.FormatDescription().c_str());
+      MAGMA_DMESSAGE("SendOnNotifyMemoryImportedEvent failed: %s",
+                     result.FormatDescription().c_str());
     }
   }
 }
@@ -519,13 +521,13 @@ std::shared_ptr<ZirconConnection> ZirconConnection::Create(
     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   if (!delegate)
-    return DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
+    return MAGMA_DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
   auto connection =
       std::make_shared<ZirconConnection>(std::move(delegate), client_id, std::move(notification));
 
   if (!connection->Bind(std::move(primary)))
-    return DRETP(nullptr, "Bind failed");
+    return MAGMA_DRETP(nullptr, "Bind failed");
 
   return connection;
 }

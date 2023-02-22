@@ -10,7 +10,7 @@
 
 #include "device_id.h"
 #include "hwreg/bitfields.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_intel_register_io.h"
 #include "types.h"
 

@@ -714,24 +714,24 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
   if (!endpoints.is_ok())
-    return DRETP(nullptr, "Failed to create primary endpoints");
+    return MAGMA_DRETP(nullptr, "Failed to create primary endpoints");
 
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   if (!notification_endpoints.is_ok())
-    return DRETP(nullptr, "Failed to create notification endpoints");
+    return MAGMA_DRETP(nullptr, "Failed to create notification endpoints");
 
   auto connection =
       magma::ZirconConnection::Create(std::move(delegate), 1u, std::move(endpoints->server),
                                       std::move(notification_endpoints->server));
   if (!connection)
-    return DRETP(nullptr, "failed to create PlatformConnection");
+    return MAGMA_DRETP(nullptr, "failed to create PlatformConnection");
 
   client_connection = magma::PlatformConnectionClient::Create(
       endpoints->client.channel().release(), notification_endpoints->client.TakeChannel().release(),
       shared_data->max_inflight_messages, shared_data->max_inflight_bytes);
 
   if (!client_connection)
-    return DRETP(nullptr, "failed to create PlatformConnectionClient");
+    return MAGMA_DRETP(nullptr, "failed to create PlatformConnectionClient");
 
   auto ipc_thread = std::thread(IpcThreadFunc, connection);
 

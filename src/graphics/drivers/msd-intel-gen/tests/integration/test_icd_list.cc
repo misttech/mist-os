@@ -13,7 +13,7 @@
 
 #include "helper/test_device_helper.h"
 #include "magma/magma.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 namespace {
 

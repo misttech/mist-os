@@ -149,3 +149,19 @@ source_set("ringbuffer") {
     ":macros",
   ]
 }
+
+source_set("short_macros") {
+  # The short macros should only be used in leaf code that isn't included into other consumers.
+  visibility = [
+    "//src/graphics/drivers/*",
+    "//src/graphics/lib/magma/src/libmagma:*",
+    "//src/graphics/lib/magma/src/libmagma_virt:*",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:*",
+    "//src/graphics/lib/magma/src/sys_driver_cpp/tests:*",
+    "//src/graphics/lib/magma/tests/mock:*",
+    "//src/graphics/lib/magma/tests/unit_tests:*",
+    "//third_party/imgtec-pvr-rgx-km/*",
+  ]
+  sources = [ "short_macros.h" ]
+  public_deps = [ ":macros" ]
+}

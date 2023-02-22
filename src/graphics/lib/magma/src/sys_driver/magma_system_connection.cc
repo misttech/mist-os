@@ -12,7 +12,7 @@
 MagmaSystemConnection::MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> weak_device,
                                              msd_connection_unique_ptr_t msd_connection_t)
     : device_(weak_device), msd_connection_(std::move(msd_connection_t)) {
-  DASSERT(msd_connection_);
+  MAGMA_DASSERT(msd_connection_);
 }
 
 MagmaSystemConnection::~MagmaSystemConnection() {
@@ -55,11 +55,11 @@ uint32_t MagmaSystemConnection::GetDeviceId() {
 magma::Status MagmaSystemConnection::CreateContext(uint32_t context_id) {
   auto iter = context_map_.find(context_id);
   if (iter != context_map_.end())
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to add context with duplicate id");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to add context with duplicate id");
 
   auto msd_ctx = msd_connection_create_context(msd_connection());
   if (!msd_ctx)
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create msd context");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create msd context");
 
   auto ctx = std::unique_ptr<MagmaSystemContext>(
       new MagmaSystemContext(this, msd_context_unique_ptr_t(msd_ctx, &msd_context_destroy)));
@@ -71,8 +71,8 @@ magma::Status MagmaSystemConnection::CreateContext(uint32_t context_id) {
 magma::Status MagmaSystemConnection::DestroyContext(uint32_t context_id) {
   auto iter = context_map_.find(context_id);
   if (iter == context_map_.end())
-    return DRETF(MAGMA_STATUS_INVALID_ARGS,
-                 "MagmaSystemConnection:Attempting to destroy invalid context id");
+    return MAGMA_DRETF(MAGMA_STATUS_INVALID_ARGS,
+                       "MagmaSystemConnection:Attempting to destroy invalid context id");
 
   context_map_.erase(iter);
   return MAGMA_STATUS_OK;
@@ -81,7 +81,7 @@ magma::Status MagmaSystemConnection::DestroyContext(uint32_t context_id) {
 MagmaSystemContext* MagmaSystemConnection::LookupContext(uint32_t context_id) {
   auto iter = context_map_.find(context_id);
   if (iter == context_map_.end())
-    return DRETP(nullptr, "MagmaSystemConnection: Attempting to lookup invalid context id");
+    return MAGMA_DRETP(nullptr, "MagmaSystemConnection: Attempting to lookup invalid context id");
 
   return iter->second.get();
 }
@@ -91,8 +91,8 @@ magma::Status MagmaSystemConnection::ExecuteCommandBufferWithResources(
     std::vector<magma_exec_resource> resources, std::vector<uint64_t> semaphores) {
   auto context = LookupContext(context_id);
   if (!context)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                    "Attempting to execute command buffer on invalid context");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                          "Attempting to execute command buffer on invalid context");
 
   return context->ExecuteCommandBufferWithResources(std::move(command_buffer), std::move(resources),
                                                     std::move(semaphores));
@@ -105,8 +105,8 @@ magma::Status MagmaSystemConnection::ExecuteImmediateCommands(uint32_t context_i
                                                               uint64_t* semaphore_ids) {
   auto context = LookupContext(context_id);
   if (!context)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                    "Attempting to execute command buffer on invalid context");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                          "Attempting to execute command buffer on invalid context");
 
   return context->ExecuteImmediateCommands(commands_size, commands, semaphore_count, semaphore_ids);
 }
@@ -115,12 +115,12 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
     std::unique_ptr<magma::PlatformHandle> access_token) {
   auto device = device_.lock();
   if (!device) {
-    return DRET(MAGMA_STATUS_INTERNAL_ERROR);
+    return MAGMA_DRET(MAGMA_STATUS_INTERNAL_ERROR);
   }
   uint64_t perf_count_access_token_id = device->perf_count_access_token_id();
-  DASSERT(perf_count_access_token_id);
+  MAGMA_DASSERT(perf_count_access_token_id);
   if (!access_token) {
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
   if (access_token->global_id() != perf_count_access_token_id) {
     // This is not counted as an error, since it can happen if the client uses the event from the
@@ -136,7 +136,7 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
 magma::Status MagmaSystemConnection::ImportBuffer(uint32_t handle, uint64_t id) {
   auto buffer = magma::PlatformBuffer::Import(handle);
   if (!buffer)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import buffer");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import buffer");
 
   buffer->set_local_id(id);
 
@@ -156,7 +156,8 @@ magma::Status MagmaSystemConnection::ImportBuffer(uint32_t handle, uint64_t id) 
 magma::Status MagmaSystemConnection::ReleaseBuffer(uint64_t id) {
   auto iter = buffer_map_.find(id);
   if (iter == buffer_map_.end())
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to free invalid buffer id %lu", id);
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to free invalid buffer id %lu",
+                          id);
 
   if (--iter->second.refcount > 0)
     return MAGMA_STATUS_OK;
@@ -171,21 +172,21 @@ magma::Status MagmaSystemConnection::MapBuffer(uint64_t id, uint64_t hw_va, uint
                                                uint64_t length, uint64_t flags) {
   auto iter = buffer_map_.find(id);
   if (iter == buffer_map_.end())
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to map invalid buffer id %lu", id);
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to map invalid buffer id %lu", id);
 
   if (length + offset < length)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset overflows");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset overflows");
 
   if (length + offset > iter->second.buffer->size())
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset + length too large for buffer");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset + length too large for buffer");
 
   if (!flags)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Flags must be nonzero");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Flags must be nonzero");
 
   magma::Status status = msd_connection_map_buffer(msd_connection(), iter->second.buffer->msd_buf(),
                                                    hw_va, offset, length, flags);
   if (!status.ok())
-    return DRET_MSG(status.get(), "msd_connection_map_buffer failed");
+    return MAGMA_DRET_MSG(status.get(), "msd_connection_map_buffer failed");
 
   return MAGMA_STATUS_OK;
 }
@@ -193,12 +194,12 @@ magma::Status MagmaSystemConnection::MapBuffer(uint64_t id, uint64_t hw_va, uint
 magma::Status MagmaSystemConnection::UnmapBuffer(uint64_t id, uint64_t hw_va) {
   auto iter = buffer_map_.find(id);
   if (iter == buffer_map_.end())
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to unmap invalid buffer id");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to unmap invalid buffer id");
 
   magma::Status status =
       msd_connection_unmap_buffer(msd_connection(), iter->second.buffer->msd_buf(), hw_va);
   if (!status.ok())
-    return DRET_MSG(status.get(), "msd_connection_unmap_buffer failed");
+    return MAGMA_DRET_MSG(status.get(), "msd_connection_unmap_buffer failed");
 
   return MAGMA_STATUS_OK;
 }
@@ -207,12 +208,12 @@ magma::Status MagmaSystemConnection::BufferRangeOp(uint64_t id, uint32_t op, uin
                                                    uint64_t length) {
   auto iter = buffer_map_.find(id);
   if (iter == buffer_map_.end())
-    return DRETF(false, "Attempting to commit invalid buffer id");
+    return MAGMA_DRETF(false, "Attempting to commit invalid buffer id");
   if (start + length < start) {
-    return DRETF(false, "Offset overflows");
+    return MAGMA_DRETF(false, "Offset overflows");
   }
   if (start + length > iter->second.buffer->size()) {
-    return DRETF(false, "Page offset too large for buffer");
+    return MAGMA_DRETF(false, "Page offset too large for buffer");
   }
   return msd_connection_buffer_range_op(msd_connection(), iter->second.buffer->msd_buf(), op, start,
                                         length);
@@ -256,11 +257,11 @@ magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
                                                   magma::PlatformObject::Type object_type,
                                                   uint64_t client_id) {
   if (!client_id)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "client_id must be non zero");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "client_id must be non zero");
 
   auto device = device_.lock();
   if (!device)
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to lock device");
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to lock device");
 
   switch (object_type) {
     case magma::PlatformObject::BUFFER:
@@ -270,7 +271,7 @@ magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
       // Always import the handle to ensure it gets closed
       auto platform_sem = magma::PlatformSemaphore::Import(handle);
       if (!platform_sem)
-        return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import platform semaphore");
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import platform semaphore");
 
       platform_sem->set_local_id(client_id);
 
@@ -281,14 +282,14 @@ magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
       }
 
       auto semaphore = MagmaSystemSemaphore::Create(std::move(platform_sem));
-      DASSERT(semaphore);
+      MAGMA_DASSERT(semaphore);
 
       SemaphoreReference ref;
       ref.semaphore = std::move(semaphore);
       semaphore_map_.insert(std::make_pair(client_id, ref));
     } break;
     default:
-      return DRET(MAGMA_STATUS_INVALID_ARGS);
+      return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
 
   return MAGMA_STATUS_OK;
@@ -303,8 +304,8 @@ magma::Status MagmaSystemConnection::ReleaseObject(uint64_t object_id,
     case magma::PlatformObject::SEMAPHORE: {
       auto iter = semaphore_map_.find(object_id);
       if (iter == semaphore_map_.end())
-        return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                        "Attempting to release invalid semaphore id 0x%" PRIx64, object_id);
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                              "Attempting to release invalid semaphore id 0x%" PRIx64, object_id);
 
       if (--iter->second.refcount > 0)
         return MAGMA_STATUS_OK;
@@ -312,7 +313,7 @@ magma::Status MagmaSystemConnection::ReleaseObject(uint64_t object_id,
       semaphore_map_.erase(iter);
     } break;
     default:
-      return DRET(MAGMA_STATUS_INVALID_ARGS);
+      return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
   return MAGMA_STATUS_OK;
 }
@@ -320,7 +321,7 @@ magma::Status MagmaSystemConnection::ReleaseObject(uint64_t object_id,
 magma::Status MagmaSystemConnection::EnablePerformanceCounters(const uint64_t* counters,
                                                                uint64_t counter_count) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 
   return msd_connection_enable_performance_counters(msd_connection(), counters, counter_count);
 }
@@ -328,11 +329,11 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounters(const uint64_t* c
 magma::Status MagmaSystemConnection::CreatePerformanceCounterBufferPool(
     std::unique_ptr<magma::PlatformPerfCountPool> pool) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 
   uint64_t pool_id = pool->pool_id();
   if (pool_map_.count(pool_id))
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
 
   {
     std::lock_guard<std::mutex> lock(pool_map_mutex_);
@@ -351,11 +352,11 @@ magma::Status MagmaSystemConnection::CreatePerformanceCounterBufferPool(
 
 magma::Status MagmaSystemConnection::ReleasePerformanceCounterBufferPool(uint64_t pool_id) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 
   msd_perf_count_pool* msd_pool = LookupPerfCountPool(pool_id);
   if (!msd_pool)
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
 
   // |pool_map_mutex_| is unlocked before calling into the driver to prevent deadlocks if the driver
   // synchronously does MSD_CONNECTION_NOTIFICATION_PERFORMANCE_COUNTERS_READ_COMPLETED.
@@ -365,7 +366,7 @@ magma::Status MagmaSystemConnection::ReleasePerformanceCounterBufferPool(uint64_
     std::lock_guard<std::mutex> lock(pool_map_mutex_);
     pool_map_.erase(pool_id);
   }
-  return DRET(status);
+  return MAGMA_DRET(status);
 }
 
 magma::Status MagmaSystemConnection::AddPerformanceCounterBufferOffsetToPool(uint64_t pool_id,
@@ -373,60 +374,60 @@ magma::Status MagmaSystemConnection::AddPerformanceCounterBufferOffsetToPool(uin
                                                                              uint64_t buffer_offset,
                                                                              uint64_t buffer_size) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
   std::shared_ptr<MagmaSystemBuffer> buffer = LookupBuffer(buffer_id);
   if (!buffer) {
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
   msd_perf_count_pool* msd_pool = LookupPerfCountPool(pool_id);
   if (!msd_pool) {
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
   magma_status_t status = msd_connection_add_performance_counter_buffer_offset_to_pool(
       msd_connection(), msd_pool, buffer->msd_buf(), buffer_id, buffer_offset, buffer_size);
-  return DRET(status);
+  return MAGMA_DRET(status);
 }
 
 magma::Status MagmaSystemConnection::RemovePerformanceCounterBufferFromPool(uint64_t pool_id,
                                                                             uint64_t buffer_id) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
   std::shared_ptr<MagmaSystemBuffer> buffer = LookupBuffer(buffer_id);
   if (!buffer) {
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   }
 
   msd_perf_count_pool* msd_pool = LookupPerfCountPool(pool_id);
   if (!msd_pool)
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   magma_status_t status = msd_connection_remove_performance_counter_buffer_from_pool(
       msd_connection(), msd_pool, buffer->msd_buf());
 
-  return DRET(status);
+  return MAGMA_DRET(status);
 }
 
 magma::Status MagmaSystemConnection::DumpPerformanceCounters(uint64_t pool_id,
                                                              uint32_t trigger_id) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 
   msd_perf_count_pool* msd_pool = LookupPerfCountPool(pool_id);
   if (!msd_pool)
-    return DRET(MAGMA_STATUS_INVALID_ARGS);
+    return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
   return msd_connection_dump_performance_counters(msd_connection(), msd_pool, trigger_id);
 }
 
 magma::Status MagmaSystemConnection::ClearPerformanceCounters(const uint64_t* counters,
                                                               uint64_t counter_count) {
   if (!can_access_performance_counters_)
-    return DRET(MAGMA_STATUS_ACCESS_DENIED);
+    return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
   return msd_connection_clear_performance_counters(msd_connection(), counters, counter_count);
 }
 
 std::shared_ptr<MagmaSystemBuffer> MagmaSystemConnection::LookupBuffer(uint64_t id) {
   auto iter = buffer_map_.find(id);
   if (iter == buffer_map_.end())
-    return DRETP(nullptr, "Attempting to lookup invalid buffer id");
+    return MAGMA_DRETP(nullptr, "Attempting to lookup invalid buffer id");
 
   return iter->second.buffer;
 }
@@ -441,6 +442,6 @@ std::shared_ptr<MagmaSystemSemaphore> MagmaSystemConnection::LookupSemaphore(uin
 msd_perf_count_pool* MagmaSystemConnection::LookupPerfCountPool(uint64_t id) {
   auto it = pool_map_.find(id);
   if (it == pool_map_.end())
-    return DRETP(nullptr, "Invalid pool id %ld", id);
+    return MAGMA_DRETP(nullptr, "Invalid pool id %ld", id);
   return it->second.msd_pool;
 }

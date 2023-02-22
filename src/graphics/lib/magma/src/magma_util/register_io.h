@@ -75,7 +75,7 @@ class RegisterIo {
   };
 
   void InstallHook(std::unique_ptr<Hook> hook) {
-    DASSERT(!hook_);
+    MAGMA_DASSERT(!hook_);
     hook_ = std::move(hook);
   }
 

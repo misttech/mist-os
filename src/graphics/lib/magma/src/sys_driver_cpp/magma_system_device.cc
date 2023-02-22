@@ -15,7 +15,7 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
   if (!status.ok())
     return 0;
 
-  DASSERT(result >> 32 == 0);
+  MAGMA_DASSERT(result >> 32 == 0);
   return static_cast<uint32_t>(result);
 }
 
@@ -25,7 +25,7 @@ std::shared_ptr<magma::ZirconConnection> MagmaSystemDevice::Open(
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   std::unique_ptr<msd::Connection> msd_connection = device->msd_dev()->Open(client_id);
   if (!msd_connection)
-    return DRETP(nullptr, "msd_device_open failed");
+    return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
   return magma::ZirconConnection::Create(
       std::make_unique<MagmaSystemConnection>(std::move(device), std::move(msd_connection)),

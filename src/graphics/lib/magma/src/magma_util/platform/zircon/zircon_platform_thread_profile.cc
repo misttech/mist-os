@@ -7,7 +7,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
-#include <magma_util/macros.h>
+#include <magma_util/short_macros.h>
 
 #include "platform_thread.h"
 

@@ -5,6 +5,7 @@
 #include "magma/magma_sysmem.h"
 
 #include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_sysmem_connection.h"
 
 magma_status_t magma_sysmem_connection_import(magma_handle_t channel,

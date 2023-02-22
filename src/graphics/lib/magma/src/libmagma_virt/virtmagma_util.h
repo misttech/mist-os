@@ -12,7 +12,7 @@
 
 #include <utility>
 
-#include "src/graphics/lib/magma/src/magma_util/macros.h"
+#include "src/graphics/lib/magma/src/magma_util/short_macros.h"
 #include "virtmagma.h"
 
 inline bool virtmagma_handshake(int32_t file_descriptor) {

@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_SEQUENCER_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_SEQUENCER_H_
 
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 class Sequencer {
  public:

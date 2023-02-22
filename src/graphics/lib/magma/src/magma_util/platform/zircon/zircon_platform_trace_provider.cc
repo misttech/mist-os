@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 
 namespace magma {
 

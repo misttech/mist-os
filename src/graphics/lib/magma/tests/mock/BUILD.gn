@@ -14,6 +14,8 @@ source_set("msd") {
     "$magma_build_root/src/magma_util/platform:semaphore",
   ]
 
+  deps = [ "$magma_build_root/src/magma_util:short_macros" ]
+
   sources = [
     "mock_msd.cc",
     "mock_msd.h",
@@ -30,6 +32,8 @@ source_set("msd_cpp") {
     "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/tests/helper:platform_msd_device_helper",
   ]
+
+  deps = [ "$magma_build_root/src/magma_util:short_macros" ]
 
   sources = [
     "mock_msd_cc.cc",
@@ -64,6 +68,7 @@ source_set("magma_system") {
   deps = [
     "$magma_build_root/include:magma",
     "$magma_build_root/src/magma_util:macros",
+    "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:logger_impl",
     "$magma_build_root/src/magma_util/platform:semaphore",

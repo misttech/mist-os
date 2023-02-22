@@ -8,7 +8,7 @@
 #include <lib/ddk/driver.h>
 
 #include "magma_util/dlog.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "platform_mmio.h"
 #include "zircon_platform_bus_mapper.h"
 #include "zircon_platform_interrupt.h"

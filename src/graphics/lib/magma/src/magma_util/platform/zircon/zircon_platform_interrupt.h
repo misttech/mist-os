@@ -12,6 +12,7 @@
 
 #include <utility>
 
+#include "magma_util/short_macros.h"
 #include "platform_interrupt.h"
 
 namespace magma {

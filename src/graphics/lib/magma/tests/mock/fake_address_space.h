@@ -25,7 +25,7 @@ class FakeAllocatingAddressSpace : public AddressSpaceBase {
   uint64_t Size() const override { return size_; }
 
   bool AllocLocked(size_t size, uint8_t align_pow2, uint64_t* addr_out) override {
-    DASSERT(magma::is_page_aligned(size));
+    MAGMA_DASSERT(magma::is_page_aligned(size));
     uint64_t addr = magma::round_up(next_addr_, 1ul << align_pow2);
     allocations_[addr] = Allocation{size, true, true};
     *addr_out = addr;
@@ -67,13 +67,13 @@ class FakeAllocatingAddressSpace : public AddressSpaceBase {
 
   bool is_clear(uint64_t addr) {
     auto iter = allocations_.find(addr);
-    DASSERT(iter != allocations_.end());
+    MAGMA_DASSERT(iter != allocations_.end());
     return iter->second.clear;
   }
 
   uint64_t allocated_size(uint64_t addr) {
     auto iter = allocations_.find(addr);
-    DASSERT(iter != allocations_.end());
+    MAGMA_DASSERT(iter != allocations_.end());
     return iter->second.size;
   }
 
@@ -138,7 +138,7 @@ class FakeNonAllocatingAddressSpace : public AddressSpaceBase {
 
   uint64_t inserted_size(uint64_t addr) {
     auto iter = map_.find(addr);
-    DASSERT(iter != map_.end());
+    MAGMA_DASSERT(iter != map_.end());
     return iter->second;
   }
 

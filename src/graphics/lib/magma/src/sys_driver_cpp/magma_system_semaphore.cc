@@ -15,18 +15,18 @@ MagmaSystemSemaphore::MagmaSystemSemaphore(
 std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(
     msd::Driver* driver, std::unique_ptr<magma::PlatformSemaphore> platform_semaphore) {
   if (!platform_semaphore)
-    return DRETP(nullptr, "null platform semaphore");
+    return MAGMA_DRETP(nullptr, "null platform semaphore");
 
   uint32_t handle;
   if (!platform_semaphore->duplicate_handle(&handle))
-    return DRETP(nullptr, "failed to get duplicate handle");
+    return MAGMA_DRETP(nullptr, "failed to get duplicate handle");
 
   std::unique_ptr<msd::Semaphore> msd_semaphore;
   magma_status_t status =
       driver->ImportSemaphore(zx::event(handle), platform_semaphore->id(), &msd_semaphore);
 
   if (status != MAGMA_STATUS_OK)
-    return DRETP(nullptr, "msd_semaphore_import failed: %d", status);
+    return MAGMA_DRETP(nullptr, "msd_semaphore_import failed: %d", status);
 
   return std::unique_ptr<MagmaSystemSemaphore>(
       new MagmaSystemSemaphore(std::move(platform_semaphore), std::move(msd_semaphore)));

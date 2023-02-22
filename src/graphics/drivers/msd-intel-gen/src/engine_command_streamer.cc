@@ -8,7 +8,7 @@
 
 #include "cache_config.h"
 #include "instructions.h"
-#include "magma_util/macros.h"
+#include "magma_util/short_macros.h"
 #include "msd_intel_buffer.h"
 #include "msd_intel_connection.h"
 #include "platform_logger.h"
