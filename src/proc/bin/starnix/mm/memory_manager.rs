@@ -1649,9 +1649,13 @@ impl FileOps for ProcStatFile {
         let iter = move |_cursor, sink: &mut SeqFileBuf| {
             let command = command.as_c_str().to_str().unwrap_or("unknown");
             let mut stats = [0u64; 49];
-            stats[0] = self.task.thread_group.read().get_ppid() as u64;
-            stats[1] = self.task.thread_group.read().process_group.leader as u64;
-            stats[2] = self.task.thread_group.read().process_group.session.leader as u64;
+            {
+                let thread_group = self.task.thread_group.read();
+                stats[0] = thread_group.get_ppid() as u64;
+                stats[1] = thread_group.process_group.leader as u64;
+                stats[2] = thread_group.process_group.session.leader as u64;
+                stats[19] = thread_group.tasks.len() as u64;
+            }
             {
                 let mm_state = self.task.mm.state.read();
                 stats[24] = mm_state.stack_start.ptr() as u64;
