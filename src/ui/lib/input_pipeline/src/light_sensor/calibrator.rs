@@ -50,7 +50,7 @@ pub trait Calibrate {
 }
 
 /// Handles the calibration calculation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Calibrator<T> {
     calibration: Calibration,
     led_state: T,
@@ -106,9 +106,8 @@ where
                         backlight_brightness
                     }
                     LedType::Named(led_name) => {
-                        let light_group = match light_groups.get(&*led_name) {
-                            None => return acc,
-                            Some(light_group) => light_group,
+                        let Some(light_group) =  light_groups.get(&*led_name) else {
+                            return acc;
                         };
                         if let Some(brightness) = light_group.brightness() {
                             brightness
@@ -140,8 +139,6 @@ pub struct FactoryFileLoader {
 }
 
 impl FactoryFileLoader {
-    // TODO(fxbug.dev/100664) Remove allow once used.
-    #[allow(dead_code)]
     pub fn new(factory_store_proxy: MiscFactoryStoreProviderProxy) -> Result<Self, Error> {
         let (directory_proxy, directory_server_end) = create_proxy::<DirectoryMarker>()
             .map_err(|e| format_err!("{:?}", e))

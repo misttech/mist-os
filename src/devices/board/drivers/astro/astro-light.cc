@@ -34,7 +34,7 @@ zx_status_t Astro::LightInit() {
   metadata::LightSensorParams params = {};
   // TODO(kpt): Insert the right parameters here.
   params.integration_time_us = 711'680;
-  params.gain = 16;
+  params.gain = 64;
   params.polling_time_us = 700'000;
   device_metadata_t metadata[] = {
       {

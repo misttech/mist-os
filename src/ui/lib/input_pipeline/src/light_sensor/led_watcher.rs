@@ -87,8 +87,6 @@ impl LedWatcher {
     /// Create a new `LedWatcher` for the `light_groups` with the supplied calibration. Only the
     /// [LightGroup]s that have a corresponding calibration entry in [Calibration].`leds` will be
     /// tracked.
-    // TODO(fxbug.dev/100664) Remove allow once used.
-    #[allow(dead_code)]
     pub(crate) fn new(light_groups: Vec<LightGroupFidl>) -> Self {
         Self {
             backlight_brightness: Rc::new(RefCell::new(0.0)),
@@ -167,7 +165,7 @@ impl LedWatcher {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LedWatcherHandle {
     light_groups: Rc<RefCell<HashMap<String, LightGroup>>>,
     backlight_brightness: Rc<RefCell<f32>>,
