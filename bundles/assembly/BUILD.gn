@@ -180,9 +180,24 @@ assembly_input_bundle("kernel_args_user") {
   ]
 }
 
-# The most-common, most-basic, Assembly Input Bundle that is included by all
-# products that have an FVM (and therefore have base packages).
+########
 #
+# The /core realm AIBs
+#
+# The most-common, most-basic, Assembly Input Bundles that are included by all
+# assembled systems that include `/core`.
+
+# The most-common, most-basic, Assembly Input Bundle that is included by all
+# products that have the `/core` realm.
+#
+# This is "less than minimal".  "utility" systems include this to get a `/core`
+# realm, but do not include the `common_minimal` AIB as that brings in too much
+# functionality for these specialized systems.
+#
+assembly_input_bundle("common_core_realm") {
+  # TODO: Begin moving items here form `common_minimal`
+}
+
 # This corresponds to the "minimal" platform configuration, the most-basic
 # configuration that has pkg_resolver and pkg_cache, and can OTA itself.
 #

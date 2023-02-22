@@ -86,16 +86,22 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             (FeatureSupportLevel::Minimal, BuildType::Eng) => {
                 vec![
                     "common_bootstrap",
+                    "common_core_realm",
                     "common_minimal",
                     "common_minimal_eng",
                     "common_minimal_userdebug",
                 ]
             }
             (FeatureSupportLevel::Minimal, BuildType::UserDebug) => {
-                vec!["common_bootstrap", "common_minimal", "common_minimal_userdebug"]
+                vec![
+                    "common_bootstrap",
+                    "common_core_realm",
+                    "common_minimal",
+                    "common_minimal_userdebug",
+                ]
             }
             (FeatureSupportLevel::Minimal, BuildType::User) => {
-                vec!["common_bootstrap", "common_minimal"]
+                vec!["common_bootstrap", "common_core_realm", "common_minimal"]
             }
         } {
             builder.platform_bundle(bundle_name);

@@ -7,6 +7,7 @@
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
 PLATFORM_AIB_NAMES = [
     "common_bootstrap",
+    "common_core_realm",
     "common_minimal",
     "common_minimal_userdebug",
     "empty_live_usb",

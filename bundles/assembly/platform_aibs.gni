@@ -13,6 +13,9 @@ platform_aib_names = [
   # The bootstrap feature-set-level:
   "common_bootstrap",
 
+  # The core realm
+  "common_core_realm",
+
   # minimal feature-set-level:
   "common_minimal",
   "common_minimal_userdebug",
