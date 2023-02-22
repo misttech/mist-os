@@ -266,7 +266,7 @@ class StaticHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(StaticHtmlPixelTests, DISABLED_ValidPixelTest) {
+TEST_F(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_width_ * display_height_;
 
@@ -307,7 +307,7 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(DynamicHtmlPixelTests, DISABLED_ValidPixelTest) {
+TEST_F(DynamicHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_width_ * display_height_;
 
@@ -350,7 +350,7 @@ class VideoHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(VideoHtmlPixelTests, DISABLED_ValidPixelTest) {
+TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
   // BGRA values,
   const ui_testing::Pixel kYellow = {16, 255, 255, 255};
   const ui_testing::Pixel kRed = {26, 17, 255, 255};
