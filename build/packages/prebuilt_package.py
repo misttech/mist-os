@@ -11,16 +11,31 @@ import subprocess
 import sys
 
 
-def extract(pm, far_path, workdir, repository):
-    if not os.path.exists(workdir):
-        os.makedirs(workdir)
-    args = [pm, '-o', workdir, '-r', repository, 'expand', far_path]
-    subprocess.check_output(args, stderr=subprocess.STDOUT)
+# Extract the package into the `args.workdir` directory, and returns the
+# generated package manifest.
+def extract(args):
+    if not os.path.exists(args.workdir):
+        os.makedirs(args.workdir)
+
+    subprocess.check_call(
+        [
+            args.package_tool,
+            'package',
+            'archive',
+            'extract',
+            '-o',
+            args.workdir,
+            '--repository',
+            args.repository,
+            args.archive,
+        ])
+
+    return os.path.join(args.workdir, 'package_manifest.json')
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pm-tool', help='Path to pm tool')
+    parser.add_argument('--package-tool', help='Path to package tool')
     parser.add_argument('--name', help='Name of prebuilt package')
     parser.add_argument(
         '--archive', help='Path to archive containing prebuilt package')
@@ -29,9 +44,10 @@ def main():
 
     args = parser.parse_args()
 
-    extract(args.pm_tool, args.archive, args.workdir, args.repository)
+    package_manifest = extract(args)
 
-    with open(os.path.join(args.workdir, 'package_manifest.json')) as f:
+    # Make sure that the generated package matches the one we expected.
+    with open(package_manifest) as f:
         manifest = json.load(f)
         if manifest.get('package').get('name') != args.name:
             sys.stderr.write(

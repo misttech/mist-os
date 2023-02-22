@@ -109,6 +109,41 @@ group("non_hermetic_deps") {
     "//build/bazel/licenses:*",
     "//build/bazel/tests/*",
   ]
+
+  # FIXME(http://fxbug.dev/121915): //build/packages/prebuilt_packages.gni
+  # needs `hermetic_action_ignored_prefixes`. Remove these entries when
+  # `prebuilt_package` is hermetic.
+  visibility += [
+    "//examples/fortune:fortune_teller",
+    "//sdk/ctf/release:*",
+    "//src/cast:cast_runner_pkg",
+    "//src/chromium:chrome_pkg",
+    "//src/chromium:chromium_cast_runner_tests_cast_runner_integration_tests",
+    "//src/chromium:chromium_common_tests_base_unittests",
+    "//src/chromium:chromium_common_tests_blink_common_unittests",
+    "//src/chromium:chromium_common_tests_ipc_tests",
+    "//src/chromium:chromium_common_tests_ipc_unittests",
+    "//src/chromium:chromium_common_tests_media_unittests",
+    "//src/chromium:chromium_common_tests_mojo_unittests",
+    "//src/chromium:chromium_common_tests_skia_unittests",
+    "//src/chromium:chromium_web_engine_tests_web_engine_integration_tests",
+    "//src/chromium:chromium_web_engine_tests_web_engine_integration_tests_cfv1",
+    "//src/chromium:chromium_web_engine_tests_web_runner_integration_tests",
+    "//src/chromium:web_engine_pkg",
+    "//src/chromium:web_engine_shell_pkg",
+    "//src/chromium:web_runner_pkg",
+    "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
+    "//src/dart:dart_aot_product_runner",
+    "//src/dart:dart_aot_runner",
+    "//src/dart:dart_jit_product_runner",
+    "//src/dart:dart_jit_runner",
+    "//src/flutter:flutter_aot_product_runner",
+    "//src/flutter:flutter_aot_runner",
+    "//src/flutter:flutter_jit_product_runner",
+    "//src/flutter:flutter_jit_runner",
+    "//src/media/codec/codecs/vaapi:codec_runner_intel_gen",
+    "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
+  ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates

@@ -80,11 +80,11 @@ template("prebuilt_package") {
 
     script = "//build/packages/prebuilt_package.py"
 
-    pm = "$host_out_dir/pm"
+    package_tool = "$host_out_dir/package-tool"
 
     args = [
-      "--pm-tool",
-      rebase_path(pm, root_build_dir),
+      "--package-tool",
+      rebase_path(package_tool, root_build_dir),
       "--name",
       invoker.package_name,
       "--archive",
@@ -97,29 +97,20 @@ template("prebuilt_package") {
 
     inputs = [
       archive,
-      pm,
+      package_tool,
     ]
 
-    outputs = [
-      _out_blobs_manifest,
-      _out_blobs_json,
-      _out_package_manifest_json,
-      _out_meta_merkle,
-    ]
+    outputs = [ _out_package_manifest_json ]
 
     deps = [
       ":$define_package_metadata_target",
-      "//src/sys/pkg/bin/pm:pm_bin($host_toolchain)",
+      "//src/sys/pkg/bin/package-tool($host_toolchain)",
     ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
 
-    # Outputs seem nondeterministic, or contain timestamps.
-    # Specifically (inside PACKAGE.meta):
-    #   blobs.manifest
-    #   blobs.json
-    #   package_manifest.json
-    repeatable = false
+    # The contents of these folders is dynamic, and managed entirely by this action.
+    hermetic_action_ignored_prefixes = [ "${pkg_out_dir}/blobs" ]
   }
 }
