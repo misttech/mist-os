@@ -407,14 +407,17 @@ func Main() {
 	fidlInterfaceWatcherStats := &fidlInterfaceWatcherStats{}
 	go interfaceWatcherEventLoop(ctx, interfaceEventChan, interfacesWatcherChan, fidlInterfaceWatcherStats)
 
-	routingChangesChan := make(chan routes.RoutingTableChange, maxPendingChanges)
-	routesWatcherChan := make(chan routesGetWatcherRequest)
+	interruptChan := make(chan routeInterrupt, maxPendingInterrupts)
 	fidlRoutesWatcherMetrics := &fidlRoutesWatcherMetrics{}
-	go routesWatcherEventLoop(ctx, routesWatcherChan, routingChangesChan, fidlRoutesWatcherMetrics)
+	go routesWatcherEventLoop(ctx, interruptChan, fidlRoutesWatcherMetrics)
 
 	ns := &Netstack{
 		interfaceEventChan: interfaceEventChan,
-		routeTable:         routes.NewRouteTableWithChangesChan(routingChangesChan),
+		routeTable: routes.NewRouteTableWithOnChangeCallback(
+			func(c routes.RoutingTableChange) {
+				interruptChan <- &routingTableChange{c}
+			},
+		),
 		dnsConfig:          dns.MakeServersConfig(stk.Clock()),
 		stack:              stk,
 		stats:              stats{Stats: stk.Stats()},
@@ -653,7 +656,7 @@ func Main() {
 			},
 		)
 		getWatcherImpl := getWatcherImpl{
-			watcherChan: routesWatcherChan,
+			interruptChan: interruptChan,
 		}
 
 		stub_v4 := fnetRoutes.StateV4WithCtxStub{Impl: &getWatcherImpl}

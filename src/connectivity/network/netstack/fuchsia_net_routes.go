@@ -44,7 +44,7 @@ var _ fnetRoutes.StateV6WithCtx = (*getWatcherImpl)(nil)
 // getWatcherImpl provides implementations for fuchsia.net.routes/StateV4 and
 // fuchsia.net.routes/State.V6.
 type getWatcherImpl struct {
-	watcherChan chan<- routesGetWatcherRequest
+	interruptChan chan<- routeInterrupt
 }
 
 func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnetRoutes.StateResolveResult, error) {
@@ -131,7 +131,7 @@ func (r *getWatcherImpl) GetWatcherV4(
 	watcher fnetRoutes.WatcherV4WithCtxInterfaceRequest,
 	options fnetRoutes.WatcherOptionsV4,
 ) error {
-	r.watcherChan <- &getWatcherV4Request{
+	r.interruptChan <- &getWatcherV4Request{
 		req:     watcher,
 		options: options,
 	}
@@ -144,7 +144,7 @@ func (r *getWatcherImpl) GetWatcherV6(
 	watcher fnetRoutes.WatcherV6WithCtxInterfaceRequest,
 	options fnetRoutes.WatcherOptionsV6,
 ) error {
-	r.watcherChan <- &getWatcherV6Request{
+	r.interruptChan <- &getWatcherV6Request{
 		req:     watcher,
 		options: options,
 	}
@@ -160,7 +160,7 @@ type routesGetWatcherRequest interface {
 		cancel context.CancelFunc,
 		existingRoutes map[unboxedInstalledRoute]struct{},
 		eventsChan chan eventUnion,
-		onClose chan<- *routesWatcherImplInner,
+		onClose chan<- routeInterrupt,
 		metrics *fidlRoutesWatcherMetrics,
 	) *routesWatcherImplInner
 }
@@ -188,7 +188,7 @@ func (r *getWatcherV4Request) serve(
 	cancel context.CancelFunc,
 	existingRoutes map[unboxedInstalledRoute]struct{},
 	eventsChan chan eventUnion,
-	onClose chan<- *routesWatcherImplInner,
+	onClose chan<- routeInterrupt,
 	metrics *fidlRoutesWatcherMetrics,
 ) *routesWatcherImplInner {
 	impl := routesWatcherV4Impl{
@@ -235,7 +235,7 @@ func (r *getWatcherV6Request) serve(
 	cancel context.CancelFunc,
 	existingRoutes map[unboxedInstalledRoute]struct{},
 	eventsChan chan eventUnion,
-	onClose chan<- *routesWatcherImplInner,
+	onClose chan<- routeInterrupt,
 	metrics *fidlRoutesWatcherMetrics,
 ) *routesWatcherImplInner {
 	impl := routesWatcherV6Impl{
@@ -275,6 +275,12 @@ func (r *getWatcherV6Request) serve(
 
 	return &(impl.inner)
 }
+
+// isRouteInterrupt implements routeInterrupt.
+func (*getWatcherV4Request) isRouteInterrupt() {}
+
+// isRouteInterrupt implements routeInterrupt.
+func (*getWatcherV6Request) isRouteInterrupt() {}
 
 // routesWatcherImplInner is the implementation of a routes Watcher protocol.
 type routesWatcherImplInner struct {
@@ -412,6 +418,9 @@ func (w *routesWatcherImplInner) watch(fidlCtx fidl.Context) ([]eventUnion, erro
 	return events, err
 }
 
+// isRouteInterrupt implements routeInterrupt.
+func (*routesWatcherImplInner) isRouteInterrupt() {}
+
 // routesWatcherV4Impl and routesWatcherV6Impl wrap routesWatcherImplInner to
 // implement WatcherV4 and WatcherV6, respectively. Note that this layer of
 // indirection is necessary because both WatcherV4 and WatcherV6 expose a Watch
@@ -504,18 +513,32 @@ type eventUnion struct {
 // responsible for pulling events from the queue, thus it may back up.
 const maxPendingEventsPerClient = 5 * fnetRoutes.MaxEvents
 
-// maxPendingChanges is the maximum number of routing changes that have not yet
-// been dispatched to individual Watcher client queues. The value is somewhat
-// arbitrary because the changes are "drained" by the routesWatcherEventLoop
-// immediately; however, larger values may reduce contention between goroutines.
-const maxPendingChanges = 100
+// maxPendingInterrupts is the maximum number of interrupts that have not yet
+// been handled by the routesWatcherEventLoop. The value is somewhat arbitrary,
+// because the changes are "drained" by the routesWatcherEventLoop immediately;
+// however, larger values may reduce contention between goroutines.
+const maxPendingInterrupts = 100
+
+// routeInterrupt is a marker interface used to improve type safety in
+// routesWatcherEventLoop.
+type routeInterrupt interface {
+	isRouteInterrupt()
+}
+
+// routingTableChanged wraps routes.RoutingTableChanged so that it can implement
+// routeEvent.
+type routingTableChange struct {
+	routes.RoutingTableChange
+}
+
+// isRouteInterrupt implements routeInterrupt.
+func (*routingTableChange) isRouteInterrupt() {}
 
 // routesWatcherEventLoop is the main event loop servicing clients of the
 // fuchsia.net.routes Watcher protocols.
 func routesWatcherEventLoop(
 	ctx context.Context,
-	getWatcherChan <-chan routesGetWatcherRequest,
-	routingChangesChan <-chan routes.RoutingTableChange,
+	interruptChan chan routeInterrupt,
 	metrics *fidlRoutesWatcherMetrics,
 ) {
 	// Keep track of the current routing table state as changes are received.
@@ -527,53 +550,83 @@ func routesWatcherEventLoop(
 	// Keep track of the active Watcher implementations
 	currentWatchers := make(map[*routesWatcherImplInner]struct{})
 
-	// A channel to notify this event loop that a Watcher client has exited.
-	watcherClosedChan := make(chan *routesWatcherImplInner)
-
 	for {
 		select {
 		case <-ctx.Done():
 			_ = syslog.WarnTf(routesFidlName, "stopping routes watcher event loop")
 			// Wait for all watchers to close.
 			for len(currentWatchers) > 0 {
-				watcher := <-watcherClosedChan
-				delete(currentWatchers, watcher)
+				switch interrupt := (<-interruptChan).(type) {
+				case *routesWatcherImplInner:
+					delete(currentWatchers, interrupt)
+				case *routingTableChange, *getWatcherV4Request, *getWatcherV6Request:
+					// Ignore all other interrupts when canceled.
+				default:
+					panic(fmt.Sprintf("unknown interrupt: %T", interrupt))
+				}
 			}
 			return
-		case change := <-routingChangesChan:
-			route := fidlconv.ToInstalledRoute(change.Route)
-			unboxedRoute := unbox(route)
-			var eventType eventTag
-			// Updates routes based on the received change.
-			switch change.Change {
-			case routes.RouteAdded:
-				if _, present := currentRoutes[unboxedRoute]; present {
-					panic(fmt.Sprintf("received duplicate add event for route: %+v", change.Route))
+		case interrupt := <-interruptChan:
+			switch interrupt := interrupt.(type) {
+			case *routingTableChange:
+				route := fidlconv.ToInstalledRoute(interrupt.Route)
+				unboxedRoute := unbox(route)
+				var eventType eventTag
+				// Updates routes based on the received change.
+				switch interrupt.Change {
+				case routes.RouteAdded:
+					if _, present := currentRoutes[unboxedRoute]; present {
+						panic(fmt.Sprintf(
+							"received duplicate add event for route: %+v",
+							interrupt.Route,
+						))
+					}
+					currentRoutes[unboxedRoute] = struct{}{}
+					eventType = addedEvent
+				case routes.RouteRemoved:
+					if _, present := currentRoutes[unboxedRoute]; !present {
+						panic(fmt.Sprintf(
+							"received remove event for non-existent route: %+v",
+							interrupt.Route,
+						))
+					}
+					delete(currentRoutes, unboxedRoute)
+					eventType = removedEvent
+				default:
+					panic(fmt.Sprintf(
+						"observed unexpected routing table change :%+v",
+						interrupt.Route,
+					))
 				}
-				currentRoutes[unboxedRoute] = struct{}{}
-				eventType = addedEvent
-			case routes.RouteRemoved:
-				if _, present := currentRoutes[unboxedRoute]; !present {
-					panic(fmt.Sprintf("received remove event for non-existent route: %+v", change.Route))
+				// Notify the watchers of change
+				event := toEvent(eventType, route)
+				for watcherImpl := range currentWatchers {
+					watcherImpl.pushEvent(event)
 				}
-				delete(currentRoutes, unboxedRoute)
-				eventType = removedEvent
+			case *getWatcherV4Request, *getWatcherV6Request:
+				// NB: because we're using a case-list, Golang will keep
+				// interrupt as an routeInterrupt, instead of rebinding it to a
+				// more specific type.
+				var watcher routesGetWatcherRequest
+				var ok bool
+				if watcher, ok = interrupt.(routesGetWatcherRequest); !ok {
+					panic(fmt.Sprintf(
+						"interrupt was impossibly not a routesGetWatcherRequest: %T",
+						interrupt,
+					))
+				}
+				// Serve the new watcher client.
+				eventsChan := make(chan eventUnion, maxPendingEventsPerClient)
+				watcherCtx, cancel := context.WithCancel(ctx)
+				impl := watcher.serve(
+					watcherCtx, cancel, currentRoutes, eventsChan, interruptChan, metrics,
+				)
+				currentWatchers[impl] = struct{}{}
+			case *routesWatcherImplInner:
+				delete(currentWatchers, interrupt)
 			default:
-				panic(fmt.Sprintf("observed unexpected routing table change :%+v", change))
+				panic(fmt.Sprintf("unknown interrupt: %T", interrupt))
 			}
-			// Notify the watchers of change
-			event := toEvent(eventType, route)
-			for watcherImpl := range currentWatchers {
-				watcherImpl.pushEvent(event)
-			}
-		case watcher := <-getWatcherChan:
-			// Serve the new watcher client.
-			eventsChan := make(chan eventUnion, maxPendingEventsPerClient)
-			watcherCtx, cancel := context.WithCancel(ctx)
-			impl := watcher.serve(watcherCtx, cancel, currentRoutes, eventsChan, watcherClosedChan, metrics)
-			currentWatchers[impl] = struct{}{}
-		case watcher := <-watcherClosedChan:
-			delete(currentWatchers, watcher)
 		}
 	}
 }

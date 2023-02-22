@@ -60,19 +60,18 @@ func TestRoutesWatcherMetrics(t *testing.T) {
 	// Instantiate the routesWatcherEventLoop.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	routingChangesChan := make(chan routes.RoutingTableChange, maxPendingChanges)
-	routesWatcherChan := make(chan routesGetWatcherRequest)
+	interruptsChan := make(chan routeInterrupt, maxPendingInterrupts)
 	metrics := fidlRoutesWatcherMetrics{}
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
-		routesWatcherEventLoop(ctx, routesWatcherChan, routingChangesChan, &metrics)
+		routesWatcherEventLoop(ctx, interruptsChan, &metrics)
 		wg.Done()
 	}()
 
 	// Connect the Watcher clients, using Watch as a means to synchronize and
 	// wait for the watcher to be installed.
-	routesWatcherChan <- &getWatcherV4Request{
+	interruptsChan <- &getWatcherV4Request{
 		req:     watcher_v4_req,
 		options: fnetRoutes.WatcherOptionsV4{},
 	}
@@ -85,7 +84,7 @@ func TestRoutesWatcherMetrics(t *testing.T) {
 	if got := metrics.count_v6.Load(); got != 0 {
 		t.Errorf("got %d WatcherV6 client; expected 0", got)
 	}
-	routesWatcherChan <- &getWatcherV6Request{
+	interruptsChan <- &getWatcherV6Request{
 		req:     watcher_v6_req,
 		options: fnetRoutes.WatcherOptionsV6{},
 	}
@@ -164,15 +163,19 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 			// Instantiate the routesWatcherEventLoop.
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			// Note; don't buffer maxPendingChanges; buffering would break the
+			// Note; don't buffer maxPendingInterrupts; buffering would break the
 			// synchronization of the test and make it flaky.
-			routingChangesChan := make(chan routes.RoutingTableChange, 1)
-			routesWatcherChan := make(chan routesGetWatcherRequest)
+			interruptChan := make(chan routeInterrupt, 1)
 			metrics := fidlRoutesWatcherMetrics{}
-			go routesWatcherEventLoop(ctx, routesWatcherChan, routingChangesChan, &metrics)
+			go routesWatcherEventLoop(ctx, interruptChan, &metrics)
 
 			// Connect the Watcher client.
-			routesWatcherChan <- test.req
+			switch req := test.req.(type) {
+			case *getWatcherV4Request:
+				interruptChan <- req
+			case *getWatcherV6Request:
+				interruptChan <- req
+			}
 
 			// Add and remove a route to generate events.
 			subnet, err := tcpip.NewSubnet(test.subnet, test.subnet_mask)
@@ -193,7 +196,7 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 				} else {
 					change.Change = routes.RouteRemoved
 				}
-				routingChangesChan <- change
+				interruptChan <- &routingTableChange{change}
 			}
 
 			// Observe PEER_CLOSED on the watcher.

@@ -147,6 +147,8 @@ func (rt ExtendedRouteTable) String() string {
 	return out.String()
 }
 
+type SendRoutingTableChangeCb func(RoutingTableChange)
+
 // RoutingChangeSender queues up pending changes to the RouteTable, and
 // sends these changes to clients of the `fuchsia.net.routes.Watcher` protocols
 // once the events changes are committed into gVisor.
@@ -156,12 +158,12 @@ type routingChangeSender struct {
 	pendingChanges []RoutingTableChange
 	// A channel to forward changes in routing state to the clients of
 	// fuchsia.net.routes Watcher protocols.
-	routingChangesChan chan<- RoutingTableChange
+	onChangeCb SendRoutingTableChangeCb
 }
 
 // queueChange queues a RoutingTableChange in the RoutingChangeSender.
 func (s *routingChangeSender) queueChange(c RoutingTableChange) {
-	if s.routingChangesChan != nil {
+	if s.onChangeCb != nil {
 		s.pendingChanges = append(s.pendingChanges, c)
 	}
 }
@@ -169,11 +171,11 @@ func (s *routingChangeSender) queueChange(c RoutingTableChange) {
 // flushChanges drains the pendingChanges by sending each RoutingTableChange
 // into the RoutingChangesChan.
 func (s *routingChangeSender) flushChanges() {
-	if s.routingChangesChan == nil {
+	if s.onChangeCb == nil {
 		return
 	}
 	for _, c := range s.pendingChanges {
-		s.routingChangesChan <- c
+		s.onChangeCb(c)
 	}
 	s.pendingChanges = nil
 }
@@ -186,10 +188,10 @@ type RouteTable struct {
 	sender routingChangeSender
 }
 
-func NewRouteTableWithChangesChan(c chan<- RoutingTableChange) RouteTable {
+func NewRouteTableWithOnChangeCallback(cb SendRoutingTableChangeCb) RouteTable {
 	return RouteTable{
 		sender: routingChangeSender{
-			routingChangesChan: c,
+			onChangeCb: cb,
 		},
 	}
 }
