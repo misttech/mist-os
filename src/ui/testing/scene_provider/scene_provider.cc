@@ -135,6 +135,14 @@ void SceneProvider::PresentView(
     fuchsia::session::scene::Manager_PresentRootView_Result set_root_view_result;
     scene_manager_->PresentRootView(std::move(*view_spec.mutable_viewport_creation_token()),
                                     &set_root_view_result);
+    if (set_root_view_result.is_err()) {
+      FX_LOGS(ERROR) << "fuchsia.session.scene.Manager/PresentRootView error:"
+                     << set_root_view_result.err();
+      fuchsia::element::GraphicalPresenter_PresentView_Result result;
+      result.set_err(fuchsia::element::PresentViewError::INVALID_ARGS);
+      callback(std::move(result));
+      return;
+    }
   } else {
     FX_LOGS(FATAL) << "Invalid view spec";
   }
