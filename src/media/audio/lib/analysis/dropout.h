@@ -13,6 +13,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "src/media/audio/lib/format/audio_buffer.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
@@ -32,11 +33,11 @@ namespace media::audio {
 class PowerChecker {
  public:
   PowerChecker(int64_t rms_window_in_frames, int32_t channels, double expected_min_power_rms,
-               const std::string& tag = "")
+               const std::string_view& tag = "")
       : rms_window_in_frames_(rms_window_in_frames),
         channels_(channels),
         expected_power_rms_(expected_min_power_rms),
-        tag_(tag.empty() ? tag : tag + ": ") {
+        tag_(tag.empty() ? tag : std::string_view(std::string(tag).append(": "))) {
     Reset();
   }
 
@@ -45,25 +46,26 @@ class PowerChecker {
     running_sum_squares_ = 0.0;
   }
 
-  bool Check(const float* samples, int64_t frame_position, int64_t num_frames, bool print = false) {
+  bool Check(const float* samples, int64_t frame_position, int64_t frame_count,
+             bool print = false) {
     if (frame_position_ != frame_position) {
       Reset();
     }
-    frame_position_ = frame_position + num_frames;
+    frame_position_ = frame_position + frame_count;
 
     bool pass = true;
     // Ingest all the provided samples before leaving
-    while (num_frames) {
+    while (frame_count) {
       // Starting from any previously-retained running totals/counts, incorporate each additional
       // sample until we have enough to analyze. Stop earlier if we run out of samples.
-      while (running_window_frame_count_ < rms_window_in_frames_ && num_frames) {
+      while (running_window_frame_count_ < rms_window_in_frames_ && frame_count) {
         for (auto chan = 0; chan < channels_; ++chan) {
           auto val = *samples;
           running_sum_squares_ += (val * val);
           samples++;
         }
         running_window_frame_count_++;
-        num_frames--;
+        frame_count--;
       }
       // If we have enough to analyze, do so now and reset our running totals/counts to zero.
       // Otherwise, just ingest these values and return true.
@@ -107,7 +109,7 @@ class PowerChecker {
   const int64_t rms_window_in_frames_;
   const int32_t channels_;  // only used for display purposes
   const double expected_power_rms_;
-  const std::string tag_;
+  const std::string_view tag_;
 
   int64_t frame_position_ = 0;
   int64_t running_window_frame_count_;
@@ -124,53 +126,98 @@ class PowerChecker {
 // frames, with Check() returning false if this ever occurs. For simplicity, this class is currently
 // limited to FLOAT data only.
 class SilenceChecker {
+  static constexpr bool kOnlyLogFailureOnEnd = true;
+
  public:
   explicit SilenceChecker(int64_t max_count_silent_frames_allowed, int32_t channels,
-                          const std::string& tag = "")
+                          const std::string_view& tag = "")
       : max_silent_frames_allowed_(max_count_silent_frames_allowed),
         channels_(channels),
-        tag_(tag.empty() ? tag : tag + ": ") {}
+        tag_(tag.empty() ? tag : std::string_view(std::string(tag).append(": "))) {}
 
-  bool Check(const float* samples, int64_t frame_position, int64_t num_frames, bool print = false) {
-    if (frame_position_ != frame_position) {
+  inline void Reset(int64_t frame_position = 0, bool print = false) {
+    if (running_silent_frame_count_) {
+      if constexpr (kOnlyLogFailureOnEnd) {
+        if (running_silent_frame_count_ > max_silent_frames_allowed_ && print) {
+          LogFailure(running_silent_frames_start_, running_silent_frame_count_);
+        }
+      }
+
+      if (print) {
+        FX_LOGS(INFO) << tag_ << "Clearing running silent frames (was "
+                      << running_silent_frame_count_ << ")";
+      }
       running_silent_frame_count_ = 0;
     }
-    frame_position_ = frame_position + num_frames;
+    frame_position_ = frame_position;
+  }
 
+  bool Check(const float* samples, int64_t frame_position, int64_t frame_count,
+             bool print = false) {
+    if (frame_position_ != frame_position) {
+      if (print) {
+        FX_LOGS(INFO) << tag_ << "Changing running frame position from " << frame_position_
+                      << " to " << frame_position;
+      }
+      Reset(frame_position);
+    }
+
+    bool pass = true;
     int64_t max_silent_frames_detected = 0;
+    int64_t max_silent_frames_start = running_silent_frames_start_;
 
     // Ingest all provided samples before leaving
-    while (num_frames--) {
+    while (frame_count--) {
       // Starting from any previously-retained running count, incorporate additional silent frames.
-      bool frame_is_silent = true;
+      bool is_frame_silent = true;
       for (auto chan = 0; chan < channels_; ++chan) {
         if (samples[chan] > std::numeric_limits<float>::epsilon() ||
             samples[chan] < -std::numeric_limits<float>::epsilon()) {
-          frame_is_silent = false;
+          is_frame_silent = false;
           break;
         }
       }
-      running_silent_frame_count_ = frame_is_silent ? running_silent_frame_count_ + 1 : 0;
-      max_silent_frames_detected =
-          std::max(max_silent_frames_detected, running_silent_frame_count_);
+
+      if (is_frame_silent) {
+        if (!running_silent_frame_count_) {
+          running_silent_frames_start_ = frame_position_;
+        }
+        ++running_silent_frame_count_;
+        if (running_silent_frame_count_ > max_silent_frames_allowed_) {
+          pass = false;
+        }
+        if (running_silent_frame_count_ > max_silent_frames_detected) {
+          max_silent_frames_start = running_silent_frames_start_;
+          max_silent_frames_detected = running_silent_frame_count_;
+        }
+      } else {
+        Reset(frame_position_, print);
+      }
       samples += channels_;
+      frame_position_++;
     }
-    if (print && max_silent_frames_detected > max_silent_frames_allowed_) {
-      FX_LOGS(ERROR) << tag_ << "********* Silence detected -- measured "
-                     << max_silent_frames_detected
-                     << " consecutive silent frames (max allowed: " << max_silent_frames_allowed_
-                     << ") **********";
+    if constexpr (!kOnlyLogFailureOnEnd) {
+      if (max_silent_frames_detected > max_silent_frames_allowed_ && print) {
+        LogFailure(max_silent_frames_start, max_silent_frames_detected);
+      }
     }
-    return (max_silent_frames_detected <= max_silent_frames_allowed_);
+    return pass;
+  }
+
+  void LogFailure(int64_t max_silent_frames_start, int64_t max_silent_frames_detected) {
+    FX_LOGS(ERROR) << tag_ << "XXX  Silence detected -- measured " << max_silent_frames_detected
+                   << " consecutive silent frames (max allowed: " << max_silent_frames_allowed_
+                   << ") starting at " << max_silent_frames_start << "  XXX";
   }
 
  private:
   const int64_t max_silent_frames_allowed_;
   const int32_t channels_;
-  const std::string tag_;
+  const std::string_view tag_;
 
   int64_t frame_position_ = 0;
   int64_t running_silent_frame_count_ = 0;
+  int64_t running_silent_frames_start_;
 };
 
 }  // namespace media::audio

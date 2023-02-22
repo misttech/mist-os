@@ -99,27 +99,31 @@ TEST(DropoutDetectors, PowerChecker_Reset) {
   EXPECT_FALSE(checker.Check(&kBadValue, 10, 1, false));
 }
 
+// These test cases must be carefully written, because SilenceChecker::kOnlyLogFailureOnEnd might be
+// set, which means we don't log our ERROR message (even if Check returns false) until the silent
+// range of frames ends (even if that particular Check returns true).
 TEST(DropoutDetectors, SilenceChecker_Reset) {
   // Allow two consecutive silent frames, but not three.
   SilenceChecker checker(2, 1);
 
-  auto silent_val = 0.0f;
-  EXPECT_TRUE(checker.Check(&silent_val, 0, 1, true));
-  EXPECT_TRUE(checker.Check(&silent_val, 1, 1, true));
-  EXPECT_FALSE(checker.Check(&silent_val, 2, 1, false));
+  float bad_vals[] = {0.0f, 0.0f, 0.0f, 0.5f};
+  EXPECT_FALSE(checker.Check(bad_vals, 0, 3, false));
 
   // Ensure that the counter is NOT reset after the above failure (increments from 3 to 4).
-  EXPECT_FALSE(checker.Check(&silent_val, 3, 1, false));
+  EXPECT_FALSE(checker.Check(bad_vals, 3, 4, false));
 
-  // Ensure that the counter is reset (from 4 to 0) by position discontinuity.
-  EXPECT_TRUE(checker.Check(&silent_val, 0, 1, true));
-  EXPECT_TRUE(checker.Check(&silent_val, 1, 1, true));
+  // Ensure that the counter is reset (from 2 silent frames to 0) by position discontinuity.
+  EXPECT_TRUE(checker.Check(bad_vals, 6, 2, true));
+  EXPECT_TRUE(checker.Check(bad_vals, 0, 2, true));
 
-  // Ensure that the counter is reset (from 2 to 0) by a good value.
-  auto non_silent_val = 0.5f;
+  // Ensure that the counter is reset by a good value.
+  auto non_silent_val = bad_vals[3];
   EXPECT_TRUE(checker.Check(&non_silent_val, 2, 1, true));
-  EXPECT_TRUE(checker.Check(&silent_val, 3, 1, true));
-  EXPECT_TRUE(checker.Check(&silent_val, 4, 1, true));
+  EXPECT_TRUE(checker.Check(bad_vals, 3, 2, true));
+
+  // Ensure that the counter is reset by an explicit Reset().
+  checker.Reset(0, true);
+  EXPECT_TRUE(checker.Check(bad_vals, 0, 2, true));
 }
 
 // All samples in a frame must be silent, to qualify as a silent frame for this checker.
@@ -127,11 +131,11 @@ TEST(DropoutDetectors, SilenceChecker_EntireFrame) {
   // Allow one silent frame but not two.
   SilenceChecker checker(1, 2);
 
-  float source_data[10] = {
-      0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+  float source_data[12] = {
+      0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
   };
-  EXPECT_TRUE(checker.Check(source_data, 0, 5, true));
-  EXPECT_FALSE(checker.Check(source_data + 1, 1, 4, false));
+  EXPECT_TRUE(checker.Check(source_data, 0, 6, true));
+  EXPECT_FALSE(checker.Check(source_data + 1, 1, 5, false));
 }
 
 TEST(DropoutDetectors, SilenceChecker_Sine) {
@@ -156,13 +160,13 @@ TEST(DropoutDetectors, SilenceChecker_Sine) {
 TEST(DropoutDetectors, SilenceChecker_Epsilon) {
   SilenceChecker checker(1, 1);
 
-  auto bad_val = std::numeric_limits<float>::epsilon();
-  EXPECT_TRUE(checker.Check(&bad_val, 0, 1, true));
-  bad_val = -bad_val;
-  EXPECT_FALSE(checker.Check(&bad_val, 1, 1, false));
+  float bad_vals[] = {
+      std::numeric_limits<float>::epsilon(), -1.0f * std::numeric_limits<float>::epsilon(),
+      2.0f * std::numeric_limits<float>::epsilon(), -2.0f * std::numeric_limits<float>::epsilon()};
+  EXPECT_TRUE(checker.Check(&bad_vals[0], 0, 1, true));
+  EXPECT_FALSE(checker.Check(&bad_vals[1], 1, 2, false));
 
-  bad_val *= 2.0f;
-  EXPECT_TRUE(checker.Check(&bad_val, 2, 1, true));
+  EXPECT_TRUE(checker.Check(&bad_vals[2], 2, 2, true));
 }
 
 }  // namespace media::audio

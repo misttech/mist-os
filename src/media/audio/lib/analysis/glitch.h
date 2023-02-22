@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <limits>
+#include <string_view>
 
 #include "src/media/audio/lib/format/audio_buffer.h"
 
@@ -21,8 +22,9 @@ namespace media::audio {
 class SlopeChecker {
  public:
   SlopeChecker(int32_t samples_per_second, int32_t expected_frequency,
-               double expected_max_amplitude = 1.0, const std::string& tag = "")
-      : expected_max_amplitude_(expected_max_amplitude), tag_(tag.empty() ? tag + ": " : tag) {
+               double expected_max_amplitude = 1.0, const std::string_view& tag = "")
+      : expected_max_amplitude_(expected_max_amplitude),
+        tag_(tag.empty() ? tag : std::string_view(std::string(tag).append(": "))) {
     double samples_per_period =
         static_cast<double>(samples_per_second) / static_cast<double>(expected_frequency);
     // Max delta for a sine of this freq is the diff between vals at -1/2 smpls and +1/2 smpls.
@@ -54,7 +56,7 @@ class SlopeChecker {
 
  private:
   const double expected_max_amplitude_;
-  const std::string tag_;
+  const std::string_view tag_;
 
   double max_expected_slope_;
   std::optional<float> prev_sample_;
