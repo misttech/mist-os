@@ -12,8 +12,10 @@
 #include <iomanip>
 #include <limits>
 #include <optional>
+#include <string>
 
 #include "src/media/audio/lib/format/audio_buffer.h"
+#include "src/media/audio/lib/timeline/timeline_rate.h"
 
 namespace media::audio {
 
@@ -24,7 +26,7 @@ namespace media::audio {
 //
 // This checker includes each sample in exactly one calculation (it does not use overlapping RMS
 // windows). E.g., for a 512-sample window, the first RMS check is based on samples 0-511, and the
-// second check based on samples 512-1023 (modulo any intervening RestartRmsWindow() calls).
+// second check based on samples 512-1023 (modulo any intervening Reset() calls).
 //
 // For simplicity, this class is currently limited to FLOAT data only.
 class PowerChecker {
@@ -35,12 +37,17 @@ class PowerChecker {
         channels_(channels),
         expected_power_rms_(expected_min_power_rms),
         tag_(tag.empty() ? tag : tag + ": ") {
-    RestartRmsWindow();
+    Reset();
+  }
+
+  void Reset() {
+    running_window_frame_count_ = 0;
+    running_sum_squares_ = 0.0;
   }
 
   bool Check(const float* samples, int64_t frame_position, int64_t num_frames, bool print = false) {
     if (frame_position_ != frame_position) {
-      RestartRmsWindow();
+      Reset();
     }
     frame_position_ = frame_position + num_frames;
 
@@ -70,11 +77,11 @@ class PowerChecker {
           // success/fail calculation). If ANY of them fail, return false.
           pass = false;
           if (print) {
-            FX_LOGS(ERROR) << tag_ << "********** Dropout detected -- measured power " << std::fixed
+            FX_LOGS(ERROR) << tag_ << "********** Dropout detected. Across window of "
+                           << rms_window_in_frames_ << " frames, measured power " << std::fixed
                            << std::setprecision(6) << std::setw(8) << current_root_mean_squares
                            << " (expected " << std::fixed << std::setprecision(4) << std::setw(6)
-                           << expected_power_rms_ << ") across window of " << rms_window_in_frames_
-                           << " frames **********";
+                           << expected_power_rms_ << ") **********";
           }
         } else {
           if constexpr (kSuccessLogStride) {
@@ -90,18 +97,13 @@ class PowerChecker {
             }
           }
         }
-        RestartRmsWindow();
+        Reset();
       }
     }
     return pass;
   }
 
  private:
-  void RestartRmsWindow() {
-    running_window_frame_count_ = 0;
-    running_sum_squares_ = 0.0;
-  }
-
   const int64_t rms_window_in_frames_;
   const int32_t channels_;  // only used for display purposes
   const double expected_power_rms_;

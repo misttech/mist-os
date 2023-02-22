@@ -74,6 +74,31 @@ TEST(DropoutDetectors, PowerChecker_Sine) {
   EXPECT_TRUE(checker.Check(&buf.samples()[4], 4, 4, true)) << "samples [4] to [7]";
 }
 
+TEST(DropoutDetectors, PowerChecker_Reset) {
+  constexpr float kConstValue = 0.12345f;
+  constexpr float kBadValue = 0.01234f;
+  PowerChecker checker(3, 1, kConstValue);
+
+  // We haven't finished the next RMS window, so we won't fail yet.
+  EXPECT_TRUE(checker.Check(&kBadValue, 0, 1, true));
+  EXPECT_TRUE(checker.Check(&kBadValue, 1, 1, true));
+  EXPECT_FALSE(checker.Check(&kBadValue, 2, 1, false));
+
+  EXPECT_TRUE(checker.Check(&kBadValue, 3, 1, true));
+  EXPECT_TRUE(checker.Check(&kBadValue, 4, 1, true));
+
+  // Without Reset(), this Check() should fail.
+  checker.Reset();
+  EXPECT_TRUE(checker.Check(&kBadValue, 5, 1, true));
+  EXPECT_TRUE(checker.Check(&kBadValue, 6, 1, true));
+
+  // Because of position discontinuity, these Check()s will pass.
+  EXPECT_TRUE(checker.Check(&kBadValue, 8, 1, true));
+  EXPECT_TRUE(checker.Check(&kBadValue, 9, 1, true));
+
+  EXPECT_FALSE(checker.Check(&kBadValue, 10, 1, false));
+}
+
 TEST(DropoutDetectors, SilenceChecker_Reset) {
   // Allow two consecutive silent frames, but not three.
   SilenceChecker checker(2, 1);
