@@ -606,7 +606,7 @@ pub async fn log_impl<W: std::io::Write>(
         LogFilterCriteria::try_from_cmd(&cmd, default_log_spam_path)?,
         &mut stdout,
         LogFormatterOptions {
-            raw: cmd.raw || cmd.no_symbols,
+            raw: cmd.raw,
             display: if opts.is_machine {
                 DisplayOption::Json
             } else {

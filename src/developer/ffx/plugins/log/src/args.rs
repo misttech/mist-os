@@ -160,10 +160,6 @@ pub struct LogCommand {
     #[argh(switch)]
     pub raw: bool,
 
-    /// DEPRECATED
-    #[argh(switch)]
-    pub no_symbols: bool,
-
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -203,7 +199,6 @@ impl Default for LogCommand {
             severity: Severity::Info,
             show_metadata: false,
             raw: false,
-            no_symbols: false,
             since: None,
             since_monotonic: None,
             until: None,
