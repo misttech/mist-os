@@ -56,33 +56,3 @@ fuchsia_package_with_single_component("starnix_package") {
 
   deps = [ ":starnix_manager_bin" ]
 }
-
-if (target_cpu == "x64") {
-  fuchsia_package_with_single_component("test_galaxy") {
-    manifest = "meta/test_galaxy.cml"
-    package_name = "test_galaxy"
-    deps = [
-      ":data_tmp_target",
-      ":init",
-      ":system_image",
-    ]
-  }
-
-  resource("system_image") {
-    sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
-    outputs = [ "data/system.img" ]
-  }
-
-  resource("data_tmp_target") {
-    sources = [ "//src/proc/bin/galaxies/placeholder" ]
-    outputs = [ "data/tmp/.placeholder" ]
-  }
-
-  resource("init") {
-    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
-    out_dir = get_label_info(init_label, "root_out_dir")
-    sources = [ "${out_dir}/default_init" ]
-    outputs = [ "data/init" ]
-    deps = [ init_label ]
-  }
-}

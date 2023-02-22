@@ -283,33 +283,17 @@ zip_resource("gvisor_runfiles") {
   dest_prefix = "data/tests"
 }
 
-resource("system_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
-  outputs = [ "data/system.img" ]
-}
-
-# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
-resource("data_tmp_target") {
-  sources = [ "//src/proc/bin/galaxies/placeholder" ]
-  outputs = [ "data/tmp/.placeholder" ]
-}
-
-# The filesystem image containing tests built in the Android tree but not included in the system
-# image.
-resource("testcases_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
-  outputs = [ "data/testcases.img" ]
-}
-
 group("galaxy_resources") {
-  deps = [
-    ":data_tmp_target",
-    ":gvisor_runfiles",
-    ":system_image",
-    ":testcases_image",
-    "//src/connectivity/network/netstack:component",
-    "//src/proc/bin/starnix_manager:init",
-  ]
+  if (target_cpu == "x64") {
+    deps = [
+      ":gvisor_runfiles",
+      "//src/connectivity/network/netstack:component",
+      "//src/proc/bin/galaxies:data_tmp_target",
+      "//src/proc/bin/galaxies:default_init",
+      "//src/proc/bin/galaxies/bionic:system_image",
+      "//src/proc/bin/galaxies/bionic:testcases_image",
+    ]
+  }
 }
 
 template("gvisor_test_component") {

@@ -14,6 +14,13 @@ resource("system_image") {
   outputs = [ "data/system.img" ]
 }
 
+# The filesystem image containing tests built in the Android tree but not included in the system
+# image.
+resource("testcases_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
+  outputs = [ "data/testcases.img" ]
+}
+
 fuchsia_package_with_single_component("bionic_package") {
   manifest = "meta/bionic_galaxy.cml"
   package_name = "starbionic"

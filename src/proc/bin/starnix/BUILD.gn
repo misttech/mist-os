@@ -341,15 +341,6 @@ fuchsia_unittest_package("starnix-tests") {
   }
 }
 
-# The default init executable. Used if the starnix kernel configuration has no init.
-resource("default_init") {
-  init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
-  out_dir = get_label_info(init_label, "root_out_dir")
-  sources = [ "${out_dir}/default_init" ]
-  outputs = [ "data/init" ]
-  deps = [ init_label ]
-}
-
 fuchsia_component("starnix_kernel") {
   cm_label = ":starnix_kernel_manifest"
   deps = [ ":starnix_kernel_bin" ]
@@ -363,9 +354,11 @@ fuchsia_structured_config_values("kernel_config") {
 fuchsia_package("starnix_kernel_package") {
   package_name = "starnix_kernel"
   deps = [
-    ":default_init",
     ":kernel_config",
     ":starnix_kernel",
     ":starnix_kernel_manifest",
   ]
+  if (target_cpu == "x64") {
+    deps += [ "//src/proc/bin/galaxies:default_init" ]
+  }
 }

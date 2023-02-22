@@ -50,11 +50,6 @@ fuchsia_test_component_with_expectations("libutils_test") {
   deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
 }
 
-resource("starnix_testcases_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
-  outputs = [ "data/testcases.img" ]
-}
-
 fuchsia_test_component("init_test") {
   manifest = "meta/init_test.cml"
   deps = [ "//src/proc/tests:starnix_test" ]
@@ -73,31 +68,13 @@ fuchsia_component("boringssl_self_test64") {
   manifest = "meta/boringssl_self_test64.cml"
 }
 
-resource("system_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
-  outputs = [ "data/system.img" ]
-}
-
-# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
-resource("data_tmp_target") {
-  sources = [ "//src/proc/bin/galaxies/placeholder" ]
-  outputs = [ "data/tmp/.placeholder" ]
-}
-
-# The filesystem image containing tests built in the Android tree but not included in the system
-# image.
-resource("testcases_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
-  outputs = [ "data/testcases.img" ]
-}
-
 group("galaxy_resources") {
   if (target_cpu == "x64") {
     deps = [
-      ":data_tmp_target",
-      ":system_image",
-      ":testcases_image",
-      "//src/proc/bin/starnix_manager:init",
+      "//src/proc/bin/galaxies:data_tmp_target",
+      "//src/proc/bin/galaxies:default_init",
+      "//src/proc/bin/galaxies/bionic:system_image",
+      "//src/proc/bin/galaxies/bionic:testcases_image",
     ]
   }
 }

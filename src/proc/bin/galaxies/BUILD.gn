@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+import("//src/proc/bin/starnix/starnix.gni")
+
 group("galaxies") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
@@ -25,5 +28,22 @@ group("release") {
 group("tests") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [ "empty_galaxy" ]
+  }
+}
+
+if (target_cpu == "x64") {
+  # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+  resource("data_tmp_target") {
+    sources = [ "//src/proc/bin/galaxies/placeholder" ]
+    outputs = [ "data/tmp/.placeholder" ]
+  }
+
+  # The default init executable. Used if the starnix kernel configuration has no init.
+  resource("default_init") {
+    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
+    out_dir = get_label_info(init_label, "root_out_dir")
+    sources = [ "${out_dir}/default_init" ]
+    outputs = [ "data/init" ]
+    deps = [ init_label ]
   }
 }

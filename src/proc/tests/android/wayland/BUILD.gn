@@ -77,21 +77,11 @@ foreach(test_name, wayland_tests) {
   }
 }
 
-resource("system_image") {
-  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
-  outputs = [ "data/system.img" ]
-}
-
-resource("data_tmp_target") {
-  sources = [ "//src/proc/bin/galaxies/placeholder" ]
-  outputs = [ "data/tmp/.placeholder" ]
-}
-
 group("galaxy_resources") {
   deps = [
-    ":data_tmp_target",
-    ":system_image",
-    "//src/proc/bin/starnix_manager:init",
+    "//src/proc/bin/galaxies:data_tmp_target",
+    "//src/proc/bin/galaxies:default_init",
+    "//src/proc/bin/galaxies/bionic:system_image",
   ]
 }
 

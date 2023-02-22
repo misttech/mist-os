@@ -274,7 +274,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
       deps = [
         ":data_tmp_target",
         ":system_image",
-        "//src/proc/bin/starnix_manager:init",
+        "//src/proc/bin/galaxies:default_init",
       ]
     }
   }

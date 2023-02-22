@@ -119,23 +119,12 @@ starnix_linux_test_component("crash_test") {
   test_binary = "crash"
 }
 
-resource("system_image") {
-  sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
-  outputs = [ "data/system.img" ]
-}
-
-# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
-resource("data_tmp_target") {
-  sources = [ "//src/proc/bin/galaxies/placeholder" ]
-  outputs = [ "data/tmp/.placeholder" ]
-}
-
 group("galaxy_resources") {
   if (target_cpu == "x64") {
     deps = [
-      ":data_tmp_target",
-      ":system_image",
-      "//src/proc/bin/starnix_manager:init",
+      "//src/proc/bin/galaxies:data_tmp_target",
+      "//src/proc/bin/galaxies:default_init",
+      "//src/proc/bin/galaxies/chromiumos:system_image",
     ]
   }
 }

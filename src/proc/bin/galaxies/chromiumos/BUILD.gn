@@ -3,29 +3,15 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/proc/bin/starnix/starnix.gni")
 
 group("chromiumos") {
   deps = [ ":chromiumos_package" ]
 }
 
 if (target_cpu == "x64") {
-  resource("data_tmp_target") {
-    sources = [ "//src/proc/bin/galaxies/placeholder" ]
-    outputs = [ "data/tmp/.placeholder" ]
-  }
-
   resource("system_image") {
     sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
     outputs = [ "data/system.img" ]
-  }
-
-  resource("init") {
-    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
-    out_dir = get_label_info(init_label, "root_out_dir")
-    sources = [ "${out_dir}/default_init" ]
-    outputs = [ "data/init" ]
-    deps = [ init_label ]
   }
 }
 
@@ -36,9 +22,9 @@ fuchsia_package_with_single_component("chromiumos_package") {
 
   if (target_cpu == "x64") {
     deps = [
-      ":data_tmp_target",
-      ":init",
       ":system_image",
+      "//src/proc/bin/galaxies:data_tmp_target",
+      "//src/proc/bin/galaxies:default_init",
     ]
   }
 }
