@@ -184,18 +184,37 @@ assembly_input_bundle("kernel_args_user") {
 #
 # The /core realm AIBs
 #
-# The most-common, most-basic, Assembly Input Bundles that are included by all
-# assembled systems that include `/core`.
+# These are the Assembly Input Bundles that are included by all assembled
+# systems that include the `/core` realm.
 
-# The most-common, most-basic, Assembly Input Bundle that is included by all
-# products that have the `/core` realm.
+# core_realm
+#
+# This AIB adds the `/core` realm itself, and it's mandatory children.  The
+# other AIBs in this group add shards and optional children of `/core`.
 #
 # This is "less than minimal".  "utility" systems include this to get a `/core`
 # realm, but do not include the `common_minimal` AIB as that brings in too much
 # functionality for these specialized systems.
 #
 assembly_input_bundle("common_core_realm") {
-  # TODO: Begin moving items here form `common_minimal`
+  base_packages = [
+    # The required SWD stack artifacts to enable packages in an FVM.
+    "//src/sys/pkg/bin/pkg-cache",
+    "//src/sys/pkg/bin/pkg-resolver",
+
+    # Build-Information
+    "//src/developer/build_info:build-info-service",
+
+    # Hardware Information
+    "//src/hwinfo:hwinfo",
+
+    # System Time
+    "//src/sys/time/timekeeper",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+
+    # Other
+    "//src/sys/stash:pkg",
+  ]
 }
 
 # This corresponds to the "minimal" platform configuration, the most-basic
@@ -206,19 +225,9 @@ assembly_input_bundle("common_core_realm") {
 #
 assembly_input_bundle("common_minimal") {
   base_packages = [
-    # The required SWD stack artifacts to enable packages in an FVM.
-    "//src/sys/pkg/bin/pkg-cache",
-    "//src/sys/pkg/bin/pkg-resolver",
-
     # The SWD stack artifacts that enable OTAs
     "//src/sys/pkg/bin/system-update-committer",
     "//src/sys/pkg/bin/system-updater",
-
-    # Build-Information
-    "//src/developer/build_info:build-info-service",
-
-    # Hardware Information
-    "//src/hwinfo:hwinfo",
 
     # Diagnostics
     "//src/cobalt/bin/app:cobalt",
@@ -227,12 +236,6 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/persistence:diagnostics-persistence",
     "//src/diagnostics/kcounter:diagnostics-kcounter",
     "//src/diagnostics/sampler",
-
-    # Other
-    "//src/sys/stash:pkg",
-
-    "//src/sys/time/timekeeper",
-    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
 
     # Security
     "//src/security/bin/root_ssl_certificates",
