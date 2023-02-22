@@ -29,7 +29,6 @@ filegroup(
     srcs = [
         "bin/clang",
         "bin/clang++",
-        "bin/clang-" + constants.clang_short_version,
     ],
 )
 
