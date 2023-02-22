@@ -49,7 +49,7 @@ build_subdir="$(relpath "$project_root" . )"
 project_root_rel="$(relpath . "$project_root")"
 
 # defaults
-config="$script_dir"/fuchsia-re-client.cfg
+config="$script_dir"/fuchsia-rewrapper.cfg
 
 detected_os="$(uname -s)"
 case "$detected_os" in
@@ -69,6 +69,7 @@ PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
 # location of reclient binaries relative to output directory where build is run
 reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$PREBUILT_SUBDIR"
 
+# This script starts/stops reproxy around any command.
 auto_reproxy="$script_dir"/fuchsia-reproxy-wrap.sh
 
 usage() {
@@ -198,7 +199,6 @@ do
 done
 test -z "$prev_opt" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
 
-reproxy_cfg="$config"
 rewrapper_cfg="$config"
 
 rewrapper="$reclient_bindir"/rewrapper
@@ -276,11 +276,12 @@ rewrapped_command=(
 reproxy_prefix=()
 # Prefix to startup and stop reproxy around this single command,
 # which is needed if reproxy is not already running.
+# If you want to pass a different reproxy cfg than the default,
+# you will need to manually invoke the reproxy wrapper.
 test "$want_auto_reproxy" = 0 ||
   reproxy_prefix=(
     "$auto_reproxy"
     --bindir="$reclient_bindir"
-    --cfg="$reproxy_cfg"
     --
   )
 

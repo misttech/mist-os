@@ -43,7 +43,7 @@ fi
 project_root_rel="$(relpath . "$project_root")"
 
 # defaults
-config="$script_dir"/fuchsia-re-client.cfg
+config="$script_dir"/fuchsia-reproxy.cfg
 
 detected_os="$(uname -s)"
 case "$detected_os" in

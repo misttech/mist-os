@@ -11,7 +11,7 @@ script="$0"
 script_dir="$(dirname "$script")"
 
 # defaults
-config="$script_dir"/fuchsia-re-client.cfg
+config="$script_dir"/fuchsia-reproxy.cfg
 
 remotetool="$(which remotetool)" || {
   cat <<EOF
@@ -63,7 +63,7 @@ do
 done
 test -z "$prev_opt" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
 
-# Grab RBE action parameters from the config file.
+# Grab RBE action parameters from the reproxy config file.
 service="$(grep "^service=" "$config" | cut -d= -f2)"
 instance="$(grep "^instance=" "$config" | cut -d= -f2)"
 

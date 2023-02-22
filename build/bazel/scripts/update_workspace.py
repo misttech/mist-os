@@ -185,22 +185,32 @@ def get_fx_build_dir(fuchsia_dir):
 
 def get_reclient_config(fuchsia_dir):
     """Return reclient configuration."""
-    reclient_config_path = os.path.join(
-        fuchsia_dir, 'build', 'rbe', 'fuchsia-re-client.cfg')
+    rewrapper_config_path = os.path.join(
+        fuchsia_dir, 'build', 'rbe', 'fuchsia-rewrapper.cfg')
+    reproxy_config_path = os.path.join(
+        fuchsia_dir, 'build', 'rbe', 'fuchsia-reproxy.cfg')
 
     instance_prefix = "instance="
+    # Note: platform value is a comma-separated list of key=values.
+    # This extraction assumes that "container-image" is the only key-value.
+    # If ever there are multiple key-values, this extraction will require
+    # a little more parsing to be more robust.
     container_image_prefix = "platform=container-image="
 
     instance_name = None
     container_image = None
 
-    with open(reclient_config_path) as f:
+    with open(rewrapper_config_path) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(container_image_prefix):
+                container_image = line[len(container_image_prefix):]
+
+    with open(reproxy_config_path) as f:
         for line in f:
             line = line.strip()
             if line.startswith(instance_prefix):
                 instance_name = line[len(instance_prefix):]
-            elif line.startswith(container_image_prefix):
-                container_image = line[len(container_image_prefix):]
 
     if not instance_name:
         print(

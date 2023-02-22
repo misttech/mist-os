@@ -97,7 +97,8 @@ action("generate_main_workspace") {
     "//build/bazel/config/main_workspace_top_dir",
 
     # The script reads RBE configs
-    rbe_config_file,
+    rewrapper_config_file,
+    reproxy_config_file,
   ]
 
   deps = [
