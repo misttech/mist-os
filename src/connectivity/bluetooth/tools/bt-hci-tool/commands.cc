@@ -932,23 +932,23 @@ bool HandleWritePageScanType(const CommandData* cmd_data, const fxl::CommandLine
     return false;
   }
 
-  ::bt::hci_spec::PageScanType page_scan_type = ::bt::hci_spec::PageScanType::kStandardScan;
+  pw::bluetooth::emboss::PageScanType page_scan_type =
+      pw::bluetooth::emboss::PageScanType::STANDARD_SCAN;
   std::string type_str;
   if (cmd_line.GetOptionValue("type", &type_str)) {
     if (type_str == "standard") {
-      page_scan_type = ::bt::hci_spec::PageScanType::kStandardScan;
+      page_scan_type = pw::bluetooth::emboss::PageScanType::STANDARD_SCAN;
     } else if (type_str == "interlaced") {
-      page_scan_type = ::bt::hci_spec::PageScanType::kInterlacedScan;
+      page_scan_type = pw::bluetooth::emboss::PageScanType::INTERLACED_SCAN;
     } else {
       std::cout << "  Unrecognized type: " << type_str << std::endl;
     }
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::WritePageScanTypeCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kWritePageScanType, kPayloadSize);
-
-  packet->mutable_payload<::bt::hci_spec::WritePageScanTypeCommandParams>()->page_scan_type =
-      page_scan_type;
+  auto packet =
+      ::bt::hci::EmbossCommandPacket::New<pw::bluetooth::emboss::WritePageScanTypeCommandWriter>(
+          ::bt::hci_spec::kWritePageScanType);
+  packet.view_t().page_scan_type().Write(page_scan_type);
 
   auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
 
@@ -973,9 +973,10 @@ bool HandleReadPageScanType(const CommandData* cmd_data, const fxl::CommandLine&
       return;
     }
 
-    if (return_params->page_scan_type == ::bt::hci_spec::PageScanType::kStandardScan) {
+    if (return_params->page_scan_type == pw::bluetooth::emboss::PageScanType::STANDARD_SCAN) {
       std::cout << "  Type: standard" << std::endl;
-    } else if (return_params->page_scan_type == ::bt::hci_spec::PageScanType::kInterlacedScan) {
+    } else if (return_params->page_scan_type ==
+               pw::bluetooth::emboss::PageScanType::INTERLACED_SCAN) {
       std::cout << "  Type: interlaced" << std::endl;
     } else {
       std::cout << "  Type: unknown" << std::endl;
