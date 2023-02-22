@@ -88,7 +88,6 @@ impl InstallerFailure {
         self.reason
     }
 
-    #[cfg(test)]
     pub fn new(state_name: &'static str, reason: InstallerFailureReason) -> Self {
         Self { state_name, reason }
     }

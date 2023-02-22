@@ -11,20 +11,18 @@ use futures::{lock::Mutex, prelude::*, stream::FuturesUnordered};
 use omaha_client::{
     cup_ecdsa::StandardCupv2Handler, state_machine::StateMachineBuilder, time::StandardTimeSource,
 };
-use omaha_client_fuchsia::{http_request, install_plan, timer};
+use omaha_client_fuchsia::{app_set, http_request, installer, timer};
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{error, info};
 
 mod api_metrics;
-mod app_set;
 mod channel;
 mod cobalt;
 mod configuration;
 mod feedback_annotation;
 mod fidl;
 mod inspect;
-mod installer;
 mod metrics;
 mod observer;
 mod policy;
