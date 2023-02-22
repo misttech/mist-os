@@ -58,16 +58,24 @@ group("assembly") {
   deps = eng_platform_aib_labels
 }
 
-# The most-common, most-basic, Assembly Input Bundle that is included by all
-# products.  No product can function without these.
+########
 #
-# This corresponds to a subset the "bringup" platform configuration, the
-# most-basic configuration that can boot.
+# The /bootstrap realm AIBs
+#
+# The most-common, most-basic, Assembly Input Bundles that are included by all
+# assembled systems.  No system can function without these.
+#
+# These provide the `/bootstrap` realm and its children that are always present
+# in each of the build-types.
+#
+
+# The most-common, most-basic, AIB that is included in all assembled systems,
+# regardless of build-type.
 #
 # WARNING:  The only way to remove items from this AIB for a given product is to
 # move them to other AIBs that are included by all other products.
 #
-assembly_input_bundle("common_bringup") {
+assembly_input_bundle("common_bootstrap") {
   bootfs_files_labels = [
     "//src/bringup:bootfs",
     "//src/bringup/bin/debuglog:bootfs",
@@ -113,6 +121,7 @@ assembly_input_bundle("common_bringup") {
 
 # The virtcon AIB is included by all eng and userdebug products, and can be
 # optionally included by user products.
+#
 assembly_input_bundle("virtcon") {
   bootfs_files_labels = [
     "//src/bringup/bin/virtcon:bootfs",
@@ -132,6 +141,7 @@ assembly_input_bundle("virtcon") {
 
 # All eng build type products will include this Assembly Input Bundle.
 # These kernel args should be refactored so that the AIBs have logical names.
+#
 assembly_input_bundle("kernel_args_eng") {
   kernel_cmdline = [
     "console.shell=true",
@@ -144,6 +154,7 @@ assembly_input_bundle("kernel_args_eng") {
 
 # All userdebug build type products will include this Assembly Input Bundle.
 # These kernel args should be refactored so that the AIBs have logical names.
+#
 assembly_input_bundle("kernel_args_userdebug") {
   kernel_cmdline = [
     "console.shell=false",

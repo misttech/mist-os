@@ -235,7 +235,7 @@ if (is_fuchsia) {
   product_assembly_configuration("for-fastboot") {
     platform = {
       build_type = "user"
-      feature_set_level = "bringup"
+      feature_set_level = "bootstrap"
     }
     product = {
     }

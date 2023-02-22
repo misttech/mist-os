@@ -1,6 +1,6 @@
 {
     "platform": {
-        "feature_set_level": "bringup",
+        "feature_set_level": "bootstrap",
         "build_type": "eng"
     },
     "product": {}

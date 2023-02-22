@@ -10,8 +10,8 @@ platform_aib_names = [
   ###
   # The common platform bundles
 
-  # bringup feature-set-level:
-  "common_bringup",
+  # The bootstrap feature-set-level:
+  "common_bootstrap",
 
   # minimal feature-set-level:
   "common_minimal",

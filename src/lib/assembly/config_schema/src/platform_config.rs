@@ -104,11 +104,11 @@ pub struct PlatformConfig {
 /// be enabled on top of this most-basic level, but some features will require
 /// a higher basic level of support.
 ///
-/// These are (initially) based on the product definitions that are used to
+/// These were initially based on the product definitions that are used to
 /// provide the basis for all other products:
 ///
-/// bringup.gni
-///   +--> minimal.gni
+/// bringup.gni  (Bootstrap)
+///   +--> minimal.gni  (Minimal)
 ///         +--> core.gni
 ///               +--> (everything else)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -119,13 +119,14 @@ pub enum FeatureSupportLevel {
     #[serde(rename = "empty")]
     Empty,
 
-    /// Bootable, but serial-only.  No netstack, no storage drivers, etc.  this
-    /// is the smallest bootable system, and is primarily used for board-level
-    /// bringup.
+    /// Bootable, but serial-only.  This is only the `/bootstrap` realm.  No
+    /// netstack, no storage drivers, etc.  this is the smallest bootable system
+    /// created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
-    #[serde(rename = "bringup")]
-    Bringup,
+    #[serde(alias = "bringup")]
+    #[serde(rename = "bootstrap")]
+    Bootstrap,
 
     /// This is the smallest "full Fuchsia" configuration.  This has a netstack,
     /// can update itself, and has all the subsystems that are required to

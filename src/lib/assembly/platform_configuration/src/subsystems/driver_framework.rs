@@ -23,7 +23,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             builder.platform_bundle("driver_framework_v2");
         }
 
-        let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bringup);
+        let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
 
         builder
             .package("driver-index")

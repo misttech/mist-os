@@ -28,8 +28,8 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut archivist_config = builder.bootfs().component("meta/archivist.cm")?;
 
         match (context.build_type, context.feature_set_level) {
-            // Always clear bind_services for bringup.
-            (_, FeatureSupportLevel::Bringup) => {
+            // Always clear bind_services for bootstrap (bringup).
+            (_, FeatureSupportLevel::Bootstrap) => {
                 bind_services.clear();
             }
             // Detect isn't present on user builds.
@@ -68,7 +68,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
 
         let exception_handler_available =
-            !matches!(context.feature_set_level, FeatureSupportLevel::Bringup);
+            !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
         builder
             .package("svchost")
             .component("meta/svchost.cm")?
@@ -159,9 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn test_default_on_bringup() {
+    fn test_default_on_bootstrap() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Bringup,
+            feature_set_level: &FeatureSupportLevel::Bootstrap,
             build_type: &BuildType::Eng,
             board_info: None,
         };
