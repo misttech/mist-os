@@ -169,8 +169,8 @@ assembly_input_groups("diagnostics") {
     "//src/diagnostics/kcounter:core_shard",
     "//src/diagnostics/sampler:core_shard",
     "//src/diagnostics/log-stats:core_shard",
-    "//src/diagnostics/persistence:core_shard",
-    "//src/diagnostics/detect:core_shard",
+    "//src/diagnostics/persistence:core_shard_new",
+    "//src/diagnostics/detect:core_shard_new",
   ]
 }
 

@@ -12,7 +12,7 @@
             // time we'll be seeing the status of STARTING_UP. To avoid having a very slow test or
             // introducing flakiness, we check either OK or STARTING_UP instead of increasing
             // `timeout_seconds`. This at least will tell us that persistence started.
-            "core/diagnostics-persistence:root/fuchsia.inspect.Health:status WHERE [s] Or(s == 'OK', s == 'STARTING_UP')",
+            "core/diagnostics/persistence:root/fuchsia.inspect.Health:status WHERE [s] Or(s == 'OK', s == 'STARTING_UP')",
         ],
     },
 }

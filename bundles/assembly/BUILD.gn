@@ -324,15 +324,26 @@ assembly_input_bundle("common_minimal") {
           rebase_path(
               "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
               root_build_dir),
+          rebase_path("//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
+                      root_build_dir),
           rebase_path(
-              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
+              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard_new.cml",
               root_build_dir),
+
           rebase_path("//src/diagnostics/sampler/meta/sampler.core_shard.cml",
                       root_build_dir),
           rebase_path(
-              "//src/connectivity/network/meta/persistence.core_shard_transitional.cml",
+              "//src/connectivity/network/meta/persistence.core_shard.cml",
               root_build_dir),
         ]
+      }
+    },
+    {
+      name = "diagnostics"
+      components = {
+        diagnostics =
+            [ rebase_path("//src/diagnostics/realm/meta/diagnostics_realm.cml",
+                          root_build_dir) ]
       }
     },
   ]
@@ -378,11 +389,19 @@ assembly_input_bundle("common_minimal_userdebug") {
   base_packages = [ "//src/diagnostics/detect:triage-detect" ]
   compiled_packages = [
     {
+      name = "diagnostics"
+      component_shards = {
+        diagnostics = [ rebase_path(
+                "//src/diagnostics/detect/meta/detect.realm_shard.cml",
+                root_build_dir) ]
+      }
+    },
+    {
       name = "core"
       component_shards = {
-        core =
-            [ rebase_path("//src/diagnostics/detect/meta/detect.core_shard.cml",
-                          root_build_dir) ]
+        core = [ rebase_path(
+                "//src/diagnostics/detect/meta/detect.core_shard_new.cml",
+                root_build_dir) ]
       }
     },
   ]

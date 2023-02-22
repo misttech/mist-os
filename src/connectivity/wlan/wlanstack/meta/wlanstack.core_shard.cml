@@ -29,7 +29,7 @@
         },
         {
             protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            from: "#diagnostics-persistence",
+            from: "#diagnostics",
             to: "#wlanstack",
             source_availability: "unknown",
         },
