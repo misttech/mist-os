@@ -18,4 +18,8 @@ pub struct ListCompositesCommand {
     /// list all the properties of a composite.
     #[argh(switch, short = 'v', long = "verbose")]
     pub verbose: bool,
+
+    /// if this exists, the user will be prompted for a component to select.
+    #[argh(switch, short = 's', long = "select")]
+    pub select: bool,
 }

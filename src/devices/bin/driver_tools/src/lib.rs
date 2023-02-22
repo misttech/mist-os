@@ -74,7 +74,7 @@ pub async fn driver(
         }
         DriverSubCommand::ListComposites(subcmd) => {
             let driver_development_proxy = driver_connector
-                .get_driver_development_proxy(false)
+                .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
             subcommands::list_composites::list_composites(subcmd, writer, driver_development_proxy)
