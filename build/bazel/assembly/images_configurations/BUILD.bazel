@@ -16,7 +16,7 @@ load(
 )
 
 package(default_visibility = [
-    "//build/bazel/assembly:__pkg__",
+    "//build/bazel/assembly:__subpackages__",
     "//vendor/google:__subpackages__",
 ])
 
@@ -138,4 +138,30 @@ fuchsia_filesystem_empty_data(
 fuchsia_filesystem_reserved(
     name = "internal_reserved",
     slices = "0",
+)
+
+fuchsia_zbi(
+    name = "zedboot_zbi_default",
+    zbi_name = "zedboot",
+)
+
+fuchsia_vbmeta(
+    name = "zedboot_vbmeta_default",
+    key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
+    key_metadata =
+        "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+    vbmeta_name = "zedboot",
+)
+
+fuchsia_images_configuration(
+    name = "zedboot_default",
+    images = [
+        ":zedboot_zbi_default",
+        ":zedboot_vbmeta_default",
+    ],
+)
+
+fuchsia_images_configuration(
+    name = "zedboot_qemu",
+    images = [":zedboot_zbi_default"],
 )
