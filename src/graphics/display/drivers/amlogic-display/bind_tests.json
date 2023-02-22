@@ -1,19 +1,54 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "dsi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "S905D2 display"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY"
+                }
+            }
+        ]
+    },
+    {
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sysmem.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
+    },
+    {
+        "node": "canvas",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS"
+                }
+            }
+        ]
     }
 ]

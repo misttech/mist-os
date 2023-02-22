@@ -1,31 +1,25 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file
+// found in the LICENSE file.
 
 composite display;
 
-using fuchsia.platform;
-using fuchsia.amlogic.platform;
-using fuchsia.hardware.dsi;
+using fuchsia.hdmi;
 using fuchsia.gpio;
-using fuchsia.amlogic.platform.s905d3;
+using fuchsia.platform;
 using fuchsia.sysmem;
+using fuchsia.amlogic.platform;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
-  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
-}
-
-node "dsi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL;
 }
 
 node "gpio" {
   fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOZ_PIN_ID.PIN_13;  // GPIO_LCD_RESET
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_RESET;
 }
 
 node "sysmem" {
@@ -35,3 +29,8 @@ node "sysmem" {
 node "canvas" {
   fuchsia.BIND_PROTOCOL == fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS;
 }
+
+node "hdmi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.hdmi.BIND_PROTOCOL.DEVICE;
+}
+

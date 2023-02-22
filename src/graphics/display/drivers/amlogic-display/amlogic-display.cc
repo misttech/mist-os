@@ -33,7 +33,12 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
+#ifdef ENABLE_VIM3_DISPLAY
+#include "src/graphics/display/drivers/amlogic-display/amlogic-display-vim3-bind.h"
+#else
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display-bind.h"
+#endif
+
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"

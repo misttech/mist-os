@@ -10,14 +10,21 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/dsi/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-display-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace astro {
@@ -118,22 +125,79 @@ zx_status_t Astro::DisplayInit() {
     return dev;
   }();
 
+  auto dsi_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+  };
+
+  auto dsi_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+  };
+
+  auto gpio_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d2::GPIOH_PIN_ID_PIN_6),
+  };
+
+  auto gpio_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+  };
+
+  auto sysmem_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto sysmem_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto canvas_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+  };
+
+  auto canvas_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                        bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+  };
+
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = dsi_bind_rules,
+          .properties = dsi_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = gpio_bind_rules,
+          .properties = gpio_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = sysmem_bind_rules,
+          .properties = sysmem_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = canvas_bind_rules,
+          .properties = canvas_properties,
+      }},
+  };
+
+  auto node_group =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
+
   // TODO(payamm): Change from "dsi" to nullptr to separate DSI and Display into two different
   // driver hosts once support for it lands.
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, display_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, display_fragments,
-                                               std::size(display_fragments)),
-      "dsi");
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, display_dev),
+                                                          fidl::ToWire(fidl_arena, node_group));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Display(display_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Display(display_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

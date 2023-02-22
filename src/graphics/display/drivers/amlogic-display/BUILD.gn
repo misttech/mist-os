@@ -7,12 +7,46 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
+config("display-vim3-config") {
+  defines = [ "ENABLE_VIM3_DISPLAY" ]
+}
+
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
   header_output = "amlogic-display-bind.h"
   bind_output = "amlogic-display.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.dsi",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
+}
+
+driver_bind_rules("amlogic_display_vim3_bind") {
+  rules = "amlogic-display-vim3.bind"
+  header_output = "amlogic-display-vim3-bind.h"
+  bind_output = "amlogic-display-vim3.bindbc"
+  tests = "bind_tests_vim3.json"
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hdmi",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 source_set("common_srcs") {
@@ -21,7 +55,6 @@ source_set("common_srcs") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "amlogic-display.cc",
     "clock.cc",
     "dsi-host.cc",
     "hdmi-host.cc",
@@ -34,7 +67,6 @@ source_set("common_srcs") {
     "vpu.cc",
   ]
   public_deps = [
-    ":amlogic_display_bind",
     "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.clamprgb:fuchsia.hardware.display.clamprgb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
@@ -45,7 +77,6 @@ source_set("common_srcs") {
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -71,9 +102,37 @@ source_set("common_srcs") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
+source_set("amlogic_display_driver_src") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  public_deps = [
+    ":amlogic_display_bind",
+    ":amlogic_display_vim3_bind_header",
+    ":common_srcs",
+  ]
+  sources = [ "amlogic-display.cc" ]
+}
+
+source_set("amlogic_display_driver_vim3_src") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+    ":display-vim3-config",
+  ]
+  public_deps = [
+    ":amlogic_display_bind_header",
+    ":amlogic_display_vim3_bind",
+    ":common_srcs",
+  ]
+  sources = [ "amlogic-display.cc" ]
+}
+
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
   deps = [
+    ":amlogic_display_driver_src",
     ":common_srcs",
     "//sdk/lib/syslog/cpp:backend",
   ]
@@ -87,14 +146,31 @@ fuchsia_driver_component("amlogic-display") {
   colocate = true
 }
 
+fuchsia_driver("amlogic-display-driver-vim3") {
+  output_name = "amlogic-display-vim3"
+  deps = [
+    ":amlogic_display_driver_vim3_src",
+    ":common_srcs",
+    "//sdk/lib/syslog/cpp:backend",
+  ]
+}
+
+fuchsia_driver_component("amlogic-display-vim3") {
+  component_name = "amlogic-display-vim3"
+  deps = [ ":amlogic-display-driver-vim3" ]
+  info = "amlogic-display-info.json"
+  uses_profiles = true
+  colocate = false
+}
+
 test("amlogic-display-test") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "amlogic-display-test.cc",
     "vout-test.cc",
   ]
-  deps = [
-    ":common_srcs",
+  public_deps = [
+    ":amlogic_display_driver_src",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -109,6 +185,7 @@ test("clock-test") {
   configs += [ "//build/config:all_source" ]
   sources = [ "clock-test.cc" ]
   deps = [
+    ":amlogic_display_driver_src",
     ":common_srcs",
     "//zircon/system/ulib/zxtest",
   ]
@@ -120,6 +197,7 @@ group("tests") {
     ":amlogic-clock-test-package",
     ":amlogic-display-test-package",
     ":amlogic_display_bind_test",
+    ":amlogic_display_vim3_bind_test",
   ]
 }
 

@@ -66,21 +66,6 @@ driver_bind_rules("astro-cpu-bind") {
   ]
 }
 
-driver_bind_rules("astro-display-bind") {
-  rules = "bind/astro-display.bind"
-  header_output = "astro-display-bind.h"
-  bind_output = "astro-display-bind.bc"
-  tests = "bind-tests/astro-display-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.hardware.dsi",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 driver_bind_rules("astro-mali-bind") {
   rules = "bind/astro-mali.bind"
   header_output = "astro-mali-bind.h"
@@ -305,7 +290,6 @@ fuchsia_driver("astro-driver") {
     ":astro-cpu-bind_header",
     ":astro-dai-test-in-bind_header",
     ":astro-dai-test-out-bind_header",
-    ":astro-display-bind_header",
     ":astro-dwc2-phy-bind_header",
     ":astro-mali-bind_header",
     ":astro-pwm-bind_header",
@@ -331,11 +315,14 @@ fuchsia_driver("astro-driver") {
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+    "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+    "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -393,7 +380,6 @@ group("tests") {
     ":astro-cpu-bind_test",
     ":astro-dai-test-in-bind_test",
     ":astro-dai-test-out-bind_test",
-    ":astro-display-bind_test",
     ":astro-dwc2-phy-bind_test",
     ":astro-mali-bind_test",
     ":astro-pwm-bind_test",

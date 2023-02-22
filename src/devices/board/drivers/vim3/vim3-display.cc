@@ -8,7 +8,14 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hdmi/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
@@ -74,61 +81,74 @@ static const fpbus::Node display_dev = []() {
   return dev;
 }();
 
-// Composite binding rules for display driver.
-
-static const zx_bind_inst_t hpd_gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, VIM3_HPD_IN),
-};
-
-static const zx_bind_inst_t sysmem_match[] = {
-    BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_SYSMEM),
-};
-
-static const zx_bind_inst_t canvas_match[] = {
-    BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_AMLOGIC_CANVAS),
-};
-
-static const zx_bind_inst_t hdmi_match[] = {
-    BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_HDMI),
-};
-
-static const device_fragment_part_t hpd_gpio_fragment[] = {
-    {std::size(hpd_gpio_match), hpd_gpio_match},
-};
-
-static const device_fragment_part_t sysmem_fragment[] = {
-    {std::size(sysmem_match), sysmem_match},
-};
-
-static const device_fragment_part_t canvas_fragment[] = {
-    {std::size(canvas_match), canvas_match},
-};
-
-static const device_fragment_part_t hdmi_fragment[] = {
-    {std::size(hdmi_match), hdmi_match},
-};
-
-static const device_fragment_t fragments[] = {
-    {"gpio", std::size(hpd_gpio_fragment), hpd_gpio_fragment},
-    {"sysmem", std::size(sysmem_fragment), sysmem_fragment},
-    {"canvas", std::size(canvas_fragment), canvas_fragment},
-    {"hdmi", std::size(hdmi_fragment), hdmi_fragment},
-};
-
 zx_status_t Vim3::DisplayInit() {
+  auto hdmi_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_hdmi::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto hdmi_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hdmi::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto gpio_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_HPD_IN)),
+  };
+
+  auto gpio_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+  };
+
+  auto sysmem_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto sysmem_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto canvas_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+  };
+
+  auto canvas_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                        bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+  };
+
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = hdmi_bind_rules,
+          .properties = hdmi_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = gpio_bind_rules,
+          .properties = gpio_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = sysmem_bind_rules,
+          .properties = sysmem_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = canvas_bind_rules,
+          .properties = canvas_properties,
+      }},
+  };
+  auto spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, display_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, fragments, std::size(fragments)), {});
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, display_dev),
+                                                          fidl::ToWire(fidl_arena, spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Display(display_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) request failed: %s", __func__,
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Display(display_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

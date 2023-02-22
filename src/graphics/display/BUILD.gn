@@ -10,6 +10,7 @@ group("drivers") {
     "drivers/aml-canvas",
     "drivers/aml-hdmi:aml-hdmi",
     "drivers/amlogic-display",
+    "drivers/amlogic-display:amlogic-display-vim3",
     "drivers/display",
     "drivers/dsi-dw",
     "drivers/fake:fake-display",
