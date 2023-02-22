@@ -34,7 +34,7 @@ use netstack_testing_common::{
     interfaces,
     ndp::send_ra_with_router_lifetime,
     pause_fake_clock,
-    realms::{KnownServiceProvider, Manager, ManagerConfig, Netstack2, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt as _},
     wait_for_component_stopped, Result, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -55,10 +55,10 @@ use packet_formats::{
 use packet_formats_dhcp::v6;
 
 #[netstack_test]
-async fn no_ip_literal(name: &str) {
+async fn no_ip_literal<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
@@ -150,7 +150,7 @@ async fn poll_lookup_admin<
 /// Tests that Netstack exposes DNS servers discovered dynamically and NetworkManager
 /// configures the Lookup service.
 #[netstack_test]
-async fn discovered_dns<M: Manager>(name: &str) {
+async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
     const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     /// DNS server served by DHCP.
     const DHCP_DNS_SERVER: fnet::Ipv4Address = fidl_ip_v4!("123.12.34.56");
@@ -169,7 +169,7 @@ async fn discovered_dns<M: Manager>(name: &str) {
 
     let network = sandbox.create_network("net").await.expect("failed to create network");
     let server_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_server", name),
             &[
                 KnownServiceProvider::DnsResolver,
@@ -181,7 +181,7 @@ async fn discovered_dns<M: Manager>(name: &str) {
         .expect("failed to create server realm");
 
     let client_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_client", name),
             &[
                 // Start the network manager on the client.
@@ -300,7 +300,7 @@ async fn discovered_dns<M: Manager>(name: &str) {
 /// Tests that DHCPv6 exposes DNS servers discovered dynamically and the network manager
 /// configures the Lookup service.
 #[netstack_test]
-async fn discovered_dhcpv6_dns<M: Manager>(name: &str) {
+async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
     /// DHCPv6 server IP.
     const DHCPV6_SERVER: net_types_ip::Ipv6Addr =
         net_types_ip::Ipv6Addr::from_bytes(std_ip_v6!("fe80::1").octets());
@@ -319,7 +319,7 @@ async fn discovered_dhcpv6_dns<M: Manager>(name: &str) {
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_client", name),
             &[
                 // Start the network manager on the client.
@@ -533,7 +533,7 @@ const EXAMPLE_IPV4_ADDR: fnet::IpAddress = fidl_ip!("93.184.216.34");
 const EXAMPLE_IPV6_ADDR: fnet::IpAddress = fidl_ip!("2606:2800:220:1:248:1893:25c8:1946");
 
 #[netstack_test]
-async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
+async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(name: &str) {
     use trust_dns_proto::{
         op::{Message, ResponseCode},
         rr::RecordType,
@@ -541,7 +541,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
@@ -687,7 +687,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
 }
 
 #[netstack_test]
-async fn fallback_on_error_response_code(name: &str) {
+async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
     use itertools::Itertools as _;
     use trust_dns_proto::{
         op::{Message, ResponseCode},
@@ -726,7 +726,7 @@ async fn fallback_on_error_response_code(name: &str) {
 
         let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
         let realm = sandbox
-            .create_netstack_realm_with::<Netstack2, _, _>(
+            .create_netstack_realm_with::<N, _, _>(
                 name,
                 &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
             )
@@ -897,12 +897,12 @@ async fn setup_dns_server(
 }
 
 #[netstack_test]
-async fn no_fallback_to_tcp_on_failed_udp(name: &str) {
+async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
@@ -958,12 +958,12 @@ async fn no_fallback_to_tcp_on_failed_udp(name: &str) {
 }
 
 #[netstack_test]
-async fn fallback_to_tcp_on_truncated_response(name: &str) {
+async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
@@ -1064,12 +1064,12 @@ async fn fallback_to_tcp_on_truncated_response(name: &str) {
 }
 
 #[netstack_test]
-async fn query_preferred_name_servers_first(name: &str) {
+async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
