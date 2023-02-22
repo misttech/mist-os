@@ -2161,10 +2161,9 @@ impl TryFrom<fdecl::Component> for ComponentDecl {
 }
 
 // Converts the contents of a CM-Rust declaration into a CM_FIDL declaration
-impl TryFrom<ComponentDecl> for fdecl::Component {
-    type Error = Error;
-    fn try_from(decl: ComponentDecl) -> Result<Self, Self::Error> {
-        Ok(decl.native_into_fidl())
+impl From<ComponentDecl> for fdecl::Component {
+    fn from(decl: ComponentDecl) -> Self {
+        decl.native_into_fidl()
     }
 }
 
