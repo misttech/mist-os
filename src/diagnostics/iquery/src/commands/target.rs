@@ -126,13 +126,10 @@ pub async fn connect_to_archivist_selector_str(
 }
 
 pub async fn connect_to_archivist_selector(
-    selector: &Option<Selector>,
+    selector: &Selector,
 ) -> Result<ArchiveAccessorProxy, Error> {
     let (mut realm_query_proxy, _) = connect_realm_protocols().await?;
-    match selector {
-        Some(s) => connect_to_archivist(s, &mut realm_query_proxy).await,
-        None => connect_to_the_first_archivist(&mut realm_query_proxy).await,
-    }
+    connect_to_archivist(selector, &mut realm_query_proxy).await
 }
 
 /// Connect to `bootstrap/archivist:expose:fuchsia.diagnostics.ArchiveAccessor`.

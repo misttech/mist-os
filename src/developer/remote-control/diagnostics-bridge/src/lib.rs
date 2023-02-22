@@ -14,13 +14,13 @@ use {
         RemoteDiagnosticsBridgeRequestStream, StreamError,
     },
     fidl_fuchsia_diagnostics::{
-        ArchiveAccessorProxy,
+        ArchiveAccessorMarker,
         ClientSelectorConfiguration::{SelectAll, Selectors},
         DataType, SelectorArgument, StreamMode,
     },
     fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES,
     fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
+    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::{
         future::BoxFuture,
         prelude::*,
@@ -165,8 +165,10 @@ struct ArchiveReaderManagerImpl {
 
 impl ArchiveReaderManagerImpl {
     async fn new(parameters: BridgeStreamParameters) -> Result<Self> {
-        let archive: ArchiveAccessorProxy =
-            connect_to_archivist_selector(&parameters.accessor).await?;
+        let archive = match parameters.accessor {
+            Some(selector) => connect_to_archivist_selector(&selector).await?,
+            None => connect_to_protocol::<ArchiveAccessorMarker>()?,
+        };
         let mut reader = ArchiveReader::new();
         reader.with_archive(archive).retry_if_empty(false);
         match parameters.client_selector_configuration {
