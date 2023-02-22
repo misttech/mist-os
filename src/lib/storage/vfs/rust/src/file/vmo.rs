@@ -21,7 +21,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
-    futures::{future::BoxFuture, lock::Mutex},
+    futures::lock::Mutex,
     std::{future::Future, sync::Arc},
 };
 
@@ -84,55 +84,6 @@ where
     )
 }
 
-/// DEPRECATED - DO NOT USE. Use [`read_only`] instead.
-///
-/// Creates a new read-only `VmoFile` which serves static content.  Also see
-/// `read_only_const` which allows you to pass the ownership to the file itself.
-// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_only`.
-pub fn read_only_static<Bytes>(bytes: Bytes) -> Arc<VmoFile>
-where
-    Bytes: 'static + AsRef<[u8]> + Send + Sync,
-{
-    read_only(bytes)
-}
-
-/// DEPRECATED - DO NOT USE. Use [`read_only`] instead.
-///
-/// Create a new read-only `VmoFile` which servers a constant content.  The difference with
-/// `read_only_static` is that this function takes a run time values that it will own, while
-/// `read_only_static` requires a reference to something with a static lifetime.
-// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_only`.
-pub fn read_only_const(bytes: impl AsRef<[u8]>) -> Arc<VmoFile> {
-    read_only(bytes.as_ref().to_vec())
-}
-
-/// DEPRECATED - DO NOT USE. Use [`read_write`] instead.
-/// Just like `simple_init_vmo`, but allows one to specify the capacity explicitly, instead of
-/// setting it to be the max of 100 and the content size.  The VMO is sized to be the
-/// maximum of the `content` length and the specified `capacity`.
-// TODO(http://fxbug.dev/99448): Remove when out-of-tree callers are migrated to `read_write`.
-pub fn simple_init_vmo_with_capacity(
-    content: &[u8],
-    capacity: u64,
-) -> impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static {
-    let content = content.to_vec();
-    move || {
-        // In "production" code we would instead wrap `content` in a smart pointer to be able to
-        // share it with the async block, but for tests it is fine to just clone it.
-        let content = content.clone();
-        Box::pin(async move {
-            let size = content.len() as u64;
-            let vmo_size = std::cmp::max(size, capacity);
-            let vmo = Vmo::create(vmo_size)?;
-            if content.len() > 0 {
-                vmo.write(&content, 0)?;
-            }
-            vmo.set_content_size(&size)?;
-            Ok(vmo)
-        })
-    }
-}
-
 /// Create new read-write `VmoFile` with the specified `content` and `capacity`. If `capacity` is
 /// smaller than `content.as_ref().len()`, `content` will be truncated. If `capacity` is `None`,
 /// the file's size and capacity will both be equal to `content.as_ref().len()`.
@@ -171,15 +122,6 @@ where
         /*writable*/ true,
         /*executable*/ false,
     )
-}
-
-/// DEPRECATED - DO NOT USE. Same as `read_write` but supports out-of-tree migrations.
-pub fn read_write_deprecated<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    VmoFile::new_async(init_vmo, true, true, false)
 }
 
 /// Implementation of a VMO-backed file in a virtual file system. Supports both synchronous (from
