@@ -890,6 +890,7 @@ mod tests {
                         target_name: "exposed_by_provider".into(),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some(PathBuf::from_str("provider_subdir").unwrap()),
+                        availability: cm_rust::Availability::Required,
                     }.into(),
                 ],
                 ..ComponentDecl::default()

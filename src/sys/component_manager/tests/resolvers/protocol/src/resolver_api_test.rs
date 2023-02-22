@@ -59,6 +59,7 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
         source_name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),
+        availability: cm_rust::Availability::Required,
     }));
     resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
         name: fcresolution::ResolverMarker::PROTOCOL_NAME.into(),

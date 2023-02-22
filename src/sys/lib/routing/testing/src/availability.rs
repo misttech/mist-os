@@ -152,6 +152,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_name: "fuchsia.examples.EchoService".into(),
                             target_name: "fuchsia.examples.EchoService".into(),
                             target: ExposeTarget::Parent,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
@@ -159,6 +160,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_name: "fuchsia.examples.Echo".into(),
                             target_name: "fuchsia.examples.Echo".into(),
                             target: ExposeTarget::Parent,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .directory(
                             DirectoryDeclBuilder::new("dir")
@@ -173,6 +175,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .build(),
                 ),
@@ -350,6 +353,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_name: "fuchsia.examples.Echo".into(),
                             target_name: "fuchsia.examples.Echo".into(),
                             target: ExposeTarget::Parent,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .directory(
                             DirectoryDeclBuilder::new("dir")
@@ -364,6 +368,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .build(),
                 ),

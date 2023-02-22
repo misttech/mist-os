@@ -51,6 +51,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -110,6 +111,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -169,6 +171,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -228,6 +231,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::W_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -287,6 +291,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -346,6 +351,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),

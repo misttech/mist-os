@@ -1586,6 +1586,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                         source_name: "fuchsia.examples.Echo".into(),
                         target: cm_rust::ExposeTarget::Parent,
                         target_name: "fuchsia.examples.Echo".into(),
+                        availability: cm_rust::Availability::Required,
                     })],
                     ..cm_rust::ComponentDecl::default()
                 }
@@ -1603,6 +1604,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                     source_name: "fuchsia.examples.Echo".into(),
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "fuchsia.examples.Echo".into(),
+                    availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
             })
@@ -1618,6 +1620,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
         source_name: "fuchsia.examples.Echo".into(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: "fuchsia.examples.Echo".into(),
+        availability: cm_rust::Availability::Required,
     }));
     assert_matches!(builder.replace_realm_decl(realm_decl).await, Ok(()));
 

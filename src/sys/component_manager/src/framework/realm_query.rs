@@ -775,6 +775,7 @@ mod tests {
                 source_name: expose_name.clone().into(),
                 target: ExposeTarget::Parent,
                 target_name: expose_name.into(),
+                availability: Availability::Required,
             });
 
             manifest = manifest.use_(use_decl).expose(expose_decl);
@@ -899,6 +900,7 @@ mod tests {
             source_name: "bar".into(),
             target: ExposeTarget::Parent,
             target_name: "bar".into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let components = vec![(
@@ -1132,6 +1134,7 @@ mod tests {
                         source: ExposeSource::Self_,
                         target: ExposeTarget::Parent,
                         rights: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1402,6 +1405,7 @@ mod deprecated {
                 source_name: "bar".into(),
                 target: ExposeTarget::Parent,
                 target_name: "bar".into(),
+                availability: cm_rust::Availability::Required,
             });
 
             let checksum = ConfigChecksum::Sha256([

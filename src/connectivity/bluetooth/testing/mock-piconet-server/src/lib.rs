@@ -51,6 +51,7 @@ fn expose_decl(name: &str, id: bt_types::PeerId, capability_name: &str) -> Expos
         source_name: capability_name.into(),
         target: ExposeTarget::Parent,
         target_name: capability_path_for_peer_id(id, capability_name).into(),
+        availability: cm_rust::Availability::Required,
     })
 }
 
@@ -1015,6 +1016,7 @@ mod tests {
             source_name: profile_capability_name.clone().into(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name.clone().into(),
+            availability: cm_rust::Availability::Required,
         };
         let expose_decl = ExposeDecl::Protocol(expose_profile_decl.clone());
         assert!(pico_member_decl.exposes.contains(&expose_decl));
@@ -1030,6 +1032,7 @@ mod tests {
                 source_name: profile_capability_name.into(),
                 target: ExposeTarget::Parent,
                 target_name: custom_profile_capability_name.into(),
+                availability: cm_rust::Availability::Required,
             };
             let root_expose_decl = ExposeDecl::Protocol(custom_expose_profile_decl);
             let root = builder.get_realm_decl().await.expect("failed to get root");
@@ -1054,6 +1057,7 @@ mod tests {
             source_name: profile_capability_name.clone(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name,
+            availability: cm_rust::Availability::Required,
         };
         let expose_decl = ExposeDecl::Protocol(expose_proto_decl.clone());
         assert!(pico_member_decl.exposes.contains(&expose_decl));
@@ -1147,6 +1151,7 @@ mod tests {
             source_name: profile_capability_name.clone(),
             target: ExposeTarget::Parent,
             target_name: profile_capability_name.clone(),
+            availability: cm_rust::Availability::Required,
         });
         let interposer = test_harness
             .builder
@@ -1295,6 +1300,7 @@ mod tests {
             source_name: fake_cap1.clone().into(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap1).into(),
+            availability: cm_rust::Availability::Required,
         });
         // `Bar` is exposed by the profile to parent.
         let fake_capability_expose2 = ExposeDecl::Protocol(ExposeProtocolDecl {
@@ -1302,6 +1308,7 @@ mod tests {
             source_name: fake_cap2.clone().into(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member.peer_id(), &fake_cap2).into(),
+            availability: cm_rust::Availability::Required,
         });
         // `Cat` is used by the profile and exposed from above the test root.
         let fake_capability_offer3 = OfferDecl::Protocol(OfferProtocolDecl {
@@ -1360,12 +1367,14 @@ mod tests {
             source_name: fake_cap.clone().into(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member1.peer_id(), &fake_cap).into(),
+            availability: cm_rust::Availability::Required,
         });
         let profile2_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child(profile_name2.to_string()),
             source_name: fake_cap.clone().into(),
             target: ExposeTarget::Parent,
             target_name: capability_path_for_peer_id(profile_member2.peer_id(), &fake_cap).into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let root = test_harness.builder.get_realm_decl().await.expect("unable to get root decl");

@@ -424,6 +424,7 @@ mod tests {
             target: ExposeTarget::Framework,
             rights: Some(fio::Operations::CONNECT),
             subdir: None,
+            availability: cm_rust::Availability::Required,
         })
     }
 }

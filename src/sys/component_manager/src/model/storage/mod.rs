@@ -487,6 +487,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -574,6 +575,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -691,6 +693,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -819,6 +822,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),

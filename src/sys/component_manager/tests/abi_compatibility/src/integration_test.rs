@@ -149,6 +149,7 @@ async fn add_component_resolver(
         source_name: component_resolver.name().try_into().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: component_resolver.name().try_into().unwrap(),
+        availability: cm_rust::Availability::Required,
     }));
     builder.replace_component_decl(&child, child_decl).await.unwrap();
     // Add resolver to the test realm

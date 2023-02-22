@@ -1205,6 +1205,7 @@ mod tests {
                             source_name: "foo".into(),
                             target_name: "hippo".into(),
                             target: ExposeTarget::Parent,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .build(),
                 ),
@@ -1269,6 +1270,7 @@ mod tests {
                             source_name: "foo".into(),
                             target_name: "hippo".into(),
                             target: ExposeTarget::Parent,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .build(),
                 ),

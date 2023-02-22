@@ -711,6 +711,7 @@ mod tests {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -771,6 +772,7 @@ mod tests {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "foo".into(),
@@ -1451,6 +1453,7 @@ mod tests {
             source_name: "foo_svc".into(),
             target_name: "bar_svc".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         });
         let protocol_decl = ProtocolDeclBuilder::new("foo_svc").build();
         let components = vec![
@@ -1568,6 +1571,7 @@ mod tests {
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
+            availability: cm_rust::Availability::Required,
         });
         let d_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Self_,
@@ -1576,6 +1580,7 @@ mod tests {
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
             subdir: None,
+            availability: cm_rust::Availability::Required,
         });
         let directory_decl = DirectoryDeclBuilder::new("foo_data").build();
 
@@ -2000,6 +2005,7 @@ mod tests {
             source_name: "base".into(),
             target: ExposeTarget::Parent,
             target_name: "base".into(),
+            availability: cm_rust::Availability::Required,
         });
         let resolver_decl = ResolverDecl {
             name: "base".into(),
@@ -2359,6 +2365,7 @@ mod tests {
             source_name: "bad_protocol".into(),
             target_name: "bad_protocol".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         });
         let use_event_decl = UseDecl::Event(UseEventDecl {
             source: UseSource::Parent,

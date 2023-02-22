@@ -93,6 +93,7 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
             source_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
             target: ExposeTarget::Parent,
             target_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            availability: cm_rust::Availability::Required,
         })],
         ..Default::default()
     }
@@ -532,12 +533,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -630,12 +633,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "bar_svc".into(),
                         target_name: "baz_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .build(),
@@ -652,12 +657,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -922,12 +929,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -996,12 +1005,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1092,12 +1103,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("d".to_string()),
                         source_name: "bar_svc".into(),
                         target_name: "baz_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("d")
                     .build(),
@@ -1135,12 +1148,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1231,6 +1246,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("d")
                     .add_lazy_child("e")
@@ -1272,6 +1288,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1325,6 +1342,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo_from_h_svc".into(),
                         target_name: "foo_from_h_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("h")
                     .build(),
@@ -1338,6 +1356,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo_svc".into(),
                         target_name: "foo_from_h_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1771,12 +1790,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source_name: "hippo_svc".into(),
                         source: ExposeSource::Self_,
                         target_name: "hippo_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -1811,6 +1832,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             source_name: "foo".into(),
             target_name: "foo".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let expected_protocol_decl =
             ProtocolDecl { name: "foo".into(), source_path: Some("/svc/foo".parse().unwrap()) };
@@ -1831,6 +1853,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .protocol(expected_protocol_decl.clone())
                     .build(),
@@ -1900,12 +1923,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Framework,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "bar_svc".into(),
                         target: ExposeTarget::Framework,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -2070,6 +2095,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .protocol(expected_protocol_decl.clone())
                     .build(),
@@ -2082,6 +2108,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .protocol(expected_protocol_decl.clone())
                     .build(),
@@ -2172,6 +2199,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2184,6 +2212,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2278,6 +2307,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2290,6 +2320,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2380,6 +2411,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2392,6 +2424,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(expected_service_decl.clone())
                     .build(),
@@ -2544,6 +2577,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_name: "foo_data".into(),
                         rights: Some(fio::R_STAR_DIR),
                         subdir: Some(PathBuf::from("s1/s2")),
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -2601,6 +2635,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: None,
                         subdir: Some(PathBuf::from("s3")),
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("b")
                     .build(),
@@ -2615,6 +2650,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: None,
                         subdir: Some(PathBuf::from("s1/s2")),
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .build(),
@@ -2630,6 +2666,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -2664,12 +2701,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "hippo_svc".into(),
                         target_name: "hippo_bar_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("c")
                     .build(),
@@ -2686,12 +2725,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "hippo_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -2753,12 +2794,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".into(),
                         target_name: "hippo_svc".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3999,12 +4042,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             source_name: "svc_allowed".into(),
             target_name: "svc_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".into(),
             target_name: "svc_not_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let components = vec![
             ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
@@ -4131,12 +4176,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             source_name: "svc_allowed".into(),
             target_name: "svc_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".into(),
             target_name: "svc_not_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let components = vec![
             ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
@@ -4193,12 +4240,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "svc_allowed".into(),
                         target_name: "svc_allowed".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(cm_rust::ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("e".into()),
                         source_name: "svc_not_allowed".into(),
                         target_name: "svc_not_allowed".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("e".into())
                     .build(),
@@ -4271,12 +4320,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             source_name: "svc_allowed".into(),
             target_name: "svc_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".into(),
             target_name: "svc_not_allowed".into(),
             target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
         };
         let components = vec![
             ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
@@ -4493,6 +4544,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -4564,6 +4616,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "foo".into(),
@@ -4643,6 +4696,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "foo".into(),
@@ -4736,6 +4790,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "foo".into(),
                         target_name: "foo".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "foo".into(),
@@ -4951,6 +5006,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "elf".into(),
                         target: ExposeTarget::Parent,
                         target_name: "dwarf".into(),
+                        availability: cm_rust::Availability::Required,
                     }))
                     .runner(RunnerDecl {
                         name: "elf".into(),

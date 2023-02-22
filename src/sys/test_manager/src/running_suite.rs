@@ -612,6 +612,7 @@ async fn get_realm(
         source_name: "fuchsia.debugdata.Publisher".into(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: "fuchsia.debugdata.Publisher".into(),
+        availability: cm_rust::Availability::Required,
     }));
     debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fuchsia.debugdata.Publisher".into(),
@@ -631,6 +632,7 @@ async fn get_realm(
             source_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             target: cm_rust::ExposeTarget::Parent,
             target_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
+            availability: cm_rust::Availability::Required,
         },
     ));
     hermetic_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(

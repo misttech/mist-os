@@ -700,6 +700,7 @@ async fn dynamic_offer_siblings_same_collection() {
                     source: ExposeSource::Self_,
                     target_name: "hippo_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -800,6 +801,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                     source: ExposeSource::Self_,
                     target_name: "hippo_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -897,6 +899,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                     source: ExposeSource::Self_,
                     target_name: "hippo_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -1019,6 +1022,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                     target: ExposeTarget::Parent,
                     rights: Some(fio::R_STAR_DIR),
                     subdir: None,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -1142,6 +1146,7 @@ async fn dynamic_offer_to_static_offer() {
                     source: ExposeSource::Self_,
                     target_name: "hippo_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -1303,6 +1308,7 @@ async fn destroying_instance_blocks_on_routing() {
                     source_name: "foo_svc".into(),
                     target_name: "foo_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
@@ -1311,6 +1317,7 @@ async fn destroying_instance_blocks_on_routing() {
                     target: ExposeTarget::Parent,
                     rights: Some(fio::R_STAR_DIR),
                     subdir: None,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -1624,6 +1631,7 @@ async fn use_runner_from_sibling_environment() {
                     source_name: "elf".into(),
                     target: ExposeTarget::Parent,
                     target_name: "dwarf".into(),
+                    availability: cm_rust::Availability::Required,
                 }))
                 .runner(RunnerDecl {
                     name: "elf".into(),
@@ -2067,6 +2075,7 @@ async fn use_from_destroyed_but_not_removed() {
                     source_name: "foo_svc".into(),
                     target_name: "bar_svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .build(),
         ),
@@ -2140,6 +2149,7 @@ async fn use_resolver_from_parent_environment() {
                     source_name: "base".into(),
                     target: ExposeTarget::Parent,
                     target_name: "base".into(),
+                    availability: cm_rust::Availability::Required,
                 }))
                 .resolver(ResolverDecl {
                     name: "base".into(),
@@ -2643,6 +2653,7 @@ async fn list_service_instances_from_collection() {
                     source_name: "foo".into(),
                     target: ExposeTarget::Parent,
                     target_name: "foo".into(),
+                    availability: cm_rust::Availability::Required,
                 }))
                 .service(ServiceDecl {
                     name: "foo".into(),
@@ -2658,6 +2669,7 @@ async fn list_service_instances_from_collection() {
                     source_name: "foo".into(),
                     target: ExposeTarget::Parent,
                     target_name: "foo".into(),
+                    availability: cm_rust::Availability::Required,
                 }))
                 .service(ServiceDecl {
                     name: "foo".into(),
@@ -2787,6 +2799,7 @@ async fn use_service_from_sibling_collection() {
                     source_name: "my.service.Service".into(),
                     target_name: "my.service.Service".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
                 .build(),
@@ -2799,6 +2812,7 @@ async fn use_service_from_sibling_collection() {
                     source_name: "my.service.Service".into(),
                     target_name: "my.service.Service".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".into(),
@@ -2814,6 +2828,7 @@ async fn use_service_from_sibling_collection() {
                     source_name: "my.service.Service".into(),
                     target_name: "my.service.Service".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".into(),
@@ -2959,6 +2974,7 @@ async fn use_filtered_service_from_sibling() {
                     source_name: "my.service.Service".into(),
                     target_name: "my.service.Service".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".into(),

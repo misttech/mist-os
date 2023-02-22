@@ -39,6 +39,7 @@ async fn resolve_cast_url() {
         source_name: "cast_resolver".try_into().unwrap(),
         target: cm_rust::ExposeTarget::Parent,
         target_name: "cast_resolver".try_into().unwrap(),
+        availability: cm_rust::Availability::Required,
     }));
     builder.replace_component_decl(&cast_resolver, cast_resolver_decl).await.unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();

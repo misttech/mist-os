@@ -704,10 +704,11 @@ impl ExposeDeclCommon for ExposeDecl {
 #[fidl_decl(fidl_table = "fdecl::ExposeService")]
 pub struct ExposeServiceDecl {
     pub source: ExposeSource,
-
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -718,6 +719,8 @@ pub struct ExposeProtocolDecl {
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -739,6 +742,9 @@ pub struct ExposeDirectoryDecl {
     pub rights: Option<fio::Operations>,
 
     pub subdir: Option<PathBuf>,
+
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -749,6 +755,8 @@ pub struct ExposeRunnerDecl {
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -759,6 +767,8 @@ pub struct ExposeResolverDecl {
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -770,6 +780,8 @@ pub struct ExposeEventStreamDecl {
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
     pub scope: Option<Vec<EventScope>>,
+    #[fidl_decl(default)]
+    pub availability: Availability,
 }
 
 #[cfg_attr(
@@ -2186,11 +2198,11 @@ mod tests {
                 fn $test_name() {
                     {
                         let res = ComponentDecl::try_from($input).expect("try_from failed");
-                        assert_eq!(res, $result);
+                        assert_eq!(res, $result, "Conversion from FIDL type into cm_rust ComponentDecl type did not match expected result (left is expected, right is actual)");
                     }
                     {
                         let res = fdecl::Component::try_from($result).expect("try_from failed");
-                        assert_eq!(res, $input);
+                        assert_eq!($input, res, "Conversion from cm_rust ComponentDecl type into FIDL type did not match expected result (left is expected, right is actual)");
                     }
                 }
             )+
@@ -2416,6 +2428,7 @@ mod tests {
                         source_name: Some("legacy_netstack".to_string()),
                         target_name: Some("legacy_mynetstack".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeProtocol::EMPTY
                     }),
                     fdecl::Expose::Directory(fdecl::ExposeDirectory {
@@ -2428,6 +2441,7 @@ mod tests {
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: Some("foo/bar".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
                         ..fdecl::ExposeDirectory::EMPTY
                     }),
                     fdecl::Expose::Runner(fdecl::ExposeRunner {
@@ -2438,6 +2452,7 @@ mod tests {
                         source_name: Some("elf".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target_name: Some("elf".to_string()),
+                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeRunner::EMPTY
                     }),
                     fdecl::Expose::Resolver(fdecl::ExposeResolver{
@@ -2448,6 +2463,7 @@ mod tests {
                         source_name: Some("pkg".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_name: Some("pkg".to_string()),
+                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeResolver::EMPTY
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
@@ -2458,6 +2474,7 @@ mod tests {
                         source_name: Some("netstack1".to_string()),
                         target_name: Some("mynetstack".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeService::EMPTY
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
@@ -2468,6 +2485,7 @@ mod tests {
                         source_name: Some("netstack2".to_string()),
                         target_name: Some("mynetstack".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeService::EMPTY
                     }),
                     fdecl::Expose::EventStream (
@@ -2477,6 +2495,7 @@ mod tests {
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name: "netstack".to_string(), collection: None})]),
                             target_name: Some("diagnostics_ready".to_string()),
+                            availability: Some(fdecl::Availability::Optional),
                             ..fdecl::ExposeEventStream::EMPTY
                         }
                     )
@@ -2855,6 +2874,7 @@ mod tests {
                             source_name: "legacy_netstack".try_into().unwrap(),
                             target_name: "legacy_mynetstack".try_into().unwrap(),
                             target: ExposeTarget::Parent,
+                            availability: Availability::Required,
                         }),
                         ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Child("netstack".to_string()),
@@ -2863,30 +2883,35 @@ mod tests {
                             target: ExposeTarget::Parent,
                             rights: Some(fio::Operations::CONNECT),
                             subdir: Some("foo/bar".into()),
+                            availability: Availability::Optional,
                         }),
                         ExposeDecl::Runner(ExposeRunnerDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "elf".try_into().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "elf".try_into().unwrap(),
+                            availability: Availability::Required,
                         }),
                         ExposeDecl::Resolver(ExposeResolverDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "pkg".try_into().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "pkg".try_into().unwrap(),
+                            availability: Availability::Required,
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "netstack1".try_into().unwrap(),
                             target_name: "mynetstack".try_into().unwrap(),
                             target: ExposeTarget::Parent,
+                            availability: Availability::Required,
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "netstack2".try_into().unwrap(),
                             target_name: "mynetstack".try_into().unwrap(),
                             target: ExposeTarget::Parent,
+                            availability: Availability::Required,
                         }),
                         ExposeDecl::EventStream (
                             ExposeEventStreamDecl {
@@ -2895,6 +2920,7 @@ mod tests {
                                 target: ExposeTarget::Parent,
                                 scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
                                 target_name: CapabilityName::from("diagnostics_ready"),
+                                availability: Availability::Optional,
                             }
                         )
                     ],
@@ -3401,5 +3427,86 @@ mod tests {
                 }
             },
         },
+    }
+
+    #[test]
+    fn default_expose_availability() {
+        let source = fdecl::Ref::Self_(fdecl::SelfRef {});
+        let source_name = "";
+        let target = fdecl::Ref::Parent(fdecl::ParentRef {});
+        let target_name = "";
+        assert_eq!(
+            fdecl::ExposeService {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                availability: None,
+                ..fdecl::ExposeService::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
+        assert_eq!(
+            fdecl::ExposeProtocol {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                ..fdecl::ExposeProtocol::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
+        assert_eq!(
+            fdecl::ExposeDirectory {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                ..fdecl::ExposeDirectory::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
+        assert_eq!(
+            fdecl::ExposeRunner {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                ..fdecl::ExposeRunner::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
+        assert_eq!(
+            fdecl::ExposeResolver {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                ..fdecl::ExposeResolver::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
+        assert_eq!(
+            fdecl::ExposeEventStream {
+                source: Some(source.clone()),
+                source_name: Some(source_name.into()),
+                target: Some(target.clone()),
+                target_name: Some(target_name.into()),
+                ..fdecl::ExposeEventStream::EMPTY
+            }
+            .fidl_into_native()
+            .availability,
+            Availability::Required
+        );
     }
 }

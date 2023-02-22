@@ -2608,6 +2608,7 @@ pub mod tests {
             target: ExposeTarget::Parent,
             source_name: "bar".into(),
             target_name: "bar".into(),
+            availability: cm_rust::Availability::Required,
         });
         let example_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,

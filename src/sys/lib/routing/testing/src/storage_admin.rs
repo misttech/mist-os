@@ -263,6 +263,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         source_name: "fuchsia.sys2.StorageAdmin".into(),
                         target_name: "fuchsia.sys2.StorageAdmin".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("d")
                     .build(),
@@ -569,6 +570,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         source_name: "fuchsia.sys2.StorageAdmin".into(),
                         target_name: "fuchsia.sys2.StorageAdmin".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("d")
                     .build(),
@@ -802,6 +804,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         source_name: "unrelated.protocol".into(),
                         target_name: "fuchsia.sys2.StorageAdmin".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_lazy_child("d")
                     .build(),

@@ -1111,6 +1111,7 @@ mod tests {
                         source_name: "my.service.Service".into(),
                         target_name: "my.service.Service".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
                     .build(),
@@ -1123,6 +1124,7 @@ mod tests {
                         source_name: "my.service.Service".into(),
                         target_name: "my.service.Service".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".into(),
@@ -1138,6 +1140,7 @@ mod tests {
                         source_name: "my.service.Service".into(),
                         target_name: "my.service.Service".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".into(),
@@ -1153,6 +1156,7 @@ mod tests {
                         source_name: "my.service.Service".into(),
                         target_name: "my.service.Service".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".into(),

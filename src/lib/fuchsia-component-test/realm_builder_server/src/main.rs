@@ -42,6 +42,8 @@ lazy_static! {
             source_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
             target: cm_rust::ExposeTarget::Parent,
             target_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
+            // TODO(fxbug.dev/107231): Support optional exposes.
+            availability: cm_rust::Availability::Required,
         },);
 }
 
@@ -1531,6 +1533,8 @@ fn create_expose_decl(
                 source_name,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
+                // TODO(fxbug.dev/107231): Support optional exposes.
+                availability: cm_rust::Availability::Required,
             })
         }
         ftest::Capability::Directory(directory) => {
@@ -1553,6 +1557,8 @@ fn create_expose_decl(
                 target_name,
                 rights: directory.rights,
                 subdir,
+                // TODO(fxbug.dev/107231): Support optional exposes.
+                availability: cm_rust::Availability::Required,
             })
         }
         ftest::Capability::Storage(storage) => {
@@ -1572,6 +1578,8 @@ fn create_expose_decl(
                 source_name,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
+                // TODO(fxbug.dev/107231): Support optional exposes.
+                availability: cm_rust::Availability::Required,
             })
         }
         _ => {
@@ -3231,6 +3239,7 @@ mod tests {
                     source_name: "fuchsia.examples.Echo".into(),
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "fuchsia.examples.Echo".into(),
+                    availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
             },
@@ -3695,6 +3704,7 @@ mod tests {
                             source_name: "fuchsia.examples.Hippo".into(),
                             target: cm_rust::ExposeTarget::Parent,
                             target_name: "fuchsia.examples.Hippo".into(),
+                            availability: cm_rust::Availability::Required,
                         })],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -3924,6 +3934,7 @@ mod tests {
                             source_name: "fuchsia.examples.Echo".into(),
                             target: cm_rust::ExposeTarget::Parent,
                             target_name: "fuchsia.examples.Echo".into(),
+                            availability: cm_rust::Availability::Required,
                         })],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -4434,6 +4445,7 @@ mod tests {
                 target_name: "data".into(),
                 rights: Some(fio::R_STAR_DIR),
                 subdir: None,
+                availability: cm_rust::Availability::Required,
             })],
             ..cm_rust::ComponentDecl::default()
         };

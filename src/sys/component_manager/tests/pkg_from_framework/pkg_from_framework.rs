@@ -105,6 +105,7 @@ async fn expose_pkg_from_framework() {
                     target_name: "config".into(),
                     rights: Some(fio::R_STAR_DIR),
                     subdir: Some("data".into()),
+                    availability: cm_rust::Availability::Required,
                 })],
                 ..cm_rust::ComponentDecl::default()
             },

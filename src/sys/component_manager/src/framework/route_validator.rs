@@ -309,6 +309,7 @@ mod tests {
             source_name: "foo.bar".into(),
             target: ExposeTarget::Parent,
             target_name: "foo.bar".into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
@@ -316,6 +317,7 @@ mod tests {
             source_name: "foo.bar".into(),
             target: ExposeTarget::Parent,
             target_name: "foo.bar".into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let capability_decl = ProtocolDecl {
@@ -425,6 +427,7 @@ mod tests {
             source_name: "c".into(),
             target: ExposeTarget::Parent,
             target_name: "c".into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
@@ -432,6 +435,7 @@ mod tests {
             source_name: "d".into(),
             target: ExposeTarget::Parent,
             target_name: "d".into(),
+            availability: cm_rust::Availability::Required,
         });
 
         let components = vec![

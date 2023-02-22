@@ -666,6 +666,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -745,6 +746,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some("subdir_1".into()),
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -847,6 +849,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),

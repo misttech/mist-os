@@ -797,6 +797,7 @@ mod tests {
                         source_name: "foo".into(),
                         target_name: "bar".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -805,6 +806,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         rights: None,
                         subdir: None,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
                 config: None,

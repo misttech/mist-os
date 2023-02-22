@@ -957,6 +957,7 @@ mod tests {
                 source_name: "serviceFromChild".into(),
                 target_name: "serviceFromChild".into(),
                 source: ExposeSource::Child("childA".to_string()),
+                availability: cm_rust::Availability::Required,
             })],
             children: vec![ChildDecl {
                 name: "childA".to_string(),
@@ -3194,6 +3195,7 @@ mod tests {
                         source_name: "serviceD".into(),
                         target_name: "serviceD".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3350,6 +3352,7 @@ mod tests {
                         source_name: "serviceD".into(),
                         target_name: "serviceD".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3372,6 +3375,7 @@ mod tests {
                         source_name: "serviceE".into(),
                         target_name: "serviceE".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3565,6 +3569,7 @@ mod tests {
                         source_name: "serviceD".into(),
                         target_name: "serviceD".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3587,6 +3592,7 @@ mod tests {
                         source_name: "serviceE".into(),
                         target_name: "serviceE".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3741,6 +3747,7 @@ mod tests {
                         source_name: "serviceC".into(),
                         target_name: "serviceC".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3839,6 +3846,7 @@ mod tests {
                         source_name: "serviceC".into(),
                         target_name: "serviceC".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -3930,6 +3938,7 @@ mod tests {
                         source_name: "serviceB".into(),
                         target_name: "serviceB".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
@@ -3952,6 +3961,7 @@ mod tests {
                         source_name: "serviceC".into(),
                         target_name: "serviceC".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),
@@ -4034,6 +4044,7 @@ mod tests {
                         source_name: "serviceC".into(),
                         target_name: "serviceC".into(),
                         target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
                     }))
                     .build(),
             ),

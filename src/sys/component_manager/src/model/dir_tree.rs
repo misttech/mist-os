@@ -297,6 +297,7 @@ mod tests {
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
                     subdir: None,
+                    availability: cm_rust::Availability::Required,
                 }),
                 ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
@@ -305,18 +306,21 @@ mod tests {
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
                     subdir: None,
+                    availability: cm_rust::Availability::Required,
                 }),
                 ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "baz-svc".into(),
                     target_name: "hippo-svc".into(),
                     target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
                 }),
                 ExposeDecl::Runner(ExposeRunnerDecl {
                     source: ExposeSource::Self_,
                     source_name: CapabilityName::from("elf"),
                     target: ExposeTarget::Parent,
                     target_name: CapabilityName::from("elf"),
+                    availability: cm_rust::Availability::Required,
                 }),
             ],
             ..default_component_decl()

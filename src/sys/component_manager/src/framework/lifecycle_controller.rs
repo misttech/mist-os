@@ -887,6 +887,7 @@ mod deprecated {
                             source: ExposeSource::Self_,
                             target: ExposeTarget::Parent,
                             rights: None,
+                            availability: cm_rust::Availability::Required,
                         }))
                         .build(),
                 ),
