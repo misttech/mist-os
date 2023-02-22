@@ -850,8 +850,6 @@ fidl/fuchsia.ui.input3/overview.fidl
 fidl/fuchsia.ui.observation.geometry/meta.json
 fidl/fuchsia.ui.observation.geometry/overview.fidl
 fidl/fuchsia.ui.observation.geometry/watcher.fidl
-fidl/fuchsia.ui.pointer.augment/augment.fidl
-fidl/fuchsia.ui.pointer.augment/meta.json
 fidl/fuchsia.ui.pointer/meta.json
 fidl/fuchsia.ui.pointer/mouse.fidl
 fidl/fuchsia.ui.pointer/overview.fidl

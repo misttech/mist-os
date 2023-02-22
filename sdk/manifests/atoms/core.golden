@@ -124,7 +124,6 @@
 //sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_sdk
 //sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_sdk
 //sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_sdk
-//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_sdk
 //sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_sdk
 //sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_sdk
 //sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_sdk
