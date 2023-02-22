@@ -8,7 +8,7 @@ load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 load("//:bundles/assembly/platform_aib_names.bzl", "ENG_PLATFORM_AIB_NAMES", "PLATFORM_AIB_NAMES")
 
 package(default_visibility = [
-    "//build/bazel/assembly:__subpackages__",
+    "//build/bazel/assembly:__pkg__",
     "//vendor/google:__subpackages__",
 ])
 
