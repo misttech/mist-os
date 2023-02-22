@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::generate_inspect_with_info;
 use crate::payload_convert;
 use crate::policy::response::Response;
 use serde::{Deserialize, Serialize};
@@ -10,10 +9,6 @@ use settings_storage::device_storage::DeviceStorageCompatible;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use thiserror::Error;
-
-/// Defines the policy handler trait, which describes a component that persists and applies the
-/// policies specified by policy clients
-pub mod policy_handler;
 
 /// The policy types supported by the service.
 #[derive(PartialEq, Debug, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
@@ -26,14 +21,12 @@ pub(crate) trait HasPolicyType {
     const POLICY_TYPE: PolicyType;
 }
 
-generate_inspect_with_info! {
-    /// Enumeration over the possible policy state information for all policies.
-    #[derive(PartialEq, Debug, Clone)]
-    #[allow(dead_code)]
-    pub enum PolicyInfo {
-        /// This value is reserved for testing purposes.
-        Unknown(UnknownInfo),
-    }
+/// Enumeration over the possible policy state information for all policies.
+#[derive(PartialEq, Debug, Clone)]
+#[allow(dead_code)]
+pub enum PolicyInfo {
+    /// This value is reserved for testing purposes.
+    Unknown(UnknownInfo),
 }
 
 macro_rules! conversion_impls {

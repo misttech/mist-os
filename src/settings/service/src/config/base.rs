@@ -66,9 +66,6 @@ pub enum AgentType {
     /// Responsible for logging external API calls to other components and
     /// their responses to Inspect.
     InspectExternalApis,
-    /// Responsible for recording internal state of messages sent on the message
-    /// hub to policy proxies handlers.
-    InspectPolicyValues,
     /// Responsible for logging all settings values of messages between the
     /// proxy and setting handlers to Inspect.
     InspectSettingProxy,
@@ -82,7 +79,6 @@ pub fn get_default_agent_types() -> HashSet<AgentType> {
     [
         AgentType::Restore,
         AgentType::InspectExternalApis,
-        AgentType::InspectPolicyValues,
         AgentType::InspectSettingProxy,
         AgentType::InspectSettingValues,
         AgentType::InspectSettingTypeUsage,
@@ -124,10 +120,6 @@ impl From<AgentType> for AgentCreator {
             AgentType::InspectSettingTypeUsage => create_agent!(
                 usage_counts,
                 inspect::usage_counts::SettingTypeUsageInspectAgent::create
-            ),
-            AgentType::InspectPolicyValues => create_agent!(
-                policy_values,
-                inspect::policy_values::PolicyValuesInspectAgent::create
             ),
             AgentType::InspectSettingValues => create_agent!(
                 setting_values,

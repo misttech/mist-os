@@ -53,7 +53,6 @@ mod light_sensor_tests;
 mod media_buttons_agent_tests;
 mod message_tests;
 pub(crate) mod message_utils;
-mod policy_handler_tests;
 mod privacy_tests;
 mod restore_agent_tests;
 pub(crate) mod scaffold;
