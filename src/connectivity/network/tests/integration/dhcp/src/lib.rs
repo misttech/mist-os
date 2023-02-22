@@ -18,7 +18,7 @@ use futures::{
 use net_declare::{fidl_ip_v4, fidl_mac};
 use netstack_testing_common::{
     dhcpv4 as dhcpv4_helper, interfaces,
-    realms::{constants, KnownServiceProvider, Netstack2, TestSandboxExt as _},
+    realms::{constants, KnownServiceProvider, Netstack, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -223,11 +223,11 @@ struct Settings<'a> {
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device(name: &str) {
+async fn acquire_with_dhcpd_bound_device<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    test_dhcp(
+    test_dhcp::<N>(
         name,
         &sandbox,
         &mut [
@@ -265,7 +265,7 @@ async fn acquire_with_dhcpd_bound_device(name: &str) {
 }
 
 #[netstack_test]
-async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
+async fn acquire_then_renew_with_dhcpd_bound_device<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -281,7 +281,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
         ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
     }));
 
-    test_dhcp(
+    test_dhcp::<N>(
         name,
         &sandbox,
         &mut [
@@ -321,7 +321,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
+async fn acquire_with_dhcpd_bound_device_dup_addr<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -346,7 +346,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
         }
     };
 
-    test_dhcp(
+    test_dhcp::<N>(
         name,
         &sandbox,
         &mut [
@@ -398,7 +398,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
 ///        -- Start DHCP servers on each server endpoint
 ///        -- Start DHCP clients on each client endpoint and verify that they acquire the expected
 ///           addresses
-fn test_dhcp<'a>(
+fn test_dhcp<'a, N: Netstack>(
     test_name: &'a str,
     sandbox: &'a netemul::TestSandbox,
     netstack_configs: &'a mut [TestNetstackRealmConfig<'a>],
@@ -411,7 +411,7 @@ fn test_dhcp<'a>(
             .then(|(id, netstack)| async move {
                 let TestNetstackRealmConfig { servers, clients } = netstack;
                 let netstack_realm = sandbox
-                    .create_netstack_realm_with::<Netstack2, _, _>(
+                    .create_netstack_realm_with::<N, _, _>(
                         format!("netstack_realm_{}_{}", test_name, id),
                         &[
                             KnownServiceProvider::DhcpServer { persistent: false },
@@ -678,9 +678,9 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
 // clear_leases() function is triggered, which will cause a panic if the server is in an
 // inconsistent state.
 #[netstack_test]
-async fn acquire_persistent_dhcp_server_after_restart(name: &str) {
+async fn acquire_persistent_dhcp_server_after_restart<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Persistent;
-    acquire_dhcp_server_after_restart(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart::<N>(&format!("{}_{}", name, mode), mode).await
 }
 
 // An ephemeral dhcp server cannot become inconsistent with its persistent state because it has
@@ -688,16 +688,16 @@ async fn acquire_persistent_dhcp_server_after_restart(name: &str) {
 // configuration.  This test verifies that an ephemeral dhcp server will return an error if run
 // after restarting.
 #[netstack_test]
-async fn acquire_ephemeral_dhcp_server_after_restart(name: &str) {
+async fn acquire_ephemeral_dhcp_server_after_restart<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Ephemeral;
-    acquire_dhcp_server_after_restart(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart::<N>(&format!("{}_{}", name, mode), mode).await
 }
 
-async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
+async fn acquire_dhcp_server_after_restart<N: Netstack>(name: &str, mode: PersistenceMode) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let server_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_server", name),
             &[
                 match mode {
@@ -716,7 +716,7 @@ async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
         .expect("failed to create server realm");
 
     let client_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
         .expect("failed to create client realm");
 
     let network = sandbox.create_network(name).await.expect("failed to create network");
@@ -861,22 +861,22 @@ async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
 }
 
 #[netstack_test]
-async fn dhcp_server_persistence_mode_persistent(name: &str) {
+async fn dhcp_server_persistence_mode_persistent<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Persistent;
-    test_dhcp_server_persistence_mode(&format!("{}_{}", name, mode), mode).await
+    test_dhcp_server_persistence_mode::<N>(&format!("{}_{}", name, mode), mode).await
 }
 
 #[netstack_test]
-async fn dhcp_server_persistence_mode_ephemeral(name: &str) {
+async fn dhcp_server_persistence_mode_ephemeral<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Ephemeral;
-    test_dhcp_server_persistence_mode(&format!("{}_{}", name, mode), mode).await
+    test_dhcp_server_persistence_mode::<N>(&format!("{}_{}", name, mode), mode).await
 }
 
-async fn test_dhcp_server_persistence_mode(name: &str, mode: PersistenceMode) {
+async fn test_dhcp_server_persistence_mode<N: Netstack>(name: &str, mode: PersistenceMode) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let server_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_server", name),
             &[
                 match mode {

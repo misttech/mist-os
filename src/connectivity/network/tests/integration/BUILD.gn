@@ -6,24 +6,10 @@ import("//build/components.gni")
 import("//build/config.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":netstack-integration-tests",
-    ":netstack-integration-tests-with-expectations",
-    "macros:netstack_testing_macros_test",
-  ]
-
-  if (!is_coverage) {
-    # TODO(fxbug.dev/104137): Re-enable this test when it passes with
-    # the coverage variant.
-    deps += [ ":netstack-long-integration-tests" ]
-  }
-}
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 tests = [
-  "dhcp",
   "dns",
   "fidl",
   "forwarding",
@@ -42,9 +28,11 @@ tests_with_expectations = [
   "device",
 ]
 
+tests_with_expectations_with_err_logs = [ "dhcp" ]
+
 long_tests = [ "multicast-forwarding" ]
 
-foreach(test, tests) {
+foreach(test, tests + tests_with_expectations_with_err_logs + long_tests) {
   name = "netstack-${test}-integration-test"
   fuchsia_test_component(name) {
     manifest = "meta/${name}.cml"
@@ -56,14 +44,6 @@ foreach(test, tests_with_expectations) {
   name = "netstack-${test}-integration-test"
   fuchsia_test_component_with_expectations(name) {
     expectations = "expects/${name}.json5"
-    manifest = "meta/${name}.cml"
-    deps = [ test ]
-  }
-}
-
-foreach(test, long_tests) {
-  name = "netstack-${test}-integration-test"
-  fuchsia_test_component(name) {
     manifest = "meta/${name}.cml"
     deps = [ test ]
   }
@@ -128,6 +108,36 @@ fuchsia_test_package("netstack-integration-tests-with-expectations") {
   deps = package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
+err_log_package_deps = []
+foreach(test, tests_with_expectations_with_err_logs) {
+  name = "netstack-${test}-integration-test"
+  no_err_logs_package_name = "${name}-no-err-logs"
+  fuchsia_test_with_expectations_package(no_err_logs_package_name) {
+    test_components = [ ":${name}" ]
+    expectations = "expects/${name}.json5"
+    treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+    deps =
+        package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
+  }
+  with_err_logs_package_name = "${name}-with-err-logs"
+  fuchsia_test_with_expectations_package(with_err_logs_package_name) {
+    test_components = [ ":${name}" ]
+    expectations = "expects/${name}.json5"
+    treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+    deps =
+        package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+    }
+  }
+  err_log_package_deps += [
+    ":${no_err_logs_package_name}",
+    ":${with_err_logs_package_name}",
+  ]
+}
+
 fuchsia_test_package("netstack-long-integration-tests") {
   test_components = []
   foreach(test, long_tests) {
@@ -162,4 +172,19 @@ resource("netcfg-with-forwarding-netemul-config") {
 resource("sampler-config") {
   sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
   outputs = [ "data/sampler-config/netstack.json" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+           ":netstack-integration-tests",
+           ":netstack-integration-tests-with-expectations",
+           "macros:netstack_testing_macros_test",
+         ] + err_log_package_deps
+
+  if (!is_coverage) {
+    # TODO(fxbug.dev/104137): Re-enable this test when it passes with
+    # the coverage variant.
+    deps += [ ":netstack-long-integration-tests" ]
+  }
 }

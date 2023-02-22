@@ -1,0 +1,30 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                "dhcp_server_persistence_mode_persistent_ns3",
+                "dhcp_server_persistence_mode_ephemeral_ns3",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "acquire_ephemeral_dhcp_server_after_restart_ns3",
+                "acquire_then_renew_with_dhcpd_bound_device_ns3",
+                "acquire_persistent_dhcp_server_after_restart_ns3",
+                "acquire_with_dhcpd_bound_device_dup_addr_ns3",
+                "acquire_with_dhcpd_bound_device_ns3",
+            ],
+        },
+    ],
+}
