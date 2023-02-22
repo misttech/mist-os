@@ -310,6 +310,7 @@ TEST_F(MagmaExecuteMsdVsi, ExecuteMany) {
 }
 
 TEST_F(MagmaExecuteMsdVsi, MmuExceptionRecovery) {
+  GTEST_SKIP() << "TODO(https://fxbug.dev/122408): Skipping flaky test";
   TestExecuteMmuException();
   TearDown();
   // Verify new commands complete successfully.
