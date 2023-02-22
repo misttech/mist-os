@@ -54,8 +54,8 @@ class ScopedChild final {
 
   ~ScopedChild();
 
-  ScopedChild(ScopedChild&&) noexcept;
-  ScopedChild& operator=(ScopedChild&&) noexcept;
+  ScopedChild(ScopedChild&&) = default;
+  ScopedChild& operator=(ScopedChild&&) = default;
 
   ScopedChild(const ScopedChild&) = delete;
   ScopedChild& operator=(const ScopedChild&) = delete;
@@ -145,10 +145,10 @@ class ScopedChild final {
               fuchsia::component::decl::ChildRef child_ref,
               fuchsia::io::DirectorySyncPtr exposed_dir);
 
-  std::shared_ptr<sys::ServiceDirectory> svc_ = nullptr;
+  // nullptr iff `this` has been moved OR `Teardown` has been called.
+  std::shared_ptr<sys::ServiceDirectory> svc_;
   fuchsia::component::decl::ChildRef child_ref_;
   fuchsia::io::DirectorySyncPtr exposed_dir_;
-  bool has_moved_ = false;
 };
 
 }  // namespace component_testing

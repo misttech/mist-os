@@ -77,7 +77,7 @@ ScopedChild::ScopedChild(std::shared_ptr<sys::ServiceDirectory> svc,
       exposed_dir_(std::move(exposed_dir)) {}
 
 ScopedChild::~ScopedChild() {
-  if (has_moved_) {
+  if (svc_ == nullptr) {
     return;
   }
 
@@ -85,21 +85,6 @@ ScopedChild::~ScopedChild() {
   ZX_COMPONENT_ASSERT_STATUS_OK("sys::ServiceDirectory/Connect",
                                 svc_->Connect(sync_realm_proxy.NewRequest()));
   internal::DestroyChild(sync_realm_proxy.get(), child_ref_);
-}
-
-ScopedChild::ScopedChild(ScopedChild&& other) noexcept
-    : svc_(std::move(other.svc_)),
-      child_ref_(std::move(other.child_ref_)),
-      exposed_dir_(std::move(other.exposed_dir_)) {
-  other.has_moved_ = true;
-}
-
-ScopedChild& ScopedChild::operator=(ScopedChild&& other) noexcept {
-  this->svc_ = std::move(other.svc_);
-  this->child_ref_ = std::move(other.child_ref_);
-  this->exposed_dir_ = std::move(other.exposed_dir_);
-  other.has_moved_ = true;
-  return *this;
 }
 
 void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback callback) {
@@ -135,7 +120,7 @@ void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback call
       });
 
   // Prevent the destructor from calling DestroyChild again.
-  has_moved_ = true;
+  svc_ = nullptr;
 }
 
 zx_status_t ScopedChild::Connect(const std::string& interface_name, zx::channel request) const {
