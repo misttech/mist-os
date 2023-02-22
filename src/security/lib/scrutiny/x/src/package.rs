@@ -30,7 +30,7 @@ use crate::component::fake::Component;
 
 /// Simple wrapper around `fuchsia_pkg::MetaPackage` that implements `MetaPackage` trait.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct MetaPackage(FuchsiaMetaPackage);
+pub(crate) struct MetaPackage(FuchsiaMetaPackage);
 
 impl MetaPackageApi for MetaPackage {}
 
@@ -42,7 +42,7 @@ impl From<FuchsiaMetaPackage> for MetaPackage {
 
 /// Simple wrapper around `fuchsia_pkg::MetaContents` that implements `MetaContents` trait.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct MetaContents(FuchsiaMetaContents);
+pub(crate) struct MetaContents(FuchsiaMetaContents);
 
 impl From<FuchsiaMetaContents> for MetaContents {
     fn from(meta_contents: FuchsiaMetaContents) -> Self {
@@ -82,7 +82,7 @@ enum PackageInitializationError {
 /// Model of a Fuchsia package, including meta entries (from meta.far) and content entries
 /// accessible via an associated `BlobSet`. This object wraps a reference-counted pointer
 /// to its state, which makes it cheap to clone.
-struct Package<
+pub(crate) struct Package<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
@@ -225,6 +225,21 @@ where
     }
 }
 
+// Some fakes rely on package implementations with `Default`. In order to write tests that use
+// these fakes, but for other purposes in the test, use the production `Package` implementation,
+// a panicking test-only `Default` implementation is provided.
+#[cfg(test)]
+impl<
+        PackageDataSource: Clone + DataSourceApi,
+        PackageBlobs: BlobSet,
+        FarReaderSeeker: io::Read + io::Seek,
+    > Default for Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
+{
+    fn default() -> Self {
+        panic!("Production `Package` has no default");
+    }
+}
+
 /// Internal state of a [`Package`] object.
 struct PackageData<
     PackageDataSource: Clone + DataSourceApi,
@@ -287,7 +302,7 @@ impl<PackageBlobs: BlobSet> Clone for ContentBlobData<PackageBlobs> {
 
 /// Errors that can occur attempting to use a `MetaBlob` as a `Blob`.
 #[derive(Debug, Error)]
-enum MetaBlobError {
+pub(crate) enum MetaBlobError {
     #[error("failed to load meta blob from far: {0}")]
     FarError(#[from] FarError),
     #[error("failed to read path as UTF8 string: {0}")]
@@ -295,7 +310,7 @@ enum MetaBlobError {
 }
 
 /// `Blob` implementation that combines `MetaBlobData` and a `FarReader`.
-struct MetaBlob<
+pub(crate) struct MetaBlob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
@@ -336,7 +351,7 @@ impl<
 
 /// Errors that can occur attempting to use a `ContentBlob` as a `Blob`.
 #[derive(Debug, Error)]
-enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
+pub(crate) enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
     #[error("failed to lookup package content blob: {0}")]
     BlobSourceError(BlobSourceError),
     #[error("failed to open package content blob: {0}")]
@@ -344,7 +359,7 @@ enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
 }
 
 /// `Blob` implementation that combines `ContentBlobData` and a `BlobSet`.
-struct ContentBlob<
+pub(crate) struct ContentBlob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
@@ -452,7 +467,7 @@ impl<
 
 /// Errors that can occur attempting to use a `Blob` as a `crate::api::Blob`.
 #[derive(Debug, Error)]
-enum BlobError<
+pub(crate) enum BlobError<
     BlobSourceErrorForContentBlobError: 'static + error::Error,
     BlobErrorForContentBlobError: 'static + error::Error,
 > {
@@ -466,7 +481,7 @@ enum BlobError<
 
 /// `std::io::Read + std::io::Seek` implementation over either a content blob or a meta blob
 /// loaded from a [`Package`].
-enum BlobReaderSeeker<PackageBlobs: BlobSet> {
+pub(crate) enum BlobReaderSeeker<PackageBlobs: BlobSet> {
     ///`std::io::Read + std::io::Seek` for a content blob loaded from a [`Package`].
     ContentReaderSeeker(<PackageBlobs::Blob as BlobApi>::ReaderSeeker),
 
@@ -504,7 +519,7 @@ impl<PackageBlobs: BlobSet> io::Seek for BlobReaderSeeker<PackageBlobs> {
 
 /// `crate::api::Blob` implementation for either a content blob or a meta blob loaded from a
 /// [`Package`].
-enum Blob<
+pub(crate) enum Blob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,

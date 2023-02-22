@@ -6,24 +6,30 @@
 
 #[cfg(test)]
 pub mod fake {
+    use crate::api::Blob as BlobApi;
     use crate::api::ComponentManagerConfiguration as ComponentManagerConfigurationApi;
     use crate::api::DevMgrConfiguration as DevMgrConfigurationApi;
     use crate::api::KernelFlags as KernelFlagsApi;
+    use crate::api::Package as PackageApi;
     use crate::api::System as SystemApi;
     use crate::api::VbMeta as VbMetaApi;
     use crate::api::Zbi as ZbiApi;
-    use crate::blob::fake::Blob;
+    use crate::blob::fake::Blob as FakeBlob;
     use crate::hash::fake::Hash;
-    use crate::package::fake::Package;
+    use crate::package::fake::Package as FakePackage;
     use std::iter;
+    use std::marker::PhantomData;
 
     #[derive(Default)]
-    pub(crate) struct System;
+    pub(crate) struct System<
+        Blob: BlobApi = FakeBlob<Hash>,
+        Package: Default + PackageApi = FakePackage,
+    >(PhantomData<(Blob, Package)>);
 
-    impl SystemApi for System {
+    impl<Blob: BlobApi, Package: Default + PackageApi> SystemApi for System<Blob, Package> {
         type DataSourcePath = &'static str;
         type Zbi = Zbi;
-        type Blob = Blob<Hash>;
+        type Blob = Blob;
         type Package = Package;
         type KernelFlags = KernelFlags;
         type VbMeta = VbMeta;
@@ -65,7 +71,7 @@ pub mod fake {
 
     impl ZbiApi for Zbi {
         type BootfsPath = &'static str;
-        type Blob = Blob<Hash>;
+        type Blob = FakeBlob<Hash>;
 
         fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>> {
             Box::new(iter::empty())

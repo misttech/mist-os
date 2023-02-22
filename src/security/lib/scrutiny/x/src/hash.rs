@@ -11,7 +11,7 @@ use std::io::Read;
 pub(crate) struct Hash(FuchsiaMerkleHash);
 
 impl Hash {
-    fn from_contents<R: Read>(contents: R) -> Self {
+    pub fn from_contents<R: Read>(contents: R) -> Self {
         Self(FuchsiaMerkleTree::from_reader(contents).expect("compute fuchsia merkle tree").root())
     }
 }

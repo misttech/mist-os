@@ -46,7 +46,6 @@ if (is_host) {
       "//src/security/lib/scrutiny/utils",
     ]
     test_deps = [
-      "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:maplit",

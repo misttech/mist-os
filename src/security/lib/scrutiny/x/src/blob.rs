@@ -9,6 +9,7 @@ use crate::data_source::BlobDirectory;
 use crate::data_source::BlobFsArchive;
 use crate::data_source::BlobSource;
 use crate::hash::Hash;
+use crate::product_bundle::ProductBundleRepositoryBlob;
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use fuchsia_merkle::MerkleTree;
@@ -276,8 +277,9 @@ impl BlobFsBlobSetBuilder {
 pub(crate) struct BlobDirectoryBlobSet(Rc<BlobDirectoryBlobSetData>);
 
 impl BlobDirectoryBlobSet {
-    fn new(directory: PathBuf, blob_ids: Vec<Hash>) -> Self {
-        Self(Rc::new(BlobDirectoryBlobSetData::new(directory, blob_ids)))
+    /// Creates a builder for a [`BlobDirectoryBlobSet`].
+    pub fn builder() -> BlobDirectoryBlobSetBuilder {
+        BlobDirectoryBlobSetBuilder::new()
     }
 
     /// Gets the path to this blobs directory.
@@ -288,6 +290,11 @@ impl BlobDirectoryBlobSet {
     /// Gets the hashes in this blobs directory.
     pub fn blob_ids(&self) -> &Vec<Hash> {
         self.0.blob_ids()
+    }
+
+    /// Constructs a new blob directory blob set from backing data.
+    fn new(directory: PathBuf, blob_ids: Vec<Hash>) -> Self {
+        Self(Rc::new(BlobDirectoryBlobSetData::new(directory, blob_ids)))
     }
 }
 
@@ -426,6 +433,7 @@ pub(crate) enum BlobError {
 pub(crate) enum Blob {
     BlobFsBlob(BlobFsBlob),
     FileBlob(FileBlob),
+    ProductBundleRepositoryBlob(ProductBundleRepositoryBlob),
 }
 
 impl From<BlobFsBlob> for Blob {
@@ -440,6 +448,12 @@ impl From<FileBlob> for Blob {
     }
 }
 
+impl From<ProductBundleRepositoryBlob> for Blob {
+    fn from(product_bundle_repository_blob: ProductBundleRepositoryBlob) -> Self {
+        Self::ProductBundleRepositoryBlob(product_bundle_repository_blob)
+    }
+}
+
 impl BlobApi for Blob {
     type Hash = Hash;
     type ReaderSeeker = Box<dyn ReadSeek>;
@@ -450,6 +464,9 @@ impl BlobApi for Blob {
         match self {
             Self::BlobFsBlob(blob_fs_blob) => blob_fs_blob.hash(),
             Self::FileBlob(file_blob) => file_blob.hash(),
+            Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => {
+                product_bundle_repository_blob.hash()
+            }
         }
     }
 
@@ -457,6 +474,9 @@ impl BlobApi for Blob {
         match self {
             Self::BlobFsBlob(blob_fs_blob) => blob_fs_blob.reader_seeker().map_err(BlobError::from),
             Self::FileBlob(file_blob) => file_blob.reader_seeker().map_err(BlobError::from),
+            Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => {
+                product_bundle_repository_blob.reader_seeker().map_err(BlobError::from)
+            }
         }
     }
 
@@ -468,6 +488,9 @@ impl BlobApi for Blob {
             Self::FileBlob(file_blob) => {
                 Box::new(file_blob.data_sources().map(|data_source| data_source.into()))
             }
+            Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => Box::new(
+                product_bundle_repository_blob.data_sources().map(|data_source| data_source.into()),
+            ),
         }
     }
 }

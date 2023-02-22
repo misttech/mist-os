@@ -202,7 +202,10 @@ pub trait ComponentManager {
 pub trait ComponentManagerConfiguration {}
 
 /// Model of a data source that a [`Scrutiny`] instance is using as a source of truth about the
-/// underlying system.
+/// underlying system. This type is used for interrogating where a Fuchsia abstraction such as a
+/// blob, package, or component came from (in terms of host filesystem artifacts). This is useful,
+/// for example, in constructing error messages related to failed operations over a Fuchsia
+/// abstraction.
 pub trait DataSource: Debug {
     /// Concrete type used to refer to the path to this data source, if any.
     type SourcePath: AsRef<Path>;
