@@ -78,8 +78,7 @@ bool VmLz4Compressor::Init() {
 }
 
 fbl::RefPtr<VmLz4Compressor> VmLz4Compressor::Create() {
-  // TODO(fxbug.dev/60238): Configure this using a kernel cmdline parameter.
-  const int acceleration = 11;
+  const int acceleration = static_cast<int>(gBootOptions->compression_lz4_acceleration);
 
   fbl::AllocChecker ac;
   fbl::RefPtr<VmLz4Compressor> lz4 =

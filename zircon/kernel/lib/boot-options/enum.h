@@ -85,6 +85,20 @@ constexpr auto Enum<WallclockType> = [](auto&& Switch) {
       .Case("hpet", WallclockType::kHpet);
 };
 
+template <>
+constexpr auto Enum<CompressionStrategy> = [](auto&& Switch) {
+  return Switch  //
+      .Case("none", CompressionStrategy::kNone)
+      .Case("lz4", CompressionStrategy::kLz4);
+};
+
+template <>
+constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
+  return Switch  //
+      .Case("none", CompressionStorageStrategy::kNone)
+      .Case("tri_page", CompressionStorageStrategy::kTriPage);
+};
+
 #if BOOT_OPTIONS_GENERATOR || defined(__aarch64__)
 
 template <>

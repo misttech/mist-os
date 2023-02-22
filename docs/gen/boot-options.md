@@ -760,6 +760,48 @@ This value was chosen to consume, in the worst case, 5% CPU on a lower-end
 arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 
+### kernel.compression.strategy=\[none | lz4\]
+
+**Default:** `none`
+
+Supported compression strategies are:
+- `none`
+- `lz4`
+
+This option selects the desired compression strategy to be used when a page needs to be compressed.
+If `none` is set then `kernel.compression.storage-strategy` must also be `none`. Selecting `none`
+effectively disables compression.
+
+### kernel.compression.storage-strategy=\[none | tri_page\]
+
+**Default:** `none`
+
+Supported compression storage strategies are:
+- `none`
+- `tri_page`
+
+This option selects the desired storage strategy to be used for storing data that has been
+compressed. If `none` is set then `kernel.compression.strategy` must also be `none`.
+
+### kernel.compression.threshold=\<uint32_t>
+
+**Default:** `0x46`
+
+This option controls the compression threshold that must be achieved for a compressed page to be
+stored. Pages that do not achieve this threshold will continue to be stored uncompressed instead.
+
+The option is a percentage, with a value of 100 meaning a page just needs to compress to at least
+its original size, and a value of 0 meaning that page would need to compress to a zero size.
+
+Valid values are between 1 and 100, inclusive.
+
+### kernel.compression.lz4.acceleration=\<uint32_t>
+
+**Default:** `0xb`
+
+This option controls the acceleration factor provided to the LZ4 compression implementation. Refer
+to the current LZ4 implementation for how this value will be interpreted.
+
 ### kernel.pmm-checker.action=\<string>
 
 **Default:** `oops`

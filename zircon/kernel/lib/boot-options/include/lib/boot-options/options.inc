@@ -648,6 +648,40 @@ arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 )""")
 
+DEFINE_OPTION("kernel.compression.strategy", CompressionStrategy, compression_strategy, {CompressionStrategy::kNone}, R"""(
+Supported compression strategies are:
+- `none`
+- `lz4`
+
+This option selects the desired compression strategy to be used when a page needs to be compressed.
+If `none` is set then `kernel.compression.storage-strategy` must also be `none`. Selecting `none`
+effectively disables compression.
+)""")
+
+DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy, compression_storage_strategy, {CompressionStorageStrategy::kNone}, R"""(
+Supported compression storage strategies are:
+- `none`
+- `tri_page`
+
+This option selects the desired storage strategy to be used for storing data that has been
+compressed. If `none` is set then `kernel.compression.strategy` must also be `none`.
+)""")
+
+DEFINE_OPTION("kernel.compression.threshold", uint32_t, compression_threshold, {70}, R"""(
+This option controls the compression threshold that must be achieved for a compressed page to be
+stored. Pages that do not achieve this threshold will continue to be stored uncompressed instead.
+
+The option is a percentage, with a value of 100 meaning a page just needs to compress to at least
+its original size, and a value of 0 meaning that page would need to compress to a zero size.
+
+Valid values are between 1 and 100, inclusive.
+)""")
+
+DEFINE_OPTION("kernel.compression.lz4.acceleration", uint32_t, compression_lz4_acceleration, {11}, R"""(
+This option controls the acceleration factor provided to the LZ4 compression implementation. Refer
+to the current LZ4 implementation for how this value will be interpreted.
+)""")
+
 DEFINE_OPTION("kernel.pmm-checker.action", SmallString, pmm_checker_action, {"oops"}, R"""(
 Supported actions:
 - `oops`

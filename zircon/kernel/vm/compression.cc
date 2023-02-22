@@ -10,8 +10,10 @@
 #include <lib/counters.h>
 
 #include <ktl/algorithm.h>
+#include <vm/lz4_compressor.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
+#include <vm/tri_page_storage.h>
 
 namespace {
 
@@ -196,8 +198,79 @@ void VmCompression::Dump() const {
 
 // static
 fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
-  // TODO(fxbug.dev/60238)
-  return nullptr;
+  // See if we even have a strategy.
+  if ((gBootOptions->compression_strategy == CompressionStrategy::kNone) ||
+      (gBootOptions->compression_storage_strategy == CompressionStorageStrategy::kNone)) {
+    // It is an error to only have one of a storage or compressor strategy set.
+    if ((gBootOptions->compression_strategy == CompressionStrategy::kNone) ^
+        (gBootOptions->compression_storage_strategy == CompressionStorageStrategy::kNone)) {
+      printf(
+          "ERROR: Exactly one of kernel.compression.strategy and "
+          "kernel.compression.storage-strategy was defined\n");
+    }
+    return nullptr;
+  }
+
+  if constexpr (!PAGE_COMPRESSION) {
+    panic(
+        "ERROR: A kernel compression strategy was declared, but kernel compression was not enabled in the build");
+  }
+
+  fbl::AllocChecker ac;
+  fbl::RefPtr<VmCompressedStorage> storage;
+  switch (gBootOptions->compression_storage_strategy) {
+    case CompressionStorageStrategy::kTriPage:
+      storage = fbl::AdoptRef<VmTriPageStorage>(new (&ac) VmTriPageStorage());
+      if (!ac.check()) {
+        printf("[ZRAM]: Failed to create tri_page compressed storage area\n");
+        return nullptr;
+      }
+      printf("[ZRAM]: Using compressed storage strategy: tri_page\n");
+      break;
+    case CompressionStorageStrategy::kNone:
+      // Original check should have handled this.
+      panic("Unreachable");
+      break;
+  }
+  ASSERT(storage);
+
+  if (gBootOptions->compression_threshold == 0 || gBootOptions->compression_threshold > 100) {
+    panic("ERROR: kernel.compression.threshold must be between 1 and 100");
+  }
+
+  const uint32_t threshold =
+      static_cast<uint32_t>(PAGE_SIZE) * gBootOptions->compression_threshold / 100u;
+
+  fbl::RefPtr<VmCompressionStrategy> strategy;
+  switch (gBootOptions->compression_strategy) {
+    case CompressionStrategy::kLz4:
+      // Although we checked earlier that the kernel is built with page compression, the
+      // VmLz4Compressor is not declared as a type when this is not enabled, and so we must guard
+      // this block separately.
+#if PAGE_COMPRESSION
+      strategy = VmLz4Compressor::Create();
+      if (!strategy) {
+        printf("[ZRAM]: Failed to create lz4 compressor\n");
+        return nullptr;
+      }
+      printf("[ZRAM]: Using compression strategy: lz4\n");
+#endif
+      break;
+    case CompressionStrategy::kNone:
+      // Original check should have handled this.
+      panic("Unreachable");
+      break;
+  }
+  ASSERT(strategy);
+
+  fbl::RefPtr<VmCompression> compression = fbl::MakeRefCountedChecked<VmCompression>(
+      &ac, ktl::move(storage), ktl::move(strategy), threshold);
+  if (!ac.check()) {
+    printf("[ZRAM]: Failed to create compressor\n");
+    return nullptr;
+  }
+  ASSERT(compression);
+  return compression;
 }
 
 // These need to disable analysis as there is a requirement on the caller that the lock for the VMO

@@ -421,6 +421,22 @@ void BootOptions::PrintValue(const WallclockType& value, FILE* out) {
   Enum<WallclockType>(EnumPrinter{value, out});
 }
 
+bool BootOptions::Parse(std::string_view value, CompressionStrategy BootOptions::*member) {
+  return Enum<CompressionStrategy>(EnumParser{value, &(this->*member)}).Check();
+}
+
+void BootOptions::PrintValue(const CompressionStrategy& value, FILE* out) {
+  Enum<CompressionStrategy>(EnumPrinter{value, out});
+}
+
+bool BootOptions::Parse(std::string_view value, CompressionStorageStrategy BootOptions::*member) {
+  return Enum<CompressionStorageStrategy>(EnumParser{value, &(this->*member)}).Check();
+}
+
+void BootOptions::PrintValue(const CompressionStorageStrategy& value, FILE* out) {
+  Enum<CompressionStorageStrategy>(EnumPrinter{value, out});
+}
+
 bool BootOptions::Parse(std::string_view value,
                         std::optional<RamReservation> BootOptions::*member) {
   if (value.empty()) {

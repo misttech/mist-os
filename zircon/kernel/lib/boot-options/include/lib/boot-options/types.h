@@ -91,6 +91,16 @@ enum class WallclockType {
   kHpet,
 };
 
+enum class CompressionStrategy {
+  kNone,
+  kLz4,
+};
+
+enum class CompressionStorageStrategy {
+  kNone,
+  kTriPage,
+};
+
 // See kernel.test.ram.reserve.
 struct RamReservation {
   std::optional<uint64_t> paddr;

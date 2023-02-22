@@ -117,6 +117,8 @@ struct BootOptions {
   OPTION_TYPE(PageTableEvictionPolicy);
   OPTION_TYPE(RootJobBehavior);
   OPTION_TYPE(WallclockType);
+  OPTION_TYPE(CompressionStrategy);
+  OPTION_TYPE(CompressionStorageStrategy);
   OPTION_TYPE(std::optional<RamReservation>);
 #if BOOT_OPTIONS_TESTONLY_OPTIONS
   OPTION_TYPE(TestEnum);
