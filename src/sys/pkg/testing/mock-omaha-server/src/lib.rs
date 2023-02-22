@@ -712,6 +712,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     #[should_panic(expected = "configured to expect CUP")]
+    // TODO(fxbug.dev/88496): delete the below
+    #[cfg_attr(feature = "variant_asan", ignore)]
     async fn test_server_expect_cup_panic() {
         let server_url = OmahaServer::start(Arc::new(Mutex::new(
             OmahaServerBuilder::default()
