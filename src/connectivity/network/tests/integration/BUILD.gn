@@ -23,12 +23,12 @@ tests = [
   "sys",
 ]
 
-tests_with_expectations = [
-  "bridge",
-  "device",
-]
+tests_with_expectations = [ "device" ]
 
-tests_with_expectations_with_err_logs = [ "dhcp" ]
+tests_with_expectations_with_err_logs = [
+  "bridge",
+  "dhcp",
+]
 
 long_tests = [ "multicast-forwarding" ]
 

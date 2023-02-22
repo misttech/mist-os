@@ -10,12 +10,11 @@
             ],
         },
         {
-            type: "skip",
+            type: "expect_failure_with_err_logs",
             matchers: [
                 "test_ns3*",
                 "test_remove_bridge_interface_disabled_ns3",
-            ]
+            ],
         },
     ],
 }
-
