@@ -2027,7 +2027,8 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event: Option<OneOrMany<Name>>,
 
-    /// Deprecated.
+    // TODO(fxbug.dev/81980): remove.
+    /// Deprecated and unusable. In the process of being removed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream_deprecated: Option<Name>,
 
@@ -2064,19 +2065,24 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<RelativePath>,
 
-    /// TODO(fxb/96705): Document events features.
+    // TODO(fxbug.dev/81980): remove.
+    /// Deprecated and unusable. In the process of being removed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#as: Option<Name>,
 
-    /// TODO(fxb/96705): Document events features.
+    /// (`event_stream` only) When defined the event stream will contain events about only the
+    /// components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
 
-    /// TODO(fxb/96705): Document events features.
+    /// (`event_stream` only) Capability requested event streams require especifying a filter
+    /// referring to the protocol to which the events in the event stream apply. The content of the
+    /// filter will be an object mapping from "name" to the "protocol name".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Map<String, Value>>,
 
-    /// TODO(fxb/96705): Document events features.
+    // TODO(fxbug.dev/81980): remove.
+    /// Deprecated and unusable. In the process of being removed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscriptions: Option<EventSubscriptions>,
 
@@ -2188,11 +2194,13 @@ pub struct Expose {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<RelativePath>,
 
-    /// TODO(fxb/96705): Complete.
+    /// (`event_stream` only) the name(s) of the event streams being exposed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream: Option<OneOrMany<Name>>,
 
-    /// TODO(fxb/96705): Complete.
+    /// (`event_stream` only) the scope(s) of the event streams being exposed. This is used to
+    /// downscope the range of components to which an event stream refers and make it refer only to
+    /// the components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
 }
@@ -2328,15 +2336,17 @@ pub struct Offer {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<RelativePath>,
 
-    /// TODO(fxb/96705): Complete.
+    // TODO(fxbug.dev/81980): remove.
+    /// Deprecated and unusable. In the process of being removed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Map<String, Value>>,
 
-    /// TODO(fxb/96705): Complete.
+    /// (`event_stream` only) the name(s) of the event streams being offered.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream: Option<OneOrMany<Name>>,
 
-    /// TODO(fxb/96705): Complete.
+    /// (`event_stream` only) When defined the event stream will contain events about only the
+    /// components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<OneOrMany<EventScope>>,
 

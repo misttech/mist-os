@@ -393,7 +393,7 @@ this component and the capability's source.
 - `directory`: (_optional `string`_) When using a directory capability, the [name](#name) of a [directory capability][doc-directory].
 - `storage`: (_optional `string`_) When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
 - `event`: (_optional `string or array of strings`_) When using an event capability, the [name](#name) of an [event capability][doc-event].
-- `event_stream_deprecated`: (_optional `string`_) Deprecated.
+- `event_stream_deprecated`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
     - `parent`: The component's parent.
@@ -412,10 +412,13 @@ this component and the capability's source.
     the directory in the component's namespace.
 - `subdir`: (_optional `string`_) (`directory` only) A subdirectory within the directory capability to provide in the
     component's namespace.
-- `as`: (_optional `string`_) TODO(fxb/96705): Document events features.
-- `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Document events features.
-- `filter`: (_optional `object`_) TODO(fxb/96705): Document events features.
-- `subscriptions`: (_optional `string`_) TODO(fxb/96705): Document events features.
+- `as`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
+- `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
+    components defined in the scope.
+- `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require especifying a filter
+    referring to the protocol to which the events in the event stream apply. The content of the
+    filter will be an object mapping from "name" to the "protocol name".
+- `subscriptions`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `dependency`: (_optional `string`_) `dependency` _(optional)_: The type of dependency between the source and
     this component, one of:
     - `strong`: a strong dependency, which is used to determine shutdown
@@ -494,8 +497,10 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     the exposed directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
     capability to route.
-- `event_stream`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
-- `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
+- `event_stream`: (_optional `string or array of strings`_) (`event_stream` only) the name(s) of the event streams being exposed.
+- `scope`: (_optional `string or array of strings`_) (`event_stream` only) the scope(s) of the event streams being exposed. This is used to
+    downscope the range of components to which an event stream refers and make it refer only to
+    the components defined in the scope.
 
 Example:
 
@@ -576,9 +581,10 @@ instance or a [child collection][doc-collections].
     the offered directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
     capability to route.
-- `filter`: (_optional `object`_) TODO(fxb/96705): Complete.
-- `event_stream`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
-- `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
+- `filter`: (_optional `object`_) Deprecated and unusable. In the process of being removed.
+- `event_stream`: (_optional `string or array of strings`_) (`event_stream` only) the name(s) of the event streams being offered.
+- `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
+    components defined in the scope.
 - `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
     of:
     - `required` (default): a required dependency, the source must exist and provide it. Use
