@@ -1,12 +1,7 @@
-load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_select",
-)
-
 alias(
     name = "dist",
-    actual = fuchsia_select({
-        "@fuchsia_clang//:arm_build": "//{{relative_dir}}/arm64:dist",
-        "@fuchsia_clang//:x86_build": "//{{relative_dir}}/x64:dist",
+    actual = select({
+        "@rules_fuchsia//fuchsia/constraints:is_fuchsia_arm64": "//{{relative_dir}}/arm64:dist",
+        "@rules_fuchsia//fuchsia/constraints:is_fuchsia_x64": "//{{relative_dir}}/x64:dist",
     }),
 )
