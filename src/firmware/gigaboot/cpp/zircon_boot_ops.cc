@@ -137,6 +137,44 @@ uint8_t* GetLoadBuffer(ZirconBootOps* ops, size_t* size) {
   return status == EFI_SUCCESS ? reinterpret_cast<uint8_t*>(addr) : nullptr;
 }
 
+bool VerifiedBootGetPartitionSize(ZirconBootOps* ops, const char* part, size_t* out) {
+  auto gpt_device = FindEfiGptDevice();
+  if (gpt_device.is_error()) {
+    return false;
+  }
+
+  auto load_res = gpt_device.value().Load();
+  if (load_res.is_error()) {
+    return false;
+  }
+
+  part = MaybeMapPartitionName(gpt_device.value(), part).data();
+  const gpt_entry_t* gpt_entry = gpt_device.value().FindPartition(part);
+  if (!gpt_entry) {
+    return false;
+  }
+
+  *out = (gpt_entry->last - gpt_entry->first + 1) * gpt_device.value().BlockSize();
+  return true;
+}
+
+// TODO(b/235489025): Implement these callbacks correctly.
+bool VerifiedBootReadIsDeviceLocked(ZirconBootOps* ops, bool* out_is_locked) {
+  *out_is_locked = true;
+  return true;
+}
+
+bool VerifiedBootWriteRollbackIndex(ZirconBootOps* ops, size_t rollback_index_location,
+                                    uint64_t rollback_index) {
+  return true;
+}
+
+bool VerifiedBootReadRollbackIndex(ZirconBootOps* ops, size_t rollback_index_location,
+                                   uint64_t* out_rollback_index) {
+  *out_rollback_index = 0;
+  return true;
+}
+
 }  // namespace
 
 // TODO(b/269178761): write unit tests for "default" implementation of zircon boot ops code.
@@ -150,13 +188,10 @@ ZirconBootOps GetZirconBootOps() {
   zircon_boot_ops.get_kernel_load_buffer = GetLoadBuffer;
   zircon_boot_ops.firmware_can_boot_kernel_slot = nullptr;
 
-  // TODO(b/235489025): Implement the following callbacks for libavb integration. These operations
-  // might differ from product to product. Thus we may need to implement them as a configurable
-  // sysdeps and let product specify them.
-  zircon_boot_ops.verified_boot_get_partition_size = nullptr;
-  zircon_boot_ops.verified_boot_read_rollback_index = nullptr;
-  zircon_boot_ops.verified_boot_write_rollback_index = nullptr;
-  zircon_boot_ops.verified_boot_read_is_device_locked = nullptr;
+  zircon_boot_ops.verified_boot_get_partition_size = VerifiedBootGetPartitionSize;
+  zircon_boot_ops.verified_boot_read_rollback_index = VerifiedBootReadRollbackIndex;
+  zircon_boot_ops.verified_boot_write_rollback_index = VerifiedBootWriteRollbackIndex;
+  zircon_boot_ops.verified_boot_read_is_device_locked = VerifiedBootReadIsDeviceLocked;
   zircon_boot_ops.verified_boot_read_permanent_attributes = ReadPermanentAttributes;
   zircon_boot_ops.verified_boot_read_permanent_attributes_hash = ReadPermanentAttributesHash;
   return zircon_boot_ops;
