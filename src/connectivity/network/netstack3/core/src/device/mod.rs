@@ -59,7 +59,7 @@ use crate::{
         types::{AddableEntry, AddableEntryEither},
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
     },
-    sync::{ReferenceCounted, RwLock, WeakReferenceCounted},
+    sync::{KillableRc, RwLock, WeakRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -280,8 +280,8 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx> for &'_ Sync
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub(crate) struct DevicesIter<'s, I: Instant> {
-    ethernet: id_map::Iter<'s, ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>>,
-    loopback: core::option::Iter<'s, ReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>>,
+    ethernet: id_map::Iter<'s, KillableRc<IpLinkDeviceState<I, EthernetDeviceState>>>,
+    loopback: core::option::Iter<'s, KillableRc<IpLinkDeviceState<I, LoopbackDeviceState>>>,
 }
 
 impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
@@ -290,9 +290,9 @@ impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
         ethernet
-            .map(|(id, state)| EthernetDeviceId(id, ReferenceCounted::downgrade(state)).into())
+            .map(|(id, state)| EthernetDeviceId(id, KillableRc::downgrade(state)).into())
             .chain(loopback.map(|state| {
-                DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
+                DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
             }))
             .next()
     }
@@ -357,7 +357,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
     fn loopback_id(&self) -> Option<Self::DeviceId> {
         let devices = self.state.device.devices.read();
         devices.loopback.as_ref().map(|state| {
-            DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
+            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
         })
     }
 }
@@ -548,7 +548,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
     fn loopback_id(&self) -> Option<Self::DeviceId> {
         let devices = self.state.device.devices.read();
         devices.loopback.as_ref().map(|state| {
-            DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
+            DeviceIdInner::Loopback(LoopbackDeviceId(KillableRc::downgrade(state))).into()
         })
     }
 }
@@ -650,7 +650,7 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub(crate) struct EthernetDeviceId<I: Instant>(
     usize,
-    WeakReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>,
+    WeakRc<IpLinkDeviceState<I, EthernetDeviceState>>,
 );
 
 impl<I: Instant> PartialEq for EthernetDeviceId<I> {
@@ -857,8 +857,8 @@ impl FrameDestination {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 struct Devices<I: Instant> {
-    ethernet: IdMap<ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>>,
-    loopback: Option<ReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>>,
+    ethernet: IdMap<KillableRc<IpLinkDeviceState<I, EthernetDeviceState>>>,
+    loopback: Option<KillableRc<IpLinkDeviceState<I, LoopbackDeviceState>>>,
 }
 
 /// The state associated with the device layer.
@@ -916,11 +916,11 @@ impl<I: Instant> DeviceLayerState<I> {
     ) -> DeviceId<I> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
-        let ptr = ReferenceCounted::new(IpLinkDeviceState::new(
+        let ptr = KillableRc::new(IpLinkDeviceState::new(
             EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
             self.origin.clone(),
         ));
-        let weak_ptr = ReferenceCounted::downgrade(&ptr);
+        let weak_ptr = KillableRc::downgrade(&ptr);
         let id = ethernet.push(ptr);
         debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
         EthernetDeviceId(id, weak_ptr).into()
@@ -934,11 +934,11 @@ impl<I: Instant> DeviceLayerState<I> {
             return Err(ExistsError);
         }
 
-        let ptr = ReferenceCounted::new(IpLinkDeviceState::new(
+        let ptr = KillableRc::new(IpLinkDeviceState::new(
             LoopbackDeviceState::new(mtu),
             self.origin.clone(),
         ));
-        let id = ReferenceCounted::downgrade(&ptr);
+        let id = KillableRc::downgrade(&ptr);
 
         *loopback = Some(ptr);
 
@@ -1030,14 +1030,14 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
                 .remove(*id)
                 .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
             let ptr = ptr.upgrade().unwrap();
-            assert!(ReferenceCounted::ptr_eq(&removed, &ptr));
+            assert!(KillableRc::ptr_eq(&removed, &ptr));
             debug!("removing Ethernet device with ID {}", id);
         }
         DeviceIdInner::Loopback(LoopbackDeviceId(ptr)) => {
-            let removed: ReferenceCounted<IpLinkDeviceState<_, _>> =
+            let removed: KillableRc<IpLinkDeviceState<_, _>> =
                 devices.loopback.take().expect("loopback device does not exist");
             let ptr = ptr.upgrade().unwrap();
-            assert!(ReferenceCounted::ptr_eq(&removed, &ptr));
+            assert!(KillableRc::ptr_eq(&removed, &ptr));
             debug!("removing Loopback device");
         }
     }

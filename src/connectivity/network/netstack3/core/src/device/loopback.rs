@@ -29,14 +29,14 @@ use crate::{
         state::IpLinkDeviceState,
         with_loopback_state, Device, DeviceIdContext, DeviceLayerEventDispatcher, FrameDestination,
     },
-    sync::WeakReferenceCounted,
+    sync::WeakRc,
     DeviceId, Instant, NonSyncContext, SyncCtx,
 };
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub(crate) struct LoopbackDeviceId<I: Instant>(
-    pub(super) WeakReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>,
+    pub(super) WeakRc<IpLinkDeviceState<I, LoopbackDeviceState>>,
 );
 
 impl<I: Instant> PartialEq for LoopbackDeviceId<I> {
