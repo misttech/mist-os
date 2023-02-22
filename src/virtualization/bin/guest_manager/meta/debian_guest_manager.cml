@@ -10,7 +10,7 @@
     children: [
         {
             name: "guest_pkg",
-            url: "fuchsia-pkg://fuchsia.com/debian_guest#meta/debian_guest.cm",
+            url: "debian_guest#meta/debian_guest.cm",
         },
     ],
     expose: [

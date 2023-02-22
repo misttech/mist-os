@@ -62,6 +62,7 @@ fuchsia_unittest_package("guest_manager_rs_test") {
 }
 
 fuchsia_component("debian_guest_manager_cmp") {
+  visibility = [ ":*" ]
   manifest = "meta/debian_guest_manager.cml"
   deps = [ ":guest_manager_bin" ]
   component_name = "debian_guest_manager_rs"
@@ -69,4 +70,5 @@ fuchsia_component("debian_guest_manager_cmp") {
 
 fuchsia_package("debian_guest_manager_rs") {
   deps = [ ":debian_guest_manager_cmp" ]
+  subpackages = [ "//src/virtualization/packages/debian_guest" ]
 }

@@ -22,13 +22,15 @@ config("guest_test_util") {
   }
 }
 
-# Packages required to run the guest integration tests.
 guest_packages = [
-  "//src/virtualization/bin/vmm",
-  "//src/virtualization/bin/guest_manager:debian_guest_manager_cmp",
-  "//src/virtualization/bin/guest_manager:zircon_guest_manager_cmp",
-  "//src/virtualization/bin/termina_guest_manager:termina_guest_manager_cmp",
-  "//src/virtualization/packages",
+  "//src/virtualization/bin/guest_manager:debian_guest_manager",
+  "//src/virtualization/bin/guest_manager:zircon_guest_manager",
+
+  # TODO(https://fxbug.dev/122217): when
+  # fuchsia.component.test/Realm.InitMutableConfigFromPackage works with
+  # subpackaged components, replace with:
+  # "//src/virtualization/bin/termina_guest_manager",
+  "//src/virtualization/packages/termina_guest",
 ]
 
 linux_tests_label = "//src/virtualization/packages/debian_guest:tests"
@@ -75,20 +77,22 @@ group("tests") {
       ":virtualization_sound_tests_pkg",
     ]
   }
-
-  # Ensure guest packages are available in the manifest.
-  data_deps = guest_packages
 }
 
 group("test_images") {
   testonly = true
   deps = [
-           ":debian_tests_img",
-           ":linux_extras_img",
-           ":termina_extras_img",
-           linux_tests_label,
-           termina_extras_label,
-         ] + guest_packages
+    ":debian_tests_img",
+    ":linux_extras_img",
+    ":termina_extras_img",
+    linux_tests_label,
+    termina_extras_label,
+
+    # TODO(https://fxbug.dev/122217): when
+    # fuchsia.component.test/Realm.InitMutableConfigFromPackage works with
+    # subpackaged components, remove this line.
+    "//src/virtualization/bin/termina_guest_manager:termina_guest_manager_cmp",
+  ]
 }
 
 executable("virtualization_core_tests") {
@@ -110,18 +114,18 @@ executable("virtualization_core_tests") {
 }
 
 fuchsia_test_component("virtualization_core_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_core_tests"
   deps = [
-           ":test_images",
-           ":virtualization_core_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_core_tests",
+  ]
   manifest = "meta/virtualization_core_tests.cml"
 }
 
 fuchsia_test_package("virtualization_core_tests_pkg") {
   package_name = "virtualization-core-tests"
   test_components = [ ":virtualization_core_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -147,18 +151,18 @@ executable("virtualization_shutdown_tests") {
 }
 
 fuchsia_test_component("virtualization_shutdown_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_shutdown_tests"
   deps = [
-           ":test_images",
-           ":virtualization_shutdown_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_shutdown_tests",
+  ]
   manifest = "meta/virtualization_shutdown_tests.cml"
 }
 
 fuchsia_test_package("virtualization_shutdown_tests_pkg") {
   package_name = "virtualization_shutdown_tests"
   test_components = [ ":virtualization_shutdown_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -188,18 +192,18 @@ executable("virtualization_balloon_tests") {
 }
 
 fuchsia_test_component("virtualization_balloon_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_balloon_tests"
   deps = [
-           ":test_images",
-           ":virtualization_balloon_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_balloon_tests",
+  ]
   manifest = "meta/virtualization_balloon_tests.cml"
 }
 
 fuchsia_test_package("virtualization_balloon_tests_pkg") {
   package_name = "virtualization_balloon_tests"
   test_components = [ ":virtualization_balloon_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -227,18 +231,18 @@ executable("virtualization_block_tests") {
 }
 
 fuchsia_test_component("virtualization_block_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_block_tests"
   deps = [
-           ":test_images",
-           ":virtualization_block_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_block_tests",
+  ]
   manifest = "meta/virtualization_block_tests.cml"
 }
 
 fuchsia_test_package("virtualization_block_tests_pkg") {
   package_name = "virtualization-block-tests"
   test_components = [ ":virtualization_block_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -266,18 +270,18 @@ executable("virtualization_gpu_tests") {
 }
 
 fuchsia_test_component("virtualization_gpu_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_gpu_tests"
   deps = [
-           ":test_images",
-           ":virtualization_gpu_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_gpu_tests",
+  ]
   manifest = "meta/virtualization_gpu_tests.cml"
 }
 
 fuchsia_test_package("virtualization_gpu_tests_pkg") {
   package_name = "virtualization-gpu-tests"
   test_components = [ ":virtualization_gpu_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_vulkan_envs
     log_settings = {
@@ -303,18 +307,18 @@ executable("virtualization_input_tests") {
 }
 
 fuchsia_test_component("virtualization_input_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_input_tests"
   deps = [
-           ":test_images",
-           ":virtualization_input_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_input_tests",
+  ]
   manifest = "meta/virtualization_input_tests.cml"
 }
 
 fuchsia_test_package("virtualization_input_tests_pkg") {
   package_name = "virtualization-input-tests"
   test_components = [ ":virtualization_input_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     # Require vulkan for UITestManager
     environments = guest_vulkan_envs
@@ -342,18 +346,18 @@ executable("virtualization_net_tests") {
 }
 
 fuchsia_test_component("virtualization_net_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_net_tests"
   deps = [
-           ":test_images",
-           ":virtualization_net_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_net_tests",
+  ]
   manifest = "meta/virtualization_net_tests.cml"
 }
 
 fuchsia_test_package("virtualization_net_tests_pkg") {
   package_name = "virtualization-net-tests"
   test_components = [ ":virtualization_net_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -381,7 +385,6 @@ executable("virtualization_sound_tests") {
 }
 
 fuchsia_test_component("virtualization_sound_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_sound_tests"
   deps = [
     ":test_images",
@@ -393,6 +396,7 @@ fuchsia_test_component("virtualization_sound_tests_cmp") {
 audio_core_test_package("virtualization_sound_tests_pkg") {
   package_name = "virtualization-sound-tests"
   test_components = [ ":virtualization_sound_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -422,18 +426,18 @@ executable("virtualization_vsock_tests") {
 }
 
 fuchsia_test_component("virtualization_vsock_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_vsock_tests"
   deps = [
-           ":test_images",
-           ":virtualization_vsock_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_vsock_tests",
+  ]
   manifest = "meta/virtualization_vsock_tests.cml"
 }
 
 fuchsia_test_package("virtualization_vsock_tests_pkg") {
   package_name = "virtualization-vsock-tests"
   test_components = [ ":virtualization_vsock_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -463,18 +467,18 @@ executable("virtualization_mem_tests") {
 }
 
 fuchsia_test_component("virtualization_mem_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_mem_tests"
   deps = [
-           ":test_images",
-           ":virtualization_mem_tests",
-         ] + guest_packages
+    ":test_images",
+    ":virtualization_mem_tests",
+  ]
   manifest = "meta/virtualization_mem_tests.cml"
 }
 
 fuchsia_test_package("virtualization_mem_tests_pkg") {
   package_name = "virtualization_mem_tests"
   test_components = [ ":virtualization_mem_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = guest_envs
     log_settings = {
@@ -582,7 +586,6 @@ resource("linux_extras_img") {
 }
 
 fuchsia_test_component("virtualization_magma_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "virtualization_magma_tests"
   deps = [
     ":test_images",
@@ -594,6 +597,7 @@ fuchsia_test_component("virtualization_magma_tests_cmp") {
 fuchsia_test_package("virtualization_magma_tests_pkg") {
   package_name = "virtualization_magama_tests"
   test_components = [ ":virtualization_magma_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     environments = [ nuc_env ]
     log_settings = {
@@ -618,7 +622,6 @@ executable("termina_container_tests") {
 }
 
 fuchsia_test_component("termina_container_tests_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "termina_container_tests"
   deps = [
     ":termina_container_tests",
@@ -630,6 +633,7 @@ fuchsia_test_component("termina_container_tests_cmp") {
 fuchsia_test_package("termina_container_tests_pkg") {
   package_name = "termina_container_tests"
   test_components = [ ":termina_container_tests_cmp" ]
+  subpackages = guest_packages
   test_specs = {
     if (is_debug) {
       # See fxbug.dev/110903 for test timeouts when starting the container.

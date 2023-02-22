@@ -214,6 +214,7 @@ template("audio_core_test_package") {
     forward_variables_from(invoker,
                            [
                              "package_name",
+                             "subpackages",
                              "test_components",
                              "test_specs",
                            ])

@@ -9,9 +9,4 @@
     program: {
         binary: "bin/virtualization_sound_tests",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "termina_guest" ],
-        },
-    },
 }

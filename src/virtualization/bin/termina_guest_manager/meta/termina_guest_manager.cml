@@ -13,7 +13,7 @@
     children: [
         {
             name: "guest_pkg",
-            url: "fuchsia-pkg://fuchsia.com/termina_guest#meta/termina_guest.cm",
+            url: "termina_guest#meta/termina_guest.cm",
         },
     ],
     capabilities: [

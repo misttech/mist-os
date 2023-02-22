@@ -32,7 +32,6 @@ rustc_test("guest") {
 }
 
 fuchsia_test_component("netemul-guest-self-test") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/netemul-guest-self-test.cml"
   deps = [ ":guest" ]
 }
@@ -46,9 +45,11 @@ fuchsia_test_package("netemul-guest-self-tests") {
 
     # netemul-guest expose FIDL APIs for creating and controlling guests.
     "//src/connectivity/network/testing/netemul/guest:netemul-guest",
+  ]
 
+  subpackages = [
     # guest-manager is used by netemul-guest to create and interact with guests.
-    "//src/virtualization/bin/guest_manager:debian_guest_manager_cmp",
+    "//src/virtualization/bin/guest_manager:debian_guest_manager",
   ]
 
   test_specs = {

@@ -11,12 +11,4 @@
             protocol: [ "fuchsia.kernel.Stats" ],
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "debian_guest",
-                "termina_guest",
-            ],
-        },
-    },
 }

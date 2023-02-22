@@ -10,15 +10,4 @@
     program: {
         binary: "test/f2fs-dir-compatibility-test",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "debian_guest",
-                "debian_guest_manager",
-                "virtio_block",
-                "virtio_console",
-                "vmm",
-            ],
-        },
-    },
 }

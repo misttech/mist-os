@@ -30,18 +30,4 @@
             to: "#netemul-guest",
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "debian_guest",
-                "debian_guest_manager",
-                "virtio_block",
-                "virtio_console",
-                "virtio_net",
-                "virtio_net_rs",
-                "virtio_vsock",
-                "vmm",
-            ],
-        },
-    },
 }

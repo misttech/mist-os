@@ -6,9 +6,4 @@
     program: {
         binary: "bin/virtualization_input_tests",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "debian_guest" ],
-        },
-    },
 }

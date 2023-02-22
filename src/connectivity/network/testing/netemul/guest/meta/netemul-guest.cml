@@ -10,7 +10,7 @@
     children: [
         {
             name: "guest-manager",
-            url: "#meta/debian_guest_manager.cm",
+            url: "debian_guest_manager#meta/debian_guest_manager.cm",
         },
     ],
     capabilities: [

@@ -6,12 +6,4 @@
     program: {
         binary: "bin/virtualization_vsock_tests",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "debian_guest",
-                "termina_guest",
-            ],
-        },
-    },
 }

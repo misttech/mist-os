@@ -239,6 +239,17 @@ template("fuchsia_component_manifest") {
 #   testonly
 #   visibility
 template("fuchsia_component") {
+  forwarded = [
+    "data_deps",
+    "deps",
+    "component_name",
+    "manifest",
+    "metadata",
+    "restricted_features",
+    "testonly",
+    "visibility",
+    "experimental_force_runner",
+  ]
   if (current_toolchain == default_toolchain) {
     _manifest_defined = defined(invoker.manifest)
     _cm_label_defined = defined(invoker.cm_label)
@@ -246,23 +257,11 @@ template("fuchsia_component") {
         (_manifest_defined && !_cm_label_defined) ||
             (!_manifest_defined && _cm_label_defined),
         "Exactly one of `manifest` or `cm_label` argument must be specified when calling fuchsia_component($target_name)")
-
     if (defined(invoker.manifest)) {
       # Compile the manifest from source
       cm_target = "${target_name}_manifest_compile"
       fuchsia_component_manifest(cm_target) {
-        forward_variables_from(invoker,
-                               [
-                                 "data_deps",
-                                 "deps",
-                                 "component_name",
-                                 "manifest",
-                                 "metadata",
-                                 "restricted_features",
-                                 "testonly",
-                                 "visibility",
-                                 "experimental_force_runner",
-                               ])
+        forward_variables_from(invoker, forwarded)
         if (!defined(component_name)) {
           component_name = invoker.target_name
         }
@@ -276,6 +275,7 @@ template("fuchsia_component") {
       cm_label = ":$cm_target"
     } else {
       cm_label = invoker.cm_label
+      not_needed(invoker, forwarded)
     }
 
     if (!defined(invoker.check_includes) || invoker.check_includes) {
@@ -397,6 +397,12 @@ template("fuchsia_component") {
       forward_variables_from(invoker, [ "testonly" ])
       deps = [ ":$target_name($default_toolchain)" ]
     }
-    not_needed(invoker, "*")
+    not_needed(invoker,
+               forwarded + [
+                     "check_includes",
+                     "check_references",
+                     "cm_label",
+                     "manifest_deps",
+                   ])
   }
 }

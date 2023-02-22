@@ -5,18 +5,9 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-guest_packages = [
-  "//src/virtualization/bin/vmm",
-  "//src/virtualization/bin/guest_manager:debian_guest_manager",
-  "//src/virtualization/bin/guest_manager:zircon_guest_manager",
-  "//src/virtualization/bin/termina_guest_manager:termina_guest_manager_cmp",
-  "//src/virtualization/packages",
-]
-
 group("tests") {
   testonly = true
   deps = [ ":f2fs-compatibility-test-pkg" ]
-  data_deps = guest_packages
 }
 
 test_sources = [
@@ -82,45 +73,39 @@ test("f2fs-mkfs-fsck-compatibility-test") {
   deps = test_deps
 }
 
-component_deps = [ "//src/virtualization/tests:test_images" ] + guest_packages
+component_deps = [ "//src/virtualization/tests:test_images" ]
 
 fuchsia_test_component("f2fs-dir-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-dir-compatibility-test-cmp"
   deps = [ ":f2fs-dir-compatibility-test" ] + component_deps
   manifest = "f2fs_dir_compatibility.cml"
 }
 
 fuchsia_test_component("f2fs-file-attr-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-file-attr-compatibility-test-cmp"
   deps = [ ":f2fs-file-attr-compatibility-test" ] + component_deps
   manifest = "f2fs_file_attr_compatibility.cml"
 }
 
 fuchsia_test_component("f2fs-file-rw-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-file-rw-compatibility-test-cmp"
   deps = [ ":f2fs-file-rw-compatibility-test" ] + component_deps
   manifest = "f2fs_file_rw_compatibility.cml"
 }
 
 fuchsia_test_component("f2fs-file-slow-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-file-slow-compatibility-test-cmp"
   deps = [ ":f2fs-file-slow-compatibility-test" ] + component_deps
   manifest = "f2fs_file_slow_compatibility.cml"
 }
 
 fuchsia_test_component("f2fs-inline-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-inline-compatibility-test-cmp"
   deps = [ ":f2fs-inline-compatibility-test" ] + component_deps
   manifest = "f2fs_inline_compatibility.cml"
 }
 
 fuchsia_test_component("f2fs-mkfs-fsck-compatibility-test-cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   component_name = "f2fs-mkfs-fsck-compatibility-test-cmp"
   deps = [ ":f2fs-mkfs-fsck-compatibility-test" ] + component_deps
   manifest = "f2fs_mkfs_fsck_compatibility.cml"
@@ -136,6 +121,8 @@ fuchsia_test_package("f2fs-compatibility-test-pkg") {
     ":f2fs-inline-compatibility-test-cmp",
     ":f2fs-mkfs-fsck-compatibility-test-cmp",
   ]
+  subpackages =
+      [ "//src/virtualization/bin/guest_manager:debian_guest_manager" ]
   test_specs = {
     environments = guest_envs
     log_settings = {

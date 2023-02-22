@@ -55,7 +55,7 @@ void GuestInteractionTest::SetUp() {
 
   // Launch the Debian guest
   constexpr auto kFakeNetstackComponentName = "fake_netstack";
-  constexpr auto kDebianGuestManagerUrl = "#meta/debian_guest_manager.cm";
+  constexpr auto kDebianGuestManagerUrl = "debian_guest_manager#meta/debian_guest_manager.cm";
 
   constexpr auto kGuestManagerName = "guest_manager";
 

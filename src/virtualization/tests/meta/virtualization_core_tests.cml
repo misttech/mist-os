@@ -6,13 +6,4 @@
     program: {
         binary: "bin/virtualization_core_tests",
     },
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "debian_guest",
-                "termina_guest",
-                "zircon_guest",
-            ],
-        },
-    },
 }

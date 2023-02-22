@@ -31,8 +31,6 @@
 #include <grpc++/server_posix.h>
 
 namespace {
-[[maybe_unused]] constexpr const char kLinuxGuestPackage[] =
-    "fuchsia-pkg://fuchsia.com/termina_guest#meta/termina_guest.cmx";
 constexpr const char kContainerName[] = "penguin";
 constexpr const char kContainerImageAlias[] = "debian/bullseye";
 constexpr const char kContainerImageServer[] = "https://storage.googleapis.com/cros-containers/96";

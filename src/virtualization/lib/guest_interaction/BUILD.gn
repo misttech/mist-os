@@ -167,11 +167,9 @@ resource("test_script") {
 }
 
 fuchsia_test_component("server_daemon_test_cmp") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [
     ":server_daemon_test",
     ":test_script",
-    "//src/virtualization/bin/guest_manager:debian_guest_manager_cmp",
   ]
   component_name = "server_daemon_test"
   manifest = "meta/server_daemon_test.cml"
@@ -179,6 +177,8 @@ fuchsia_test_component("server_daemon_test_cmp") {
 
 fuchsia_test_package("guest_interaction_tests") {
   test_components = [ ":server_daemon_test_cmp" ]
+  subpackages =
+      [ "//src/virtualization/bin/guest_manager:debian_guest_manager" ]
   test_specs = {
     environments = guest_envs
     log_settings = {

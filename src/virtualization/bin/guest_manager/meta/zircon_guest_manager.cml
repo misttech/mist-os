@@ -10,7 +10,7 @@
     children: [
         {
             name: "guest_pkg",
-            url: "fuchsia-pkg://fuchsia.com/zircon_guest#meta/zircon_guest.cm",
+            url: "zircon_guest#meta/zircon_guest.cm",
         },
     ],
     expose: [
