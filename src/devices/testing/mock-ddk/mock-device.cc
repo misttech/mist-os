@@ -11,7 +11,12 @@
 #include <latch>
 
 MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
-    : parent_(parent), ops_(args->ops), ctx_(args->ctx), name_(args->name) {
+    : parent_(parent),
+      ops_(args->ops),
+      ctx_(args->ctx),
+      name_(args->name),
+      inspect_(zx::vmo{args->inspect_vmo}),
+      outgoing_(zx::channel{args->outgoing_dir_channel}) {
   if (args->proto_id && args->proto_ops) {
     AddProtocol(args->proto_id, args->proto_ops, ctx_);
   }
@@ -27,8 +32,6 @@ MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
                   args->metadata_list[i].length);
     }
   }
-
-  inspect_ = zx::vmo(args->inspect_vmo);
 }
 
 // static

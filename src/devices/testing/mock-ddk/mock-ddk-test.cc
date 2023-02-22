@@ -768,3 +768,16 @@ TEST(MockDdk, GetInspectVmo) {
 
   ASSERT_EQ(test_device->zxdev()->GetInspectVmo().get(), handle);
 }
+
+TEST(MockDdk, GetOutgoingDir) {
+  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
+  auto dev = std::make_unique<TestDevice>(parent.get());
+  zx::channel chan0, chan1;
+  ASSERT_OK(zx::channel::create(0, &chan0, &chan1));
+  zx_handle_t handle = chan0.get();
+  ASSERT_OK(dev->DdkAdd(ddk::DeviceAddArgs("my-test-device").set_outgoing_dir(std::move(chan0))));
+  // The MockDevice is now in charge of the memory for dev.
+  TestDevice* test_device = dev.release();
+
+  ASSERT_EQ(test_device->zxdev()->outgoing().channel()->get(), handle);
+}

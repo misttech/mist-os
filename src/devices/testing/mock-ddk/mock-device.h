@@ -152,6 +152,8 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
 
   const zx::vmo& GetInspectVmo() const { return inspect_; }
 
+  fidl::UnownedClientEnd<fuchsia_io::Directory> outgoing() const { return outgoing_; }
+
   // Metadata is often set for the parent of a device, to be available when the device
   // calls device_get_metadata
   void SetMetadata(uint32_t type, const void* data, size_t data_length);
@@ -319,6 +321,7 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   std::vector<zx_device_prop_t> props_;
   std::vector<zx_device_str_prop_t> str_props_;
   zx::vmo inspect_;
+  fidl::ClientEnd<fuchsia_io::Directory> outgoing_;
 };
 
 namespace mock_ddk {
