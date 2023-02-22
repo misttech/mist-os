@@ -10,7 +10,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/sync/completion.h>
 #include <stdio.h>

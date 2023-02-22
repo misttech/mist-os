@@ -5,7 +5,6 @@
 #include "parent_device.h"
 
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/platform-device.h>
 
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"

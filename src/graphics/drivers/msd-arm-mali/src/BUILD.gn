@@ -102,7 +102,6 @@ source_set("src") {
     "//sdk/banjo/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/graphics/lib/magma/src/magma_util:short_macros",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg",

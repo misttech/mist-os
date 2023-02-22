@@ -81,7 +81,6 @@ test("goldfish-unittests") {
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zxtest",
   ]

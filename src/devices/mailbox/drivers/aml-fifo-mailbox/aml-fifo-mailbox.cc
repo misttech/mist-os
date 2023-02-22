@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>

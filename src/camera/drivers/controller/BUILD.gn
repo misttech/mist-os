@@ -78,7 +78,6 @@ source_set("source") {
     "//src/camera/drivers/controller/configs",
     "//src/camera/lib/format_conversion",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/devices/lib/driver",
     "//src/devices/lib/sysmem",
     "//src/lib/ddk",

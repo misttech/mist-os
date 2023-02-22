@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 

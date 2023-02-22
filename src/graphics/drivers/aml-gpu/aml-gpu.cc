@@ -12,7 +12,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
 #include <stdio.h>

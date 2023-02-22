@@ -9,7 +9,6 @@
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev.h>
-#include <lib/device-protocol/platform-device.h>
 #include <zircon/fidl.h>
 
 #include <ddktl/device.h>

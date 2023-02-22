@@ -30,7 +30,6 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp_wire",
     "//sdk/lib/fidl",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",

@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/zx/event.h>
 
 #include <vector>

@@ -31,7 +31,6 @@ source_set("optee_lib") {
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
     "//sdk/lib/fit-promise",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/devices/lib/mmio",
     "//src/lib/ddktl",
     "//src/security/lib/tee/tee-client-api:tee-client-api-headers",

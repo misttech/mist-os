@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <lib/device-protocol/platform-device.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>

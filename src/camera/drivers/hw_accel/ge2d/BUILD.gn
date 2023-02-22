@@ -38,7 +38,6 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//src/camera/drivers/hw_accel/task:camera-task",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/lib/device-protocol-platform-device",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",

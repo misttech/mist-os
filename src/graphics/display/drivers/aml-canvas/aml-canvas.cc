@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/platform-device.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
