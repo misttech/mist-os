@@ -7,27 +7,48 @@ import(
 import("//build/product.gni")
 
 if (use_bringup_assembly) {
-  _gn_image_name = "default"
-  _bazel_image_target_name = "bringup"
-  _bazel_image_name = "bringup"
+  verify_images_configuration("verify_bringup") {
+    testonly = true
+    gn_images_config_target = "//boards/images:default"
+    bazel_images_config_target =
+        "//build/bazel/assembly/images_configurations:bringup"
+    bazel_inputs =
+        [ "//build/images/bringup:bringup.bazel_images_config_inputs" ]
+  }
 } else {
-  _gn_image_name = "x64"
-  _bazel_image_target_name = "fuchsia_x64"
-  _bazel_image_name = "fuchsia"
+  verify_images_configuration("verify_fuchsia_x64") {
+    testonly = true
+    gn_images_config_target = "//boards/images:x64"
+    bazel_images_config_target =
+        "//build/bazel/assembly/images_configurations:fuchsia_x64"
+    bazel_inputs =
+        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
+  }
 }
 
-verify_images_configuration("verify_images_configuration") {
-  gn_images_config_target = "//boards/images:${_gn_image_name}"
-  bazel_images_config_target =
-      "//build/bazel/assembly/images_configurations:${_bazel_image_target_name}"
-
-  bazel_inputs = [ "//build/images/${_bazel_image_name}:${_bazel_image_name}.bazel_images_config_inputs" ]
-
-  # Required since ${_bazel_image_name}.bazel_images_config_inputs is testonly.
+verify_images_configuration("verify_zedboot_default") {
   testonly = true
+  gn_images_config_target = "//boards/images:zedboot_default"
+  bazel_images_config_target =
+      "//build/bazel/assembly/images_configurations:zedboot_default"
+}
+
+verify_images_configuration("verify_zedboot_qemu") {
+  testonly = true
+  gn_images_config_target = "//boards/images:zedboot_qemu"
+  bazel_images_config_target =
+      "//build/bazel/assembly/images_configurations:zedboot_qemu"
 }
 
 group("verifications") {
   testonly = true
-  deps = [ ":verify_images_configuration" ]
+  deps = [
+    ":verify_zedboot_default",
+    ":verify_zedboot_qemu",
+  ]
+  if (use_bringup_assembly) {
+    deps += [ ":verify_bringup" ]
+  } else {
+    deps += [ ":verify_fuchsia_x64" ]
+  }
 }
