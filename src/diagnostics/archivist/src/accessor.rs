@@ -188,12 +188,9 @@ impl ArchiveAccessorServer {
                         (selectors, _) => (selectors, None),
                     };
 
-                let unpopulated_container_vec = inspect_repo
-                    .fetch_inspect_data(
-                        &selectors,
-                        pipeline.read().await.static_selectors_matchers(),
-                    )
-                    .await;
+                let static_selectors_matchers = pipeline.read().await.static_selectors_matchers();
+                let unpopulated_container_vec =
+                    inspect_repo.fetch_inspect_data(&selectors, static_selectors_matchers).await;
 
                 let per_component_budget_opt = if unpopulated_container_vec.is_empty() {
                     None

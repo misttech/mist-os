@@ -224,9 +224,13 @@ impl PipelineMutableState {
         Ok(())
     }
 
-    pub fn static_selectors_matchers(&self) -> Option<&HashMap<Moniker, Arc<HierarchyMatcher>>> {
+    pub fn static_selectors_matchers(&self) -> Option<HashMap<Moniker, Arc<HierarchyMatcher>>> {
         if self.static_selectors.is_some() {
-            return Some(&self.moniker_to_static_matcher_map);
+            // TODO(fxbug.dev/78871): can we avoid cloning here? This clone is not super expensive
+            // as it'll be just cloning arcs, but we could be more efficient here.
+            // Due to lock semantics we can't just return a reference at the moment as it leads to
+            // an ABBA lock between inspect insertion into the repo and inspect reading.
+            return Some(self.moniker_to_static_matcher_map.clone());
         }
         None
     }

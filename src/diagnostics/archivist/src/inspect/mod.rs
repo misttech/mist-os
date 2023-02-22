@@ -1071,10 +1071,9 @@ mod tests {
         };
 
         let trace_id = ftrace::Id::random();
+        let static_selectors_matchers = pipeline.read().await.static_selectors_matchers();
         let reader_server = Box::pin(ReaderServer::stream(
-            inspect_repo
-                .fetch_inspect_data(&None, pipeline.read().await.static_selectors_matchers())
-                .await,
+            inspect_repo.fetch_inspect_data(&None, static_selectors_matchers).await,
             test_performance_config,
             // No selectors
             None,

@@ -59,7 +59,7 @@ impl InspectRepository {
     pub async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.inner
             .read()
@@ -201,7 +201,7 @@ impl InspectRepositoryInner {
     async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         let mut containers = vec![];
         for (_, diagnostics_artifacts_container_opt) in self.diagnostics_containers.iter() {
@@ -210,7 +210,7 @@ impl InspectRepositoryInner {
                 None => continue,
             };
 
-            let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
+            let optional_hierarchy_matcher = match &moniker_to_static_matcher_map {
                 Some(map) => {
                     match map.get(&identity.relative_moniker) {
                         Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
