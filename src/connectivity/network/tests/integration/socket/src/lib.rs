@@ -176,6 +176,8 @@ enum UdpCacheInvalidationReason {
     AddressRemoved,
     SetConfigurationCalled,
     SetInterfaceIpForwardingDeprecatedCalled,
+    RouteRemoved,
+    RouteAdded,
 }
 
 enum ToAddrExpectation {
@@ -324,6 +326,8 @@ async fn execute_and_validate_preflights(
     "Stack.SetInterfaceIpForwardingDeprecated",
     UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
 )]
+#[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
+#[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
 async fn udp_send_msg_preflight_fidl(
     root_name: &str,
     test_name: &str,
@@ -331,22 +335,23 @@ async fn udp_send_msg_preflight_fidl(
 ) {
     const PORT: u16 = 80;
     const INSTALLED_ADDR: fnet::Ipv4SocketAddress =
-        fnet::Ipv4SocketAddress { address: fidl_ip_v4!("10.0.0.0"), port: PORT };
+        fnet::Ipv4SocketAddress { address: fidl_ip_v4!("192.0.2.0"), port: PORT };
     const REACHABLE_ADDR1: fnet::SocketAddress =
         fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("10.0.0.1"),
+            address: fidl_ip_v4!("192.0.2.1"),
             port: PORT,
         });
     const REACHABLE_ADDR2: fnet::SocketAddress =
         fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("10.0.0.2"),
+            address: fidl_ip_v4!("192.0.2.2"),
             port: PORT,
         });
     const UNREACHABLE_ADDR: fnet::SocketAddress =
         fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("11.0.0.0"),
+            address: fidl_ip_v4!("198.51.100.1"),
             port: PORT,
         });
+    const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
@@ -354,7 +359,7 @@ async fn udp_send_msg_preflight_fidl(
         setup_fastudp_network(&realm_name, &sandbox, fposix_socket::Domain::Ipv4).await;
 
     let mut installed_subnet =
-        fnet::Subnet { addr: fnet::IpAddress::Ipv4(INSTALLED_ADDR.address), prefix_len: 8 };
+        fnet::Subnet { addr: fnet::IpAddress::Ipv4(INSTALLED_ADDR.address), prefix_len: 16 };
     iface.add_address_and_subnet_route(installed_subnet).await.expect("failed to add subnet route");
 
     let successful_preflights = execute_and_validate_preflights(
@@ -453,6 +458,16 @@ async fn udp_send_msg_preflight_fidl(
                 .expect("remove_address fidl error")
                 .expect("failed to remove address");
             assert!(removed, "address was not removed from interface");
+        }
+        UdpCacheInvalidationReason::RouteRemoved => {
+            let () = iface
+                .del_subnet_route(installed_subnet)
+                .await
+                .expect("failed to delete subnet route");
+        }
+        UdpCacheInvalidationReason::RouteAdded => {
+            let () =
+                iface.add_subnet_route(OTHER_SUBNET).await.expect("failed to add subnet route");
         }
         UdpCacheInvalidationReason::SetConfigurationCalled => {
             let _prev_config = iface
