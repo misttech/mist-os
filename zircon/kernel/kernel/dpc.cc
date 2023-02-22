@@ -185,7 +185,8 @@ void DpcQueue::InitForCurrentCpu() {
   // a much lower frequency than 3.333KHz.
   // TODO(fxbug.dev/38571): Make this runtime tunable. It may be necessary to change the
   // Dpc deadline params later in boot, after configuration is loaded somehow.
-  thread_->SetDeadline({ZX_USEC(150), ZX_USEC(300), ZX_USEC(300)});
+  thread_->SetBaseProfile(SchedulerState::BaseProfile{
+      SchedDeadlineParams{SchedDuration{ZX_USEC(150)}, SchedDuration{ZX_USEC(300)}}});
 
   thread_->Resume();
 }

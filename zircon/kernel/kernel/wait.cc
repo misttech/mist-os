@@ -80,16 +80,6 @@ void WaitQueue::TimeoutHandler(Timer* timer, zx_time_t now, void* arg) {
   thread_lock.Release();
 }
 
-// Deal with the consequences of a change of maximum priority across the set of
-// waiters in a wait queue.
-void WaitQueue::UpdatePriority(int old_prio) TA_REQ(thread_lock, preempt_disabled_token) {
-  // If this is an owned wait queue, and the maximum priority of its set of
-  // waiters has changed, make sure to apply any needed priority inheritance.
-  if ((magic_ == OwnedWaitQueue::kOwnedMagic) && (old_prio != BlockedPriority())) {
-    static_cast<OwnedWaitQueue*>(this)->WaitersPriorityChanged(old_prio);
-  }
-}
-
 // Remove a thread from a wait queue, maintain the wait queue's internal count,
 // and update the WaitQueue specific bookkeeping in the thread in the process.
 void WaitQueue::Dequeue(Thread* t, zx_status_t wait_queue_error) TA_REQ(thread_lock) {
@@ -101,6 +91,33 @@ void WaitQueue::Dequeue(Thread* t, zx_status_t wait_queue_error) TA_REQ(thread_l
   collection_.Remove(t);
   t->wait_queue_state().blocked_status_ = wait_queue_error;
   t->wait_queue_state().blocking_wait_queue_ = nullptr;
+}
+
+SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
+  if (threads_.is_empty()) {
+    return SchedDuration::Max();
+  }
+
+  const Thread* t = threads_.root()->wait_queue_state().subtree_min_rel_deadline_thread_;
+  if (t == nullptr) {
+    return SchedDuration::Max();
+  }
+
+  // Deadline profiles must (currently) always be inheritable, otherwise we
+  // would need to maintain a second augmented invariant here.  One for the
+  // minimum effective relative deadline (used when waking "the best" thread),
+  // and the other for the minimum inheritable relative deadline (for
+  // recomputing an OWQ's inherited minimum deadline after the removal of
+  // thread from the wait queue).
+  //
+  // For now, assert that the thread we are reporting as having the minimum
+  // relative deadline is either inheriting it's deadline from somewhere else,
+  // or that its base deadline profile is inheritable.
+  const SchedulerState& ss = t->scheduler_state();
+  const SchedDuration min_deadline = ss.effective_profile().deadline.deadline_ns;
+  DEBUG_ASSERT((ss.base_profile_.IsDeadline() && (ss.base_profile_.inheritable == true)) ||
+               (ss.inherited_profile_values_.min_deadline == min_deadline));
+  return min_deadline;
 }
 
 Thread* WaitQueueCollection::Peek(zx_time_t signed_now) {
@@ -157,7 +174,7 @@ Thread* WaitQueueCollection::Peek(zx_time_t signed_now) {
 void WaitQueueCollection::Insert(Thread* thread) {
   WqTraceDepth(this, Count() + 1);
 
-  auto& wq_state = thread->wait_queue_state();
+  WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
   DEBUG_ASSERT(wq_state.blocked_threads_tree_sort_key_ == 0);
   DEBUG_ASSERT(wq_state.subtree_min_rel_deadline_thread_ == nullptr);
 
@@ -174,7 +191,8 @@ void WaitQueueCollection::Insert(Thread* thread) {
                 "whole number of nanoseconds");
 
   const auto& sched_state = thread->scheduler_state();
-  if (sched_state.discipline() == SchedDiscipline::Fair) {
+  const auto& ep = sched_state.effective_profile();
+  if (ep.IsFair()) {
     // Statically assert that the offset we are going to add to a fair thread's
     // start time to form its virtual start time can never be the equivalent of
     // something more than ~1 year.  If the resolution of SchedWeight becomes
@@ -188,15 +206,13 @@ void WaitQueueCollection::Insert(Thread* thread) {
     static_assert(OneYear >= (Scheduler::kDefaultTargetLatency / kMinPosWeight),
                   "SchedWeight resolution is too fine");
 
-    SchedTime key =
-        sched_state.start_time() + (Scheduler::kDefaultTargetLatency / sched_state.fair().weight);
+    SchedTime key = sched_state.start_time() + (Scheduler::kDefaultTargetLatency / ep.fair.weight);
     wq_state.blocked_threads_tree_sort_key_ =
         static_cast<uint64_t>(key.raw_value()) | kFairThreadSortKeyBit;
   } else {
     wq_state.blocked_threads_tree_sort_key_ =
         static_cast<uint64_t>(sched_state.finish_time().raw_value());
   }
-
   threads_.insert(thread);
 }
 
@@ -208,8 +224,8 @@ void WaitQueueCollection::Remove(Thread* thread) {
   // collection.  This can help to find bugs by allowing us to assert that the
   // value is zero during insertion, however it is not strictly needed in a
   // production build and can be skipped.
+  WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
 #ifdef DEBUG_ASSERT_IMPLEMENTED
-  auto& wq_state = thread->wait_queue_state();
   wq_state.blocked_threads_tree_sort_key_ = 0;
 #endif
 }
@@ -217,6 +233,7 @@ void WaitQueueCollection::Remove(Thread* thread) {
 void WaitQueue::ValidateQueue() TA_REQ(thread_lock) {
   DEBUG_ASSERT_MAGIC_CHECK(this);
   thread_lock.AssertHeld();
+  collection_.Validate();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -224,28 +241,6 @@ void WaitQueue::ValidateQueue() TA_REQ(thread_lock) {
 // Begin user facing API
 //
 ////////////////////////////////////////////////////////////////////////////////
-
-// return the numeric priority of the highest priority thread queued
-int WaitQueue::BlockedPriority() const {
-  // TODO(johngro): Remove this, as well as the concept of "priority" from all
-  // of the OwnedWaitQueue and profile inheritance code.  The wait queue
-  // ordering no longer depends on the deprecated concept of priority, and there
-  // is no point in maintaining the system of inheriting the "maximum priority"
-  // during inheritance events.
-  //
-  // Instead, PI will be switched over to inheriting the sum of the weights of
-  // all of the upstream threads, modeling the weight of a deadline thread as
-  // the weight of a "max priority" thread (as is done today).  This will be a
-  // temporary stepping stone on the way to implementing generalize deadline
-  // inheritance, which depends on knowing the minimum relative deadline across
-  // a set of waiting threads, something which is already being maintained using
-  // the WaitQueueCollection's augmented binary tree.
-  int ret = -1;
-  for (const Thread& t : collection_.threads_) {
-    ret = ktl::max(ret, t.scheduler_state().effective_priority());
-  }
-  return ret;
-}
 
 /**
  * @brief  Block until a wait queue is notified, ignoring existing signals
@@ -415,13 +410,6 @@ void WaitQueue::WakeAll(zx_status_t wait_queue_error) {
   Scheduler::Unblock(ktl::move(list));
 }
 
-bool WaitQueue::IsEmpty() const {
-  DEBUG_ASSERT_MAGIC_CHECK(this);
-  thread_lock.AssertHeld();
-
-  return collection_.Count() == 0;
-}
-
 /**
  * @brief  Tear down a wait queue
  *
@@ -472,40 +460,31 @@ zx_status_t WaitQueue::UnblockThread(Thread* t, zx_status_t wait_queue_error) {
     wq->ValidateQueue();
   }
 
-  int old_wq_prio = wq->BlockedPriority();
+  // Remove the thread from the wait queue and deal with any PI propagation
+  // which is required. Then, go ahead and formally unblock the thread (allowing
+  // it to join a scheduler run-queue, somewhere).
   wq->Dequeue(t, wait_queue_error);
-  wq->UpdatePriority(old_wq_prio);
-
+  if (OwnedWaitQueue* owq = OwnedWaitQueue::DowncastToOwq(wq); owq != nullptr) {
+    owq->UpdateSchedStateStorageThreadRemoved(*t);
+    OwnedWaitQueue::BeginPropagate(*t, *owq, OwnedWaitQueue::RemoveSingleEdgeOp);
+  }
   Scheduler::Unblock(t);
+
   return ZX_OK;
 }
 
-void WaitQueue::PriorityChanged(Thread* t, int old_prio, PropagatePI propagate) {
-  t->canary().Assert();
+void WaitQueue::UpdateBlockedThreadEffectiveProfile(Thread& t) {
+  t.canary().Assert();
   thread_lock.AssertHeld();
-  DEBUG_ASSERT(t->state() == THREAD_BLOCKED || t->state() == THREAD_BLOCKED_READ_LOCK);
-
-  DEBUG_ASSERT(t->wait_queue_state().blocking_wait_queue_ == this);
+  DEBUG_ASSERT(t.state() == THREAD_BLOCKED || t.state() == THREAD_BLOCKED_READ_LOCK);
+  DEBUG_ASSERT(t.wait_queue_state().blocking_wait_queue_ == this);
   DEBUG_ASSERT_MAGIC_CHECK(this);
 
-  LTRACEF("%p %d -> %d\n", t, old_prio, t->scheduler_state().effective_priority());
+  SchedulerState& state = t.scheduler_state();
+  collection_.Remove(&t);
+  state.RecomputeEffectiveProfile();
+  collection_.Insert(&t);
 
-  // |t|'s effective priority has already been re-calculated.  If |t| is
-  // currently at the head of this WaitQueue, then |t|'s old priority is the
-  // previous priority of the WaitQueue.  Otherwise, it is the priority of
-  // the WaitQueue as it stands before we re-insert |t|.
-  const int old_wq_prio = (Peek(current_time()) == t) ? old_prio : BlockedPriority();
-
-  // simple algorithm: remove the thread from the queue and add it back
-  // TODO: implement optimal algorithm depending on all the different edge
-  // cases of how the thread was previously queued and what priority its
-  // switching to.
-  collection_.Remove(t);
-  collection_.Insert(t);
-
-  if (propagate == PropagatePI::Yes) {
-    UpdatePriority(old_wq_prio);
-  }
   if (WAIT_QUEUE_VALIDATION) {
     ValidateQueue();
   }

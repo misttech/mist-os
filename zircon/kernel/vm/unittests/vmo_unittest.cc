@@ -3255,6 +3255,11 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   constexpr uint32_t kWaitingThreadCount = kFakePageCount * kWaitingThreadsPerPage;
   constexpr int kOwnerThreadBasePriority = LOW_PRIORITY;
   constexpr int kBlockedThreadBasePriority = DEFAULT_PRIORITY;
+  constexpr SchedWeight kOwnerThreadBaseWeight =
+      SchedulerState::ConvertPriorityToWeight(kOwnerThreadBasePriority);
+  constexpr SchedWeight kBlockedThreadBaseWeight =
+      SchedulerState::ConvertPriorityToWeight(kBlockedThreadBasePriority);
+
   fbl::AllocChecker ac;
 
   // Local structures used by the tests.  The kernel stack is pretty small, so
@@ -3354,11 +3359,13 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
 
   // Now wait until the owner thread has taken ownership of the test pages, then
   // double check to make sure that the owner thread is still running with its
-  // base priority.
+  // base profile.
   ot->ownership_acquired.Wait();
   {
     Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    ASSERT_EQ(kOwnerThreadBasePriority, ot->thread->scheduler_state().effective_priority());
+    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
+    ASSERT_TRUE(ep.IsFair());
+    ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
   }
 
   // Start up all of our waiter threads.
@@ -3394,11 +3401,15 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   }
 
   // Now that we are certain that all threads are blocked in the wait queue, we
-  // should see the priority of the owning thread increased to the base priority
-  // of the blocked threads.
+  // should see the weight of the owning thread increased to the total of its
+  // base weight, and weights of all of the threads blocked behind it.
   {
     Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    ASSERT_EQ(kBlockedThreadBasePriority, ot->thread->scheduler_state().effective_priority());
+    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
+    constexpr SchedWeight kExpectedWeight =
+        kOwnerThreadBaseWeight + (kWaitingThreadCount * kBlockedThreadBaseWeight);
+    ASSERT_TRUE(ep.IsFair());
+    ASSERT_EQ(kExpectedWeight.raw_value(), ep.fair.weight.raw_value());
   }
 
   // Wait a bit, the threads should still be blocked.
@@ -3425,10 +3436,12 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
     Thread::Current::SleepRelative(ZX_MSEC(1));
   }
 
-  // Verify that the priority of the owner thread has relaxed.
+  // Verify that the profile of the owner thread has relaxed.
   {
     Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    EXPECT_EQ(kOwnerThreadBasePriority, ot->thread->scheduler_state().effective_priority());
+    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
+    ASSERT_TRUE(ep.IsFair());
+    ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
   }
 
   // Test is finished.  Let our fit::defer handle all of the cleanup.

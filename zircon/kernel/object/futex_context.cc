@@ -413,29 +413,32 @@ zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_
       // Record the futex ID of the thread we are about to block on.
       current_thread->blocking_futex_id_ = futex_id;
 
-      // Enter the thread lock (exchanging the futex context lock and the
+      // Defer rescheduling, then enter the thread lock (exchanging the futex context lock and the
       // ThreadDispatcher's object lock for the thread spin-lock in the process)
       // and wait on the futex wait queue, assigning ownership properly in the
       // process.
-      Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-      ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::FUTEX);
-      guard.Release(MutexPolicy::ThreadLockHeld);
-      new_owner_guard.Release(MutexPolicy::ThreadLockHeld);
+      {
+        AutoEagerReschedDisabler eager_resched_disabler;
+        Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+        ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::FUTEX);
+        guard.Release(MutexPolicy::ThreadLockHeld);
+        new_owner_guard.Release(MutexPolicy::ThreadLockHeld);
 
-      wait_tracer.FutexWait(futex_id, new_owner);
+        wait_tracer.FutexWait(futex_id, new_owner);
 
-      result = futex_ref->waiters_.BlockAndAssignOwner(
-          deadline, new_owner, ResourceOwnership::Normal, Interruptible::Yes);
+        result = futex_ref->waiters_.BlockAndAssignOwner(
+            deadline, new_owner, ResourceOwnership::Normal, Interruptible::Yes);
 
-      // Do _not_ allow the PendingOpRef helper to release our pending op
-      // reference.  Having just woken up, either the thread which woke us will
-      // have released our pending op reference, or we will need to revalidate
-      // _which_ futex we were waiting on (because of FutexRequeue) and manage the
-      // release of the reference ourselves.
-      futex_ref.CancelRef();
-      // If we got to here then we have no user copy faults that need retrying, so we should break
-      // out of the infinite loop.
-      break;
+        // Do _not_ allow the PendingOpRef helper to release our pending op
+        // reference.  Having just woken up, either the thread which woke us will
+        // have released our pending op reference, or we will need to revalidate
+        // _which_ futex we were waiting on (because of FutexRequeue) and manage the
+        // release of the reference ourselves.
+        futex_ref.CancelRef();
+        // If we got to here then we have no user copy faults that need retrying, so we should break
+        // out of the infinite loop.
+        break;
+      }
     }
   }
 
@@ -496,7 +499,7 @@ zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_
   // explicitly update ownership as it joins the queue once it has made it
   // inside of the thread lock.
   {
-    AnnotatedAutoPreemptDisabler preempt_disabler;
+    AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
     Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
     if (futex_ref->waiters_.IsEmpty()) {
       futex_ref->waiters_.AssignOwner(nullptr);

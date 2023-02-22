@@ -50,6 +50,10 @@ declare_args() {
   # analysis.
   scheduler_queue_tracing_enabled = false
 
+  # Enables extra (expensive) validation of scheduler invariants to assist in
+  # debugging changes to the scheduler's behavior.
+  scheduler_extra_invariant_validation = false
+
   # Enables kernel tracing of futex interactions
   futex_tracing_enabled = false
 

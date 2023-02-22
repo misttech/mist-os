@@ -19,10 +19,12 @@ __BEGIN_CDECLS
 #define ZX_PROFILE_INFO_FLAG_PRIORITY (1 << 0)
 #define ZX_PROFILE_INFO_FLAG_CPU_MASK (1 << 1)
 #define ZX_PROFILE_INFO_FLAG_DEADLINE (1 << 2)
+#define ZX_PROFILE_INFO_FLAG_NO_INHERIT (1 << 3)
 
 typedef struct zx_profile_info {
-  // A bitmask of ZX_PROFILE_INFO_FLAG_* values. Specifies which fields
-  // below have been specified. Other fields are considered unset.
+  // A bitmask of ZX_PROFILE_INFO_FLAG_* values. Controls overall profile
+  // options as well as specifying which other fields below have been specified.
+  // Other fields are considered unset.
   uint32_t flags;
 
   uint8_t padding1[4];
@@ -31,7 +33,6 @@ typedef struct zx_profile_info {
     struct {
       // Scheduling priority. |flags| must have ZX_PROFILE_INFO_FLAG_PRIORITY set.
       int32_t priority;
-
       uint8_t padding2[20];
     };
 

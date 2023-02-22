@@ -21,6 +21,8 @@ source_set("kernel") {
     "percpu.cc",
     "restricted.cc",
     "scheduler.cc",
+    "scheduler_pi.cc",
+    "scheduler_state.cc",
     "semaphore.cc",
     "task_runtime_stats.cc",
     "thread.cc",

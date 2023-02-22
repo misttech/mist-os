@@ -63,8 +63,7 @@ static void timer_diag_all_cpus(void) {
     char name[16];
     snprintf(name, sizeof(name), "timer %u\n", i);
 
-    timer_threads[i] =
-        Thread::CreateEtc(NULL, name, timer_do_one_thread, NULL, DEFAULT_PRIORITY, NULL);
+    timer_threads[i] = Thread::Create(name, timer_do_one_thread, NULL, DEFAULT_PRIORITY);
     DEBUG_ASSERT_MSG(timer_threads[i] != NULL, "failed to create thread for cpu %u\n", i);
     timer_threads[i]->SetCpuAffinity(cpu_num_to_mask(i));
     timer_threads[i]->Resume();

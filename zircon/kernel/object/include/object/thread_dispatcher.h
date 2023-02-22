@@ -187,8 +187,7 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
                          size_t buffer_size) TA_EXCL(get_lock());
 
   // Profile support
-  zx_status_t SetPriority(int32_t priority) TA_EXCL(get_lock());
-  zx_status_t SetDeadline(const zx_sched_deadline_params_t& params) TA_EXCL(get_lock());
+  zx_status_t SetBaseProfile(const SchedulerState::BaseProfile& profile) TA_EXCL(get_lock());
   zx_status_t SetSoftAffinity(cpu_mask_t mask) TA_EXCL(get_lock());
 
   // For ChannelDispatcher use.
@@ -252,6 +251,10 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // ThreadDispatcher, and so that it can access the "thread_" member of the class so that
   // wait_queue operations can be performed on ThreadDispatchers
   friend class FutexContext;
+
+  // OwnedWaitQueue is a friend only so that it can access the blocking_futex_id_ member for tracing
+  // purposes.
+  friend class OwnedWaitQueue;
 
   // kernel level entry point
   static int StartRoutine(void* arg);

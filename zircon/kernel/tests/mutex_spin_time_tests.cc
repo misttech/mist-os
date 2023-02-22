@@ -48,9 +48,9 @@ bool mutex_spin_time_test(void) {
   // thread's priority and cpu affinity.
   auto cleanup =
       fit::defer([affinity = Thread::Current::Get()->GetCpuAffinity(),
-                  priority = Thread::Current::Get()->scheduler_state().base_priority()]() {
+                  bp = Thread::Current::Get()->scheduler_state().SnapshotBaseProfile()]() {
         Thread::Current::Get()->SetCpuAffinity(affinity);
-        Thread::Current::Get()->SetPriority(priority);
+        Thread::Current::Get()->SetBaseProfile(bp);
       });
 
   constexpr zx::duration kTimeouts[] = {
@@ -85,7 +85,7 @@ bool mutex_spin_time_test(void) {
   // Boost our thread priority and lock ourselves down to a specific CPU before
   // starting the test.
   Thread::Current::Get()->SetCpuAffinity(timer_mask);
-  Thread::Current::Get()->SetPriority(HIGH_PRIORITY);
+  Thread::Current::Get()->SetBaseProfile(SchedulerState::BaseProfile{HIGH_PRIORITY});
 
   for (const auto& timeout : kTimeouts) {
     zx::ticks start, end;

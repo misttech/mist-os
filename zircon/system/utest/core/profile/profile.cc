@@ -95,7 +95,7 @@ TEST(SchedulerProfileTest, CreateProfileWithLowPriorityIsOk) {
   ASSERT_OK(zx::profile::create(*root_job, 0u, &profile_info, &profile));
 }
 
-TEST(SchedulerProfileTest, CreateProfileWithHihgPriorityIsOk) {
+TEST(SchedulerProfileTest, CreateProfileWithHighPriorityIsOk) {
   zx::unowned_job root_job(zx::job::default_job());
   ASSERT_TRUE(root_job->is_valid());
   zx_profile_info_t profile_info = MakeSchedulerProfileInfo(ZX_PRIORITY_HIGH);
@@ -109,6 +109,17 @@ TEST(SchedulerProfileTest, CreateProfileWithHighestPriorityIsOk) {
   ASSERT_TRUE(root_job->is_valid());
   zx_profile_info_t profile_info = MakeSchedulerProfileInfo(ZX_PRIORITY_HIGHEST);
   zx::profile profile;
+
+  ASSERT_OK(zx::profile::create(*root_job, 0u, &profile_info, &profile));
+}
+
+TEST(SchedulerProfileTest, CreateFairProfileWithNoInheritIsOk) {
+  zx::unowned_job root_job(zx::job::default_job());
+  ASSERT_TRUE(root_job->is_valid());
+  zx_profile_info_t profile_info = MakeSchedulerProfileInfo(ZX_PRIORITY_DEFAULT);
+  zx::profile profile;
+
+  profile_info.flags |= ZX_PROFILE_INFO_FLAG_NO_INHERIT;
 
   ASSERT_OK(zx::profile::create(*root_job, 0u, &profile_info, &profile));
 }
@@ -187,6 +198,17 @@ TEST(SchedulerProfileTest, CreateProfileWithNonZeroOptionsIsInvalidArgs) {
   zx::profile profile;
 
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx::profile::create(*root_job, 1u, &profile_info, &profile));
+}
+
+TEST(SchedulerProfileTest, CreateProfileWithDeadlineAndNoInheritIsInvalidArgs) {
+  zx::unowned_job root_job(zx::job::default_job());
+  ASSERT_TRUE(root_job->is_valid());
+  zx_profile_info_t profile_info = MakeSchedulerProfileInfo({ZX_MSEC(1), ZX_MSEC(8), ZX_MSEC(10)});
+  zx::profile profile;
+
+  profile_info.flags |= ZX_PROFILE_INFO_FLAG_NO_INHERIT;
+
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx::profile::create(*root_job, 0u, &profile_info, &profile));
 }
 
 TEST(SchedulerProfileTest, SetThreadPriorityIsOk) {

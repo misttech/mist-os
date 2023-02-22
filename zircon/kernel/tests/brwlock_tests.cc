@@ -41,7 +41,9 @@ class BrwLockTest {
     Thread* writer_threads[writers];
     Thread* upgrader_threads[upgraders];
 
-    int old_prio = Thread::Current::Get()->scheduler_state().base_priority();
+    SchedulerState::BaseProfile old_bp =
+        Thread::Current::Get()->scheduler_state().SnapshotBaseProfile();
+
     // Run at high priority so that we can be validating what the other threads are doing.
     // Unless we are a uniprocessor, in which case we will just have to live with poor
     // testing. If we do boost priority then we need to make sure worker threads
@@ -50,12 +52,12 @@ class BrwLockTest {
     cpu_mask_t worker_mask = mp_get_online_mask();
     if (lowest_cpu_set(worker_mask) != highest_cpu_set(worker_mask)) {
       mp_get_online_mask();
-      Thread::Current::Get()->SetPriority(HIGH_PRIORITY);
+      Thread::Current::Get()->SetBaseProfile(SchedulerState::BaseProfile{HIGH_PRIORITY});
       cpu_mask_t pin_mask = cpu_num_to_mask(lowest_cpu_set(worker_mask));
       Thread::Current::Get()->SetCpuAffinity(pin_mask);
       worker_mask -= pin_mask;
     } else {
-      Thread::Current::Get()->SetPriority(DEFAULT_PRIORITY);
+      Thread::Current::Get()->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY});
     }
 
     // Start threads
@@ -124,8 +126,8 @@ class BrwLockTest {
     }
     EXPECT_EQ(test.state_.load(ktl::memory_order_seq_cst), 0u, "Threads still holding lock");
 
-    // Restore original priority.
-    Thread::Current::Get()->SetPriority(old_prio);
+    // Restore original base profile.
+    Thread::Current::Get()->SetBaseProfile(old_bp);
 
     END_TEST;
   }

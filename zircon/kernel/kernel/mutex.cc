@@ -434,7 +434,34 @@ __NO_INLINE void Mutex::ReleaseContendedMutex(Thread* current_thread, uintptr_t 
   };
 
   KTracer tracer;
-  wait_.WakeThreads(1, {cbk, &woken});
+  {
+    // Changes in ownership of node in a PI graph have the potential to affect
+    // the running/runnable status of multiple threads at the same time.
+    // Because of this, the OwnedWaitQueue class requires that we disable eager
+    // rescheduling in order to optimize a situation where we might otherwise
+    // send multiple (redundant) IPIs to the same CPUs during one PI graph
+    // mutation.
+    //
+    // Note that this is an optimization, not a requirement.  What _is_ a
+    // requirement is that we keep preemption disabled during the PI
+    // propagation.  Currently, all of the invariants of OwnedWaitQueues and PI
+    // graphs are protected by a single global "thread lock" which must be held
+    // when a thread calls into the scheduler.  If a change to a PI graph would
+    // cause the current scheduler to choose a different thread to run on that
+    // CPU, however, the current thread will be preempted, and the ownership of
+    // the thread lock will be transferred to the newly selected thread.  As the
+    // new thread unwinds, it is going to drop the thread lock and return to
+    // executing, leaving the first thread in the middle of what was supposed to
+    // be an atomic operation.
+    //
+    // Because if this, it is critically important that local preemption be
+    // disabled (at a minimum) when mutating a PI graph.  In the case that a
+    // thread eventually blocks, the OWQ code will make sure that all invariants
+    // will be restored before the thread finally blocks (and eventually wakes
+    // and unwinds).
+    AutoEagerReschedDisabler eager_resched_disabler;
+    wait_.WakeThreads(1, {cbk, &woken});
+  }
   tracer.KernelMutexWake(this, woken, wait_.Count());
 
   // So, the mutex is now in one of three states.  It can be...

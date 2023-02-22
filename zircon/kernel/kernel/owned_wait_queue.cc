@@ -11,250 +11,147 @@
 #include <zircon/compiler.h>
 
 #include <arch/mp.h>
-#include <arch/ops.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
-#include <kernel/mp.h>
+#include <fbl/enum_bits.h>
+#include <kernel/auto_preempt_disabler.h>
 #include <kernel/scheduler.h>
 #include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
 #include <ktl/bit.h>
 #include <ktl/type_traits.h>
+#include <object/thread_dispatcher.h>
 
 #include <ktl/enforce.h>
 
 // Notes on the defined kernel counters.
 //
 // Adjustments (aka promotions and demotions)
-// The number of times that a thread increased or decreased its priority because
-// of a priority inheritance related event.
+// The number of times that a thread either gained or lost inherited profile
+// pressure as a result of a PI event.
 //
 // Note that the number of promotions does not have to equal the number of
-// demotions in the system.  For example, a thread could slowly climb up in priority as
-// threads of increasing priority join a wait queue it owns, then suddenly drop
-// back down to its base priority when it releases its queue.
+// demotions in the system.  For example, a thread could slowly gain weight as
+// fair scheduled threads join a wait queue it owns, then suddenly drop
+// back down to its base profile when the thread releases ownership of the
+// queue.
 //
-// There are other (more complicated) sequences which could cause a thread to
-// jump up in priority with one promotion, then slowly step back down again over
-// multiple demotions.
-//
-// Reschedule events.
-// Counts of the number of times that a local reschedule was requested, as well
-// as the total number of reschedule IPIs which were sent, as a result of
-// priority inheritance related events.
+// In addition to simple promotions and demotions, the number of threads whose
+// effective profile changed as a result of another thread's base profile
+// changing is also tracked, although whether these changes amount to a
+// promotion or a demotion is not computed.
 //
 // Max chain traversal.
-// The maximum traversed length of a PI chain during exection of the propagation
+// The maximum traversed length of a PI chain during execution of the propagation
 // algorithm.
 //
-// IOW - if a change to a wait queue's maximum effective priority ends up
-// changing the inherited priority of thread A, but nothing else is needed, this
-// is a traversal length of 1.  OTOH, if thread A was blocked by a wait queue
-// (Qa) which was owned by thread B, and Qa's maximum effective priority, then
-// the algorithm would need to traverse another link in the chain, and our
-// traversed chain length would be at least 2.
-//
-// Note that the maximum traversed chain length does not have to be the length
-// maximum PI chain ever assembled in the system.  This is a result of the fact
-// that the PI algortim attempt to terminate propagation as soon as it can, as
-// well as the fact that changes can start to propagate in the middle of a chain
-// instead of being required to start at the end (for example, 2 chains of
-// length 2 could merge to form a chain of length 4, but still result in a
-// traversal of only length 1).
+// The length of a propagation chain is defined as the number of nodes in an
+// inheritance graph which are affected by a propagation event.  For example, if
+// a thread (T1) blocks in an owned wait queue (OWQ1), adding an edge between
+// them, and the wait queue has no owner, then the propagation event's chain
+// length is 1. This is regardless of whether or not the blocking thread
+// currently owns one or more wait queues upstream from it. The OWQ1's IPVs were
+// updated, but no other nodes in the graph were affected.  If the OWQ1 had been
+// owned by a running/runnable thread (T2), then the chain length of the
+// operation would have been two instead, since both OWQ1 and T2 needed to be
+// visited and updated.
 KCOUNTER(pi_promotions, "kernel.pi.adj.promotions")
 KCOUNTER(pi_demotions, "kernel.pi.adj.demotions")
-KCOUNTER(pi_triggered_local_reschedules, "kernel.pi.resched.local")
-KCOUNTER(pi_triggered_ipis, "kernel.pi.resched.ipis")
+KCOUNTER(pi_bp_changed, "kernel.pi.adj.bp_changed")
 KCOUNTER_DECLARE(max_pi_chain_traverse, "kernel.pi.max_chain_traverse", Max)
 
 namespace {
 
-enum class PiTracingLevel {
-  // No tracing of PI events will happen
-  None,
-
-  // Only PI events which result in change of a target's effective priority
-  // will be traced.
-  Normal,
-
-  // PI events which result in change of either a target's effective or
-  // inherited priority will be traced.
-  Extended,
+enum class ChainLengthTrackerOpt : uint32_t {
+  None = 0,
+  RecordMaxLength = 1,
+  EnforceLengthGuard = 2,
 };
+FBL_ENABLE_ENUM_BITS(ChainLengthTrackerOpt)
 
-// Compile time control of whether recursion and infinite loop guards are
-// enabled.  By default, guards are enabled in everything but release builds.
-constexpr bool kEnablePiChainGuards = LK_DEBUGLEVEL > 0;
+// By default, we always maintain the max length counter, and we enforce the
+// length guard in everything but release builds.
+constexpr ChainLengthTrackerOpt kEnablePiChainGuards =
+    ((LK_DEBUGLEVEL > 0) ? ChainLengthTrackerOpt::EnforceLengthGuard : ChainLengthTrackerOpt::None);
 
-constexpr PiTracingLevel kDefaultPiTracingLevel = PiTracingLevel::None;
+constexpr ChainLengthTrackerOpt kDefaultChainLengthTrackerOpt =
+    ChainLengthTrackerOpt::RecordMaxLength | kEnablePiChainGuards;
 
-// A couple of small stateful helper classes which drop out of release builds
-// which perform some sanity checks for us when propagating priority
-// inheritance.  In specific, we want to make sure that...
-//
-// ++ We never recurse from any of the calls we make into the scheduler into
-//    this code.
-// ++ When propagating iteratively, we are always making progress, and we never
-//    exceed any completely insane limits for a priority inheritance chain.
-template <bool Enable = kEnablePiChainGuards>
-class RecursionGuard;
-template <bool Enable = kEnablePiChainGuards>
-class InfiniteLoopGuard;
-
-template <>
-class RecursionGuard<false> {
+template <ChainLengthTrackerOpt Options = kDefaultChainLengthTrackerOpt>
+class ChainLengthTracker {
  public:
-  void Acquire() {}
-  void Release() {}
-};
+  using Opt = ChainLengthTrackerOpt;
 
-template <>
-class RecursionGuard<true> {
- public:
-  constexpr RecursionGuard() = default;
-
-  void Acquire() {
-    ASSERT(!acquired_);
-    acquired_ = true;
+  ChainLengthTracker() {
+    if constexpr (Options != Opt::None) {
+      nodes_visited_ = 0;
+    }
   }
-  void Release() { acquired_ = false; }
 
- private:
-  bool acquired_ = false;
-};
+  ~ChainLengthTracker() {
+    if constexpr ((Options & Opt::EnforceLengthGuard) != Opt::None) {
+      // Note, the only real reason that this is an accurate max at all is
+      // because the counter is effectively protected by the thread lock
+      // (although there is no real good way to annotate that fact).  When we
+      // finally remove the thread lock, we are going to need to do better than
+      // this.
+      auto old = max_pi_chain_traverse.ValueCurrCpu();
+      if (nodes_visited_ > old) {
+        max_pi_chain_traverse.Set(nodes_visited_);
+      }
+    }
+  }
 
-template <>
-class InfiniteLoopGuard<false> {
- public:
-  constexpr InfiniteLoopGuard() = default;
-  void CheckProgress(uint32_t) {}
-};
+  void NodeVisited() {
+    if constexpr (Options != Opt::None) {
+      ++nodes_visited_;
+    }
 
-template <>
-class InfiniteLoopGuard<true> {
- public:
-  constexpr InfiniteLoopGuard() = default;
-  void CheckProgress(uint32_t next) {
-    // ASSERT that we are making progress
-    ASSERT(expected_next_ == next);
-    expected_next_ = next + 1;
-
-    // ASSERT that we have not exceeded any completely ludicrous loop
-    // bounds.  Note that in practice, a PI chain can technically be as long
-    // as the user has resources for.  In reality, chains tend to be 2-3
-    // nodes long at most.  If we see anything on the order to 2000, it
-    // almost certainly indicates that something went Very Wrong, and we
-    // should stop and investigate.
-    constexpr uint32_t kMaxChainLen = 2048;
-    ASSERT(next <= kMaxChainLen);
+    if constexpr ((Options & Opt::EnforceLengthGuard) != Opt::None) {
+      constexpr uint32_t kMaxChainLen = 2048;
+      ASSERT_MSG(nodes_visited_ <= kMaxChainLen, "visited %u", nodes_visited_);
+    }
   }
 
  private:
-  uint32_t expected_next_ = 1;
+  uint32_t nodes_visited_ = 0;
 };
 
-// Update our reschedule related kernel counters.
-inline void UpdateStats() TA_REQ(thread_lock) {
-  const cpu_mask_t pending_reschedule_mask =
-      Thread::Current::Get()->preemption_state().preempts_pending();
-  const cpu_mask_t current_cpu_mask = cpu_num_to_mask(arch_curr_cpu_num());
-  if (pending_reschedule_mask & ~current_cpu_mask) {
-    pi_triggered_ipis.Add(ktl::popcount(pending_reschedule_mask & ~current_cpu_mask));
-  }
-  if (pending_reschedule_mask & current_cpu_mask) {
-    pi_triggered_local_reschedules.Add(1);
+using AddSingleEdgeTag = decltype(OwnedWaitQueue::AddSingleEdgeOp);
+using RemoveSingleEdgeTag = decltype(OwnedWaitQueue::RemoveSingleEdgeOp);
+using BaseProfileChangedTag = decltype(OwnedWaitQueue::BaseProfileChangedOp);
+
+inline bool IpvsAreConsequential(const SchedulerState::InheritedProfileValues* ipvs) {
+  return (ipvs != nullptr) && ((ipvs->total_weight != SchedWeight{0}) ||
+                               (ipvs->uncapped_utilization != SchedUtilization{0}));
+}
+
+template <typename UpstreamType, typename DownstreamType>
+void Propagate(UpstreamType& upstream, DownstreamType& downstream, AddSingleEdgeTag)
+    TA_REQ(thread_lock, preempt_disabled_token) {
+  Scheduler::JoinNodeToPiGraph(upstream, downstream);
+  if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
+    pi_promotions.Add(1u);
   }
 }
 
-template <PiTracingLevel Level = kDefaultPiTracingLevel, typename = void>
-class PiKTracer;
-
-// Disabled PiKTracer stores nothing and does nothing.
-template <>
-class PiKTracer<PiTracingLevel::None> {
- public:
-  void Trace(Thread* t, int old_effec_prio, int new_effec_prio) {}
-};
-
-struct PiKTracerFlowIdGenerator {
- private:
-  friend class PiKTracer<PiTracingLevel::Normal>;
-  friend class PiKTracer<PiTracingLevel::Extended>;
-  [[maybe_unused]] inline static ktl::atomic<uint32_t> gen_{0};
-};
-
-template <PiTracingLevel Level>
-class PiKTracer<Level, ktl::enable_if_t<(Level == PiTracingLevel::Normal) ||
-                                        (Level == PiTracingLevel::Extended)>> {
- public:
-  PiKTracer() = default;
-  ~PiKTracer() { Flush(FlushType::FINAL); }
-
-  void Trace(Thread* t, int old_effec_prio, int old_inherited_prio) {
-    if ((old_effec_prio != t->scheduler_state().effective_priority()) ||
-        ((Level == PiTracingLevel::Extended) &&
-         (old_inherited_prio != t->scheduler_state().inherited_priority()))) {
-      if (thread_ == nullptr) {
-        if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
-          // Generate the start event and a flow id.
-          flow_id_ = PiKTracerFlowIdGenerator::gen_.fetch_add(1, ktl::memory_order_relaxed);
-          zx_ticks_t ts = current_ticks();
-          fxt_duration_complete("kernel:sched"_category, ts, t->fxt_ref(),
-                                fxt::StringRef{"inherit_prio"_intern}, ts + 50);
-
-          fxt_flow_begin("kernel:sched"_category, ts, t->fxt_ref(),
-                         fxt::StringRef{"inherit_prio"_intern}, flow_id_);
-        }
-      } else {
-        // Flush the previous event, but do not declare it to be the last in
-        // the flow.
-        Flush(FlushType::INTERMEDIATE);
-      }
-
-      // Record the info we will need for the subsequent event to be logged.
-      // We don't want to actually log this event until we know whether or not
-      // it will be the final event in the flow.
-      thread_ = t;
-      priorities_ = (old_effec_prio & 0xFF) |
-                    ((t->scheduler_state().effective_priority() & 0xFF) << 8) |
-                    ((old_inherited_prio & 0xFF) << 16) |
-                    ((t->scheduler_state().inherited_priority() & 0xFF) << 24);
-    }
+template <typename UpstreamType, typename DownstreamType>
+void Propagate(UpstreamType& upstream, DownstreamType& downstream, RemoveSingleEdgeTag)
+    TA_REQ(thread_lock, preempt_disabled_token) {
+  Scheduler::SplitNodeFromPiGraph(upstream, downstream);
+  if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
+    pi_demotions.Add(1u);
   }
+}
 
- private:
-  enum class FlushType { FINAL, INTERMEDIATE };
-
-  void Flush(FlushType type) {
-    if (!thread_) {
-      return;
-    }
-
-    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
-      fxt::Argument old_ep_arg{"old_ip"_intern, priorities_ & 0xFF};
-      fxt::Argument new_ep_arg{"new_ip"_intern, (priorities_ >> 8) & 0xFF};
-      fxt::Argument old_ip_arg{"old_ep"_intern, (priorities_ >> 16) & 0xFF};
-      fxt::Argument new_ip_arg{"new_ep"_intern, (priorities_ >> 24) & 0xFF};
-      zx_ticks_t ts = current_ticks();
-      fxt_duration_complete("kernel:sched"_category, ts, thread_->fxt_ref(),
-                            fxt::StringRef{"inherit_prio"_intern}, ts + 50, old_ip_arg, new_ip_arg,
-                            old_ep_arg, new_ep_arg);
-      if (type == FlushType::INTERMEDIATE) {
-        fxt_flow_step("kernel:sched"_category, ts, thread_->fxt_ref(),
-                      fxt::StringRef{"inherit_prio"_intern}, flow_id_);
-      } else {
-        fxt_flow_end("kernel:sched"_category, ts, thread_->fxt_ref(),
-                     fxt::StringRef{"inherit_prio"_intern}, flow_id_);
-      }
-    }
+template <typename UpstreamType, typename DownstreamType>
+void Propagate(UpstreamType& upstream, DownstreamType& downstream, BaseProfileChangedTag)
+    TA_REQ(thread_lock, preempt_disabled_token) {
+  Scheduler::UpstreamThreadBaseProfileChanged(upstream, downstream);
+  if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
+    pi_bp_changed.Add(1u);
   }
-
-  Thread* thread_ = nullptr;
-  uint32_t flow_id_ = 0;
-  uint32_t priorities_ = 0;
-};
-
-RecursionGuard qpc_recursion_guard;
+}
 
 }  // namespace
 
@@ -278,195 +175,18 @@ void OwnedWaitQueue::DisownAllQueues(Thread* t) {
   t->wait_queue_state_.owned_wait_queues_.clear();
 }
 
-void OwnedWaitQueue::QueuePressureChanged(Thread* t, int old_prio, int new_prio)
-    TA_REQ(thread_lock) {
-  fbl::AutoLock guard(&qpc_recursion_guard);
-  DEBUG_ASSERT(old_prio != new_prio);
-
-  uint32_t traverse_len = 1;
-
-  // When we have finally finished updating everything, make sure to update
-  // our max traversal statistic.
-  //
-  // Note, the only real reason that this is an accurate max at all is because
-  // the counter is effectively protected by the thread lock (although there
-  // is no real good way to annotate that fact).
-  auto on_exit = fit::defer([&traverse_len]() {
-    auto old = max_pi_chain_traverse.ValueCurrCpu();
-    if (traverse_len > old) {
-      max_pi_chain_traverse.Set(traverse_len);
-    }
-  });
-
-  DEBUG_ASSERT(t != nullptr);
-
-  PiKTracer tracer;
-  InfiniteLoopGuard inf_loop_guard;
-  while (true) {
-    inf_loop_guard.CheckProgress(traverse_len);
-    if (new_prio < old_prio) {
-      // If the pressure just dropped, but the old pressure was strictly
-      // lower than the current inherited priority of the thread, then
-      // there is nothing to do.  We can just stop.  The maximum inherited
-      // priority must have come from a different wait queue.
-      //
-      if (old_prio < t->scheduler_state().inherited_priority()) {
-        return;
-      }
-
-      // Since the pressure from one of our queues just dropped, we need
-      // to recompute the new maximum priority across all of the wait
-      // queues currently owned by this thread.
-      [[maybe_unused]] int orig_new_prio = new_prio;
-      for (const auto& owq : t->wait_queue_state_.owned_wait_queues_) {
-        int queue_prio = owq.BlockedPriority();
-
-        // If our bookkeeping is accurate, it should be impossible for
-        // our original new priority to be greater than the priority of
-        // any of the queues currently owned by this thread.
-        DEBUG_ASSERT(orig_new_prio <= queue_prio);
-        new_prio = ktl::max(new_prio, queue_prio);
-      }
-
-      // If our calculated new priority is still the same as our current
-      // inherited priority, then we are done.
-      if (new_prio == t->scheduler_state().inherited_priority()) {
-        return;
-      }
-    } else {
-      // Likewise, if the pressure just went up, but the new pressure is
-      // not strictly higher than the current inherited priority, then
-      // there is nothing to do.
-      if (new_prio <= t->scheduler_state().inherited_priority()) {
-        return;
-      }
-    }
-
-    // OK, at this point in time, we know that there has been a change to
-    // our inherited priority.  Update it, and check to see if that resulted
-    // in a change of the maximum waiter priority of the wait queue blocking
-    // this thread (if any).  If not, then we are done.
-    const WaitQueue* bwq = t->wait_queue_state_.blocking_wait_queue_;
-    int old_effec_prio = t->scheduler_state().effective_priority();
-    int old_inherited_prio = t->scheduler_state().inherited_priority();
-    int old_queue_prio = bwq ? bwq->BlockedPriority() : -1;
-    int new_queue_prio;
-
-    t->get_lock().AssertHeld();
-    Scheduler::InheritPriority(t, new_prio);
-
-    new_queue_prio = bwq ? bwq->BlockedPriority() : -1;
-
-    // If the effective priority of this thread has gone up or down, record
-    // it in the kernel counters as a PI promotion or demotion.
-    if (old_effec_prio != t->scheduler_state().effective_priority()) {
-      if (old_effec_prio < t->scheduler_state().effective_priority()) {
-        pi_promotions.Add(1);
-      } else {
-        pi_demotions.Add(1);
-      }
-    }
-
-    // Trace the change in priority if enabled.
-    tracer.Trace(t, old_effec_prio, old_inherited_prio);
-
-    if (old_queue_prio == new_queue_prio) {
-      return;
-    }
-
-    // It looks the change of this thread's inherited priority affected its
-    // blocking wait queue in a meaningful way.  If this wait_queue is an
-    // OwnedWait queue, and it currently has an owner, then continue to
-    // propagate the change.  Otherwise, we are done.
-    if ((bwq != nullptr) && (bwq->magic() == OwnedWaitQueue::kOwnedMagic)) {
-      t = static_cast<const OwnedWaitQueue*>(bwq)->owner();
-      if (t != nullptr) {
-        old_prio = old_queue_prio;
-        new_prio = new_queue_prio;
-        ++traverse_len;
-        continue;
-      }
-    }
-
-    return;
-  }
-}
-
-void OwnedWaitQueue::WaitersPriorityChanged(int old_prio) {
-  if (owner() == nullptr) {
-    return;
-  }
-
-  int new_prio = BlockedPriority();
-  if (old_prio == new_prio) {
-    return;
-  }
-
-  QueuePressureChanged(owner(), old_prio, new_prio);
-  UpdateStats();
-}
-
-void OwnedWaitQueue::UpdateBookkeeping(Thread* new_owner, int old_prio) {
-  const int new_prio = BlockedPriority();
-
-  // The new owner may not be a dying thread.
-  if ((new_owner != nullptr) && (new_owner->state() == THREAD_DEATH)) {
-    new_owner = nullptr;
-  }
-
-  if (new_owner == owner()) {
-    // The owner has not changed.  If there never was an owner, or there is
-    // an owner but the queue pressure has not changed, then there is
-    // nothing we need to do.
-    if ((owner() == nullptr) || (new_prio == old_prio)) {
-      return;
-    }
-    QueuePressureChanged(owner(), old_prio, new_prio);
-  } else {
-    // Looks like the ownership has actually changed.  Start releasing
-    // ownership and propagating the PI consequences for the old owner (if
-    // any).
-    Thread* old_owner = owner();
-    if (old_owner != nullptr) {
-      DEBUG_ASSERT(this->InContainer());
-      old_owner->wait_queue_state_.owned_wait_queues_.erase(*this);
-      owner_ = nullptr;
-
-      if (old_prio >= 0) {
-        QueuePressureChanged(old_owner, old_prio, -1);
-      }
-
-      // If we no longer own any queues, then we had better not be inheriting any priority at
-      // this point in time.
-      DEBUG_ASSERT(!old_owner->wait_queue_state_.owned_wait_queues_.is_empty() ||
-                   (old_owner->scheduler_state().inherited_priority() == -1));
-    }
-
-    // Update to the new owner.  If there is a new owner, fix the
-    // bookkeeping.  Then, if there are waiters in the queue (therefore,
-    // non-negative pressure), then apply that pressure now.
-    owner_ = new_owner;
-    if (new_owner != nullptr) {
-      DEBUG_ASSERT(!this->InContainer());
-      new_owner->wait_queue_state_.owned_wait_queues_.push_back(this);
-
-      if (new_prio >= 0) {
-        QueuePressureChanged(new_owner, -1, new_prio);
-      }
-    }
-  }
-}
-
-void OwnedWaitQueue::WakeThreadsInternal(uint32_t wake_count, Thread** out_new_owner, zx_time_t now,
+void OwnedWaitQueue::WakeThreadsInternal(uint32_t wake_count, zx_time_t now,
                                          Hook on_thread_wake_hook) {
   DEBUG_ASSERT(magic() == kOwnedMagic);
-  DEBUG_ASSERT(out_new_owner != nullptr);
+  auto post_op_validate = fit::defer([this]() { ValidateSchedStateStorage(); });
 
-  // Note: This methods relies on the wait queue to be kept sorted in the
-  // order that the scheduler would prefer to wake threads.
-  *out_new_owner = nullptr;
+  // Start by removing any existing owner.  We will either select a new owner
+  // based on what the user-provided hook tells us to do, or we should end up
+  // with no owner.
+  AssignOwnerInternal(nullptr);
 
-  for (uint32_t woken = 0; woken < wake_count; ++woken) {
+  uint32_t woken = 0;
+  while (woken < wake_count) {
     // Consider the thread that the queue considers to be the most important to
     // wake right now.  If there are no threads left in the queue, then we are
     // done.
@@ -486,25 +206,489 @@ void OwnedWaitQueue::WakeThreadsInternal(uint32_t wake_count, Thread** out_new_o
     }
 
     // All other choices involve waking up this thread, so go ahead and do that now.
+    ++woken;
+
+    // If this is a wake-and-assign-owner operation, then the number of threads
+    // we have woken so far should be exactly one.
+    DEBUG_ASSERT((action != Action::SelectAndAssignOwner) || (woken == 1));
+
+    // Dequeue the thread and propagate the PI consequences.  Do not actually unblock the
+    // thread from the scheduler's perspective just yet.
     DequeueThread(t, ZX_OK);
+    UpdateSchedStateStorageThreadRemoved(*t);
+    BeginPropagate(*t, *this, RemoveSingleEdgeOp);
+
+    // No go ahead and unblock the thread we just removed from the wait queue.
+    //
+    // TODO(johngro) : instead of unblocking the thread now, it might be better
+    // to put it on a local list, then batch unblock all of the threads we woke
+    // at the end of everything.
     Scheduler::Unblock(t);
 
-    // If we are supposed to keep going, simply continue the loop.
-    if (action == Action::SelectAndKeepGoing) {
-      continue;
+    // If this thread was selected to become the new queue owner, and it still
+    // has waiters, make the assignment and we are done.
+    if (action == Action::SelectAndAssignOwner) {
+      if (!IsEmpty()) {
+        AssignOwnerInternal(t);
+      }
+      break;
     }
 
-    // No matter what the user chose at this point, we are going to stop after
-    // this. Make sure that we have not woken any other threads, and return a
-    // pointer to the thread who is to become the new owner if there are still
-    // threads waiting in the queue.
-    DEBUG_ASSERT(action == Action::SelectAndAssignOwner);
-    DEBUG_ASSERT(woken == 0);
-    if (!IsEmpty()) {
-      *out_new_owner = t;
+    // Looks like this is just a simple wake operation.  Keep going as long as
+    // there are more threads to wake.
+    DEBUG_ASSERT(action == Action::SelectAndKeepGoing);
+  };
+
+  // If there are no threads left waiting in this queue, then it cannot have any owner.
+  DEBUG_ASSERT((owner_ == nullptr) || !IsEmpty());
+}
+
+void OwnedWaitQueue::ValidateSchedStateStorageUnconditional() {
+  thread_lock.AssertHeld();
+  if (inherited_scheduler_state_storage_ != nullptr) {
+    bool found = false;
+    for (const Thread& t : this->collection_.threads()) {
+      if (&t.wait_queue_state().inherited_scheduler_state_storage_ ==
+          inherited_scheduler_state_storage_) {
+        found = true;
+        break;
+      }
     }
-    break;
+    DEBUG_ASSERT(found);
+  } else {
+    DEBUG_ASSERT(this->IsEmpty());
   }
+}
+
+SchedulerState::InheritedProfileValues OwnedWaitQueue::SnapshotThreadIpv(Thread& thread) {
+  const SchedulerState& tss = thread.scheduler_state();
+  SchedulerState::InheritedProfileValues ret = tss.inherited_profile_values_;
+  const SchedulerState::BaseProfile& bp = tss.base_profile_;
+
+  if (bp.inheritable) {
+    if (bp.discipline == SchedDiscipline::Fair) {
+      ret.total_weight += bp.fair.weight;
+    } else {
+      DEBUG_ASSERT(ret.min_deadline != SchedDuration{0});
+      ret.uncapped_utilization += bp.deadline.utilization;
+      ret.min_deadline = ktl::min(ret.min_deadline, bp.deadline.deadline_ns);
+    }
+  }
+
+  return ret;
+}
+
+void OwnedWaitQueue::ApplyIpvDeltaToThread(const SchedulerState::InheritedProfileValues* old_ipv,
+                                           const SchedulerState::InheritedProfileValues* new_ipv,
+                                           Thread& thread) {
+  DEBUG_ASSERT((old_ipv != nullptr) || (new_ipv != nullptr));
+
+  SchedWeight weight_delta = new_ipv ? new_ipv->total_weight : SchedWeight{0};
+  SchedUtilization util_delta = new_ipv ? new_ipv->uncapped_utilization : SchedUtilization{0};
+  if (old_ipv != nullptr) {
+    weight_delta -= old_ipv->total_weight;
+    util_delta -= old_ipv->uncapped_utilization;
+  }
+
+  SchedulerState& tss = thread.scheduler_state();
+  SchedulerState::InheritedProfileValues& thread_ipv = tss.inherited_profile_values_;
+
+  tss.effective_profile_.MarkInheritedProfileChanged();
+  thread_ipv.total_weight += weight_delta;
+  thread_ipv.uncapped_utilization += util_delta;
+
+  DEBUG_ASSERT(thread_ipv.total_weight >= SchedWeight{0});
+  DEBUG_ASSERT(thread_ipv.uncapped_utilization >= SchedUtilization{0});
+
+  // If a set of IPVs is going away, and the value which is going away was the
+  // minimum, then we need to recompute the new minimum by checking the
+  // minimum across all of this thread's owned wait queues.
+  //
+  // TODO(johngro): Consider keeping the set of owned wait queues as a WAVL
+  // tree, indexed by minimum relative deadline, so that this can be
+  // maintained in O(1) time instead of O(N).
+  if ((new_ipv != nullptr) && (new_ipv->min_deadline <= thread_ipv.min_deadline)) {
+    thread_ipv.min_deadline = ktl::min(thread_ipv.min_deadline, new_ipv->min_deadline);
+  } else {
+    if ((old_ipv != nullptr) && (old_ipv->min_deadline <= thread_ipv.min_deadline)) {
+      SchedDuration new_min_deadline{SchedDuration::Max()};
+
+      for (auto& other_queue : thread.wait_queue_state().owned_wait_queues_) {
+        if (!other_queue.IsEmpty()) {
+          DEBUG_ASSERT(other_queue.inherited_scheduler_state_storage_ != nullptr);
+          const SchedulerState::InheritedProfileValues& other_ipvs =
+              other_queue.inherited_scheduler_state_storage_->ipvs;
+          new_min_deadline = ktl::min(new_min_deadline, other_ipvs.min_deadline);
+        }
+      }
+
+      thread_ipv.min_deadline = new_min_deadline;
+    }
+
+    if (new_ipv != nullptr) {
+      thread_ipv.min_deadline = ktl::min(thread_ipv.min_deadline, new_ipv->min_deadline);
+    }
+  }
+
+  DEBUG_ASSERT(thread_ipv.min_deadline > SchedDuration{0});
+}
+
+void OwnedWaitQueue::ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileValues* old_ipv,
+                                        const SchedulerState::InheritedProfileValues* new_ipv,
+                                        OwnedWaitQueue& owq) {
+  SchedWeight weight_delta = new_ipv ? new_ipv->total_weight : SchedWeight{0};
+  SchedUtilization util_delta = new_ipv ? new_ipv->uncapped_utilization : SchedUtilization{0};
+
+  if (old_ipv != nullptr) {
+    weight_delta -= old_ipv->total_weight;
+    util_delta -= old_ipv->uncapped_utilization;
+  }
+
+  DEBUG_ASSERT(!owq.IsEmpty());
+  DEBUG_ASSERT(owq.inherited_scheduler_state_storage_ != nullptr);
+  SchedulerState::WaitQueueInheritedSchedulerState& iss = *owq.inherited_scheduler_state_storage_;
+
+  iss.ipvs.total_weight += weight_delta;
+  iss.ipvs.uncapped_utilization += util_delta;
+  iss.ipvs.min_deadline = owq.collection_.MinInheritableRelativeDeadline();
+
+  DEBUG_ASSERT(iss.ipvs.total_weight >= SchedWeight{0});
+  DEBUG_ASSERT(iss.ipvs.uncapped_utilization >= SchedUtilization{0});
+  DEBUG_ASSERT(iss.ipvs.min_deadline > SchedDuration{0});
+}
+
+bool OwnedWaitQueue::CheckForCycle(const OwnedWaitQueue* owq, const Thread* owner_thread,
+                                   const Thread* blocking_thread) {
+  // If the owner of OWQ is being set to nullptr, then there cannot be a cycle.
+  if (owner_thread == nullptr) {
+    return false;
+  }
+
+  // ASSERT if this operation goes on for way too long, but do not record this
+  // as a chain traversal for kcounter purposes.
+  ChainLengthTracker<kEnablePiChainGuards> inf_loop_guard;
+
+  // Trace the downstream path from the proposed owner thread.  If it leads back
+  // to either |owq| or |blocking_thread|, then we would have a cycle if
+  // |blocking_thread| blocked in |owq|, and |owner_thread| were to become the
+  // owner.
+  const Thread* thread_iter = owner_thread;
+
+  while (true) {
+    // Peek at the wait queue which is blocking this thread.
+    const OwnedWaitQueue* next_owq =
+        DowncastToOwq(thread_iter->wait_queue_state().blocking_wait_queue_);
+
+    // If there is no blocking wait queue, or it is not an owned wait queue,
+    // then there is no cycle and we are finished.
+    if (next_owq == nullptr) {
+      return false;
+    }
+    inf_loop_guard.NodeVisited();
+
+    // If the OWQ blocking this thread is the OWQ involved in cycle detection,
+    // then we have found a cycle.
+    if (next_owq == owq) {
+      return true;
+    }
+
+    // Move on to the next thread.  If there is no next thread, then there is no
+    // cycle.  Alternatively, if we are considering blocking a thread, and this
+    // is the same thread as the OWQ's owner, then we have detected a cycle.
+    thread_iter = next_owq->owner_;
+    if (thread_iter == nullptr) {
+      return false;
+    }
+    inf_loop_guard.NodeVisited();
+
+    if (thread_iter == blocking_thread) {
+      return true;
+    }
+  }
+}
+
+template <OwnedWaitQueue::PropagateOp OpType>
+void OwnedWaitQueue::BeginPropagate(Thread& upstream_node, OwnedWaitQueue& downstream_node,
+                                    PropagateOpTag<OpType> op) {
+  // When needed, base profile changes will directly call FinishPropagate.
+  static_assert(OpType != PropagateOp::BaseProfileChanged);
+  SchedulerState::InheritedProfileValues ipv_snapshot;
+
+  // Are we starting from a thread during an edge remove operation?  If so,
+  // and we were the last thread to leave the queue, then there is no longer
+  // any IPV storage for our downstream wait queue which needs to be updated.
+  // If the wait queue has no owner either, then we are done with propagation.
+  if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    if (downstream_node.IsEmpty() && (downstream_node.owner_ == nullptr)) {
+      return;
+    }
+  }
+
+  ipv_snapshot = SnapshotThreadIpv(upstream_node);
+
+  if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    FinishPropagate(upstream_node, downstream_node, nullptr, &ipv_snapshot, op);
+  } else if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    FinishPropagate(upstream_node, downstream_node, &ipv_snapshot, nullptr, op);
+  }
+}
+
+template <OwnedWaitQueue::PropagateOp OpType>
+void OwnedWaitQueue::BeginPropagate(OwnedWaitQueue& upstream_node, Thread& downstream_node,
+                                    PropagateOpTag<OpType> op) {
+  // When needed, base profile changes will directly call FinishPropagate.
+  static_assert(OpType != PropagateOp::BaseProfileChanged);
+
+  if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    // If we are adding an owner to this OWQ, we should be able to assert that
+    // it does not currently have one.
+    DEBUG_ASSERT(upstream_node.owner_ == nullptr);
+    DEBUG_ASSERT(!upstream_node.InContainer());
+
+    upstream_node.owner_ = &downstream_node;
+    downstream_node.wait_queue_state().owned_wait_queues_.push_back(&upstream_node);
+  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    // If we are removing the owner of this OWQ, or we are updating the base
+    // profile of the immediately upstream thread, we should be able to assert
+    // that the owq's current owner is the thread passed to this method.
+    DEBUG_ASSERT(upstream_node.owner_ == &downstream_node);
+    DEBUG_ASSERT(upstream_node.InContainer());
+    downstream_node.wait_queue_state().owned_wait_queues_.erase(upstream_node);
+    upstream_node.owner_ = nullptr;
+  }
+
+  // If the OWQ we are starting from has no active waiters, then there are no
+  // IPV deltas to propagate.  After updating the links, we are finished.
+  if (upstream_node.IsEmpty()) {
+    return;
+  }
+
+  DEBUG_ASSERT(upstream_node.inherited_scheduler_state_storage_ != nullptr);
+  SchedulerState::InheritedProfileValues& ipvs =
+      upstream_node.inherited_scheduler_state_storage_->ipvs;
+
+  if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    FinishPropagate(upstream_node, downstream_node, nullptr, &ipvs, op);
+  } else if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    FinishPropagate(upstream_node, downstream_node, &ipvs, nullptr, op);
+  }
+}
+
+template <OwnedWaitQueue::PropagateOp OpType, typename UpstreamNodeType,
+          typename DownstreamNodeType>
+void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
+                                     DownstreamNodeType& downstream_node,
+                                     const SchedulerState::InheritedProfileValues* added_ipv,
+                                     const SchedulerState::InheritedProfileValues* lost_ipv,
+                                     PropagateOpTag<OpType> op) {
+  // Propagation must start from a(n) (OWQ|Thread) and proceed to a(n) (Thread|OWQ).
+  static_assert((ktl::is_same_v<UpstreamNodeType, OwnedWaitQueue> &&
+                 ktl::is_same_v<DownstreamNodeType, Thread>) ||
+                    (ktl::is_same_v<UpstreamNodeType, Thread> &&
+                     ktl::is_same_v<DownstreamNodeType, OwnedWaitQueue>),
+                "Bad types for FinishPropagate.  Must be either OWQ -> Thread, or Thread -> OWQ");
+
+  constexpr bool kStartingFromThread = ktl::is_same_v<UpstreamNodeType, Thread>;
+
+  // If neither the IPVs we are adding, nor the IPVs we are removing, are
+  // "consequential" (meaning, the have either some fair weight, or some
+  // deadline capacity, or both), then we can just get out now.  There are no
+  // effective changes to propagate.
+  if (!IpvsAreConsequential(added_ipv) && !IpvsAreConsequential(lost_ipv)) {
+    return;
+  }
+
+  // Set up the pointers we will use as iterators for traversing the inheritance
+  // graph.  Snapshot the starting node's current inherited profile values which
+  // we need to propagate.
+  OwnedWaitQueue* owq_iter;
+  Thread* thread_iter;
+
+  if constexpr (kStartingFromThread) {
+    thread_iter = &upstream_node;
+    owq_iter = &downstream_node;
+
+    // Is this a base profile changed operation?  If so, we should already have
+    // a link between our thread and the downstream owned wait queue.  Go ahead
+    // and ASSERT this.  We don't need to bother to check the other
+    // combinations; those have already been asserted during
+    // BeginPropagate.
+    if constexpr (OpType == PropagateOp::BaseProfileChanged) {
+      DEBUG_ASSERT_MSG(
+          thread_iter->wait_queue_state().blocking_wait_queue_ == static_cast<WaitQueue*>(owq_iter),
+          "blocking wait queue %p owq_iter %p",
+          thread_iter->wait_queue_state().blocking_wait_queue_, static_cast<WaitQueue*>(owq_iter));
+    }
+  } else {
+    // Base profile changes should never start from OWQs.
+    static_assert(OpType != PropagateOp::BaseProfileChanged);
+    owq_iter = &upstream_node;
+    thread_iter = &downstream_node;
+    DEBUG_ASSERT(!owq_iter->IsEmpty());
+  }
+
+  if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv == nullptr);
+  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    DEBUG_ASSERT(added_ipv == nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else if constexpr (OpType == PropagateOp::BaseProfileChanged) {
+    static_assert(
+        kStartingFromThread,
+        "Base profile propagation changes may only start from Threads, not OwnedWaitQueues");
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else {
+    static_assert(OpType != OpType, "Unrecognized propagation operation");
+  }
+
+  // When we have finally finished updating everything, make sure to update
+  // our max traversal statistic.
+  ChainLengthTracker len_tracker;
+
+  // OK - we are finally ready to get to work.  Use a slightly-evil(tm) goto in
+  // order to start our propagate loop with the proper phase (either
+  // thread-to-OWQ first, or OWQ-to-thread first)
+  if constexpr (kStartingFromThread == false) {
+    goto start_from_owq;
+  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    // Are we starting from a thread during an edge remove operation?  If so,
+    // and if we were the last thread to leave our wait queue, then we don't
+    // need to bother to update its IPVs anymore (it cannot have any IPVs if it
+    // has no waiters), so we can just skip it an move on to its owner thread.
+    //
+    // Additionally, we know that it must have an owner thread at this point in
+    // time.  If if didn't, BeginPropagate would have already bailed out.
+    if (owq_iter->IsEmpty()) {
+      thread_iter = owq_iter->owner_;
+      DEBUG_ASSERT(thread_iter != nullptr);
+      goto start_from_owq;
+    }
+  }
+
+  while (true) {
+    {
+      // Propagate from the current thread_iter to the current owq_iter.
+      // First, apply the change in pressure to the next OWQ in the chain.
+      ApplyIpvDeltaToOwq(lost_ipv, added_ipv, *owq_iter);
+
+      // We should not be here if this OWQ has no waiters.  That special case
+      // was handled above.
+      DEBUG_ASSERT(owq_iter->Count() > 0);
+
+      // If our OWQ target has exactly one waiter, then propagation of the
+      // dynamic parameters is simple, we just need to copy that thread's current
+      // dynamic parameters.  Otherwise, we call into the scheduler in order to
+      // allow it to apply the lag equation, as appropriate.
+      if (owq_iter->Count() == 1) {
+        DEBUG_ASSERT(owq_iter->inherited_scheduler_state_storage_ != nullptr);
+        SchedulerState::WaitQueueInheritedSchedulerState& owq_iss =
+            *owq_iter->inherited_scheduler_state_storage_;
+
+        Thread& only_waiter = owq_iter->collection_.PeekOnlyThread();
+        SchedulerState& only_waiter_ss = only_waiter.scheduler_state();
+
+        owq_iss.start_time = only_waiter_ss.start_time_;
+        owq_iss.finish_time = only_waiter_ss.finish_time_;
+        owq_iss.time_slice_ns = only_waiter_ss.time_slice_ns_;
+      } else {
+        Propagate(upstream_node, *owq_iter, op);
+      }
+      len_tracker.NodeVisited();
+
+      // Advance to the next thread, if any.  If there isn't another thread,
+      // then we are finished, simply break out of the propagation loop.
+      thread_iter = owq_iter->owner_;
+      if (thread_iter == nullptr) {
+        break;
+      }
+    }
+
+    // clang-format off
+    [[maybe_unused]] start_from_owq:
+    // clang-format on
+
+    {
+      // Propagate from the current owq_iter to the current thread_iter.
+      // Apply the change in pressure to the next thread in the chain.
+      ApplyIpvDeltaToThread(lost_ipv, added_ipv, *thread_iter);
+      Propagate(upstream_node, *thread_iter, op);
+      len_tracker.NodeVisited();
+
+      owq_iter = DowncastToOwq(thread_iter->wait_queue_state().blocking_wait_queue_);
+      if (owq_iter == nullptr) {
+        break;
+      }
+    }
+  }
+}
+
+void OwnedWaitQueue::SetThreadBaseProfileAndPropagate(Thread& thread,
+                                                      const SchedulerState::BaseProfile& profile) {
+  AutoEagerReschedDisabler eager_resched_disabler;
+  SchedulerState& state = thread.scheduler_state();
+
+  SchedulerState::InheritedProfileValues old_ipvs;
+  OwnedWaitQueue* owq = DowncastToOwq(thread.wait_queue_state().blocking_wait_queue_);
+
+  // If our thread is blocked in an owned wait queue, we need observe the
+  // thread's transmitted IPVs before and after the base profile change in order
+  // to properly handle propagation.
+  if (owq != nullptr) {
+    old_ipvs = SnapshotThreadIpv(thread);
+  }
+
+  // Regardless of the state of the thread whose base profile has changed, we
+  // need to update the base profile and let the scheduler know.  The scheduler
+  // code will handle:
+  // 1) Updating our effective profile
+  // 2) Repositioning us in our wait queue (if we are blocked)
+  // 3) Updating our dynamic scheduling parameters (if we are either runnable or
+  //    a blocked deadline thread)
+  // 4) Updating the scheduler's state (if we happen to be a runnable thread).
+  state.base_profile_ = profile;
+  state.effective_profile_.MarkBaseProfileChanged();
+  Scheduler::ThreadBaseProfileChanged(thread);
+
+  // Now, if we are blocked in an owned wait queue, propagate the consequences
+  // of the base profile change downstream.
+  if (owq != nullptr) {
+    SchedulerState::InheritedProfileValues new_ipvs = SnapshotThreadIpv(thread);
+    FinishPropagate(thread, *owq, &new_ipvs, &old_ipvs, BaseProfileChangedOp);
+  }
+}
+
+zx_status_t OwnedWaitQueue::AssignOwner(Thread* new_owner) {
+  DEBUG_ASSERT(magic() == kOwnedMagic);
+
+  // If there is a change of owners, and the change would produce a cycle, then
+  // fail the call instead.
+  if ((owner_ != new_owner) && CheckForCycle(this, new_owner)) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  AssignOwnerInternal(new_owner);
+  return ZX_OK;
+}
+
+void OwnedWaitQueue::AssignOwnerInternal(Thread* new_owner) {
+  // If there is no change, then we are done already.
+  if (owner_ == new_owner) {
+    return;
+  }
+
+  // Start by releasing the old owner (if any) and propagating the PI effects.
+  if (owner_ != nullptr) {
+    BeginPropagate(*this, *owner_, RemoveSingleEdgeOp);
+  }
+
+  // If there is a new owner to assign, do so now and propagate the PI effects.
+  if (new_owner != nullptr) {
+    BeginPropagate(*this, *new_owner, AddSingleEdgeOp);
+  }
+
+  ValidateSchedStateStorage();
 }
 
 zx_status_t OwnedWaitQueue::BlockAndAssignOwner(const Deadline& deadline, Thread* new_owner,
@@ -516,13 +700,34 @@ zx_status_t OwnedWaitQueue::BlockAndAssignOwner(const Deadline& deadline, Thread
   DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   thread_lock.AssertHeld();
 
-  // Remember what the maximum effective priority of the wait queue was before
-  // we add current_thread to it.
-  int old_queue_prio = BlockedPriority();
+  // TODO(johngro) : when we start to use distributed locking, start by
+  // obtaining the queue lock for the current thread, followed by the queue lock
+  // for this OWQ.  Then validate that the operation is still technically legal.
+  if (CheckForCycle(this, new_owner, current_thread)) {
+    // TODO(johngro) : Change this when we reach the point that we are ready to
+    // propagate errors in the case that someone attempts to create a cycle.
+    // For now, we avoid the cycle by forcing the OWQ to become unowned.
+#if 0
+    return ZX_ERR_BAD_STATE;
+#else
+    new_owner = nullptr;
+#endif
+  }
 
-  // Perform the first half of the BlockEtc operation.  If this fails, then
-  // the state of the actual wait queue is unchanged and we can just get out
-  // now.
+  // If the there is a change of owner happening, start by releasing the current
+  // owner.
+  const bool owner_changed = (owner_ != new_owner);
+  if (owner_changed) {
+    AssignOwnerInternal(nullptr);
+  }
+
+  // Perform the first half of the BlockEtc operation.  This will attempt to add
+  // an edge between the thread which is blocking, and the OWQ it is blocking in
+  // (this).  We know that this cannot produce a cycle in the graph because we
+  // know that this OWQ does not currently have an owner.
+  //
+  // If the block preamble fails, then the state of the actual wait queue is
+  // unchanged and we can just get out now.
   zx_status_t res = BlockEtcPreamble(deadline, 0u, resource_ownership, interruptible);
   if (res != ZX_OK) {
     // There are only three reasons why the pre-wait operation should ever fail.
@@ -537,33 +742,49 @@ zx_status_t OwnedWaitQueue::BlockAndAssignOwner(const Deadline& deadline, Thread
     // not mean that ownership assignment gets skipped.
     ZX_DEBUG_ASSERT((res == ZX_ERR_TIMED_OUT) || (res == ZX_ERR_INTERNAL_INTR_KILLED) ||
                     (res == ZX_ERR_INTERNAL_INTR_RETRY));
-    AssignOwner(new_owner);
+    if (owner_changed) {
+      AssignOwnerInternal(new_owner);
+    }
+
     return res;
   }
 
-  // Success.  The current thread has passed all of its sanity checks and been
-  // added to the wait queue.  Go ahead and update our priority inheritance
-  // bookkeeping since both ownership and current PI pressure may have changed
-  // (ownership because of |new_owner| and pressure because of the addition of
-  // the thread to the queue.
-  UpdateBookkeeping(new_owner, old_queue_prio);
-  UpdateStats();
+  // We succeeded in placing our thread into our wait collection.  Make sure we
+  // update the scheduler state storage location if needed, then propagate the
+  // effects down the chain.
+  UpdateSchedStateStorageThreadAdded(*current_thread);
+  BeginPropagate(*current_thread, *this, AddSingleEdgeOp);
+
+  // Finally, assign the new owner (if we have one).
+  if (owner_changed && (new_owner != nullptr)) {
+    DEBUG_ASSERT(owner_ == nullptr);
+    AssignOwnerInternal(new_owner);
+  }
 
   // Finally, go ahead and run the second half of the BlockEtc operation.
   // This will actually block our thread and handle setting any timeout timers
   // in the process.
-  return BlockEtcPostamble(deadline);
+
+  // DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!!
+  //
+  // It is very important that no attempts to access |this| are made after
+  // either of the calls to BlockEtcPostamble (below). When someone eventually
+  // comes along and unblocks us from the queue, they have already taken care of
+  // removing us from the this wait queue.  It it totally possible that the wait
+  // queue we were blocking in has been destroyed by the time we make it out of
+  // BlockEtcPostable, making |this| no longer a valid pointer.
+  //
+  // DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!! DANGER!!
+  res = BlockEtcPostamble(deadline);
+
+  return res;
 }
 
 void OwnedWaitQueue::WakeThreads(uint32_t wake_count, Hook on_thread_wake_hook) {
   DEBUG_ASSERT(magic() == kOwnedMagic);
   zx_time_t now = current_time();
 
-  Thread* new_owner;
-  const int old_queue_prio = BlockedPriority();
-  WakeThreadsInternal(wake_count, &new_owner, now, on_thread_wake_hook);
-  UpdateBookkeeping(new_owner, old_queue_prio);
-  UpdateStats();
+  WakeThreadsInternal(wake_count, now, on_thread_wake_hook);
 }
 
 void OwnedWaitQueue::WakeAndRequeue(uint32_t wake_count, OwnedWaitQueue* requeue_target,
@@ -573,6 +794,8 @@ void OwnedWaitQueue::WakeAndRequeue(uint32_t wake_count, OwnedWaitQueue* requeue
   DEBUG_ASSERT(requeue_target != nullptr);
   DEBUG_ASSERT(requeue_target->magic() == kOwnedMagic);
   zx_time_t now = current_time();
+
+  auto post_op_validate = fit::defer([this]() { ValidateSchedStateStorage(); });
 
   // If the potential new owner of the requeue wait queue is already dead,
   // then it cannot become the owner of the requeue wait queue.
@@ -588,18 +811,20 @@ void OwnedWaitQueue::WakeAndRequeue(uint32_t wake_count, OwnedWaitQueue* requeue
     }
   }
 
-  // Remember what our queue priorities had been.  We will need this when it
-  // comes time to update the PI chains.
-  const int old_wake_prio = BlockedPriority();
-  const int old_requeue_prio = requeue_target->BlockedPriority();
+  // Wake the specified number of threads and assign a new owner if needed.
+  WakeThreadsInternal(wake_count, now, on_thread_wake_hook);
 
-  Thread* new_wake_owner;
-  WakeThreadsInternal(wake_count, &new_wake_owner, now, on_thread_wake_hook);
+  // If the requeue target currently has an owner, and the owner is changing,
+  // start by clearing the owner from the queue.
+  if (requeue_target->owner_ && (requeue_target->owner_ != requeue_owner)) {
+    requeue_target->AssignOwnerInternal(requeue_owner);
+  }
 
   // If there are still threads left in the wake queue (this), and we were asked to
   // requeue threads, then do so.
-  if (!this->IsEmpty() && requeue_count) {
-    for (uint32_t requeued = 0; requeued < requeue_count; ++requeued) {
+  uint32_t requeued = 0;
+  if (!this->IsEmpty()) {
+    while (requeued < requeue_count) {
       // Consider the thread that the queue considers to be the most important to
       // wake right now.  If there are no threads left in the queue, then we are
       // done.
@@ -621,25 +846,42 @@ void OwnedWaitQueue::WakeAndRequeue(uint32_t wake_count, OwnedWaitQueue* requeue
         break;
       }
 
-      // SelectAndKeepGoing is the only legal choice left.
-      DEBUG_ASSERT(action == Action::SelectAndKeepGoing);
+      // If attempting to move this thread to the requeue target would create a
+      // cycle with the new owner, then clear ownership of the queue instead.
+      //
+      // TODO(johngro): Change this when we switch to propagating the error
+      // instead of simply removing ownership.
+      if (CheckForCycle(requeue_target, requeue_owner, t)) {
+        requeue_owner = nullptr;
+        requeue_target->AssignOwnerInternal(nullptr);
+      }
 
       // Actually move the thread from this to the requeue_target.
-      WaitQueue::MoveThread(this, requeue_target, t);
-    };
-  }
+      this->collection_.Remove(t);
+      t->wait_queue_state().blocking_wait_queue_ = nullptr;
+      this->UpdateSchedStateStorageThreadRemoved(*t);
+      BeginPropagate(*t, *this, RemoveSingleEdgeOp);
 
-  // Now that we are finished moving everyone around, update the ownership of
-  // the queues involved in the operation.  These updates should deal with
-  // propagating any priority inheritance consequences of the requeue operation.
-  UpdateBookkeeping(new_wake_owner, old_wake_prio);
+      requeue_target->collection_.Insert(t);
+      t->wait_queue_state().blocking_wait_queue_ = requeue_target;
+      requeue_target->UpdateSchedStateStorageThreadAdded(*t);
+      BeginPropagate(*t, *requeue_target, AddSingleEdgeOp);
+
+      ++requeued;
+
+      // SelectAndKeepGoing is the only legal choice left.
+      DEBUG_ASSERT(action == Action::SelectAndKeepGoing);
+    }
+  }
 
   // If there is no one waiting in the requeue target, then it is not allowed to
   // have an owner.
   if (requeue_target->IsEmpty()) {
     requeue_owner = nullptr;
   }
-
-  requeue_target->UpdateBookkeeping(requeue_owner, old_requeue_prio);
-  UpdateStats();
+  requeue_target->AssignOwnerInternal(requeue_owner);
 }
+
+// Explicit instantiation of a variant of the generic BeginPropagate method used in
+// wait.cc during thread unblock operations.
+template void OwnedWaitQueue::BeginPropagate(Thread&, OwnedWaitQueue&, RemoveSingleEdgeTag);

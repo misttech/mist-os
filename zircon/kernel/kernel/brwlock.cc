@@ -36,6 +36,31 @@ void BrwLock<PI>::Block(bool write) {
   LOCK_TRACE_FLOW_BEGIN("contend_rwlock", flow_id);
 
   if constexpr (PI == BrwLockEnablePi::Yes) {
+    // Changes in ownership of node in a PI graph have the potential to affect
+    // the running/runnable status of multiple threads at the same time.
+    // Because of this, the OwnedWaitQueue class requires that we disable eager
+    // rescheduling in order to optimize a situation where we might otherwise
+    // send multiple (redundant) IPIs to the same CPUs during one PI graph
+    // mutation.
+    //
+    // Note that this is an optimization, not a requirement.  What _is_ a
+    // requirement is that we keep preemption disabled during the PI
+    // propagation.  Currently, all of the invariants of OwnedWaitQueues and PI
+    // graphs are protected by a single global "thread lock" which must be held
+    // when a thread calls into the scheduler.  If a change to a PI graph would
+    // cause the current scheduler to choose a different thread to run on that
+    // CPU, however, the current thread will be preempted, and the ownership of
+    // the thread lock will be transferred to the newly selected thread.  As the
+    // new thread unwinds, it is going to drop the thread lock and return to
+    // executing, leaving the first thread in the middle of what was supposed to
+    // be an atomic operation.
+    //
+    // Because if this, it is critically important that local preemption be
+    // disabled (at a minimum) when mutating a PI graph.  In the case that a
+    // thread eventually blocks, the OWQ code will make sure that all invariants
+    // will be restored before the thread finally blocks (and eventually wakes
+    // and unwinds).
+    AutoEagerReschedDisabler eager_resched_disabler;
     ret = wait_.BlockAndAssignOwner(Deadline::infinite(),
                                     state_.writer_.load(ktl::memory_order_relaxed), reason,
                                     Interruptible::No);
@@ -156,33 +181,35 @@ void BrwLock<PI>::ContendedReadAcquire() {
   // In the case where we wake other threads up we need them to not run until we're finished
   // holding the thread_lock, so disable local rescheduling.
   AnnotatedAutoPreemptDisabler preempt_disable;
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    // Remove our optimistic reader from the count, and put a waiter on there instead.
-    uint64_t prev =
-        state_.state_.fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
-    // If there is a writer then we just block, they will wake us up
-    if (StateHasWriter(prev)) {
-      Block(false);
-      return;
-    }
-    // If we raced and there is in fact no one waiting then we can switch to
-    // having the lock
-    if (!StateHasWaiters(prev)) {
+  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+  // Remove our optimistic reader from the count, and put a waiter on there instead.
+  uint64_t prev =
+      state_.state_.fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
+  // If there is a writer then we just block, they will wake us up
+  if (StateHasWriter(prev)) {
+    Block(false);
+    return;
+  }
+  // If we raced and there is in fact no one waiting then we can switch to
+  // having the lock
+  if (!StateHasWaiters(prev)) {
+    state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
+    return;
+  }
+  // If there are no current readers then we need to wake somebody up
+  if (StateReaderCount(prev) == 1) {
+    // See the comment in BrwLock<PI>::Block for why this eager reschedule
+    // disabled is important.
+    AutoEagerReschedDisabler eager_resched_disabler;
+    if (Wake() == ResourceOwnership::Reader) {
+      // Join the reader pool.
       state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
       return;
     }
-    // If there are no current readers then we need to wake somebody up
-    if (StateReaderCount(prev) == 1) {
-      if (Wake() == ResourceOwnership::Reader) {
-        // Join the reader pool.
-        state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
-        return;
-      }
-    }
-
-    Block(false);
   }
+
+  Block(false);
 }
 
 template <BrwLockEnablePi PI>
@@ -221,32 +248,35 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   // In the case where we wake other threads up we need them to not run until we're finished
   // holding the thread_lock, so disable local rescheduling.
   AnnotatedAutoPreemptDisabler preempt_disable;
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    // Mark ourselves as waiting
-    uint64_t prev = state_.state_.fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
-    // If there is a writer then we just block, they will wake us up
-    if (StateHasWriter(prev)) {
-      Block(true);
-      return;
-    }
-    if (!StateHasReaders(prev)) {
-      if (!StateHasWaiters(prev)) {
-        if constexpr (PI == BrwLockEnablePi::Yes) {
-          state_.writer_.store(Thread::Current::Get(), ktl::memory_order_relaxed);
-        }
-        // Must have raced previously as turns out there's no readers or
-        // waiters, so we can convert to having the lock
-        state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
-        return;
-      } else {
-        // There's no readers, but someone already waiting, wake up someone
-        // before we ourselves block
-        Wake();
-      }
-    }
+  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+  // Mark ourselves as waiting
+  uint64_t prev = state_.state_.fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
+  // If there is a writer then we just block, they will wake us up
+  if (StateHasWriter(prev)) {
     Block(true);
+    return;
   }
+  if (!StateHasReaders(prev)) {
+    if (!StateHasWaiters(prev)) {
+      if constexpr (PI == BrwLockEnablePi::Yes) {
+        state_.writer_.store(Thread::Current::Get(), ktl::memory_order_relaxed);
+      }
+      // Must have raced previously as turns out there's no readers or
+      // waiters, so we can convert to having the lock
+      state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
+      return;
+    } else {
+      // There's no readers, but someone already waiting, wake up someone
+      // before we ourselves block
+      //
+      // See the comment in BrwLock<PI>::Block for why this eager reschedule
+      // disabled is important.
+      AutoEagerReschedDisabler eager_resched_disabler;
+      Wake();
+    }
+  }
+  Block(true);
 }
 
 template <BrwLockEnablePi PI>
@@ -302,14 +332,17 @@ void BrwLock<PI>::WriteRelease() {
 template <BrwLockEnablePi PI>
 void BrwLock<PI>::ReleaseWakeup() {
   // Don't reschedule whilst we're waking up all the threads as if there are
-  // several readers available then we'd like to get them all out of the wait queue.
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    uint64_t count = state_.state_.load(ktl::memory_order_relaxed);
-    if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
-      Wake();
-    }
+  // several readers available then we'd like to get them all out of the wait
+  // queue.
+  //
+  // See the comment in BrwLock<PI>::Block for why this eager reschedule
+  // disabled is important.
+  AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
+  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+  uint64_t count = state_.state_.load(ktl::memory_order_relaxed);
+  if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
+    Wake();
   }
 }
 

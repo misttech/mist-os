@@ -22,6 +22,7 @@
 #include <kernel/event.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 #include <ktl/iterator.h>
@@ -34,11 +35,10 @@
 // NOTE: The tests in this file are meant for interactive use only. Use a minimal
 // build and in the console type "k thread_tests".
 
-static uint rand_range(uint low, uint high) {
+static int rand_range(int low, int high) {
+  ZX_DEBUG_ASSERT(low <= high);
   uint r = rand();
-  uint result = ((r ^ (r >> 16)) % (high - low + 1u)) + low;
-
-  return result;
+  return static_cast<int>(((r ^ (r >> 16)) % (high - low + 1u)) + low);
 }
 
 static int mutex_thread(void* arg) {
@@ -88,8 +88,7 @@ static int mutex_test() {
   Thread* threads[5];
 
   for (auto& thread : threads) {
-    thread = Thread::Create("mutex tester", &mutex_thread, &m,
-                            Thread::Current::Get()->scheduler_state().base_priority());
+    thread = Thread::Create("mutex tester", &mutex_thread, &m, DEFAULT_PRIORITY);
     thread->Resume();
   }
 
@@ -125,7 +124,8 @@ static int mutex_inherit_test() {
         uint r = rand_range(1, inherit_test_mutex_count);
 
         // pick a random priority
-        Thread::Current::Get()->SetPriority(rand_range(DEFAULT_PRIORITY - 4, DEFAULT_PRIORITY + 4));
+        Thread::Current::Get()->SetBaseProfile(
+            SchedulerState::BaseProfile{rand_range(DEFAULT_PRIORITY - 4, DEFAULT_PRIORITY + 4)});
 
         // grab a random number of mutexes
         for (uint j = 0; j < r; j++) {
@@ -152,8 +152,7 @@ static int mutex_inherit_test() {
     // create a stack of mutexes and a few threads
     Thread* test_thread[inherit_test_thread_count];
     for (auto& t : test_thread) {
-      t = Thread::Create("mutex tester", inherit_worker, &args,
-                         Thread::Current::Get()->scheduler_state().base_priority());
+      t = Thread::Create("mutex tester", inherit_worker, &args, DEFAULT_PRIORITY);
       t->Resume();
     }
 
@@ -748,7 +747,9 @@ __NO_INLINE static void affinity_test() {
 
 static int prio_test_thread(void* arg) {
   Thread* volatile t = Thread::Current::Get();
-  ASSERT(t->scheduler_state().base_priority() == LOW_PRIORITY);
+  SchedulerState::BaseProfile bp = t->scheduler_state().SnapshotBaseProfile();
+  ASSERT(bp.discipline == SchedDiscipline::Fair);
+  ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(LOW_PRIORITY));
 
   auto ev = (Event*)arg;
   ev->Signal();
@@ -756,7 +757,9 @@ static int prio_test_thread(void* arg) {
   // Busy loop until our priority changes.
   int count = 0;
   for (;;) {
-    if (t->scheduler_state().base_priority() == DEFAULT_PRIORITY) {
+    bp = t->scheduler_state().SnapshotBaseProfile();
+    ASSERT(bp.discipline == SchedDiscipline::Fair);
+    if (bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY)) {
       break;
     }
     ++count;
@@ -766,7 +769,9 @@ static int prio_test_thread(void* arg) {
 
   // And then when it changes again.
   for (;;) {
-    if (t->scheduler_state().base_priority() == HIGH_PRIORITY) {
+    bp = t->scheduler_state().SnapshotBaseProfile();
+    ASSERT(bp.discipline == SchedDiscipline::Fair);
+    if (bp.fair.weight == SchedulerState::ConvertPriorityToWeight(HIGH_PRIORITY)) {
       break;
     }
     ++count;
@@ -779,20 +784,25 @@ __NO_INLINE static void priority_test() {
   printf("starting priority tests\n");
 
   Thread* t = Thread::Current::Get();
-  int base_priority = t->scheduler_state().base_priority();
+  SchedulerState::BaseProfile bp = t->scheduler_state().SnapshotBaseProfile();
 
-  if (base_priority != DEFAULT_PRIORITY) {
+  if (!bp.IsFair() ||
+      (bp.fair.weight != SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY))) {
     printf("unexpected initial state, aborting test\n");
     return;
   }
 
-  t->SetPriority(DEFAULT_PRIORITY + 2);
+  t->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY + 2});
   Thread::Current::SleepRelative(ZX_MSEC(1));
-  ASSERT(t->scheduler_state().base_priority() == DEFAULT_PRIORITY + 2);
+  bp = t->scheduler_state().SnapshotBaseProfile();
+  ASSERT(bp.IsFair());
+  ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY + 2));
 
-  t->SetPriority(DEFAULT_PRIORITY - 2);
+  t->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY - 2});
   Thread::Current::SleepRelative(ZX_MSEC(1));
-  ASSERT(t->scheduler_state().base_priority() == DEFAULT_PRIORITY - 2);
+  bp = t->scheduler_state().SnapshotBaseProfile();
+  ASSERT(bp.IsFair());
+  ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY - 2));
 
   cpu_mask_t active = mp_get_active_mask();
   if (!active || ispow2(active)) {
@@ -819,11 +829,11 @@ __NO_INLINE static void priority_test() {
 
   zx_status_t status = ev.WaitDeadline(ZX_TIME_INFINITE, Interruptible::Yes);
   ASSERT(status == ZX_OK);
-  nt->SetPriority(DEFAULT_PRIORITY);
+  nt->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY});
 
   status = ev.WaitDeadline(ZX_TIME_INFINITE, Interruptible::Yes);
   ASSERT(status == ZX_OK);
-  nt->SetPriority(HIGH_PRIORITY);
+  nt->SetBaseProfile(SchedulerState::BaseProfile{HIGH_PRIORITY});
 
   int count = 0;
   nt->Join(&count, ZX_TIME_INFINITE);

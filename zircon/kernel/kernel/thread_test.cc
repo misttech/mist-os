@@ -486,8 +486,8 @@ bool migrate_unpinned_threads_test() {
     Scheduler::LockHandoff();
     Thread::Current::Exit(0);
   };
-  Thread* migrate =
-      Thread::CreateEtc(nullptr, "migrate", nullptr, nullptr, DEFAULT_PRIORITY, migrate_body);
+  Thread* migrate = Thread::CreateEtc(nullptr, "migrate", nullptr, nullptr,
+                                      SchedulerState::BaseProfile{DEFAULT_PRIORITY}, migrate_body);
   migrate->SetCpuAffinity(cpu_num_to_mask(kStartingCpu));
   migrate->Resume();
 

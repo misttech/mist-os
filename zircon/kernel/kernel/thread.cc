@@ -150,13 +150,6 @@ void WaitQueueCollection::ThreadState::UnsleepIfInterruptible(Thread* thread, zx
   }
 }
 
-void WaitQueueCollection::ThreadState::UpdatePriorityIfBlocked(Thread* thread, int priority,
-                                                               PropagatePI propagate) {
-  if (blocking_wait_queue_) {
-    blocking_wait_queue_->PriorityChanged(thread, priority, propagate);
-  }
-}
-
 WaitQueueCollection::ThreadState::~ThreadState() {
   DEBUG_ASSERT(blocking_wait_queue_ == nullptr);
 
@@ -258,7 +251,8 @@ void Thread::Trampoline() {
  * @return  Pointer to thread object, or nullptr on failure.
  */
 Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entry, void* arg,
-                          int priority, thread_trampoline_routine alt_trampoline) {
+                          const SchedulerState::BaseProfile& profile,
+                          thread_trampoline_routine alt_trampoline) {
   unsigned int flags = 0;
 
   if (!t) {
@@ -275,7 +269,7 @@ Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entr
   construct_thread(t, name);
 
   t->task_state_.Init(entry, arg);
-  Scheduler::InitializeThread(t, priority);
+  Scheduler::InitializeThread(t, profile);
 
   zx_status_t status = t->stack_.Init();
   if (status != ZX_OK) {
@@ -304,7 +298,13 @@ Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entr
 }
 
 Thread* Thread::Create(const char* name, thread_start_routine entry, void* arg, int priority) {
-  return Thread::CreateEtc(nullptr, name, entry, arg, priority, nullptr);
+  return Thread::CreateEtc(nullptr, name, entry, arg, SchedulerState::BaseProfile{priority},
+                           nullptr);
+}
+
+Thread* Thread::Create(const char* name, thread_start_routine entry, void* arg,
+                       const SchedulerState::BaseProfile& profile) {
+  return Thread::CreateEtc(nullptr, name, entry, arg, profile, nullptr);
 }
 
 /**
@@ -1286,17 +1286,15 @@ void Thread::Current::SetName(const char* name) {
 }
 
 /**
- * @brief Change priority of current thread
+ * @brief Change the base profile of current thread
  *
- * Sets the thread to use the fair scheduling discipline using the given
- * priority.
+ * Changes the base profile of the thread to the base profile supplied by the
+ * users, dealing with any side effects in the process.
  *
- * See Thread::Create() for a discussion of priority values.
+ * @param profile The base profile to apply to the thread.
  */
-void Thread::SetPriority(int priority) {
+void Thread::SetBaseProfile(const SchedulerState::BaseProfile& profile) {
   canary_.Assert();
-  ASSERT(priority >= LOWEST_PRIORITY && priority <= HIGHEST_PRIORITY);
-
   // It is not sufficient to simply hold the thread lock while changing the
   // profile of a thread. Doing so runs the risk that a change to a PI graph
   // results in another thread becoming "more runnable" than we are, and then
@@ -1318,28 +1316,7 @@ void Thread::SetPriority(int priority) {
   AnnotatedAutoPreemptDisabler apd;
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   this->get_lock().AssertHeld();
-  Scheduler::ChangePriority(this, priority);
-}
-
-/**
- * @brief Change the deadline of current thread
- *
- * Sets the thread to use the deadline scheduling discipline using the given
- * parameters.
- *
- * @param t The thread to set or change deadline scheduling parameters.
- * @param params The deadline parameters to apply to the thread.
- */
-void Thread::SetDeadline(const zx_sched_deadline_params_t& params) {
-  canary_.Assert();
-  ASSERT(params.capacity > 0 && params.capacity <= params.relative_deadline &&
-         params.relative_deadline <= params.period);
-
-  // See the comment in Thread::SetPriority
-  AnnotatedAutoPreemptDisabler apd;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  this->get_lock().AssertHeld();
-  Scheduler::ChangeDeadline(this, params);
+  OwnedWaitQueue::SetThreadBaseProfileAndPropagate(*this, profile);
 }
 
 /**
@@ -1387,7 +1364,10 @@ void Thread::Current::BecomeIdle() {
 
   // Now that we are the idle thread, make sure that we drop out of the
   // scheduler's bookkeeping altogether.
-  Scheduler::RemoveFirstThread(t);
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    Scheduler::RemoveFirstThread(t);
+  }
   t->set_running();
 
   // Cpu is active.
@@ -1446,7 +1426,10 @@ void thread_secondary_cpu_entry() {
   percpu::GetCurrent().dpc_queue.InitForCurrentCpu();
 
   // Remove ourselves from the Scheduler's bookkeeping
-  Scheduler::RemoveFirstThread(Thread::Current::Get());
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    Scheduler::RemoveFirstThread(Thread::Current::Get());
+  }
 
   // Exit from our bootstrap thread, and enter the scheduler on this cpu
   Thread::Current::Exit(0);
@@ -1462,7 +1445,7 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
   snprintf(name, sizeof(name), "idle %u", cpu_num);
 
   Thread* t = Thread::CreateEtc(&percpu::Get(cpu_num).idle_thread, name, arch_idle_thread_routine,
-                                nullptr, IDLE_PRIORITY, nullptr);
+                                nullptr, SchedulerState::BaseProfile{IDLE_PRIORITY}, nullptr);
   if (t == nullptr) {
     return t;
   }
@@ -1528,15 +1511,25 @@ void dump_thread_locked(Thread* t, bool full_dump) {
   char oname[ZX_MAX_NAME_LEN];
   t->OwnerName(oname);
 
+  char profile_str[64]{0};
+  if (const SchedulerState::EffectiveProfile ep =
+          t->scheduler_state().SnapshotEffectiveProfileLocked();
+      ep.IsFair()) {
+    snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.fair.weight.raw_value());
+  } else {
+    DEBUG_ASSERT(ep.IsDeadline());
+    snprintf(profile_str, sizeof(profile_str), "Deadline (c,d = %ld,%ld)",
+             ep.deadline.capacity_ns.raw_value(), ep.deadline.deadline_ns.raw_value());
+  }
+
   if (full_dump) {
     dprintf(INFO, "dump_thread: t %p (%s:%s)\n", t, oname, t->name());
     dprintf(INFO,
             "\tstate %s, curr/last cpu %d/%d, hard_affinity %#x, soft_cpu_affinity %#x, "
-            "priority %d [%d,%d], remaining time slice %" PRIi64 "\n",
+            "%s, remaining time slice %" PRIi64 "\n",
             thread_state_to_str(t->state()), (int)t->scheduler_state().curr_cpu(),
             (int)t->scheduler_state().last_cpu(), t->scheduler_state().hard_affinity(),
-            t->scheduler_state().soft_affinity(), t->scheduler_state().effective_priority(),
-            t->scheduler_state().base_priority(), t->scheduler_state().inherited_priority(),
+            t->scheduler_state().soft_affinity(), profile_str,
             t->scheduler_state().time_slice_ns());
     dprintf(INFO, "\truntime_ns %" PRIi64 ", runtime_s %" PRIi64 "\n", runtime,
             runtime / 1000000000);
@@ -1556,10 +1549,9 @@ void dump_thread_locked(Thread* t, bool full_dump) {
             t->pid(), t->tid());
     arch_dump_thread(t);
   } else {
-    printf("thr %p st %4s owq %d pri %2d [%d,%d] pid %" PRIu64 " tid %" PRIu64 " (%s:%s)\n", t,
+    printf("thr %p st %4s owq %d %s pid %" PRIu64 " tid %" PRIu64 " (%s:%s)\n", t,
            thread_state_to_str(t->state()), !t->wait_queue_state().owned_wait_queues_.is_empty(),
-           t->scheduler_state().effective_priority_, t->scheduler_state().base_priority_,
-           t->scheduler_state().inherited_priority_, t->pid(), t->tid(), oname, t->name());
+           profile_str, t->pid(), t->tid(), oname, t->name());
   }
 }
 

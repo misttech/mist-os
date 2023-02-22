@@ -116,7 +116,8 @@ static bool event_signal_spinlock_test() {
 
   // Give the thread deadline parameters with 100% utilization to increase the likelihood that it
   // reaches its Event::Wait before the current thread reaches its Event::Signal.
-  t->SetDeadline({ZX_USEC(150), ZX_USEC(150), ZX_USEC(150)});
+  t->SetBaseProfile(SchedulerState::BaseProfile{
+      SchedDeadlineParams{SchedDuration{ZX_USEC(150)}, SchedDuration{ZX_USEC(150)}}});
   t->Resume();
 
   // Spin until we know the Waiter has started running.

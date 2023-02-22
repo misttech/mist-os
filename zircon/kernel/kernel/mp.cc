@@ -328,8 +328,8 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
   // HIGHEST_PRIORITY task scheduled in between when we resume the
   // thread and when the CPU is woken up).
   Event unplug_done;
-  thread = Thread::CreateEtc(nullptr, "unplug_thread", nullptr, &unplug_done, HIGHEST_PRIORITY,
-                             mp_unplug_trampoline);
+  thread = Thread::CreateEtc(nullptr, "unplug_thread", nullptr, &unplug_done,
+                             SchedulerState::BaseProfile{HIGHEST_PRIORITY}, mp_unplug_trampoline);
   if (thread == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -342,7 +342,8 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
   // Pin to the target CPU
   thread->SetCpuAffinity(cpu_num_to_mask(cpu_id));
 
-  thread->SetDeadline({ZX_MSEC(9), ZX_MSEC(10), ZX_MSEC(10)});
+  thread->SetBaseProfile(SchedulerState::BaseProfile{
+      SchedDeadlineParams{SchedDuration{ZX_MSEC(9)}, SchedDuration{ZX_MSEC(10)}}});
 
   status = thread->DetachAndResume();
   if (status != ZX_OK) {

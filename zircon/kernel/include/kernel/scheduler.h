@@ -156,10 +156,9 @@ class Scheduler {
 
   // Public entry points.
 
-  static void InitializeThread(Thread* thread, int priority);
-  static void InitializeThread(Thread* thread, const zx_sched_deadline_params_t& params);
+  static void InitializeThread(Thread* thread, const SchedulerState::BaseProfile& profile);
   static void InitializeFirstThread(Thread* thread);
-  static void RemoveFirstThread(Thread* thread);
+  static void RemoveFirstThread(Thread* thread) TA_REQ(thread_lock);
   static void Block() TA_REQ(thread_lock);
   static void Yield() TA_REQ(thread_lock);
   static void Preempt() TA_REQ(thread_lock);
@@ -177,25 +176,55 @@ class Scheduler {
   // This function is logically private and should only be called by timer.cc.
   static void TimerTick(SchedTime now);
 
-  // Set the inherited priority of a thread.
-  static void InheritPriority(Thread* t, int priority)
-      TA_REQ(t->get_lock(), preempt_disabled_token);
-
-  // Set the priority of a thread and reset the boost value. This function might reschedule.
-  // pri should be 0 <= to <= MAX_PRIORITY.
-  static void ChangePriority(Thread* t, int priority) TA_REQ(t->get_lock(), preempt_disabled_token);
-
-  // Set the deadline of a thread. This function might reschedule.
-  // This requires: 0 < capacity <= relative_deadline <= period.
-  static void ChangeDeadline(Thread* t, const zx_sched_deadline_params_t& params)
-      TA_REQ(t->get_lock(), preempt_disabled_token);
-
   // Releases the lock held by the previous thread and acquires the lock
   // previously held by the current thread when it entered the scheduler. This
   // is called automatically by the scheduler when switching between threads,
   // however, this must be called manually by thread trampolines at some point
   // to release whichever lock was used for scheduler synchronization.
   static void LockHandoff();
+
+  // Called when the base profile of |thread| has been changed by a program. The
+  // thread must be either running or runnable when this method is called. If
+  // the thread had been blocked instead, the change of the base profile would
+  // have been managed at the WaitQueue level, perhaps eventually propagating to
+  // the scheduler via UpstreamThreadBaseProfileChanged.
+  static void ThreadBaseProfileChanged(Thread& thread) TA_REQ(thread_lock, preempt_disabled_token);
+
+  // Called when the base profile of a thread (|upstream|) which exists upstream
+  // of |target| has changed its base profile.  It is possible for the rules
+  // regarding scheduling penalties base profile changes to be slightly
+  // different for when a thread's effective profile changes as a result of its
+  // own base profile changing, vs the base profile of a thread which exists
+  // upstream of it in a PI graph.  Because of this, the two scenarios are
+  // handled separately using two different methods.
+  template <typename TargetType>
+  static void UpstreamThreadBaseProfileChanged(Thread& upstream, TargetType& target)
+      TA_REQ(thread_lock, preempt_disabled_token);
+
+  // Called when a thread (|upstream|) blocks in an OwnedWaitQueue, and the
+  // target of that OWQ (|target|) is running or runnable.  At the point that
+  // this method is called, propagation of the static profile pressure
+  // parameters (weight, deadline utilization, and minimum deadline) should have
+  // already been propagated to |target|, and its EffectiveProfile should be
+  // dirty.  This method is called in order to update the dynamic scheduling
+  // parameters (start time, finish time, time slice remaining) of |target| as
+  // needed because of the join operation.
+  template <typename UpstreamType, typename TargetType>
+  static void JoinNodeToPiGraph(UpstreamType& upstream, TargetType& target)
+      TA_REQ(thread_lock, preempt_disabled_token);
+
+  // Called when a thread (|upstream|) unblocks from an OwnedWaitQueue and
+  // leaves the PI graph whose running or runnable target is |target|.
+  //
+  // At the point that this method is called, propagation of the static profile
+  // pressure parameters (weight, deadline utilization, and minimum deadline)
+  // should have already been propagated to |target|, and its EffectiveProfile
+  // should be dirty.  This method is called in order to update the dynamic
+  // scheduling parameters (start time, finish time, time slice remaining) in
+  // both |target| and |upstream| as needed because of the split operation.
+  template <typename UpstreamType, typename TargetType>
+  static void SplitNodeFromPiGraph(UpstreamType& upstream, TargetType& target)
+      TA_REQ(thread_lock, preempt_disabled_token);
 
   // Return the time at which the current thread should be preempted.
   //
@@ -226,12 +255,26 @@ class Scheduler {
       TA_EXCL(thread_lock);
 
  private:
+  // fwd decl of a helper class used for PI Join/Split operations
+  template <typename T>
+  class PiNodeAdapter;
+
   // Allow percpu to init our cpu number and performance scale.
   friend struct percpu;
   // Load balancer test.
   friend struct LoadBalancerTestAccess;
   // Allow tests to modify our state.
   friend class LoadBalancerTest;
+  // A helper used in Join/Split operations
+  template <typename T>
+  friend class PiNodeAdapter;
+
+  // EffectiveProfile and BaseProfile are both inner classes of SchedulerState which
+  // are also frequently used by the methods in Scheduler.  Make a couple of handy
+  // private aliases to keep us from needing to say
+  // SchedulerState::(Effective|Base)Profile in all of the Scheduler methods.
+  using EffectiveProfile = SchedulerState::EffectiveProfile;
+  using BaseProfile = SchedulerState::BaseProfile;
 
   static void LockHandoffInternal(Thread* thread) TA_NO_THREAD_SAFETY_ANALYSIS;
 
@@ -241,13 +284,15 @@ class Scheduler {
 
   static inline void RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) TA_REQ(thread_lock);
 
-  static void ChangeWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_reschedule_mask)
-      TA_REQ(thread_lock, preempt_disabled_token);
-  static void ChangeDeadline(Thread* thread, const SchedDeadlineParams& params,
-                             cpu_mask_t* cpus_to_reschedule_mask)
-      TA_REQ(thread_lock, preempt_disabled_token);
-  static void InheritWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_reschedule_mask)
-      TA_REQ(thread_lock, preempt_disabled_token);
+  // Unconditionally perform an expensive check of as many scheduler invariants
+  // as we can.  Usually, this is not called directly; the ValidateInvariants
+  // version (which is gated on a default-off build option) is preferred.
+  void ValidateInvariantsUnconditional() const TA_REQ(thread_lock, queue_lock_);
+  void ValidateInvariants() const TA_REQ(thread_lock, queue_lock_) {
+    if constexpr (kSchedulerExtraInvariantValidation) {
+      ValidateInvariantsUnconditional();
+    }
+  }
 
   // Specifies how to associate a thread with a Scheduler instance, update
   // metadata, and whether/where to place the thread in a run queue.
@@ -284,18 +329,32 @@ class Scheduler {
   static Scheduler* Get(cpu_num_t cpu);
 
   // Returns a CPU to run the given thread on.
-  static cpu_num_t FindTargetCpu(Thread* thread);
+  static cpu_num_t FindTargetCpu(Thread* thread) TA_REQ(thread_lock);
 
-  // Updates the thread's weight and updates state-dependent bookkeeping.
-  static void UpdateWeightCommon(Thread* thread, int original_priority, SchedWeight weight,
-                                 cpu_mask_t* cpus_to_reschedule_mask, PropagatePI propagate)
-      TA_REQ(thread_lock, preempt_disabled_token);
-
-  // Updates the thread's deadline and updates state-dependent bookkeeping.
-  static void UpdateDeadlineCommon(Thread* thread, int original_priority,
-                                   const SchedDeadlineParams& params,
-                                   cpu_mask_t* cpus_to_reschedule_mask, PropagatePI propagate)
-      TA_REQ(thread_lock, preempt_disabled_token);
+  // Handle all of the common tasks associated with each of the possible PI
+  // interactions.  The outline of this is:
+  //
+  // 1) If the target is an active thread (meaning either running or runnable),
+  //    we need to:
+  // 1.1) Enter the scheduler's queue lock.
+  // 1.2) If the thread is active, but not actually running, remove the target
+  //      thread from its scheduler's run queue.
+  // 1.3) Now update the thread's effective profile.
+  // 1.4) Apply any changes in the thread's effective profile to its scheduler's
+  //      bookkeeping.
+  // 1.5) Update the dynamic parameters of the thread.
+  // 1.6) Either re-insert the thread into its scheduler's run queue (if it was
+  //      READY) or adjust its schedulers preemption time (if it was RUNNING).
+  // 1.7) Trigger a reschedule on the thread's scheduler.
+  // 2) If the target is either an OwnedWaitQueue, or a thread which is not
+  //    active:
+  // 2.1) Recompute the target's effective profile, adjust the target's position
+  //      in it's wait queue if the target is a thread which is currently
+  //      blocked in a wait queue.
+  // 2.2) Recompute the target's dynamic scheduler parameters.
+  template <typename TargetType, typename Callable>
+  static inline void HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<TargetType>& target,
+                                               Callable UpdateDynamicParams) TA_REQ(thread_lock);
 
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
@@ -306,38 +365,40 @@ class Scheduler {
   // updating the run queue as necessary.
   Thread* EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
                              SchedDuration total_runtime_ns,
-                             Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) TA_REQ(queue_lock_);
+                             Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
+      TA_REQ(queue_lock_, thread_lock);
 
   // Adds a thread to the run queue tree. The thread must be active on this
   // CPU.
   void QueueThread(Thread* thread, Placement placement, SchedTime now = SchedTime{0},
-                   SchedDuration total_runtime_ns = SchedDuration{0}) TA_REQ(queue_lock_);
+                   SchedDuration total_runtime_ns = SchedDuration{0})
+      TA_REQ(queue_lock_, thread_lock);
 
   // Removes the thread at the head of the first eligible run queue.
   Thread* DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Removes the thread at the head of the fair run queue and returns it.
-  Thread* DequeueFairThread() TA_REQ(queue_lock_);
+  Thread* DequeueFairThread() TA_REQ(queue_lock_, thread_lock);
 
   // Removes the eligible thread with the earliest deadline in the deadline run
   // queue and returns it.
-  Thread* DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_);
+  Thread* DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_, thread_lock);
 
   // Returns the eligible thread in the run queue with a deadline earlier than
   // the given deadline, or nullptr if one does not exist.
   Thread* FindEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Removes the eligible thread with a deadline earlier than the given deadline
   // and returns it or nullptr if one does not exist.
   Thread* DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Attempts to steal work from other busy CPUs. Returns nullptr if no work was
   // stolen, otherwise returns a pointer to the stolen thread that is now
   // associated with the local Scheduler instance.
-  Thread* StealWork(SchedTime now) TA_EXCL(queue_lock_);
+  Thread* StealWork(SchedTime now) TA_EXCL(queue_lock_) TA_REQ(thread_lock);
 
   // Returns the time that the next deadline task will become eligible or infinite
   // if there are no ready deadline tasks.
@@ -345,7 +406,7 @@ class Scheduler {
 
   // Calculates the timeslice of the thread based on the current run queue
   // state.
-  SchedDuration CalculateTimeslice(Thread* thread) TA_REQ(queue_lock_);
+  SchedDuration CalculateTimeslice(Thread* thread) TA_REQ(queue_lock_, thread_lock);
 
   // Returns the completion time clamped to the start of the earliest deadline
   // thread that will become eligible in that time frame.
@@ -355,13 +416,13 @@ class Scheduler {
   // thread that will become eligible in that time frame and also has an earlier
   // deadline than the given finish time.
   SchedTime ClampToEarlierDeadline(SchedTime completion_time, SchedTime finish_time)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Updates the timeslice of the thread based on the current run queue state.
   // Returns the absolute deadline for the next time slice, which may be earlier
   // than the completion of the time slice if other threads could preempt the
   // given thread before the time slice is exhausted.
-  SchedTime NextThreadTimeslice(Thread* thread, SchedTime now) TA_REQ(queue_lock_);
+  SchedTime NextThreadTimeslice(Thread* thread, SchedTime now) TA_REQ(queue_lock_, thread_lock);
 
   // Updates the scheduling period based on the number of active threads.
   void UpdatePeriod() TA_REQ(queue_lock_);
@@ -372,15 +433,16 @@ class Scheduler {
   // Makes a thread active on this CPU's scheduler and inserts it into the
   // run queue tree.
   void Insert(SchedTime now, Thread* thread, Placement placement = Placement::Insertion)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Removes the thread from this CPU's scheduler. The thread must not be in
   // the run queue tree.
-  void Remove(Thread* thread) TA_REQ(queue_lock_);
+  void Remove(Thread* thread) TA_REQ(queue_lock_, thread_lock);
 
   // Removes a specific thread from its current RunQueue.  Note that the thread
   // must currently exist in its queue, it is an error otherwise.
   void EraseFromQueue(Thread* thread) TA_REQ(queue_lock_) {
+    thread_lock.AssertHeld();
     SchedulerState& state = thread->scheduler_state();
     DEBUG_ASSERT(state.InQueue());
     RunQueue& queue =
@@ -403,7 +465,7 @@ class Scheduler {
   // shadow variable for cross-CPU readers.
   inline void UpdateTotalDeadlineUtilization(SchedUtilization delta_ns) TA_REQ(queue_lock_);
 
-  // Utilities to scale up or down the given value by the performace scale of the CPU.
+  // Utilities to scale up or down the given value by the performance scale of the CPU.
   template <typename T>
   inline T ScaleUp(T value) const;
   template <typename T>
@@ -411,6 +473,10 @@ class Scheduler {
 
   // Update trace counters which track the total number of runnable threads for a CPU
   inline void TraceTotalRunnableThreads() const TA_REQ(queue_lock_);
+
+  // Trace a context switch event.
+  static inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
+                                        cpu_num_t current_cpu) TA_REQ(thread_lock);
 
   // Returns a new flow id when flow tracing is enabled, zero otherwise.
   inline static uint64_t NextFlowId();
@@ -447,17 +513,35 @@ class Scheduler {
 
   // Finds the next eligible thread in the given run queue.
   Thread* FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eligible_time)
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
 
   // Finds the next eligible thread in the given run queue that also passes the
   // given predicate.
   template <typename Predicate>
   Thread* FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eligible_time,
-                                     Predicate&& predicate) TA_REQ(queue_lock_);
+                                     Predicate&& predicate) TA_REQ(queue_lock_, thread_lock);
 
   // Emits queue event tracers for trace-based scheduler performance analysis.
   inline void TraceThreadQueueEvent(const fxt::InternedString& name, Thread* thread) const
-      TA_REQ(queue_lock_);
+      TA_REQ(queue_lock_, thread_lock);
+
+  // Returns true if the given thread is fair scheduled.
+  static bool IsFairThread(const Thread* thread) TA_REQ(thread_lock) {
+    return thread->scheduler_state().effective_profile_.IsFair();
+  }
+
+  // Returns true if the given thread is deadline scheduled.
+  static bool IsDeadlineThread(const Thread* thread) TA_REQ(thread_lock) {
+    return thread->scheduler_state().effective_profile_.IsDeadline();
+  }
+
+  // Returns true if the given thread's time slice is adjustable under changes to
+  // the fair scheduler demand on the CPU.
+  static bool IsThreadAdjustable(const Thread* thread) TA_REQ(thread_lock) {
+    // Checking the thread state avoids unnecessary adjustments on a thread that
+    // is no longer competing.
+    return !thread->IsIdle() && IsFairThread(thread) && thread->state() == THREAD_READY;
+  }
 
   // Protects run queues and associated metadata for this Scheduler instance.
   // The queue lock is the bottom most lock in the system for the CPU it is

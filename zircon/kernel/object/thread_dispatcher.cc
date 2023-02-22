@@ -52,9 +52,12 @@ zx_status_t ThreadDispatcher::Create(fbl::RefPtr<ProcessDispatcher> process, uin
     return ZX_ERR_NO_MEMORY;
   }
 
+  // The default profile for user mode threads is a fair profile with default
+  // weight which is not inherited by default.
+  const SchedulerState::BaseProfile profile{DEFAULT_PRIORITY, false};
+
   // Create the lower level thread and attach it to the scheduler.
-  Thread* core_thread =
-      Thread::Create(name.data(), StartRoutine, user_thread.get(), DEFAULT_PRIORITY);
+  Thread* core_thread = Thread::Create(name.data(), StartRoutine, user_thread.get(), profile);
   if (!core_thread) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -814,27 +817,16 @@ zx_status_t ThreadDispatcher::WriteState(zx_thread_state_topic_t state_kind,
   }
 }
 
-zx_status_t ThreadDispatcher::SetPriority(int32_t priority) {
+zx_status_t ThreadDispatcher::SetBaseProfile(const SchedulerState::BaseProfile& profile) {
   Guard<CriticalMutex> guard{get_lock()};
   if ((state_.lifecycle() == ThreadState::Lifecycle::INITIAL) ||
       (state_.lifecycle() == ThreadState::Lifecycle::DYING) ||
       (state_.lifecycle() == ThreadState::Lifecycle::DEAD)) {
     return ZX_ERR_BAD_STATE;
   }
-  // The priority was already validated by the Profile dispatcher.
-  core_thread_->SetPriority(priority);
-  return ZX_OK;
-}
 
-zx_status_t ThreadDispatcher::SetDeadline(const zx_sched_deadline_params_t& params) {
-  Guard<CriticalMutex> guard{get_lock()};
-  if ((state_.lifecycle() == ThreadState::Lifecycle::INITIAL) ||
-      (state_.lifecycle() == ThreadState::Lifecycle::DYING) ||
-      (state_.lifecycle() == ThreadState::Lifecycle::DEAD)) {
-    return ZX_ERR_BAD_STATE;
-  }
-  // The deadline parameters are already validated by the Profile dispatcher.
-  core_thread_->SetDeadline(params);
+  // The profile was already validated by the Profile dispatcher.
+  core_thread_->SetBaseProfile(profile);
   return ZX_OK;
 }
 

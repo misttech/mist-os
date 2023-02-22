@@ -106,7 +106,7 @@ enum class PropagatePI : bool { No = false, Yes };
 // the threads should be woken, from "most important" to "least important".
 //
 // One unusual property of the ordering implemented by a WaitQueueCollection is
-// that, unlike an ordering determined by completely properties such as thread
+// that, unlike an ordering determined completely by properties such as thread
 // priority or weight, it is dynamic with respect to time.  This is to say that
 // while at any instant in time there is always a specific order to the threads,
 // as time advances, this order can change.  The ordering itself is determined
@@ -194,24 +194,6 @@ enum class PropagatePI : bool { No = false, Yes };
 //    cost of restoring the augmented invariant after removal, which involves
 //    walking from the point of removal up to the root of the tree.
 //
-// Finally:
-// Please note that it is possible for the dynamic ordering defined above choose
-// a deadline thread which is not currently eligible to run as the choice for
-// "best thread".  This is because the scheduler does not currently demand that
-// the absolute deadline of a thread be equal to when its period ends and its
-// timeslice is eligible for refresh.
-//
-// While it is possible to account for this behavior as well, doing so is not
-// without cost (both in WaitQueue object size and code complexity). This
-// behavior is no different from the previous priority-based-ordering's
-// behavior, where ineligible deadline threads could also be chosen.  The
-// ability to specify a period different from a relative deadline is currently
-// rarely used in the system, and we are moving in a direction of removing it
-// entirely.  If the concept needs to be re-introduced at a later date, this
-// data structure could be adjusted later on to order threads in phase 2 based
-// on the earliest absolute deadline the could possible have based on earliest
-// time that their period could be refreshed, and their relative deadline
-// parameter.
 class WaitQueueCollection {
  private:
   // fwd decls
@@ -244,12 +226,7 @@ class WaitQueueCollection {
     void Unsleep(Thread* thread, zx_status_t status) TA_REQ(thread_lock);
     void UnsleepIfInterruptible(Thread* thread, zx_status_t status) TA_REQ(thread_lock);
 
-    void UpdatePriorityIfBlocked(Thread* thread, int priority, PropagatePI propagate)
-        TA_REQ(thread_lock, preempt_disabled_token);
-
-    void AssertNoOwnedWaitQueues() const TA_REQ(thread_lock) {
-      DEBUG_ASSERT(owned_wait_queues_.is_empty());
-    }
+    void AssertNoOwnedWaitQueues() const TA_REQ(thread_lock) {}
 
     void AssertNotBlocked() const TA_REQ(thread_lock) {
       DEBUG_ASSERT(blocking_wait_queue_ == nullptr);
@@ -259,6 +236,7 @@ class WaitQueueCollection {
    private:
     // WaitQueues, WaitQueueCollections, and their List types, can
     // directly manipulate the contents of the per-thread state, for now.
+    friend class Scheduler;
     friend class OwnedWaitQueue;
     friend class WaitQueue;
     friend class WaitQueueCollection;
@@ -291,12 +269,28 @@ class WaitQueueCollection {
 
     // Are we allowed to be interrupted on the current thing we're blocked/sleeping on?
     Interruptible interruptible_ = Interruptible::No;
+
+    // Storage used by an OwnedWaitQueue, but held within a thread
+    // instance, while that thread is blocked in the wait queue.
+    SchedulerState::WaitQueueInheritedSchedulerState inherited_scheduler_state_storage_{};
   };
 
   constexpr WaitQueueCollection() {}
+  ~WaitQueueCollection() { Validate(); }
 
-  // The number of threads currently in the collection.
+  void Validate() const TA_REQ(thread_lock) {
+    DEBUG_ASSERT(threads_.is_empty());
+    // TODO(johngro): We could perform a more rigorous check of the two maintained
+    // invariants of the threads_ collection, however we probably only want to do
+    // so if kSchedulerExtraInvariantValidation is true.
+  }
+
+  // Passthrus for the underlying container's size and is_empty methods.
   uint32_t Count() const TA_REQ(thread_lock) { return static_cast<uint32_t>(threads_.size()); }
+  bool IsEmpty() const TA_REQ(thread_lock) { return threads_.is_empty(); }
+
+  // The current minimum inheritable relative deadline of the set of blocked threads.
+  SchedDuration MinInheritableRelativeDeadline() const TA_REQ(thread_lock);
 
   // Peek at the first Thread in the collection.
   Thread* Peek(zx_time_t now) TA_REQ(thread_lock);
@@ -304,18 +298,31 @@ class WaitQueueCollection {
     return const_cast<WaitQueueCollection*>(this)->Peek(now);
   }
 
+  Thread& PeekOnlyThread() TA_REQ(thread_lock) {
+    DEBUG_ASSERT_MSG(threads_.size() == 1, "Expected size 1, not %zu", threads_.size());
+    return threads_.front();
+  }
+
+  inline SchedulerState::WaitQueueInheritedSchedulerState* FindInheritedSchedulerStateStorage()
+      TA_REQ(thread_lock);
+
   // Add the Thread into its sorted location in the collection.
   void Insert(Thread* thread) TA_REQ(thread_lock);
 
   // Remove the Thread from the collection.
   void Remove(Thread* thread) TA_REQ(thread_lock);
 
-  // Disallow copying.
+  // Const accessor used in some debug/validation code.
+  const auto& threads() const { return threads_; }
+
+  // Disallow copying and moving.
   WaitQueueCollection(const WaitQueueCollection&) = delete;
   WaitQueueCollection& operator=(const WaitQueueCollection&) = delete;
 
+  WaitQueueCollection(WaitQueueCollection&&) = delete;
+  WaitQueueCollection& operator=(WaitQueueCollection&&) = delete;
+
  private:
-  friend class WaitQueue;  // TODO(johngro): remove this when WaitQueue::BlockedPriority goes away.
   static constexpr uint64_t kFairThreadSortKeyBit = uint64_t{1} << 63;
 
   struct BlockedThreadTreeTraits {
@@ -391,33 +398,16 @@ class WaitQueue {
   void WakeAll(zx_status_t wait_queue_error) TA_REQ(thread_lock);
 
   // Whether the wait queue is currently empty.
-  bool IsEmpty() const TA_REQ(thread_lock);
-
+  bool IsEmpty() const TA_REQ(thread_lock) { return collection_.IsEmpty(); }
   uint32_t Count() const TA_REQ(thread_lock) { return collection_.Count(); }
 
-  // Returns the highest priority of all the blocked threads on this WaitQueue.
-  // Returns -1 if no threads are blocked.
-  int BlockedPriority() const TA_REQ(thread_lock);
-
-  // Used by WaitQueue and OwnedWaitQueue to manage changes to the maximum
-  // priority of a wait queue due to external effects (thread priority change,
-  // thread timeout, thread killed).
-  void UpdatePriority(int old_prio) TA_REQ(thread_lock);
-
-  // A thread's priority has changed.  Update the wait queue bookkeeping to
-  // properly reflect this change.
+  // Recompute the effective profile of a thread which is known to be blocked in
+  // this wait queue, reordering the thread in the queue collection as needed.
   //
-  // |t| must be blocked on this WaitQueue.
-  //
-  // If |propagate| is PropagatePI::Yes, call into the wait queue code to
-  // propagate the priority change down the PI chain (if any).  Then returns true
-  // if the change of priority has affected the priority of another thread due to
-  // priority inheritance, or false otherwise.
-  //
-  // If |propagate| is PropagatePI::No, do not attempt to propagate the PI change.
-  // This is the mode used by OwnedWaitQueue during a batch update of a PI chain.
-  void PriorityChanged(Thread* t, int old_prio, PropagatePI propagate)
-      TA_REQ(thread_lock, preempt_disabled_token);
+  // This method does not deal with the consequences of profile inheritance, and
+  // should only ever be called from one of the OwnedWaitQueue's Propagate
+  // methods (which will deal with the consequences)
+  void UpdateBlockedThreadEffectiveProfile(Thread& t) TA_REQ(thread_lock);
 
   // OwnedWaitQueue needs to be able to call this on WaitQueues to
   // determine if they are base WaitQueues or the OwnedWaitQueue
@@ -443,6 +433,9 @@ class WaitQueue {
   static void MoveThread(WaitQueue* source, WaitQueue* dest, Thread* t) TA_REQ(thread_lock);
 
  private:
+  // The OwnedWaitQueue subclass also manipulates the collection.
+  friend class OwnedWaitQueue;
+
   static void TimeoutHandler(Timer* timer, zx_time_t now, void* arg);
 
   // Internal helper for dequeueing a single Thread.
@@ -458,8 +451,6 @@ class WaitQueue {
   static constexpr uint32_t kMagic = fbl::magic("wait");
   uint32_t magic_;
 
-  // The OwnedWaitQueue subclass also manipulates the collection.
- protected:
   WaitQueueCollection collection_;
 };
 
@@ -1066,8 +1057,11 @@ struct Thread {
   // MUST be called.
   // The thread will not be scheduled until Resume() is called.
   static Thread* Create(const char* name, thread_start_routine entry, void* arg, int priority);
+  static Thread* Create(const char* name, thread_start_routine entry, void* arg,
+                        const SchedulerState::BaseProfile& profile);
   static Thread* CreateEtc(Thread* t, const char* name, thread_start_routine entry, void* arg,
-                           int priority, thread_trampoline_routine alt_trampoline);
+                           const SchedulerState::BaseProfile& profile,
+                           thread_trampoline_routine alt_trampoline);
 
   // Internal initialization routines. Eventually, these should be private.
   void SecondaryCpuInitEarly();
@@ -1122,8 +1116,15 @@ struct Thread {
   // Erase this thread from all global lists, where applicable.
   void EraseFromListsLocked() TA_REQ(thread_lock);
 
-  void SetPriority(int priority);
-  void SetDeadline(const zx_sched_deadline_params_t& params);
+  /**
+   * @brief Set the base profile for this thread.
+   *
+   * The chosen scheduling discipline and its associate parameters are defined by the BaseProfile
+   * object.
+   *
+   * @param params The weight to apply to the thread.
+   */
+  void SetBaseProfile(const SchedulerState::BaseProfile& profile);
 
   void* recursive_object_deletion_list() { return recursive_object_deletion_list_; }
   void set_recursive_object_deletion_list(void* ptr) { recursive_object_deletion_list_ = ptr; }
@@ -1770,6 +1771,7 @@ inline fbl::WAVLTreeNodeState<Thread*>& WaitQueueCollection::BlockedThreadTreeTr
 inline Thread* WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(const Thread& thread) {
   // TODO(johngro), consider pre-computing this value so it is just a fetch
   // instead of a branch.
+  thread_lock.AssertHeld();
   return (thread.scheduler_state().discipline() == SchedDiscipline::Fair)
              ? nullptr
              : const_cast<Thread*>(&thread);
@@ -1787,8 +1789,8 @@ inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(Thread* a, T
   // clang-format off
   if (a == nullptr) { return false; }
   if (b == nullptr) { return true; }
-  const SchedDuration a_deadline = a->scheduler_state().deadline().deadline_ns;
-  const SchedDuration b_deadline = b->scheduler_state().deadline().deadline_ns;
+  const SchedDuration a_deadline = a->scheduler_state().effective_profile().deadline.deadline_ns;
+  const SchedDuration b_deadline = b->scheduler_state().effective_profile().deadline.deadline_ns;
   return (a_deadline < b_deadline) || ((a_deadline == b_deadline) && (a < b));
   // clang-format on
 }
@@ -1810,6 +1812,13 @@ inline void WaitQueueCollection::MinRelativeDeadlineTraits::ResetBest(Thread& th
 
 inline void PreemptDisabledToken::AssertHeld() {
   DEBUG_ASSERT(Thread::Current::preemption_state().PreemptIsEnabled() == false);
+}
+
+inline SchedulerState::WaitQueueInheritedSchedulerState*
+WaitQueueCollection::FindInheritedSchedulerStateStorage() {
+  return threads_.is_empty()
+             ? nullptr
+             : &threads_.back().wait_queue_state().inherited_scheduler_state_storage_;
 }
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_THREAD_H_

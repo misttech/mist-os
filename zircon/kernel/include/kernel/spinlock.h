@@ -16,8 +16,7 @@
 #include <arch/interrupt.h>
 #include <arch/spinlock.h>
 #include <fbl/enum_bits.h>
-#include <lockdep/lock_policy.h>
-#include <lockdep/lock_traits.h>
+#include <kernel/lockdep.h>
 
 enum class SpinLockOptions : uint32_t {
   None = 0,

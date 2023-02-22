@@ -26,9 +26,11 @@ class ProfileDispatcher final
   zx_status_t ApplyProfile(fbl::RefPtr<ThreadDispatcher> thread);
 
  private:
-  explicit ProfileDispatcher(const zx_profile_info_t& info);
+  explicit ProfileDispatcher(const ktl::optional<SchedulerState::BaseProfile>& profile,
+                             const ktl::optional<cpu_mask_t>& cpu_mask);
 
-  const zx_profile_info_t info_;
+  const ktl::optional<SchedulerState::BaseProfile> profile_;
+  const ktl::optional<cpu_mask_t> cpu_mask_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PROFILE_DISPATCHER_H_

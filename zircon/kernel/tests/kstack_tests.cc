@@ -4,13 +4,13 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/intrin.h>
 #include <lib/unittest/unittest.h>
 
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/event.h>
 #include <kernel/mp.h>
 #include <kernel/thread.h>
-#include <lib/arch/intrin.h>
 
 namespace {
 
@@ -34,8 +34,7 @@ bool kstack_interrupt_depth_test() {
 }
 
 #if __has_feature(safe_stack)
-__attribute__((no_sanitize("safe-stack")))
-bool kstack_interrupt_depth_test_no_safestack() {
+__attribute__((no_sanitize("safe-stack"))) bool kstack_interrupt_depth_test_no_safestack() {
   BEGIN_TEST;
   constexpr size_t kSize = DEFAULT_STACK_SIZE / 2;
   volatile uint8_t buffer[kSize] = {};
@@ -97,8 +96,8 @@ bool kstack_mp_sync_exec_test() {
   Thread::Current::Get()->SetCpuAffinity(cpu_num_to_mask(cpu_a));
 
   // and |spin_fn| runs on CPU-B.
-  Thread* const thread =
-      Thread::CreateEtc(nullptr, "waiter", spin_fn, &context, DEFAULT_PRIORITY, nullptr);
+  Thread* const thread = Thread::CreateEtc(nullptr, "waiter", spin_fn, &context,
+                                           SchedulerState::BaseProfile{DEFAULT_PRIORITY}, nullptr);
   thread->SetCpuAffinity(cpu_num_to_mask(cpu_b));
   thread->Resume();
 
