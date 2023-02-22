@@ -64,11 +64,10 @@ struct VirtioGpuTestParam {
   bool configure_cursor_queue;
 };
 
-// TODO(https://fxbug.dev/122176): Disabled.
-class DISABLED_VirtioGpuTest : public TestWithDevice,
-                               public ::testing::WithParamInterface<VirtioGpuTestParam> {
+class VirtioGpuTest : public TestWithDevice,
+                      public ::testing::WithParamInterface<VirtioGpuTestParam> {
  protected:
-  DISABLED_VirtioGpuTest()
+  VirtioGpuTest()
       :  // Place both queues after the miscellaneous data segment
         control_queue_(phys_mem_,
                        std::accumulate(kQueueDataSizes.begin(), kQueueDataSizes.end(), 0),
@@ -282,7 +281,7 @@ class DISABLED_VirtioGpuTest : public TestWithDevice,
   std::unique_ptr<sys::ServiceDirectory> exposed_client_services_;
 };
 
-TEST_P(DISABLED_VirtioGpuTest, GetDisplayInfo) {
+TEST_P(VirtioGpuTest, GetDisplayInfo) {
   auto geometry = WaitForScanout();
   ASSERT_TRUE(geometry.is_ok());
   auto [gpu_width, gpu_height] = *geometry;
@@ -309,21 +308,21 @@ TEST_P(DISABLED_VirtioGpuTest, GetDisplayInfo) {
   EXPECT_EQ(response->pmodes[0].r.height, gpu_height);
 }
 
-TEST_P(DISABLED_VirtioGpuTest, SetScanout) {
+TEST_P(VirtioGpuTest, SetScanout) {
   ASSERT_TRUE(WaitForScanout().is_ok());
   ResourceCreate2d();
   ResourceAttachBacking();
   SetScanout(kResourceId, VIRTIO_GPU_RESP_OK_NODATA);
 }
 
-TEST_P(DISABLED_VirtioGpuTest, SetScanoutWithInvalidResourceId) {
+TEST_P(VirtioGpuTest, SetScanoutWithInvalidResourceId) {
   ASSERT_TRUE(WaitForScanout().is_ok());
   ResourceCreate2d();
   ResourceAttachBacking();
   SetScanout(UINT32_MAX, VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID);
 }
 
-TEST_P(DISABLED_VirtioGpuTest, CreateLargeResource) {
+TEST_P(VirtioGpuTest, CreateLargeResource) {
   virtio_gpu_ctrl_hdr_t* response;
   ASSERT_EQ(SendControlRequest(
                 virtio_gpu_resource_create_2d_t{
@@ -337,7 +336,7 @@ TEST_P(DISABLED_VirtioGpuTest, CreateLargeResource) {
   EXPECT_EQ(response->type, VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY);
 }
 
-TEST_P(DISABLED_VirtioGpuTest, InvalidTransferToHostParams) {
+TEST_P(VirtioGpuTest, InvalidTransferToHostParams) {
   ResourceCreate2d();
   ResourceAttachBacking();
 
@@ -366,7 +365,7 @@ TEST_P(DISABLED_VirtioGpuTest, InvalidTransferToHostParams) {
   EXPECT_EQ(response->type, VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER);
 }
 
-TEST_P(DISABLED_VirtioGpuTest, UpdateCursor) {
+TEST_P(VirtioGpuTest, UpdateCursor) {
   if (!GetParam().configure_cursor_queue)
     return;
 
@@ -679,7 +678,7 @@ TEST_P(DISABLED_VirtioGpuTest, UpdateCursor) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(VirtioGpuComponentsTest, DISABLED_VirtioGpuTest,
+INSTANTIATE_TEST_SUITE_P(VirtioGpuComponentsTest, VirtioGpuTest,
                          testing::Values(VirtioGpuTestParam{"cursorq", true},
                                          VirtioGpuTestParam{"nocursorq", false}),
                          [](const testing::TestParamInfo<VirtioGpuTestParam>& info) {
