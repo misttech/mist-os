@@ -36,9 +36,9 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     let blobs_dir = cmd.out.join("blobs");
 
     std::fs::create_dir_all(&blobs_dir)
-        .with_context(|| format!("creating directory {}", blobs_dir.display()))?;
+        .with_context(|| format!("creating directory {blobs_dir}"))?;
 
-    let mut package_manifest = PackageManifest::from_archive(&cmd.archive, &blobs_dir)
+    let mut package_manifest = PackageManifest::from_archive(&cmd.archive, blobs_dir.as_std_path())
         .with_context(|| format!("extracting package manifest {}", cmd.archive.display()))?;
 
     if let Some(repository) = cmd.repository {
@@ -46,11 +46,9 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     }
 
     let package_manifest_path = cmd.out.join(PACKAGE_MANIFEST_NAME);
-
-    let file = File::create(&package_manifest_path)
-        .with_context(|| format!("creating {}", package_manifest_path.display()))?;
-
-    to_writer_json_pretty(file, &package_manifest)?;
+    let package_manifest = package_manifest
+        .write_with_relative_paths(&package_manifest_path)
+        .with_context(|| format!("creating {package_manifest_path}"))?;
 
     // FIXME(fxbug.dev/101304): Write out the meta.far.merkle file, that contains the meta.far
     // merkle.
@@ -66,7 +64,7 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);
         let file = File::create(&blobs_json_path)
-            .with_context(|| format!("creating {}", blobs_json_path.display()))?;
+            .with_context(|| format!("creating {blobs_json_path}"))?;
         to_writer_json_pretty(file, package_manifest.blobs())?;
     }
 
@@ -96,7 +94,7 @@ mod tests {
 
     struct Package {
         manifest_path: Utf8PathBuf,
-        metafar_contents: Vec<u8>,
+        meta_far_contents: Vec<u8>,
     }
 
     fn create_package(pkg_dir: &Utf8Path) -> Package {
@@ -107,13 +105,13 @@ mod tests {
         // Build the package.
         let metafar_path = pkg_dir.join("meta.far");
         let manifest = builder.build(pkg_dir, &metafar_path).unwrap();
-        let metafar_contents = std::fs::read(&metafar_path).unwrap();
+        let meta_far_contents = std::fs::read(&metafar_path).unwrap();
 
         let manifest_path = pkg_dir.join(PACKAGE_MANIFEST_NAME);
 
         serde_json::to_writer(std::fs::File::create(&manifest_path).unwrap(), &manifest).unwrap();
 
-        Package { manifest_path, metafar_contents }
+        Package { manifest_path, meta_far_contents }
     }
 
     fn read_archive(archive: &mut Utf8Reader<std::fs::File>) -> BTreeMap<String, Vec<u8>> {
@@ -148,52 +146,68 @@ mod tests {
     fn check_extract(
         package: &Package,
         extract_dir: &Utf8Path,
-        meta_far_path: &Utf8Path,
+        blob_sources_relative: Option<&str>,
+        mut meta_far_path: Utf8PathBuf,
+        mut bin_path: Utf8PathBuf,
+        mut lib_path: Utf8PathBuf,
     ) -> BTreeMap<Utf8PathBuf, Vec<u8>> {
         let manifest_path = extract_dir.join("package_manifest.json");
-        let bin_path = extract_dir.join("blobs").join(BIN_HASH);
-        let lib_path = extract_dir.join("blobs").join(LIB_HASH);
 
         // Read the extracted files.
         let mut extract_contents = read_dir(extract_dir);
 
         // Check the extracted manifest is correct.
+        let mut expected = serde_json::json!({
+            "version": "1",
+            "package": {
+                "name": "some_pkg_name",
+                "version": "0"
+            },
+            "blobs": [
+                {
+                    "merkle": META_FAR_HASH,
+                    "path": "meta/",
+                    "size": 16384,
+                    "source_path": meta_far_path,
+                },
+                {
+                    "merkle": BIN_HASH,
+                    "path": "bin",
+                    "size": 3,
+                    "source_path": bin_path,
+                },
+                {
+                    "merkle": LIB_HASH,
+                    "path": "lib",
+                    "size": 3,
+                    "source_path": lib_path,
+                },
+            ]
+        });
+
+        if let Some(blob_sources_relative) = blob_sources_relative {
+            expected
+                .as_object_mut()
+                .unwrap()
+                .insert("blob_sources_relative".into(), blob_sources_relative.into());
+
+            if blob_sources_relative == "file" {
+                meta_far_path = extract_dir.join(meta_far_path);
+                bin_path = extract_dir.join(bin_path);
+                lib_path = extract_dir.join(lib_path);
+            }
+        }
+
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(
                 &extract_contents.remove(&manifest_path).unwrap()
             )
             .unwrap(),
-            serde_json::json!({
-                "version": "1",
-                "package": {
-                    "name": "some_pkg_name",
-                    "version": "0"
-                },
-                "blobs": [
-                    {
-                        "merkle": META_FAR_HASH,
-                        "path": "meta/",
-                        "size": 16384,
-                        "source_path": meta_far_path,
-                    },
-                    {
-                        "merkle": BIN_HASH,
-                        "path": "bin",
-                        "size": 3,
-                        "source_path": bin_path,
-                    },
-                    {
-                        "merkle": LIB_HASH,
-                        "path": "lib",
-                        "size": 3,
-                        "source_path": lib_path,
-                    },
-                ]
-            })
+            expected,
         );
 
         // Check that the meta.far is right.
-        assert_eq!(extract_contents.remove(meta_far_path).unwrap(), package.metafar_contents,);
+        assert_eq!(extract_contents.remove(&meta_far_path).unwrap(), package.meta_far_contents);
 
         // Check the rest of the blobs are correct.
         assert_eq!(extract_contents.remove(&bin_path).unwrap(), BIN_CONTENTS);
@@ -226,7 +240,7 @@ mod tests {
         assert_eq!(
             read_archive(&mut archive),
             BTreeMap::from([
-                ("meta.far".to_string(), package.metafar_contents.clone()),
+                ("meta.far".to_string(), package.meta_far_contents.clone()),
                 (BIN_HASH.to_string(), BIN_CONTENTS.to_vec()),
                 (LIB_HASH.to_string(), LIB_CONTENTS.to_vec()),
             ]),
@@ -235,18 +249,23 @@ mod tests {
         // Extract the archive.
         let extract_dir = root.join("extract");
         cmd_package_archive_extract(PackageArchiveExtractCommand {
-            out: extract_dir.clone().into(),
+            out: extract_dir.clone(),
             repository: None,
-            archive: archive_path.clone().into_std_path_buf(),
+            archive: archive_path.clone().into(),
             meta_far_merkle: true,
             blobs_json: true,
         })
         .await
         .unwrap();
 
-        let blobs_dir = extract_dir.join("blobs");
-        let meta_far_path = blobs_dir.join(META_FAR_HASH);
-        let mut extract_contents = check_extract(&package, &extract_dir, &meta_far_path);
+        let mut extract_contents = check_extract(
+            &package,
+            &extract_dir,
+            Some("file"),
+            Utf8Path::new("blobs").join(META_FAR_HASH),
+            Utf8Path::new("blobs").join(BIN_HASH),
+            Utf8Path::new("blobs").join(LIB_HASH),
+        );
 
         assert_eq!(
             &extract_contents.remove(&extract_dir.join(META_FAR_MERKLE_NAME)).unwrap(),
@@ -260,19 +279,19 @@ mod tests {
             .unwrap(),
             serde_json::json!([
                     {
-                        "source_path": meta_far_path,
+                        "source_path": format!("blobs/{META_FAR_HASH}"),
                         "path": "meta/",
                         "merkle": META_FAR_HASH,
                         "size": 16384,
                     },
                     {
-                        "source_path": blobs_dir.join(BIN_HASH),
+                        "source_path": format!("blobs/{BIN_HASH}"),
                         "path": "bin",
                         "merkle": BIN_HASH,
                         "size": 3,
                     },
                     {
-                        "source_path": blobs_dir.join(LIB_HASH),
+                        "source_path": format!("blobs/{LIB_HASH}"),
                         "path": "lib",
                         "merkle": LIB_HASH,
                         "size": 3,
@@ -312,7 +331,14 @@ mod tests {
 
         // Check that the `pm archive` extracts what we expect.
         let meta_far_path = extract_dir.join("meta.far");
-        let mut extract_contents = check_extract(&package, &extract_dir, &meta_far_path);
+        let mut extract_contents = check_extract(
+            &package,
+            &extract_dir,
+            None,
+            meta_far_path.clone(),
+            blobs_dir.join(BIN_HASH),
+            blobs_dir.join(LIB_HASH),
+        );
 
         assert_eq!(
             &extract_contents.remove(&extract_dir.join(META_FAR_MERKLE_NAME)).unwrap(),
@@ -393,7 +419,7 @@ mod tests {
         // Extract the archive.
         let extract_dir = root.join("extract");
         cmd_package_archive_extract(PackageArchiveExtractCommand {
-            out: extract_dir.clone().into(),
+            out: extract_dir.clone(),
             repository: None,
             meta_far_merkle: false,
             blobs_json: false,
@@ -402,8 +428,14 @@ mod tests {
         .await
         .unwrap();
 
-        let extract_contents =
-            check_extract(&package, &extract_dir, &extract_dir.join("blobs").join(META_FAR_HASH));
+        let extract_contents = check_extract(
+            &package,
+            &extract_dir,
+            Some("file"),
+            Utf8Path::new("blobs").join(META_FAR_HASH),
+            Utf8Path::new("blobs").join(BIN_HASH),
+            Utf8Path::new("blobs").join(LIB_HASH),
+        );
         assert_eq!(extract_contents, BTreeMap::from([]));
     }
 }

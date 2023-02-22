@@ -43,9 +43,9 @@ pub struct PackageArchiveExtractCommand {
         option,
         short = 'o',
         description = "output directory for writing the extracted files. Defaults to the current directory.",
-        default = "PathBuf::from(\"./\")"
+        default = "Utf8PathBuf::from(\"./\")"
     )]
-    pub out: PathBuf,
+    pub out: Utf8PathBuf,
 
     #[argh(option, description = "repository of the package")]
     pub repository: Option<String>,
