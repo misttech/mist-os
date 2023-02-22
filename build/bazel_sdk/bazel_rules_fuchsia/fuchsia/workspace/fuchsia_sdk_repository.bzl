@@ -4,7 +4,7 @@
 
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
-load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "sdk_id_from_manifests")
+load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "sdk_id_from_manifests")
 load("//fuchsia/workspace:utils.bzl", "normalize_os", "workspace_path")
 load("//cipd:defs.bzl", "fetch_cipd_contents")
 
@@ -146,13 +146,9 @@ def _fuchsia_sdk_repository_impl(ctx):
         },
     )
 
-    # Extract the target CPU names supported by our SDK manifests, then
-    # write it to generated_constants.bzl file.
-    constants = generate_sdk_constants(ctx, manifests)
-
     # TODO(fxbug.dev/117511): Allow generate_sdk_build_rules to provide
     # substitutions directly to the call to ctx.template above.
-    generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants)
+    generate_sdk_build_rules(ctx, manifests, copy_content_strategy)
 
     _merge_rules_fuchsia(ctx)
 
