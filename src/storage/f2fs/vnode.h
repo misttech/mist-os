@@ -35,6 +35,7 @@ class VnodeF2fs : public fs::PagedVnode,
                   public fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>> {
  public:
   explicit VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode);
+  ~VnodeF2fs() { ReleasePagedVmo(); }
 
   uint32_t InlineDataOffset() const {
     return kPageSize - sizeof(NodeFooter) -
@@ -58,8 +59,10 @@ class VnodeF2fs : public fs::PagedVnode,
 
   static zx_status_t Allocate(F2fs *fs, ino_t ino, umode_t mode, fbl::RefPtr<VnodeF2fs> *out);
   static zx_status_t Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
+  static zx_status_t Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
+
   void Init();
-  void InitFileCache() __TA_EXCLUDES(mutex_);
+  void InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
 
@@ -84,7 +87,7 @@ class VnodeF2fs : public fs::PagedVnode,
   // For fs::PagedVnode
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override
       __TA_EXCLUDES(mutex_);
-  void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
+  void VmoRead(uint64_t offset, uint64_t length) override __TA_EXCLUDES(mutex_);
   void VmoDirty(uint64_t offset, uint64_t length) override __TA_EXCLUDES(mutex_);
 
   zx::result<size_t> CreateAndPopulateVmo(zx::vmo &vmo, const size_t offset, const size_t length)
@@ -102,7 +105,6 @@ class VnodeF2fs : public fs::PagedVnode,
   //      buffer_head *bh_result, int create);
 #endif
 
-  static zx_status_t Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
   void UpdateInode(LockedPage &inode_page);
   zx_status_t WriteInode(bool is_reclaim = false);
   zx_status_t DoTruncate(size_t len);
@@ -110,7 +112,6 @@ class VnodeF2fs : public fs::PagedVnode,
   int TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count);
   // Caller should ensure node_page is locked.
   void TruncateDataBlocks(NodePage &node_page);
-  void TruncatePartialDataPage(uint64_t from);
   zx_status_t TruncateBlocks(uint64_t from);
   zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end);
   void TruncateToSize();
@@ -123,7 +124,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node);
 
   void UpdateExtentCache(block_t blk_addr, pgoff_t file_offset);
-  zx_status_t FindDataPage(pgoff_t index, LockedPage *out);
+  zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
   // node page of a offset or the block address is not assigned, this function adds null LockedPage
   // and kNullAddr to LockedPagesAndAddrs struct. The handling of null LockedPage and kNullAddr is
@@ -135,7 +136,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out);
 
   zx::result<block_t> GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim);
-  zx::result<> WriteBegin(const size_t offset, const size_t len, const bool vmo_dirty = false);
+  zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len);
 
   virtual zx_status_t RecoverInlineData(NodePage &node_page) __TA_EXCLUDES(info_mutex_) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -205,8 +206,8 @@ class VnodeF2fs : public fs::PagedVnode,
     return (GetBlocks() > xattr_block);
   }
 
-  void SetSize(const size_t nbytes) { size_.store(nbytes, std::memory_order_release); }
-  uint64_t GetSize() const { return size_.load(std::memory_order_acquire); }
+  void SetSize(const size_t nbytes);
+  uint64_t GetSize() const;
 
   void SetParentNid(const ino_t &pino) { parent_ino_.store(pino, std::memory_order_release); }
   ino_t GetParentNid() const { return parent_ino_.load(std::memory_order_acquire); }
@@ -338,7 +339,6 @@ class VnodeF2fs : public fs::PagedVnode,
   void ClearXattrNid() { xattr_nid_ = 0; }
   uint16_t GetInlineXattrAddrs() const { return inline_xattr_size_; }
   void SetInlineXattrAddrs(const uint16_t addrs) { inline_xattr_size_ = addrs; }
-  uint8_t *InlineDataPtr(Page *page);
 
   uint16_t GetExtraISize() const { return extra_isize_; }
   void SetExtraISize(const uint16_t size) { extra_isize_ = size; }
@@ -359,17 +359,11 @@ class VnodeF2fs : public fs::PagedVnode,
     }
   }
 
-  void Activate() { SetFlag(InodeInfoFlag::kActive); }
-  void Deactivate() {
-    ClearFlag(InodeInfoFlag::kActive);
-    flag_cvar_.notify_all();
-  }
-  bool IsActive() const { return TestFlag(InodeInfoFlag::kActive); }
-  void WaitForDeactive(std::mutex &mutex) {
-    if (IsActive()) {
-      flag_cvar_.wait(mutex, [this]() { return !IsActive(); });
-    }
-  }
+  void Activate();
+  void Deactivate();
+  bool IsActive() const;
+  void WaitForDeactive(std::mutex &mutex);
+
   void ClearDirty() { ClearFlag(InodeInfoFlag::kDirty); }
   bool IsDirty() const { return TestFlag(InodeInfoFlag::kDirty); }
   bool IsBad() const { return TestFlag(InodeInfoFlag::kBad); }
@@ -454,8 +448,10 @@ class VnodeF2fs : public fs::PagedVnode,
  protected:
   void RecycleNode() override;
   VmoManager &vmo_manager() const { return *vmo_manager_; }
-  void ReportPagerError(const uint64_t offset, const uint64_t length, const zx_status_t err)
-      __TA_REQUIRES_SHARED(mutex_);
+  void ReportPagerError(const uint32_t op, const uint64_t offset, const uint64_t length,
+                        const zx_status_t err) __TA_EXCLUDES(mutex_);
+  void ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset, const uint64_t length,
+                              const zx_status_t err) __TA_REQUIRES_SHARED(mutex_);
 
  private:
   zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page);
@@ -466,7 +462,7 @@ class VnodeF2fs : public fs::PagedVnode,
   bool NeedToSyncDir() const;
   bool NeedToCheckpoint();
 
-  zx::result<size_t> CreatePagedVmo() __TA_REQUIRES(mutex_);
+  zx::result<size_t> CreatePagedVmo(uint64_t size) __TA_REQUIRES(mutex_);
   zx_status_t ClonePagedVmo(fuchsia_io::wire::VmoFlags flags, size_t size, zx::vmo *out_vmo)
       __TA_REQUIRES(mutex_);
   void SetPagedVmoName() __TA_REQUIRES(mutex_);
@@ -480,7 +476,6 @@ class VnodeF2fs : public fs::PagedVnode,
   std::atomic<block_t> num_blocks_ = 0;
   std::atomic<uint32_t> nlink_ = 0;
   std::atomic<block_t> dirty_pages_ = 0;  // # of dirty dentry/data pages
-  std::atomic<size_t> size_ = 0;
   std::atomic<ino_t> parent_ino_ = kNullIno;
   std::array<std::atomic_flag, static_cast<uint8_t>(InodeInfoFlag::kFlagSize)> flags_ = {
       ATOMIC_FLAG_INIT};

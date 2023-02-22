@@ -188,8 +188,8 @@ class F2fs final {
   void SetTearDown();
   zx_status_t CheckOrphanSpace();
   void AddOrphanInode(VnodeF2fs *vnode);
-  void RecoverOrphanInode(nid_t ino);
-  int RecoverOrphanInodes();
+  void PurgeOrphanInode(nid_t ino);
+  int PurgeOrphanInodes();
   void WriteOrphanInodes(block_t start_blk);
   zx_status_t GetValidCheckpoint();
   zx_status_t ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out);
@@ -272,6 +272,9 @@ class F2fs final {
   void ScheduleWriter(sync_completion_t *completion = nullptr, PageList pages = {},
                       bool flush = true) {
     writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
+  }
+  void ScheduleWriter(fpromise::promise<> task) {
+    writer_->ScheduleTask(std::move(task));
   }
 
   void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);

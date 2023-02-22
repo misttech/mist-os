@@ -187,7 +187,9 @@ class NodeManager {
     memset(nat_bitmap_.get(), 0, nat_bitmap_size_);
     return ZX_OK;
   }
-  void SetNatBitmap(const uint8_t *bitmap) { memcpy(nat_bitmap_.get(), bitmap, nat_bitmap_size_); }
+  void SetNatBitmap(const uint8_t *bitmap) {
+    std::memcpy(nat_bitmap_.get(), bitmap, nat_bitmap_size_);
+  }
   uint8_t *GetNatBitmap() const { return nat_bitmap_.get(); }
   void GetNatBitmap(void *out);
 

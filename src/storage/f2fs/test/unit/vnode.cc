@@ -240,12 +240,7 @@ TEST_F(VnodeTest, TruncateExceptionCase) {
   ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
   fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
 
-  // 1. Check TruncatePartialDataPage() exception
-  file_vnode->SetSize(1);
-  file_vnode->TruncatePartialDataPage(1);
-  ASSERT_EQ(file_vnode->GetSize(), 1UL);
-
-  // 2. Check TruncateBlocks() exception
+  // 1. Check TruncateBlocks() exception
   file_vnode->SetSize(1);
   ASSERT_EQ(file_vnode->TruncateBlocks(1), ZX_OK);
   ASSERT_EQ(file_vnode->GetSize(), 1UL);
@@ -264,7 +259,7 @@ TEST_F(VnodeTest, TruncateExceptionCase) {
   ASSERT_EQ(file_vnode->TruncateBlocks(invalid_size), ZX_ERR_NOT_FOUND);
   ASSERT_EQ(file_vnode->GetSize(), invalid_size);
 
-  // 3. Check TruncateHole() exception
+  // 2. Check TruncateHole() exception
   file_vnode->SetSize(invalid_size);
   ASSERT_EQ(file_vnode->TruncateHole(invalid_size, invalid_size + 1), ZX_OK);
   ASSERT_EQ(file_vnode->GetSize(), invalid_size);
@@ -272,7 +267,7 @@ TEST_F(VnodeTest, TruncateExceptionCase) {
   ASSERT_EQ(file_vnode->Close(), ZX_OK);
   file_vnode = nullptr;
 
-  // 4. Check TruncateToSize() exception
+  // 3. Check TruncateToSize() exception
   fbl::RefPtr<fs::Vnode> block_fs_vnode;
   std::string block_name("test_block");
   ASSERT_EQ(root_dir_->Create(block_name, S_IFBLK, &block_fs_vnode), ZX_OK);
@@ -387,8 +382,9 @@ void CheckDataPages(LockedPagesAndAddrs &address_and_pages, pgoff_t start_offset
       ASSERT_EQ(address_and_pages.block_addrs[offset], kNullAddr);
       continue;
     }
-    ASSERT_EQ(*address_and_pages.pages[offset]->GetAddress<uint32_t>(),
-              static_cast<uint32_t>(offset));
+    uint32_t read_offset = 0;
+    ASSERT_EQ(address_and_pages.pages[offset]->Read(&read_offset, 0, sizeof(uint32_t)), ZX_OK);
+    ASSERT_EQ(read_offset, offset);
   }
 }
 

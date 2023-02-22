@@ -226,36 +226,30 @@ TEST_F(FileCacheTest, WritebackOperation) {
   ASSERT_EQ(vn->Writeback(op), 0UL);
   ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kWriteback), 0);
 
-  // It should not release any clean Pages since op.bReleasePages is false.
-  ASSERT_EQ(vn->Writeback(op), 0UL);
-  // Pages at 1st and 2nd blocks should be uptodate
+  // The Pages should be kept but not set to uptodate since kernel can evict any clean pages.
   {
-    LockedPage page;
-    vn->GrabCachePage(0, &page);
-    ASSERT_EQ(page->IsUptodate(), true);
+    fbl::RefPtr<Page> page;
+    ASSERT_EQ(vn->FindPage(0, &page), ZX_OK);
+    ASSERT_EQ(page->IsUptodate(), false);
   }
   {
-    LockedPage page;
-    vn->GrabCachePage(1, &page);
-    ASSERT_EQ(page->IsUptodate(), true);
+    fbl::RefPtr<Page> page;
+    ASSERT_EQ(vn->FindPage(1, &page), ZX_OK);
+    ASSERT_EQ(page->IsUptodate(), false);
   }
 
   // Release clean Pages
   op.bReleasePages = true;
-  // It should release and evict clean Pages from FileCache.
   ASSERT_EQ(vn->Writeback(op), 0UL);
-  // There is no uptodate Page.
-  {
-    LockedPage page;
-    vn->GrabCachePage(0, &page);
-    ASSERT_EQ(page->IsUptodate(), false);
-  }
-  {
-    LockedPage page;
-    vn->GrabCachePage(1, &page);
-    ASSERT_EQ(page->IsUptodate(), false);
-  }
 
+  {
+    fbl::RefPtr<Page> page;
+    ASSERT_EQ(vn->FindPage(0, &page), ZX_ERR_NOT_FOUND);
+  }
+  {
+    fbl::RefPtr<Page> page;
+    ASSERT_EQ(vn->FindPage(1, &page), ZX_ERR_NOT_FOUND);
+  }
   vn->Close();
   vn = nullptr;
 }
@@ -419,7 +413,9 @@ TEST_F(FileCacheTest, Basic) {
     vn->GrabCachePage(i, &page);
     ASSERT_EQ(page->IsUptodate(), true);
     ASSERT_EQ(page->IsDirty(), true);
-    ASSERT_EQ(memcmp(buf, page->GetAddress(), kPageSize), 0);
+    FsBlock read_buffer;
+    page->Read(read_buffer.get());
+    ASSERT_EQ(memcmp(buf, read_buffer.get(), kPageSize), 0);
   }
 
   // Write out some dirty pages
@@ -430,10 +426,11 @@ TEST_F(FileCacheTest, Basic) {
   for (size_t i = 0; i < nblocks; ++i) {
     LockedPage page;
     vn->GrabCachePage(i, &page);
-    ASSERT_EQ(page->IsUptodate(), true);
     if (i < nblocks / 2) {
+      ASSERT_EQ(page->IsUptodate(), false);
       ASSERT_EQ(page->IsDirty(), false);
     } else {
+      ASSERT_EQ(page->IsUptodate(), true);
       ASSERT_EQ(page->IsDirty(), true);
     }
   }

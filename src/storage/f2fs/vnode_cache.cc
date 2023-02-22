@@ -163,7 +163,6 @@ zx_status_t VnodeCache::LookupUnsafe(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* o
       }
       // When it is inactive, it is safe to make Refptr.
       *out = fbl::ImportFromRawPtr(raw_ptr);
-      (*out)->InitFileCache();
       (*out)->Activate();
       return ZX_OK;
     }

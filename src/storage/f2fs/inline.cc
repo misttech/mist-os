@@ -93,14 +93,14 @@ zx_status_t Dir::MakeEmptyInlineDir(VnodeF2fs *vnode) {
   de->name_len = CpuToLe(static_cast<uint16_t>(1));
   de->hash_code = 0;
   de->ino = CpuToLe(vnode->Ino());
-  memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[0], ".", 1);
+  std::memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[0], ".", 1);
   SetDeType(de, vnode);
 
   de = &InlineDentryArray(&(*ipage), *vnode)[1];
   de->hash_code = 0;
   de->name_len = CpuToLe(static_cast<uint16_t>(2));
   de->ino = CpuToLe(Ino());
-  memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[1], "..", 2);
+  std::memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[1], "..", 2);
   SetDeType(de, vnode);
 
   TestAndSetBit(0, InlineDentryBitmap(&(*ipage)));
@@ -169,9 +169,10 @@ zx_status_t Dir::ConvertInlineDir() {
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
 
   // copy data from inline dentry block to new dentry block
-  memcpy(dentry_blk->dentry_bitmap, InlineDentryBitmap(ipage), InlineDentryBitmapSize());
-  memcpy(dentry_blk->dentry, InlineDentryArray(ipage, *this), sizeof(DirEntry) * MaxInlineDentry());
-  memcpy(
+  std::memcpy(dentry_blk->dentry_bitmap, InlineDentryBitmap(ipage), InlineDentryBitmapSize());
+  std::memcpy(dentry_blk->dentry, InlineDentryArray(ipage, *this),
+              sizeof(DirEntry) * MaxInlineDentry());
+  std::memcpy(
       dentry_blk->filename, InlineDentryFilenameArray(ipage, *this),
       safemath::CheckMul(safemath::checked_cast<size_t>(MaxInlineDentry()), kNameLen).ValueOrDie());
 
@@ -221,7 +222,8 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
       DirEntry *de = &InlineDentryArray(ipage.get(), *this)[bit_pos];
       de->hash_code = name_hash;
       de->name_len = static_cast<uint16_t>(CpuToLe(name.length()));
-      memcpy(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos], name.data(), name.length());
+      std::memcpy(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos], name.data(),
+                  name.length());
       de->ino = CpuToLe(vnode->Ino());
       SetDeType(de, vnode);
       for (int i = 0; i < slots; ++i) {
@@ -355,22 +357,14 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
   return ZX_OK;
 }
 
-uint8_t *VnodeF2fs::InlineDataPtr(Page *page) {
-  Node *rn = page->GetAddress<Node>();
-  Inode &ri = rn->i;
-  return reinterpret_cast<uint8_t *>(
-      &ri.i_addr[GetExtraISize() / sizeof(uint32_t) + kInlineStartOffset]);
-}
-
 zx_status_t File::ReadInline(void *data, size_t len, size_t off, size_t *out_actual) {
   LockedPage inline_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
     return ret;
   }
 
-  uint8_t *inline_data = InlineDataPtr(inline_page.get());
   size_t cur_len = std::min(len, GetSize() - off);
-  memcpy(static_cast<uint8_t *>(data), inline_data + off, cur_len);
+  inline_page->Read(data, InlineDataOffset() + off, cur_len);
 
   *out_actual = cur_len;
 
@@ -411,10 +405,8 @@ zx_status_t File::ConvertInlineData() {
   }
 
   if (TestFlag(InodeInfoFlag::kDataExist)) {
-    uint8_t *inline_data = InlineDataPtr(ipage);
     page->WaitOnWriteback();
-    memcpy(page->GetAddress(), inline_data, GetSize());
-    page.Zero(GetSize());
+    page->Write(ipage->GetAddress<uint8_t>() + InlineDataOffset(), 0, GetSize());
     page.SetDirty();
 
     dnode_page->WaitOnWriteback();
@@ -435,9 +427,7 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
   }
 
   inline_page->WaitOnWriteback();
-
-  uint8_t *inline_data = InlineDataPtr(inline_page.get());
-  memcpy(inline_data + offset, static_cast<const uint8_t *>(data), len);
+  inline_page->Write(data, InlineDataOffset() + offset, len);
 
   SetSize(std::max(static_cast<size_t>(GetSize()), offset + len));
   SetFlag(InodeInfoFlag::kDataExist);
@@ -462,10 +452,9 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
 
   inline_page->WaitOnWriteback();
 
-  uint8_t *inline_data = InlineDataPtr(inline_page.get());
   size_t size_diff = (len > GetSize()) ? (len - GetSize()) : (GetSize() - len);
-  size_t offset = ((len > GetSize()) ? GetSize() : len);
-  memset(inline_data + offset, 0, size_diff);
+  size_t offset = InlineDataOffset() + ((len > GetSize()) ? GetSize() : len);
+  inline_page.Zero(offset, offset + size_diff);
 
   // When removing inline data during recovery, file size should not be modified.
   if (!is_recover) {
@@ -506,8 +495,10 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
     if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
       return err;
     }
+    FsBlock block;
     ipage->WaitOnWriteback();
-    memcpy(InlineDataPtr(ipage.get()), InlineDataPtr(&page), MaxInlineData());
+    page.Read(block.get(), InlineDataOffset(), MaxInlineData());
+    ipage->Write(block.get(), InlineDataOffset(), MaxInlineData());
 
     SetFlag(InodeInfoFlag::kInlineData);
     SetFlag(InodeInfoFlag::kDataExist);

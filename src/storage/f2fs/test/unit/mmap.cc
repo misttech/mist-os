@@ -427,8 +427,8 @@ TEST_F(MmapTest, ReleasePagedVmoInVnodeRecycle) {
   test_vnode->Close();
   test_vnode.reset();
 
-  // Make sure pager-backed VMO is freed
-  ASSERT_EQ(vnode_ptr->HasPagedVmo(), false);
+  // Make sure pager-backed VMO is not freed as long as it is alive in VnodeCache
+  ASSERT_EQ(vnode_ptr->HasPagedVmo(), true);
 }
 
 }  // namespace

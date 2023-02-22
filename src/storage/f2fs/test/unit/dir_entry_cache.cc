@@ -206,11 +206,10 @@ TEST_F(DirEntryCacheTest, CacheDataValidation) {
     // Validate cached child name
     ASSERT_EQ(element->GetName(), child_name_from_key);
 
-    LockedPage page;
-
     // To validate cached parent ino, read a page for cached index
-    ASSERT_EQ(root_dir_->FindDataPage(element->GetDataPageIndex(), &page), ZX_OK);
-    DentryBlock *dentry_block = page->GetAddress<DentryBlock>();
+    auto page_or = root_dir_->FindDataPage(element->GetDataPageIndex());
+    ASSERT_TRUE(page_or.is_ok());
+    DentryBlock *dentry_block = page_or->GetAddress<DentryBlock>();
 
     uint32_t bit_pos = FindNextBit(dentry_block->dentry_bitmap, kNrDentryInBlock, 0);
     while (bit_pos < kNrDentryInBlock) {

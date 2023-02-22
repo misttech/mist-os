@@ -215,6 +215,54 @@ bool Page::ClearColdData() {
   return false;
 }
 
+zx_status_t Page::VmoOpUnlock(bool evict) {
+  ZX_DEBUG_ASSERT(InTreeContainer());
+  // |evict| can be true only when the Page is clean or subject to invalidation.
+  if (((!IsDirty() && !file_cache_->IsOrphan()) || evict) && IsVmoLocked()) {
+    WaitOnWriteback();
+    ClearFlag(PageFlag::kPageVmoLocked);
+    return GetVmoManager().UnlockVmo(index_, evict);
+  }
+  return ZX_OK;
+}
+
+zx::result<bool> Page::VmoOpLock() {
+  ZX_DEBUG_ASSERT(InTreeContainer());
+  ZX_DEBUG_ASSERT(IsLocked());
+  if (!SetFlag(PageFlag::kPageVmoLocked)) {
+    return GetVmoManager().CreateAndLockVmo(index_);
+  }
+  return zx::ok(true);
+}
+
+zx_status_t Page::Read(void *data, uint64_t offset, size_t len) {
+  if (unlikely(offset + len > Size())) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (uint8_t *addr = GetAddress<uint8_t>(); addr) {
+    std::memcpy(data, &addr[offset], len);
+    return ZX_OK;
+  }
+  return GetVmoManager().Read(data, index_ * Size() + offset, len);
+}
+
+zx_status_t Page::Write(const void *data, uint64_t offset, size_t len) {
+  if (unlikely(offset + len > Size())) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (uint8_t *addr = GetAddress<uint8_t>(); addr) {
+    std::memcpy(&addr[offset], data, len);
+    return ZX_OK;
+  }
+  return GetVmoManager().Write(data, index_ * Size() + offset, len);
+}
+
+void LockedPage::Zero(size_t start, size_t end) const {
+  if (start < end && end <= Page::Size()) {
+    page_->Write(kZeroBuffer_.data(), start, end - start);
+  }
+}
+
 zx::result<> LockedPage::SetVmoDirty() {
   if (!page_->IsDirty() && !page_->IsWriteback() && page_->GetVmoManager().IsPaged()) {
     size_t start_offset = safemath::CheckMul(page_->GetKey(), kBlockSize).ValueOrDie();
@@ -234,26 +282,6 @@ bool LockedPage::SetDirty(bool add_to_list) {
     ZX_ASSERT(page_->GetFileCache().GetDirtyPageList().AddDirty(*this).is_ok());
   }
   return ret;
-}
-
-zx_status_t Page::VmoOpUnlock(bool evict) {
-  ZX_DEBUG_ASSERT(InTreeContainer());
-  // |evict| can be true only when the Page is clean or subject to invalidation.
-  if (((!IsDirty() && !file_cache_->IsOrphan()) || evict) && IsVmoLocked()) {
-    WaitOnWriteback();
-    ClearFlag(PageFlag::kPageVmoLocked);
-    return GetVmoManager().UnlockVmo(index_, evict);
-  }
-  return ZX_OK;
-}
-
-zx::result<bool> Page::VmoOpLock() {
-  ZX_DEBUG_ASSERT(InTreeContainer());
-  ZX_DEBUG_ASSERT(IsLocked());
-  if (!SetFlag(PageFlag::kPageVmoLocked)) {
-    return GetVmoManager().CreateAndLockVmo(index_);
-  }
-  return zx::ok(true);
 }
 
 FileCache::FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager)
@@ -541,8 +569,8 @@ void FileCache::ClearDirtyPages() {
   {
     std::lock_guard tree_lock(tree_lock_);
     pages = GetLockedPagesUnsafe();
-    // Let kernel clear dirty pages if |this| is running on paged vmo.
-    vmo_manager_->ClearDirtyPages(*vnode_->fs()->vfs());
+    // Let kernel evict the pages if |this| is running on paged vmo.
+    vmo_manager_->AllowEviction(*vnode_->fs()->vfs());
   }
   // Clear the dirty flag of all Pages.
   for (auto &page : pages) {
@@ -566,13 +594,6 @@ std::vector<bool> FileCache::GetReadaheadPagesInfo(pgoff_t index, size_t max_sca
   std::vector<bool> read_blocks;
   size_t num_read_blocks = kDefaultReadaheadSize;
   read_blocks.reserve(num_read_blocks);
-
-  // Do readahead if |index| belongs to the first vmo node or the previus vmo node has been touched.
-  if (index >= kBlocksPerVmoNode) {
-    if (vmo_manager_->GetAddress(index - kBlocksPerVmoNode).is_error()) {
-      num_read_blocks = kDefaultReadaheadSize / 2;
-    }
-  }
 
   // Set bits in |read_blocks| which requires read IOs.
   std::lock_guard tree_lock(tree_lock_);
@@ -730,18 +751,18 @@ pgoff_t FileCache::Writeback(WritebackOperation &operation) {
 
 pgoff_t FileCache::WritebackFromDirtyList(const WritebackOperation &operation) {
   // do ZX_PAGER_OP_WRITEBACK_BEGIN
-  VmoCleaner cleaner(*vnode_);
-  // Fetches |size| of dirty pages from the fifo list.
-  // |size| can be overestimated as many as pages newly dirtied after |cleaner|, and
-  // kernel can unnecessarily keep the pages dirty though they are actually flushed
-  // already. At the moment, such dirty pages get reclaimed at the next flush time or in
-  // VnodeF2fs::RecycleNode().
+  VmoCleaner cleaner(operation.bSync, *vnode_);
+  // Fetche |size| of dirty pages from the fifo list.
+  // TODO(https://fxbug.dev/122292):
+  // |size| of pages can include ones newly dirtied after ZX_PAGER_OP_WRITEBACK_BEGIN of |cleaner|.
+  // In this case, kernel unnecessarily keeps the pages dirty after ZX_PAGER_OP_WRITEBACK_END of
+  // |cleaner| though they are actually flushed already. Such dirty pages get cleaned at the next
+  // flush time or in VnodeF2fs::RecycleNode().
   size_t merged_blocks = 0;
   size_t size = vnode_->GetDirtyPageList().Size();
   size_t nwritten = size;
-  bool flush = false;
   while (size) {
-    flush = false;
+    bool flush = false;
     auto num_pages = std::min(size, static_cast<uint64_t>(kDefaultBlocksPerSegment / 4));
     auto pages = vnode_->GetDirtyPageList().TakePages(num_pages);
     merged_blocks += pages.size();

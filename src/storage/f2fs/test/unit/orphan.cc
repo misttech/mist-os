@@ -80,7 +80,7 @@ TEST(OrphanInode, RecoverOrphanInode) {
 
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
-  // 4. Remount and recover orphan inodes
+  // 4. Remount and purge orphan inodes
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
   ASSERT_EQ(fs->GetSuperblockInfo().GetVnodeSetSize(InoType::kOrphanIno), static_cast<uint64_t>(0));

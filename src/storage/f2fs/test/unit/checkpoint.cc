@@ -470,7 +470,7 @@ TEST_F(CheckpointTest, RemoveOrphanInode) {
   DoCheckpoints(check_remove_orphan_inode, kCheckpointLoopCnt);
 }
 
-TEST_F(CheckpointTest, RecoverOrphanInode) {
+TEST_F(CheckpointTest, PurgeOrphanInode) {
   CheckpointCallback check_recover_orphan_inode = [this](uint32_t expect_cp_position,
                                                          uint32_t expect_cp_ver, bool after_mkfs) {
     LockedPage cp_page;
@@ -501,13 +501,13 @@ TEST_F(CheckpointTest, RecoverOrphanInode) {
           return ZX_OK;
         };
         DeviceTester::SetHook(fs_.get(), hook);
-        ASSERT_EQ(fs_->RecoverOrphanInodes(), ZX_ERR_PEER_CLOSED);
+        ASSERT_EQ(fs_->PurgeOrphanInodes(), ZX_ERR_PEER_CLOSED);
         ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
         DeviceTester::SetHook(fs_.get(), nullptr);
         superblock_info.ClearCpFlags(CpFlag::kCpErrorFlag);
       }
-      ASSERT_EQ(fs_->RecoverOrphanInodes(), 0);
+      ASSERT_EQ(fs_->PurgeOrphanInodes(), 0);
 
       for (auto &vnode_refptr : vnodes) {
         ASSERT_EQ(vnode_refptr.get()->GetNlink(), (uint32_t)0);
@@ -535,6 +535,7 @@ TEST_F(CheckpointTest, RecoverOrphanInode) {
       VnodeF2fs *vnode = nullptr;
 
       VnodeF2fs::Allocate(fs_.get(), ino, S_IFREG, &vnode_refptr);
+      vnode_refptr->InitFileCache();
       ASSERT_NE(vnode = vnode_refptr.get(), nullptr);
 
       vnode->ClearNlink();

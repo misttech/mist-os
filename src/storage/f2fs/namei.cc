@@ -32,7 +32,6 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
     vnode->SetGid(getgid());
   }
 
-  vnode->SetSize(0);
   vnode->InitNlink();
   vnode->InitBlocks();
 

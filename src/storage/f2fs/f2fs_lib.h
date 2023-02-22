@@ -166,11 +166,11 @@ template <typename T = uint8_t>
 class FsBlock {
  public:
   FsBlock() { memset(data_, 0, kBlockSize); }
-  FsBlock(uint8_t (&block)[kBlockSize]) { memcpy(data_, block, kBlockSize); }
+  FsBlock(uint8_t (&block)[kBlockSize]) { std::memcpy(data_, block, kBlockSize); }
   FsBlock(const FsBlock &block) = delete;
   FsBlock &operator=(const FsBlock &block) = delete;
   FsBlock &operator=(const uint8_t (&block)[kBlockSize]) {
-    memcpy(data_, block, kBlockSize);
+    std::memcpy(data_, block, kBlockSize);
     return *this;
   }
   template <typename U = void>

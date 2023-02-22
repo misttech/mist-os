@@ -140,13 +140,13 @@ DirEntry *Dir::FindInLevel(unsigned int level, std::string_view name, f2fs_hash_
   end_block = bidx + nblock;
 
   for (; bidx < end_block; ++bidx) {
-    LockedPage dentry_page;
     // no need to allocate new dentry pages to all the indices
-    if (FindDataPage(bidx, &dentry_page) != ZX_OK) {
+    auto dentry_page_or = FindDataPage(bidx);
+    if (dentry_page_or.is_error()) {
       room = true;
       continue;
     }
-    if (de = FindInBlock(dentry_page.release(), name, &max_slots, namehash, res_page);
+    if (de = FindInBlock(dentry_page_or.value().release(), name, &max_slots, namehash, res_page);
         de != nullptr) {
       break;
     }
@@ -207,14 +207,15 @@ DirEntry *Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
       return FindInInlineDir(name, res_page);
     }
 
-    LockedPage dentry_page;
-    if (FindDataPage(*cache_page_index, &dentry_page) != ZX_OK) {
+    auto dentry_page_or = FindDataPage(*cache_page_index);
+    if (dentry_page_or.is_error()) {
       return nullptr;
     }
 
     uint64_t max_slots = 0;
     f2fs_hash_t name_hash = DentryHash(name);
-    if (DirEntry *de = FindInBlock(dentry_page.release(), name, &max_slots, name_hash, res_page);
+    if (DirEntry *de =
+            FindInBlock(dentry_page_or.value().release(), name, &max_slots, name_hash, res_page);
         de != nullptr) {
       return de;
     }
@@ -445,7 +446,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
           DirEntry *de = &dentry_blk->dentry[bit_pos];
           de->hash_code = CpuToLe(dentry_hash);
           de->name_len = CpuToLe(safemath::checked_cast<uint16_t>(namelen));
-          memcpy(dentry_blk->filename[bit_pos], name.data(), namelen);
+          std::memcpy(dentry_blk->filename[bit_pos], name.data(), namelen);
           de->ino = CpuToLe(vnode->Ino());
           SetDeType(de, vnode);
           for (int i = 0; i < slots; ++i) {
@@ -550,14 +551,14 @@ zx_status_t Dir::MakeEmpty(VnodeF2fs *vnode) {
   de->name_len = CpuToLe(static_cast<uint16_t>(1));
   de->hash_code = 0;
   de->ino = CpuToLe(vnode->Ino());
-  memcpy(dentry_blk->filename[0], ".", 1);
+  std::memcpy(dentry_blk->filename[0], ".", 1);
   SetDeType(de, vnode);
 
   de = &dentry_blk->dentry[1];
   de->hash_code = 0;
   de->name_len = CpuToLe(static_cast<uint16_t>(2));
   de->ino = CpuToLe(Ino());
-  memcpy(dentry_blk->filename[1], "..", 2);
+  std::memcpy(dentry_blk->filename[1], "..", 2);
   SetDeType(de, vnode);
 
   TestAndSetBit(0, dentry_blk->dentry_bitmap);
@@ -665,6 +666,12 @@ zx_status_t Dir::Readdir(fs::VdirCookie *cookie, void *dirents, size_t len, size
   *out_actual = df.BytesFilled();
 
   return ret;
+}
+
+void Dir::VmoRead(uint64_t offset, uint64_t length) {
+  ZX_ASSERT_MSG(0,
+                "Unexpected ZX_PAGER_VMO_READ request to dir node[%s:%u]. offset: %lu, size: %lu",
+                GetNameView().data(), GetKey(), offset, length);
 }
 
 }  // namespace f2fs

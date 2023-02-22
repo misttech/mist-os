@@ -190,14 +190,12 @@ TEST_F(GcManagerTest, PageColdData) {
 
   // Get old block address.
   auto old_blk_addr_or = file->FindDataBlkAddr(0);
-  ASSERT_EQ(old_blk_addr_or.is_error(), false);
+  ASSERT_EQ(old_blk_addr_or.is_ok(), true);
 
   {
-    auto result = file->WriteBegin(0, kPageSize);
-    ASSERT_TRUE(result.is_ok());
-    LockedPage page;
-    file->GrabCachePage(0, &page);
-    page.SetDirty();
+    auto pages_or = file->WriteBegin(0, kPageSize);
+    ASSERT_TRUE(pages_or.is_ok());
+    ASSERT_TRUE(pages_or->front()->IsDirty());
   }
   // If kPageColdData flag is not set, allocate its block as SSR or LFS.
   ASSERT_NE(file->Writeback(op), 0UL);
@@ -206,12 +204,10 @@ TEST_F(GcManagerTest, PageColdData) {
   ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
 
   {
-    auto result = file->WriteBegin(0, kPageSize);
-    ASSERT_TRUE(result.is_ok());
-    LockedPage page;
-    file->GrabCachePage(0, &page);
-    page.SetDirty();
-    page->SetColdData();
+    auto pages_or = file->WriteBegin(0, kPageSize);
+    ASSERT_TRUE(pages_or.is_ok());
+    ASSERT_TRUE(pages_or->front()->IsDirty());
+    pages_or->front()->SetColdData();
   }
   // If kPageColdData flag is set, allocate its block as LFS.
   CursegInfo *cold_curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegColdData);

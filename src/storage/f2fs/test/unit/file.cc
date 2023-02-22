@@ -201,6 +201,80 @@ TEST_F(FileTest, FileReadExceedFileSize) {
   test_file_vn = nullptr;
 }
 
+TEST_F(FileTest, Truncate) {
+  srand(testing::UnitTest::GetInstance()->random_seed());
+
+  fbl::RefPtr<fs::Vnode> test_file;
+  ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
+
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_file));
+  File *test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  constexpr uint32_t data_size = Page::Size() * 2;
+
+  char w_buf[data_size];
+  char r_buf[data_size * 2];
+  std::array<char, data_size> zero = {0};
+
+  for (size_t i = 0; i < data_size; ++i) {
+    w_buf[i] = static_cast<char>(rand() % 128);
+  }
+
+  size_t out;
+  ASSERT_EQ(test_file_ptr->Write(w_buf, data_size, 0, &out), ZX_OK);
+  ASSERT_EQ(test_file_ptr->GetSize(), out);
+
+  // Truncate to a smaller size, and verify its content and size.
+  size_t after = Page::Size() / 2;
+  ASSERT_EQ(test_file_ptr->Truncate(after), ZX_OK);
+  ASSERT_EQ(test_file_ptr->Read(r_buf, data_size, 0, &out), ZX_OK);
+  ASSERT_EQ(out, after);
+  ASSERT_EQ(test_file_ptr->GetSize(), out);
+  ASSERT_EQ(std::memcmp(r_buf, w_buf, after), 0);
+
+  {
+    // Check if its vmo is zeroed after |after|.
+    LockedPage page;
+    test_file_ptr->GrabCachePage(after / Page::Size(), &page);
+    page->Read(r_buf);
+    ASSERT_EQ(std::memcmp(r_buf, w_buf, after), 0);
+    ASSERT_EQ(std::memcmp(&r_buf[after], zero.data(), Page::Size() - after), 0);
+    ASSERT_TRUE(page->IsDirty());
+  }
+
+  ASSERT_EQ(test_file_ptr->Write(w_buf, data_size, 0, &out), ZX_OK);
+  ASSERT_EQ(test_file_ptr->GetSize(), out);
+
+  // Truncate to a large size, and verify its content and size.
+  after = data_size + Page::Size() / 2;
+  ASSERT_EQ(test_file_ptr->Truncate(after), ZX_OK);
+  ASSERT_EQ(test_file_ptr->Read(r_buf, after, 0, &out), ZX_OK);
+  ASSERT_EQ(out, after);
+  ASSERT_EQ(std::memcmp(r_buf, w_buf, data_size), 0);
+  ASSERT_EQ(std::memcmp(&r_buf[data_size], zero.data(), after - data_size), 0);
+
+  // Clear all dirty pages.
+  WritebackOperation op = {.bReleasePages = true};
+  test_file_ptr->Writeback(op);
+  op.bSync = true;
+  test_file_ptr->Writeback(op);
+
+  // Truncate to a smaller size, and check the page state and content.
+  after = Page::Size() / 2;
+  ASSERT_EQ(test_file_ptr->Truncate(after), ZX_OK);
+  {
+    LockedPage page;
+    test_file_ptr->GrabCachePage(after / Page::Size(), &page);
+    page->Read(r_buf);
+    ASSERT_EQ(std::memcmp(r_buf, w_buf, after), 0);
+    ASSERT_EQ(std::memcmp(&r_buf[after], zero.data(), Page::Size() - after), 0);
+    ASSERT_TRUE(page->IsDirty());
+  }
+
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+}
+
 TEST_F(FileTest, MixedSizeWrite) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 

@@ -38,8 +38,8 @@ uint32_t SegmentManager::GetValidBlocks(uint32_t segno, uint32_t section) {
 void SegmentManager::SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
-  memcpy(segment_entry.cur_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
-  memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  std::memcpy(segment_entry.cur_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  std::memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
   segment_entry.type = GetSitType(raw_sit);
   segment_entry.mtime = LeToCpu(uint64_t{raw_sit.mtime});
 }
@@ -48,8 +48,8 @@ void SegmentManager::SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_
   uint16_t raw_vblocks =
       static_cast<uint16_t>(segment_entry.type << kSitVblocksShift) | segment_entry.valid_blocks;
   raw_sit.vblocks = CpuToLe(raw_vblocks);
-  memcpy(raw_sit.valid_map, segment_entry.cur_valid_map.get(), kSitVBlockMapSize);
-  memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  std::memcpy(raw_sit.valid_map, segment_entry.cur_valid_map.get(), kSitVBlockMapSize);
+  std::memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
   segment_entry.ckpt_valid_blocks = segment_entry.valid_blocks;
   raw_sit.mtime = CpuToLe(static_cast<uint64_t>(segment_entry.mtime));
 }
@@ -115,7 +115,7 @@ void SegmentManager::SetTestAndInuse(uint32_t segno) {
 }
 
 void SegmentManager::GetSitBitmap(void *dst_addr) {
-  memcpy(dst_addr, sit_info_->sit_bitmap.get(), sit_info_->bitmap_size);
+  std::memcpy(dst_addr, sit_info_->sit_bitmap.get(), sit_info_->bitmap_size);
 }
 
 block_t SegmentManager::FreeSegments() {
@@ -568,7 +568,7 @@ void SegmentManager::GetSumPage(uint32_t segno, LockedPage *out) {
 void SegmentManager::WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr) {
   LockedPage page;
   fs_->GrabMetaPage(blk_addr, &page);
-  memcpy(page->GetAddress(), sum_blk, kPageSize);
+  page->Write(sum_blk);
   page.SetDirty();
 }
 
@@ -743,7 +743,6 @@ void SegmentManager::RefreshNextBlkoff(CursegInfo *seg) {
 void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
   CursegInfo *curseg = CURSEG_I(type);
   uint32_t new_segno = curseg->next_segno;
-  SummaryBlock *sum_node;
 
   WriteSumPage(&curseg->sum_blk, GetSumBlock(curseg->segno));
   SetTestAndInuse(new_segno);
@@ -761,8 +760,7 @@ void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
   if (reuse) {
     LockedPage sum_page;
     GetSumPage(new_segno, &sum_page);
-    sum_node = sum_page->GetAddress<SummaryBlock>();
-    memcpy(curseg->sum_blk.get(), sum_node, kSumEntrySize);
+    sum_page->Read(curseg->sum_blk.get(), 0, kSumEntrySize);
   }
 }
 
@@ -1015,8 +1013,6 @@ void SegmentManager::RecoverDataPage(Summary &sum, block_t old_blkaddr, block_t 
 
 zx_status_t SegmentManager::ReadCompactedSummaries() {
   Checkpoint &ckpt = superblock_info_->GetCheckpoint();
-  CursegInfo *seg_i;
-  uint8_t *kaddr;
   LockedPage page;
   block_t start;
   int offset;
@@ -1026,15 +1022,14 @@ zx_status_t SegmentManager::ReadCompactedSummaries() {
   if (zx_status_t ret = fs_->GetMetaPage(start++, &page); ret != ZX_OK) {
     return ret;
   }
-  kaddr = page->GetAddress<uint8_t>();
 
   // Step 1: restore nat cache
-  seg_i = CURSEG_I(CursegType::kCursegHotData);
-  memcpy(&seg_i->sum_blk->n_nats, kaddr, kSumJournalSize);
+  CursegInfo *seg_i = CURSEG_I(CursegType::kCursegHotData);
+  page->Read(&seg_i->sum_blk->n_nats, 0, kSumJournalSize);
 
   // Step 2: restore sit cache
   seg_i = CURSEG_I(CursegType::kCursegColdData);
-  memcpy(&seg_i->sum_blk->n_sits, kaddr + kSumJournalSize, kSumJournalSize);
+  page->Read(&seg_i->sum_blk->n_sits, kSumJournalSize, kSumJournalSize);
   offset = 2 * kSumJournalSize;
 
   // Step 3: restore summary entries
@@ -1055,18 +1050,15 @@ zx_status_t SegmentManager::ReadCompactedSummaries() {
       blk_off = static_cast<uint16_t>(superblock_info_->GetBlocksPerSeg());
 
     for (int j = 0; j < blk_off; ++j) {
-      Summary *s = reinterpret_cast<Summary *>(kaddr + offset);
-      seg_i->sum_blk->entries[j] = *s;
+      page->Read(&seg_i->sum_blk->entries[j], offset, kSummarySize);
       offset += kSummarySize;
-      if (offset + kSummarySize <= kPageSize - kSumFooterSize)
+      if (offset + kSummarySize <= kPageSize - kSumFooterSize) {
         continue;
-
-      page.reset();
+      }
 
       if (zx_status_t ret = fs_->GetMetaPage(start++, &page); ret != ZX_OK) {
         return ret;
       }
-      kaddr = page->GetAddress<uint8_t>();
       offset = 0;
     }
   }
@@ -1122,7 +1114,7 @@ zx_status_t SegmentManager::ReadNormalSummaries(int type) {
   curseg = CURSEG_I(static_cast<CursegType>(type));
   {
     std::lock_guard curseg_lock(curseg->curseg_mutex);
-    memcpy(curseg->sum_blk.get(), sum, kPageSize);
+    new_page->Read(curseg->sum_blk.get());
     curseg->next_segno = segno;
     ResetCurseg(static_cast<CursegType>(type), 0);
     curseg->alloc_type = ckpt.alloc_type[type];
@@ -1150,21 +1142,17 @@ zx_status_t SegmentManager::RestoreCursegSummaries() {
 
 void SegmentManager::WriteCompactedSummaries(block_t blkaddr) {
   LockedPage page;
-  Summary *summary;
-  CursegInfo *seg_i;
-  int written_size = 0;
-
   fs_->GrabMetaPage(blkaddr++, &page);
-  uint8_t *vaddr = page->GetAddress<uint8_t>();
 
+  size_t written_size = 0;
   // Step 1: write nat cache
-  seg_i = CURSEG_I(CursegType::kCursegHotData);
-  memcpy(vaddr, &seg_i->sum_blk->n_nats, kSumJournalSize);
+  CursegInfo *seg_i = CURSEG_I(CursegType::kCursegHotData);
+  page->Write(&seg_i->sum_blk->n_nats, 0, kSumJournalSize);
   written_size += kSumJournalSize;
 
   // Step 2: write sit cache
   seg_i = CURSEG_I(CursegType::kCursegColdData);
-  memcpy(vaddr + written_size, &seg_i->sum_blk->n_sits, kSumJournalSize);
+  page->Write(&seg_i->sum_blk->n_sits, written_size, kSumJournalSize);
   written_size += kSumJournalSize;
 
   page.SetDirty();
@@ -1183,16 +1171,15 @@ void SegmentManager::WriteCompactedSummaries(block_t blkaddr) {
     for (int j = 0; j < blkoff; ++j) {
       if (!page) {
         fs_->GrabMetaPage(blkaddr++, &page);
-        vaddr = page->GetAddress<uint8_t>();
         written_size = 0;
         page.SetDirty();
       }
-      summary = reinterpret_cast<Summary *>(vaddr + written_size);
-      *summary = seg_i->sum_blk->entries[j];
+      page->Write(&seg_i->sum_blk->entries[j], written_size, kSummarySize);
       written_size += kSummarySize;
 
-      if (written_size + kSummarySize <= kPageSize - kSumFooterSize)
+      if (written_size + kSummarySize <= kPageSize - kSumFooterSize) {
         continue;
+      }
 
       page.reset();
     }
@@ -1279,7 +1266,7 @@ zx::result<LockedPage> SegmentManager::GetNextSitPage(uint32_t start) {
   fs_->GrabMetaPage(dst_off, &dst_page);
   ZX_ASSERT(!src_page->IsDirty());
 
-  memcpy(dst_page->GetAddress(), src_page->GetAddress(), kPageSize);
+  dst_page->Write(src_page->GetAddress());
 
   dst_page.SetDirty();
 
@@ -1416,7 +1403,7 @@ zx_status_t SegmentManager::BuildSitInfo() {
   src_bitmap = static_cast<uint8_t *>(superblock_info_->BitmapPtr(MetaBitmap::kSitBitmap));
 
   sit_i->sit_bitmap = std::make_unique<uint8_t[]>(bitmap_size);
-  memcpy(sit_i->sit_bitmap.get(), src_bitmap, bitmap_size);
+  std::memcpy(sit_i->sit_bitmap.get(), src_bitmap, bitmap_size);
 
 #if 0  // porting needed
   /* init SIT information */

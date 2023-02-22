@@ -66,8 +66,8 @@ zx::result<nid_t> NodeManager::GetNextFreeNid() {
 }
 
 void NodeManager::GetNatBitmap(void *out) {
-  memcpy(out, nat_bitmap_.get(), nat_bitmap_size_);
-  memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
+  std::memcpy(out, nat_bitmap_.get(), nat_bitmap_size_);
+  std::memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
 }
 
 pgoff_t NodeManager::CurrentNatAddr(nid_t start) {
@@ -161,7 +161,7 @@ zx::result<LockedPage> NodeManager::GetNextNatPage(nid_t nid) {
   LockedPage dst_page;
   fs_->GrabMetaPage(dst_off, &dst_page);
 
-  std::memcpy(dst_page->GetAddress(), src_page->GetAddress(), Page::Size());
+  dst_page->Write(src_page->GetAddress());
   dst_page.SetDirty();
 
   SetToNextNat(nid);
@@ -1203,7 +1203,8 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
   src = page.GetAddress<Node>();
   dst = ipage->GetAddress<Node>();
 
-  memcpy(dst, src, reinterpret_cast<uint64_t>(&src->i.i_ext) - reinterpret_cast<uint64_t>(&src->i));
+  std::memcpy(dst, src,
+              reinterpret_cast<uint64_t>(&src->i.i_ext) - reinterpret_cast<uint64_t>(&src->i));
   dst->i.i_size = 0;
   dst->i.i_blocks = 1;
   dst->i.i_links = 1;
@@ -1407,8 +1408,8 @@ zx_status_t NodeManager::InitNodeManager() {
     return ZX_ERR_INVALID_ARGS;
 
   // copy version bitmap
-  memcpy(nat_bitmap_.get(), version_bitmap, nat_bitmap_size_);
-  memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
+  std::memcpy(nat_bitmap_.get(), version_bitmap, nat_bitmap_size_);
+  std::memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
   return ZX_OK;
 }
 

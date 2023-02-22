@@ -189,8 +189,8 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
-  vnode->UnlockNewInode();
   vnode->InitFileCache();
+  vnode->UnlockNewInode();
   fs->InsertVnode(vnode.get());
   vnode->MarkInodeDirty();
 }
@@ -261,15 +261,14 @@ void FileTester::CheckChildrenInBlock(Dir *vn, uint64_t bidx,
     childs.insert("..");
   }
 
-  LockedPage page;
-
   if (childs.empty()) {
-    ASSERT_EQ(vn->FindDataPage(bidx, &page), ZX_ERR_NOT_FOUND);
+    ASSERT_EQ(vn->FindDataPage(bidx).status_value(), ZX_ERR_NOT_FOUND);
     return;
   }
 
-  ASSERT_EQ(vn->FindDataPage(bidx, &page), ZX_OK);
-  DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
+  auto page_or = vn->FindDataPage(bidx);
+  ZX_ASSERT(page_or.is_ok());
+  DentryBlock *dentry_blk = page_or->GetAddress<DentryBlock>();
 
   uint32_t bit_pos = FindNextBit(dentry_blk->dentry_bitmap, kNrDentryInBlock, 0);
   while (bit_pos < kNrDentryInBlock) {

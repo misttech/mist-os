@@ -385,7 +385,7 @@ zx_status_t F2fs::FillSuper() {
   }
 
   // if there are nt orphan nodes free them
-  if (err = RecoverOrphanInodes(); err != ZX_OK) {
+  if (err = PurgeOrphanInodes(); err != ZX_OK) {
     return err;
   }
 

@@ -95,6 +95,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) final {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  void VmoRead(uint64_t offset, uint64_t length) final;
 
  private:
   // helper

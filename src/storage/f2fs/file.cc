@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <zircon/syscalls-next.h>
+
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
@@ -294,6 +296,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 #endif
 
 zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_actual) {
+  // MUST NOT enable this path except for unit tests.
   TRACE_DURATION("f2fs", "File::Read", "event", "File::Read", "ino", Ino(), "offset",
                  offset / kBlockSize, "length", length / kBlockSize);
 
@@ -315,10 +318,9 @@ zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_act
 
   for (size_t node = vmo_node_start; node < vmo_node_end && num_bytes; ++node) {
     VmoHolder vmo_node(vmo_manager(), kBlocksPerVmoNode * node);
-    uint8_t *const addr = static_cast<uint8_t *>(vmo_node.GetAddress());
     size_t num_bytes_in_node = safemath::CheckSub<size_t>(kVmoNodeSize, src_offset).ValueOrDie();
     num_bytes_in_node = std::min(num_bytes_in_node, num_bytes);
-    std::memcpy(static_cast<uint8_t *>(data) + dst_offset, &addr[src_offset], num_bytes_in_node);
+    vmo_node.Read(static_cast<uint8_t *>(data) + dst_offset, src_offset, num_bytes_in_node);
 
     dst_offset += num_bytes_in_node;
     num_bytes -= num_bytes_in_node;
@@ -331,6 +333,7 @@ zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_act
 }
 
 zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *out_actual) {
+  // MUST NOT enable this path except for unit tests.
   if (len == 0) {
     return ZX_OK;
   }
@@ -343,13 +346,24 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     if (offset + len < MaxInlineData()) {
       return WriteInline(data, len, offset, out_actual);
     }
-
     ConvertInlineData();
   }
 
-  fs()->GetSegmentManager().BalanceFs();
-  if (auto status = WriteBegin(offset, len); status.is_error()) {
-    return status.error_value();
+  // We need to check if there is enough space here as there is no way to get ZX_ERR_NO_SPACE from
+  // File::VmoDirty().
+  {
+    std::lock_guard lock(mutex_);
+    block_t num_blocks =
+        CheckedDivRoundUp(static_cast<block_t>(len), static_cast<block_t>(Page::Size()));
+    if (zx_status_t ret = fs()->IncValidBlockCount(this, num_blocks); ret != ZX_OK) {
+      return ret;
+    }
+    fs()->DecValidBlockCount(this, num_blocks);
+  }
+
+  // Set the size to adjust the vmo and content sizes, and then we can access the range in the vmo.
+  if (offset + len > GetSize()) {
+    SetSize(offset + len);
   }
 
   size_t num_bytes = len;
@@ -361,26 +375,13 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
 
   for (size_t node = vmo_node_start; node < vmo_node_end && num_bytes; ++node) {
     VmoHolder vmo_node(vmo_manager(), kBlocksPerVmoNode * node);
-    uint8_t *const addr = static_cast<uint8_t *>(vmo_node.GetAddress());
     size_t num_bytes_in_node = safemath::CheckSub<size_t>(kVmoNodeSize, dst_offset).ValueOrDie();
     num_bytes_in_node = std::min(num_bytes_in_node, num_bytes);
-    std::memcpy(&addr[dst_offset], static_cast<const uint8_t *>(data) + src_offset,
-                num_bytes_in_node);
+    vmo_node.Write(static_cast<const uint8_t *>(data) + src_offset, dst_offset, num_bytes_in_node);
 
     src_offset += num_bytes_in_node;
     num_bytes -= num_bytes_in_node;
     dst_offset = 0;
-  }
-
-  if (src_offset > 0) {
-    if (offset + src_offset > GetSize()) {
-      SetSize(offset + src_offset);
-    }
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-    SetCTime(cur_time);
-    SetMTime(cur_time);
-    MarkInodeDirty(true);
   }
 
   *out_actual = src_offset;
@@ -419,8 +420,9 @@ zx_status_t File::Truncate(size_t len) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (len == GetSize())
+  if (len == GetSize()) {
     return ZX_OK;
+  }
 
   if (len > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))
     return ZX_ERR_INVALID_ARGS;
@@ -468,19 +470,42 @@ zx_status_t File::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
 }
 
 void File::VmoDirty(uint64_t offset, uint64_t length) {
-  // If kInlineData is set, it means that ConvertInlineData() is handling block allocation and
-  // migrating inline data to the block at |offset|. Just make this range dirty.
-  if (!TestFlag(InodeInfoFlag::kInlineData) && !TestFlag(InodeInfoFlag::kNoAlloc)) {
-    // File::DoWrite() has already allocated its block. When F2fs supports zx::stream, every block
-    // will be allocated here.
-    if (auto status = WriteBegin(offset, length, true); status.is_error()) {
-      FX_LOGS(WARNING) << "failed to reserve blocks at " << offset << " + " << length << ", "
-                       << status.status_string();
-      fs::SharedLock rlock(mutex_);
-      return ReportPagerError(offset, length, status.status_value());
-    }
+  if (unlikely(offset + length > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))) {
+    return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, ZX_ERR_BAD_STATE);
   }
+  if (unlikely(TestFlag(InodeInfoFlag::kNoAlloc) || TestFlag(InodeInfoFlag::kInlineData))) {
+    return VnodeF2fs::VmoDirty(offset, length);
+  }
+
+  fs()->GetSegmentManager().BalanceFs();
+  auto pages_or = WriteBegin(offset, length);
+  if (unlikely(pages_or.is_error())) {
+    return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, pages_or.error_value());
+  }
+  timespec cur_time;
+  clock_gettime(CLOCK_REALTIME, &cur_time);
+  SetCTime(cur_time);
+  SetMTime(cur_time);
+  MarkInodeDirty(true);
   return VnodeF2fs::VmoDirty(offset, length);
 }
+
+void File::VmoRead(uint64_t offset, uint64_t length) {
+  ZX_DEBUG_ASSERT(kBlockSize == PAGE_SIZE);
+  ZX_DEBUG_ASSERT(offset % kBlockSize == 0);
+  ZX_DEBUG_ASSERT(length);
+  ZX_DEBUG_ASSERT(length % kBlockSize == 0);
+  return VnodeF2fs::VmoRead(offset, length);
+}
+
+zx_status_t File::CreateStream(uint32_t stream_options, zx::stream *out_stream) {
+  if (TestFlag(InodeInfoFlag::kInlineData)) {
+    ConvertInlineData();
+  }
+  fs::SharedLock lock(mutex_);
+  return zx::stream::create(stream_options, paged_vmo(), 0u, out_stream);
+}
+
+bool File::SupportsClientSideStreams() { return true; }
 
 }  // namespace f2fs

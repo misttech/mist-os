@@ -95,9 +95,10 @@ class Page : public PageRefCounted<Page>,
 
   template <typename U = void>
   U *GetAddress() const {
-    auto address_or = GetVmoManager().GetAddress(index_);
-    ZX_DEBUG_ASSERT(address_or.is_ok());
-    return reinterpret_cast<U *>(*address_or);
+    if (auto address_or = GetVmoManager().GetAddress(index_); address_or.is_ok()) {
+      return reinterpret_cast<U *>(*address_or);
+    }
+    return nullptr;
   }
 
   bool IsUptodate() const { return TestFlag(PageFlag::kPageUptodate); }
@@ -162,6 +163,9 @@ class Page : public PageRefCounted<Page>,
   bool InListContainer() const {
     return fbl::DoublyLinkedListable<fbl::RefPtr<Page>>::InContainer();
   }
+
+  zx_status_t Read(void *data, uint64_t offset = 0, size_t len = Size());
+  zx_status_t Write(const void *data, uint64_t offset = 0, size_t len = Size());
 
   F2fs *fs() const;
 
@@ -264,11 +268,7 @@ class LockedPage final {
   // Call Page::SetDirty().
   // If |add_to_list| is true, it is inserted into F2fs::dirty_data_page_list_.
   bool SetDirty(bool add_to_list = true);
-  void Zero(size_t start = 0, size_t end = Page::Size()) const {
-    if (start < end && end <= Page::Size()) {
-      std::memset(page_->GetAddress<uint8_t>() + start, 0, end - start);
-    }
-  }
+  void Zero(size_t start = 0, size_t end = Page::Size()) const;
 
   // release() returns the unlocked page without changing its ref_count.
   // After release() is called, the LockedPage instance no longer has the ownership of the Page.
@@ -299,6 +299,7 @@ class LockedPage final {
   bool operator!=(decltype(nullptr)) const { return (page_ != nullptr); }
 
  private:
+  static constexpr std::array<uint8_t, Page::Size()> kZeroBuffer_ = {0};
   fbl::RefPtr<Page> page_ = nullptr;
 };
 
@@ -375,7 +376,7 @@ class FileCache {
   VnodeF2fs &GetVnode() const { return *vnode_; }
   // Only Page::RecyclePage() is allowed to call it.
   void Downgrade(Page *raw_page) __TA_EXCLUDES(tree_lock_);
-  bool IsOrphan() { return is_orphan_.test(std::memory_order_relaxed); }
+  bool IsOrphan() const { return is_orphan_.test(std::memory_order_relaxed); }
   bool SetOrphan() { return is_orphan_.test_and_set(std::memory_order_relaxed); }
   // Check if |max_scan| pages keep active before |index|. If so, it returns a bitmap indicating
   // which block needs to be read from |index|.

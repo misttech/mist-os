@@ -57,29 +57,22 @@ zx_status_t VnodeF2fs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol
 
 zx_status_t VnodeF2fs::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
   std::lock_guard lock(mutex_);
-  auto size_or = CreatePagedVmo();
+  auto size_or = CreatePagedVmo(GetSize());
   if (size_or.is_error()) {
     return size_or.error_value();
   }
   return ClonePagedVmo(flags, *size_or, out_vmo);
 }
 
-zx::result<size_t> VnodeF2fs::CreatePagedVmo() {
-  ZX_ASSERT(PAGE_SIZE == kBlockSize);
-  constexpr size_t granularity = PAGE_SIZE;
-  size_t rounded_size = fbl::round_up(GetSize(), granularity);
-  if (rounded_size == 0) {
-    rounded_size = granularity;
-  }
+zx::result<size_t> VnodeF2fs::CreatePagedVmo(size_t size) {
   if (!paged_vmo().is_valid()) {
-    // TODO: consider updating the content size of vmo.
-    if (auto status = EnsureCreatePagedVmo(rounded_size, ZX_VMO_RESIZABLE | ZX_VMO_TRAP_DIRTY);
+    if (auto status = EnsureCreatePagedVmo(size, ZX_VMO_RESIZABLE | ZX_VMO_TRAP_DIRTY);
         status.is_error()) {
       return status.take_error();
     }
     SetPagedVmoName();
   }
-  return zx::ok(rounded_size);
+  return zx::ok(size);
 }
 
 void VnodeF2fs::SetPagedVmoName() {
@@ -129,11 +122,6 @@ zx_status_t VnodeF2fs::ClonePagedVmo(fuchsia_io::wire::VmoFlags flags, size_t si
 }
 
 void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
-  ZX_DEBUG_ASSERT(kBlockSize == PAGE_SIZE);
-  ZX_DEBUG_ASSERT(offset % kBlockSize == 0);
-  ZX_DEBUG_ASSERT(length);
-  ZX_DEBUG_ASSERT(length % kBlockSize == 0);
-
   zx::vmo vmo;
   auto size_or = CreateAndPopulateVmo(vmo, offset, length);
   fs::SharedLock rlock(mutex_);
@@ -143,16 +131,14 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
     FX_LOGS(WARNING) << "A pager-backed VMO is already freed: " << ZX_ERR_NOT_FOUND;
     return;
   }
-
   if (unlikely(size_or.is_error())) {
-    FX_LOGS(ERROR) << "failed to popluate vmo at " << offset << " + " << length << ", "
-                   << size_or.status_string();
-    ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
-    return;
+    return ReportPagerErrorUnsafe(ZX_PAGER_VMO_READ, offset, length, size_or.error_value());
   }
-  if (auto ret = vmo_manager_->SupplyPages(*fs()->vfs(), offset, *size_or, std::move(vmo), 0);
+  std::optional vfs = this->vfs();
+  ZX_DEBUG_ASSERT(vfs.has_value());
+  if (auto ret = vfs.value().get().SupplyPages(paged_vmo(), offset, *size_or, std::move(vmo), 0);
       ret.is_error()) {
-    ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
+    ReportPagerErrorUnsafe(ZX_PAGER_VMO_READ, offset, length, ret.error_value());
   }
 }
 
@@ -163,21 +149,17 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
   size_t scan_blocks = 4UL;
   std::vector<bool> block_bitmap;
   size_t block_offset = offset / kBlockSize;
+  size_t file_size = GetSize();
 
-  if (TestFlag(InodeInfoFlag::kInlineData) || offset >= GetSize() ||
-      TestFlag(InodeInfoFlag::kNoAlloc)) {
+  if (TestFlag(InodeInfoFlag::kInlineData) || TestFlag(InodeInfoFlag::kNoAlloc) ||
+      offset >= file_size) {
     // Just supply pages without read I/Os for appended or inline area.
-    // |vmo_size| is set to kDefaultReadaheadSize by default
-    // unless supplying |*vmo_ro| exceeds the boundary of paged vmo node.
-    vmo_size =
-        std::min(fbl::round_up(offset + length, kBlockSize * kDefaultBlocksPerSegment) - offset,
-                 kBlockSize * kDefaultReadaheadSize);
+    vmo_size = fbl::round_up(length, kBlockSize);
   } else {
     block_bitmap = GetReadaheadPagesInfo(block_offset, scan_blocks);
     ZX_DEBUG_ASSERT(block_bitmap.size() >= length / kBlockSize);
     vmo_size =
-        std::min(fbl::round_up(offset + length, kBlockSize * kDefaultBlocksPerSegment) - offset,
-                 block_bitmap.size() * kBlockSize);
+        std::min(fbl::round_up(file_size, kBlockSize) - offset, block_bitmap.size() * kBlockSize);
   }
 
   // Create vmo to feed paged vmo.
@@ -219,12 +201,16 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
 }
 
 void VnodeF2fs::VmoDirty(uint64_t offset, uint64_t length) {
-  auto ret = vmo_manager().DirtyPages(*fs()->vfs(), offset, offset + length);
-  if (unlikely(ret.is_error())) {
-    FX_LOGS(WARNING) << "failed to do ZX_PAGER_OP_DIRTY from " << offset << " to "
-                     << offset + length << ". " << ret.status_string();
-    fs::SharedLock lock(mutex_);
-    ReportPagerError(offset, length, ret.status_value());
+  fs::SharedLock lock(mutex_);
+  std::optional vfs = this->vfs();
+  ZX_DEBUG_ASSERT(vfs.has_value());
+  auto ret = vfs.value().get().DirtyPages(paged_vmo(), offset, length);
+  if (ret.is_error()) {
+    // If someone has already dirtied or truncated these pages, do nothing.
+    if (ret.error_value() == ZX_ERR_NOT_FOUND) {
+      return;
+    }
+    ReportPagerErrorUnsafe(ZX_PAGER_OP_DIRTY, offset, length, ret.error_value());
   }
 }
 
@@ -234,13 +220,29 @@ void VnodeF2fs::OnNoPagedVmoClones() {
   ZX_DEBUG_ASSERT(!has_clones());
 }
 
-void VnodeF2fs::ReportPagerError(const uint64_t offset, const uint64_t length,
+void VnodeF2fs::ReportPagerError(const uint32_t op, const uint64_t offset, const uint64_t length,
                                  const zx_status_t err) {
+  fs::SharedLock lock(mutex_);
+  return ReportPagerErrorUnsafe(op, offset, length, err);
+}
+
+void VnodeF2fs::ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset,
+                                       const uint64_t length, const zx_status_t err) {
   std::optional vfs = this->vfs();
-  ZX_ASSERT(vfs.has_value());
-  if (auto result = vfs.value().get().ReportPagerError(paged_vmo(), offset, length, err);
+  ZX_DEBUG_ASSERT(vfs.has_value());
+  zx_status_t pager_err = err;
+  // Notifies the kernel that a page request for the given `range` has failed. Sent in response
+  // to a `ZX_PAGER_VMO_READ` or `ZX_PAGER_VMO_DIRTY` page request. See `ZX_PAGER_OP_FAIL` for
+  // more information.
+  if (err != ZX_ERR_IO && err != ZX_ERR_IO_DATA_INTEGRITY && err != ZX_ERR_BAD_STATE &&
+      err != ZX_ERR_NO_SPACE && err != ZX_ERR_BUFFER_TOO_SMALL) {
+    pager_err = ZX_ERR_BAD_STATE;
+  }
+  FX_LOGS(WARNING) << "Failed to handle a pager request(" << std::hex << op << "). "
+                   << zx_status_get_string(err);
+  if (auto result = vfs.value().get().ReportPagerError(paged_vmo(), offset, length, pager_err);
       result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to report pager error to kernel: " << result.status_string();
+    FX_LOGS(ERROR) << "Failed to report a pager error. " << result.status_string();
   }
 }
 
@@ -264,33 +266,61 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
     return ZX_ERR_NOT_FOUND;
   }
 
-  Inode &ri = node_page->GetAddress<Node>()->i;
+  Inode &inode = node_page->GetAddress<Node>()->i;
   fbl::RefPtr<VnodeF2fs> vnode;
-  if (auto status = Allocate(fs, ino, LeToCpu(ri.i_mode), &vnode); status != ZX_OK) {
+  if (zx_status_t status = Allocate(fs, ino, LeToCpu(inode.i_mode), &vnode); status != ZX_OK) {
     return status;
   }
 
-  vnode->SetUid(LeToCpu(ri.i_uid));
-  vnode->SetGid(LeToCpu(ri.i_gid));
-  vnode->SetNlink(LeToCpu(ri.i_links));
-  vnode->SetSize(LeToCpu(ri.i_size));
-  // Don't count the in-memory inode.i_blocks for compatibility with the generic filesystem
-  // including linux f2fs.
-  vnode->SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(ri.i_blocks), 1).ValueOrDie());
-  vnode->SetATime(LeToCpu(ri.i_atime), LeToCpu(ri.i_atime_nsec));
-  vnode->SetCTime(LeToCpu(ri.i_ctime), LeToCpu(ri.i_ctime_nsec));
-  vnode->SetMTime(LeToCpu(ri.i_mtime), LeToCpu(ri.i_mtime_nsec));
-  vnode->SetGeneration(LeToCpu(ri.i_generation));
-  vnode->SetParentNid(LeToCpu(ri.i_pino));
-  vnode->SetCurDirDepth(LeToCpu(ri.i_current_depth));
-  vnode->SetXattrNid(LeToCpu(ri.i_xattr_nid));
-  vnode->SetInodeFlags(LeToCpu(ri.i_flags));
-  vnode->SetDirLevel(ri.i_dir_level);
+  vnode->SetUid(LeToCpu(inode.i_uid));
+  vnode->SetGid(LeToCpu(inode.i_gid));
+  vnode->SetNlink(LeToCpu(inode.i_links));
+  // Don't count the in-memory inode.i_blocks for compatibility with the generic
+  // filesystem including linux f2fs.
+  vnode->SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(inode.i_blocks), 1).ValueOrDie());
+  vnode->SetATime(LeToCpu(inode.i_atime), LeToCpu(inode.i_atime_nsec));
+  vnode->SetCTime(LeToCpu(inode.i_ctime), LeToCpu(inode.i_ctime_nsec));
+  vnode->SetMTime(LeToCpu(inode.i_mtime), LeToCpu(inode.i_mtime_nsec));
+  vnode->SetGeneration(LeToCpu(inode.i_generation));
+  vnode->SetParentNid(LeToCpu(inode.i_pino));
+  vnode->SetCurDirDepth(LeToCpu(inode.i_current_depth));
+  vnode->SetXattrNid(LeToCpu(inode.i_xattr_nid));
+  vnode->SetInodeFlags(LeToCpu(inode.i_flags));
+  vnode->SetDirLevel(inode.i_dir_level);
   vnode->UpdateVersion(LeToCpu(fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver) - 1);
-  vnode->SetAdvise(ri.i_advise);
-  vnode->GetExtentInfo(ri.i_ext);
-  std::string_view name(reinterpret_cast<char *>(ri.i_name), std::min(kMaxNameLen, ri.i_namelen));
-  if (ri.i_namelen != name.length() ||
+  vnode->SetAdvise(inode.i_advise);
+  vnode->GetExtentInfo(inode.i_ext);
+
+  if (inode.i_inline & kInlineDentry) {
+    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
+    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
+  }
+  if (inode.i_inline & kInlineData) {
+    vnode->SetFlag(InodeInfoFlag::kInlineData);
+  }
+  if (inode.i_inline & kInlineXattr) {
+    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
+    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
+  }
+  if (inode.i_inline & kExtraAttr) {
+    vnode->SetExtraISize(LeToCpu(inode.i_extra_isize));
+    if (inode.i_inline & kInlineXattr) {
+      vnode->SetInlineXattrAddrs(LeToCpu(inode.i_inline_xattr_size));
+    }
+  }
+  if (inode.i_inline & kDataExist) {
+    vnode->SetFlag(InodeInfoFlag::kDataExist);
+  }
+
+  // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
+  // block later.
+  if (!fs->GetSuperblockInfo().IsOnRecovery() || !vnode->GetNlink()) {
+    vnode->InitFileCache(LeToCpu(inode.i_size));
+  }
+
+  std::string_view name(reinterpret_cast<char *>(inode.i_name),
+                        std::min(kMaxNameLen, inode.i_namelen));
+  if (inode.i_namelen != name.length() ||
       (ino != fs->GetSuperblockInfo().GetRootIno() && !fs::IsValidName(name))) {
     // TODO: Need to repair the file or set NeedFsck flag when fsck supports repair feature.
     // For now, we set kBad and clear link, so that it can be deleted without purging.
@@ -298,30 +328,7 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
     vnode->SetFlag(InodeInfoFlag::kBad);
     return ZX_ERR_NOT_FOUND;
   }
-
   vnode->SetName(name);
-  vnode->InitFileCache();
-
-  if (ri.i_inline & kInlineDentry) {
-    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-  if (ri.i_inline & kInlineData) {
-    vnode->SetFlag(InodeInfoFlag::kInlineData);
-  }
-  if (ri.i_inline & kInlineXattr) {
-    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-  if (ri.i_inline & kExtraAttr) {
-    vnode->SetExtraISize(ri.i_extra_isize);
-    if (ri.i_inline & kInlineXattr) {
-      vnode->SetInlineXattrAddrs(ri.i_inline_xattr_size);
-    }
-  }
-  if (ri.i_inline & kDataExist) {
-    vnode->SetFlag(InodeInfoFlag::kDataExist);
-  }
 
   *out = std::move(vnode);
   return ZX_OK;
@@ -341,10 +348,6 @@ void VnodeF2fs::RecycleNode() {
                   GetNameView().data(), GetKey(), open_count());
   }
   if (GetNlink()) {
-    // Before freeing paged_vmo, ensure that all dirty pages are flushed.
-    file_cache_.reset();
-    vmo_manager_.reset();
-    ReleasePagedVmo();
     // f2fs removes the last reference of |this| from the dirty vnode list
     // when there is no dirty Page for the vnode at checkpoint time. So, it
     // should not happen except when disk IOs fail.
@@ -357,6 +360,7 @@ void VnodeF2fs::RecycleNode() {
                                ? "set."
                                : "not set.");
     }
+    file_cache_->Reset();
     fs()->GetVCache().Downgrade(this);
   } else {
     // If PagedVfs::Teardown() releases the refptr of orphan vnodes, purge it at the next
@@ -364,10 +368,9 @@ void VnodeF2fs::RecycleNode() {
     if (!fs()->IsTearDown()) {
       EvictVnode();
     }
-    file_cache_.reset();
-    vmo_manager_.reset();
-    ReleasePagedVmo();
     Deactivate();
+    file_cache_->Reset();
+    ReleasePagedVmo();
     delete this;
   }
 }
@@ -378,7 +381,7 @@ zx_status_t VnodeF2fs::GetAttributes(fs::VnodeAttributes *a) {
   fs::SharedLock rlock(info_mutex_);
   a->mode = mode_;
   a->inode = ino_;
-  a->content_size = size_;
+  a->content_size = GetSize();
   a->storage_size = GetBlockCount() * kBlockSize;
   a->link_count = nlink_;
   a->creation_time = zx_time_add_duration(ZX_SEC(ctime_.tv_sec), ctime_.tv_nsec);
@@ -466,40 +469,36 @@ struct f2fs_iget_args {
 #endif
 
 zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
-  fbl::RefPtr<VnodeF2fs> vnode_refptr;
-
-  if (fs->LookupVnode(ino, &vnode_refptr) == ZX_OK) {
-    vnode_refptr->WaitForInit();
-    *out = std::move(vnode_refptr);
+  fbl::RefPtr<VnodeF2fs> vnode;
+  if (fs->LookupVnode(ino, &vnode) == ZX_OK) {
+    vnode->WaitForInit();
+    *out = std::move(vnode);
     return ZX_OK;
   }
 
-  if (zx_status_t status = Create(fs, ino, &vnode_refptr); status != ZX_OK) {
+  if (zx_status_t status = Create(fs, ino, &vnode); status != ZX_OK) {
     return status;
   }
 
-  if (ino != fs->GetSuperblockInfo().GetNodeIno() && ino != fs->GetSuperblockInfo().GetMetaIno()) {
-    if (!fs->GetSuperblockInfo().IsOnRecovery() && vnode_refptr->GetNlink() == 0) {
-      vnode_refptr->SetFlag(InodeInfoFlag::kBad);
-      vnode_refptr.reset();
-      *out = nullptr;
-      return ZX_ERR_NOT_FOUND;
-    }
+  // VnodeCache should keep vnodes holding valid links except when purging orphans at mount time.
+  if (ino != fs->GetSuperblockInfo().GetNodeIno() && ino != fs->GetSuperblockInfo().GetMetaIno() &&
+      (!fs->GetSuperblockInfo().IsOnRecovery() && !vnode->GetNlink())) {
+    vnode->SetFlag(InodeInfoFlag::kBad);
+    return ZX_ERR_NOT_FOUND;
   }
 
-  if (zx_status_t status = fs->InsertVnode(vnode_refptr.get()); status != ZX_OK) {
-    vnode_refptr->SetFlag(InodeInfoFlag::kBad);
-    vnode_refptr.reset();
-    if (fs->LookupVnode(ino, &vnode_refptr) == ZX_OK) {
-      vnode_refptr->WaitForInit();
-      *out = std::move(vnode_refptr);
-      return ZX_OK;
-    }
+  if (zx_status_t status = fs->InsertVnode(vnode.get()); status != ZX_OK) {
+    ZX_ASSERT(status == ZX_ERR_ALREADY_EXISTS);
+    vnode->SetFlag(InodeInfoFlag::kBad);
+    vnode.reset();
+    ZX_ASSERT(fs->LookupVnode(ino, &vnode) == ZX_OK);
+    vnode->WaitForInit();
+    *out = std::move(vnode);
+    return ZX_OK;
   }
 
-  vnode_refptr->UnlockNewInode();
-  *out = std::move(vnode_refptr);
-
+  vnode->UnlockNewInode();
+  *out = std::move(vnode);
   return ZX_OK;
 }
 
@@ -597,6 +596,9 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
   zx_status_t ret;
 
   if (ret = TruncateBlocks(len); ret == ZX_OK) {
+    // SetSize() adjusts the size of its vmo or vmo content, and then the kernel guarantees
+    // that its vmo after |len| are zeroed. If necessary, it triggers VmoDirty() to let f2fs write
+    // changes to disk.
     SetSize(len);
     if (GetSize() == 0) {
       ClearFlag(InodeInfoFlag::kDataExist);
@@ -639,26 +641,6 @@ int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node
 
 void VnodeF2fs::TruncateDataBlocks(NodePage &node_page) {
   TruncateDataBlocksRange(node_page, 0, kAddrsPerBlock);
-}
-
-void VnodeF2fs::TruncatePartialDataPage(uint64_t from) {
-  const size_t offset_in_block = from % kBlockSize;
-  if (!offset_in_block || TestFlag(InodeInfoFlag::kNoAlloc)) {
-    return;
-  }
-
-  // Get page and zero the buffer after |from|.
-  const pgoff_t block_index = safemath::CheckDiv(from, kBlockSize).ValueOrDie();
-  LockedPage page;
-  if (FindDataPage(block_index, &page) == ZX_OK) {
-    page->WaitOnWriteback();
-    if (auto dirty_or = page.SetVmoDirty(); dirty_or.is_error()) {
-      VmoRead(safemath::CheckMul(page->GetKey(), kBlockSize).ValueOrDie(), kBlockSize);
-      ZX_ASSERT(page.SetVmoDirty().is_ok());
-    }
-    page.Zero(offset_in_block, kPageSize);
-    page.SetDirty();
-  }
 }
 
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
@@ -707,8 +689,6 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
     return err;
   }
 
-  // lastly zero out the first data page
-  TruncatePartialDataPage(from);
   return ZX_OK;
 }
 
@@ -788,22 +768,32 @@ void VnodeF2fs::EvictVnode() {
   }
   fs()->EvictVnode(this);
 }
-void VnodeF2fs::InitFileCache() {
+
+void VnodeF2fs::InitFileCache(uint64_t nbytes) {
+  zx::vmo vmo;
+  VmoMode mode;
+  size_t vmo_node_size = 0;
+
+  ZX_DEBUG_ASSERT(!file_cache_);
   if (IsReg()) {
     std::lock_guard lock(mutex_);
-    if (auto size_or = CreatePagedVmo(); size_or.is_ok()) {
+    if (auto size_or = CreatePagedVmo(nbytes); size_or.is_ok()) {
       zx_rights_t right = ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ |
                           ZX_RIGHT_WRITE | ZX_RIGHT_RESIZE;
-      zx::vmo vmo;
       ZX_ASSERT(paged_vmo().duplicate(right, &vmo) == ZX_OK);
-      vmo_manager_ =
-          std::make_unique<VmoManager>(VmoMode::kPaged, GetSize(), kVmoNodeSize, std::move(vmo));
+      mode = VmoMode::kPaged;
+      vmo_node_size = zx_system_get_page_size();
     }
   } else {
-    vmo_manager_ = std::make_unique<VmoManager>(VmoMode::kDiscardable, GetSize(), kVmoNodeSize);
+    mode = VmoMode::kDiscardable;
+    vmo_node_size = kVmoNodeSize;
   }
+  ZX_ASSERT(!(zx_system_get_page_size() % kBlockSize));
+  ZX_ASSERT(!(vmo_node_size % zx_system_get_page_size()));
+  vmo_manager_ = std::make_unique<VmoManager>(mode, nbytes, vmo_node_size, std::move(vmo));
   file_cache_ = std::make_unique<FileCache>(this, vmo_manager_.get());
 }
+
 void VnodeF2fs::Init() {
   SetCurDirDepth(1);
   SetFlag(InodeInfoFlag::kInit);
@@ -846,6 +836,16 @@ bool VnodeF2fs::NeedToCheckpoint() {
     return true;
   }
   return false;
+}
+
+void VnodeF2fs::SetSize(const size_t nbytes) {
+  ZX_ASSERT(vmo_manager_);
+  vmo_manager().SetContentSize(nbytes);
+}
+
+uint64_t VnodeF2fs::GetSize() const {
+  ZX_ASSERT(vmo_manager_);
+  return vmo_manager().GetContentSize();
 }
 
 zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
@@ -915,5 +915,21 @@ void VnodeF2fs::SetRawExtent(Extent &extent) {
   extent.blk_addr = CpuToLe(extent_cache_.blk_addr);
   extent.len = CpuToLe(extent_cache_.len);
 }
+
+void VnodeF2fs::Activate() { SetFlag(InodeInfoFlag::kActive); }
+
+void VnodeF2fs::Deactivate() {
+  if (IsActive()) {
+    ClearFlag(InodeInfoFlag::kActive);
+    flag_cvar_.notify_all();
+  }
+}
+void VnodeF2fs::WaitForDeactive(std::mutex &mutex) {
+  if (IsActive()) {
+    flag_cvar_.wait(mutex, [this]() { return !IsActive(); });
+  }
+}
+
+bool VnodeF2fs::IsActive() const { return TestFlag(InodeInfoFlag::kActive); }
 
 }  // namespace f2fs

@@ -22,8 +22,7 @@ F2fs::FsyncInodeEntry *F2fs::GetFsyncInode(FsyncInodeList &inode_list, nid_t ino
 }
 
 zx_status_t F2fs::RecoverDentry(NodePage &ipage, VnodeF2fs &vnode) {
-  Node *raw_node = ipage.GetAddress<Node>();
-  Inode *raw_inode = &(raw_node->i);
+  Inode &inode = ipage.GetAddress<Node>()->i;
   fbl::RefPtr<VnodeF2fs> dir_refptr;
   zx_status_t err = ZX_OK;
 
@@ -31,7 +30,7 @@ zx_status_t F2fs::RecoverDentry(NodePage &ipage, VnodeF2fs &vnode) {
     return ZX_OK;
   }
 
-  if (err = VnodeF2fs::Vget(this, LeToCpu(raw_inode->i_pino), &dir_refptr); err != ZX_OK) {
+  if (err = VnodeF2fs::Vget(this, LeToCpu(inode.i_pino), &dir_refptr); err != ZX_OK) {
     return err;
   }
 
@@ -43,10 +42,10 @@ zx_status_t F2fs::RecoverInode(VnodeF2fs &vnode, NodePage &node_page) {
   struct Inode *raw_inode = &(raw_node->i);
 
   vnode.SetMode(LeToCpu(raw_inode->i_mode));
-  vnode.SetSize(LeToCpu(raw_inode->i_size));
   vnode.SetATime(LeToCpu(raw_inode->i_atime), LeToCpu(raw_inode->i_atime_nsec));
   vnode.SetCTime(LeToCpu(raw_inode->i_ctime), LeToCpu(raw_inode->i_ctime_nsec));
   vnode.SetMTime(LeToCpu(raw_inode->i_mtime), LeToCpu(raw_inode->i_mtime_nsec));
+  vnode.InitFileCache(LeToCpu(raw_inode->i_size));
 
   return RecoverDentry(node_page, vnode);
 }
@@ -298,12 +297,11 @@ void F2fs::RecoverFsyncData() {
   FsyncInodeList inode_list;
 
   // Step #1: find fsynced inode numbers
+  superblock_info.SetOnRecovery();
   if (auto result = FindFsyncDnodes(inode_list); result == ZX_OK) {
     // Step #2: recover data
     if (!inode_list.is_empty()) {
-      superblock_info.SetOnRecovery();
       RecoverData(inode_list, CursegType::kCursegWarmNode);
-      superblock_info.ClearOnRecovery();
       ZX_DEBUG_ASSERT(inode_list.is_empty());
       GetMetaVnode().InvalidatePages(GetSegmentManager().GetMainAreaStartBlock());
       WriteCheckpoint(false, false);
@@ -312,6 +310,7 @@ void F2fs::RecoverFsyncData() {
   // TODO: Handle error cases
   GetMetaVnode().InvalidatePages(GetSegmentManager().GetMainAreaStartBlock());
   DestroyFsyncDnodes(inode_list);
+  superblock_info.ClearOnRecovery();
 }
 
 }  // namespace f2fs

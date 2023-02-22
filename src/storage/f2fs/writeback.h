@@ -33,6 +33,8 @@ class Writer final {
   // If |completion| is set, it notifies the caller when the task is completed.
   void ScheduleWriteBlocks(sync_completion_t *completion = nullptr, PageList pages = {},
                            bool flush = true);
+  // It schedules a writeback operation for I/Os or VMO_PAGER_OP_WRITEBACK_BEGIN/END.
+  void ScheduleTask(fpromise::promise<> task);
 
  private:
   // It returns a task to be scheduled on |executor_| for write IOs.
@@ -43,8 +45,6 @@ class Writer final {
   fpromise::promise<> GetTaskForWriteIO(sync_completion_t *completion);
   StorageOperations MakeStorageOperations(PageList &to_submit) __TA_EXCLUDES(mutex_);
 
-  // For disk write IO tasks.
-  void ScheduleTask(fpromise::promise<> task);
 
   std::mutex mutex_;
   PageList pages_ __TA_GUARDED(mutex_);

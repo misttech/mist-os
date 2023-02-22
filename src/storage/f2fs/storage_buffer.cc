@@ -42,7 +42,7 @@ zx::result<size_t> StorageBuffer::ReserveWriteOperation(Page &page) {
       .length = 1,
   };
   // Copy |page| to |buffer| at |key|.
-  std::memcpy(buffer_.Data(op.vmo_offset), page.GetAddress(), page.Size());
+  page.Read(buffer_.Data(op.vmo_offset));
   // Here, |operation| can be merged into a previous operation.
   builder_.Add(op, &buffer_);
   reserved_keys_.push_back(std::move(key));

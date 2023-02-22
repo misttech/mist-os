@@ -1150,10 +1150,12 @@ mod tests {
 
         // check against the snapshot FilesystemInfo
         let fs_info2 = serving.query().await.expect("failed to query filesystem info after write");
-        assert_eq!(
-            fs_info2.used_bytes - fs_info1.used_bytes,
-            fs_info2.block_size as u64 // assuming content < 4K
-        );
+        // With zx::stream, f2fs doesn't support the inline data feature allowing file
+        // inode blocks to include small data. This way requires keeping two copies of VMOs
+        // for the same inline data
+        // assuming content < 4K and its inode block.
+        let expected_size2 = fs_info2.block_size * 2;
+        assert_eq!(fs_info2.used_bytes - fs_info1.used_bytes, expected_size2 as u64);
 
         serving.shutdown().await.expect("failed to shutdown f2fs the first time");
         let serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
@@ -1173,10 +1175,9 @@ mod tests {
 
         // once more check against the snapshot FilesystemInfo
         let fs_info3 = serving.query().await.expect("failed to query filesystem info after read");
-        assert_eq!(
-            fs_info3.used_bytes - fs_info1.used_bytes,
-            fs_info3.block_size as u64 // assuming content < 4K
-        );
+        // assuming content < 4K and its inode block.
+        let expected_size3 = fs_info3.block_size * 2;
+        assert_eq!(fs_info3.used_bytes - fs_info1.used_bytes, expected_size3 as u64);
 
         serving.shutdown().await.expect("failed to shutdown f2fs the second time");
         f2fs.fsck().await.expect("failed to fsck f2fs after shutting down the second time");
