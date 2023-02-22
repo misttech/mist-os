@@ -25,7 +25,7 @@ use futures::StreamExt;
 use settings_storage::device_storage::DeviceStorageCompatible;
 use settings_storage::storage_factory::FidlStorageFactory;
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 const ENV_NAME: &str = "settings_service_setting_handler_test_environment";
@@ -139,13 +139,9 @@ async fn test_write_notify() {
     let (invocation_messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     let (_, agent_receptor) = delegate.create(MessengerType::Unbound).await.unwrap();
     let agent_receptor_signature = agent_receptor.get_signature();
-    let agent_context = crate::agent::Context::new(
-        agent_receptor,
-        delegate,
-        [SettingType::Accessibility].into(),
-        HashSet::new(),
-    )
-    .await;
+    let agent_context =
+        crate::agent::Context::new(agent_receptor, delegate, [SettingType::Accessibility].into())
+            .await;
 
     let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>().unwrap();
     let blueprint = crate::agent::storage_agent::create_registrar(

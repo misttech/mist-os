@@ -81,7 +81,6 @@ use crate::job::source::Seeder;
 use crate::keyboard::keyboard_controller::KeyboardController;
 use crate::light::light_controller::LightController;
 use crate::night_mode::night_mode_controller::NightModeController;
-use crate::policy::PolicyType;
 use crate::privacy::privacy_controller::PrivacyController;
 use crate::service::message::Delegate;
 use crate::service_context::GenerateService;
@@ -555,7 +554,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             job_seeder.clone(),
             settings,
             self.registrants,
-            policies,
             agent_blueprints,
             self.event_subscriber_blueprints,
             service_context,
@@ -810,7 +808,6 @@ async fn create_environment<'a, T, F>(
     job_seeder: Seeder,
     components: HashSet<SettingType>,
     registrants: Vec<Registrant>,
-    policies: HashSet<PolicyType>,
     agent_blueprints: Vec<AgentCreator>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     service_context: Arc<ServiceContext>,
@@ -847,8 +844,7 @@ where
         let _ = entities.insert(Entity::Handler(*setting_type));
     }
 
-    let mut agent_authority =
-        Authority::create(delegate.clone(), components.clone(), policies).await?;
+    let mut agent_authority = Authority::create(delegate.clone(), components.clone()).await?;
 
     for registrant in registrants {
         if registrant.get_dependencies().iter().all(|dependency| {

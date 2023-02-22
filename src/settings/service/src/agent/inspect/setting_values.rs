@@ -235,7 +235,6 @@ mod tests {
             hub.create(MessengerType::Unbound).await.expect("should be present").1,
             hub,
             vec![SettingType::Unknown].into_iter().collect(),
-            HashSet::new(),
         )
         .await
     }

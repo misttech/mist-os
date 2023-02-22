@@ -5,7 +5,6 @@
 use crate::agent::{AgentCreator, AgentError, Context, Invocation, Lifespan, Payload};
 use crate::base::SettingType;
 use crate::message::base::{Audience, MessengerType};
-use crate::policy::PolicyType;
 use crate::service;
 use crate::service_context::ServiceContext;
 use anyhow::{format_err, Context as _, Error};
@@ -23,14 +22,12 @@ pub(crate) struct Authority {
     messenger: service::message::Messenger,
     // Available components
     available_components: HashSet<SettingType>,
-    available_policies: HashSet<PolicyType>,
 }
 
 impl Authority {
     pub(crate) async fn create(
         delegate: service::message::Delegate,
         available_components: HashSet<SettingType>,
-        available_policies: HashSet<PolicyType>,
     ) -> Result<Authority, Error> {
         let (client, _) = delegate
             .create(MessengerType::Unbound)
@@ -42,7 +39,6 @@ impl Authority {
             delegate,
             messenger: client,
             available_components,
-            available_policies,
         })
     }
 
@@ -54,13 +50,9 @@ impl Authority {
             .expect("agent receptor should be created")
             .1;
         let signature = agent_receptor.get_signature();
-        let context = Context::new(
-            agent_receptor,
-            self.delegate.clone(),
-            self.available_components.clone(),
-            self.available_policies.clone(),
-        )
-        .await;
+        let context =
+            Context::new(agent_receptor, self.delegate.clone(), self.available_components.clone())
+                .await;
 
         creator.create(context).await;
 
@@ -156,7 +148,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_log() {
         let delegate = MessageHub::create();
-        let mut authority = Authority::create(delegate, HashSet::new(), HashSet::new())
+        let mut authority = Authority::create(delegate, HashSet::new())
             .await
             .expect("Should be able to create authority");
         authority.register(crate::create_agent!(test_agent, create)).await;

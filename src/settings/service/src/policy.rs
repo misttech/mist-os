@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::payload_convert;
-use crate::policy::response::Response;
 use serde::{Deserialize, Serialize};
 use settings_storage::device_storage::DeviceStorageCompatible;
-use std::borrow::Cow;
 use std::convert::TryFrom;
-use thiserror::Error;
 
 /// The policy types supported by the service.
 #[derive(PartialEq, Debug, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
@@ -85,60 +81,9 @@ impl From<&PolicyInfo> for PolicyType {
 #[allow(dead_code)]
 pub struct UnknownInfo(pub bool);
 
-#[derive(PartialEq, Clone, Debug)]
-pub enum Payload {
-    Request(Request),
-    Response(Response),
-}
-
-payload_convert!(Policy, Payload);
-
 /// `Role` defines grouping for responsibilities on the policy message hub.
 #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
 pub enum Role {
     /// This role indicates that the messenger handles and enacts policy requests.
     PolicyHandler,
-}
-
-/// `Request` defines the request space for all policies handled by
-/// the Setting Service. Note that the actions that can be taken upon each
-/// policy should be defined within each policy's Request enum.
-#[derive(PartialEq, Debug, Clone)]
-pub enum Request {
-    /// Fetches the current policy state.
-    Get,
-
-    /// Restore saved state from disk.
-    Restore,
-}
-
-pub mod response {
-    use super::*;
-
-    pub type Response = Result<Payload, Error>;
-
-    /// `Payload` defines the possible successful responses for a request. There
-    /// should be a corresponding policy response payload type for each request type.
-    #[derive(PartialEq, Debug, Clone)]
-    pub enum Payload {
-        PolicyInfo(PolicyInfo),
-        Restore,
-    }
-
-    /// The possible errors that can be returned from a request. Note that
-    /// unlike the request and response space, errors are not type specific.
-    #[derive(Error, Debug, Clone, PartialEq)]
-    pub enum Error {
-        #[error("Unexpected error")]
-        Unexpected,
-
-        #[error("Communication error")]
-        CommunicationError,
-
-        #[error("Invalid input argument for policy: {0:?} argument:{1:?} value:{2:?}")]
-        InvalidArgument(PolicyType, Cow<'static, str>, Cow<'static, str>),
-
-        #[error("Write failed for policy: {0:?}")]
-        WriteFailure(PolicyType),
-    }
 }

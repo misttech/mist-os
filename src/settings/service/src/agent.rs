@@ -6,7 +6,6 @@ use crate::base::SettingType;
 use crate::event;
 use crate::message::base::MessengerType;
 use crate::payload_convert;
-use crate::policy::PolicyType;
 use crate::service;
 use crate::service::message::Receptor;
 use crate::service_context::ServiceContext;
@@ -131,9 +130,6 @@ pub struct Context {
 
     /// Indicates available Settings interfaces.
     pub(crate) available_components: HashSet<SettingType>,
-
-    /// Indicates available policy types supported by the Settings interfaces.
-    pub available_policies: HashSet<PolicyType>,
 }
 
 impl Context {
@@ -141,10 +137,9 @@ impl Context {
         receptor: Receptor,
         delegate: service::message::Delegate,
         available_components: HashSet<SettingType>,
-        available_policies: HashSet<PolicyType>,
     ) -> Self {
         let publisher = event::Publisher::create(&delegate, MessengerType::Unbound).await;
-        Self { receptor, publisher, delegate, available_components, available_policies }
+        Self { receptor, publisher, delegate, available_components }
     }
 
     /// Generates a new `Messenger` on the service `MessageHub`. Only

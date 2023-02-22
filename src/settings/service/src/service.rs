@@ -82,10 +82,6 @@ pub enum Payload {
     /// The communication to and from a controller to handle requests and
     /// lifetime.
     Controller(controller::Payload),
-    /// Policy payloads contain communication to and from policy handlers, including general
-    /// requests and responses served by any policy as well as domain-specific requests and
-    /// responses defined for individual policies.
-    Policy(policy::Payload),
     /// Agent payloads contain communication between the agent authority and individual agents.
     Agent(agent::Payload),
     /// Event payloads contain data about events that occur throughout the system.
