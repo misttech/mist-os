@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 /// Unified `crate::api::DataSource` implementation over production types.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum DataSource {
+pub enum DataSource {
     BlobSource(BlobSource),
     ProductBundleSource(ProductBundleSource),
 }
@@ -73,14 +73,17 @@ impl DataSourceApi for DataSource {
 
 /// Unified `crate::api::DataSource` implementation over production blob types.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum BlobSource {
-    BlobFsArchive(BlobFsArchive),
+pub enum BlobSource {
+    #[cfg(test)]
+    BlobFsArchive(blobfs::BlobFsArchive),
+
     BlobDirectory(BlobDirectory),
     ProductBundleRepositoryBlobs(ProductBundleRepositoryBlobs),
 }
 
-impl From<BlobFsArchive> for BlobSource {
-    fn from(blob_fs_archive: BlobFsArchive) -> Self {
+#[cfg(test)]
+impl From<blobfs::BlobFsArchive> for BlobSource {
+    fn from(blob_fs_archive: blobfs::BlobFsArchive) -> Self {
         Self::BlobFsArchive(blob_fs_archive)
     }
 }
@@ -102,7 +105,9 @@ impl DataSourceApi for BlobSource {
 
     fn kind(&self) -> DataSourceKind {
         match self {
+            #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.kind(),
+
             Self::BlobDirectory(blob_directory) => blob_directory.kind(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.kind()
@@ -112,7 +117,9 @@ impl DataSourceApi for BlobSource {
 
     fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
         match self {
+            #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.parent(),
+
             Self::BlobDirectory(blob_directory) => blob_directory.parent(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.parent()
@@ -124,7 +131,9 @@ impl DataSourceApi for BlobSource {
         &self,
     ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
         match self {
+            #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.children(),
+
             Self::BlobDirectory(blob_directory) => blob_directory.children(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.children()
@@ -134,7 +143,9 @@ impl DataSourceApi for BlobSource {
 
     fn path(&self) -> Option<Self::SourcePath> {
         match self {
+            #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.path(),
+
             Self::BlobDirectory(blob_directory) => blob_directory.path(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.path()
@@ -144,7 +155,9 @@ impl DataSourceApi for BlobSource {
 
     fn version(&self) -> DataSourceVersion {
         match self {
+            #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.version(),
+
             Self::BlobDirectory(blob_directory) => blob_directory.version(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.version()
@@ -153,47 +166,57 @@ impl DataSourceApi for BlobSource {
     }
 }
 
+#[cfg(test)]
+pub mod blobfs {
+    use crate::api::DataSource as DataSourceApi;
+    use crate::api::DataSourceKind;
+    use crate::api::DataSourceVersion;
+    use std::iter;
+    use std::path::PathBuf;
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct BlobFsArchive {
+        path: PathBuf,
+    }
+
+    impl BlobFsArchive {
+        /// Constructs a [`BlobFsArchive`] that is backed by the file located at `path`.
+        pub fn new(path: PathBuf) -> Self {
+            Self { path }
+        }
+    }
+
+    impl DataSourceApi for BlobFsArchive {
+        type SourcePath = PathBuf;
+
+        fn kind(&self) -> DataSourceKind {
+            DataSourceKind::BlobfsArchive
+        }
+
+        fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+            None
+        }
+
+        fn children(
+            &self,
+        ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>>
+        {
+            Box::new(iter::empty())
+        }
+
+        fn path(&self) -> Option<Self::SourcePath> {
+            Some(self.path.clone())
+        }
+
+        fn version(&self) -> DataSourceVersion {
+            // TODO: Add support for exposing the blobfs format version.
+            DataSourceVersion::Unknown
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct BlobFsArchive {
-    path: PathBuf,
-}
-
-impl BlobFsArchive {
-    /// Constructs a [`BlobFsArchive`] that is backed by the file located at `path`.
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-}
-
-impl DataSourceApi for BlobFsArchive {
-    type SourcePath = PathBuf;
-
-    fn kind(&self) -> DataSourceKind {
-        DataSourceKind::BlobfsArchive
-    }
-
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
-        None
-    }
-
-    fn children(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
-        Box::new(iter::empty())
-    }
-
-    fn path(&self) -> Option<Self::SourcePath> {
-        Some(self.path.clone())
-    }
-
-    fn version(&self) -> DataSourceVersion {
-        // TODO: Add support for exposing the blobfs format version.
-        DataSourceVersion::Unknown
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub(crate) struct BlobDirectory {
+pub struct BlobDirectory {
     directory: PathBuf,
 }
 

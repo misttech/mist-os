@@ -3,16 +3,20 @@
 // found in the LICENSE file.
 
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
-use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
 use std::fmt;
-use std::io::Read;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct Hash(FuchsiaMerkleHash);
+pub struct Hash(FuchsiaMerkleHash);
 
+#[cfg(test)]
 impl Hash {
-    pub fn from_contents<R: Read>(contents: R) -> Self {
-        Self(FuchsiaMerkleTree::from_reader(contents).expect("compute fuchsia merkle tree").root())
+    /// Constructs a [`Hash`] that represents the contents read from `contents.
+    pub fn from_contents<R: std::io::Read>(contents: R) -> Self {
+        Self(
+            fuchsia_merkle::MerkleTree::from_reader(contents)
+                .expect("compute fuchsia merkle tree")
+                .root(),
+        )
     }
 }
 

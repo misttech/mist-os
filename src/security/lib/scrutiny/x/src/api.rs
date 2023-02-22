@@ -9,6 +9,7 @@ use std::hash;
 use std::io::Read;
 use std::io::Seek;
 use std::path::Path;
+use std::path::PathBuf;
 
 /// Instance of the scrutiny framework backed by a particular set of artifacts.
 pub trait Scrutiny {
@@ -374,6 +375,9 @@ pub enum DataSourceVersion {
     /// Either no version information is available, or the information was malformed.
     Unknown,
 }
+
+/// Boxed production [`DataSource`] type.
+pub type BoxedDataSource = Box<dyn DataSource<SourcePath = PathBuf>>;
 
 /// A content-addressed file.
 pub trait Blob {
@@ -843,6 +847,7 @@ pub trait ComponentInstanceCapability {
     >;
 }
 
+#[cfg(test)]
 mod tests {
     use super::DataSource;
     use super::DataSourceKind;

@@ -4,8 +4,7 @@
 
 // TODO(fxbug.dev/111243): Implement production component API.
 
-// TODO(fxbug.dev/111243): Annotate as `#[cfg(test)]` when production APIs that depend on the
-// component API use a production implementation of the component API.
+#[cfg(test)]
 pub mod fake {
     use crate::api::Component as ComponentApi;
     use crate::api::PackageResolverUrl;

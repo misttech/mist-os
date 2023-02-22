@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(fxbug.dev/111242): Exercise production package implementations to eliminate dead code
+// warnings.
+#![allow(dead_code)]
+
 use crate::api::Blob as BlobApi;
 use crate::api::DataSource as DataSourceApi;
 use crate::api::MetaContents as MetaContentsApi;
@@ -9,6 +13,8 @@ use crate::api::MetaPackage as MetaPackageApi;
 use crate::api::Package as PackageApi;
 use crate::blob::BlobSet;
 use crate::hash::Hash;
+use crate::product_bundle::ProductBundleRepositoryBlobSet;
+use crate::product_bundle::ProductBundleRepositoryBlobs;
 use fuchsia_archive::Error as FarError;
 use fuchsia_archive::Utf8Reader as FarReader;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
@@ -17,6 +23,7 @@ use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
 use fuchsia_pkg::MetaContentsError as FuchsiaMetaContentsError;
 use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
 use fuchsia_pkg::MetaPackageError as FuchsiaMetaPackageError;
+use scrutiny_utils::io::ReadSeek;
 use std::cell::RefCell;
 use std::error;
 use std::io;
@@ -26,11 +33,11 @@ use std::rc::Rc;
 use thiserror::Error;
 
 // TODO(fxbug.dev/111243): Use production component API when it is ready.
-use crate::component::fake::Component;
+use crate::todo::Component;
 
 /// Simple wrapper around `fuchsia_pkg::MetaPackage` that implements `MetaPackage` trait.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MetaPackage(FuchsiaMetaPackage);
+pub struct MetaPackage(FuchsiaMetaPackage);
 
 impl MetaPackageApi for MetaPackage {}
 
@@ -42,7 +49,7 @@ impl From<FuchsiaMetaPackage> for MetaPackage {
 
 /// Simple wrapper around `fuchsia_pkg::MetaContents` that implements `MetaContents` trait.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MetaContents(FuchsiaMetaContents);
+pub struct MetaContents(FuchsiaMetaContents);
 
 impl From<FuchsiaMetaContents> for MetaContents {
     fn from(meta_contents: FuchsiaMetaContents) -> Self {
@@ -82,11 +89,16 @@ enum PackageInitializationError {
 /// Model of a Fuchsia package, including meta entries (from meta.far) and content entries
 /// accessible via an associated `BlobSet`. This object wraps a reference-counted pointer
 /// to its state, which makes it cheap to clone.
-pub(crate) struct Package<
+pub struct Package<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 >(Rc<PackageData<PackageDataSource, PackageBlobs, FarReaderSeeker>>);
+
+/// Unboxed production `crate::package::Package` implementation used by production
+/// `crate::api::Scrutiny` implementation.
+pub type ScrutinyPackage =
+    Package<ProductBundleRepositoryBlobs, ProductBundleRepositoryBlobSet, Box<dyn ReadSeek>>;
 
 impl<
         PackageDataSource: Clone + DataSourceApi,
@@ -302,7 +314,7 @@ impl<PackageBlobs: BlobSet> Clone for ContentBlobData<PackageBlobs> {
 
 /// Errors that can occur attempting to use a `MetaBlob` as a `Blob`.
 #[derive(Debug, Error)]
-pub(crate) enum MetaBlobError {
+pub enum MetaBlobError {
     #[error("failed to load meta blob from far: {0}")]
     FarError(#[from] FarError),
     #[error("failed to read path as UTF8 string: {0}")]
@@ -310,7 +322,7 @@ pub(crate) enum MetaBlobError {
 }
 
 /// `Blob` implementation that combines `MetaBlobData` and a `FarReader`.
-pub(crate) struct MetaBlob<
+pub struct MetaBlob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
@@ -351,7 +363,7 @@ impl<
 
 /// Errors that can occur attempting to use a `ContentBlob` as a `Blob`.
 #[derive(Debug, Error)]
-pub(crate) enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
+pub enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
     #[error("failed to lookup package content blob: {0}")]
     BlobSourceError(BlobSourceError),
     #[error("failed to open package content blob: {0}")]
@@ -359,7 +371,7 @@ pub(crate) enum ContentBlobError<BlobSourceError: error::Error, BlobError: error
 }
 
 /// `Blob` implementation that combines `ContentBlobData` and a `BlobSet`.
-pub(crate) struct ContentBlob<
+pub struct ContentBlob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
@@ -467,7 +479,7 @@ impl<
 
 /// Errors that can occur attempting to use a `Blob` as a `crate::api::Blob`.
 #[derive(Debug, Error)]
-pub(crate) enum BlobError<
+pub enum BlobError<
     BlobSourceErrorForContentBlobError: 'static + error::Error,
     BlobErrorForContentBlobError: 'static + error::Error,
 > {
@@ -481,7 +493,7 @@ pub(crate) enum BlobError<
 
 /// `std::io::Read + std::io::Seek` implementation over either a content blob or a meta blob
 /// loaded from a [`Package`].
-pub(crate) enum BlobReaderSeeker<PackageBlobs: BlobSet> {
+pub enum BlobReaderSeeker<PackageBlobs: BlobSet> {
     ///`std::io::Read + std::io::Seek` for a content blob loaded from a [`Package`].
     ContentReaderSeeker(<PackageBlobs::Blob as BlobApi>::ReaderSeeker),
 
@@ -519,7 +531,7 @@ impl<PackageBlobs: BlobSet> io::Seek for BlobReaderSeeker<PackageBlobs> {
 
 /// `crate::api::Blob` implementation for either a content blob or a meta blob loaded from a
 /// [`Package`].
-pub(crate) enum Blob<
+pub enum Blob<
     PackageDataSource: Clone + DataSourceApi,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,

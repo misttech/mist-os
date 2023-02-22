@@ -2,30 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use scrutiny_utils::io::ReadSeek;
-
 use crate::api::Scrutiny as ScrutinyApi;
 use crate::blob::Blob;
 use crate::blob::BlobDirectoryBlobSetBuilderError;
 use crate::blob::BlobSet;
 use crate::data_source::DataSource;
-use crate::package::Package;
+use crate::package::ScrutinyPackage;
 use crate::product_bundle::DataSource as ProductBundleSource;
 use crate::product_bundle::ProductBundle;
 use crate::product_bundle::ProductBundleRepositoryBlobSet;
-use crate::product_bundle::ProductBundleRepositoryBlobs;
 use std::fmt;
 use thiserror::Error;
 
 /// Errors that can be encountered building a [`Scrutiny`] via a [`ScrutinyBuilder`].
 #[derive(Debug, Error)]
-pub(crate) enum ScrutinyBuilderError {
+pub enum ScrutinyBuilderError {
     #[error("failed to construct blob set for scrutiny interface: {0:?}")]
     BlobDirectoryBlobSetBuilderError(#[from] BlobDirectoryBlobSetBuilderError),
 }
 
 /// A builder pattern for constructing well-formed instances of [`Scrutiny`].
-pub(crate) struct ScrutinyBuilder {
+pub struct ScrutinyBuilder {
     product_bundle: ProductBundle,
 }
 
@@ -46,7 +43,7 @@ impl ScrutinyBuilder {
 }
 
 /// Production implementation of the [`crate::api::Scrutiny`] API.
-pub(crate) struct Scrutiny {
+pub struct Scrutiny {
     product_bundle_blobs_set: ProductBundleRepositoryBlobSet,
     product_bundle: ProductBundle,
 }
@@ -66,24 +63,20 @@ impl fmt::Debug for Scrutiny {
     }
 }
 
-type ScrutinyPackage =
-    Package<ProductBundleRepositoryBlobs, ProductBundleRepositoryBlobSet, Box<dyn ReadSeek>>;
-
 impl ScrutinyApi for Scrutiny {
     type Blob = Blob;
     type Package = ScrutinyPackage;
     type DataSource = DataSource;
 
     // TODO: Use production implementations when available.
-    type PackageResolver = crate::package_resolver::fake::PackageResolver;
-    type Component = crate::component::fake::Component;
-    type ComponentResolver = crate::component_resolver::fake::ComponentResolver;
-    type ComponentCapability = crate::component_capability::fake::ComponentCapability;
-    type ComponentInstance = crate::component_instance::fake::ComponentInstance;
-    type ComponentInstanceCapability =
-        crate::component_instance_capability::fake::ComponentInstanceCapability;
-    type System = crate::system::fake::System<Blob, ScrutinyPackage>;
-    type ComponentManager = crate::component_manager::fake::ComponentManager;
+    type PackageResolver = crate::todo::PackageResolver;
+    type Component = crate::todo::Component;
+    type ComponentResolver = crate::todo::ComponentResolver;
+    type ComponentCapability = crate::todo::ComponentCapability;
+    type ComponentInstance = crate::todo::ComponentInstance;
+    type ComponentInstanceCapability = crate::todo::ComponentInstanceCapability;
+    type System = crate::todo::System;
+    type ComponentManager = crate::todo::ComponentManager;
 
     fn system(&self) -> Self::System {
         todo!("TODO(fxbug.dev/111251): Integrate Scrutiny with production System API")
@@ -153,7 +146,7 @@ pub mod fake {
     use std::iter;
 
     #[derive(Default)]
-    pub(crate) struct Scrutiny;
+    struct Scrutiny;
 
     impl ScrutinyApi for Scrutiny {
         type Blob = Blob<Hash>;

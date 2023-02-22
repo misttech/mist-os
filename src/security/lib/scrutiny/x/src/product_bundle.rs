@@ -24,7 +24,7 @@ use thiserror::Error;
 
 /// Unified `crate::api::DataSource` implementation over product bundle types.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum DataSource {
+pub enum DataSource {
     ProductBundle(ProductBundle),
     ProductBundleRepository(ProductBundleRepository),
 }
@@ -94,7 +94,7 @@ impl DataSourceApi for DataSource {
 
 /// Errors that may be encountered in `ProductBundleBuilder::build`.
 #[derive(Debug, Error)]
-pub(crate) enum ProductBundleBuilderError {
+pub enum ProductBundleBuilderError {
     #[error("attempted to build product bundle without specifying a directory")]
     MissingDirectory,
     #[error("attempted to build product bundle without specifying a system slot (e.g., A, B, R)")]
@@ -114,7 +114,7 @@ pub(crate) enum ProductBundleBuilderError {
 }
 
 /// Builder pattern for constructing instances of [`ProductBundle`].
-pub(crate) struct ProductBundleBuilder {
+pub struct ProductBundleBuilder {
     directory: Option<PathBuf>,
     system_slot: Option<SystemSlot>,
     repository_name: Option<String>,
@@ -192,10 +192,10 @@ impl ProductBundleBuilder {
     }
 }
 
-/// A system slot under which images may be grouped in a product bundle. See fields of
-/// `sdk_metadata::ProductBundleV2` for details.
+/// A system slot under which images may be grouped in a product bundle. See
+/// https://fuchsia.dev/fuchsia-src/glossary?hl=en#abr for details.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum SystemSlot {
+pub enum SystemSlot {
     A,
     B,
     R,
@@ -203,17 +203,12 @@ pub(crate) enum SystemSlot {
 
 /// A model of a particular system described by a product bundle.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ProductBundle(Rc<ProductBundleData>);
+pub struct ProductBundle(Rc<ProductBundleData>);
 
 impl ProductBundle {
     /// Constructs a builder for a new [`ProductBundle`].
     pub fn builder() -> ProductBundleBuilder {
         ProductBundleBuilder::new()
-    }
-
-    /// Returns a reference to the directory that backs this product bundle.
-    pub fn directory(&self) -> &PathBuf {
-        &self.0.directory
     }
 
     /// Constructs a data source that refers to this product bundle's repository.
@@ -239,6 +234,14 @@ impl ProductBundle {
     /// Constructs a new product bundle from backing data.
     fn new(product_bundle_data: ProductBundleData) -> Self {
         Self(Rc::new(product_bundle_data))
+    }
+}
+
+#[cfg(test)]
+impl ProductBundle {
+    /// Returns a reference to the directory that backs this product bundle.
+    pub fn directory(&self) -> &PathBuf {
+        &self.0.directory
     }
 }
 
@@ -286,7 +289,7 @@ impl DataSourceApi for ProductBundle {
 
 /// A data source for a product bundle's TUF repository.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct ProductBundleRepository(ProductBundle);
+pub struct ProductBundleRepository(ProductBundle);
 
 impl ProductBundleRepository {
     /// Constructs a data source that describes the repository in a product bundle.
@@ -337,7 +340,7 @@ impl DataSourceApi for ProductBundleRepository {
 
 /// A data source for a product bundle's TUF repository's blobs.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ProductBundleRepositoryBlobs(ProductBundle);
+pub struct ProductBundleRepositoryBlobs(ProductBundle);
 
 impl ProductBundleRepositoryBlobs {
     /// Constructs a blob set backed by this blobs directory.
@@ -389,7 +392,7 @@ impl DataSourceApi for ProductBundleRepositoryBlobs {
 }
 
 #[derive(Clone)]
-pub(crate) struct ProductBundleRepositoryBlobSet {
+pub struct ProductBundleRepositoryBlobSet {
     data_source: ProductBundleRepositoryBlobs,
     blob_set: BlobDirectoryBlobSet,
 }
@@ -427,7 +430,7 @@ impl BlobSetApi for ProductBundleRepositoryBlobSet {
     }
 }
 
-pub(crate) struct ProductBundleRepositoryBlob {
+pub struct ProductBundleRepositoryBlob {
     data_source: ProductBundleRepositoryBlobs,
     blob: FileBlob,
 }
