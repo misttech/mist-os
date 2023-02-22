@@ -5,12 +5,12 @@
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use std::fmt;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Hash(FuchsiaMerkleHash);
 
 #[cfg(test)]
 impl Hash {
-    /// Constructs a [`Hash`] that represents the contents read from `contents.
+    /// Constructs a [`Hash`] that represents the contents read from `contents`.
     pub fn from_contents<R: std::io::Read>(contents: R) -> Self {
         Self(
             fuchsia_merkle::MerkleTree::from_reader(contents)

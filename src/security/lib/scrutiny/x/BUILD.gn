@@ -39,6 +39,7 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:camino",
+      "//third_party/rust_crates:rayon",
       "//third_party/rust_crates:thiserror",
 
       # TODO(fxbug.dev/112505): This dependency was introduced for accessing blobfs archives via

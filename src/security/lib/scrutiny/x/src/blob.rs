@@ -12,6 +12,7 @@ use crate::product_bundle::ProductBundleRepositoryBlob;
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use fuchsia_merkle::MerkleTree;
+use rayon::prelude::*;
 use scrutiny_utils::io::ReadSeek;
 use std::error;
 use std::fs;
@@ -574,32 +575,38 @@ impl BlobDirectoryBlobSetBuilder {
         let directory = self.directory.unwrap();
         let paths =
             fs::read_dir(&directory).map_err(BlobDirectoryBlobSetBuilderError::ListError)?;
-        let mut blob_ids = vec![];
-        for dir_entry_result in paths {
-            let dir_entry =
-                dir_entry_result.map_err(BlobDirectoryBlobSetBuilderError::DirEntryError)?;
-            let file_name = dir_entry.file_name();
-            let file_name = file_name.to_str().ok_or_else(|| {
-                BlobDirectoryBlobSetBuilderError::PathStringError(String::from(
-                    file_name.to_string_lossy(),
-                ))
-            })?;
-            let hash_from_path = parse_path_as_hash(file_name)
-                .map_err(BlobDirectoryBlobSetBuilderError::PathError)?;
-            let mut blob_file = fs::File::open(directory.join(file_name))
-                .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?;
-            let fuchsia_hash = MerkleTree::from_reader(&mut blob_file)
-                .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?
-                .root();
-            let computed_hash = Hash::from(fuchsia_hash);
-            if hash_from_path != computed_hash {
-                return Err(BlobDirectoryBlobSetBuilderError::HashMismatch {
-                    hash_from_path,
-                    computed_hash,
-                });
-            }
-            blob_ids.push(computed_hash);
-        }
+        let dir_entries: Vec<_> = paths
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BlobDirectoryBlobSetBuilderError::DirEntryError)?;
+
+        let mut blob_ids = dir_entries
+            .into_par_iter()
+            .map(|dir_entry| {
+                let file_name = dir_entry.file_name();
+                let file_name = file_name.to_str().ok_or_else(|| {
+                    BlobDirectoryBlobSetBuilderError::PathStringError(String::from(
+                        file_name.to_string_lossy(),
+                    ))
+                })?;
+                let hash_from_path = parse_path_as_hash(file_name)
+                    .map_err(BlobDirectoryBlobSetBuilderError::PathError)?;
+
+                let mut blob_file = fs::File::open(dir_entry.path())
+                    .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?;
+                let fuchsia_hash = MerkleTree::from_reader(&mut blob_file)
+                    .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?
+                    .root();
+                let computed_hash = Hash::from(fuchsia_hash);
+                if hash_from_path != computed_hash {
+                    return Err(BlobDirectoryBlobSetBuilderError::HashMismatch {
+                        hash_from_path,
+                        computed_hash,
+                    });
+                }
+                Ok(computed_hash)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        blob_ids.sort();
 
         Ok(BlobDirectoryBlobSet::new(directory, blob_ids))
     }
