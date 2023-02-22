@@ -5,9 +5,9 @@
 use {
     crate::{
         io::Directory,
-        realm::{ExecutionInfo, Instance, InstanceType, ResolvedInfo},
+        realm::{ExecutionInfo, Instance, InstanceType, ResolvedInfo, Runtime},
     },
-    anyhow::{format_err, Result},
+    anyhow::{format_err, Context, Result},
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     futures::{
@@ -20,6 +20,55 @@ use {
 /// Reading from the v1/CMX hub is flaky while components are being added/removed.
 /// Attempt to get CMX instances several times before calling it a failure.
 const CMX_HUB_RETRY_ATTEMPTS: u64 = 10;
+
+pub async fn get_runtime(hub_dir: &Directory) -> Result<Runtime> {
+    let (job_id, process_id) =
+        futures::join!(hub_dir.read_file("job-id"), hub_dir.read_file("process-id"),);
+
+    let job_id = job_id?.parse::<u64>().context("Job ID is not u64")?;
+
+    let process_id = if hub_dir.exists("process-id").await? {
+        Some(process_id?.parse::<u64>().context("Process ID is not u64")?)
+    } else {
+        None
+    };
+
+    Ok(Runtime::Elf {
+        job_id,
+        process_id,
+        process_start_time: None,
+        process_start_time_utc_estimate: None,
+    })
+}
+
+pub async fn get_namespace_capabilities(hub_dir: &Directory) -> Result<Vec<String>> {
+    let in_dir = hub_dir.open_dir_readable("in")?;
+    get_capabilities(in_dir).await
+}
+
+pub async fn get_outgoing_capabilities(hub_dir: &Directory) -> Result<Vec<String>> {
+    let out_dir = hub_dir.open_dir_readable("out")?;
+    get_capabilities(out_dir).await
+}
+
+// Get all entries in a capabilities directory. If there is a "svc" directory, traverse it and
+// collect all protocol names as well.
+async fn get_capabilities(capability_dir: Directory) -> Result<Vec<String>, anyhow::Error> {
+    let mut entries = capability_dir.entry_names().await?;
+
+    for (index, name) in entries.iter().enumerate() {
+        if name == "svc" {
+            entries.remove(index);
+            let svc_dir = capability_dir.open_dir_readable("svc")?;
+            let mut svc_entries = svc_dir.entry_names().await?;
+            entries.append(&mut svc_entries);
+            break;
+        }
+    }
+
+    entries.sort_unstable();
+    Ok(entries)
+}
 
 pub async fn get_all_instances(query: &fsys::RealmQueryProxy) -> Result<Vec<Instance>> {
     // Reading from the v1/CMX hub is flaky while components are being added/removed.
@@ -216,6 +265,7 @@ mod tests {
         let query = serve_realm_query(
             vec![],
             HashMap::new(),
+            HashMap::new(),
             HashMap::from([(
                 ("./core/appmgr".to_string(), fsys::OpenDirType::OutgoingDir),
                 appmgr_out_dir,
@@ -229,13 +279,35 @@ mod tests {
         assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/core/appmgr/sshd.cmx").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/sshd#meta/sshd.cmx");
 
-        match instance.instance_type {
-            InstanceType::Cmx(_) => {}
+        let hub_dir = match instance.instance_type {
+            InstanceType::Cmx(hub_dir) => hub_dir,
             i => panic!("unexpected instance type: {:?}", i),
         };
 
         assert!(instance.instance_id.is_none());
         let resolved = instance.resolved_info.unwrap();
         resolved.execution_info.unwrap();
+
+        let namespace_capabilities = get_namespace_capabilities(&hub_dir).await.unwrap();
+        assert_eq!(namespace_capabilities, vec!["data", "pkg"]);
+
+        let outgoing_capabilities = get_outgoing_capabilities(&hub_dir).await.unwrap();
+        assert_eq!(outgoing_capabilities, vec!["dev"]);
+
+        let runtime = get_runtime(&hub_dir).await.unwrap();
+        match runtime {
+            Runtime::Elf {
+                job_id,
+                process_id,
+                process_start_time,
+                process_start_time_utc_estimate,
+            } => {
+                assert_eq!(job_id, 5454);
+                assert_eq!(process_id, Some(9898));
+                assert!(process_start_time.is_none());
+                assert!(process_start_time_utc_estimate.is_none());
+            }
+            r => panic!("unexpected runtime: {:?}", r),
+        }
     }
 }

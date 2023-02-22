@@ -7,10 +7,7 @@ use crate::component::types::{
     ComponentLaunchRequest, ComponentLaunchResponse, ComponentSearchRequest, ComponentSearchResult,
 };
 use anyhow::{format_err, Context as _, Error};
-use component_debug::{
-    list::{get_all_instances, ListFilter},
-    show::find_instances,
-};
+use component_debug::cli::{list_cmd_serialized, show_cmd_serialized, ListFilter};
 use component_events::{events::*, matcher::*};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fcdecl;
@@ -168,8 +165,7 @@ impl ComponentFacade {
             None => return Err(format_err!("Need name of the component to search.")),
         };
         let query = client::connect_to_protocol::<fsys::RealmQueryMarker>()?;
-        let explorer = client::connect_to_protocol::<fsys::RealmExplorerMarker>()?;
-        let instances = match find_instances(name.to_string(), &explorer, &query).await {
+        let instances = match show_cmd_serialized(name.to_string(), query).await {
             Ok(p) => p,
             Err(err) => fx_err_and_bail!(
                 &with_line!(tag),
@@ -186,9 +182,8 @@ impl ComponentFacade {
     pub async fn list(&self) -> Result<Vec<String>, Error> {
         info!("List running Component under appmgr in ComponentSearch Facade",);
         let query = client::connect_to_protocol::<fsys::RealmQueryMarker>()?;
-        let explorer = client::connect_to_protocol::<fsys::RealmExplorerMarker>()?;
-        let instances = get_all_instances(&explorer, &query, Some(ListFilter::Running)).await?;
-        let urls: Vec<String> = instances.into_iter().filter_map(|i| i.url).collect();
+        let instances = list_cmd_serialized(Some(ListFilter::Running), query).await?;
+        let urls: Vec<String> = instances.into_iter().map(|i| i.url).collect();
         Ok(urls)
     }
 }

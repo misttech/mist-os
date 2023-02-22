@@ -15,9 +15,6 @@ pub async fn exec() -> Result<()> {
     let args: ComponentArgs = argh::from_env();
 
     let writer = std::io::stdout();
-    let realm_explorer = connect_to_protocol_at_path::<fsys::RealmExplorerMarker>(
-        "/svc/fuchsia.sys2.RealmExplorer.root",
-    )?;
     let realm_query =
         connect_to_protocol_at_path::<fsys::RealmQueryMarker>("/svc/fuchsia.sys2.RealmQuery.root")?;
     let route_validator = connect_to_protocol_at_path::<fsys::RouteValidatorMarker>(
@@ -28,9 +25,7 @@ pub async fn exec() -> Result<()> {
     )?;
 
     match args.subcommand {
-        ComponentSubcommand::Show(args) => {
-            show_cmd_print(args.query, realm_query, realm_explorer, writer).await
-        }
+        ComponentSubcommand::Show(args) => show_cmd_print(args.query, realm_query, writer).await,
         ComponentSubcommand::Create(args) => {
             create_cmd(args.url, args.moniker, lifecycle_controller, writer).await
         }
