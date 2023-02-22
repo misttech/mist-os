@@ -113,7 +113,8 @@ def _generate_bind_library_build_rules(ctx, meta, relative_dir, build_file, proc
 # buildifier: disable=unused-variable
 def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     files = []
-    for arch in meta["versions"]:
+    arch_list = process_context.constants.target_cpus
+    for arch in arch_list:
         meta_for_arch = meta["versions"][arch]
         if "debug_libs" in meta_for_arch:
             files.extend(meta_for_arch["debug_libs"])
@@ -131,7 +132,7 @@ def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_c
     })
 
     arch_tmpl = ctx.path(ctx.attr._sysroot_arch_subtemplate)
-    for arch in meta["versions"]:
+    for arch in arch_list:
         srcs = {}
         lib_path = {}
         libs_base = meta["versions"][arch]["dist_dir"] + "/dist/lib/"
@@ -367,6 +368,16 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["headers"])
 
+# Maps a Bazel cpu name to its Fuchsia name.
+_TO_FUCHSIA_CPU_NAME_MAP = {
+    "x86_64": "x64",
+    "k8": "x64",
+    "aarch64": "arm64",
+}
+
+def _to_fuchsia_cpu_name(cpu_name):
+    return _TO_FUCHSIA_CPU_NAME_MAP.get(cpu_name, cpu_name)
+
 # Maps a Fuchsia cpu name to the corresponding config_setting() label in
 # @rules_fuchsia//fuchsia/constraints
 _FUCHSIA_CPU_CONSTRAINT_MAP = {
@@ -400,13 +411,15 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
 
     # add all supported architectures to the select, even if they are not available in the current SDK,
     # so that SDKs for different architectures can be composed by a simple directory merge.
-    for arch, constraint in _FUCHSIA_CPU_CONSTRAINT_MAP.items():
+    arch_list = process_context.constants.target_cpus
+    for arch in arch_list:
+        constraint = _FUCHSIA_CPU_CONSTRAINT_MAP[arch]
         dist_select[constraint] = ["//%s/%s:dist" % (relative_dir, arch)]
         prebuilt_select[constraint] = ["//%s/%s:prebuilts" % (relative_dir, arch)]
 
     has_distlibs = False
 
-    for arch in meta["binaries"]:
+    for arch in arch_list:
         per_arch_build_file = build_file.dirname.get_child(arch).get_child("BUILD.bazel")
         ctx.file(per_arch_build_file, content = _header())
 
@@ -548,7 +561,44 @@ def load_parent_sdk_metadata(ctx, parent_sdk_contents):
                 key = "%s" % dir
                 parent_sdk_contents[key] = meta
 
-def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, filter_types = None, exclude_types = None):
+def generate_sdk_constants(repo_ctx, manifests):
+    """Generates generated_constants.bzl from the sdk metadata
+
+    Args:
+        repo_ctx: the repository context
+        manifests: a list of paths to the meta data manifests.
+
+    Returns:
+        A struct mapping the content of generated_constants.bzl
+    """
+    host_cpu_names_set = {}
+    target_cpu_names_set = {}
+    for manifest_obj in manifests:
+        root = manifest_obj.get("root")
+        manifest_path = manifest_obj.get("manifest")
+        json_obj = json.decode(repo_ctx.read(_path_in_root(repo_ctx, root, manifest_path)))
+        host_os = json_obj["arch"]["host"]
+        host_cpu = _to_fuchsia_cpu_name(host_os.split("-")[0])
+        host_cpu_names_set[host_cpu] = None
+        for cpu_name in json_obj["arch"]["target"]:
+            target_cpu_names_set[cpu_name] = None
+
+    host_cpu_names = sorted(host_cpu_names_set.keys())
+    target_cpu_names = sorted(target_cpu_names_set.keys())
+
+    constants = struct(
+        host_cpus = host_cpu_names,
+        target_cpus = target_cpu_names,
+    )
+    generated_content = "# AUTO-GENERATED - DO NOT EDIT!\n\n"
+    generated_content += "# The following list of CPU names use Fuchsia conventions.\n"
+    generated_content += "constants = %s\n" % constants
+
+    repo_ctx.file("generated_constants.bzl", generated_content)
+
+    return constants
+
+def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants, filter_types = None, exclude_types = None):
     """ Generates BUILD.bazel rules from the sdk metadata
 
     Args:
@@ -556,6 +606,7 @@ def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, filter_types
         manifests: a list of paths to the meta data manifests.
         copy_content_strategy: "symlink" to create symlinks to Fuchsia SDK artifacts or "copy" to attempt
                 to create hardlinks, or standard copy if hardlinks are not possible
+        constants: A struct returned by generated_sdk_constants
         filter_types: tuple of sdk element types. If given, do not process any sdk element types that are not in this tuple
         exclude_types: tuple of sdk element types. If given, do not process any sdk element types in this tuple
     """
@@ -603,6 +654,7 @@ def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, filter_types
     process_context = struct(
         files_to_copy = files_to_copy,
         component_manifest_targets = [],
+        constants = constants,
     )
 
     for dir in dir_to_meta.keys():
