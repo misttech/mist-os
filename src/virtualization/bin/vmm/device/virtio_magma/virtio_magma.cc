@@ -437,6 +437,20 @@ zx_status_t VirtioMagma::Handle_poll(VirtioDescriptor* request_desc,
 zx_status_t VirtioMagma::Handle_connection_export_buffer(
     const virtio_magma_connection_export_buffer_ctrl_t* request,
     virtio_magma_connection_export_buffer_resp_t* response) {
+  virtio_magma_buffer_export_ctrl_t request_copy = {.hdr = {.type = VIRTIO_MAGMA_CMD_BUFFER_EXPORT},
+                                                    .buffer = request->buffer};
+  virtio_magma_buffer_export_resp_t response_copy{};
+
+  response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
+  zx_status_t status = Handle_buffer_export(&request_copy, &response_copy);
+  response->buffer_handle_out = response_copy.buffer_handle_out;
+  response->result_return = response_copy.result_return;
+
+  return status;
+}
+
+zx_status_t VirtioMagma::Handle_buffer_export(const virtio_magma_buffer_export_ctrl_t* request,
+                                              virtio_magma_buffer_export_resp_t* response) {
   if (!wayland_importer_) {
     LOG_VERBOSE("driver attempted to export a buffer without wayland present");
     response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
@@ -448,23 +462,18 @@ zx_status_t VirtioMagma::Handle_connection_export_buffer(
   // We only export images
   fuchsia::virtualization::hardware::VirtioImage image;
 
-  {
-    auto& image_map =
-        connection_image_map_[reinterpret_cast<magma_connection_t>(request->connection)];
-
+  for (auto& map_entry : connection_image_map_) {
     const uint64_t buffer = request->buffer;
-    auto iter = image_map.find(buffer);
-    if (iter == image_map.end()) {
-      response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
-      response->buffer_handle_out = 0;
-      response->result_return = MAGMA_STATUS_INVALID_ARGS;
-      return ZX_OK;
+
+    auto iter = map_entry.second.find(buffer);
+    if (iter == map_entry.second.end()) {
+      continue;
     }
 
     ImageInfoWithToken& info = iter->second;
 
     // Get the VMO handle for this buffer.
-    zx_status_t status = VirtioMagmaGeneric::Handle_connection_export_buffer(request, response);
+    zx_status_t status = VirtioMagmaGeneric::Handle_buffer_export(request, response);
     if (status != ZX_OK) {
       LOG_VERBOSE("VirtioMagmaGeneric::Handle_export failed: %d", status);
       return status;
@@ -479,6 +488,13 @@ zx_status_t VirtioMagma::Handle_connection_export_buffer(
       LOG_VERBOSE("InitFromImageInfo failed: %d", status);
       return status;
     }
+  }
+
+  if (!image.vmo.is_valid()) {
+    response->hdr.type = VIRTIO_MAGMA_RESP_BUFFER_EXPORT;
+    response->buffer_handle_out = 0;
+    response->result_return = MAGMA_STATUS_INVALID_ARGS;
+    return ZX_OK;
   }
 
   // TODO(fxbug.dev/13261): improvement backlog
@@ -508,7 +524,7 @@ zx_status_t VirtioMagma::Handle_connection_import_buffer(
   request_copy.buffer_handle = request->buffer_handle;
   virtio_magma_connection_import_buffer2_resp_t response_copy{};
 
-  response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER2;
+  response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER;
   zx_status_t status = Handle_connection_import_buffer2(&request_copy, &response_copy);
   response->result_return = response_copy.result_return;
   response->buffer_out = response_copy.buffer_out;

@@ -213,8 +213,13 @@ magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
   return MAGMA_STATUS_OK;
 }
 
+// DEPRECATED
 magma_status_t magma_connection_export_buffer(magma_connection_t connection, magma_buffer_t buffer,
                                               uint32_t* buffer_handle_out) {
+  return magma_buffer_export(buffer, buffer_handle_out);
+}
+
+magma_status_t magma_buffer_export(magma_buffer_t buffer, uint32_t* buffer_handle_out) {
   auto platform_buffer = reinterpret_cast<magma::PlatformBuffer*>(buffer);
 
   if (!platform_buffer->duplicate_handle(buffer_handle_out))
@@ -449,9 +454,14 @@ magma_status_t magma_poll(magma_poll_item_t* items, uint32_t count, uint64_t tim
   return MAGMA_STATUS_OK;
 }
 
+// DEPRECATED
 magma_status_t magma_connection_export_semaphore(magma_connection_t connection,
                                                  magma_semaphore_t semaphore,
                                                  uint32_t* semaphore_handle_out) {
+  return magma_semaphore_export(semaphore, semaphore_handle_out);
+}
+
+magma_status_t magma_semaphore_export(magma_semaphore_t semaphore, uint32_t* semaphore_handle_out) {
   auto platform_semaphore = reinterpret_cast<magma::PlatformSemaphore*>(semaphore);
 
   if (!platform_semaphore->duplicate_handle(semaphore_handle_out))

@@ -156,8 +156,8 @@ MAGMA_EXPORT void magma_connection_release_buffer(
     magma_buffer_t buffer);
 
 ///
-/// \brief Exports the given buffer, returning a handle that may be imported into another
-///        connection.
+/// \brief DEPRECATED - Exports the given buffer, returning a handle that may be imported into
+///        another connection.
 /// \param connection An open connection.
 /// \param buffer A valid buffer.
 /// \param buffer_handle_out The returned handle.
@@ -213,8 +213,8 @@ MAGMA_EXPORT void magma_connection_release_semaphore(
     magma_semaphore_t semaphore);
 
 ///
-/// \brief Exports the given semaphore, returning a handle that may be imported into another
-///        connection
+/// \brief DEPRECATED - Exports the given semaphore, returning a handle that may be imported into
+///        another connection
 /// \param connection An open connection.
 /// \param semaphore A valid semaphore.
 /// \param semaphore_handle_out The returned handle.
@@ -418,6 +418,15 @@ MAGMA_EXPORT magma_status_t magma_buffer_get_handle(
     magma_handle_t* handle_out);
 
 ///
+/// \brief Exports the given buffer, returning a handle that may be imported into a connection.
+/// \param buffer A valid buffer.
+/// \param buffer_handle_out The returned handle.
+///
+MAGMA_EXPORT magma_status_t magma_buffer_export(
+    magma_buffer_t buffer,
+    magma_handle_t* buffer_handle_out);
+
+///
 /// \brief Returns a unique id for the given semaphore.
 /// \param semaphore A valid semaphore.
 ///
@@ -437,6 +446,15 @@ MAGMA_EXPORT void magma_semaphore_signal(
 ///
 MAGMA_EXPORT void magma_semaphore_reset(
     magma_semaphore_t semaphore);
+
+///
+/// \brief Exports the given semaphore, returning a handle that may be imported into a connection
+/// \param semaphore A valid semaphore.
+/// \param semaphore_handle_out The returned handle.
+///
+MAGMA_EXPORT magma_status_t magma_semaphore_export(
+    magma_semaphore_t semaphore,
+    magma_handle_t* semaphore_handle_out);
 
 ///
 /// \brief Waits for at least one of the given items to meet a condition. Does not reset any

@@ -431,7 +431,7 @@ class TestConnection {
 
     for (int i = 0; i < count; i++) {
       magma_handle_t handle;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, &handle));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_export(buffer, &handle));
 
       magma_buffer_id_t buffer_id2;
       uint64_t buffer_size2;
@@ -495,7 +495,7 @@ class TestConnection {
     magma_connection_release_buffer(connection_, buffer);
   }
 
-  void BufferExport(uint32_t* handle_out, uint64_t* id_out) {
+  void BufferExportOld(uint32_t* handle_out, uint64_t* id_out) {
     ASSERT_TRUE(connection_);
 
     uint64_t size = page_size();
@@ -508,6 +508,23 @@ class TestConnection {
     *id_out = buffer_id;
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, handle_out));
+
+    magma_connection_release_buffer(connection_, buffer);
+  }
+
+  void BufferExport(uint32_t* handle_out, uint64_t* id_out) {
+    ASSERT_TRUE(connection_);
+
+    uint64_t size = page_size();
+    magma_buffer_t buffer;
+    uint64_t buffer_id;
+
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer2(connection_, size, &size, &buffer, &buffer_id));
+
+    *id_out = buffer_id;
+
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_export(buffer, handle_out));
 
     magma_connection_release_buffer(connection_, buffer);
   }
@@ -789,7 +806,7 @@ class TestConnection {
 #endif
   }
 
-  void SemaphoreExport(magma_handle_t* handle_out, uint64_t* id_out) {
+  void SemaphoreExportOld(magma_handle_t* handle_out, uint64_t* id_out) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
@@ -797,6 +814,16 @@ class TestConnection {
     *id_out = magma_semaphore_get_id(semaphore);
     EXPECT_EQ(magma_connection_export_semaphore(connection_, semaphore, handle_out),
               MAGMA_STATUS_OK);
+    magma_connection_release_semaphore(connection_, semaphore);
+  }
+
+  void SemaphoreExport(magma_handle_t* handle_out, uint64_t* id_out) {
+    ASSERT_TRUE(connection_);
+
+    magma_semaphore_t semaphore;
+    ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
+    *id_out = magma_semaphore_get_id(semaphore);
+    EXPECT_EQ(magma_semaphore_export(semaphore, handle_out), MAGMA_STATUS_OK);
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
@@ -808,6 +835,13 @@ class TestConnection {
     EXPECT_NE(magma_semaphore_get_id(semaphore), exported_id);
 
     magma_connection_release_semaphore(connection_, semaphore);
+  }
+
+  static void SemaphoreImportExportOld(TestConnection* test1, TestConnection* test2) {
+    magma_handle_t handle;
+    uint64_t exported_id;
+    test1->SemaphoreExportOld(&handle, &exported_id);
+    test2->SemaphoreImport(handle, exported_id);
   }
 
   static void SemaphoreImportExport(TestConnection* test1, TestConnection* test2) {
@@ -1407,7 +1441,7 @@ TEST_F(Magma, BufferImportExportOld) {
 
   uint32_t handle;
   uint64_t exported_id;
-  test1.BufferExport(&handle, &exported_id);
+  test1.BufferExportOld(&handle, &exported_id);
   test2.BufferImportOld(handle, exported_id);
 }
 

@@ -10,6 +10,7 @@ Symbols:
   - { Name: magma_buffer_constraints_release2, Type: Func }
   - { Name: magma_buffer_constraints_set_colorspaces2, Type: Func }
   - { Name: magma_buffer_constraints_set_format2, Type: Func }
+  - { Name: magma_buffer_export, Type: Func }
   - { Name: magma_buffer_get_cache_policy, Type: Func }
   - { Name: magma_buffer_get_handle, Type: Func }
   - { Name: magma_buffer_get_id, Type: Func }
@@ -64,6 +65,7 @@ Symbols:
   - { Name: magma_initialize_logging, Type: Func }
   - { Name: magma_initialize_tracing, Type: Func }
   - { Name: magma_poll, Type: Func }
+  - { Name: magma_semaphore_export, Type: Func }
   - { Name: magma_semaphore_get_id, Type: Func }
   - { Name: magma_semaphore_reset, Type: Func }
   - { Name: magma_semaphore_signal, Type: Func }

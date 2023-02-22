@@ -212,8 +212,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
 
       {
         magma_handle_t buffer_handle;
-        EXPECT_EQ(MAGMA_STATUS_OK,
-                  magma_connection_export_buffer(connection_, image, &buffer_handle));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_export(image, &buffer_handle));
         fd = buffer_handle;
       }
 

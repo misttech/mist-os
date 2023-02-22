@@ -315,33 +315,44 @@ pub fn execute_command(
 /// a raw handle provided by magma.
 pub fn export_buffer(
     current_task: &CurrentTask,
-    control: virtio_magma_connection_export_buffer_ctrl_t,
-    response: &mut virtio_magma_connection_export_buffer_resp_t,
+    control: virtio_magma_buffer_export_ctrl_t,
+    response: &mut virtio_magma_buffer_export_resp_t,
     connections: &ConnectionMap,
 ) -> Result<(), Errno> {
     let mut buffer_handle_out = 0;
     let status = unsafe {
-        magma_connection_export_buffer(
-            control.connection as magma_connection_t,
+        magma_buffer_export(
             control.buffer as magma_buffer_t,
             &mut buffer_handle_out as *mut magma_handle_t,
         )
     };
     if status as u32 == MAGMA_STATUS_OK {
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) };
-        let file = match connections
-            .get(&{ control.connection })
-            .and_then(|buffers| buffers.get(&(control.buffer as magma_buffer_t)))
-        {
-            Some(BufferInfo::Image(image_info)) => {
-                ImageFile::new_file(current_task, image_info.clone(), vmo)
+
+        let mut image_info_opt: Option<ImageInfo> = None;
+        'outer: for image_map in connections.values() {
+            for (image, info) in image_map {
+                if *image == control.buffer {
+                    if let BufferInfo::Image(image_info) = info.clone() {
+                        image_info_opt = Some(image_info);
+                        break 'outer;
+                    }
+                }
             }
-            _ => Anon::new_file(
-                current_task,
-                Box::new(VmoFileObject::new(Arc::new(vmo))),
-                OpenFlags::RDWR,
-            ),
+        }
+
+        let file = {
+            if let Some(image_info) = image_info_opt {
+                ImageFile::new_file(current_task, image_info, vmo)
+            } else {
+                Anon::new_file(
+                    current_task,
+                    Box::new(VmoFileObject::new(Arc::new(vmo))),
+                    OpenFlags::RDWR,
+                )
+            }
         };
+
         let fd = current_task.files.add_with_flags(file, FdFlags::empty())?;
         response.buffer_handle_out = fd.raw() as u64;
     }

@@ -645,11 +645,10 @@ TEST_F(VirtioMagmaTest, HandleImportExport) {
   ASSERT_NO_FATAL_FAILURE(CreateImage(connection, &create_info, &image, &size));
 
   {
-    virtio_magma_connection_export_buffer_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_BUFFER;
-    request.connection = connection;
+    virtio_magma_buffer_export_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_BUFFER_EXPORT;
     request.buffer = image;
-    virtio_magma_connection_export_buffer_resp_t response{};
+    virtio_magma_buffer_export_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -664,7 +663,7 @@ TEST_F(VirtioMagmaTest, HandleImportExport) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_BUFFER_EXPORT);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_EQ(response.buffer_handle_out, kMockVfdId);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
