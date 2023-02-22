@@ -55,6 +55,12 @@ struct UEventFile {
     device: DeviceType,
 }
 
+impl UEventFile {
+    fn parse_commands(data: &[u8]) -> Vec<&[u8]> {
+        data.split(|&c| c == b'\0' || c == b'\n').collect()
+    }
+}
+
 impl FileOps for UEventFile {
     fileops_impl_seekable!();
 
@@ -77,15 +83,26 @@ impl FileOps for UEventFile {
     fn write_at(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
-        _data: &mut dyn InputBuffer,
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if offset != 0 {
             return error!(EINVAL);
         }
-        // TODO(fxb/119437): Transmit command to DeviceRegistry
-        error!(EINVAL)
+        let content = data.read_all()?;
+        for command in Self::parse_commands(&content) {
+            match command {
+                b"" => { // Ignore empty lines
+                }
+                b"add" => {
+                    current_task.kernel().device_registry.write().dispatch_event(self.device);
+                }
+                // TODO(fxb/119437): Handle other commands
+                _ => return error!(EINVAL),
+            }
+        }
+        Ok(content.len())
     }
 }
 

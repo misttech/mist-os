@@ -112,7 +112,7 @@ async fn connect_to_vsock(
         bridge_socket,
         OpenFlags::RDWR | OpenFlags::NONBLOCK,
     )?;
-    socket.remote_connection(pipe)?;
+    socket.remote_connection(&galaxy.system_task, pipe)?;
 
     Ok(())
 }

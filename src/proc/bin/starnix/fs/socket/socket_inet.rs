@@ -7,7 +7,6 @@ use super::*;
 use crate::fs::buffers::*;
 use crate::fs::fuchsia::*;
 use crate::fs::*;
-use crate::logging::*;
 use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
@@ -143,9 +142,13 @@ impl SocketOps for InetSocket {
         ))
     }
 
-    fn remote_connection(&self, _socket: &Socket, _file: FileHandle) -> Result<(), Errno> {
-        not_implemented!("?", "InetSocket::remote_connection is stubbed");
-        Ok(())
+    fn remote_connection(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        _file: FileHandle,
+    ) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
     }
 
     fn bind(

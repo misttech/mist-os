@@ -50,20 +50,35 @@ where
     }
 }
 
+/// Keys returned by the registration method for `DeviceListener`s that allows to unregister a
+/// listener.
+pub type DeviceListenerKey = u64;
+
+/// A listener for uevents on devices.
+pub trait DeviceListener: Send + Sync {
+    fn on_device_event(&self, seqnum: u64, device: DeviceType);
+}
+
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
     /// Maps device identifier to character device implementation.
     char_devices: BTreeMap<u32, Box<dyn DeviceOps>>,
     dyn_devices: Arc<RwLock<DynRegistry>>,
     next_anon_minor: u32,
+    listeners: BTreeMap<u64, Box<dyn DeviceListener>>,
+    next_listener_id: u64,
+    next_event_id: u64,
 }
 
 impl DeviceRegistry {
     pub fn new() -> Self {
         let mut registry = Self {
             char_devices: BTreeMap::new(),
-            dyn_devices: Arc::new(RwLock::new(DynRegistry::new())),
+            dyn_devices: Default::default(),
             next_anon_minor: 1,
+            listeners: Default::default(),
+            next_listener_id: 0,
+            next_event_id: 0,
         };
         registry.char_devices.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
         registry
@@ -104,6 +119,33 @@ impl DeviceRegistry {
         id
     }
 
+    /// Register a new listener for uevents on devices.
+    ///
+    /// Returns a key used to unregister the listener.
+    pub fn register_listener(
+        &mut self,
+        listener: impl DeviceListener + 'static,
+    ) -> DeviceListenerKey {
+        let key = self.next_listener_id;
+        self.next_listener_id += 1;
+        self.listeners.insert(key, Box::new(listener));
+        key
+    }
+
+    /// Unregister a listener previously registered through `register_listener`.
+    pub fn unregister_listener(&mut self, key: &DeviceListenerKey) {
+        self.listeners.remove(key);
+    }
+
+    /// Dispatch an uevent for the given `device`.
+    pub fn dispatch_event(&mut self, device: DeviceType) {
+        let event_id = self.next_event_id;
+        self.next_event_id += 1;
+        for listener in self.listeners.values() {
+            listener.on_device_event(event_id, device)
+        }
+    }
+
     /// Opens a device file corresponding to the device identifier `dev`.
     pub fn open_device(
         &self,
@@ -124,16 +166,13 @@ impl DeviceRegistry {
     }
 }
 
+#[derive(Default)]
 struct DynRegistry {
     dyn_devices: BTreeMap<u32, Box<dyn DeviceOps>>,
     next_dynamic_minor: u32,
 }
 
 impl DynRegistry {
-    fn new() -> Self {
-        Self { dyn_devices: BTreeMap::new(), next_dynamic_minor: 0 }
-    }
-
     fn register(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
         let minor = self.next_dynamic_minor;
         if minor > 255 {

@@ -144,8 +144,10 @@ impl UnixSocket {
         open_flags: OpenFlags,
     ) -> Result<(FileHandle, FileHandle), Errno> {
         let credentials = current_task.as_ucred();
-        let left = Socket::new(domain, socket_type, SocketProtocol::default())?;
-        let right = Socket::new(domain, socket_type, SocketProtocol::default())?;
+        let left =
+            Socket::new(current_task.kernel(), domain, socket_type, SocketProtocol::default())?;
+        let right =
+            Socket::new(current_task.kernel(), domain, socket_type, SocketProtocol::default())?;
         downcast_socket_to_unix(&left).lock().state = UnixSocketState::Connected(right.clone());
         downcast_socket_to_unix(&left).lock().credentials = Some(credentials.clone());
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
@@ -158,8 +160,8 @@ impl UnixSocket {
     fn connect_stream(
         &self,
         socket: &SocketHandle,
+        current_task: &CurrentTask,
         peer: &SocketHandle,
-        credentials: ucred,
     ) -> Result<(), Errno> {
         // Only hold one lock at a time until we make sure the lock ordering
         // is right: client before listener
@@ -188,9 +190,14 @@ impl UnixSocket {
             return error!(EAGAIN);
         }
 
-        let server = Socket::new(peer.domain, peer.socket_type, SocketProtocol::default())?;
+        let server = Socket::new(
+            current_task.kernel(),
+            peer.domain,
+            peer.socket_type,
+            SocketProtocol::default(),
+        )?;
         client.state = UnixSocketState::Connected(server.clone());
-        client.credentials = Some(credentials);
+        client.credentials = Some(current_task.as_ucred());
         {
             let mut server = downcast_socket_to_unix(&server).lock();
             server.state = UnixSocketState::Connected(socket.clone());
@@ -423,7 +430,7 @@ impl SocketOps for UnixSocket {
         };
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {
-                self.connect_stream(socket, &peer, current_task.as_ucred())
+                self.connect_stream(socket, current_task, &peer)
             }
             SocketType::Datagram | SocketType::Raw => self.connect_datagram(socket, &peer),
             _ => error!(EINVAL),
@@ -465,7 +472,12 @@ impl SocketOps for UnixSocket {
         queue.sockets.pop_front().ok_or_else(|| errno!(EAGAIN))
     }
 
-    fn remote_connection(&self, _socket: &Socket, _file: FileHandle) -> Result<(), Errno> {
+    fn remote_connection(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        _file: FileHandle,
+    ) -> Result<(), Errno> {
         error!(EOPNOTSUPP)
     }
 
@@ -965,15 +977,16 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_socket_send_capacity() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let socket = Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
-            .expect("Failed to create socket.");
+        let (kernel, current_task) = create_kernel_and_task();
+        let socket =
+            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
+                .expect("Failed to create socket.");
         socket
             .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
             .expect("Failed to bind socket.");
         socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
         let connecting_socket =
-            Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
+            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
                 .expect("Failed to connect socket.");
         connecting_socket
             .connect(&current_task, SocketPeer::Handle(socket.clone()))

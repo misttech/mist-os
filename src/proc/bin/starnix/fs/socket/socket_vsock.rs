@@ -110,7 +110,12 @@ impl SocketOps for VsockSocket {
         Ok(socket)
     }
 
-    fn remote_connection(&self, socket: &Socket, file: FileHandle) -> Result<(), Errno> {
+    fn remote_connection(
+        &self,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        file: FileHandle,
+    ) -> Result<(), Errno> {
         // we only allow non-blocking files here, so that
         // read and write on file can return EAGAIN.
         assert!(file.flags().contains(OpenFlags::NONBLOCK));
@@ -128,6 +133,7 @@ impl SocketOps for VsockSocket {
                     return error!(EAGAIN);
                 }
                 let remote_socket = Socket::new(
+                    current_task.kernel(),
                     SocketDomain::Vsock,
                     SocketType::Stream,
                     SocketProtocol::default(),
@@ -300,13 +306,17 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_vsock_socket() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
         const VSOCK_PORT: u32 = 5555;
 
-        let listen_socket =
-            Socket::new(SocketDomain::Vsock, SocketType::Stream, SocketProtocol::default())
-                .expect("Failed to create socket.");
+        let listen_socket = Socket::new(
+            &kernel,
+            SocketDomain::Vsock,
+            SocketType::Stream,
+            SocketProtocol::default(),
+        )
+        .expect("Failed to create socket.");
         current_task
             .abstract_vsock_namespace
             .bind(&current_task, VSOCK_PORT, &listen_socket)
@@ -319,7 +329,7 @@ mod tests {
             .expect("Failed to look up listening socket.");
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
-        listen_socket.remote_connection(remote).unwrap();
+        listen_socket.remote_connection(&current_task, remote).unwrap();
 
         let server_socket = listen_socket.accept().unwrap();
 
@@ -351,9 +361,13 @@ mod tests {
     fn test_vsock_write_while_read() {
         let (kernel, current_task) = create_kernel_and_task();
         let (fs1, fs2) = fidl::Socket::create_stream();
-        let socket =
-            Socket::new(SocketDomain::Vsock, SocketType::Stream, SocketProtocol::default())
-                .expect("Failed to create socket.");
+        let socket = Socket::new(
+            &kernel,
+            SocketDomain::Vsock,
+            SocketType::Stream,
+            SocketProtocol::default(),
+        )
+        .expect("Failed to create socket.");
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
         downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
@@ -382,15 +396,19 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_vsock_poll() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
-        let socket_object =
-            Socket::new(SocketDomain::Vsock, SocketType::Stream, SocketProtocol::default())
-                .expect("Failed to create socket.");
+        let socket_object = Socket::new(
+            &kernel,
+            SocketDomain::Vsock,
+            SocketType::Stream,
+            SocketProtocol::default(),
+        )
+        .expect("Failed to create socket.");
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
         let socket = Socket::new_file(&current_task, socket_object, OpenFlags::RDWR);
 

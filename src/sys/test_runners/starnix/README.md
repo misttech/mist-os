@@ -59,10 +59,8 @@ appropriate galaxy configuration values. For example,
             "/data/tmp:tmpfs",
             "/tmp:tmpfs",
             "/dev/pts:devpts",
-
-            // TODO(tbodt): Stop overloading /var, create a real /sys.
-            "/var:sysfs",
-            "/var/fs/bpf:bpf",
+            "/sys:sysfs",
+            "/sys/fs/bpf:bpf",
         ],
         name: "chromiumos_test",
         startup_file_path: "",

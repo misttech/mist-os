@@ -269,6 +269,7 @@ impl DirEntry {
                 let node = self.node.mknod(current_task, name, mode, dev, owner)?;
                 if mode.is_sock() {
                     node.set_socket(Socket::new(
+                        current_task.kernel(),
                         SocketDomain::Unix,
                         SocketType::Stream,
                         SocketProtocol::default(),

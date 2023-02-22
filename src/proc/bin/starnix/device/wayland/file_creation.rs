@@ -14,8 +14,12 @@ pub fn create_display_socket(
     current_task: &CurrentTask,
     display_path: FsString,
 ) -> Result<SocketHandle, Errno> {
-    let display_socket =
-        Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())?;
+    let display_socket = Socket::new(
+        current_task.kernel(),
+        SocketDomain::Unix,
+        SocketType::Stream,
+        SocketProtocol::default(),
+    )?;
 
     let (socket_parent, socket_basename) =
         current_task.lookup_parent_at(FdNumber::AT_FDCWD, &display_path)?;

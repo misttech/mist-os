@@ -46,7 +46,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     ///
     /// - `socket`: A listening socket (for streams) or a datagram socket
     /// - `local_handle`: our side of a remote socket connection
-    fn remote_connection(&self, socket: &Socket, local_handle: FileHandle) -> Result<(), Errno>;
+    fn remote_connection(
+        &self,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        local_handle: FileHandle,
+    ) -> Result<(), Errno>;
 
     /// Binds this socket to a `socket_address`.
     ///
@@ -223,6 +228,7 @@ pub enum SocketPeer {
 }
 
 fn create_socket_ops(
+    kernel: &Arc<Kernel>,
     domain: SocketDomain,
     socket_type: SocketType,
     protocol: SocketProtocol,
@@ -235,7 +241,7 @@ fn create_socket_ops(
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
-            new_netlink_socket(socket_type, netlink_family)
+            new_netlink_socket(kernel, socket_type, netlink_family)
         }
     }
 }
@@ -246,11 +252,12 @@ impl Socket {
     /// # Parameters
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
     pub fn new(
+        kernel: &Arc<Kernel>,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> Result<SocketHandle, Errno> {
-        let ops = create_socket_ops(domain, socket_type, protocol)?;
+        let ops = create_socket_ops(kernel, domain, socket_type, protocol)?;
         Ok(Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() }))
     }
 
@@ -390,8 +397,12 @@ impl Socket {
     }
 
     #[allow(dead_code)]
-    pub fn remote_connection(&self, file: FileHandle) -> Result<(), Errno> {
-        self.ops.remote_connection(self, file)
+    pub fn remote_connection(
+        &self,
+        current_task: &CurrentTask,
+        file: FileHandle,
+    ) -> Result<(), Errno> {
+        self.ops.remote_connection(self, current_task, file)
     }
 
     pub fn read(
@@ -493,16 +504,17 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_read_write_kernel() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let socket = Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
-            .expect("Failed to create socket.");
+        let (kernel, current_task) = create_kernel_and_task();
+        let socket =
+            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
+                .expect("Failed to create socket.");
         socket
             .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
             .expect("Failed to bind socket.");
         socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
         assert_eq!(FdEvents::empty(), socket.query_events(&current_task));
         let connecting_socket =
-            Socket::new(SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
+            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
                 .expect("Failed to create socket.");
         connecting_socket
             .connect(&current_task, SocketPeer::Handle(socket.clone()))
@@ -533,11 +545,15 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_dgram_socket() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let bind_address = SocketAddress::Unix(b"dgram_test".to_vec());
-        let rec_dgram =
-            Socket::new(SocketDomain::Unix, SocketType::Datagram, SocketProtocol::default())
-                .expect("Failed to create socket.");
+        let rec_dgram = Socket::new(
+            &kernel,
+            SocketDomain::Unix,
+            SocketType::Datagram,
+            SocketProtocol::default(),
+        )
+        .expect("Failed to create socket.");
         let passcred: u32 = 1;
         let opt_size = std::mem::size_of::<u32>();
         let user_address = map_memory(&current_task, UserAddress::default(), opt_size as u64);
@@ -551,8 +567,13 @@ mod tests {
         let xfer_value: u64 = 1234567819;
         let xfer_bytes = xfer_value.to_ne_bytes();
 
-        let send = Socket::new(SocketDomain::Unix, SocketType::Datagram, SocketProtocol::default())
-            .expect("Failed to connect socket.");
+        let send = Socket::new(
+            &kernel,
+            SocketDomain::Unix,
+            SocketType::Datagram,
+            SocketProtocol::default(),
+        )
+        .expect("Failed to connect socket.");
         send.connect(&current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
         let no_write = send
             .write(&current_task, &mut VecInputBuffer::new(&xfer_bytes), &mut None, &mut vec![])
