@@ -126,9 +126,10 @@ For information on packaging and running tests, see
 
 The following in-tree third-party crates can help you write tests:
 
-* [`matches`]: provides the macro `assert_matches!`, making pattern assertions ergonomic.
-* [`pretty_assertions`]: provides an alternative `assert_eq!` macro that displays a colored diff
-  when the assertion fails.
+* [`assert_matches`]: provides the macro `assert_matches!`, making pattern
+  assertions ergonomic.
+* [`pretty_assertions`]: provides an alternative `assert_eq!` macro that
+  displays a colored diff when the assertion fails.
 
 These can be included in your `BUILD.gn` under `test_deps`.
 
@@ -149,5 +150,5 @@ rustc_binary("bin") {
 [component-tests]:/docs/development/testing/components/test_component.md
 [example-src]: /examples/hello_world/rust
 [glossary.component-manifest]: /docs/glossary/README.md#component-manifest
-[`matches`]: https://fuchsia-docs.firebaseapp.com/rust/matches/index.html
+[`assert_matches`]: https://fuchsia-docs.firebaseapp.com/rust/assert_matches/index.html
 [`pretty_assertions`]: https://fuchsia-docs.firebaseapp.com/rust/pretty_assertions/index.html
