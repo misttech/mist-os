@@ -12,7 +12,7 @@ use fidl_fuchsia_net_stack as fnet_stack;
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _};
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
-use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
@@ -73,7 +73,7 @@ const RESPONSE: &str = "hello from server";
     };
     "ipv6"
 )]
-async fn forwarding(name: &str, setup: Setup) {
+async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
     let Setup {
         client_ip,
         client_subnet,
@@ -89,15 +89,12 @@ async fn forwarding(name: &str, setup: Setup) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let client_net = sandbox.create_network("client").await.expect("create network");
     let server_net = sandbox.create_network("server").await.expect("create network");
-    let client = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
-        .expect("create realm");
-    let server = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
-        .expect("create realm");
-    let router = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_router", name))
-        .expect("create realm");
+    let client =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_client", name)).expect("create realm");
+    let server =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_server", name)).expect("create realm");
+    let router =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_router", name)).expect("create realm");
 
     let client_iface = client
         .join_network(&client_net, "client-ep")
