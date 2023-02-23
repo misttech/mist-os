@@ -17,13 +17,14 @@ source_set("common") {
     "common.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/zxtest",
   ]
   deps = [
     ":device-enumeration-shard",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -58,8 +59,6 @@ test("device-enumeration") {
     ":common",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp_wire",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
   ]
 }
 

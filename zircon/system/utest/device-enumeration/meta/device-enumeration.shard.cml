@@ -8,7 +8,12 @@
         "//src/devices/testing/devices_test.shard.cml",
     ],
     use: [
-        { protocol: "fuchsia.driver.development.DriverDevelopment" },
+        {
+            protocol: [
+                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.sysinfo.SysInfo",
+            ],
+        },
         {
             directory: "dev-topological",
             rights: [ "rw*" ],
