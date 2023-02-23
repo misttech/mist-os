@@ -35,6 +35,7 @@ impl ScrutinyBuilder {
     /// Builds a [`Scrutiny`] based on data in builder. This builder relies on the
     /// `ProductBundleRepositoryBlobs::blob_set()` API to construct a `BlobSet` from a product
     /// bundle repository blobs directory.
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<Scrutiny, ScrutinyBuilderError> {
         let product_bundle = self.product_bundle.clone();
         let product_bundle_blobs_set = product_bundle.repository().blobs().blob_set()?;

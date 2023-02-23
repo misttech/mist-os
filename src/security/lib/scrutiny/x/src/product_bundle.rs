@@ -149,6 +149,7 @@ impl ProductBundleBuilder {
     }
 
     /// Builds a [`ProductBundle`] based on data encoded in this builder.
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<ProductBundle, ProductBundleBuilderError> {
         let directory =
             self.directory.ok_or_else(|| ProductBundleBuilderError::MissingDirectory)?;

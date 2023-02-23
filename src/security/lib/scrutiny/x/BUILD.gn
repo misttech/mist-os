@@ -41,6 +41,7 @@ if (is_host) {
       "//third_party/rust_crates:camino",
       "//third_party/rust_crates:rayon",
       "//third_party/rust_crates:thiserror",
+      "//third_party/rust_crates:tracing",
 
       # TODO(fxbug.dev/112505): This dependency was introduced for accessing blobfs archives via
       # bespoke code that is not owned by the storage team. `scrutiny_x` should contain its own

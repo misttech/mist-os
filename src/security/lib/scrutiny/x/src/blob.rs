@@ -262,6 +262,7 @@ mod blobfs {
         }
 
         /// Builds a [`BlobFsBlobSet`] based on data accumulated in builder.
+        #[tracing::instrument(level = "trace", skip_all)]
         pub fn build(self) -> Result<BlobFsBlobSet, BlobFsBlobSetBuilderError> {
             if self.archive_path.is_none() {
                 return Err(BlobFsBlobSetBuilderError::MissingArchivePath);
@@ -567,6 +568,7 @@ impl BlobDirectoryBlobSetBuilder {
     ///
     /// After these checks are performed, the set of verified hashes is passed to a
     /// [`BlobDirectoryBlobSet`] constructor.
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<BlobDirectoryBlobSet, BlobDirectoryBlobSetBuilderError> {
         if self.directory.is_none() {
             return Err(BlobDirectoryBlobSetBuilderError::MissingDirectory);
@@ -1083,6 +1085,7 @@ pub mod fake {
             self
         }
 
+        #[tracing::instrument(level = "trace", skip_all)]
         pub fn build(self) -> (BlobSet<H>, H) {
             (BlobSet::from_hash_map(self.blobs), self.next_id)
         }
