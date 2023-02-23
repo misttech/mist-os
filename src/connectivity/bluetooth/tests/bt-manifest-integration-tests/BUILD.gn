@@ -165,7 +165,7 @@ rustc_binary("bt_a2dp_topology_fake_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_rust",
-    "//sdk/fidl/fuchsia.bluetooth.avdtp:fuchsia.bluetooth.avdtp_rust",
+    "//sdk/fidl/fuchsia.bluetooth.avdtp.test:fuchsia.bluetooth.avdtp.test_rust",
     "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
@@ -204,7 +204,7 @@ rustc_test("bt_a2dp_smoke_test_bin") {
   source_root = "src/bt_a2dp_smoke_test.rs"
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_rust",
-    "//sdk/fidl/fuchsia.bluetooth.avdtp:fuchsia.bluetooth.avdtp_rust",
+    "//sdk/fidl/fuchsia.bluetooth.avdtp.test:fuchsia.bluetooth.avdtp.test_rust",
     "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",

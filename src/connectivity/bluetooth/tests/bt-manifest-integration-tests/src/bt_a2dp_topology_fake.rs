@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeRequestStream},
-    fidl_fuchsia_bluetooth_avdtp as fidl_avdtp, fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
+    fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp, fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     fidl_fuchsia_bluetooth_bredr::ProfileMarker,
     fidl_fuchsia_bluetooth_component::LifecycleMarker,
     fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerRequestStream},

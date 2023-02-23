@@ -1,7 +1,7 @@
 # bt-avdtp-tool
 
 `bt-avdtp-tool` sends AVDTP commands to a peer that is connected using the
-`fuchsia.bluetooth.avdtp.PeerManager` protocol.
+`fuchsia.bluetooth.avdtp.test.PeerManager` protocol.
 
 The primary use of this tool is to provide user prompted commands to a
 Fuchsia device under test for passing PTS certification tests.

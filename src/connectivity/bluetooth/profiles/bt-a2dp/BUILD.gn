@@ -143,7 +143,7 @@ core_shard("eager_with_mediaplayer_core_shard") {
 
 # The core realm shards to be used by product integrators.
 # The "testonly-core-shard" should be used in test configurations in which A2DP is started by
-# requesting a capability it exposes (e.g `fuchsia.bluetooth.avdtp.PeerManager`).
+# requesting a capability it exposes (e.g `fuchsia.bluetooth.avdtp.test.PeerManager`).
 core_shard("testonly-core-shard") {
   shard_file = "meta/bt-a2dp-testonly.core_shard.cml"
 }

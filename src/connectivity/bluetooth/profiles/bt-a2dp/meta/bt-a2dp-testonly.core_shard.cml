@@ -5,7 +5,7 @@
     include: [ "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-lazy.core_shard.cml" ],
     use: [
         {
-            protocol: [ "fuchsia.bluetooth.avdtp.PeerManager" ],
+            protocol: [ "fuchsia.bluetooth.avdtp.test.PeerManager" ],
             from: "#bt-a2dp",
         },
     ],

@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_bluetooth_avdtp::*;
+use fidl_fuchsia_bluetooth_avdtp_test::*;
 use fuchsia_async as fasync;
 use futures::channel::mpsc::{channel, SendError};
 use futures::{try_join, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};

@@ -582,8 +582,8 @@ async fn main() -> Result<(), Error> {
 
     let peers = Arc::new(Mutex::new(peers));
 
-    // `bt-a2dp` provides the `avdtp.PeerManager`, `a2dp.AudioMode`, and `internal.a2dp.Controller`
-    // capabilities.
+    // `bt-a2dp` provides the `avdtp.test.PeerManager`, `a2dp.AudioMode`, and
+    // `internal.a2dp.Controller` capabilities.
     let _ =
         fs.dir("svc").add_fidl_service(move |s| controller_pool.connected(s)).add_fidl_service({
             let peers = peers.clone();

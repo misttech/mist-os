@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_bluetooth_a2dp as fidl_a2dp, fidl_fuchsia_bluetooth_avdtp as fidl_avdtp,
+    fidl_fuchsia_bluetooth_a2dp as fidl_a2dp, fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp,
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream},
     fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerProxy},
@@ -129,7 +129,8 @@ impl From<BatteryManagerRequestStream> for Event {
     }
 }
 
-/// Represents a fake A2DP client that requests the `avdtp.PeerManager` and `a2dp.AudioMode` services.
+/// Represents a fake A2DP client that requests the `avdtp.test.PeerManager` and `a2dp.AudioMode`
+/// services.
 async fn mock_a2dp_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
@@ -287,8 +288,8 @@ async fn a2dp_v2_component_topology() {
     //   - `bt-a2dp` connecting to the 11 services specified in its manifest.
     //   - `bt-avrcp-target` (a child of bt-a2dp) connecting to the 3 services specified in its
     //     manifest.
-    //   - `fake-a2dp-client` connecting to the `avdtp.PeerManager`, `AudioMode`, & `Controller`
-    //     services which are provided by `bt-a2dp`.
+    //   - `fake-a2dp-client` connecting to the `avdtp.test.PeerManager`, `AudioMode`, &
+    //     `Controller` services which are provided by `bt-a2dp`.
     let mut events = Vec::new();
     let expected_number_of_events = 17;
     for i in 0..expected_number_of_events {

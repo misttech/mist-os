@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_bluetooth::{Appearance, Uuid as FidlUuid};
-use fidl_fuchsia_bluetooth_avdtp::PeerControllerProxy;
+use fidl_fuchsia_bluetooth_avdtp_test::PeerControllerProxy;
 use fidl_fuchsia_bluetooth_avrcp::{
     AvcPanelCommand, BatteryStatus, CustomAttributeValue, CustomPlayerApplicationSetting,
     Equalizer, PlayStatus, PlaybackStatus, PlayerApplicationSettingAttributeId,

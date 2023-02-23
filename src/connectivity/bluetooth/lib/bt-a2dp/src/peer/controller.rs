@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    bt_avdtp::{Error, MediaCodecType, MediaType, ServiceCapability, StreamEndpointId},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_bluetooth_avdtp::{
-        PeerControllerMarker, PeerControllerRequest, PeerControllerRequestStream, PeerError,
-        PeerManagerControlHandle, PeerManagerRequest, PeerManagerRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::{detachable_map::DetachableWeak, types::PeerId},
-    futures::{TryFutureExt, TryStreamExt},
-    parking_lot::Mutex,
-    std::{collections::HashMap, convert::TryInto, sync::Arc},
-    tracing::{error, info, warn},
+use anyhow::format_err;
+use bt_avdtp::{Error, MediaCodecType, MediaType, ServiceCapability, StreamEndpointId};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_bluetooth_avdtp_test::{
+    PeerControllerMarker, PeerControllerRequest, PeerControllerRequestStream, PeerError,
+    PeerManagerControlHandle, PeerManagerRequest, PeerManagerRequestStream,
 };
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::{detachable_map::DetachableWeak, types::PeerId};
+use futures::{TryFutureExt, TryStreamExt};
+use parking_lot::Mutex;
+use std::{collections::HashMap, convert::TryInto, sync::Arc};
+use tracing::{error, info, warn};
 
 use crate::peer::Peer;
 
@@ -395,7 +393,7 @@ mod tests {
     use super::*;
     use bt_avdtp::{EndpointType, ErrorCode, Peer as AvdtpPeer, Request, StreamInformation};
     use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
-    use fidl_fuchsia_bluetooth_avdtp::*;
+    use fidl_fuchsia_bluetooth_avdtp_test::*;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::{detachable_map::DetachableMap, types::Channel};

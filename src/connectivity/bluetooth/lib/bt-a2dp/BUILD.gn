@@ -11,7 +11,7 @@ rustc_library("bt-a2dp") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
-    "//sdk/fidl/fuchsia.bluetooth.avdtp:fuchsia.bluetooth.avdtp_rust",
+    "//sdk/fidl/fuchsia.bluetooth.avdtp.test:fuchsia.bluetooth.avdtp.test_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/connectivity/bluetooth/lib/bt-avdtp",

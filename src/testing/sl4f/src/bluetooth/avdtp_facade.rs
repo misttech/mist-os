@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_bluetooth_avdtp::{
+use fidl_fuchsia_bluetooth_avdtp_test::{
     PeerControllerMarker, PeerControllerProxy, PeerManagerEvent, PeerManagerMarker,
     PeerManagerProxy,
 };

@@ -1,7 +1,9 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {fidl_fuchsia_bluetooth_avdtp::PeerControllerProxy, std::collections::HashMap};
+
+use fidl_fuchsia_bluetooth_avdtp_test::PeerControllerProxy;
+use std::collections::HashMap;
 
 /// Prompt to be shown for tool's REPL
 pub static PROMPT: &str = "\x1b[34mavdtp>\x1b[0m ";
