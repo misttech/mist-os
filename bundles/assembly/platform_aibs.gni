@@ -10,13 +10,13 @@ platform_aib_names = [
   ###
   # The common platform bundles
 
-  # The bootstrap feature-set-level:
-  "common_bootstrap",
+  # The bootstrap feature-set-level
+  "bootstrap",
 
   # The core realm
-  "common_core_realm",
+  "core_realm",
 
-  # minimal feature-set-level:
+  # The minimal feature-set-level
   "common_minimal",
   "common_minimal_userdebug",
 

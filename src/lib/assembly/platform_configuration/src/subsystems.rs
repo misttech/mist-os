@@ -81,30 +81,25 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
         // Set up the platform's common AIBs by feature_set_level and build_type.
         for bundle_name in match (context.feature_set_level, context.build_type) {
             (FeatureSupportLevel::Bootstrap, _) => {
-                vec!["common_bootstrap"]
+                vec!["bootstrap"]
             }
             (FeatureSupportLevel::Utility, _) => {
-                vec!["common_bootstrap", "common_core_realm"]
+                vec!["bootstrap", "core_realm"]
             }
             (FeatureSupportLevel::Minimal, BuildType::Eng) => {
                 vec![
-                    "common_bootstrap",
-                    "common_core_realm",
+                    "bootstrap",
+                    "core_realm",
                     "common_minimal",
                     "common_minimal_eng",
                     "common_minimal_userdebug",
                 ]
             }
             (FeatureSupportLevel::Minimal, BuildType::UserDebug) => {
-                vec![
-                    "common_bootstrap",
-                    "common_core_realm",
-                    "common_minimal",
-                    "common_minimal_userdebug",
-                ]
+                vec!["bootstrap", "core_realm", "common_minimal", "common_minimal_userdebug"]
             }
             (FeatureSupportLevel::Minimal, BuildType::User) => {
-                vec!["common_bootstrap", "common_core_realm", "common_minimal"]
+                vec!["bootstrap", "core_realm", "common_minimal"]
             }
         } {
             builder.platform_bundle(bundle_name);
