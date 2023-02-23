@@ -32,13 +32,13 @@ typedef uint32_t zx_vcpu_state_topic_t;
 // Rename to zx_vcpu_state_general_regs_t
 // Structure to read and write VCPU state.
 typedef struct zx_vcpu_state {
-#if __aarch64__
+#if defined(__aarch64__)
   uint64_t x[31];
   uint64_t sp;
   // Contains only the user-controllable upper 4-bits (NZCV).
   uint32_t cpsr;
   uint8_t padding1[4];
-#elif __x86_64__
+#elif defined(__x86_64__)
   uint64_t rax;
   uint64_t rcx;
   uint64_t rdx;
@@ -57,6 +57,9 @@ typedef struct zx_vcpu_state {
   uint64_t r15;
   // Contains only the user-controllable lower 32-bits.
   uint64_t rflags;
+#else
+  // Placeholder to avoid warnings about C vs C++ struct size differences.
+  uint32_t empty;
 #endif
 } zx_vcpu_state_t;
 

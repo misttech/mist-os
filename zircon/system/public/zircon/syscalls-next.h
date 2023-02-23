@@ -99,6 +99,9 @@ typedef struct zx_restricted_state {
   uint64_t ip, flags;
 
   uint64_t fs_base, gs_base;
+#else
+  // Avoids sizing differences for empty structs between C and C++.
+  uint32_t reserved;
 #endif
 } zx_restricted_state_t;
 

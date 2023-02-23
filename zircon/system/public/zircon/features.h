@@ -53,6 +53,10 @@
 // arm64 address-tagging features
 #define ZX_ARM64_FEATURE_ADDRESS_TAGGING_TBI  ((uint32_t)(1u << 0))
 
+#elif defined(__riscv)
+
+// TODO(mcgrathr): RISC-V CPU features.
+
 #else
 
 #error what architecture?
