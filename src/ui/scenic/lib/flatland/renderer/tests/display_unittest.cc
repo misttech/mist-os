@@ -7,6 +7,7 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>
+#include <lib/fit/defer.h>
 
 #include <thread>
 
@@ -43,6 +44,10 @@ class DisplayTest : public gtest::RealLoopFixture {
 
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
+    // TODO(fxbug.dev/122131): This reuses the display controller from previous
+    // test cases in the same test component, so the display controller may be
+    // in a dirty state. Tests should request a reset of display controller
+    // here.
     auto hdc_promise = ui_display::GetHardwareDisplayController();
     executor_->schedule_task(
         hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
@@ -137,6 +142,13 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   bool res = scenic_impl::ImportBufferCollection(collection_id, *display_controller.get(),
                                                  std::move(display_token), display_constraints);
   ASSERT_TRUE(res);
+  auto release_buffer_collection =
+      fit::defer([display_controller = display_controller.get(), collection_id] {
+        // Release the buffer collection.
+        zx_status_t release_buffer_collection_status =
+            (*display_controller)->ReleaseBufferCollection(collection_id);
+        EXPECT_EQ(release_buffer_collection_status, ZX_OK);
+      });
 
   // Importing should fail again, because we've only set 2 of the 3 constraints.
   import_result =

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -12,6 +13,7 @@
 #include "src/ui/lib/escher/renderer/batch_gpu_uploader.h"
 #include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/lib/escher/util/image_utils.h"
+#include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -65,6 +67,10 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
     display_manager_ = std::make_unique<display::DisplayManager>([]() {});
 
+    // TODO(fxbug.dev/122131): This reuses the display controller from previous
+    // test cases in the same test component, so the display controller may be
+    // in a dirty state. Tests should request a reset of display controller
+    // here.
     auto hdc_promise = ui_display::GetHardwareDisplayController();
     executor_->schedule_task(
         hdc_promise.then([this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
@@ -161,7 +167,6 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   auto display_controller = display_manager_->default_display_controller();
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
-  const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
 
   // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
@@ -173,6 +178,10 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &texture_collection_info);
   EXPECT_TRUE(texture_collection);
+  auto release_texture_collection = fit::defer([display_compositor, kTextureCollectionId] {
+    display_compositor->ReleaseBufferCollection(kTextureCollectionId,
+                                                BufferCollectionUsage::kClientImage);
+  });
 
   // Import the texture to the engine.
   auto image_metadata = ImageMetadata{.collection_id = kTextureCollectionId,

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -270,6 +271,17 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     return texture_collection;
   }
 
+  void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
+    auto display = display_manager_->default_display();
+    auto display_controller = display_manager_->default_display_controller();
+    (*display_controller)->ReleaseBufferCollection(collection_id);
+  }
+
+  static void ReleaseClientTextureBufferCollection(
+      DisplayCompositor* display_compositor, allocation::GlobalBufferCollectionId collection_id) {
+    display_compositor->ReleaseBufferCollection(collection_id, BufferCollectionUsage::kClientImage);
+  }
+
   // Captures the pixel values on the display and reads them into |read_values|.
   void CaptureDisplayOutput(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
                             uint64_t capture_image_id, std::vector<uint8_t>* read_values) {
@@ -379,7 +391,6 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
         }
         num_different++;
       }
-
     }
     EXPECT_EQ(num_different, 0U) << "Capture Compare number of values different: " << num_different;
     return num_different == 0U;
@@ -395,7 +406,8 @@ test body:
 
 Furthermore, please make sure to use GTEST_SKIP() when appropriate to prevent display-controller
 related failures that may happen when using fake display or on certain devices where some
-display-controller functionality may not be implemented:
+display-controller functionality may not be implemented, and release the imported buffer collection
+when the test ends:
 
 For example, when using display capture:
 
@@ -403,6 +415,8 @@ For example, when using display capture:
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
     GTEST_SKIP();
   }
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
 And when importing textures to the display compositor:
 
@@ -412,6 +426,10 @@ And when importing textures to the display compositor:
   if (!texture_collection) {
     GTEST_SKIP();
   }
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor.get(), kTextureCollectionId);
+      });
 
 If you are developing a test specifically for the DisplayController that does NOT need the
 Vulkan Renderer, try creating a DisplayCompositor with the NullRenderer
@@ -468,6 +486,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
@@ -481,6 +501,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   if (!texture_collection) {
     GTEST_SKIP();
   }
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
+      });
 
   // Get a raw pointer for the texture's vmo and make it green.
   const uint32_t num_pixels = kTextureWidth * kTextureHeight;
@@ -581,6 +605,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
@@ -594,6 +620,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   if (!compare_collection) {
     GTEST_SKIP();
   }
+  auto release_compare_collection =
+      fit::defer([display_compositor = display_compositor.get(), kCompareCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kCompareCollectionId);
+      });
 
   // Set up the values that will be used to test against the display capture. We are making
   // a green rect with color correcion to multiply it by 0.2 so we should get (1 * 0.2) * 255 = 51
@@ -700,6 +730,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
@@ -713,6 +745,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   if (!compare_collection) {
     GTEST_SKIP();
   }
+  auto release_compare_collection =
+      fit::defer([display_compositor = display_compositor.get(), kCompareCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kCompareCollectionId);
+      });
 
   // Setup the values we will compare the display capture against.
   const uint32_t num_pixels = kTextureWidth * kTextureHeight;
@@ -808,6 +844,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the texture. Due to display controller limitations, the size of
   // the texture needs to match the size of the rect. So since we have a fullscreen rect, we
@@ -821,6 +859,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   if (!compare_collection) {
     GTEST_SKIP();
   }
+  auto release_compare_collection =
+      fit::defer([display_compositor = display_compositor.get(), kCompareCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kCompareCollectionId);
+      });
 
   const uint8_t kMinimum = 10U;
 
@@ -928,6 +970,8 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
@@ -955,6 +999,10 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   auto texture_collection = SetupClientTextures(display_compositor.get(), kTextureCollectionId,
                                                 GetParam(), kTextureWidth, kTextureHeight,
                                                 /*num_vmos*/ 2, &texture_collection_info);
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
+      });
 
   // Write to the two textures. Make the first blue and the second red.
   const uint32_t num_pixels = kTextureWidth * kTextureHeight;
@@ -1100,6 +1148,8 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   }
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
@@ -1130,6 +1180,10 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
       SetupClientTextures(display_compositor.get(), kTextureCollectionId,
                           fuchsia::sysmem::PixelFormatType::BGRA32, kTextureWidth, kTextureHeight,
                           /*num_vmos*/ 2, &texture_collection_info);
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
+      });
 
   // Write to the two textures. Make the first blue and opaque and the second red and
   // half transparent. Format is ARGB.
@@ -1271,6 +1325,8 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
@@ -1288,6 +1344,10 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
                           /*num_vmos*/ 1, &texture_collection_info);
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
+      });
 
   switch (GetParam()) {
     case fuchsia::sysmem::PixelFormatType::BGRA32: {
@@ -1461,6 +1521,8 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
 
   EXPECT_TRUE(capture_collection_result.is_ok());
   auto capture_collection = std::move(capture_collection_result.value());
+  auto release_capture_collection = fit::defer(
+      [this, kCaptureCollectionId] { ReleaseCaptureBufferCollection(kCaptureCollectionId); });
 
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
@@ -1478,6 +1540,10 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
                           /*num_vmos*/ 1, &texture_collection_info);
+  auto release_texture_collection =
+      fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
+        ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
+      });
 
   switch (GetParam()) {
     case fuchsia::sysmem::PixelFormatType::BGRA32: {
