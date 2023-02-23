@@ -4,17 +4,17 @@
 # found in the LICENSE file.
 """Default implementation of FuchsiaDevice abstract base class."""
 
-import json
 import logging
 import subprocess
 import time
+from functools import lru_cache
 from typing import Any, Dict, Iterable, Optional, Type
 
 from honeydew import custom_types, errors
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
-from honeydew.utils import host_utils, http_utils
+from honeydew.utils import ffx_cli, host_utils, http_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ _CMDS = {
 _SL4F_PORT = 80
 _SL4F_METHODS = {
     "GetDeviceName": "device_facade.GetDeviceName",
+    "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",
+    "GetProductInfo": "hwinfo_facade.HwinfoGetProductInfo",
+    "GetVersion": "device_facade.GetVersion",
 }
 
 _TIMEOUTS = {
@@ -62,6 +65,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
 
         device_ip_address: Device IP (V4|V6) address. If not provided, attempts
             to resolve automatically.
+
+    Raises:
+        errors.FuchsiaDeviceError: Failed to instantiate.
     """
 
     def __init__(
@@ -75,49 +81,71 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
 
     # List all the static properties in alphabetical order
     @property
+    @lru_cache
     def device_type(self) -> str:
         """Returns the device type.
 
         Returns:
             Device type.
-        """
-        raise NotImplementedError
 
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        return ffx_cli.get_target_type(self.name)
+
+    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def manufacturer(self) -> str:
         """Returns the manufacturer of the device.
 
         Returns:
             Manufacturer of device.
-        """
-        raise NotImplementedError
 
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        return self._product_info["manufacturer"]
+
+    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def model(self) -> str:
         """Returns the model of the device.
 
         Returns:
             Model of device.
-        """
-        raise NotImplementedError
 
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        return self._product_info["model"]
+
+    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def product_name(self) -> str:
         """Returns the product name of the device.
 
         Returns:
             Product name of the device.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
         """
-        raise NotImplementedError
+        return self._product_info["name"]
 
     @property
+    @lru_cache
     def serial_number(self) -> str:
         """Returns the serial number of the device.
 
         Returns:
             Serial number of device.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
         """
-        raise NotImplementedError
+        get_device_info_resp = self._send_sl4f_command(
+            method=_SL4F_METHODS["GetDeviceInfo"])
+        return get_device_info_resp["result"]["serial_number"]
 
     # List all the dynamic properties in alphabetical order
     @property
@@ -126,8 +154,13 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
 
         Returns:
             Firmware version of device.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
         """
-        raise NotImplementedError
+        get_version_resp = self._send_sl4f_command(
+            method=_SL4F_METHODS["GetVersion"])
+        return get_version_resp["result"]
 
     # List all the affordances in alphabetical order
     @property
@@ -175,15 +208,34 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         raise NotImplementedError
 
     # List all private methods in alphabetical order
-    def _get_device_name(self) -> str:
-        """Returns the device name by sending a SL4F request.
+    def _check_sl4f_connection(self):
+        """Checks SL4F connection by sending a SL4F request to device.
 
-        Returns:
-            Device name.
+        Raises:
+            errors.FuchsiaDeviceError: If SL4F connection is not successful.
         """
         get_device_name_resp = self._send_sl4f_command(
             method=_SL4F_METHODS["GetDeviceName"])
-        return get_device_name_resp["result"]
+        device_name = get_device_name_resp["result"]
+
+        if device_name != self.name:
+            raise errors.FuchsiaDeviceError(
+                f"Failed to start SL4F server on '{self.name}'.")
+
+    @property
+    @lru_cache
+    def _product_info(self) -> Dict[str, Any]:
+        """Returns the product information of the device.
+
+        Returns:
+            Product info dict.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        get_product_info_resp = self._send_sl4f_command(
+            method=_SL4F_METHODS["GetProductInfo"])
+        return get_product_info_resp["result"]
 
     def _run_ssh_command_on_host(
             self,
@@ -239,7 +291,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
                 exceptions_to_skip then a empty dict will be returned.
 
         Raises:
-            FuchsiaDeviceError: On failure.
+            errors.FuchsiaDeviceError: On failure.
         """
         if params is None:
             params = {}
@@ -291,12 +343,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         """Starts the SL4F server on fuchsia device.
 
         Raises:
-            FuchsiaDeviceError: Failed to start the SL4F server.
+            errors.FuchsiaDeviceError: Failed to start the SL4F server.
         """
         _LOGGER.info("Starting SL4F server on %s...", self.name)
         self._run_ssh_command_on_host(command=_CMDS['START_SL4F'])
 
         # verify the device is responsive to SL4F requests
-        if self._get_device_name() != self.name:
-            raise errors.FuchsiaDeviceError(
-                f"Failed to start SL4F server on '{self.name}'.")
+        self._check_sl4f_connection()

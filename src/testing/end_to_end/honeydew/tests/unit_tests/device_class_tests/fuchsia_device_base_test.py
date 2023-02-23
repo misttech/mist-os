@@ -18,8 +18,11 @@ _INPUT_ARGS = {
     "ssh_user": "root",
     "device_ip_address": "11.22.33.44"
 }
+
 _MOCK_ARGS = {
+    "device_name": "fuchsia-emulator",
     "device_ip_address": "12.34.56.78",
+    "device_type": "qemu-x64",
     "sl4f_request": fuchsia_device_base._SL4F_METHODS["GetDeviceName"],
     "sl4f_response": {
         'id': '',
@@ -161,6 +164,105 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         else:
             mock_get_target_address.assert_not_called()
 
+    # List all the tests related to static properties in alphabetical order
+    @mock.patch.object(
+        fuchsia_device_base.ffx_cli,
+        "get_target_type",
+        return_value=_MOCK_ARGS["device_type"],
+        autospec=True)
+    def test_device_type(self, mock_ffx_cli_get_target_type):
+        """Testcase for FuchsiaDeviceBase.device_type property"""
+        self.assertEqual(self.fd_obj.device_type, _MOCK_ARGS["device_type"])
+        mock_ffx_cli_get_target_type.assert_called_once_with(self.fd_obj.name)
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_send_sl4f_command",
+        return_value={
+            "result":
+                {
+                    "manufacturer": "default-manufacturer",
+                    "model": "default-model",
+                    "name": "default-product-name",
+                }
+        },
+        autospec=True)
+    def test_manufacturer(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.manufacturer property"""
+        self.assertEqual(self.fd_obj.manufacturer, "default-manufacturer")
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["GetProductInfo"])
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_send_sl4f_command",
+        return_value={
+            "result":
+                {
+                    "manufacturer": "default-manufacturer",
+                    "model": "default-model",
+                    "name": "default-product-name",
+                }
+        },
+        autospec=True)
+    def test_model(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.model property"""
+        self.assertEqual(self.fd_obj.model, "default-model")
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["GetProductInfo"])
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_send_sl4f_command",
+        return_value={
+            "result":
+                {
+                    "manufacturer": "default-manufacturer",
+                    "model": "default-model",
+                    "name": "default-product-name",
+                }
+        },
+        autospec=True)
+    def test_product_name(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.product_name property"""
+        self.assertEqual(self.fd_obj.product_name, "default-product-name")
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["GetProductInfo"])
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_send_sl4f_command",
+        return_value={"result": {
+            "serial_number": "default-serial-number",
+        }},
+        autospec=True)
+    def test_serial_number(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.serial_number property"""
+        self.assertEqual(self.fd_obj.serial_number, "default-serial-number")
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["GetDeviceInfo"])
+
+    # List all the tests related to dynamic properties in alphabetical order
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_send_sl4f_command",
+        return_value={"result": "1.2.3"},
+        autospec=True)
+    def test_firmware_version(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.firmware_version property"""
+        self.assertEqual(self.fd_obj.firmware_version, "1.2.3")
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj, method=fuchsia_device_base._SL4F_METHODS["GetVersion"])
+
     # List all the tests related to private methods in alphabetical order
 
     # Note - Test case for FuchsiaDeviceBase._start_sl4f_server() is covered in
@@ -169,11 +271,11 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
         "_send_sl4f_command",
-        return_value={"result": "device-name"},
+        return_value={"result": _MOCK_ARGS["device_name"]},
         autospec=True)
-    def test_get_device_name(self, mock_send_sl4f_command):
-        """Testcase for FuchsiaDeviceBase._get_device_name()"""
-        self.assertEqual(self.fd_obj._get_device_name(), "device-name")
+    def test_check_sl4f_connection(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase._check_sl4f_connection()"""
+        self.fd_obj._check_sl4f_connection()
 
         mock_send_sl4f_command.assert_called_once_with(
             self.fd_obj,
