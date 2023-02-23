@@ -6,6 +6,8 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
@@ -26,9 +28,10 @@ using TestAddCompositeNodeSpecCallback =
 
 class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordinator> {
  public:
-  zx_status_t Connect(async_dispatcher_t* dispatcher,
-                      fidl::ServerEnd<fuchsia_device_manager::Coordinator> request) {
-    return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
+  zx_status_t Connect(fidl::ServerEnd<fuchsia_device_manager::Coordinator> request) {
+    bindings_.AddBinding(async_get_default_dispatcher(), std::move(request), this,
+                         fidl::kIgnoreBindingClosure);
+    return ZX_OK;
   }
 
   void AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) override {
@@ -74,15 +77,17 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  uint32_t bind_count() { return bind_count_.load(); }
+  uint32_t bind_count() { return bind_count_; }
 
-  void set_spec_callback(TestAddCompositeNodeSpecCallback callback) {
+  zx_status_t set_spec_callback(TestAddCompositeNodeSpecCallback callback) {
     spec_callback_ = std::move(callback);
+    return ZX_OK;
   }
 
  private:
-  std::atomic<uint32_t> bind_count_ = 0;
+  uint32_t bind_count_ = 0;
   TestAddCompositeNodeSpecCallback spec_callback_;
+  fidl::ServerBindingGroup<fuchsia_device_manager::Coordinator> bindings_;
 };
 
 class CoreTest : public zxtest::Test {
@@ -122,8 +127,8 @@ class CoreTest : public zxtest::Test {
     DeviceControllerConnection::Bind(std::move(conn), std::move(controller_endpoints->server),
                                      ctx_.loop().dispatcher());
 
-    ASSERT_OK(coordinator_.Connect(coordinator_loop_.dispatcher(),
-                                   std::move(coordinator_endpoints->server)));
+    ASSERT_OK(
+        coordinator_.SyncCall(&FakeCoordinator::Connect, std::move(coordinator_endpoints->server)));
 
     clients_.push_back(controller_endpoints->client.TakeChannel());
   }
@@ -146,7 +151,8 @@ class CoreTest : public zxtest::Test {
   fbl::RefPtr<Driver> driver_obj_;
 
   async::Loop coordinator_loop_;
-  FakeCoordinator coordinator_;
+  async_patterns::TestDispatcherBound<FakeCoordinator> coordinator_{coordinator_loop_.dispatcher(),
+                                                                    std::in_place};
 };
 
 void Remove(fbl::RefPtr<zx_device_t> dev) {
@@ -219,7 +225,7 @@ TEST_F(CoreTest, RebindNoChildren) {
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
   EXPECT_OK(dev->Rebind());
-  EXPECT_EQ(coordinator_.bind_count(), 1);
+  EXPECT_EQ(coordinator_.SyncCall(&FakeCoordinator::bind_count), 1);
 }
 
 TEST_F(CoreTest, SystemPowerStateMapping) {
@@ -301,7 +307,7 @@ TEST_F(CoreTest, RebindHasOneChild) {
     child->set_parent(parent);
 
     EXPECT_OK(parent->Rebind());
-    EXPECT_EQ(coordinator_.bind_count(), 0);
+    EXPECT_EQ(coordinator_.SyncCall(&FakeCoordinator::bind_count), 0);
     ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
     EXPECT_EQ(unbind_count, 1);
 
@@ -309,7 +315,7 @@ TEST_F(CoreTest, RebindHasOneChild) {
   }
 
   ASSERT_OK(ctx_.loop().RunUntilIdle());
-  EXPECT_EQ(coordinator_.bind_count(), 1);
+  EXPECT_EQ(coordinator_.SyncCall(&FakeCoordinator::bind_count), 1);
 }
 
 TEST_F(CoreTest, RebindHasMultipleChildren) {
@@ -339,7 +345,7 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
     EXPECT_OK(parent->Rebind());
 
     for (auto& child : children) {
-      EXPECT_EQ(coordinator_.bind_count(), 0);
+      EXPECT_EQ(coordinator_.SyncCall(&FakeCoordinator::bind_count), 0);
       ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
     }
 
@@ -350,7 +356,7 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
     }
   }
   ctx_.loop().RunUntilIdle();
-  EXPECT_EQ(coordinator_.bind_count(), 1);
+  EXPECT_EQ(coordinator_.SyncCall(&FakeCoordinator::bind_count), 1);
 }
 
 TEST_F(CoreTest, AddCompositeNodeSpec) {
@@ -414,7 +420,7 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
         ASSERT_TRUE(parent_2_prop_result.at(0).value.bool_value());
       };
 
-  coordinator_.set_spec_callback(std::move(test_callback));
+  ASSERT_OK(coordinator_.SyncCall(&FakeCoordinator::set_spec_callback, std::move(test_callback)));
 
   const device_bind_prop_value_t parent_1_bind_rules_values_1[] = {
       device_bind_prop_int_val(1),

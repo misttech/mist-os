@@ -233,6 +233,7 @@ test("driver_host_test") {
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
     "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_cpp_wire",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_hlcpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
