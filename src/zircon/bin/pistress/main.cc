@@ -24,6 +24,7 @@ namespace {
 const std::array kThreadBehaviors{
     TestThreadBehavior{},
     TestThreadBehavior{},
+    TestThreadBehavior{ .inheritable = false },
     TestThreadBehavior{
         .profile_type = ProfileType::Fair,
         .priority = ZX_PRIORITY_HIGH,
@@ -49,8 +50,33 @@ const std::array kThreadBehaviors{
         },
     },
     TestThreadBehavior{
+        .profile_type = ProfileType::Fair,
+        .priority = ZX_PRIORITY_HIGH,
+        .inheritable = false,
+        .intermediate_linger{
+            .linger_probability = 0.5f,
+            .time_dist{ZX_USEC(100), ZX_USEC(200)},
+        },
+        .final_linger{
+            .linger_probability = 0.5f,
+            .time_dist{ZX_USEC(100), ZX_MSEC(2)},
+        },
+    },
+    TestThreadBehavior{
+        .profile_type = ProfileType::Fair,
+        .priority = ZX_PRIORITY_LOW,
+        .inheritable = false,
+        .intermediate_linger{
+            .linger_probability = 0.5f,
+            .time_dist{ZX_USEC(100), ZX_MSEC(2)},
+        },
+        .final_linger{
+            .linger_probability = 1.0f,
+            .time_dist{ZX_MSEC(5), ZX_MSEC(20)},
+        },
+    },
+    TestThreadBehavior{
         .profile_type = ProfileType::Deadline,
-        .period = ZX_MSEC(10),
         .deadline = ZX_MSEC(5),
         .capacity = ZX_MSEC(2),
         .final_linger{
@@ -60,7 +86,6 @@ const std::array kThreadBehaviors{
     },
     TestThreadBehavior{
         .profile_type = ProfileType::Deadline,
-        .period = ZX_MSEC(10),
         .deadline = ZX_MSEC(5),
         .capacity = ZX_MSEC(2),
         .final_linger{
@@ -70,7 +95,6 @@ const std::array kThreadBehaviors{
     },
     TestThreadBehavior{
         .profile_type = ProfileType::Deadline,
-        .period = ZX_MSEC(1),
         .deadline = ZX_MSEC(1),
         .capacity = ZX_USEC(800),
         .final_linger{
@@ -80,7 +104,6 @@ const std::array kThreadBehaviors{
     },
     TestThreadBehavior{
         .profile_type = ProfileType::Deadline,
-        .period = ZX_MSEC(1),
         .deadline = ZX_MSEC(1),
         .capacity = ZX_USEC(800),
         .intermediate_linger{

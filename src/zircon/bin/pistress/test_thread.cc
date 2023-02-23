@@ -92,7 +92,11 @@ zx_status_t TestThread::AddThread(const TestThreadBehavior& behavior) {
     profile_info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
     profile_info.deadline_params.capacity = behavior.capacity;
     profile_info.deadline_params.relative_deadline = behavior.deadline;
-    profile_info.deadline_params.period = behavior.period;
+    profile_info.deadline_params.period = behavior.deadline;
+  }
+
+  if (behavior.inheritable == false) {
+    profile_info.flags |= ZX_PROFILE_INFO_FLAG_NO_INHERIT;
   }
 
   status = zx::profile::create(root_job_, 0, &profile_info, &profile);
@@ -102,9 +106,8 @@ zx_status_t TestThread::AddThread(const TestThreadBehavior& behavior) {
       profile_info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
       printf("Failed to create Fair profile with priority %u\n", profile_info.priority);
     } else {
-      printf("Failed to create Deadline profile with capacity(%ld) deadline(%ld) period(%ld)\n",
-             profile_info.deadline_params.capacity, profile_info.deadline_params.relative_deadline,
-             profile_info.deadline_params.period);
+      printf("Failed to create Deadline profile with capacity(%ld) deadline(%ld)\n",
+             profile_info.deadline_params.capacity, profile_info.deadline_params.relative_deadline);
     }
     return status;
   }

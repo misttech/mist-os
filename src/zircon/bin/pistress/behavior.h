@@ -23,9 +23,9 @@ struct TestThreadBehavior {
   // Default profile for the thread is a Fair profile with default weight.
   const ProfileType profile_type = ProfileType::Fair;
   const uint32_t priority = ZX_PRIORITY_DEFAULT;
-  const uint64_t period = 0;
   const uint64_t deadline = 0;
   const uint64_t capacity = 0;
+  const bool inheritable = true;
 
   // By default, threads do not linger at the intermediate stages of SyncObj
   // acquisition.
