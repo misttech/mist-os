@@ -26,7 +26,7 @@ py_binary(
 
 fuchsia_product_configuration(
     name = "default",
-    additional_platform_flags_string = {"feature_set_level": "boostrap"},
+    additional_platform_flags_string = {"feature_set_level": "bootstrap"},
     build_type = BUILD_TYPES.USER,
 )
 
