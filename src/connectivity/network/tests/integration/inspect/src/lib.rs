@@ -16,7 +16,7 @@ use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netstack_testing_common::{
     constants, get_inspect_data,
-    realms::{Netstack2, TestSandboxExt as _},
+    realms::{Netstack, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -94,14 +94,13 @@ impl fuchsia_inspect::testing::PropertyAssertion for AddressMatcher {
 }
 
 #[netstack_test]
-async fn inspect_nic(name: &str) {
+async fn inspect_nic<N: Netstack>(name: &str) {
     // The number of IPv6 addresses that the stack will assign to an interface.
     const EXPECTED_NUM_IPV6_ADDRESSES: usize = 1;
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
     const NETDEV_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:0A:0B:0C:0D:0E");
 
@@ -324,10 +323,9 @@ async fn inspect_nic(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_routing_table(name: &str) {
+async fn inspect_routing_table<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
     let stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
@@ -421,7 +419,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
             port: DHCP_CLIENT_PORT,
         }
     ]; "multiple_invalid_port_and_single_invalid_trans_proto")]
-async fn inspect_dhcp(
+async fn inspect_dhcp<N: Netstack>(
     netstack_test_name: &str,
     test_case_name: &str,
     inbound_packets: Vec<PacketAttributes>,
@@ -431,7 +429,7 @@ async fn inspect_dhcp(
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
     let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}-{}", netstack_test_name, test_case_name))
+        .create_netstack_realm::<N, _>(format!("{}-{}", netstack_test_name, test_case_name))
         .expect("failed to create realm");
     // Create the fake endpoint before installing an endpoint in the netstack to ensure
     // that we receive all DHCP messages sent by the client.
@@ -607,10 +605,9 @@ async fn inspect_dhcp(
 // serves as a change detector to acknowledge any possible additions
 // or deletions when importing code from upstream.
 #[netstack_test]
-async fn inspect_stat_counters(name: &str) {
+async fn inspect_stat_counters<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     // Connect to netstack service to spawn a netstack instance.
     let _stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
@@ -858,10 +855,9 @@ async fn inspect_stat_counters(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_for_sampler(name: &str) {
+async fn inspect_for_sampler<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     // Connect to netstack service to spawn a netstack instance.
     let _stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
