@@ -179,6 +179,10 @@ struct Telemetry {
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     state_summary: Option<SystemStateSummary>,
     state_last_refreshed: fasync::Time,
+    reachability_lost_at: Option<(
+        fasync::Time,
+        metrics::ReachabilityGlobalSnapshotDurationMetricDimensionRouteConfig,
+    )>,
     network_config: Option<NetworkConfig>,
     network_config_last_refreshed: fasync::Time,
 }
@@ -192,6 +196,7 @@ impl Telemetry {
             cobalt_proxy,
             state_summary: None,
             state_last_refreshed: fasync::Time::now(),
+            reachability_lost_at: None,
             network_config: None,
             network_config_last_refreshed: fasync::Time::now(),
         }
@@ -315,7 +320,21 @@ impl Telemetry {
                         event_codes: vec![route_config_dim as u32],
                         payload: MetricEventPayload::Count(1),
                     });
+                    self.reachability_lost_at = Some((now, route_config_dim));
                 }
+            }
+
+            if !previously_reachable && now_reachable {
+                if let Some((reachability_lost_at, route_config_dim)) = self.reachability_lost_at {
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::REACHABILITY_LOST_DURATION_METRIC_ID,
+                        event_codes: vec![route_config_dim as u32],
+                        payload: MetricEventPayload::IntegerValue(
+                            (now - reachability_lost_at).into_micros(),
+                        ),
+                    });
+                }
+                self.reachability_lost_at = None;
             }
         }
 
@@ -483,13 +502,37 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         update.system_state = IpVersions { ipv4: None, ipv6: Some(State::Down) };
-        test_helper.telemetry_sender.send(TelemetryEvent::SystemStateUpdate { update });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
         test_helper.advance_test_fut(&mut test_fut);
 
         // Reachability lost metric is not logged again even when `internet_available`
         // becomes false, because it was already considered lost previously.
         let logged_metrics = test_helper.get_logged_metrics(metrics::REACHABILITY_LOST_METRIC_ID);
         assert_eq!(logged_metrics.len(), 0);
+
+        test_helper.cobalt_events.clear();
+
+        test_helper.advance_by(2.hours(), &mut test_fut);
+        update.system_state = IpVersions { ipv4: Some(State::Internet), ipv6: None };
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
+        test_helper.telemetry_sender.send(TelemetryEvent::DnsProbe { dns_active: true });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        // When reachability is recovered, the duration that reachability was lost is logged.
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::REACHABILITY_LOST_DURATION_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(7200_000_000));
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            // Reachability is recovered on ipv4, but we still log the ipv6 dimension because
+            // that was the config when reachability was lost.
+            &[metrics::ReachabilityLostMetricDimensionRouteConfig::Ipv6Only as u32]
+        );
     }
 
     #[test_case(true, true, Some(metrics::ReachabilityGlobalDefaultRouteDurationMetricDimensionDefaultRoute::Ipv4Ipv6); "ipv4+ipv6 default routes")]
