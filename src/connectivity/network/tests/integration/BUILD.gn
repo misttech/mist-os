@@ -10,7 +10,6 @@ import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 tests = [
-  "ipv4",
   "ipv6",
   "management",
   "product-flow",
@@ -30,6 +29,7 @@ tests_with_expectations_with_err_logs = [
   "dns",
   "fidl",
   "forwarding",
+  "ipv4",
 ]
 
 long_tests = [ "multicast-forwarding" ]

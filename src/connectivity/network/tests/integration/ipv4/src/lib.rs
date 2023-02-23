@@ -13,7 +13,7 @@ use net_declare::{net_ip_v4, std_ip_v4};
 use net_types::{ip as net_types_ip, MulticastAddress as _};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
-    interfaces, realms::Netstack2, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    interfaces, realms::Netstack, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
@@ -118,7 +118,7 @@ fn check_igmpv3_report(
 #[test_case(fnet_interfaces_admin::IgmpVersion::V1, check_igmpv1_report)]
 #[test_case(fnet_interfaces_admin::IgmpVersion::V2, check_igmpv2_report)]
 #[test_case(fnet_interfaces_admin::IgmpVersion::V3, check_igmpv3_report)]
-async fn sends_igmp_reports(
+async fn sends_igmp_reports<N: Netstack>(
     name: &str,
     igmp_version: fnet_interfaces_admin::IgmpVersion,
     check_igmp_report: fn(net_types_ip::Ipv4Addr, &[u8], net_types_ip::Ipv4Addr) -> bool,
@@ -128,7 +128,7 @@ async fn sends_igmp_reports(
 
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, realm, iface, fake_ep) =
-        setup_network::<Netstack2>(&sandbox, name, None).await.expect("error setting up network");
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     {
         let gen_config = |igmp_version| fnet_interfaces_admin::Configuration {
