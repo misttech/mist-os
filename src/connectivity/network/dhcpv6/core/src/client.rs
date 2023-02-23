@@ -2014,12 +2014,15 @@ impl<I: Instant> ServerDiscovery<I> {
                 };
             }
         };
-        if let Some(success_status_message) = success_status_message {
-            if !success_status_message.is_empty() {
+        match success_status_message {
+            Some(success_status_message) if !success_status_message.is_empty() => {
                 info!(
                     "Advertise from server {:?} contains success status code message: {}",
                     server_id, success_status_message,
                 );
+            }
+            _ => {
+                info!("processing Advertise from server {:?}", server_id);
             }
         }
         let non_temporary_addresses = non_temporary_addresses
