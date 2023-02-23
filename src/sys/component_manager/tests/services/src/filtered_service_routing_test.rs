@@ -325,6 +325,72 @@ async fn filtered_service_through_collection_test() {
     ));
 }
 
+/// Test that clients can open a protocol in an aggregated service directory, given a path
+/// to the service instance and the protocol, with the `fuchsia.io/OpenFlags.NOT_DIRECTORY` flag.
+///
+/// This ensures the FilteredServiceProvider uses correct flags when opening service
+/// instance directories served by the source component.
+#[fuchsia::test]
+async fn aggregate_open_as_not_directory_test() {
+    let dynamic_child_name = "echo_client_as_not_directory";
+
+    // Create a provider for the `goodbye` instance.
+    let dynamic_provider_name = "open_as_not_directory_test_provider";
+    create_dynamic_service_provider(dynamic_provider_name).await;
+
+    // Create a client and offer it a service with the `default` and `goodbye` instances.
+    let offer_service_decl_0 = fdecl::OfferService {
+        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+            name: PROVIDER_A_CHILD_NAME.to_string(),
+            collection: None,
+        })),
+        source_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+        target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+        renamed_instances: None,
+        source_instance_filter: Some(vec!["default".to_string()]),
+        ..fdecl::OfferService::EMPTY
+    };
+    let offer_service_decl_1 = fdecl::OfferService {
+        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+            name: dynamic_provider_name.to_string(),
+            collection: Some(TEST_COLLECTION_NAME.to_string()),
+        })),
+        source_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+        target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+        renamed_instances: None,
+        source_instance_filter: Some(vec!["goodbye".to_string()]),
+        ..fdecl::OfferService::EMPTY
+    };
+
+    let dynamic_offers = vec![
+        fdecl::Offer::Service(offer_service_decl_0),
+        fdecl::Offer::Service(offer_service_decl_1),
+    ];
+    create_dynamic_service_client_from_offers(dynamic_child_name, dynamic_offers)
+        .await
+        .expect("Failed to create dynamic service client");
+    let exposed_dir = client::open_childs_exposed_directory(
+        dynamic_child_name,
+        Some(TEST_COLLECTION_NAME.to_string()),
+    )
+    .await
+    .expect("Failed to get child expose directory.");
+
+    // Open the `regular_echo` protocol in the `default` instance with the NOT_DIRECTORY flag.
+    let echo = fuchsia_fs::directory::open_no_describe::<fexamples::EchoMarker>(
+        &exposed_dir,
+        vec![fexamples::EchoServiceMarker::SERVICE_NAME, "default", "regular_echo"]
+            .join("/")
+            .as_str(),
+        fio::OpenFlags::NOT_DIRECTORY,
+    )
+    .expect("failed to open regular_echo");
+
+    // Call a method on the protocol and verify the response.
+    let response = echo.echo_string(ECHO_TEST_STRING).await.expect("failed to call EchoString");
+    assert_eq!(&response, ECHO_TEST_STRING);
+}
+
 #[fuchsia::test]
 async fn aggregate_instances_test() {
     let dynamic_child_name = "aggregate_instances_test_client";
@@ -808,7 +874,9 @@ async fn regular_echo_at_service_instance(
     let direct_protocol_response =
         client::connect_to_named_protocol_at_dir_root::<fexamples::EchoMarker>(
             exposed_dir,
-            vec!["fuchsia.examples.EchoService", instance_name, "regular_echo"].join("/").as_str(),
+            vec![fexamples::EchoServiceMarker::SERVICE_NAME, instance_name, "regular_echo"]
+                .join("/")
+                .as_str(),
         )
         .expect("failed to connect to protocol directly")
         .echo_string(echo_string)

@@ -290,14 +290,20 @@ impl CapabilityProvider for FilteredServiceProvider {
                 .map_err(|_| ModelError::path_invalid(relative_path_utf8))?
         };
 
-        // create a remote directory referring to the unfiltered source service directory.
+        // Create a remote directory referring to the unfiltered source service directory.
         let (source_service_proxy, source_service_server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         self.source_service_provider
             .open(
                 task_scope,
-                flags,
-                PathBuf::new(), //relative_path,
+                // Open the directory with client-provided flags, but add DIRECTORY and remove
+                // NOT_DIRECTORY.
+                //
+                // Normally, opening this directory only requires the DIRECTORY right. The client
+                // may be trying to open a non-directory node within the service directory (i.e.
+                // a protocol in a service instance), so the flags cannot be used as-is.
+                flags & !fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DIRECTORY,
+                PathBuf::new(),
                 &mut (source_service_server_end.into_channel()),
             )
             .await?;
