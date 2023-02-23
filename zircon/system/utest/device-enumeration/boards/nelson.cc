@@ -81,7 +81,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:1c/aml_light",
       "class/light/000",
 
-      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi-1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
+      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi-1/aml-spi-1/spi/spi-1-0/spi-banjo-1-0/selina-composite/selina",
 
       "sys/platform/05:05:24/ram",
 
@@ -91,7 +91,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-45/audio-tas58xx/TAS5805m/brownout-protection",
 
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
-      "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52811-radio/ot-radio",
+      "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/spi-banjo-0-0/nrf52811-radio/ot-radio",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

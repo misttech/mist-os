@@ -184,16 +184,31 @@ void SpiChild::DdkUnbind(ddk::UnbindTxn txn) {
 
 void SpiChild::DdkRelease() { delete this; }
 
-zx_status_t SpiChild::ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+SpiFidlChild::SpiFidlChild(zx_device_t* parent, SpiChild* spi, async_dispatcher_t* dispatcher)
+    : SpiFidlChildType(parent), spi_(spi), outgoing_(dispatcher) {
   zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_spi::Device>(
-      [this](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
-        Bind(dispatcher_, std::move(server_end));
+      [spi = spi_, dispatcher](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
+        spi->Bind(dispatcher, std::move(server_end));
       });
-  if (status.is_error()) {
-    return status.status_value();
+  ZX_ASSERT_MSG(status.is_ok(), "%s", status.status_string());
+}
+
+void SpiFidlChild::DdkRelease() { delete this; }
+
+zx_status_t SpiFidlChild::ServeOutgoingDirectory(
+    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  return outgoing_.Serve(std::move(server_end)).status_value();
+}
+
+zx_status_t SpiBanjoChild::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
+  if (proto_id != ZX_PROTOCOL_SPI) {
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return outgoing_.Serve(std::move(server_end)).status_value();
+  spi_protocol_t* spi_proto = static_cast<spi_protocol_t*>(out_protocol);
+  spi_proto->ops = &spi_->spi_protocol_ops();
+  spi_proto->ctx = spi_;
+  return ZX_OK;
 }
 
 }  // namespace spi
