@@ -11,6 +11,7 @@ ffx_plugin("ffx_repository_server") {
 
   plugin_deps = [
     "start:ffx_repository_server_start",
+    "status:ffx_repository_server_status",
     "stop:ffx_repository_server_stop",
   ]
 

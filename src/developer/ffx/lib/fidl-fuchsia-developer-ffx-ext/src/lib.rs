@@ -6,5 +6,5 @@ mod repo;
 
 pub use repo::{
     PackageEntry, RepositoryConfig, RepositoryError, RepositoryPackage, RepositorySpec,
-    RepositoryStorageType, RepositoryTarget,
+    RepositoryStorageType, RepositoryTarget, ServerStatus,
 };

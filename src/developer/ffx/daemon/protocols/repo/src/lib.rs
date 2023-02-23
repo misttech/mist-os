@@ -2,42 +2,46 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::tunnel::TunnelManager;
-use async_lock::RwLock;
-use async_trait::async_trait;
-use ffx_daemon_core::events::{EventHandler, Status as EventStatus};
-use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
-use ffx_daemon_target::target::Target;
-use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
-use fidl_fuchsia_net_ext::SocketAddress;
-use fidl_fuchsia_pkg::RepositoryManagerMarker;
-use fidl_fuchsia_pkg_rewrite::EngineMarker;
-use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
-use fuchsia_async as fasync;
-use fuchsia_hyper::{new_https_client, HttpsClient};
-use fuchsia_repo::{
-    manager::RepositoryManager,
-    repo_client::RepoClient,
-    repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
-    server::RepositoryServer,
+use {
+    crate::tunnel::TunnelManager,
+    async_lock::RwLock,
+    async_trait::async_trait,
+    ffx_daemon_core::events::{EventHandler, Status as EventStatus},
+    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo},
+    ffx_daemon_target::target::Target,
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_developer_ffx as ffx,
+    fidl_fuchsia_developer_ffx_ext::{
+        RepositoryError, RepositorySpec, RepositoryTarget, ServerStatus,
+    },
+    fidl_fuchsia_net_ext::SocketAddress,
+    fidl_fuchsia_pkg::RepositoryManagerMarker,
+    fidl_fuchsia_pkg_rewrite::EngineMarker,
+    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule},
+    fuchsia_async as fasync,
+    fuchsia_hyper::{new_https_client, HttpsClient},
+    fuchsia_repo::{
+        manager::RepositoryManager,
+        repo_client::RepoClient,
+        repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
+        server::RepositoryServer,
+    },
+    fuchsia_url::RepositoryUrl,
+    fuchsia_zircon_status::Status,
+    futures::{FutureExt as _, StreamExt as _},
+    itertools::Itertools as _,
+    pkg::config as pkg_config,
+    protocols::prelude::*,
+    std::{
+        collections::HashSet,
+        convert::{TryFrom, TryInto},
+        net::SocketAddr,
+        rc::Rc,
+        sync::Arc,
+        time::Duration,
+    },
+    url::Url,
 };
-use fuchsia_url::RepositoryUrl;
-use fuchsia_zircon_status::Status;
-use futures::{FutureExt as _, StreamExt as _};
-use itertools::Itertools as _;
-use pkg::config as pkg_config;
-use protocols::prelude::*;
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    net::SocketAddr,
-    rc::Rc,
-    sync::Arc,
-    time::Duration,
-};
-use url::Url;
 
 mod metrics;
 mod tunnel;
@@ -506,12 +510,12 @@ async fn create_aliases(
 impl RepoInner {
     async fn start_server(
         &mut self,
-        socket_address: Option<SocketAddress>,
-    ) -> Result<Option<SocketAddr>, ffx::RepositoryError> {
+        socket_address: Option<SocketAddr>,
+    ) -> Result<Option<SocketAddr>, RepositoryError> {
         // Exit early if the server is disabled.
         let server_enabled = pkg_config::get_repository_server_enabled().await.map_err(|err| {
             tracing::error!("failed to read save server enabled flag: {:#?}", err);
-            ffx::RepositoryError::InternalError
+            RepositoryError::InternalError
         })?;
 
         if !server_enabled {
@@ -528,7 +532,7 @@ impl RepoInner {
             }
             ServerState::Stopped => match {
                 if let Some(addr) = socket_address {
-                    Ok(Some(addr.0))
+                    Ok(Some(addr))
                 } else {
                     pkg_config::repository_listen_addr().await
                 }
@@ -571,39 +575,10 @@ impl RepoInner {
 
                 match err.kind() {
                     std::io::ErrorKind::AddrInUse => {
-                        Err(ffx::RepositoryError::ServerAddressAlreadyInUse)
+                        Err(RepositoryError::ServerAddressAlreadyInUse)
                     }
-                    _ => Err(ffx::RepositoryError::IoError),
+                    _ => Err(RepositoryError::IoError),
                 }
-            }
-        }
-    }
-
-    async fn fetch_repo_address(&mut self) -> Result<Option<SocketAddr>, ffx::RepositoryError> {
-        let last_addr = pkg_config::get_repository_server_last_address_used().await.unwrap();
-        if let Some(_addr) = last_addr {
-            Ok(last_addr)
-        } else {
-            let listen_addr = pkg_config::repository_listen_addr().await.unwrap();
-            Ok(listen_addr)
-        }
-    }
-
-    async fn start_server_warn(&mut self) {
-        let previous_addr = self.fetch_repo_address().await.unwrap();
-        if previous_addr.is_none() {
-            tracing::warn!(
-                "Unable to find address for package repo. Please set via --address flag\n\
-            $ ffx repository server start --address <IP4V_or_IP6V_addr>\n\
-            Or using ffx config\n\
-            ffx config set repository.server.listen '[::]:8083'"
-            )
-        } else {
-            let repo_addr = previous_addr.unwrap();
-            if let Err(err) =
-                self.start_server(Some(fidl_fuchsia_net_ext::SocketAddress(repo_addr))).await
-            {
-                tracing::error!("Failed to start repository server: {:#?}", err);
             }
         }
     }
@@ -878,25 +853,26 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
         match req {
             ffx::RepositoryRegistryRequest::ServerStart { address, responder } => {
                 let mut res = async {
-                    pkg_config::set_repository_server_enabled(true).await.map_err(|err| {
-                        tracing::error!("failed to save server enabled flag to config: {:#?}", err);
-                        ffx::RepositoryError::InternalError
-                    })?;
-
                     let mut inner = self.inner.write().await;
 
                     if matches!(inner.server, ServerState::Disabled) {
                         return Err(ffx::RepositoryError::ServerNotRunning);
                     }
 
-                    let server_start = inner.start_server(address.map(|addr| (*addr).into())).await;
-                    match server_start {
+                    pkg_config::set_repository_server_enabled(true).await.map_err(|err| {
+                        tracing::error!("failed to save server enabled flag to config: {:#?}", err);
+                        ffx::RepositoryError::InternalError
+                    })?;
+
+                    let address = address.map(|addr| SocketAddress::from(*addr).0);
+
+                    match inner.start_server(address).await {
                         Ok(Some(addr)) => Ok(SocketAddress(addr).into()),
                         Ok(None) => {
                             tracing::warn!("Not starting server because the server is disabled");
                             Err(ffx::RepositoryError::ServerNotRunning)
                         }
-                        Err(err) => Err(err),
+                        Err(err) => Err(err.into()),
                     }
                 }
                 .await;
@@ -943,6 +919,19 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
                 .await;
 
                 responder.send(&mut res)?;
+
+                Ok(())
+            }
+            ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
+                let status = match self.inner.read().await.server {
+                    ServerState::Running(ref info) => {
+                        ServerStatus::Running { address: info.server.local_addr() }
+                    }
+                    ServerState::Stopped => ServerStatus::Stopped,
+                    ServerState::Disabled => ServerStatus::Disabled,
+                };
+
+                responder.send(&mut status.into())?;
 
                 Ok(())
             }
@@ -1119,7 +1108,19 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
 
         // Start the server if it is enabled.
         if pkg_config::get_repository_server_enabled().await? {
-            self.inner.write().await.start_server_warn().await;
+            match fetch_repo_address().await {
+                Ok(Some(last_addr)) => {
+                    if let Err(err) = self.inner.write().await.start_server(Some(last_addr)).await {
+                        tracing::error!("failed to start server: {:#}", err);
+                    }
+                }
+                Ok(None) => {
+                    tracing::warn!("repository server is enabled, but we are not configured to listen on an address");
+                }
+                Err(err) => {
+                    tracing::error!("failed to read last address used from config: {:#}", err);
+                }
+            }
         }
 
         load_repositories_from_config(&self.inner).await;
@@ -1135,6 +1136,14 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
         }
 
         Ok(())
+    }
+}
+
+async fn fetch_repo_address() -> anyhow::Result<Option<SocketAddr>> {
+    if let Some(last_addr) = pkg_config::get_repository_server_last_address_used().await? {
+        Ok(Some(last_addr))
+    } else {
+        pkg_config::repository_listen_addr().await
     }
 }
 
@@ -1293,30 +1302,33 @@ impl EventHandler<TargetEvent> for TargetEventHandler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use addr::TargetAddr;
-    use assert_matches::assert_matches;
-    use ffx_config::ConfigLevel;
-    use fidl::{self, endpoints::Request};
-    use fidl_fuchsia_developer_ffx_ext::RepositoryStorageType;
-    use fidl_fuchsia_developer_remotecontrol as rcs;
-    use fidl_fuchsia_pkg::{
-        MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
-    };
-    use fidl_fuchsia_pkg_rewrite::{
-        EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
-    };
-    use futures::TryStreamExt;
-    use protocols::testing::FakeDaemonBuilder;
-    use std::{
-        cell::RefCell,
-        convert::TryInto,
-        fs,
-        future::Future,
-        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-        rc::Rc,
-        str::FromStr,
-        sync::{Arc, Mutex},
+    use {
+        super::*,
+        addr::TargetAddr,
+        assert_matches::assert_matches,
+        ffx_config::ConfigLevel,
+        fidl::{self, endpoints::Request},
+        fidl_fuchsia_developer_ffx as ffx,
+        fidl_fuchsia_developer_ffx_ext::RepositoryStorageType,
+        fidl_fuchsia_developer_remotecontrol as rcs,
+        fidl_fuchsia_pkg::{
+            MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
+        },
+        fidl_fuchsia_pkg_rewrite::{
+            EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
+        },
+        futures::TryStreamExt,
+        protocols::testing::FakeDaemonBuilder,
+        std::{
+            cell::RefCell,
+            convert::TryInto,
+            fs,
+            future::Future,
+            net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+            rc::Rc,
+            str::FromStr,
+            sync::{Arc, Mutex},
+        },
     };
 
     const REPO_NAME: &str = "some-repo";
@@ -1990,12 +2002,27 @@ mod tests {
 
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
+            assert_eq!(
+                ServerStatus::try_from(proxy.server_status().await.unwrap()).unwrap(),
+                ServerStatus::Stopped,
+            );
+
             let actual_address =
                 SocketAddress::from(proxy.server_start(None).await.unwrap().unwrap()).0;
             let expected_address = repo.borrow().inner.read().await.server.listen_addr().unwrap();
             assert_eq!(actual_address, expected_address);
 
+            assert_eq!(
+                ServerStatus::try_from(proxy.server_status().await.unwrap()).unwrap(),
+                ServerStatus::Running { address: expected_address },
+            );
+
             assert_matches!(proxy.server_stop().await.unwrap(), Ok(()));
+
+            assert_eq!(
+                ServerStatus::try_from(proxy.server_status().await.unwrap()).unwrap(),
+                ServerStatus::Stopped,
+            );
         })
     }
 

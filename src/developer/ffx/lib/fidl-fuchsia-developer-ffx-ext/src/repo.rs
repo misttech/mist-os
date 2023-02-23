@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
-use fidl_fuchsia_developer_ffx as fidl;
-use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
-use thiserror::Error;
+use {
+    camino::Utf8PathBuf,
+    fidl_fuchsia_developer_ffx as fidl,
+    fidl_fuchsia_net_ext::SocketAddress,
+    serde::{Deserialize, Serialize},
+    std::{
+        convert::{TryFrom, TryInto},
+        net::SocketAddr,
+    },
+    thiserror::Error,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -189,6 +195,40 @@ impl From<RepositoryTarget> for fidl::RepositoryTarget {
             aliases: Some(repo_target.aliases),
             storage_type: repo_target.storage_type.map(|storage_type| storage_type.into()),
             ..fidl::RepositoryTarget::EMPTY
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "lowercase")]
+pub enum ServerStatus {
+    Disabled,
+    Stopped,
+    Running { address: SocketAddr },
+}
+
+impl TryFrom<fidl::ServerStatus> for ServerStatus {
+    type Error = RepositoryError;
+
+    fn try_from(status: fidl::ServerStatus) -> Result<Self, Self::Error> {
+        match status {
+            fidl::ServerStatus::Disabled(fidl::Disabled {}) => Ok(Self::Disabled),
+            fidl::ServerStatus::Stopped(fidl::Stopped {}) => Ok(Self::Stopped),
+            fidl::ServerStatus::Running(fidl::Running { address }) => {
+                Ok(Self::Running { address: SocketAddress::from(address).0 })
+            }
+        }
+    }
+}
+
+impl From<ServerStatus> for fidl::ServerStatus {
+    fn from(status: ServerStatus) -> Self {
+        match status {
+            ServerStatus::Disabled => Self::Disabled(fidl::Disabled),
+            ServerStatus::Stopped => Self::Stopped(fidl::Stopped),
+            ServerStatus::Running { address } => {
+                Self::Running(fidl::Running { address: SocketAddress(address).into() })
+            }
         }
     }
 }
