@@ -47,7 +47,7 @@ struct SdkAtoms {
     atoms: Vec<Atom>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Atom {
     #[cfg(test)]
     category: String,
@@ -64,7 +64,7 @@ struct Atom {
     kind: ElementType,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct File {
     destination: String,
     source: String,
@@ -269,7 +269,7 @@ impl Sdk {
 
             let meta = real_paths
                 .get(&atom.meta)
-                .ok_or(anyhow!("Atom did not specify source for its metadata."))?;
+                .ok_or(anyhow!("Atom did not specify source for its metadata: {:?}", &atom,))?;
 
             metas.push(Part { meta: meta.clone(), kind: atom.kind.clone() });
         }
