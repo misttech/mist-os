@@ -103,10 +103,11 @@ async fn exec_script() {
     ];
 
     // Request that the guest run the command.
-    let (stdout, stderr) =
+    let (return_code, stdout, stderr) =
         guest.exec(command_to_run, env, Some(STDIN_INPUT)).await.expect("exec failed");
 
-    // Validate the stdout and stderr.
+    // Validate the return code, stdout, and stderr.
+    assert_eq!(return_code, 0);
     assert_eq!(stdout.trim(), STDOUT_EXPECTED);
     assert_eq!(stderr.trim(), STDERR_EXPECTED);
 

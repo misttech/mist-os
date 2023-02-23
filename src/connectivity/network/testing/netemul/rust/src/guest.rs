@@ -108,6 +108,36 @@ impl Controller {
         })
     }
 
+    /// Executes `command` on the guest with environment variables held in
+    /// `env`, writing `input` into the remote process's `stdin` and logs
+    /// the remote process's stdout and stderr.
+    ///
+    /// Returns an error if the executed command's exit code is non-zero.
+    pub async fn exec_with_output_logged(
+        &self,
+        command: &str,
+        env: Vec<fguest_interaction::EnvironmentVariable>,
+        input: Option<&str>,
+    ) -> Result<()> {
+        let (return_code, stdout, stderr) = self.exec(command, env, input).await?;
+        tracing::info!(
+            "command `{}` for guest {} output\nstdout: {}\nstderr: {}",
+            command,
+            self.name,
+            stdout,
+            stderr
+        );
+        if return_code != 0 {
+            return Err(anyhow!(
+                "command `{}` for guest {} failed with return code: {}",
+                command,
+                self.name,
+                return_code,
+            ));
+        }
+        Ok(())
+    }
+
     /// Executes `command` on the guest with environment variables held in `env`, writing
     /// `input` into the remote process's `stdin` and returning the remote process's
     /// (stdout, stderr).
@@ -116,7 +146,7 @@ impl Controller {
         command: &str,
         mut env: Vec<fguest_interaction::EnvironmentVariable>,
         input: Option<&str>,
-    ) -> Result<(String, String)> {
+    ) -> Result<(i32, String, String)> {
         let (stdout_local, stdout_remote) = zx::Socket::create_stream();
         let (stderr_local, stderr_remote) = zx::Socket::create_stream();
 
@@ -198,35 +228,28 @@ impl Controller {
                             )
                         })?;
 
-                        if return_code != 0 {
-                            return Err(anyhow!(
-                                "command `{}` for guest {} failed with return code: {}",
-                                command,
-                                self.name,
-                                return_code
-                            ));
-                        }
-                        break;
+                        return Ok(return_code);
                     }
                 }
             }
-            Ok(())
         }
         .fuse();
 
         // Scope required to limit the lifetime of pinned futures.
-        {
+        let return_code = {
             // Poll the stdout and stderr sockets in parallel while waiting for the remote
             // process to terminate. This avoids deadlock in case the remote process blocks
             // on writing to stdout/stderr.
             futures::pin_mut!(stderr_fut, listener_fut, stdout_fut);
-            futures::try_join!(stderr_fut, listener_fut, stdout_fut)?;
-        }
+            let (_, return_code, _): (usize, _, usize) =
+                futures::try_join!(stderr_fut, listener_fut, stdout_fut)?;
+            return_code
+        };
 
         let stdout = String::from_utf8(stdout_buf).context("failed to convert stdout to string")?;
         let stderr = String::from_utf8(stderr_buf).context("failed to convert stderr to string")?;
 
-        Ok((stdout, stderr))
+        Ok((return_code, stdout, stderr))
     }
 }
 
