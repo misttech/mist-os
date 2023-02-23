@@ -574,86 +574,77 @@ zx_status_t PlatformDevice::Start() {
   ddk::DeviceAddArgs args(name);
   args.set_props(props).set_proto_id(ZX_PROTOCOL_PDEV);
 
-  if (type_ == Protocol) {
-    auto protocol_handler =
-        [this](fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> server_end) {
-          fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end),
-                          restricted_.get());
-        };
-    fuchsia_hardware_platform_bus::Service::InstanceHandler handler(
-        {.platform_bus = std::move(protocol_handler)});
+  std::array fidl_protocol_offers = {
+      fidl::DiscoverableProtocolName<fuchsia_hardware_platform_device::Device>,
+  };
+  std::array fidl_service_offers = {
+      fuchsia_hardware_platform_device::Service::Name,
+  };
+  std::array runtime_service_offers = {
+      fuchsia_hardware_platform_bus::Service::Name,
+  };
 
-    auto status = outgoing_.AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
-    if (status.is_error()) {
-      return status.error_value();
-    }
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-
-    auto result = outgoing_.Serve(std::move(endpoints->server));
+  // Set our FIDL offers.
+  {
+    zx::result result = outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
+        fuchsia_hardware_platform_device::Service::InstanceHandler({
+            .device = bind_handler(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        }));
     if (result.is_error()) {
+      zxlogf(ERROR, "could not add service to outgoing directory: %s", result.status_string());
       return result.error_value();
     }
 
-    std::array protocol_offers = {
-        fuchsia_hardware_platform_bus::Service::Name,
-    };
-
-    args.set_outgoing_dir(endpoints->client.TakeChannel())
-        .set_runtime_service_offers(protocol_offers);
-
-    return DdkAdd(std::move(args));
-  } else if (type_ == Isolated) {
-    // Isolated devices run in separate devhosts.
-    // Protocol devices must be in same devhost as platform bus.
-    // Composite device fragments are also in the same devhost as platform bus,
-    // but the actual composite device will be in a new devhost or devhost belonging to
-    // one of the other fragments.
-    args.set_flags(DEVICE_ADD_MUST_ISOLATE);
-
-    auto add_service_result = outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
-        fuchsia_hardware_platform_device::Service::InstanceHandler(
-            {.device = bind_handler(fdf::Dispatcher::GetCurrent()->async_dispatcher())}));
-    if (add_service_result.is_error()) {
-      zxlogf(ERROR, "could not add service to outgoing directory: %s",
-             add_service_result.status_string());
-      return add_service_result.error_value();
-    }
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      zxlogf(ERROR, "could not create fuchsia.io endpoints for outgoing directory: %s",
-             endpoints.status_string());
-      return endpoints.status_value();
-    }
-
-    auto result = outgoing_.Serve(std::move(endpoints->server));
-    if (result.is_error()) {
-      zxlogf(ERROR, "could not serve outgoing directory: %s", result.status_string());
-      return result.error_value();
-    }
-
-    std::array protocol_offers = {
-        fidl::DiscoverableProtocolName<fuchsia_hardware_platform_device::Device>,
-    };
-
-    std::array offers = {
-        fuchsia_hardware_platform_device::Service::Name,
-    };
-
-    args.set_outgoing_dir(endpoints->client.TakeChannel())
-        .set_fidl_protocol_offers(protocol_offers)
-        .set_fidl_service_offers(offers);
-
-    return DdkAdd(std::move(args));
-  } else if (type_ == Fragment) {
-    return DdkAdd(std::move(args));
-  } else {
-    __UNREACHABLE;
+    args.set_fidl_protocol_offers(fidl_protocol_offers)
+        .set_fidl_service_offers(fidl_service_offers);
   }
+
+  switch (type_) {
+    case Protocol: {
+      auto protocol_handler =
+          [this](fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> server_end) {
+            fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end),
+                            restricted_.get());
+          };
+      fuchsia_hardware_platform_bus::Service::InstanceHandler handler({
+          .platform_bus = std::move(protocol_handler),
+      });
+
+      zx::result result =
+          outgoing_.AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
+      if (result.is_error()) {
+        return result.error_value();
+      }
+
+      args.set_runtime_service_offers(runtime_service_offers);
+      break;
+    }
+
+    case Isolated: {
+      // Isolated devices run in separate devhosts.
+      // Protocol devices must be in same devhost as platform bus.
+      // Composite device fragments are also in the same devhost as platform bus,
+      // but the actual composite device will be in a new devhost or devhost belonging to
+      // one of the other fragments.
+      args.set_flags(DEVICE_ADD_MUST_ISOLATE);
+      break;
+    }
+
+    case Fragment: {
+      break;
+    }
+  }
+
+  // Setup the outgoing directory.
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  if (zx::result result = outgoing_.Serve(std::move(endpoints->server)); result.is_error()) {
+    return result.error_value();
+  }
+  args.set_outgoing_dir(endpoints->client.TakeChannel());
+  return DdkAdd(std::move(args));
 }
 
 void PlatformDevice::DdkInit(ddk::InitTxn txn) {
