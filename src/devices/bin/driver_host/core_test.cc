@@ -8,6 +8,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl-async/cpp/bind.h>
+#include <lib/fit/defer.h>
 
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
@@ -148,9 +149,23 @@ class CoreTest : public zxtest::Test {
   FakeCoordinator coordinator_;
 };
 
+void Remove(fbl::RefPtr<zx_device_t> dev) {
+  dev->set_flag(DEV_FLAG_DEAD);
+  std::optional<zx_status_t> removal_status;
+  {
+    fbl::AutoLock lock(&dev->driver_host_context()->api_lock());
+    dev->removal_cb = [&removal_status](zx_status_t status) { removal_status = status; };
+    dev->driver_host_context()->DriverManagerRemove(dev);
+  }
+  ASSERT_OK(dev->driver_host_context()->loop().RunUntilIdle());
+  ASSERT_TRUE(removal_status.has_value());
+  ASSERT_OK(removal_status.value());
+}
+
 TEST_F(CoreTest, ConnectFidlReturnsError) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
+  auto remove = fit::defer([&dev]() { Remove(dev); });
 
   zx_protocol_device_t ops = {};
   dev->set_ops(&ops);
@@ -161,14 +176,6 @@ TEST_F(CoreTest, ConnectFidlReturnsError) {
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 device_connect_fidl_protocol(dev.get(), "test-protocol",
                                              endpoints->server.TakeChannel().release()));
-
-  dev->set_flag(DEV_FLAG_DEAD);
-  {
-    fbl::AutoLock lock(&ctx_.api_lock());
-    dev->removal_cb = [](zx_status_t) {};
-    ctx_.DriverManagerRemove(std::move(dev));
-  }
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 TEST_F(CoreTest, LastDeviceUnbindStopsAsyncLoop) {
@@ -204,6 +211,7 @@ TEST_F(CoreTest, LastDeviceUnbindStopsAsyncLoop) {
 TEST_F(CoreTest, RebindNoChildren) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
+  auto remove = fit::defer([&dev]() { Remove(dev); });
 
   zx_protocol_device_t ops = {};
   dev->set_ops(&ops);
@@ -212,19 +220,13 @@ TEST_F(CoreTest, RebindNoChildren) {
 
   EXPECT_OK(dev->Rebind());
   EXPECT_EQ(coordinator_.bind_count(), 1);
-
-  dev->set_flag(DEV_FLAG_DEAD);
-  {
-    fbl::AutoLock lock(&ctx_.api_lock());
-    dev->removal_cb = [](zx_status_t) {};
-    ctx_.DriverManagerRemove(std::move(dev));
-  }
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 TEST_F(CoreTest, SystemPowerStateMapping) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
+  auto remove = fit::defer([&dev]() { Remove(dev); });
+
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
   ASSERT_OK(dev->SetPowerStates(internal::kDeviceDefaultPowerStates,
@@ -275,24 +277,17 @@ TEST_F(CoreTest, SystemPowerStateMapping) {
                                                   &state_info, &suspend_reason));
   ASSERT_EQ(suspend_reason, DEVICE_SUSPEND_REASON_REBOOT_KERNEL_INITIATED);
   ASSERT_EQ(state_info.performance_state, 7);
-
-  dev->set_flag(DEV_FLAG_DEAD);
-  {
-    fbl::AutoLock lock(&ctx_.api_lock());
-    dev->removal_cb = [](zx_status_t) {};
-    ctx_.DriverManagerRemove(std::move(dev));
-  }
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 TEST_F(CoreTest, RebindHasOneChild) {
   uint32_t unbind_count = 0;
-  fbl::RefPtr<zx_device> parent;
 
   zx_protocol_device_t ops = {};
   ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
 
+  fbl::RefPtr<zx_device> parent;
   ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
+  auto remove = fit::defer([&parent]() { Remove(parent); });
   ASSERT_NO_FATAL_FAILURE(Connect(parent));
   parent->set_ops(&ops);
   parent->set_ctx(&unbind_count);
@@ -315,68 +310,53 @@ TEST_F(CoreTest, RebindHasOneChild) {
 
   ASSERT_OK(ctx_.loop().RunUntilIdle());
   EXPECT_EQ(coordinator_.bind_count(), 1);
-
-  parent->set_flag(DEV_FLAG_DEAD);
-  {
-    fbl::AutoLock lock(&ctx_.api_lock());
-    parent->removal_cb = [](zx_status_t) {};
-    ctx_.DriverManagerRemove(std::move(parent));
-  }
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 TEST_F(CoreTest, RebindHasMultipleChildren) {
+  uint32_t unbind_count = 0;
+
+  zx_protocol_device_t ops = {};
+  ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
+
+  fbl::RefPtr<zx_device> parent;
+  ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
+  auto remove = fit::defer([&parent]() { Remove(parent); });
+
+  ASSERT_NO_FATAL_FAILURE(Connect(parent));
+  parent->set_ops(&ops);
+  parent->set_ctx(&unbind_count);
   {
-    uint32_t unbind_count = 0;
-    fbl::RefPtr<zx_device> parent;
-
-    zx_protocol_device_t ops = {};
-    ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
-
-    ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
-    ASSERT_NO_FATAL_FAILURE(Connect(parent));
-    parent->set_ops(&ops);
-    parent->set_ctx(&unbind_count);
-    {
-      std::array<fbl::RefPtr<zx_device>, 5> children;
-      for (auto& child : children) {
-        ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
-        ASSERT_NO_FATAL_FAILURE(Connect(child));
-        child->set_ops(&ops);
-        child->set_ctx(&unbind_count);
-        parent->add_child(child.get());
-        child->set_parent(parent);
-      }
-
-      EXPECT_OK(parent->Rebind());
-
-      for (auto& child : children) {
-        EXPECT_EQ(coordinator_.bind_count(), 0);
-        ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
-      }
-
-      EXPECT_EQ(unbind_count, children.size());
-
-      for (auto& child : children) {
-        child->set_flag(DEV_FLAG_DEAD);
-      }
+    std::array<fbl::RefPtr<zx_device>, 5> children;
+    for (auto& child : children) {
+      ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
+      ASSERT_NO_FATAL_FAILURE(Connect(child));
+      child->set_ops(&ops);
+      child->set_ctx(&unbind_count);
+      parent->add_child(child.get());
+      child->set_parent(parent);
     }
-    ctx_.loop().RunUntilIdle();
-    EXPECT_EQ(coordinator_.bind_count(), 1);
 
-    parent->set_flag(DEV_FLAG_DEAD);
-    {
-      fbl::AutoLock lock(&ctx_.api_lock());
-      parent->removal_cb = [](zx_status_t) {};
-      ctx_.DriverManagerRemove(std::move(parent));
+    EXPECT_OK(parent->Rebind());
+
+    for (auto& child : children) {
+      EXPECT_EQ(coordinator_.bind_count(), 0);
+      ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
     }
-    ASSERT_OK(ctx_.loop().RunUntilIdle());
+
+    EXPECT_EQ(unbind_count, children.size());
+
+    for (auto& child : children) {
+      child->set_flag(DEV_FLAG_DEAD);
+    }
   }
+  ctx_.loop().RunUntilIdle();
+  EXPECT_EQ(coordinator_.bind_count(), 1);
 }
 
 TEST_F(CoreTest, AddCompositeNodeSpec) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
+  auto remove = fit::defer([&dev]() { Remove(dev); });
 
   zx_protocol_device_t ops = {};
   dev->set_ops(&ops);
@@ -526,14 +506,6 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
   };
 
   EXPECT_EQ(ZX_OK, device_add_composite_spec(dev.get(), "test_composite", &spec));
-
-  dev->set_flag(DEV_FLAG_DEAD);
-  {
-    fbl::AutoLock lock(&ctx_.api_lock());
-    dev->removal_cb = [](zx_status_t) {};
-    ctx_.DriverManagerRemove(std::move(dev));
-  }
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 }  // namespace
