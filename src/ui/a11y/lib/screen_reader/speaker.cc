@@ -198,12 +198,20 @@ fpromise::promise<> Speaker::EndSpeechTask(std::weak_ptr<SpeechTask> weak_task, 
   if (!task) {
     return fpromise::make_error_promise();
   }
-  // Remove the task from the queue.
-  queue_.pop();
-  // Informs the new first task of the queue that it can start running.
+
+  if (!queue_.empty() && queue_.front() == task) {
+    queue_.pop();
+  } else {
+    FX_LOGS(ERROR) << "Tried to invoke EndSpeechTask more than once for the same task."
+                      "Ignoring. We can recover, but this indicates a logic error elsewhere.";
+    FX_DCHECK(false);
+  }
+
   if (!queue_.empty()) {
+    // Informs the new first task of the queue that it can start running.
     queue_.front()->starter.complete_ok();
   }
+
   if (!success) {
     return fpromise::make_error_promise();
   }
