@@ -131,7 +131,6 @@ pub enum FeatureSupportLevel {
     /// created by assembly, and is primarily used for board-level bringup.
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
-    #[serde(alias = "bringup")]
     #[serde(rename = "bootstrap")]
     Bootstrap,
 
