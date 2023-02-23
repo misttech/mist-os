@@ -433,7 +433,10 @@
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "parent",
             as: "fuchsia.diagnostics.RealArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
+            to: [
+                "#inspect_test_runner",
+                "#system-tests",
+            ],
         },
         {
             protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",

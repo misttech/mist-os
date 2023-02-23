@@ -28,6 +28,7 @@ group("tests") {
     "log_listener:tests",
     "persistence:tests",
     "sampler:tests",
+    "tests",
     "triage:tests",
     "validator:tests",
     "wasm:tests",
