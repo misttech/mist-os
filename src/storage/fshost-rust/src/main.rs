@@ -87,6 +87,12 @@ async fn main() -> Result<(), Error> {
     // Records inspect metrics
     register_stats(inspector.root(), env.data_root()?).await;
 
+    // The inspector is global and will maintain strong references to callbacks used to gather
+    // inspect data which will include env.data_root() which is a proxy with an async channel that
+    // is registered with the executor.  The executor will assert if anything is regsistered with it
+    // when its destructor runs, so we make sure to clean up the inspector here.
+    scopeguard::defer! { inspector.root().clear_recorded(); }
+
     let _ = service::handle_lifecycle_requests(shutdown_tx)?;
 
     let scope = ExecutionScope::new();
