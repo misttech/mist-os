@@ -1301,21 +1301,8 @@ SchedDuration Scheduler::CalculateTimeslice(Thread* thread) {
   // Calcluate the time slice in nanoseconds.
   const SchedDuration time_slice_ns = minimum_time_slice_grans * minimum_granularity_ns_;
 
-  // Note that the KTRACE_END_SCOPE macro uses a locally evaluated lambda as
-  // part of its magic. Clang static thread analysis is not clever enough to
-  // understand that this lambda is evaluated in the same capability context as
-  // the CalculateTimeslice method, and therefore cannot figure out that the
-  // thread lock is being held (a requirement for accessing ep.fair.weight) when
-  // the lambda is evaluated.
-  //
-  // So, attempting to simply access ep.fair.weight in the invocation of
-  // KTRACE_END_SCOPE results in a compile time error (even though the operation
-  // is actually safe).  To work around this issue, create a local maybe_unused
-  // copy of the current fair weight and pass that to the macro expansion
-  // instead.
-  [[maybe_unused]] const SchedWeight fair_weight = ep.fair.weight;
   trace = KTRACE_END_SCOPE(
-      ("weight", fair_weight.raw_value()),
+      ("weight", KTRACE_ANNOTATED_VALUE(thread_lock.AssertHeld(), ep.fair.weight.raw_value())),
       ("total weight", KTRACE_ANNOTATED_VALUE(AssertHeld(queue_lock_), weight_total_.raw_value())));
   return time_slice_ns;
 }
