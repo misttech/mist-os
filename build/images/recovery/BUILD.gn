@@ -78,7 +78,7 @@ if (is_fuchsia) {
   }
 
   _core_realm_deps = [
-    "//src/connectivity/wlan/wlancfg:wlancfg-core-shard-new",
+    "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
     "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
     "//src/developer/forensics:core_shard",

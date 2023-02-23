@@ -347,7 +347,7 @@ assembly_input_bundle("common_minimal") {
           rebase_path("//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
                       root_build_dir),
           rebase_path(
-              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard_new.cml",
+              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
               root_build_dir),
 
           rebase_path("//src/diagnostics/sampler/meta/sampler.core_shard.cml",
@@ -419,9 +419,9 @@ assembly_input_bundle("common_minimal_userdebug") {
     {
       name = "core"
       component_shards = {
-        core = [ rebase_path(
-                "//src/diagnostics/detect/meta/detect.core_shard_new.cml",
-                root_build_dir) ]
+        core =
+            [ rebase_path("//src/diagnostics/detect/meta/detect.core_shard.cml",
+                          root_build_dir) ]
       }
     },
   ]

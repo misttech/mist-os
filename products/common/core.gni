@@ -18,7 +18,7 @@ product_bootfs_labels += [
 
 core_realm_shards += [
   "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",
-  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard-new",
+  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
   "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
   "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
   "//src/developer/debug/debug_agent:core_shard",

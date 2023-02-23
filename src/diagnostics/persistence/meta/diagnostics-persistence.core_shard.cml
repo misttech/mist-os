@@ -1,0 +1,39 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "#diagnostics",
+        },
+        {
+            protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
+            from: "parent",
+            to: [ "#diagnostics" ],
+        },
+        {
+            storage: "cache",
+            from: "self",
+            to: "#diagnostics",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            as: "diagnostics-persistence-config-data",
+            to: "#diagnostics",
+            subdir: "diagnostics-persistence",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.component.PersistenceBinder",
+                "fuchsia.diagnostics.persist.DataPersistence-netstack",
+                "fuchsia.diagnostics.persist.DataPersistence-wlan",
+            ],
+            from: "#diagnostics",
+        },
+    ],
+}

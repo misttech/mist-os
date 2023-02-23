@@ -27,7 +27,7 @@ core_realm_shards = [
   "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
   "//src/sys/process-resolver:core_shard",
   "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",
-  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard-new",
+  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
   "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
   "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
   "//src/developer/debug/debug_agent:core_shard",
