@@ -236,6 +236,35 @@ TEST_F(SpeakerTest, DropsTaskWhenSpeakFails) {
   EXPECT_EQ(mock_tts_engine_.ExamineUtterances().size(), 1u);
 }
 
+TEST_F(SpeakerTest, RecoversWhenSpeakFails) {
+  mock_tts_engine_.set_should_fail_speak(true);
+  {
+    Node node;
+    node.mutable_attributes()->set_label("foo");
+    node.set_role(fuchsia::accessibility::semantics::Role::UNKNOWN);
+    auto task = speaker_->SpeakNodePromise(&node, {.interrupt = false});
+    executor_.schedule_task(std::move(task));
+  }
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(mock_tts_engine_.ExamineUtterances().size(), 1u);
+  EXPECT_FALSE(mock_tts_engine_.ReceivedSpeak());
+
+  mock_tts_engine_.set_should_fail_speak(false);
+  {
+    Node node;
+    node.mutable_attributes()->set_label("bar");
+    node.set_role(fuchsia::accessibility::semantics::Role::UNKNOWN);
+    auto task = speaker_->SpeakNodePromise(&node, {.interrupt = false});
+    executor_.schedule_task(std::move(task));
+  }
+  RunLoopUntilIdle();
+
+  // The speaker should continue on and send another Speak() request.
+  EXPECT_TRUE(mock_tts_engine_.ReceivedSpeak());
+  EXPECT_EQ(mock_tts_engine_.ExamineUtterances().size(), 2u);
+}
+
 TEST_F(SpeakerTest, SpeakerSavesLastUtterance) {
   std::vector<a11y::ScreenReaderMessageGenerator::UtteranceAndContext> description;
   a11y::ScreenReaderMessageGenerator::UtteranceAndContext utterance1;

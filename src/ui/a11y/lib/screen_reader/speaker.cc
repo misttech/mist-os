@@ -8,6 +8,8 @@
 #include <lib/fpromise/bridge.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "lib/fpromise/promise.h"
+
 namespace a11y {
 namespace {
 
@@ -172,15 +174,15 @@ fpromise::promise<> Speaker::DispatchSingleUtterance(std::weak_ptr<SpeechTask> w
       .and_then([this](Utterance& utterance) mutable -> fpromise::promise<> {
         return EnqueueUtterance(std::move(utterance));
       })
-      .or_else([this, weak_task = std::weak_ptr(task)]() mutable {
-        return EndSpeechTask(std::move(weak_task), /*success=*/false);
-      })
       .and_then([this, weak_task = std::weak_ptr(task)]() mutable -> fpromise::promise<> {
         auto task = weak_task.lock();
         if (!task) {
-          return EndSpeechTask(std::move(weak_task), /*success=*/false);
+          return fpromise::make_error_promise();
         }
         return Speak();
+      })
+      .or_else([this, weak_task = std::weak_ptr(task)]() mutable {
+        return EndSpeechTask(std::move(weak_task), /*success=*/false);
       });
 }
 
