@@ -25,9 +25,6 @@ using TestAddCompositeNodeSpecCallback =
 
 class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordinator> {
  public:
-  FakeCoordinator() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
-    loop_.StartThread("driver_host-test-coordinator-loop");
-  }
   zx_status_t Connect(async_dispatcher_t* dispatcher,
                       fidl::ServerEnd<fuchsia_device_manager::Coordinator> request) {
     return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
@@ -78,26 +75,26 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
 
   uint32_t bind_count() { return bind_count_.load(); }
 
-  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
-
   void set_spec_callback(TestAddCompositeNodeSpecCallback callback) {
     spec_callback_ = std::move(callback);
   }
 
  private:
   std::atomic<uint32_t> bind_count_ = 0;
-
-  // The coordinator needs a separate loop so that when the DriverHost makes blocking calls into it,
-  // it doesn't hang.
-  async::Loop loop_;
-
   TestAddCompositeNodeSpecCallback spec_callback_;
 };
 
 class CoreTest : public zxtest::Test {
  protected:
-  CoreTest() : ctx_(&kAsyncLoopConfigNoAttachToCurrentThread) {
-    ctx_.loop().StartThread("driver_host-test-loop");
+  CoreTest()
+      : ctx_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        coordinator_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+
+  ~CoreTest() { internal::RegisterContextForApi(nullptr); }
+
+  void SetUp() override {
+    // The coordinator loop needs its own thread because the driver host makes blocking calls to it.
+    coordinator_loop_.StartThread("driver_host-test-coordinator-loop");
     internal::RegisterContextForApi(&ctx_);
     ASSERT_OK(zx_driver::Create("core-test", ctx_.inspect().drivers(), &drv_));
 
@@ -106,7 +103,8 @@ class CoreTest : public zxtest::Test {
     driver_obj_ = *std::move(driver);
   }
 
-  ~CoreTest() { internal::RegisterContextForApi(nullptr); }
+  // Dummy TearDown method.
+  void TearDown() override { coordinator_loop_.Shutdown(); }
 
   void Connect(fbl::RefPtr<zx_device> device) {
     auto coordinator_endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Coordinator>();
@@ -123,8 +121,8 @@ class CoreTest : public zxtest::Test {
     DeviceControllerConnection::Bind(std::move(conn), std::move(controller_endpoints->server),
                                      ctx_.loop().dispatcher());
 
-    ASSERT_OK(
-        coordinator_.Connect(coordinator_.dispatcher(), std::move(coordinator_endpoints->server)));
+    ASSERT_OK(coordinator_.Connect(coordinator_loop_.dispatcher(),
+                                   std::move(coordinator_endpoints->server)));
 
     clients_.push_back(controller_endpoints->client.TakeChannel());
   }
@@ -145,6 +143,8 @@ class CoreTest : public zxtest::Test {
   DriverHostContext ctx_;
   fbl::RefPtr<zx_driver> drv_;
   fbl::RefPtr<Driver> driver_obj_;
+
+  async::Loop coordinator_loop_;
   FakeCoordinator coordinator_;
 };
 
@@ -161,11 +161,6 @@ TEST_F(CoreTest, ConnectFidlReturnsError) {
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 device_connect_fidl_protocol(dev.get(), "test-protocol",
                                              endpoints->server.TakeChannel().release()));
-
-  ctx_.loop().Quit();
-  ctx_.loop().JoinThreads();
-  ASSERT_OK(ctx_.loop().ResetQuit());
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
 
   dev->set_flag(DEV_FLAG_DEAD);
   {
@@ -197,9 +192,6 @@ TEST_F(CoreTest, LastDeviceUnbindStopsAsyncLoop) {
 
     // Clean up the DeviceControllerConnection we set up in Connect().
     clients_.clear();
-    ctx_.loop().Quit();
-    ctx_.loop().JoinThreads();
-    ASSERT_OK(ctx_.loop().ResetQuit());
     ASSERT_OK(ctx_.loop().RunUntilIdle());
     // Here the dev will go out of scope and fbl_recycle() will be called.
   }
@@ -220,12 +212,6 @@ TEST_F(CoreTest, RebindNoChildren) {
 
   EXPECT_OK(dev->Rebind());
   EXPECT_EQ(coordinator_.bind_count(), 1);
-
-  // Join the thread running in the background, then run the rest of the tasks locally.
-  ctx_.loop().Quit();
-  ctx_.loop().JoinThreads();
-  ctx_.loop().ResetQuit();
-  ctx_.loop().RunUntilIdle();
 
   dev->set_flag(DEV_FLAG_DEAD);
   {
@@ -290,11 +276,6 @@ TEST_F(CoreTest, SystemPowerStateMapping) {
   ASSERT_EQ(suspend_reason, DEVICE_SUSPEND_REASON_REBOOT_KERNEL_INITIATED);
   ASSERT_EQ(state_info.performance_state, 7);
 
-  ctx_.loop().Quit();
-  ctx_.loop().JoinThreads();
-  ASSERT_OK(ctx_.loop().ResetQuit());
-  ASSERT_OK(ctx_.loop().RunUntilIdle());
-
   dev->set_flag(DEV_FLAG_DEAD);
   {
     fbl::AutoLock lock(&ctx_.api_lock());
@@ -305,49 +286,43 @@ TEST_F(CoreTest, SystemPowerStateMapping) {
 }
 
 TEST_F(CoreTest, RebindHasOneChild) {
+  uint32_t unbind_count = 0;
+  fbl::RefPtr<zx_device> parent;
+
+  zx_protocol_device_t ops = {};
+  ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
+
+  ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
+  ASSERT_NO_FATAL_FAILURE(Connect(parent));
+  parent->set_ops(&ops);
+  parent->set_ctx(&unbind_count);
   {
-    uint32_t unbind_count = 0;
-    fbl::RefPtr<zx_device> parent;
+    fbl::RefPtr<zx_device> child;
+    ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
+    ASSERT_NO_FATAL_FAILURE(Connect(child));
+    child->set_ops(&ops);
+    child->set_ctx(&unbind_count);
+    parent->add_child(child.get());
+    child->set_parent(parent);
 
-    zx_protocol_device_t ops = {};
-    ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
+    EXPECT_OK(parent->Rebind());
+    EXPECT_EQ(coordinator_.bind_count(), 0);
+    ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
+    EXPECT_EQ(unbind_count, 1);
 
-    ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
-    ASSERT_NO_FATAL_FAILURE(Connect(parent));
-    parent->set_ops(&ops);
-    parent->set_ctx(&unbind_count);
-    {
-      fbl::RefPtr<zx_device> child;
-      ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
-      ASSERT_NO_FATAL_FAILURE(Connect(child));
-      child->set_ops(&ops);
-      child->set_ctx(&unbind_count);
-      parent->add_child(child.get());
-      child->set_parent(parent);
-
-      EXPECT_OK(parent->Rebind());
-      EXPECT_EQ(coordinator_.bind_count(), 0);
-      ASSERT_NO_FATAL_FAILURE(UnbindDevice(child));
-      EXPECT_EQ(unbind_count, 1);
-
-      child->set_flag(DEV_FLAG_DEAD);
-    }
-
-    ctx_.loop().Quit();
-    ctx_.loop().JoinThreads();
-    ASSERT_OK(ctx_.loop().ResetQuit());
-    ASSERT_OK(ctx_.loop().RunUntilIdle());
-    EXPECT_EQ(coordinator_.bind_count(), 1);
-
-    parent->set_flag(DEV_FLAG_DEAD);
-    {
-      fbl::AutoLock lock(&ctx_.api_lock());
-      parent->removal_cb = [](zx_status_t) {};
-      ctx_.DriverManagerRemove(std::move(parent));
-    }
-    ASSERT_OK(ctx_.loop().RunUntilIdle());
+    child->set_flag(DEV_FLAG_DEAD);
   }
-  // Join the thread running in the background, then run the rest of the tasks locally.
+
+  ASSERT_OK(ctx_.loop().RunUntilIdle());
+  EXPECT_EQ(coordinator_.bind_count(), 1);
+
+  parent->set_flag(DEV_FLAG_DEAD);
+  {
+    fbl::AutoLock lock(&ctx_.api_lock());
+    parent->removal_cb = [](zx_status_t) {};
+    ctx_.DriverManagerRemove(std::move(parent));
+  }
+  ASSERT_OK(ctx_.loop().RunUntilIdle());
 }
 
 TEST_F(CoreTest, RebindHasMultipleChildren) {
@@ -386,10 +361,6 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
         child->set_flag(DEV_FLAG_DEAD);
       }
     }
-    // Join the thread running in the background, then run the rest of the tasks locally.
-    ctx_.loop().Quit();
-    ctx_.loop().JoinThreads();
-    ctx_.loop().ResetQuit();
     ctx_.loop().RunUntilIdle();
     EXPECT_EQ(coordinator_.bind_count(), 1);
 
@@ -555,12 +526,6 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
   };
 
   EXPECT_EQ(ZX_OK, device_add_composite_spec(dev.get(), "test_composite", &spec));
-
-  // Join the thread running in the background, then run the rest of the tasks locally.
-  ctx_.loop().Quit();
-  ctx_.loop().JoinThreads();
-  ctx_.loop().ResetQuit();
-  ctx_.loop().RunUntilIdle();
 
   dev->set_flag(DEV_FLAG_DEAD);
   {
