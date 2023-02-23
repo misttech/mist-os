@@ -18,10 +18,7 @@ use {
         marker::Unpin,
         net::{self, Shutdown, SocketAddr},
         ops::Deref,
-        os::{
-            fd::AsRawFd as _,
-            unix::io::{FromRawFd as _, IntoRawFd as _},
-        },
+        os::unix::io::FromRawFd as _,
         pin::Pin,
     },
 };
@@ -215,58 +212,6 @@ impl TcpStream {
     /// Shuts down the connection, see `std::net::TcpStream.shutdown`
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.std().shutdown(how)
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    /// Sets the stream's send buffer size.
-    pub fn set_send_buffer_size(&mut self, size: usize) -> io::Result<()> {
-        self.with_wrapped_socket2_mut(|socket| socket.set_send_buffer_size(size))
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    /// Gets the stream's send buffer size.
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.with_wrapped_socket2(|socket| socket.send_buffer_size())
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    /// Sets the stream's receive buffer size.
-    pub fn set_receive_buffer_size(&mut self, size: usize) -> io::Result<()> {
-        self.with_wrapped_socket2_mut(|socket| socket.set_recv_buffer_size(size))
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    /// Gets the stream's receive buffer size.
-    pub fn receive_buffer_size(&self) -> io::Result<usize> {
-        self.with_wrapped_socket2(|socket| socket.recv_buffer_size())
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    fn with_wrapped_socket2<R>(&self, f: impl FnOnce(&socket2::Socket) -> R) -> R {
-        // This is safe because the socket2::Socket won't outlive self.stream.
-        let mut socket = unsafe { socket2::Socket::from_raw_fd(self.stream.as_ref().as_raw_fd()) };
-        let result = f(&mut socket);
-        // Turn the socket back into a raw FD so it won't try to close the
-        // underlying descriptor when dropped.
-        let _ = socket.into_raw_fd();
-        result
-    }
-
-    // TODO(https://fxbug.dev/122044): Remove this method once this type impls
-    // Deref<Target=socket2::Socket>.
-    fn with_wrapped_socket2_mut<R>(&mut self, f: impl FnOnce(&mut socket2::Socket) -> R) -> R {
-        // This is safe because the socket2::Socket won't outlive self.stream.
-        let mut socket = unsafe { socket2::Socket::from_raw_fd(self.stream.as_ref().as_raw_fd()) };
-        let result = f(&mut socket);
-        // Turn the socket back into a raw FD so it won't try to close the
-        // underlying descriptor when dropped.
-        let _ = socket.into_raw_fd();
-        result
     }
 
     /// Flushes the connection, see `std::net::TcpStream.flush`

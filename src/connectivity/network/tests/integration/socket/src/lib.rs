@@ -53,6 +53,7 @@ use packet_formats::{
     icmp::ndp::options::{NdpOptionBuilder, PrefixInformation},
     ipv4::Ipv4Header as _,
 };
+use socket2::SockRef;
 use test_case::test_case;
 
 async fn run_udp_socket_test(
@@ -1323,8 +1324,9 @@ async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &
         // If the sender supports setting SO_SNDBUF, it should be able to buffer
         // a large amount of data even if the receiver isn't reading.
         const BUFFER_SIZE: usize = 1024 * 1024;
-        sender.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
-        let size = sender.send_buffer_size().expect("get size is infallible");
+        let sender_ref = SockRef::from(sender.std());
+        sender_ref.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
+        let size = sender_ref.send_buffer_size().expect("get size is infallible");
         assert!(size >= BUFFER_SIZE, "{} >= {}", size, BUFFER_SIZE);
 
         let data = Vec::from_iter((0..BUFFER_SIZE).map(|i| i as u8));
@@ -1351,7 +1353,7 @@ async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack
     tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
         // Fill up the sender and receiver buffers by writing a lot of data.
         const LARGE_BUFFER_SIZE: usize = 1024 * 1024;
-        sender.set_send_buffer_size(LARGE_BUFFER_SIZE).expect("can set");
+        SockRef::from(sender.std()).set_send_buffer_size(LARGE_BUFFER_SIZE).expect("can set");
 
         let data = vec![b'x'; LARGE_BUFFER_SIZE];
         // Fill up the sending socket's send buffer. Since we can't prevent it
@@ -1374,9 +1376,10 @@ async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack
 
         // Now reduce the size of the send buffer. The apparent size of the send
         // buffer should decrease immediately.
-        let size_before = sender.send_buffer_size().unwrap();
-        sender.set_send_buffer_size(0).expect("can set");
-        let size_after = sender.send_buffer_size().unwrap();
+        let sender_ref = SockRef::from(sender.std());
+        let size_before = sender_ref.send_buffer_size().unwrap();
+        sender_ref.set_send_buffer_size(0).expect("can set");
+        let size_after = sender_ref.send_buffer_size().unwrap();
         assert!(size_before > size_after, "{} > {}", size_before, size_after);
 
         // Read data from the socket so that the the sender can send more.
@@ -1387,6 +1390,7 @@ async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack
             read += receiver.read(&mut buf).await.expect("can read");
         }
 
+        let sender = SockRef::from(sender.std());
         // Draining all the data from the sender into the receiver shouldn't
         // decrease the sender's apparent send buffer size.
         assert_eq!(sender.send_buffer_size().unwrap(), size_after);
