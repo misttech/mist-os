@@ -1,0 +1,39 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("bt-obex") {
+  edition = "2021"
+  with_unit_tests = true
+
+  deps = [
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
+    "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//third_party/rust_crates:thiserror",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
+  ]
+
+  sources = [
+    "src/error.rs",
+    "src/header.rs",
+    "src/lib.rs",
+  ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+fuchsia_unittest_package("bt-obex-tests") {
+  deps = [ ":bt-obex_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":bt-obex-tests" ]
+}
