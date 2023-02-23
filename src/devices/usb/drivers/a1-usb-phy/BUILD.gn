@@ -7,28 +7,29 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("aml_usb_phy_bind") {
-  rules = "aml_usb_phy.bind"
-  header_output = "aml_usb_phy_bind.h"
-  bind_output = "aml-usb-phy-v2.bindbc"
+driver_bind_rules("a1_usb_phy_bind") {
+  rules = "a1_usb_phy.bind"
+  header_output = "a1_usb_phy_bind.h"
+  bind_output = "a1-usb-phy.bindbc"
   tests = "test_bind.json"
-  deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
-fuchsia_driver("aml-usb-phy-v2-driver") {
-  output_name = "aml-usb-phy-v2"
+fuchsia_driver("a1-usb-phy-driver") {
+  output_name = "a1-usb-phy"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-usb-phy.cc" ]
+  sources = [ "a1-usb-phy.cc" ]
   deps = [
-    ":aml_usb_phy_bind",
+    ":a1_usb_phy_bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.modeswitch:fuchsia.hardware.usb.modeswitch_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
@@ -41,29 +42,27 @@ fuchsia_driver("aml-usb-phy-v2-driver") {
   ]
 }
 
-fuchsia_driver_component("aml-usb-phy-v2") {
-  info = "aml-usb-phy-v2-info.json"
-  component_name = "aml-usb-phy-v2"
-  deps = [ ":aml-usb-phy-v2-driver" ]
+fuchsia_driver_component("a1-usb-phy") {
+  info = "a1-usb-phy-info.json"
+  component_name = "a1-usb-phy"
+  deps = [ ":a1-usb-phy-driver" ]
   colocate = true
 }
 
-test("aml-usb-phy-test-bin") {
+test("a1-usb-phy-test-bin") {
   configs += [ "//build/config:all_source" ]
   sources = [
-    "aml-usb-phy-test.cc",
-    "aml-usb-phy.cc",
+    "a1-usb-phy-test.cc",
+    "a1-usb-phy.cc",
   ]
-  output_name = "aml-usb-phy-test"
+  output_name = "a1-usb-phy-test"
   deps = [
-    ":aml_usb_phy_bind",
+    ":a1_usb_phy_bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.modeswitch:fuchsia.hardware.usb.modeswitch_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/amlogic",
@@ -84,8 +83,8 @@ test("aml-usb-phy-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("aml-usb-phy-test") {
-  deps = [ ":aml-usb-phy-test-bin" ]
+fuchsia_unittest_package("a1-usb-phy-test") {
+  deps = [ ":a1-usb-phy-test-bin" ]
   test_specs = {
     environments = basic_envs
     log_settings = {
@@ -97,7 +96,7 @@ fuchsia_unittest_package("aml-usb-phy-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":aml-usb-phy-test",
-    ":aml_usb_phy_bind_test",
+    ":a1-usb-phy-test",
+    ":a1_usb_phy_bind_test",
   ]
 }

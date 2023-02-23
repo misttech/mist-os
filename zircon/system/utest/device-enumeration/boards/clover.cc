@@ -25,6 +25,9 @@ TEST_F(DeviceEnumerationTest, CloverTest) {
       "sys/platform/05:08:31/dsp/aml-dsp",
       "sys/platform/05:08:b/aml-pl-mailbox0",
       "sys/platform/05:08:b:1/aml-pl-mailbox1",
+
+      // USB
+      "sys/platform/05:08:36/a1-usb-phy",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

@@ -291,6 +291,7 @@
 //src/devices/tpm/drivers/cr50-spi:fuchsia_driver
 //src/devices/tpm/drivers/tpm-lpc:fuchsia_driver
 //src/devices/tpm/drivers/tpm:fuchsia_driver
+//src/devices/usb/drivers/a1-usb-phy:a1-usb-phy-driver
 //src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-v2-driver
 //src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-v2-driver
 //src/devices/usb/drivers/as370-usb-phy:as370-usb-phy-driver

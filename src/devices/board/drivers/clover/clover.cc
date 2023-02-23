@@ -117,6 +117,11 @@ int Clover::Thread() {
     init_txn_->Reply(status);
     return status;
   }
+  if ((status = UsbInit()) != ZX_OK) {
+    zxlogf(ERROR, "UsbInit() failed: %s", zx_status_get_string(status));
+    init_txn_->Reply(status);
+    return status;
+  }
 
   if ((status = PwmInit()) != ZX_OK) {
     zxlogf(ERROR, "PwmInit() failed: %s", zx_status_get_string(status));

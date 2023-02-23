@@ -166,7 +166,10 @@
 // |base| is guaranteed to be page aligned.
 
 // USB
-
+#define A1_USBCTRL_BASE 0xfe004400
+#define A1_USBCTRL_LENGTH 0x400
+#define A1_USBPHY_BASE 0xfe004000
+#define A1_USBPHY_LENGTH 0x400
 // sys_ctrl
 #define A1_SYS_CTRL_BASE 0xfe005800
 #define A1_SYS_CTRL_LENGTH 0x400

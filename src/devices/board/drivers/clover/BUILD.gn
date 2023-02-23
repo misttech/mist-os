@@ -107,6 +107,7 @@ fuchsia_driver("clover-driver") {
     "clover-sysmem.cc",
     "clover-tee.cc",
     "clover-thermal.cc",
+    "clover-usb.cc",
     "clover.cc",
   ]
   deps = [
@@ -120,6 +121,7 @@ fuchsia_driver("clover-driver") {
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.modeswitch:fuchsia.hardware.usb.modeswitch_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.gpio.init:fuchsia.hardware.gpio.init_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
@@ -131,6 +133,10 @@ fuchsia_driver("clover-driver") {
     "//src/devices/lib/fidl-metadata",
     "//src/devices/lib/metadata:llcpp",
     "//src/devices/lib/mmio",
+    "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb:cdc",
+    "//src/devices/usb/lib/usb:peripheral",
+    "//src/devices/usb/lib/usb:peripheral-config",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//zircon/system/ulib/fbl",

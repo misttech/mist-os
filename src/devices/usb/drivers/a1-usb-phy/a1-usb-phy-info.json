@@ -1,8 +1,10 @@
 {
-    "short_description": "AMLogic USB PHY driver",
+    "short_description": "AMLogic USB PHY driver for A1",
     "manufacturer": "AMLogic",
     "families": [],
-    "models": [],
+    "models": [
+        "A113L"
+    ],
     "areas": [
         "USB"
     ]

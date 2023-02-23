@@ -7,7 +7,7 @@
 
 #include <ddktl/device.h>
 
-namespace aml_usb_phy {
+namespace a1_usb_phy {
 
 class XhciDevice;
 using XhciDeviceType = ddk::Device<XhciDevice>;
@@ -24,6 +24,6 @@ class XhciDevice : public XhciDeviceType {
   DISALLOW_COPY_ASSIGN_AND_MOVE(XhciDevice);
 };
 
-}  // namespace aml_usb_phy
+}  // namespace a1_usb_phy
 
-#endif  // SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_XHCI_DEVICE_H_
+#endif  //  SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_XHCI_DEVICE_H_

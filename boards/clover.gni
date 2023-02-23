@@ -28,6 +28,7 @@ _common_bootfs_deps = [
   "//src/devices/sysmem/drivers/sysmem",
   "//src/devices/tee/drivers/optee",
   "//src/devices/thermal/drivers/aml-thermal",
+  "//src/devices/usb/drivers/a1-usb-phy",
   "//src/media/audio/drivers/aml-dsp",
 ]
 

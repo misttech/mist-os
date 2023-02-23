@@ -86,6 +86,7 @@ class Clover : public CloverType {
   zx_status_t SdioInit();
   zx_status_t MailboxInit();
   zx_status_t DspInit();
+  zx_status_t UsbInit();
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   std::optional<ddk::InitTxn> init_txn_;

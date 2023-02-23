@@ -5,8 +5,6 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_A1_USB_PHY_H_
 #define SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_A1_USB_PHY_H_
 
-#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/device-protocol/pdev.h>
@@ -19,17 +17,17 @@
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/usb/drivers/aml-usb-phy-v2/dwc2-device.h"
-#include "src/devices/usb/drivers/aml-usb-phy-v2/xhci-device.h"
+#include "src/devices/usb/drivers/a1-usb-phy/dwc2-device.h"
+#include "src/devices/usb/drivers/a1-usb-phy/xhci-device.h"
 
-namespace aml_usb_phy {
+namespace a1_usb_phy {
 
-class AmlUsbPhy;
-using AmlUsbPhyType =
-    ddk::Device<AmlUsbPhy, ddk::Initializable, ddk::Unbindable, ddk::ChildPreReleaseable>;
+class A1UsbPhy;
+using A1UsbPhyType =
+    ddk::Device<A1UsbPhy, ddk::Initializable, ddk::Unbindable, ddk::ChildPreReleaseable>;
 
 // This is the main class for the platform bus driver.
-class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, ddk::base_protocol> {
+class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::base_protocol> {
  public:
   // Public for testing.
   enum class UsbMode {
@@ -38,7 +36,7 @@ class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, dd
     PERIPHERAL,
   };
 
-  explicit AmlUsbPhy(zx_device_t* parent) : AmlUsbPhyType(parent) {}
+  explicit A1UsbPhy(zx_device_t* parent) : A1UsbPhyType(parent), pdev_(parent) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -58,7 +56,7 @@ class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, dd
   }
 
  private:
-  DISALLOW_COPY_ASSIGN_AND_MOVE(AmlUsbPhy);
+  DISALLOW_COPY_ASSIGN_AND_MOVE(A1UsbPhy);
 
   void InitPll(fdf::MmioBuffer* mmio);
   zx_status_t InitPhy();
@@ -68,42 +66,29 @@ class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, dd
   using SetModeCompletion = fit::callback<void(void)>;
   void SetMode(UsbMode mode, SetModeCompletion completion) __TA_REQUIRES(lock_);
 
-  zx_status_t AddXhciDevice() __TA_REQUIRES(lock_);
-  void RemoveXhciDevice(SetModeCompletion completion) __TA_REQUIRES(lock_);
-  zx_status_t AddDwc2Device() __TA_REQUIRES(lock_);
-  void RemoveDwc2Device(SetModeCompletion completion) __TA_REQUIRES(lock_);
-
   zx_status_t Init();
-  int IrqThread();
+  void InitUsbClk();
+  zx_status_t UsbPowerOn();
 
   ddk::PDev pdev_;
-  fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
-  std::optional<fdf::MmioBuffer> usbphy20_mmio_;
-  std::optional<fdf::MmioBuffer> usbphy21_mmio_;
+  std::optional<fdf::MmioBuffer> usbphy_mmio_;
+  std::optional<fdf::MmioBuffer> reset_mmio_;
+  std::optional<fdf::MmioBuffer> clk_mmio_;
 
-  zx::interrupt irq_;
-  thrd_t irq_thread_;
-  std::atomic_bool irq_thread_started_ = false;
+  // Control PowerDomain
+  zx::resource smc_monitor_;
 
   fbl::Mutex lock_;
 
   // Magic numbers for PLL from metadata
   uint32_t pll_settings_[8];
 
-  // Device node for binding XHCI driver.
-  std::unique_ptr<XhciDevice> xhci_device_ __TA_GUARDED(lock_);
-  std::unique_ptr<Dwc2Device> dwc2_device_ __TA_GUARDED(lock_);
-
   UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
   usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.
   bool dwc2_connected_ = false;
-
-  // If set, indicates that the device has a pending SetMode which
-  // will be completed once |DdkChildPreRelease| is called.
-  SetModeCompletion set_mode_completion_ __TA_GUARDED(lock_);
 };
 
-}  // namespace aml_usb_phy
+}  // namespace a1_usb_phy
 
 #endif  // SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_A1_USB_PHY_H_
