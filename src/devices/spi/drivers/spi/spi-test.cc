@@ -236,15 +236,8 @@ class SpiDeviceTest : public zxtest::Test {
     if (endpoints.is_error()) {
       return endpoints.take_error();
     }
-    auto& [client, server] = endpoints.value();
-    SpiFidlChild* fidl = child->children().front()->GetDeviceContext<SpiFidlChild>();
-    // The outgoing directory isn't thread safe; we must interact with it from the dispatcher
-    // thread.
-    async::PostTask(loop_.dispatcher(), [fidl, server = std::move(server)]() mutable {
-      ASSERT_OK(fidl->ServeOutgoingDirectory(std::move(server)));
-    });
     return component::ConnectAt<fuchsia_hardware_spi::Device>(
-        client, fidl::DiscoverableProtocolDefaultPath<fuchsia_hardware_spi::Device>);
+        child->outgoing(), fidl::DiscoverableProtocolDefaultPath<fuchsia_hardware_spi::Device>);
   }
 
   void SetSpiChannelMetadata(const spi_channel_t* channels, size_t count) {
@@ -628,8 +621,6 @@ TEST_F(SpiDeviceTest, OneClient) {
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
   EXPECT_EQ(spi_bus->child_count(), 1);
-
-  ASSERT_EQ(spi_bus->children().front()->child_count(), 2);
 
   std::shared_ptr<MockDevice> spi_child = nullptr;
   for (auto& child : spi_bus->children()) {
