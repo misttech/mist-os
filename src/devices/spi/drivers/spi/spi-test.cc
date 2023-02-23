@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -236,8 +237,10 @@ class SpiDeviceTest : public zxtest::Test {
     if (endpoints.is_error()) {
       return endpoints.take_error();
     }
-    return component::ConnectAt<fuchsia_hardware_spi::Device>(
-        child->outgoing(), fidl::DiscoverableProtocolDefaultPath<fuchsia_hardware_spi::Device>);
+
+    auto path = std::string("svc/") +
+                component::MakeServiceMemberPath<fuchsia_hardware_spi::Service::Device>("default");
+    return component::ConnectAt<fuchsia_hardware_spi::Device>(child->outgoing(), path);
   }
 
   void SetSpiChannelMetadata(const spi_channel_t* channels, size_t count) {

@@ -185,10 +185,13 @@ void SpiChild::DdkUnbind(ddk::UnbindTxn txn) {
 void SpiChild::DdkRelease() { delete this; }
 
 zx_status_t SpiChild::ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_spi::Device>(
-      [this](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
-        Bind(dispatcher_, std::move(server_end));
-      });
+  zx::result status = outgoing_.AddService<fuchsia_hardware_spi::Service>(
+      fuchsia_hardware_spi::Service::InstanceHandler({
+          .device =
+              [this](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
+                Bind(dispatcher_, std::move(server_end));
+              },
+      }));
   if (status.is_error()) {
     return status.status_value();
   }

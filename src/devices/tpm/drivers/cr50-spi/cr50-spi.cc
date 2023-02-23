@@ -35,15 +35,15 @@ zx_status_t Cr50SpiDevice::Create(void *ctx, zx_device_t *parent) {
     return endpoints.error_value();
   }
 
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent, "spi000", fidl::DiscoverableProtocolName<fuchsia_hardware_spi::Device>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not connect to SPI FIDL protocol: %s", zx_status_get_string(status));
-    return status;
+  zx::result client_end =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_spi::Service::Device>(
+          parent, "spi000");
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Could not connect to SPI FIDL protocol: %s", client_end.status_string());
+    return client_end.status_value();
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_spi::Device> client(std::move(endpoints->client));
+  fidl::WireSyncClient<fuchsia_hardware_spi::Device> client(std::move(*client_end));
   auto dev = std::make_unique<Cr50SpiDevice>(parent, std::move(acpi.value()), std::move(client));
   return dev->Bind(&dev);
 }

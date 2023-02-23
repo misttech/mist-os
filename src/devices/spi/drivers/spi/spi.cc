@@ -99,7 +99,7 @@ void SpiDevice::AddChildren(const ddk::SpiImplProtocolClient& spi, async_dispatc
     }
 
     std::array offers = {
-        fidl::DiscoverableProtocolName<fuchsia_hardware_spi::Device>,
+        fuchsia_hardware_spi::Service::Name,
     };
 
     ddk::DeviceAddArgs args = ddk::DeviceAddArgs(name);
@@ -119,7 +119,7 @@ void SpiDevice::AddChildren(const ddk::SpiImplProtocolClient& spi, async_dispatc
     }
     args.set_props(props);
 
-    status = dev->DdkAdd(args.set_fidl_protocol_offers(offers)
+    status = dev->DdkAdd(args.set_fidl_service_offers(offers)
                              .set_proto_id(ZX_PROTOCOL_SPI)
                              .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
