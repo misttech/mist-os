@@ -63,6 +63,7 @@ group("lib") {
     "uuid",
     "versioning",
     "vmo_store",
+    "windowed-stats",
     "zbitl",
     "zxdump",
   ]
@@ -166,6 +167,7 @@ group("tests") {
     "vmo_store:tests",
     "vulkan:tests",
     "watch_handler:tests",
+    "windowed-stats:tests",
     "zbitl:tests",
     "zircon:tests",
     "zxc:tests",
