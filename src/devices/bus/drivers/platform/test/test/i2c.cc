@@ -25,11 +25,11 @@ class TestI2cDevice : public DeviceType,
  public:
   static zx_status_t Create(zx_device_t* parent);
 
-  explicit TestI2cDevice(zx_device_t* parent) : DeviceType(parent) {}
+  TestI2cDevice(zx_device_t* parent, uint32_t bus_base) : DeviceType(parent), bus_base_(bus_base) {}
 
   zx_status_t Create(std::unique_ptr<TestI2cDevice>* out);
 
-  uint32_t I2cImplGetBusBase() { return 0; }
+  uint32_t I2cImplGetBusBase() { return bus_base_; }
   uint32_t I2cImplGetBusCount();
   zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size);
   zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
@@ -37,20 +37,36 @@ class TestI2cDevice : public DeviceType,
 
   // Methods required by the ddk mixins
   void DdkRelease();
+
+ private:
+  const uint32_t bus_base_;
 };
 
 zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
-  auto dev = std::make_unique<TestI2cDevice>(parent);
   pdev_protocol_t pdev;
-  zx_status_t status;
-
-  zxlogf(INFO, "TestI2cDevice::Create: %s ", DRIVER_NAME);
-
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
+  zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
     return status;
   }
+
+  pdev_device_info_t dev_info;
+  status = pdev_get_device_info(&pdev, &dev_info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_get_device_info failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // TODO(fxbug.dev/120971): Remove this once bus ID fields are no longer needed.
+  uint32_t bus_base = 0;
+  if (sscanf(dev_info.name, "i2c-%u", &bus_base) != 1) {
+    zxlogf(ERROR, "Unexpected name format \"%s\"", dev_info.name);
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto dev = std::make_unique<TestI2cDevice>(parent, bus_base);
+
+  zxlogf(INFO, "TestI2cDevice::Create: %s ", DRIVER_NAME);
 
   status = dev->DdkAdd("test-i2c");
   if (status != ZX_OK) {
@@ -65,7 +81,7 @@ zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
 
 void TestI2cDevice::DdkRelease() { delete this; }
 
-uint32_t TestI2cDevice::I2cImplGetBusCount() { return 2; }
+uint32_t TestI2cDevice::I2cImplGetBusCount() { return 1; }
 zx_status_t TestI2cDevice::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
   *out_size = 1024;
   return ZX_OK;

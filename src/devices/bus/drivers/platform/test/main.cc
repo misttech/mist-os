@@ -56,7 +56,13 @@ TEST(PbusTest, Enumeration) {
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:5/test-gpio/gpio-3").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:7/test-clock/clock-1").status_value());
   EXPECT_OK(
-      RecursiveWaitForFile(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-1-5").status_value());
+      RecursiveWaitForFile(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-0-16").status_value());
+  EXPECT_OK(
+      RecursiveWaitForFile(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-0-17").status_value());
+  EXPECT_OK(
+      RecursiveWaitForFile(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-5").status_value());
+  EXPECT_OK(
+      RecursiveWaitForFile(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-6").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f").status_value());
   EXPECT_OK(
       RecursiveWaitForFile(dirfd, "sys/platform/11:01:f/composite-dev/composite").status_value());
@@ -80,7 +86,10 @@ TEST(PbusTest, Enumeration) {
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-3-top/child-3", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:5/test-gpio/gpio-3", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:7/test-clock/clock-1", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-1-5", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-0-16", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8/test-i2c/i2c/i2c-0-17", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-5", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-6", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:f/composite-dev/composite", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:21/test-pci", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:22/test-power-sensor", &st, 0), 0);
