@@ -15,60 +15,19 @@
 
 #include <memory>
 
+#include "aml-i2c-regs.h"
 #include "src/devices/i2c/drivers/aml-i2c/aml_i2c_bind.h"
 
 #define I2C_ERROR_SIGNAL ZX_USER_SIGNAL_0
 #define I2C_TXN_COMPLETE_SIGNAL ZX_USER_SIGNAL_1
 
-#define AML_I2C_CONTROL_REG_START (uint32_t)(1 << 0)
-#define AML_I2C_CONTROL_REG_ACK_IGNORE (uint32_t)(1 << 1)
-#define AML_I2C_CONTROL_REG_STATUS (uint32_t)(1 << 2)
-#define AML_I2C_CONTROL_REG_ERR (uint32_t)(1 << 3)
-
-// There is a separate set of bits in the control register (QTR_CLK_EXT) that
-// extends this field to 12 bits. Only expose the main 10-bit field in order to
-// simplify the driver logic (delay values for normal bus frequencies won't use
-// anywhere near 10 bits anyway).
-#define AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX 0x3ff
-#define AML_I2C_CONTROL_REG_QTR_CLK_DLY_SHIFT 12
-#define AML_I2C_CONTROL_REG_QTR_CLK_DLY_MASK \
-  (uint32_t)(AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX << AML_I2C_CONTROL_REG_QTR_CLK_DLY_SHIFT)
-
-#define AML_I2C_TARGET_ADDR_REG_USE_CNTL_SCL_LOW (1 << 28)
-#define AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_MAX 0xfff
-#define AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_SHIFT 16
-
 #define AML_I2C_MAX_TRANSFER 512
 
 namespace aml_i2c {
 
-struct aml_i2c_regs_t {
-  uint32_t control;
-  uint32_t target_addr;
-  uint32_t token_list_0;
-  uint32_t token_list_1;
-  uint32_t token_wdata_0;
-  uint32_t token_wdata_1;
-  uint32_t token_rdata_0;
-  uint32_t token_rdata_1;
-} __PACKED;
-
-enum aml_i2c_token_t : uint64_t {
-  TOKEN_END,
-  TOKEN_START,
-  TOKEN_TARGET_ADDR_WR,
-  TOKEN_TARGET_ADDR_RD,
-  TOKEN_DATA,
-  TOKEN_DATA_LAST,
-  TOKEN_STOP
-};
-
 zx_status_t AmlI2cDev::SetTargetAddr(uint16_t addr) const {
   addr &= 0x7f;
-  uint32_t reg = MmioRead32(&virt_regs->target_addr);
-  reg = reg & ~0xff;
-  reg = reg | ((addr << 1) & 0xff);
-  MmioWrite32(reg, &virt_regs->target_addr);
+  TargetAddr::Get().ReadFrom(&(*regs_iobuff_)).set_target_address(addr).WriteTo(&(*regs_iobuff_));
 
   return ZX_OK;
 }
@@ -83,8 +42,7 @@ int AmlI2cDev::IrqThread() const {
       zxlogf(DEBUG, "interrupt error: %s", zx_status_get_string(status));
       continue;
     }
-    uint32_t reg = MmioRead32(&virt_regs->control);
-    if (reg & AML_I2C_CONTROL_REG_ERR) {
+    if (Control::Get().ReadFrom(&(*regs_iobuff_)).error()) {
       event_.signal(0, I2C_ERROR_SIGNAL);
     } else {
       event_.signal(0, I2C_TXN_COMPLETE_SIGNAL);
@@ -95,35 +53,27 @@ int AmlI2cDev::IrqThread() const {
 
 #if 0
 zx_status_t AmlI2cDev::DumpState() {
-  printf("control reg      : %08x\n", MmioRead32(&virt_regs->control));
-  printf("target addr reg  : %08x\n", MmioRead32(&virt_regs->target_addr));
-  printf("token list0 reg  : %08x\n", MmioRead32(&virt_regs->token_list_0));
-  printf("token list1 reg  : %08x\n", MmioRead32(&virt_regs->token_list_1));
-  printf("token wdata0     : %08x\n", MmioRead32(&virt_regs->token_wdata_0));
-  printf("token wdata1     : %08x\n", MmioRead32(&virt_regs->token_wdata_1));
-  printf("token rdata0     : %08x\n", MmioRead32(&virt_regs->token_rdata_0));
-  printf("token rdata1     : %08x\n", MmioRead32(&virt_regs->token_rdata_1));
+  printf("control reg      : %08x\n", regs_iobuff_->Read32(kControlReg));
+  printf("target addr reg  : %08x\n", regs_iobuff_->Read32(kTargetAddrReg));
+  printf("token list0 reg  : %08x\n", regs_iobuff_->Read32(kTokenList0Reg));
+  printf("token list1 reg  : %08x\n", regs_iobuff_->Read32(kTokenList1Reg));
+  printf("token wdata0     : %08x\n", regs_iobuff_->Read32(kWriteData0Reg));
+  printf("token wdata1     : %08x\n", regs_iobuff_->Read32(kWriteData1Reg));
+  printf("token rdata0     : %08x\n", regs_iobuff_->Read32(kReadData0Reg));
+  printf("token rdata1     : %08x\n", regs_iobuff_->Read32(kReadData1Reg));
 
   return ZX_OK;
 }
 #endif
 
-static inline void MmioClearBits32(uint32_t bits, MMIO_PTR volatile uint32_t* buffer) {
-  uint32_t reg = MmioRead32(buffer);
-  reg &= ~bits;
-  MmioWrite32(reg, buffer);
-}
-
-static inline void MmioSetBits32(uint32_t bits, MMIO_PTR volatile uint32_t* buffer) {
-  uint32_t reg = MmioRead32(buffer);
-  reg |= bits;
-  MmioWrite32(reg, buffer);
-}
-
 zx_status_t AmlI2cDev::StartXfer() const {
   // First have to clear the start bit before setting (RTFM)
-  MmioClearBits32(AML_I2C_CONTROL_REG_START, &virt_regs->control);
-  MmioSetBits32(AML_I2C_CONTROL_REG_START, &virt_regs->control);
+  Control::Get()
+      .ReadFrom(&(*regs_iobuff_))
+      .set_start(0)
+      .WriteTo(&(*regs_iobuff_))
+      .set_start(1)
+      .WriteTo(&(*regs_iobuff_));
   return ZX_OK;
 }
 
@@ -144,37 +94,33 @@ zx_status_t AmlI2cDev::WaitEvent(uint32_t sig_mask) const {
 zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, bool stop) const {
   TRACE_DURATION("i2c", "aml-i2c Write");
   ZX_DEBUG_ASSERT(len <= AML_I2C_MAX_TRANSFER);
-  uint32_t token_num = 0;
-  uint64_t token_reg = 0;
 
-  token_reg |= TOKEN_START << (4 * (token_num++));
-  token_reg |= TOKEN_TARGET_ADDR_WR << (4 * (token_num++));
+  TokenList tokens = TokenList::Get().FromValue(0);
+  tokens.Push(TokenList::Token::kStart);
+  tokens.Push(TokenList::Token::kTargetAddrWr);
 
   while (len > 0) {
-    bool is_last_iter = len <= 8;
-    uint32_t tx_size = is_last_iter ? len : 8;
+    bool is_last_iter = len <= WriteData::kMaxWriteBytesPerTransfer;
+    uint32_t tx_size = is_last_iter ? len : WriteData::kMaxWriteBytesPerTransfer;
     for (uint32_t i = 0; i < tx_size; i++) {
-      token_reg |= TOKEN_DATA << (4 * (token_num++));
+      tokens.Push(TokenList::Token::kData);
     }
 
     if (is_last_iter && stop) {
-      token_reg |= TOKEN_STOP << (4 * (token_num++));
+      tokens.Push(TokenList::Token::kStop);
     }
 
-    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_0);
-    token_reg = token_reg >> 32;
-    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_1);
+    tokens.WriteTo(&(*regs_iobuff_));
 
-    uint64_t wdata = 0;
+    WriteData wdata = WriteData::Get().FromValue(0);
     for (uint32_t i = 0; i < tx_size; i++) {
-      wdata |= static_cast<uint64_t>(buff[i]) << (8 * i);
+      wdata.Push(buff[i]);
     }
 
-    MmioWrite32(wdata & 0xffffffff, &virt_regs->token_wdata_0);
-    MmioWrite32((wdata >> 32) & 0xffffffff, &virt_regs->token_wdata_1);
+    wdata.WriteTo(&(*regs_iobuff_));
 
     StartXfer();
-    // while (virt_regs->control & 0x4) ;;    // wait for idle
+    // while (Control::Get().ReadFrom(&(*regs_iobuff_)).status()) ;;    // wait for idle
     zx_status_t status = WaitEvent(I2C_TXN_COMPLETE_SIGNAL);
     if (status != ZX_OK) {
       return status;
@@ -182,8 +128,6 @@ zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, bool stop) const
 
     len -= tx_size;
     buff += tx_size;
-    token_num = 0;
-    token_reg = 0;
   }
 
   return ZX_OK;
@@ -192,35 +136,31 @@ zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, bool stop) const
 zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, bool stop) const {
   ZX_DEBUG_ASSERT(len <= AML_I2C_MAX_TRANSFER);
   TRACE_DURATION("i2c", "aml-i2c Read");
-  uint32_t token_num = 0;
-  uint64_t token_reg = 0;
 
-  token_reg |= TOKEN_START << (4 * (token_num++));
-  token_reg |= TOKEN_TARGET_ADDR_RD << (4 * (token_num++));
+  TokenList tokens = TokenList::Get().FromValue(0);
+  tokens.Push(TokenList::Token::kStart);
+  tokens.Push(TokenList::Token::kTargetAddrRd);
 
   while (len > 0) {
-    bool is_last_iter = len <= 8;
-    uint32_t rx_size = is_last_iter ? len : 8;
+    bool is_last_iter = len <= ReadData::kMaxReadBytesPerTransfer;
+    uint32_t rx_size = is_last_iter ? len : ReadData::kMaxReadBytesPerTransfer;
 
     for (uint32_t i = 0; i < (rx_size - 1); i++) {
-      token_reg |= TOKEN_DATA << (4 * (token_num++));
+      tokens.Push(TokenList::Token::kData);
     }
     if (is_last_iter) {
-      token_reg |= TOKEN_DATA_LAST << (4 * (token_num++));
+      tokens.Push(TokenList::Token::kDataLast);
       if (stop) {
-        token_reg |= TOKEN_STOP << (4 * (token_num++));
+        tokens.Push(TokenList::Token::kStop);
       }
     } else {
-      token_reg |= TOKEN_DATA << (4 * (token_num++));
+      tokens.Push(TokenList::Token::kData);
     }
 
-    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_0);
-    token_reg = token_reg >> 32;
-    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_1);
+    tokens.WriteTo(&(*regs_iobuff_));
 
     // clear registers to prevent data leaking from last xfer
-    MmioWrite32(0, &virt_regs->token_rdata_0);
-    MmioWrite32(0, &virt_regs->token_rdata_1);
+    ReadData rdata = ReadData::Get().FromValue(0).WriteTo(&(*regs_iobuff_));
 
     StartXfer();
 
@@ -229,20 +169,16 @@ zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, bool stop) const {
       return status;
     }
 
-    // while (virt_regs->control & 0x4) ;;    // wait for idle
+    // while (Control::Get().ReadFrom(&(*regs_iobuff_)).status()) ;;    // wait for idle
 
-    uint64_t rdata;
-    rdata = MmioRead32(&virt_regs->token_rdata_0);
-    rdata |= static_cast<uint64_t>(MmioRead32(&virt_regs->token_rdata_1)) << 32;
+    rdata.ReadFrom(&(*regs_iobuff_));
 
-    for (uint32_t i = 0; i < rx_size; i++, rdata >>= 8) {
-      buff[i] = rdata & 0xff;
+    for (uint32_t i = 0; i < rx_size; i++) {
+      buff[i] = rdata.Pop();
     }
 
     len -= rx_size;
     buff += rx_size;
-    token_num = 0;
-    token_reg = 0;
   }
 
   return ZX_OK;
@@ -258,25 +194,25 @@ zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDe
     return status;
   }
 
-  virt_regs = reinterpret_cast<MMIO_PTR aml_i2c_regs_t*>(regs_iobuff_->get());
-
-  if (delay.quarter_clock_delay > AML_I2C_CONTROL_REG_QTR_CLK_DLY_MAX ||
-      delay.clock_low_delay > AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_MAX) {
+  if (delay.quarter_clock_delay > Control::kQtrClkDlyMax ||
+      delay.clock_low_delay > TargetAddr::kSclLowDelayMax) {
     zxlogf(ERROR, "invalid clock delay");
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (delay.quarter_clock_delay > 0) {
-    uint32_t control = MmioRead32(&virt_regs->control);
-    control &= ~AML_I2C_CONTROL_REG_QTR_CLK_DLY_MASK;
-    control |= delay.quarter_clock_delay << AML_I2C_CONTROL_REG_QTR_CLK_DLY_SHIFT;
-    MmioWrite32(control, &virt_regs->control);
+    Control::Get()
+        .ReadFrom(&(*regs_iobuff_))
+        .set_qtr_clk_dly(delay.quarter_clock_delay)
+        .WriteTo(&(*regs_iobuff_));
   }
 
   if (delay.clock_low_delay > 0) {
-    uint32_t reg = delay.clock_low_delay << AML_I2C_TARGET_ADDR_REG_SCL_LOW_DELAY_SHIFT;
-    reg |= AML_I2C_TARGET_ADDR_REG_USE_CNTL_SCL_LOW;
-    MmioWrite32(reg, &virt_regs->target_addr);
+    TargetAddr::Get()
+        .FromValue(0)
+        .set_scl_low_dly(delay.clock_low_delay)
+        .set_use_cnt_scl_low(1)
+        .WriteTo(&(*regs_iobuff_));
   }
 
   status = pdev.GetInterrupt(index, 0, &irq_);

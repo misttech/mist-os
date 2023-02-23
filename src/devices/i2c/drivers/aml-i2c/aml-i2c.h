@@ -7,7 +7,6 @@
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/pdev.h>
-#include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/event.h>
 #include <lib/zx/interrupt.h>
@@ -22,8 +21,6 @@
 
 namespace aml_i2c {
 
-struct aml_i2c_regs_t;
-
 class AmlI2cDev {
  public:
   AmlI2cDev() = default;
@@ -37,9 +34,6 @@ class AmlI2cDev {
   zx_status_t Init(unsigned index, aml_i2c_delay_values delay, ddk::PDev pdev);
 
   zx_status_t Transact(const i2c_impl_op_t* rws, size_t count) const;
-
-  // TODO(fxbug.dev/120969): Remove public members after C++ conversion.
-  MMIO_PTR volatile aml_i2c_regs_t* virt_regs;
 
  private:
   friend class AmlI2cTest;
