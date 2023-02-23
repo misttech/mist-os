@@ -5,13 +5,11 @@
 #include "aml-i2c.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <zircon/status.h>
-#include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
@@ -65,49 +63,46 @@ enum aml_i2c_token_t : uint64_t {
   TOKEN_STOP
 };
 
-static zx_status_t aml_i2c_set_target_addr(aml_i2c_dev_t* dev, uint16_t addr) {
+zx_status_t AmlI2cDev::SetTargetAddr(uint16_t addr) const {
   addr &= 0x7f;
-  uint32_t reg = MmioRead32(&dev->virt_regs->target_addr);
+  uint32_t reg = MmioRead32(&virt_regs->target_addr);
   reg = reg & ~0xff;
   reg = reg | ((addr << 1) & 0xff);
-  MmioWrite32(reg, &dev->virt_regs->target_addr);
+  MmioWrite32(reg, &virt_regs->target_addr);
 
   return ZX_OK;
 }
 
-static int aml_i2c_irq_thread(void* arg) {
-  auto* dev = reinterpret_cast<aml_i2c_dev_t*>(arg);
-  zx_status_t status;
-
-  while (1) {
-    status = zx_interrupt_wait(dev->irq, nullptr);
+int AmlI2cDev::IrqThread() const {
+  while (true) {
+    zx_status_t status = irq_.wait(nullptr);
     if (status == ZX_ERR_CANCELED) {
       break;
     }
     if (status != ZX_OK) {
-      zxlogf(DEBUG, "i2c: interrupt error");
+      zxlogf(DEBUG, "interrupt error: %s", zx_status_get_string(status));
       continue;
     }
-    uint32_t reg = MmioRead32(&dev->virt_regs->control);
+    uint32_t reg = MmioRead32(&virt_regs->control);
     if (reg & AML_I2C_CONTROL_REG_ERR) {
-      zx_object_signal(dev->event, 0, I2C_ERROR_SIGNAL);
+      event_.signal(0, I2C_ERROR_SIGNAL);
     } else {
-      zx_object_signal(dev->event, 0, I2C_TXN_COMPLETE_SIGNAL);
+      event_.signal(0, I2C_TXN_COMPLETE_SIGNAL);
     }
   }
   return ZX_OK;
 }
 
 #if 0
-static zx_status_t aml_i2c_dumpstate(aml_i2c_dev_t* dev) {
-  printf("control reg      : %08x\n", MmioRead32(&dev->virt_regs->control));
-  printf("target addr reg  : %08x\n", MmioRead32(&dev->virt_regs->target_addr));
-  printf("token list0 reg  : %08x\n", MmioRead32(&dev->virt_regs->token_list_0));
-  printf("token list1 reg  : %08x\n", MmioRead32(&dev->virt_regs->token_list_1));
-  printf("token wdata0     : %08x\n", MmioRead32(&dev->virt_regs->token_wdata_0));
-  printf("token wdata1     : %08x\n", MmioRead32(&dev->virt_regs->token_wdata_1));
-  printf("token rdata0     : %08x\n", MmioRead32(&dev->virt_regs->token_rdata_0));
-  printf("token rdata1     : %08x\n", MmioRead32(&dev->virt_regs->token_rdata_1));
+zx_status_t AmlI2cDev::DumpState() {
+  printf("control reg      : %08x\n", MmioRead32(&virt_regs->control));
+  printf("target addr reg  : %08x\n", MmioRead32(&virt_regs->target_addr));
+  printf("token list0 reg  : %08x\n", MmioRead32(&virt_regs->token_list_0));
+  printf("token list1 reg  : %08x\n", MmioRead32(&virt_regs->token_list_1));
+  printf("token wdata0     : %08x\n", MmioRead32(&virt_regs->token_wdata_0));
+  printf("token wdata1     : %08x\n", MmioRead32(&virt_regs->token_wdata_1));
+  printf("token rdata0     : %08x\n", MmioRead32(&virt_regs->token_rdata_0));
+  printf("token rdata1     : %08x\n", MmioRead32(&virt_regs->token_rdata_1));
 
   return ZX_OK;
 }
@@ -125,28 +120,28 @@ static inline void MmioSetBits32(uint32_t bits, MMIO_PTR volatile uint32_t* buff
   MmioWrite32(reg, buffer);
 }
 
-static zx_status_t aml_i2c_start_xfer(aml_i2c_dev_t* dev) {
+zx_status_t AmlI2cDev::StartXfer() const {
   // First have to clear the start bit before setting (RTFM)
-  MmioClearBits32(AML_I2C_CONTROL_REG_START, &dev->virt_regs->control);
-  MmioSetBits32(AML_I2C_CONTROL_REG_START, &dev->virt_regs->control);
+  MmioClearBits32(AML_I2C_CONTROL_REG_START, &virt_regs->control);
+  MmioSetBits32(AML_I2C_CONTROL_REG_START, &virt_regs->control);
   return ZX_OK;
 }
 
-static zx_status_t aml_i2c_wait_event(aml_i2c_dev_t* dev, uint32_t sig_mask) {
-  zx_time_t deadline = zx_deadline_after(dev->timeout);
+zx_status_t AmlI2cDev::WaitEvent(uint32_t sig_mask) const {
+  zx::time deadline = zx::deadline_after(timeout_);
   uint32_t observed;
   sig_mask |= I2C_ERROR_SIGNAL;
-  zx_status_t status = zx_object_wait_one(dev->event, sig_mask, deadline, &observed);
+  zx_status_t status = event_.wait_one(sig_mask, deadline, &observed);
   if (status != ZX_OK) {
     return status;
   }
-  zx_object_signal(dev->event, observed, 0);
+  event_.signal(observed, 0);
   if (observed & I2C_ERROR_SIGNAL)
     return ZX_ERR_TIMED_OUT;
   return ZX_OK;
 }
 
-static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32_t len, bool stop) {
+zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, bool stop) const {
   TRACE_DURATION("i2c", "aml-i2c Write");
   ZX_DEBUG_ASSERT(len <= AML_I2C_MAX_TRANSFER);
   uint32_t token_num = 0;
@@ -166,21 +161,21 @@ static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32
       token_reg |= TOKEN_STOP << (4 * (token_num++));
     }
 
-    MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_0);
+    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_0);
     token_reg = token_reg >> 32;
-    MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_1);
+    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_1);
 
     uint64_t wdata = 0;
     for (uint32_t i = 0; i < tx_size; i++) {
       wdata |= static_cast<uint64_t>(buff[i]) << (8 * i);
     }
 
-    MmioWrite32(wdata & 0xffffffff, &dev->virt_regs->token_wdata_0);
-    MmioWrite32((wdata >> 32) & 0xffffffff, &dev->virt_regs->token_wdata_1);
+    MmioWrite32(wdata & 0xffffffff, &virt_regs->token_wdata_0);
+    MmioWrite32((wdata >> 32) & 0xffffffff, &virt_regs->token_wdata_1);
 
-    aml_i2c_start_xfer(dev);
-    // while (dev->virt_regs->control & 0x4) ;;    // wait for idle
-    zx_status_t status = aml_i2c_wait_event(dev, I2C_TXN_COMPLETE_SIGNAL);
+    StartXfer();
+    // while (virt_regs->control & 0x4) ;;    // wait for idle
+    zx_status_t status = WaitEvent(I2C_TXN_COMPLETE_SIGNAL);
     if (status != ZX_OK) {
       return status;
     }
@@ -194,7 +189,7 @@ static zx_status_t aml_i2c_write(aml_i2c_dev_t* dev, const uint8_t* buff, uint32
   return ZX_OK;
 }
 
-static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len, bool stop) {
+zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, bool stop) const {
   ZX_DEBUG_ASSERT(len <= AML_I2C_MAX_TRANSFER);
   TRACE_DURATION("i2c", "aml-i2c Read");
   uint32_t token_num = 0;
@@ -219,26 +214,26 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
       token_reg |= TOKEN_DATA << (4 * (token_num++));
     }
 
-    MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_0);
+    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_0);
     token_reg = token_reg >> 32;
-    MmioWrite32(token_reg & 0xffffffff, &dev->virt_regs->token_list_1);
+    MmioWrite32(token_reg & 0xffffffff, &virt_regs->token_list_1);
 
     // clear registers to prevent data leaking from last xfer
-    MmioWrite32(0, &dev->virt_regs->token_rdata_0);
-    MmioWrite32(0, &dev->virt_regs->token_rdata_1);
+    MmioWrite32(0, &virt_regs->token_rdata_0);
+    MmioWrite32(0, &virt_regs->token_rdata_1);
 
-    aml_i2c_start_xfer(dev);
+    StartXfer();
 
-    zx_status_t status = aml_i2c_wait_event(dev, I2C_TXN_COMPLETE_SIGNAL);
+    zx_status_t status = WaitEvent(I2C_TXN_COMPLETE_SIGNAL);
     if (status != ZX_OK) {
       return status;
     }
 
-    // while (dev->virt_regs->control & 0x4) ;;    // wait for idle
+    // while (virt_regs->control & 0x4) ;;    // wait for idle
 
     uint64_t rdata;
-    rdata = MmioRead32(&dev->virt_regs->token_rdata_0);
-    rdata |= static_cast<uint64_t>(MmioRead32(&dev->virt_regs->token_rdata_1)) << 32;
+    rdata = MmioRead32(&virt_regs->token_rdata_0);
+    rdata |= static_cast<uint64_t>(MmioRead32(&virt_regs->token_rdata_1)) << 32;
 
     for (uint32_t i = 0; i < rx_size; i++, rdata >>= 8) {
       buff[i] = rdata & 0xff;
@@ -257,8 +252,6 @@ static zx_status_t aml_i2c_read(aml_i2c_dev_t* dev, uint8_t* buff, uint32_t len,
 be one of these instances for each of the soc i2c ports.
 */
 zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDev pdev) {
-  timeout = ZX_SEC(1);
-
   zx_status_t status = pdev.MapMmio(index, &regs_iobuff_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "pdev_map_mmio_buffer failed: %s", zx_status_get_string(status));
@@ -291,31 +284,31 @@ zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDe
     zxlogf(ERROR, "pdev_get_interrupt failed: %s", zx_status_get_string(status));
     return status;
   }
-  irq = irq_.get();
 
   status = zx::event::create(0, &event_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "zx_event_create failed: %s", zx_status_get_string(status));
     return status;
   }
-  event = event_.get();
 
-  thrd_create_with_name(&irqthrd, aml_i2c_irq_thread, this, "i2c_irq_thread");
+  thrd_create_with_name(
+      &irqthrd_, [](void* ctx) { return reinterpret_cast<AmlI2cDev*>(ctx)->IrqThread(); }, this,
+      "i2c_irq_thread");
 
   // Set profile for IRQ thread.
   // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
   // coding parameters.
-  const zx_duration_t capacity = ZX_USEC(20);
-  const zx_duration_t deadline = ZX_USEC(100);
-  const zx_duration_t period = deadline;
+  const zx::duration capacity = zx::usec(20);
+  const zx::duration deadline = zx::usec(100);
+  const zx::duration period = deadline;
 
   zx::profile irq_profile;
-  status = device_get_deadline_profile(nullptr, capacity, deadline, period, "aml_i2c_irq_thread",
-                                       irq_profile.reset_and_get_address());
+  status = device_get_deadline_profile(nullptr, capacity.get(), deadline.get(), period.get(),
+                                       "aml_i2c_irq_thread", irq_profile.reset_and_get_address());
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
   } else {
-    zx::unowned_thread thread(thrd_get_zx_handle(irqthrd));
+    zx::unowned_thread thread(thrd_get_zx_handle(irqthrd_));
     status = thread->set_profile(irq_profile, 0);
     if (status != ZX_OK) {
       zxlogf(WARNING, "Failed to apply deadline profile to IRQ thread: %s",
@@ -326,57 +319,51 @@ zx_status_t AmlI2cDev::Init(unsigned index, aml_i2c_delay_values delay, ddk::PDe
   return ZX_OK;
 }
 
-uint32_t aml_i2c_get_bus_count(void* ctx) {
-  auto* i2c = reinterpret_cast<aml_i2c_t*>(ctx);
+uint32_t AmlI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(i2c_devs_.size()); }
 
-  return i2c->dev_count;
-}
+uint32_t AmlI2c::I2cImplGetBusBase() { return 0; }
 
-uint32_t aml_i2c_get_bus_base(void* ctx) { return 0; }
-
-zx_status_t aml_i2c_get_max_transfer_size(void* ctx, uint32_t bus_id, size_t* out_size) {
+zx_status_t AmlI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
   *out_size = AML_I2C_MAX_TRANSFER;
   return ZX_OK;
 }
 
-zx_status_t aml_i2c_set_bitrate(void* ctx, uint32_t bus_id, uint32_t bitrate) {
+zx_status_t AmlI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
   // TODO(hollande,voydanoff) implement this
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t aml_i2c_transact(void* ctx, uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
+zx_status_t AmlI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
   TRACE_DURATION("i2c", "aml-i2c Transact");
-  size_t i;
-  for (i = 0; i < count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     if (rws[i].data_size > AML_I2C_MAX_TRANSFER) {
       return ZX_ERR_OUT_OF_RANGE;
     }
   }
-  auto* i2c = reinterpret_cast<aml_i2c_t*>(ctx);
-  if (bus_id >= i2c->dev_count) {
+  if (bus_id >= i2c_devs_.size()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  aml_i2c_dev_t* dev = &i2c->i2c_devs[bus_id];
 
-  zx_status_t status = ZX_OK;
-  for (i = 0; i < count; ++i) {
-    status = aml_i2c_set_target_addr(dev, rws[i].address);
+  return i2c_devs_[bus_id].Transact(rws, count);
+}
+
+zx_status_t AmlI2cDev::Transact(const i2c_impl_op_t* rws, size_t count) const {
+  for (size_t i = 0; i < count; ++i) {
+    zx_status_t status = SetTargetAddr(rws[i].address);
     if (status != ZX_OK) {
       return status;
     }
     if (rws[i].is_read) {
-      status = aml_i2c_read(dev, rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size),
-                            rws[i].stop);
+      status = Read(rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size), rws[i].stop);
     } else {
-      status = aml_i2c_write(dev, rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size),
-                             rws[i].stop);
+      status = Write(rws[i].data_buffer, static_cast<uint32_t>(rws[i].data_size), rws[i].stop);
     }
     if (status != ZX_OK) {
       return status;  // TODO(andresoportus) release the bus
     }
   }
 
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {

@@ -22,18 +22,6 @@
 
 namespace aml_i2c {
 
-uint32_t aml_i2c_get_bus_count(void* ctx);
-uint32_t aml_i2c_get_bus_base(void* ctx);
-zx_status_t aml_i2c_get_max_transfer_size(void* ctx, uint32_t bus_id, size_t* out_size);
-zx_status_t aml_i2c_set_bitrate(void* ctx, uint32_t bus_id, uint32_t bitrate);
-zx_status_t aml_i2c_transact(void* ctx, uint32_t bus_id, const i2c_impl_op_t* rws, size_t count);
-
-class AmlI2c;
-class AmlI2cDev;
-
-using aml_i2c_t = AmlI2c;
-using aml_i2c_dev_t = AmlI2cDev;
-
 struct aml_i2c_regs_t;
 
 class AmlI2cDev {
@@ -41,56 +29,58 @@ class AmlI2cDev {
   AmlI2cDev() = default;
   ~AmlI2cDev() {
     irq_.destroy();
-    if (irqthrd) {
-      thrd_join(irqthrd, nullptr);
+    if (irqthrd_) {
+      thrd_join(irqthrd_, nullptr);
     }
   }
 
   zx_status_t Init(unsigned index, aml_i2c_delay_values delay, ddk::PDev pdev);
 
+  zx_status_t Transact(const i2c_impl_op_t* rws, size_t count) const;
+
   // TODO(fxbug.dev/120969): Remove public members after C++ conversion.
-  zx_handle_t irq;
-  zx_handle_t event;
   MMIO_PTR volatile aml_i2c_regs_t* virt_regs;
-  zx_duration_t timeout;
-  thrd_t irqthrd{};
 
  private:
+  friend class AmlI2cTest;
+
+  zx_status_t SetTargetAddr(uint16_t addr) const;
+  zx_status_t StartXfer() const;
+  zx_status_t WaitEvent(uint32_t sig_mask) const;
+
+  zx_status_t Read(uint8_t* buff, uint32_t len, bool stop) const;
+  zx_status_t Write(const uint8_t* buff, uint32_t len, bool stop) const;
+
+  int IrqThread() const;
+
   zx::interrupt irq_;
   zx::event event_;
   std::optional<fdf::MmioBuffer> regs_iobuff_;
+  zx::duration timeout_ = zx::sec(1);
+  thrd_t irqthrd_{};
 };
 
+class AmlI2c;
 using DeviceType = ddk::Device<AmlI2c>;
+
 class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_protocol> {
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  explicit AmlI2c(zx_device_t* parent, fbl::Array<AmlI2cDev> i2c_devs)
-      : DeviceType(parent),
-        i2c_devs(i2c_devs.data()),
-        dev_count(static_cast<uint32_t>(i2c_devs.size())),
-        i2c_devs_(std::move(i2c_devs)) {}
+  AmlI2c(zx_device_t* parent, fbl::Array<AmlI2cDev> i2c_devs)
+      : DeviceType(parent), i2c_devs_(std::move(i2c_devs)) {}
 
   void DdkRelease() { delete this; }
 
-  uint32_t I2cImplGetBusBase() { return aml_i2c_get_bus_base(this); }
-  uint32_t I2cImplGetBusCount() { return aml_i2c_get_bus_count(this); }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
-    return aml_i2c_get_max_transfer_size(this, bus_id, out_size);
-  }
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
-    return aml_i2c_set_bitrate(this, bus_id, bitrate);
-  }
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
-    return aml_i2c_transact(this, bus_id, op_list, op_count);
-  }
-
-  // TODO(fxbug.dev/120969): Remove public members after C++ conversion.
-  aml_i2c_dev_t* i2c_devs;
-  uint32_t dev_count;
+  uint32_t I2cImplGetBusBase();
+  uint32_t I2cImplGetBusCount();
+  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
+  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count);
 
  private:
+  friend class AmlI2cTest;
+
   const fbl::Array<AmlI2cDev> i2c_devs_;
 };
 

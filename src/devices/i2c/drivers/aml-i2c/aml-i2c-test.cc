@@ -77,9 +77,9 @@ class AmlI2cTest : public zxtest::Test {
     EXPECT_OK(mmio_mapper_.Map(mmio_, 0, 0));
 
     AmlI2c* const i2c = root_->GetLatestChild()->GetDeviceContext<AmlI2c>();
-    ASSERT_EQ(i2c->dev_count, bus_count);
-    for (uint32_t i = 0; i < bus_count; i++) {
-      i2c->i2c_devs[i].timeout = ZX_TIME_INFINITE;
+    ASSERT_EQ(i2c->i2c_devs_.size(), bus_count);
+    for (auto& i2c_dev : i2c->i2c_devs_) {
+      i2c_dev.timeout_ = zx::duration(ZX_TIME_INFINITE);
     }
   }
 
