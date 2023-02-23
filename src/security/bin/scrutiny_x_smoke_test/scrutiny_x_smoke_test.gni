@@ -1,0 +1,73 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+
+# Check the route sources specified in a config file.
+#
+# The target that generates 'zbi' needs to be added to deps.
+#
+# Parameters
+#
+#   product_bundle_target (required)
+#     [label] Target that builds the product bundle.
+#
+#   product_bundle_path (optional)
+#     [path] Path to product bundle.
+#     If the product_bundle_target is not a product_bundle() then the
+#     product_bundle_path can be supplied here.
+#
+#   deps, public_deps, data_deps (optional)
+#     Usual GN meaning.
+template("scrutiny_x_smoke_test") {
+  assert(defined(invoker.product_bundle_target),
+         "scrutiny_x_smoke_test() must specify product_bundle_target")
+
+  if (defined(invoker.product_bundle_path)) {
+    _pb_dir = invoker.product_bundle_path
+  } else {
+    _pb_name = get_label_info(invoker.product_bundle_target, "name")
+    _pb_out = get_label_info(invoker.product_bundle_target, "target_out_dir")
+    _pb_dir = "$_pb_out/$_pb_name"
+  }
+
+  _depfile = "$target_gen_dir/$target_name.d"
+  _stamp_file = "$target_gen_dir/$target_name.complete"
+
+  compiled_action(target_name) {
+    no_output_dir_leaks = false
+
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                             "public_deps",
+                             "data_deps",
+                             "visibility",
+                           ])
+
+    depfile = _depfile
+    outputs = [ _stamp_file ]
+
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ invoker.product_bundle_target ]
+
+    tool = "//src/security/bin/scrutiny_x_smoke_test"
+    args = [
+      "--depfile",
+      rebase_path(_depfile, root_build_dir),
+      "--stamp",
+      rebase_path(_stamp_file, root_build_dir),
+      "--product-bundle",
+      rebase_path(_pb_dir, root_build_dir),
+      "--repository-name",
+      "fuchsia.com",
+
+      # Uncomment line below to get verbose output from smoke test build step.
+      # "--debug",
+    ]
+  }
+}
