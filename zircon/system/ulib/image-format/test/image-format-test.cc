@@ -920,3 +920,21 @@ TEST(ImageFormat, CorrectModifiers_wire) {
   EXPECT_NE(sysmem_v1::wire::kFormatModifierGoogleGoldfishOptimal,
             fuchsia_images2::wire::kFormatModifierGoogleGoldfishOptimal);
 }
+
+TEST(ImageFormat, RoundUpWidthForCallers) {
+  sysmem_v2::ImageFormatConstraints constraints;
+  constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
+  constraints.min_size() = {12u, 1u};
+  constraints.max_size() = {100u, 0xFFFFFFFF};
+
+  // Later we specify a width that isn't already aligned to size_alignment.width.
+  constraints.size_alignment() = {8, 1};
+
+  // Ensure that ImageFormatMinimumRowBytes rounds up for the caller.
+  uint32_t minimum_row_bytes;
+  bool result = ImageFormatMinimumRowBytes(constraints, 17, &minimum_row_bytes);
+  ASSERT_TRUE(result);
+  // Lowest value that's 17 or larger and divisible by 8.
+  EXPECT_EQ(24, minimum_row_bytes);
+}

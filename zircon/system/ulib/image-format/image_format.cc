@@ -625,15 +625,21 @@ bool linear_minimum_row_bytes(const fuchsia_sysmem2::ImageFormatConstraints& con
       (constraints.max_size().has_value() && width > constraints.max_size()->width())) {
     return false;
   }
-  if (constraints.size_alignment().has_value() &&
-      width % constraints.size_alignment()->width() != 0) {
-    return false;
+
+  // We don't enforce that width is already aligned up by the caller by the time of this call, but
+  // if the caller is a producer, the caller is nonetheless expected to conform to the
+  // size_alignment.width divisibility requirement for any fuchsia.sysmem.ImageFormat2.coded_width
+  // or fuchsia.images2.ImageFormat.size.width values the caller generates.
+  if (constraints.size_alignment().has_value()) {
+    width = fbl::round_up(width, constraints.size_alignment()->width());
   }
+
   uint32_t constraints_min_bytes_per_row =
       constraints.min_bytes_per_row().has_value() ? constraints.min_bytes_per_row().value() : 0;
   uint32_t constraints_bytes_per_row_divisor = constraints.bytes_per_row_divisor().has_value()
                                                    ? constraints.bytes_per_row_divisor().value()
                                                    : 1;
+
   // This code should match the code in garnet/public/rust/fuchsia-framebuffer/src/sysmem.rs.
   *minimum_row_bytes_out = fbl::round_up(
       std::max(
@@ -641,8 +647,11 @@ bool linear_minimum_row_bytes(const fuchsia_sysmem2::ImageFormatConstraints& con
               width,
           constraints_min_bytes_per_row),
       constraints_bytes_per_row_divisor);
-  return !(constraints.max_bytes_per_row().has_value() &&
-           *minimum_row_bytes_out > constraints.max_bytes_per_row().value());
+  if (constraints.max_bytes_per_row().has_value() &&
+      *minimum_row_bytes_out > constraints.max_bytes_per_row().value()) {
+    return false;
+  }
+  return true;
 }
 
 class LinearFormats : public ImageFormatSet {
