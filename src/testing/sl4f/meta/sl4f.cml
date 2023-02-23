@@ -129,6 +129,10 @@
             path: "/svc/fuchsia.sys2.LifecycleController",
         },
         {
+            protocol: "fuchsia.sys2.RealmExplorer.root",
+            path: "/svc/fuchsia.sys2.RealmExplorer",
+        },
+        {
             protocol: "fuchsia.sys2.RealmQuery.root",
             path: "/svc/fuchsia.sys2.RealmQuery",
         },

@@ -166,6 +166,7 @@
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sysmem.Allocator",
             ],

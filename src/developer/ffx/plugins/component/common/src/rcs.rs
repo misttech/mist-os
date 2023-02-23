@@ -33,6 +33,18 @@ pub async fn connect_to_realm_query(
     Ok(realm_query)
 }
 
+/// Obtain the root RealmExplorer protocol using the RemoteControl protocol.
+pub async fn connect_to_realm_explorer(
+    rcs_proxy: &rc::RemoteControlProxy,
+) -> Result<fsys::RealmExplorerProxy> {
+    let (realm_explorer, server_end) = create_proxy::<fsys::RealmExplorerMarker>()?;
+    rcs_proxy
+        .root_realm_explorer(server_end)
+        .await?
+        .map_err(|i| ffx_error!("Could not open RealmExplorer: {}", Status::from_raw(i)))?;
+    Ok(realm_explorer)
+}
+
 /// Obtain the root RouteValidator protocol using the RemoteControl protocol.
 pub async fn connect_to_route_validator(
     rcs_proxy: &rc::RemoteControlProxy,

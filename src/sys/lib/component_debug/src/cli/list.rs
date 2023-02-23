@@ -299,7 +299,6 @@ mod tests {
                 },
             ],
             HashMap::new(),
-            HashMap::new(),
             HashMap::from([(
                 ("./core/appmgr".to_string(), fsys::OpenDirType::OutgoingDir),
                 appmgr_out_dir,

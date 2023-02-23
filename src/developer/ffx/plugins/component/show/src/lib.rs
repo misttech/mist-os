@@ -5,10 +5,10 @@
 use anyhow::Result;
 use component_debug::{
     cli::{show_cmd_print, show_cmd_serialized},
-    realm::Instance,
+    show::Instance,
 };
 use errors::FfxError;
-use ffx_component::rcs::connect_to_realm_query;
+use ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query};
 use ffx_component_show_args::ComponentShowCommand;
 use ffx_core::ffx_plugin;
 use ffx_writer::Writer;
@@ -20,16 +20,19 @@ pub async fn cmd(
     args: ComponentShowCommand,
     #[ffx(machine = Vec<Instance>)] writer: Writer,
 ) -> Result<()> {
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
     let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
     // All errors from component_debug library are user-visible.
     if writer.is_machine() {
-        let output = show_cmd_serialized(args.query, realm_query)
+        let output = show_cmd_serialized(args.query, realm_query, realm_explorer)
             .await
             .map_err(|e| FfxError::Error(e, 1))?;
         writer.machine(&output)
     } else {
-        show_cmd_print(args.query, realm_query, writer).await.map_err(|e| FfxError::Error(e, 1))?;
+        show_cmd_print(args.query, realm_query, realm_explorer, writer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
         Ok(())
     }
 }
