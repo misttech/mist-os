@@ -2,32 +2,169 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
+import("//tools/cmc/build/expect_includes.gni")
+
+expect_includes("device-enumeration-shard") {
+  includes = [ "meta/device-enumeration.shard.cml" ]
+}
+
+source_set("common") {
+  sources = [
+    "common.cc",
+    "common.h",
+  ]
+  public_deps = [
+    "//src/lib/fsl",
+    "//zircon/system/ulib/zxtest",
+  ]
+  deps = [
+    ":device-enumeration-shard",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+  ]
+}
 
 test("device-enumeration") {
   output_name = "device-enumeration-test"
   sources = [
     "aemu.cc",
     "aemu.h",
-    "main.cc",
+    "boards/aemu_x64.cc",
+    "boards/astro.cc",
+    "boards/atlas.cc",
+    "boards/av400.cc",
+    "boards/clover.cc",
+    "boards/eve.cc",
+    "boards/gce_arm64.cc",
+    "boards/nelson.cc",
+    "boards/nocturne.cc",
+    "boards/nuc.cc",
+    "boards/pinecrest.cc",
+    "boards/qemu_arm64.cc",
+    "boards/qemu_x64.cc",
+    "boards/sherlock.cc",
+    "boards/vim3.cc",
+    "boards/visalia.cc",
+    "bootfs_main.cc",
   ]
   deps = [
+    ":common",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp_wire",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp_wire",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//src/lib/fsl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
 bootfs_test("device-enumeration-bootfs-test") {
   name = "device-enumeration-test"
   deps = [ ":device-enumeration" ]
+}
+
+# Create a board-specific packaged version of the test.
+# Some of the boards are not available in the env so they are commented out.
+_boards = [
+  [
+    "aemu_x64",
+    {
+      dimensions = {
+        device_type = "AEMU"
+        cpu = "x64"
+      }
+    },
+  ],
+  [
+    "astro",
+    astro_env,
+  ],
+  [
+    "atlas",
+    atlas_env,
+  ],
+
+  # ["av400", ],
+  # ["clover", ],
+  # ["eve", ],
+  [
+    "gce_arm64",
+    gce_env,
+  ],
+  [
+    "luis",
+    luis_env,
+  ],
+  [
+    "nelson",
+    nelson_env,
+  ],
+
+  # ["nocturne", ],
+  [
+    "nuc",
+    nuc_env,
+  ],
+
+  # ["pinecrest", ],
+  [
+    "qemu_arm64",
+    {
+      dimensions = {
+        device_type = "QEMU"
+        cpu = "arm64"
+      }
+    },
+  ],
+  [
+    "qemu_x64",
+    {
+      dimensions = {
+        device_type = "QEMU"
+        cpu = "x64"
+      }
+    },
+  ],
+  [
+    "sherlock",
+    sherlock_env,
+  ],
+  [
+    "vim3",
+    vim3_env,
+  ],
+
+  # ["visalia", ],
+]
+
+foreach(board_info, _boards) {
+  board = board_info[0]
+  test_env = {
+  }
+  test_env = board_info[1]
+  test("device-enumeration-test-${board}-bin") {
+    sources = [ "boards/${board}.cc" ]
+    deps = [ ":common" ]
+  }
+
+  fuchsia_unittest_package("device-enumeration-test-${board}") {
+    deps = [ ":device-enumeration-test-${board}-bin" ]
+    test_specs = {
+      environments = [ test_env ]
+    }
+  }
+}
+
+group("device-enumeration-tests") {
+  testonly = true
+  deps = []
+  foreach(board_info, _boards) {
+    board = board_info[0]
+    deps += [ ":device-enumeration-test-${board}" ]
+  }
 }

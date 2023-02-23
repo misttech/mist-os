@@ -26,6 +26,12 @@
             to: [ "#devices-tests" ],
         },
         {
+            // Used by the device enumeration tests.
+            protocol: "fuchsia.driver.development.DriverDevelopment",
+            from: "parent",
+            to: [ "#devices-tests" ],
+        },
+        {
             event_stream: [
                 "capability_requested",
                 "directory_ready",

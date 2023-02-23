@@ -1,0 +1,18 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "//sdk/lib/syslog/client.shard.cml",
+        "//src/devices/testing/devices_test.shard.cml",
+    ],
+    use: [
+        { protocol: "fuchsia.driver.development.DriverDevelopment" },
+        {
+            directory: "dev-topological",
+            rights: [ "rw*" ],
+            path: "/dev",
+        },
+    ],
+}
