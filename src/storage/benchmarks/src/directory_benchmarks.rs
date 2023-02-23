@@ -306,7 +306,6 @@ impl OpenDeeplyNestedFile {
 #[async_trait]
 impl Benchmark for OpenDeeplyNestedFile {
     async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
-        const FILE_COUNT: usize = 100;
         trace_duration!("benchmark", "OpenDeeplyNestedFile");
 
         let root = fs.benchmark_dir().to_path_buf();
