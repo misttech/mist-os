@@ -31,7 +31,7 @@
 #include "netbuf.h"
 
 // HW/SW bus in use
-enum brcmf_bus_type { BRCMF_BUS_TYPE_SDIO, BRCMF_BUS_TYPE_PCIE, BRCMF_BUS_TYPE_SIM };
+enum brcmf_bus_type { BRCMF_BUS_TYPE_SDIO, BRCMF_BUS_TYPE_SIM };
 
 /* The level of bus communication with the dongle */
 enum brcmf_bus_state {
@@ -99,7 +99,6 @@ class PcieBus;
 
 struct brcmf_bus {
   union {
-    ::wlan::brcmfmac::PcieBus* pcie;
     struct brcmf_sdio_dev* sdio;
     struct brcmf_usbdev* usb;
     struct brcmf_simdev* sim;
@@ -158,7 +157,7 @@ static inline zx_status_t brcmf_bus_get_rx_depth(struct brcmf_bus* bus, uint16_t
 }
 
 static inline zx_status_t brcmf_bus_get_tail_length(struct brcmf_bus* bus,
-                                                   uint16_t* tail_length_out) {
+                                                    uint16_t* tail_length_out) {
   return bus->ops->get_tail_length(bus, tail_length_out);
 }
 

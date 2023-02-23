@@ -2,23 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 source_set("chipset") {
-  sources = [
-    "axi_backplane.cc",
-    "axi_backplane.h",
-    "backplane.cc",
-    "chipset.cc",
-    "chipset_interfaces.cc",
-    "cr4_chipset.cc",
-    "cr4_chipset.h",
-    "firmware.cc",
-  ]
+  sources = [ "firmware.cc" ]
   public = [
-    "backplane.h",
-    "chipset.h",
-    "chipset_interfaces.h",
     "chipset_regs.h",
     "firmware.h",
-    "spinwait.h",
   ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",

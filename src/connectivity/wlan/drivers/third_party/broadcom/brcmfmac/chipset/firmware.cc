@@ -57,23 +57,11 @@ constexpr FirmwareMapping kSdioFirmwareMappings[] = {
     {CommonCoreId::kCypress4373, 0xFFFFFFFF, "brcmfmac4373-sdio.bin", "brcmfmac4373-sdio.txt"},
 };
 
-constexpr FirmwareMapping kPcieFirmwareMappings[] = {
-    {CommonCoreId::kBrcm4356, 0xFFFFFFFF, "brcmfmac4356-pcie.bin", "brcmfmac4356-pcie.txt"},
-};
-
 const FirmwareMapping* GetFirmwareMapping(brcmf_bus_type bus_type, CommonCoreId chip_id,
                                           uint32_t chip_rev) {
   switch (bus_type) {
     case brcmf_bus_type::BRCMF_BUS_TYPE_SDIO: {
       for (const auto& mapping : kSdioFirmwareMappings) {
-        if (chip_id == mapping.chip_id && ((1 << chip_rev) & mapping.chip_rev_mask)) {
-          return &mapping;
-        }
-      }
-      break;
-    }
-    case brcmf_bus_type::BRCMF_BUS_TYPE_PCIE: {
-      for (const auto& mapping : kPcieFirmwareMappings) {
         if (chip_id == mapping.chip_id && ((1 << chip_rev) & mapping.chip_rev_mask)) {
           return &mapping;
         }

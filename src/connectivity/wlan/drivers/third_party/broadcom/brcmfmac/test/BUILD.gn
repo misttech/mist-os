@@ -151,51 +151,6 @@ executable("device_inspect_test") {
   ]
 }
 
-executable("dma_buffer_test") {
-  output_name = "dma_buffer_test"
-  testonly = true
-  sources = [ "dma_buffer_test.cc" ]
-  deps = [
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:dmabuf",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-executable("dma_pool_test") {
-  output_name = "dma_pool_test"
-  testonly = true
-  sources = [ "dma_pool_test.cc" ]
-  deps = [
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:dmabuf",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-executable("dma_ring_test") {
-  output_name = "dma_ring_test"
-  testonly = true
-  sources = [ "dma_ring_test.cc" ]
-  deps = [
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:dmabuf",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
 executable("intrusive_list_test") {
   output_name = "intrusive_list_test"
   testonly = true
@@ -270,9 +225,6 @@ _tests = [
   "cfg80211_test",
   "debug_test",
   "device_inspect_test",
-  "dma_buffer_test",
-  "dma_pool_test",
-  "dma_ring_test",
   "intrusive_list_test",
   "netbuf_test",
   "task_queue_test",
@@ -293,16 +245,6 @@ fuchsia_test_package("brcmfmac_test") {
   }
 }
 
-bind_test("brcmfmac_pcie_bind_test") {
-  rules = "../brcmfmac_pcie.bind"
-  tests = "bind_pcie_tests.json"
-  deps = [
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:fuchsia.brcmfmac",
-    "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.pci.network",
-  ]
-}
-
 bind_test("brcmfmac_sdio_bind_test") {
   rules = "../brcmfmac_sdio.bind"
   tests = "bind_sdio_tests.json"
@@ -311,8 +253,5 @@ bind_test("brcmfmac_sdio_bind_test") {
 
 group("brcmfmac_host_tests") {
   testonly = true
-  deps = [
-    ":brcmfmac_pcie_bind_test",
-    ":brcmfmac_sdio_bind_test",
-  ]
+  deps = [ ":brcmfmac_sdio_bind_test" ]
 }

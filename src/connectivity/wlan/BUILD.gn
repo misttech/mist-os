@@ -21,9 +21,6 @@ group("drivers") {
     "drivers/wlansoftmac:wlansoftmac_driver",
     "testing/wlantap-driver:wlantap_driver",
   ]
-  if (current_cpu == "x64") {
-    deps += [ "drivers/third_party/broadcom/brcmfmac:test_fuchsia_driver" ]
-  }
 }
 
 group("_packages_common") {

@@ -19,20 +19,17 @@ import("config.gni")
 # By default, targets are only visible here and to subdirectories.
 visibility = [ "./*" ]
 
-# The brcmfmac driver can be built with support for different system buses (PCIE, SDIO and
+# The brcmfmac driver can be built with support for different system buses (SDIO and
 # simulated-firmware), and different configurations will require different support.  To facilitate
 # consolidating all the potentially messy conditional compilation in one place, "binding.cc" is
 # conditionally compiled based on the values of the preprocessor #defines:
 #
-# * CONFIG_BRCMFMAC_PCIE
 # * CONFIG_BRCMFMAC_SDIO
 # * CONFIG_BRCMFMAC_SIM
-# * CONFIG_BRCMFMAC_DRIVER_TEST
 #
 # These #defines are applied as public_configs entries on the targets:
 # respectively:
 #
-# * pcie/pcie
 # * sdio/sdio
 # * sim/sim
 #
@@ -81,26 +78,6 @@ source_set("linuxisms") {
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//zircon/system/public",
   ]
-}
-
-# Sources for DMA buffer handling.
-source_set("dmabuf") {
-  sources = [
-    "dma_buffer.cc",
-    "dma_pool.cc",
-    "dma_ring.cc",
-  ]
-  public = [
-    "dma_buffer.h",
-    "dma_pool.h",
-    "dma_ring.h",
-  ]
-  deps = [ ":debug" ]
-  public_deps = [
-    "//zircon/system/public",
-    "//zircon/system/ulib/zx",
-  ]
-  friend = [ "test/*" ]
 }
 
 # Sources for the BCDC firmware protocol.
@@ -172,7 +149,6 @@ source_set("core") {
     "fwil.h",
     "fwil_types.h",
     "proto.h",
-    "regs.h",
     "soc.h",
     "wlan_interface.h",
   ]
@@ -227,38 +203,14 @@ source_set("driver_sources") {
 
   # The bus target dependencies below are public_deps so that their configs propagate to users of
   # this target.
-  public_deps = []
-
-  # Assume for now that arm64 boards use the SDIO interface.
-  if (target_cpu == "arm64") {
-    public_deps += [
-      ":brcmfmac_sdio_bind",
-      "sdio",
-    ]
-  }
-
-  # Assume for now that x64 boards use the PCIE interface.
-  if (target_cpu == "x64") {
-    public_deps += [
-      ":brcmfmac_pcie_bind",
-      "pcie",
-    ]
-  }
+  public_deps = [
+    ":brcmfmac_sdio_bind",
+    "sdio",
+  ]
 }
 
 bind_library("fuchsia.brcmfmac") {
   source = "fuchsia.brcmfmac.bind"
-}
-
-driver_bind_rules("brcmfmac_pcie_bind") {
-  rules = "brcmfmac_pcie.bind"
-  header_output = "brcmfmac_pcie_bind.h"
-  bind_output = "brcmfmac_pcie.bindbc"
-  deps = [
-    ":fuchsia.brcmfmac",
-    "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.pci.network",
-  ]
 }
 
 driver_bind_rules("brcmfmac_sdio_bind") {
@@ -273,7 +225,6 @@ fuchsia_driver("fuchsia_driver-driver") {
   output_name = "brcmfmac"
   sources = [ "binding.cc" ]
   deps = [
-    ":brcmfmac_pcie_bind_header",
     ":brcmfmac_sdio_bind_header",
     ":core",
     ":driver_sources",
@@ -301,15 +252,9 @@ fuchsia_driver("test_fuchsia_driver-driver") {
   output_name = "brcmfmac-test"
   sources = [ "binding.cc" ]
   deps = [
-    ":brcmfmac_pcie_bind",
     ":core",
     ":driver_sources",
-
-    # All driver test targets are linked into the driver test.  The appropriate test will be
-    # executed at runtime.
-    "pcie:pcie_driver_test",
   ]
-  defines = [ "CONFIG_BRCMFMAC_DRIVER_TEST=1" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -387,19 +332,9 @@ brcmfmac_driver("brcmfmac-nelson-mfg") {
   diagnostic_deps = [ "//src/diagnostics/config/triage:brcmfmac-detect" ]
 }
 
-#brcmfmac_driver("brcmfmac-x64") {
-#  board = "x64"
-#  bus = "pcie"
-#  chip = "brcmfmac4356"
-#  clm_present = false
-#  diagnostic_deps = [ "//src/diagnostics/config/triage:brcmfmac-detect" ]
-#}
-
 # The test package, including tests in subdirs.
 group("brcmfmac_tests") {
   deps = [
-    "chipset/test:brcmfmac_chipset_test",
-    "msgbuf/test:brcmfmac_msgbuf_test",
     "sdio/test:brcmfmac_sdio_test",
     "sim/test:brcmfmac_sim_test",
     "test:brcmfmac_test",
