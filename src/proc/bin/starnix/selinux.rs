@@ -8,10 +8,10 @@ use crate::lock::{Mutex, RwLock};
 use crate::logging::not_implemented;
 use crate::task::*;
 use crate::types::*;
+use derivative::Derivative;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use derivative::Derivative;
 use zerocopy::AsBytes;
 
 /// The version of selinux_status_t this kernel implements.
@@ -34,6 +34,7 @@ impl SeLinuxFs {
         dir.entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644));
         dir.entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644));
         dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
+        dir.entry(b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
         dir.entry(
             b"deny_unknown",
             // Allow all unknown object classes/permissions.
@@ -97,6 +98,26 @@ impl BytesFileOps for SeEnforce {
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(b"0\n"[..].into())
+    }
+}
+
+struct SeCreate {
+    data: Mutex<Vec<u8>>,
+}
+
+impl SeCreate {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self { data: Mutex::default() })
+    }
+}
+
+impl BytesFileOps for SeCreate {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        *self.data.lock() = data;
+        Ok(())
+    }
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.data.lock().clone().into())
     }
 }
 
@@ -247,7 +268,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct SeLinuxThreadGroupState {
-    #[derivative(Default(value="b\"user:role:type:level\".to_vec()"))]
+    #[derivative(Default(value = "b\"user:role:type:level\".to_vec()"))]
     current_context: FsString,
     fscreate_context: FsString,
     exec_context: FsString,
