@@ -394,8 +394,6 @@ class Device final
                        GetMetadataSizeCompleter::Sync& _completer) override;
   void AddMetadata(AddMetadataRequestView request, AddMetadataCompleter::Sync& _completer) override;
   void ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& _completer) override;
-  void ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
-                           ConnectFidlProtocolCompleter::Sync& completer) override;
 
   // dfv2::NodeManager
   void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}

@@ -71,10 +71,6 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
   void ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-  void ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
-                           ConnectFidlProtocolCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
 
   uint32_t bind_count() { return bind_count_.load(); }
 

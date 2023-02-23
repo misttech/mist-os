@@ -17,8 +17,6 @@
 #include <memory>
 #include <string_view>
 
-#include <fbl/string_buffer.h>
-
 #include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/lib/log/log.h"
@@ -862,41 +860,6 @@ void Device::ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& compl
   VLOGF(1, "Scheduling unbind of children for device %p '%s'", dev.get(), dev->name().data());
   dev->coordinator->device_manager()->ScheduleDriverHostRequestedUnbindChildren(dev);
   completer.ReplySuccess(true);
-}
-
-void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
-                                 ConnectFidlProtocolCompleter::Sync& completer) {
-  fbl::RefPtr<Device> parent = nullptr;
-  if (request->fragment_name.is_null()) {
-    parent = this->parent();
-  } else {
-    if (!is_composite()) {
-      completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-      return;
-    }
-
-    for (auto& fragment : composite()->get().fragments()) {
-      if (fragment.name() == request->fragment_name.get()) {
-        parent = fragment.bound_device();
-        break;
-      }
-    }
-  }
-  if (parent == nullptr) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
-  }
-
-  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
-  path.Append("svc/");
-  if (request->service_name.is_null() == false) {
-    path.Append(request->service_name.get());
-    path.Append("/default/");
-  }
-  path.Append(request->protocol_name.get());
-  zx_status_t status = fdio_service_connect_at(parent->outgoing_dir_.channel().get(), path.c_str(),
-                                               request->server.release());
-  completer.Reply(zx::make_result(status));
 }
 
 void Device::BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync& completer) {
