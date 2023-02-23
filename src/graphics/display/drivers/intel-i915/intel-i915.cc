@@ -2238,13 +2238,10 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
       gtt_.SetupForMexec(fb, fb_info.size);
     }
 
-    // Try to map the framebuffer and clear it. If not, oh well.
-    mmio_buffer_t mmio;
-    if (pci_.MapMmio(2, ZX_CACHE_POLICY_WRITE_COMBINING, &mmio) == ZX_OK) {
-      // TODO(fxbug.dev/56253): Add MMIO_PTR to cast.
-      memset((void*)mmio.vaddr, 0, fb_info.size);
-      mmio_buffer_release(&mmio);
-    }
+    // It may be tempting to try to map the framebuffer and clear it here.
+    // However, on Tiger Lake, mapping the framebuffer BAR after setting up
+    // the display engine will cause the device to crash and reboot.
+    // See https://fxbug.dev/121921.
 
     {
       fbl::AutoLock lock(&display_lock_);
