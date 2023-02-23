@@ -14,6 +14,7 @@
 #if __cplusplus
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -60,9 +61,7 @@ class SimpleDisplay : public DeviceType,
   }
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
@@ -98,10 +97,25 @@ class SimpleDisplay : public DeviceType,
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
+  const std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>&
+  GetBufferCollectionsForTesting() const {
+    return buffer_collections_;
+  }
+
  private:
+  zx_status_t InitSysmemAllocatorClient();
+
   void OnPeriodicVSync();
 
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+
+  // Imported sysmem buffer collections.
+  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+      buffer_collections_;
+
   async::Loop loop_;
 
   static_assert(std::atomic<zx_koid_t>::is_always_lock_free);

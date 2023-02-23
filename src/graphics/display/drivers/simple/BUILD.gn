@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 source_set("shared") {
   visibility = [ ":*" ]
@@ -31,6 +33,22 @@ source_set("shared") {
   # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
+}
+
+test("simple-display-test-bin") {
+  sources = [ "simple-display-test.cc" ]
+  deps = [
+    ":shared",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/no_ddk",
+    "//src/lib/fsl",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("simple-display-test") {
+  package_name = "simple-display-test"
+  deps = [ ":simple-display-test-bin" ]
 }
 
 # Creates a Fuchsia driver assuming the driver's files start with the same
@@ -124,6 +142,7 @@ group("tests") {
   deps = [
     ":simple-amd-kaveri-bind_test",
     ":simple-bochs-bind_test",
+    ":simple-display-test",
     ":simple-gga-bind_test",
     ":simple-intel-bind_test",
     ":simple-vmware-bind_test",
