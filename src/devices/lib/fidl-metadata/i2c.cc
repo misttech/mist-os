@@ -37,4 +37,33 @@ zx::result<std::vector<uint8_t>> I2CChannelsToFidl(const cpp20::span<const Chann
   return zx::result<std::vector<uint8_t>>{
       fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
 }
+
+zx::result<std::vector<uint8_t>> I2CChannelsToFidl(const uint32_t bus_id,
+                                                   const cpp20::span<const Channel> channels) {
+  fidl::Arena allocator;
+  fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel> i2c_channels(allocator,
+                                                                                channels.size());
+
+  for (size_t i = 0; i < channels.size(); i++) {
+    auto& chan = i2c_channels[i];
+    auto& src_chan = channels[i];
+    chan.Allocate(allocator);
+
+    // For now each channel will continue to get a bus ID field holding the top-level bus ID.
+    // Eventually this field will be removed.
+    chan.set_bus_id(bus_id);
+    chan.set_address(src_chan.address);
+    chan.set_pid(src_chan.pid);
+    chan.set_did(src_chan.did);
+    chan.set_vid(src_chan.vid);
+    chan.set_name(fidl::ObjectView<fidl::StringView>(allocator, allocator, src_chan.name));
+  }
+
+  fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata(allocator);
+  metadata.set_bus_id(bus_id);
+  metadata.set_channels(allocator, i2c_channels);
+
+  return zx::result<std::vector<uint8_t>>{
+      fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
+}
 }  // namespace fidl_metadata::i2c

@@ -8,9 +8,10 @@
 
 #include <zxtest/zxtest.h>
 
-static void check_encodes(const cpp20::span<const fidl_metadata::i2c::Channel> i2c_channels) {
+static void check_encodes(const uint32_t bus_id,
+                          const cpp20::span<const fidl_metadata::i2c::Channel> i2c_channels) {
   // Encode.
-  auto result = fidl_metadata::i2c::I2CChannelsToFidl(i2c_channels);
+  auto result = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, i2c_channels);
   ASSERT_OK(result.status_value());
   std::vector<uint8_t>& data = result.value();
 
@@ -22,13 +23,13 @@ static void check_encodes(const cpp20::span<const fidl_metadata::i2c::Channel> i
   auto metadata = *decoded.value();
 
   // Check everything looks sensible.
+  ASSERT_TRUE(metadata.has_bus_id());
+  EXPECT_EQ(metadata.bus_id(), bus_id);
   ASSERT_TRUE(metadata.has_channels());
   auto channels = metadata.channels();
   ASSERT_EQ(channels.count(), i2c_channels.size());
 
   for (size_t i = 0; i < i2c_channels.size(); i++) {
-    ASSERT_TRUE(channels[i].has_bus_id());
-    ASSERT_EQ(channels[i].bus_id(), i2c_channels[i].bus_id);
     ASSERT_TRUE(channels[i].has_address());
     ASSERT_EQ(channels[i].address(), i2c_channels[i].address);
     if (i2c_channels[i].did || i2c_channels[i].vid || i2c_channels[i].pid) {
@@ -44,17 +45,15 @@ static void check_encodes(const cpp20::span<const fidl_metadata::i2c::Channel> i
 
 TEST(I2cMetadataTest, TestEncodeNoPlatformIDs) {
   static constexpr fidl_metadata::i2c::Channel kI2cChannels[] = {{
-      .bus_id = 4,
       .address = 0x01,
   }};
 
-  ASSERT_NO_FATAL_FAILURE(check_encodes(kI2cChannels));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(4, kI2cChannels));
 }
 
 TEST(I2cMetadataTest, TestEncodeManyChannels) {
   static constexpr fidl_metadata::i2c::Channel kI2cChannels[] = {
       {
-          .bus_id = 1,
           .address = 0x49,
 
           .vid = 10,
@@ -62,7 +61,6 @@ TEST(I2cMetadataTest, TestEncodeManyChannels) {
           .did = 8,
       },
       {
-          .bus_id = 0,
           .address = 0x47,
 
           .vid = 8,
@@ -70,7 +68,6 @@ TEST(I2cMetadataTest, TestEncodeManyChannels) {
           .did = 9,
       },
       {
-          .bus_id = 92,
           .address = 0xaa,
 
           .vid = 0,
@@ -79,9 +76,9 @@ TEST(I2cMetadataTest, TestEncodeManyChannels) {
       },
   };
 
-  ASSERT_NO_FATAL_FAILURE(check_encodes(kI2cChannels));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(92, kI2cChannels));
 }
 
 TEST(I2cMetadataTest, TestEncodeNoChannels) {
-  ASSERT_NO_FATAL_FAILURE(check_encodes(cpp20::span<const fidl_metadata::i2c::Channel>()));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(1, cpp20::span<const fidl_metadata::i2c::Channel>()));
 }
