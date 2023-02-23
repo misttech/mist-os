@@ -12,6 +12,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <arch/interrupt.h>
 #include <arch/ops.h>
 #include <fbl/algorithm.h>
 #include <kernel/cpu.h>
@@ -51,9 +52,8 @@ static int deadlock_test_thread(void* arg) {
   gate->Wait();
 
   ktl::atomic<int> counter(0);
-  interrupt_saved_state_t int_state = arch_interrupt_save();
+  InterruptDisableGuard block_interrupts;
   mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, counter_task, &counter);
-  arch_interrupt_restore(int_state);
   return 0;
 }
 

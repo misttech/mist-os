@@ -14,15 +14,14 @@
 // Interrupt enable/disable guard
 class InterruptDisableGuard {
  public:
-  InterruptDisableGuard() : state_(arch_interrupt_save()), disabled_(true) {}
+  InterruptDisableGuard() : state_(arch_interrupt_save()) {}
+
   ~InterruptDisableGuard() { Reenable(); }
 
   // Short circuit the disable and flip it back to reenabled.
   void Reenable() {
-    if (disabled_) {
-      arch_interrupt_restore(state_);
-      disabled_ = false;
-    }
+    arch_interrupt_restore(state_);
+    state_ = kNoopInterruptSavedState;
   }
 
   // InterruptDisableGuard cannot be copied or moved.
@@ -33,7 +32,6 @@ class InterruptDisableGuard {
 
  private:
   interrupt_saved_state_t state_;
-  bool disabled_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_ARCH_INTERRUPT_H_

@@ -16,6 +16,7 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <arch/interrupt.h>
 #include <fbl/algorithm.h>
 #include <kernel/auto_lock.h>
 #include <kernel/cpu.h>
@@ -226,14 +227,14 @@ static int timer_stress_worker(void* void_arg) {
     zx_duration_t timer_duration = rand_duration(ZX_MSEC(5));
 
     // Set a timer, then switch to a different CPU to ensure we race with it.
-
-    interrupt_saved_state_t int_state = arch_interrupt_save();
-    cpu_num_t timer_cpu = arch_curr_cpu_num();
-    const Deadline deadline = Deadline::after(timer_duration);
-    t.Set(deadline, timer_stress_cb, void_arg);
-    Thread::Current::Get()->SetCpuAffinity(~cpu_num_to_mask(timer_cpu));
-    DEBUG_ASSERT(arch_curr_cpu_num() != timer_cpu);
-    arch_interrupt_restore(int_state);
+    {
+      InterruptDisableGuard block_interrupts;
+      cpu_num_t timer_cpu = arch_curr_cpu_num();
+      const Deadline deadline = Deadline::after(timer_duration);
+      t.Set(deadline, timer_stress_cb, void_arg);
+      Thread::Current::Get()->SetCpuAffinity(~cpu_num_to_mask(timer_cpu));
+      DEBUG_ASSERT(arch_curr_cpu_num() != timer_cpu);
+    }
 
     // We're now running on something other than timer_cpu.
 

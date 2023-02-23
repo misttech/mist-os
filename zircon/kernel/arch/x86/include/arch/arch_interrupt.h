@@ -17,6 +17,8 @@
 
 typedef x86_flags_t interrupt_saved_state_t;
 
+constexpr interrupt_saved_state_t kNoopInterruptSavedState = 0;
+
 __WARN_UNUSED_RESULT
 static inline interrupt_saved_state_t arch_interrupt_save() {
   interrupt_saved_state_t state = x86_save_flags();
