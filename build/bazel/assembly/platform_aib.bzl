@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("@rules_fuchsia//fuchsia/private/assembly:providers.bzl", "FuchsiaProductAssemblyBundleInfo")
-
 """Rule for generating an assembly input bundle."""
+
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaProductAssemblyBundleInfo")
 
 def _create_pkg_list_file(ctx, pkgs, set_name):
     pkg_list_file = ctx.actions.declare_file("%s_%s_pkg_list.json" % (ctx.label.name, set_name))

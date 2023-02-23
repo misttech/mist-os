@@ -205,7 +205,7 @@ def _fuchsia_product_configuration_impl(ctx):
 fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "build_type": attr.string(
             doc = "Build type of this product.",

@@ -20,7 +20,7 @@ def _gather_dependencies(deps):
     return info
 
 def _fidl_impl(context):
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ir = context.outputs.ir
     tables = context.outputs.coding_tables
     library_name = context.attr.library
@@ -70,7 +70,7 @@ def _fidl_impl(context):
 
 _fidl_library = rule(
     implementation = _fidl_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "library": attr.string(
             doc = "The name of the FIDL library",

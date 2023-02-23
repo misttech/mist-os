@@ -12,7 +12,7 @@ load(
 )
 
 def _fuchsia_package_repository_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     repo_name = ctx.attr.repo_name or ctx.label.name
     packages = []
     package_deps = []
@@ -64,7 +64,7 @@ fuchsia_package_repository = rule(
 A Fuchsia TUF package repository as created by the 'pm' tool and used by 'ffx repository'.
 """,
     implementation = _fuchsia_package_repository_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaPackageRepoInfo],
     attrs = {
         "deps": attr.label_list(

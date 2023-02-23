@@ -5,159 +5,159 @@
 """Public definitions for Assembly related rules."""
 
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_prebuilt_package.bzl",
+    "//fuchsia/private/assembly:fuchsia_prebuilt_package.bzl",
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
+    "//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
     _fuchsia_assemble_package = "fuchsia_assemble_package",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_images_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_images_configuration.bzl",
     _fuchsia_images_configuration = "fuchsia_images_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_product_image.bzl",
+    "//fuchsia/private/assembly:fuchsia_product_image.bzl",
     _fuchsia_product_image = "fuchsia_product_image",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_input_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_input_configuration.bzl",
     _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
     _fuchsia_platform_input_configuration = "fuchsia_platform_input_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_connectivity_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_connectivity_configuration.bzl",
     _fuchsia_platform_connectivity_configuration = "fuchsia_platform_connectivity_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_connectivity_wlan_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_connectivity_wlan_configuration.bzl",
     _fuchsia_platform_connectivity_wlan_configuration = "fuchsia_platform_connectivity_wlan_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_development_support_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_development_support_configuration.bzl",
     _fuchsia_platform_development_support_configuration = "fuchsia_platform_development_support_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_driver_framework_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_driver_framework_configuration.bzl",
     _fuchsia_platform_driver_framework_configuration = "fuchsia_platform_driver_framework_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_starnix_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_starnix_configuration.bzl",
     _fuchsia_platform_starnix_configuration = "fuchsia_platform_starnix_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_storage_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_storage_configuration.bzl",
     _fuchsia_platform_storage_configuration = "fuchsia_platform_storage_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_identity_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_identity_configuration.bzl",
     _FEATURE_CONTROL = "FEATURE_CONTROL",
     _fuchsia_platform_identity_configuration = "fuchsia_platform_identity_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
     _BUILD_TYPES = "BUILD_TYPES",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
+    "//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
     _ARCH = "ARCH",
     _fuchsia_virtual_device = "fuchsia_virtual_device",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_platform_diagnostics_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_platform_diagnostics_configuration.bzl",
     _ARCHIVIST_TYPES = "ARCHIVIST_TYPES",
     _fuchsia_platform_diagnostics_configuration = "fuchsia_platform_diagnostics_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:providers.bzl",
+    "//fuchsia/private/assembly:providers.bzl",
     _FuchsiaProductAssemblyBundleInfo = "FuchsiaProductAssemblyBundleInfo",
     _FuchsiaProductImageInfo = "FuchsiaProductImageInfo",
     _FuchsiaScrutinyConfigInfo = "FuchsiaScrutinyConfigInfo",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:assembly_bundle.bzl",
+    "//fuchsia/private/assembly:assembly_bundle.bzl",
     _assembly_bundle = "assembly_bundle",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_partitions_configuration.bzl",
+    "//fuchsia/private/assembly:fuchsia_partitions_configuration.bzl",
     _fuchsia_partitions_configuration = "fuchsia_partitions_configuration",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
+    "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
     _fuchsia_product_bundle = "fuchsia_product_bundle",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_zbi.bzl",
+    "//fuchsia/private/assembly:fuchsia_zbi.bzl",
     _ZBI_COMPRESSION = "ZBI_COMPRESSION",
     _fuchsia_zbi = "fuchsia_zbi",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_vbmeta.bzl",
+    "//fuchsia/private/assembly:fuchsia_vbmeta.bzl",
     _fuchsia_vbmeta = "fuchsia_vbmeta",
     _fuchsia_vbmeta_extra_descriptor = "fuchsia_vbmeta_extra_descriptor",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_filesystem_blobfs.bzl",
+    "//fuchsia/private/assembly:fuchsia_filesystem_blobfs.bzl",
     _BLOBFS_LAYOUT = "BLOBFS_LAYOUT",
     _fuchsia_filesystem_blobfs = "fuchsia_filesystem_blobfs",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_filesystem_empty_account.bzl",
+    "//fuchsia/private/assembly:fuchsia_filesystem_empty_account.bzl",
     _fuchsia_filesystem_empty_account = "fuchsia_filesystem_empty_account",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_filesystem_empty_data.bzl",
+    "//fuchsia/private/assembly:fuchsia_filesystem_empty_data.bzl",
     _fuchsia_filesystem_empty_data = "fuchsia_filesystem_empty_data",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_filesystem_reserved.bzl",
+    "//fuchsia/private/assembly:fuchsia_filesystem_reserved.bzl",
     _fuchsia_filesystem_reserved = "fuchsia_filesystem_reserved",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_fvm_nand.bzl",
+    "//fuchsia/private/assembly:fuchsia_fvm_nand.bzl",
     _fuchsia_fvm_nand = "fuchsia_fvm_nand",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_fvm_sparse.bzl",
+    "//fuchsia/private/assembly:fuchsia_fvm_sparse.bzl",
     _fuchsia_fvm_sparse = "fuchsia_fvm_sparse",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_fvm_standard.bzl",
+    "//fuchsia/private/assembly:fuchsia_fvm_standard.bzl",
     _fuchsia_fvm_standard = "fuchsia_fvm_standard",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_bootstrap_partition.bzl",
+    "//fuchsia/private/assembly:fuchsia_bootstrap_partition.bzl",
     _fuchsia_bootstrap_partition = "fuchsia_bootstrap_partition",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_bootloader_partition.bzl",
+    "//fuchsia/private/assembly:fuchsia_bootloader_partition.bzl",
     _fuchsia_bootloader_partition = "fuchsia_bootloader_partition",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_partition.bzl",
+    "//fuchsia/private/assembly:fuchsia_partition.bzl",
     _PARTITION_TYPE = "PARTITION_TYPE",
     _SLOT = "SLOT",
     _fuchsia_partition = "fuchsia_partition",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_scrutiny_config.bzl",
+    "//fuchsia/private/assembly:fuchsia_scrutiny_config.bzl",
     _fuchsia_scrutiny_config = "fuchsia_scrutiny_config",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
+    "//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
     _fuchsia_product_size_check = "fuchsia_product_size_check",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:fuchsia_repository_keys.bzl",
+    "//fuchsia/private/assembly:fuchsia_repository_keys.bzl",
     _fuchsia_repository_keys = "fuchsia_repository_keys",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/workflows:fuchsia_task_flash.bzl",
+    "//fuchsia/private/workflows:fuchsia_task_flash.bzl",
     _fuchsia_task_flash = "fuchsia_task_flash",
 )
 

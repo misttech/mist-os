@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia/private/assembly:providers.bzl",
+    "@fuchsia_sdk//fuchsia/private/assembly:providers.bzl",
     "FuchsiaProductConfigInfo",
 )
 

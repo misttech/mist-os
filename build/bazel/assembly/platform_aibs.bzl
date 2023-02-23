@@ -4,7 +4,7 @@
 
 """platform_aibs() rule definition."""
 
-load("@rules_fuchsia//fuchsia/private/assembly:providers.bzl", "FuchsiaProductAssemblyBundleInfo")
+load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaProductAssemblyBundleInfo")
 load("//:build/bazel/bazel_version_utils.bzl", "actions_symlink_file_or_directory")
 
 def _platform_aibs_impl(ctx):

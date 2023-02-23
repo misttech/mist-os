@@ -2,8 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# NOTE: The following repository exists only to bootstrap other repositories
+# (eg: cipd, clang, fuchsia sdk).
+# Once @fuchsia_sdk is initialized, it should be used whenever possible.
 module(
-    name = "rules_fuchsia",
+    name = "fuchsia_workspace",
     version = "0.0.1",
     #TODO(fxbug.dev/108139) add bazel_compatibility when it is ready
 )

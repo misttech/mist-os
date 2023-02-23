@@ -4,7 +4,7 @@
 
 load(":fuchsia_package_test.bzl", "fuchsia_package_test_suite")
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "make_file")
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
 
 fuchsia_package_test_suite(name = "fuchsia_package_tests")
 

@@ -3,13 +3,13 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
+    "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
 )
 load(
-    "@rules_fuchsia//fuchsia:licenses.bzl",
+    "@fuchsia_sdk//fuchsia:licenses.bzl",
     "fuchsia_licenses_spdx",
 )
 load("@rules_license//rules:license.bzl", "license")

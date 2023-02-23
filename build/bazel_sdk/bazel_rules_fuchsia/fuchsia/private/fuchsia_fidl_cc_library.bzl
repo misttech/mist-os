@@ -76,7 +76,7 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
     )
 
 def _codegen_impl(context):
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
     ir = context.attr.library[FuchsiaFidlLibraryInfo].ir
     name = context.attr.library[FuchsiaFidlLibraryInfo].name
@@ -135,7 +135,7 @@ def _codegen_impl(context):
 # the cc_library as two separate rules.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

@@ -4,7 +4,7 @@
 
 load("@legacy_ninja_build_outputs//:build_args.bzl", "use_vbmeta")
 load(
-    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
     "fuchsia_filesystem_blobfs",
     "fuchsia_filesystem_empty_data",
     "fuchsia_filesystem_reserved",

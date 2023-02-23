@@ -163,7 +163,7 @@ def fuchsia_unittest_package(
     )
 
 def _build_fuchsia_package_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     archive_name = ctx.attr.archive_name or ctx.attr.package_name
 
     if not archive_name.endswith(".far"):
@@ -370,7 +370,7 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
     doc = "Builds a fuchsia package.",
     implementation = _build_fuchsia_package_impl,
     cfg = fuchsia_transition,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain", "@bazel_tools//tools/cpp:toolchain_type"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain", "@bazel_tools//tools/cpp:toolchain_type"],
     attrs = {
         "package_name": attr.string(
             doc = "The name of the package",

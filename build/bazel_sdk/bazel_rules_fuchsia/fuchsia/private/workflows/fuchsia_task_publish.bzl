@@ -4,11 +4,11 @@
 
 """Publishes packages as a workflow task."""
 
-load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
+load("//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 
 def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     far_files = [
         pkg.far_file
         for dep in ctx.attr.packages
@@ -41,7 +41,7 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_publish_impl,
     doc = """A workflow task that publishes multiple fuchsia packages.""",
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "packages": attr.label_list(
             doc = "The packages to publish.",

@@ -3,12 +3,12 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
+    "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_emulator",
     "fuchsia_local_package_repository",
     "fuchsia_remote_product_bundle",
 )
-load("@rules_fuchsia//fuchsia:workflows.bzl", "fuchsia_development_configuration")
+load("@fuchsia_sdk//fuchsia:workflows.bzl", "fuchsia_development_configuration")
 
 test_suite(
     name = "tests",

@@ -2,9 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Workspace definition for rules_fuchsia.git s
+# Workspace definition for Bazel SDK workspace rules.
 
-workspace(name = "rules_fuchsia")
+workspace(name = "fuchsia_workspace")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
@@ -40,7 +40,7 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
 load(
-    "@rules_fuchsia//fuchsia:deps.bzl",
+    "//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",
 )
@@ -52,7 +52,3 @@ fuchsia_sdk_repository(
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
-
-load("@rules_fuchsia//fuchsia:workspace_setup.bzl", "rules_fuchsia_workspace_setup")
-
-rules_fuchsia_workspace_setup()

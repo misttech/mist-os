@@ -40,7 +40,7 @@ $ORIG_DIR/$FFX \
 """
 
 def _fuchsia_product_image_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ffx_tool = fuchsia_toolchain.ffx
     legacy_aib = ctx.attr.legacy_aib[FuchsiaProductAssemblyBundleInfo]
     platform_aibs = ctx.attr.platform_aibs[FuchsiaProductAssemblyBundleInfo]
@@ -102,7 +102,7 @@ def _fuchsia_product_image_impl(ctx):
 fuchsia_product_image = rule(
     doc = """Declares a Fuchsia product image.""",
     implementation = _fuchsia_product_image_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaProductImageInfo],
     attrs = {
         "product_config": attr.label(

@@ -5,7 +5,7 @@
 """All Fuchsia Task Providers."""
 
 load(
-    "@rules_fuchsia//fuchsia/private:providers.bzl",
+    "//fuchsia/private:providers.bzl",
     _FuchsiaComponentInfo = "FuchsiaComponentInfo",
     _FuchsiaDebugSymbolInfo = "FuchsiaDebugSymbolInfo",
     _FuchsiaDriverToolInfo = "FuchsiaDriverToolInfo",

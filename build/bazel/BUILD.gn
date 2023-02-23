@@ -104,7 +104,7 @@ action("generate_main_workspace") {
   deps = [
     # This dependency is required to properly populate @fuchsia_sdk and
     # @internal_sdk for
-    # @rules_fuchsia//:fuchsia/workspace/fuchsia_sdk_repository.bzl
+    # @fuchsia_workspace//:fuchsia/workspace/fuchsia_sdk_repository.bzl
     "//sdk:core",
     "//sdk:platform",
   ]

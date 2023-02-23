@@ -3,10 +3,10 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaPackageInfo", "FuchsiaPackageResourcesInfo")
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo", "FuchsiaPackageResourcesInfo")
 
 def _fuchsia_package_checker_test_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     package_info = ctx.attr.package_under_test[FuchsiaPackageInfo]
     meta_far = package_info.meta_far
 
@@ -71,7 +71,7 @@ fuchsia_package_checker_test = rule(
     doc = """Validate the generated package.""",
     test = True,
     implementation = _fuchsia_package_checker_test_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "package_under_test": attr.label(
             doc = "Built Package.",

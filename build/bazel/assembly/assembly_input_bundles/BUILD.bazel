@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_fuchsia//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
+load("@fuchsia_sdk//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
 load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
 load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 load("//:bundles/assembly/platform_aib_names.bzl", "ENG_PLATFORM_AIB_NAMES", "PLATFORM_AIB_NAMES")

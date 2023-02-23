@@ -50,7 +50,7 @@ fuchsia_component_manifest_shard = rule(
 )
 
 def _fuchsia_component_manifest_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     if not ctx.file.src and not ctx.attr.content:
         fail("Either 'src' or 'content' needs to be specified.")
 
@@ -142,7 +142,7 @@ src file and included in the includes attribute.
 ```
 """,
     implementation = _fuchsia_component_manifest_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "src": attr.label(
             doc = "The source manifest to compile",

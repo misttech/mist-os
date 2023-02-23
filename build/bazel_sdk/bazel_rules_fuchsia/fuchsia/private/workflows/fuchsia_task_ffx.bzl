@@ -10,7 +10,7 @@ def ffx_task_rule(*, implementation, toolchains = [], **kwargs):
     """Starlark higher-order rule for creating ffx-based tasks."""
 
     def _fuchsia_task_ffx_impl(ctx, make_shell_task):
-        sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+        sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
         def _make_ffx_task(prepend_args = [], *runfiles):
             return make_shell_task([sdk.ffx] + prepend_args, *runfiles)
@@ -19,7 +19,7 @@ def ffx_task_rule(*, implementation, toolchains = [], **kwargs):
 
     return shell_task_rule(
         implementation = _fuchsia_task_ffx_impl,
-        toolchains = ["@rules_fuchsia//fuchsia:toolchain"] + toolchains,
+        toolchains = ["@fuchsia_sdk//fuchsia:toolchain"] + toolchains,
         **kwargs
     )
 

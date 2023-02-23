@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 # buildifier: disable=function-docstring
 def _sdk_host_tool_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     file = getattr(sdk, ctx.label.name)
     exe = ctx.actions.declare_file(ctx.label.name + "_wrap.sh")
     ctx.actions.write(exe, """
@@ -32,6 +32,6 @@ sdk_host_tool = rule(
     sdk_host_tool(name = "ffx")
     ```
     """,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     executable = True,
 )

@@ -9,7 +9,7 @@ load(
     "fuchsia_workflow",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/workflows:fuchsia_task_autodetect_target.bzl",
+    "//fuchsia/private/workflows:fuchsia_task_autodetect_target.bzl",
     "fuchsia_task_autodetect_target",
 )
 load(
@@ -130,7 +130,7 @@ def fuchsia_development_configuration(
     )
 
 def _summary_task_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
     summary_lines = [
         "-- Development Configuration Prepared --",
@@ -199,7 +199,7 @@ def _summary_task_impl(ctx, make_shell_task):
 (__summary_task, _summary_task_for_test, _summary_task) = shell_task_rule(
     implementation = _summary_task_impl,
     toolchains = [
-        "@rules_fuchsia//fuchsia:toolchain",
+        "@fuchsia_sdk//fuchsia:toolchain",
     ],
     attrs = {
         "product_bundle": attr.label(providers = [[FuchsiaProductBundleInfo]]),
@@ -311,7 +311,7 @@ def _set_defaults_workflow(name, emulator, package_repo):
         return None
 
 def _start_server_if_needed_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     return make_shell_task(
         command = [
             "[[",
@@ -342,12 +342,12 @@ def _start_server_if_needed_impl(ctx, make_shell_task):
 ) = shell_task_rule(
     implementation = _start_server_if_needed_impl,
     toolchains = [
-        "@rules_fuchsia//fuchsia:toolchain",
+        "@fuchsia_sdk//fuchsia:toolchain",
     ],
 )
 
 def _status_check_task_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     extra_args = []
     if ctx.attr.emulator:
         extra_args.extend([
@@ -369,7 +369,7 @@ def _status_check_task_impl(ctx, make_shell_task):
             "--expected_product_bundle_repo",
             pb_info.repository,
             "--expected_sdk_version",
-            pb_info.version or ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].sdk_id,
+            pb_info.version or ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].sdk_id,
             "--expected_product_name",
             pb_info.product_name,
         ])
@@ -392,7 +392,7 @@ def _status_check_task_impl(ctx, make_shell_task):
 ) = shell_task_rule(
     implementation = _status_check_task_impl,
     toolchains = [
-        "@rules_fuchsia//fuchsia:toolchain",
+        "@fuchsia_sdk//fuchsia:toolchain",
     ],
     attrs = {
         "emulator": attr.label(providers = [[FuchsiaEmulatorInfo]]),

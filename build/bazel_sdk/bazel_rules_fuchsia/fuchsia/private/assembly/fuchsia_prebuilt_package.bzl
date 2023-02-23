@@ -24,7 +24,7 @@ def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
 
 def _validate_components_and_drivers(ctx, outdir):
-    far = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].far
+    far = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].far
     deps = []
     for component in ctx.attr.components + ctx.attr.drivers:
         stamp_file = ctx.actions.declare_file(_relative_file_name(ctx, component + "_stamp"))
@@ -51,7 +51,7 @@ def _validate_components_and_drivers(ctx, outdir):
     return deps
 
 def _fuchsia_prebuilt_package_impl(ctx):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     far_archive = ctx.files.archive[0]
 
     # Technical note: `pm expand` below will populate its output directory
@@ -164,7 +164,7 @@ _fuchsia_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).
 """,
     implementation = _fuchsia_prebuilt_package_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "archive": attr.label(
             doc = "The fuchsia archive",

@@ -105,13 +105,13 @@ cc_library(
     srcs = MINI_CHROMIUM_BASE_SOURCES +
            select({
                "@platforms//os:osx": MINI_CHROMIUM_BASE_POSIX_SOURCES,
-               "@rules_fuchsia//fuchsia/constraints/os:fuchsia": MINI_CHROMIUM_BASE_FUCHSIA_SOURCES + MINI_CHROMIUM_BASE_POSIX_SOURCES,
+               "@platforms//os:fuchsia": MINI_CHROMIUM_BASE_FUCHSIA_SOURCES + MINI_CHROMIUM_BASE_POSIX_SOURCES,
                "//conditions:default": MINI_CHROMIUM_BASE_POSIX_SOURCES,
            }),
     hdrs = MINI_CHROMIUM_BASE_HEADERS +
            select({
                "@platforms//os:osx": MINI_CHROMIUM_BASE_POSIX_HEADERS,
-               "@rules_fuchsia//fuchsia/constraints/os:fuchsia": MINI_CHROMIUM_BASE_FUCHSIA_HEADERS + MINI_CHROMIUM_BASE_POSIX_HEADERS,
+               "@platforms//os:fuchsia": MINI_CHROMIUM_BASE_FUCHSIA_HEADERS + MINI_CHROMIUM_BASE_POSIX_HEADERS,
                "//conditions:default": MINI_CHROMIUM_BASE_POSIX_HEADERS,
            }),
     copts = select({
@@ -146,7 +146,7 @@ cc_library(
     ],
     deps = select(
         {
-            "@rules_fuchsia//fuchsia/constraints/os:fuchsia": ["@fuchsia_sdk//pkg/syslog"],
+            "@platforms//os:fuchsia": ["@fuchsia_sdk//pkg/syslog"],
             "//conditions:default": [],
         },
     ),

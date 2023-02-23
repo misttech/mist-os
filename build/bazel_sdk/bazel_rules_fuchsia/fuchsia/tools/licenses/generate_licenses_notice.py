@@ -23,7 +23,7 @@ def main():
     parser.add_argument(
         '--spdx_input',
         help='An SPDX json file containing all licenses to process.'
-        ' The output of @rules_fuchsia `fuchsia_licenses_spdx`',
+        ' The output of @fuchsia_sdk `fuchsia_licenses_spdx`',
         required=True,
     )
     parser.add_argument(

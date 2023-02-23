@@ -21,18 +21,18 @@ bazel_skylib_workspace()
 
 # Setup fuchsia rules
 local_repository(
-    name = "rules_fuchsia",
+    name = "fuchsia_workspace",
     path = "../bazel_rules_fuchsia",
 )
 
-load("@rules_fuchsia//cipd:defs.bzl", "cipd_tool_repository")
+load("@fuchsia_workspace//cipd:defs.bzl", "cipd_tool_repository")
 
 cipd_tool_repository(
     name = "cipd_tool",
 )
 
 load(
-    "@rules_fuchsia//fuchsia:deps.bzl",
+    "@fuchsia_workspace//fuchsia:deps.bzl",
     "fuchsia_clang_repository",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",

@@ -6,7 +6,7 @@ load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_t
 load(":fuchsia_images_configuration_test.bzl", "fuchsia_images_configuration_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(
-    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
     "ARCHIVIST_TYPES",
     "BLOBFS_LAYOUT",
     "BUILD_TYPES",

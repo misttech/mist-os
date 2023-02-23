@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@rules_fuchsia//fuchsia/private/assembly:providers.bzl", "FuchsiaAssemblyConfigInfo")
+load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaAssemblyConfigInfo")
 load(":test_utils.bzl", "create_validation_script")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):
@@ -42,7 +42,7 @@ fuchsia_partitions_configuration_test = rule(
             mandatory = True,
         ),
         "_json_comparator": attr.label(
-            default = "@rules_fuchsia//fuchsia/tools:json_comparator",
+            default = "@fuchsia_sdk//fuchsia/tools:json_comparator",
             executable = True,
             cfg = "exec",
         ),

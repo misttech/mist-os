@@ -4,8 +4,8 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_package")
-load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_package")
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
 
 ## Name Tests
 def _name_test_impl(ctx):

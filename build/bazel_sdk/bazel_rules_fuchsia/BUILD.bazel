@@ -16,7 +16,7 @@ load("//fuchsia/private:debug_info.bzl", "print_debug_info")
 # Note: this command relies on the existence of a fuchsia_clang repository being
 # registered in your WORKSPACE file.
 #
-# bazel run @rules_fuchsia//:debug_info
+# bazel run @fuchsia_sdk//:debug_info
 print_debug_info(
     name = "debug_info",
 )

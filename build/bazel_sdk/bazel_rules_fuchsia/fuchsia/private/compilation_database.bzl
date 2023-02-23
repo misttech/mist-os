@@ -211,7 +211,7 @@ def _compilation_db_rule_impl(ctx):
 
 _clangd_compilation_database = rule(
     implementation = _compilation_db_rule_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "output_base": attr.string(
             default = "__OUTPUT_BASE__",

@@ -38,7 +38,7 @@ def full_product_bundle_url(ctx, pb_info):
     Returns:
       URL string.
     """
-    version = pb_info.version or ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].sdk_id
+    version = pb_info.version or ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].sdk_id
     if not version:
         fail("Cannot find a version in the Fuchsia SDK")
 

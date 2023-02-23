@@ -94,7 +94,7 @@ fuchsia_virtual_device = rule(
         ),
         "_start_up_args_template": attr.label(
             allow_single_file = True,
-            default = "@rules_fuchsia//fuchsia/private:templates/emulator_flags.json.template",
+            default = "//fuchsia/private:templates/emulator_flags.json.template",
         ),
     },
 )

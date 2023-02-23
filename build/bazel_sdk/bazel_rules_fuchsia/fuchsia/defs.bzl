@@ -94,11 +94,11 @@ load(
     _clangd_compilation_database = "clangd_compilation_database",
 )
 load(
-    "@rules_fuchsia//fuchsia/private:fuchsia_emulator.bzl",
+    "//fuchsia/private:fuchsia_emulator.bzl",
     _fuchsia_emulator = "fuchsia_emulator",
 )
 load(
-    "@rules_fuchsia//fuchsia/private:fuchsia_remote_product_bundle.bzl",
+    "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
     _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
 )
 

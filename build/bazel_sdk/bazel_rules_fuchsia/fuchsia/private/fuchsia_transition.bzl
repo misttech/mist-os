@@ -25,7 +25,7 @@ def _fuchsia_transition_impl(settings, _):
     output_cpu = NATIVE_CPU_ALIASES.get(input_cpu, None)
     if not output_cpu:
         fail("Unrecognized cpu %s." % input_cpu)
-    fuchsia_platform = "@rules_fuchsia//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
+    fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
     copt = settings["//command_line_option:copt"] + (
         [] if "--debug" in settings["//command_line_option:copt"] else ["--debug"]
     )

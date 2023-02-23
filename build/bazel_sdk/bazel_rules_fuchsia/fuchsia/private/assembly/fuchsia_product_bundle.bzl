@@ -374,7 +374,7 @@ def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
     return [structured_config, depfile]
 
 def _fuchsia_product_bundle_impl(ctx):
-    fuchsia_toolchain = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
     system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
@@ -500,7 +500,7 @@ def _fuchsia_product_bundle_impl(ctx):
 fuchsia_product_bundle = rule(
     doc = """Creates pb for flashing Fuchsia images to target devices.""",
     implementation = _fuchsia_product_bundle_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. qemu-x64",

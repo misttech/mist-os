@@ -4,7 +4,7 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load(":cc_toolchain_config.bzl", "cc_toolchain_config", "feature_flag")
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_package_resource_group")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_package_resource_group")
 
 licenses(["notice"])
 

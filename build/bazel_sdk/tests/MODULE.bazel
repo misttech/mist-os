@@ -13,19 +13,16 @@ module(
     version = "1.0",
 )
 
-bazel_dep(name = "rules_fuchsia", version = "")
-
+bazel_dep(name = "fuchsia_workspace", version = "")
 local_path_override(
-    module_name = "rules_fuchsia",
+    module_name = "fuchsia_workspace",
     path = "bazel_rules_fuchsia",
 )
 
 bazel_dep(name = "bazel_skylib", version = "1.2.0")
 
-fuchsia_sdk_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_sdk_ext")
-
+fuchsia_sdk_ext = use_extension("@fuchsia_workspace//fuchsia:deps.bzl", "fuchsia_sdk_ext")
 use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
 
-fuchsia_clang_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_clang_ext")
-
+fuchsia_clang_ext = use_extension("@fuchsia_workspace//fuchsia:deps.bzl", "fuchsia_clang_ext")
 use_repo(fuchsia_clang_ext, "fuchsia_clang")

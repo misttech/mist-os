@@ -6,9 +6,9 @@
 #
 # This is referenced by //fuchsia/private/fuchsia_sdk_repository.bzl, see
 # the `fuchsia_sdk_repository` rule for more information.
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
 load("api_version.bzl", "DEFAULT_FIDL_TARGET_API", "DEFAULT_TARGET_API")
-load("@rules_fuchsia//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
+load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
 
 # Export all files as individual targets.
 exports_files(glob(["**/*"]))
@@ -22,7 +22,7 @@ filegroup(
 
 constraint_value(
     name = "fuchsia_toolchain_version_sdk",
-    constraint_setting = "@rules_fuchsia//fuchsia/constraints:version",
+    constraint_setting = "//fuchsia/constraints:version",
     visibility = ["//visibility:public"],
 )
 
@@ -100,7 +100,7 @@ fuchsia_toolchain_info(
 toolchain(
     name = "fuchsia_toolchain_sdk",
     toolchain = ":fuchsia_toolchain_info",
-    toolchain_type = "@rules_fuchsia//fuchsia:toolchain",
+    toolchain_type = "@fuchsia_sdk//fuchsia:toolchain",
 )
 
 # The following rules expose the sdk tools that are put in the fuchsia_toolchain

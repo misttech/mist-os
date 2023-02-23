@@ -22,7 +22,7 @@ $FFX \
 
 def _fuchsia_product_size_check_impl(ctx):
     images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
-    fuchsia_toolchain = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_summary")
     ctx.actions.run_shell(
@@ -43,7 +43,7 @@ def _fuchsia_product_size_check_impl(ctx):
 fuchsia_product_size_check = rule(
     doc = """Create a size summary of an image.""",
     implementation = _fuchsia_product_size_check_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_image": attr.label(
             doc = "fuchsia_product_image target to check size",

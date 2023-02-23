@@ -4,7 +4,7 @@
 
 """Assembly related Providers."""
 
-load("@rules_fuchsia//fuchsia/private:providers.bzl", _FuchsiaProductBundleInfo = "FuchsiaProductBundleInfo")
+load("//fuchsia/private:providers.bzl", _FuchsiaProductBundleInfo = "FuchsiaProductBundleInfo")
 
 FuchsiaAssembledPackageInfo = provider(
     "Packages that can be included into a product. It consists of the package and the corresponding config data.",

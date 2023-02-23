@@ -31,7 +31,7 @@ def _process_bindc_args(context):
 
 def _bind_rules_header_impl(context):
     args = _process_bindc_args(context)
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     context.actions.run(
         executable = sdk.bindc,
         arguments = [
@@ -50,7 +50,7 @@ def _bind_rules_header_impl(context):
 
 def _fuchsia_driver_bind_bytecode_impl(context):
     args = _process_bindc_args(context)
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     context.actions.run(
         executable = sdk.bindc,
         arguments = [
@@ -71,7 +71,7 @@ def _fuchsia_driver_bind_bytecode_impl(context):
 
 _bind_rules_header = rule(
     implementation = _bind_rules_header_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     output_to_genfiles = True,
     attrs = {
         "rules": attr.label(
@@ -92,7 +92,7 @@ _bind_rules_header = rule(
 
 fuchsia_driver_bind_bytecode = rule(
     implementation = _fuchsia_driver_bind_bytecode_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "rules": attr.label(
             doc = "Path to the bind rules source file",

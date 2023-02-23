@@ -10,7 +10,7 @@ _CodegenInfo = provider("Carries generated information across FIDL bindings code
 
 # ALL CODE BELOW IS DEPRECATED - TODO: REMOVE IT when soft transition is over
 def _codegen_impl(context):
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     fidlgen = sdk.fidlgen_cpp if context.attr.binding_level == "llcpp" else sdk.fidlgen_hlcpp
 
     ir = context.attr.library[FuchsiaFidlLibraryInfo].ir
@@ -99,7 +99,7 @@ def _impl_wrapper_impl(context):
 # the cc_library as two separate rules.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

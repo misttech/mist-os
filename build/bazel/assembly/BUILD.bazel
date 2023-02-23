@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_fuchsia//fuchsia:assembly.bzl", "fuchsia_product_image")
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_product_image")
 
 fuchsia_product_image(
     name = "bringup",

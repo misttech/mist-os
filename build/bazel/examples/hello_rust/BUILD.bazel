@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
+    "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
@@ -11,7 +11,7 @@ load(
     "fuchsia_test_package",
     "fuchsia_wrap_rust_binary",
 )
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_doc", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 
 rust_binary(
     name = "hello_rust_native",

@@ -211,8 +211,8 @@ archive file.
             default = "@fuchsia_sdk",
         ),
         "rules_fuchsia_root_label": attr.label(
-            doc = "The fuchsia rules root label. eg: @rules_fuchsia",
-            default = "@rules_fuchsia",
+            doc = "The fuchsia workspace rules root label. eg: @fuchsia_sdk",
+            default = "@fuchsia_sdk",
         ),
         "_cipd_ensure_file": attr.label(
             doc = "A cipd ensure file to use to download clang.",
@@ -266,8 +266,8 @@ _labels_tag = tag_class(
             default = "@fuchsia_sdk",
         ),
         "rules_fuchsia_root_label": attr.label(
-            doc = "The fuchsia rules root label. eg: @rules_fuchsia",
-            default = "@rules_fuchsia",
+            doc = "The fuchsia workspace rules root label. eg: @fuchsia_sdk",
+            default = "@fuchsia_sdk",
         ),
     },
 )

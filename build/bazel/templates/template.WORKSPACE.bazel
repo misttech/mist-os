@@ -115,14 +115,17 @@ go_wrap_sdk(
 go_rules_dependencies()
 go_register_toolchains()
 
-# Create @rules_fuchsia
+# Create @fuchsia_workspace
+# NOTE: The following repository is only valid for bootstraping other
+# repositories (eg: cipd, clang, fuchsia sdk).
+# Once @fuchsia_sdk is initialized, it should be used whenever possible.
 local_repository(
-    name = "rules_fuchsia",
+    name = "fuchsia_workspace",
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
 # buildifier: disable=load-on-top
-load("@rules_fuchsia//cipd:defs.bzl", "cipd_tool_repository")
+load("@fuchsia_workspace//cipd:defs.bzl", "cipd_tool_repository")
 
 # Create a stubbed out cipd_tool repository. Doing this is necessary because the
 # Fuchsia SDK repository rule still loads the cipd_tool repo to allow users to
@@ -134,7 +137,7 @@ cipd_tool_repository(
     validate_cipd_bin = False,
 )
 
-# googletest is a dependency from @rules_fuchsia amd requires a local
+# googletest is a dependency from @fuchsia_sdk amd requires a local
 # patch for now for Fuchsia support, which is handled by a repository rule.
 #
 # local_repository(
@@ -159,7 +162,7 @@ bazel_inputs_repository(
 
 # buildifier: disable=load-on-top
 load(
-    "@rules_fuchsia//fuchsia:deps.bzl",
+    "@fuchsia_workspace//fuchsia:deps.bzl",
     "fuchsia_clang_repository",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",

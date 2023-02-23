@@ -8,7 +8,7 @@ load("//fuchsia/private:fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
 def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     build_id_dirs, build_dirs = zip(*[
         (build_id_dir, build_dir)
         for build_dir, build_id_dirs in collect_debug_symbols(ctx.attr.deps).build_id_dirs.items()
@@ -32,7 +32,7 @@ def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
     fuchsia_task_register_debug_symbols,
 ) = shell_task_rule(
     doc = """Registers debug symbols with ffx.""",
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     implementation = _fuchsia_task_register_debug_symbols_impl,
     attrs = {
         "_tool": attr.label(

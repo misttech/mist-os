@@ -3,11 +3,10 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
     "FEATURE_CONTROL",
     "INPUT_DEVICE_TYPE",
-    "fuchsia_platform_driver_framework_configuration",
     "fuchsia_platform_identity_configuration",
     "fuchsia_platform_input_configuration",
     "fuchsia_platform_storage_configuration",

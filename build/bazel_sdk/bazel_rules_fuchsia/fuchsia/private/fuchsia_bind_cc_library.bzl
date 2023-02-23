@@ -7,7 +7,7 @@
 load(":providers.bzl", "FuchsiaBindLibraryInfo")
 
 def _codegen_impl(context):
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     bindc = sdk.bindc
     base_path = context.attr.name
     name = context.attr.library[FuchsiaBindLibraryInfo].name.replace(".", "/").replace("_bindlib", "")
@@ -44,7 +44,7 @@ def _codegen_impl(context):
 # Runs bindc to produce the header file with the constants for the bind_library.
 _codegen = rule(
     implementation = _codegen_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     # Files must be generated in genfiles in order for the header to be included
     # anywhere.
     output_to_genfiles = True,

@@ -18,7 +18,7 @@ disable logging, use `--log-file /dev/null` if this is really needed).
 This script can be run on CQ, but keep in mind that this requires accessing
 the network to download various prebuilts. This happens both during the
 prepare-fuchsia-checkout.py step, as well as during the Bazel build
-itself, due to the current state of the @rules_fuchsia repository rules
+itself, due to the current state of the @fuchsia_workspace repository rules
 being used (to be fixed in the future, of course).
 """
 

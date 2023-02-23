@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@rules_fuchsia//fuchsia:licenses.bzl",
+    "@fuchsia_sdk//fuchsia:licenses.bzl",
     "fuchsia_licenses_spdx",
 )
 load("@rules_license//rules:license.bzl", "license")

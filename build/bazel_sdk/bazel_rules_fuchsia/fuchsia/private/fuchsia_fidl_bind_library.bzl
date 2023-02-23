@@ -8,7 +8,7 @@ load(":fuchsia_bind_library.bzl", "fuchsia_bind_library")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 
 def _bindlibgen_impl(context):
-    sdk = context.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     bindc = sdk.bindc
 
     ir = context.attr.library[FuchsiaFidlLibraryInfo].ir
@@ -46,7 +46,7 @@ def _bindlibgen_impl(context):
 # Runs bindc to produce the bind library file.
 _bindlibgen = rule(
     implementation = _bindlibgen_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "library": attr.label(
             doc = "The FIDL library to generate bind library for",

@@ -11,7 +11,7 @@ load(
 )
 
 def _fuchsia_task_autodetect_target_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     command = [
         ctx.attr._detect_tool,
         "--ffx",
@@ -40,7 +40,7 @@ def _fuchsia_task_autodetect_target_impl(ctx, make_shell_task):
 ) = shell_task_rule(
     implementation = _fuchsia_task_autodetect_target_impl,
     # doc = """Creates a package server.""",
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_bundle": attr.label(
             providers = [[FuchsiaProductBundleInfo]],

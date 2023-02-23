@@ -1,5 +1,5 @@
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
+    "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_package_resource",
 )
 

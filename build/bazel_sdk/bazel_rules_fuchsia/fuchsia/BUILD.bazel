@@ -23,7 +23,7 @@ exports_files(
 # Allows the user to specify a path to a package repository
 # which packages can be published to.
 #
-# bazel build //:my_package --@rules_fuchsia//fuchsia:package_repo=out/foo
+# bazel build //:my_package --@fuchsia_sdk//fuchsia:package_repo=out/foo
 package_repo_path_flag(
     name = "package_repo",
     build_setting_default = "",

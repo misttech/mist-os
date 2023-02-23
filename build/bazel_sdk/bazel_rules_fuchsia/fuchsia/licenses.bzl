@@ -5,19 +5,19 @@
 """Public definitions for licenses related rules."""
 
 load(
-    "@rules_fuchsia//fuchsia/private/licenses:fuchsia_licenses_classification.bzl",
+    "//fuchsia/private/licenses:fuchsia_licenses_classification.bzl",
     _fuchsia_licenses_classification = "fuchsia_licenses_classification",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/licenses:fuchsia_licenses_notice.bzl",
+    "//fuchsia/private/licenses:fuchsia_licenses_notice.bzl",
     _fuchsia_licenses_notice = "fuchsia_licenses_notice",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/licenses:fuchsia_licenses_review.bzl",
+    "//fuchsia/private/licenses:fuchsia_licenses_review.bzl",
     _fuchsia_licenses_review = "fuchsia_licenses_review",
 )
 load(
-    "@rules_fuchsia//fuchsia/private/licenses:fuchsia_licenses_spdx.bzl",
+    "//fuchsia/private/licenses:fuchsia_licenses_spdx.bzl",
     _fuchsia_licenses_spdx = "fuchsia_licenses_spdx",
 )
 

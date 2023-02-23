@@ -9,7 +9,7 @@ load("//fuchsia/private:providers.bzl", "FuchsiaLocalPackageRepositoryInfo", "Fu
 load("//fuchsia/private/workflows:fuchsia_shell_task.bzl", "shell_task_rule")
 
 def _repo_task(ctx, make_shell_task, use_ffx = True, args = []):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
     tool = sdk.ffx if use_ffx else sdk.pm
     command = [
@@ -46,7 +46,7 @@ def _fuchsia_task_repository_create_impl(ctx, make_fuchsia_task):
 ) = shell_task_rule(
     implementation = _fuchsia_task_repository_create_impl,
     doc = """Creates a package server.""",
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "repository": attr.label(
             doc = "The repository that is being controlled",
@@ -78,7 +78,7 @@ def _fuchsia_task_repository_add_from_pm_impl(ctx, make_fuchsia_task):
 ) = shell_task_rule(
     doc = """Adds a pm based repo to ffx.""",
     implementation = _fuchsia_task_repository_add_from_pm_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "repository": attr.label(
             doc = "The repository that is being controlled",
@@ -90,7 +90,7 @@ def _fuchsia_task_repository_add_from_pm_impl(ctx, make_fuchsia_task):
 
 #TODO: Pipe this through some processing to do ffx --machine JSON repository list and get the path
 def _fuchsia_task_repository_delete_impl(ctx, make_shell_task):
-    sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     command = [
         ctx.attr._clean_repo,
         "--ffx",
@@ -118,7 +118,7 @@ def _fuchsia_task_repository_delete_impl(ctx, make_shell_task):
 ) = shell_task_rule(
     implementation = _fuchsia_task_repository_delete_impl,
     doc = """deletes a package server.""",
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "repository_name": attr.string(
             doc = "The repository to delete",
@@ -198,7 +198,7 @@ def _fuchsia_task_repository_register_with_default_target_impl(ctx, _make_ffx_ta
 _fuchsia_task_repository_register_with_default_target = ffx_task_rule(
     doc = """Registers the repo with the default target.""",
     implementation = _fuchsia_task_repository_register_with_default_target_impl,
-    toolchains = ["@rules_fuchsia//fuchsia:toolchain"],
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "repository": attr.label(
             doc = "The repository that is being controlled",

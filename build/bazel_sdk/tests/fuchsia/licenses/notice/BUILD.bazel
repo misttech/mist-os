@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_fuchsia//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
+load("@fuchsia_sdk//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 
 fuchsia_licenses_notice(
