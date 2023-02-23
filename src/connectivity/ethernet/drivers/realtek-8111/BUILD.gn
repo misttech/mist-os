@@ -26,7 +26,6 @@ if (current_cpu == "x64") {
       "//src/devices/lib/driver",
       "//src/devices/lib/mmio",
       "//src/devices/pci/lib/device-protocol-pci",
-      "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
       "//src/lib/ddk",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zircon-internal",
@@ -37,7 +36,7 @@ if (current_cpu == "x64") {
     component_name = "realtek-8111"
     deps = [ ":realtek-8111-driver" ]
     info = "realtek-8111-info.json"
-    colocate = true
+    manifest = "meta/realtek-8111.cml"
   }
 }
 

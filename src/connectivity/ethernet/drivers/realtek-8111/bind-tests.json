@@ -3,7 +3,7 @@
         "name": "All Match",
         "expected": "match",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.pci.BIND_PROTOCOL.DEVICE",
+            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
             "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.REALTEK",
             "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.RTL8111",
             "fuchsia.BIND_COMPOSITE": "1"
@@ -22,7 +22,7 @@
         "name": "Missing PCI VID",
         "expected": "abort",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.pci.BIND_PROTOCOL.DEVICE",
+            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
             "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.RTL8111",
             "fuchsia.BIND_COMPOSITE": "1"
         }
@@ -31,7 +31,7 @@
         "name": "Missing PCI DID",
         "expected": "abort",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.pci.BIND_PROTOCOL.DEVICE",
+            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
             "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.REALTEK",
             "fuchsia.BIND_COMPOSITE": "1"
         }
