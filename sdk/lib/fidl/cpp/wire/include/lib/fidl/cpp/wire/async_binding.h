@@ -333,8 +333,7 @@ class IncomingMessageDispatcher;
 // implementation type before invoking the public unbinding completion callback
 // that is |fidl::OnUnboundFn<ServerImpl>|.
 using AnyOnUnboundFn =
-    fit::inline_callback<void(IncomingMessageDispatcher*, UnbindInfo, fidl::internal::AnyTransport),
-                         48>;
+    fit::callback<void(IncomingMessageDispatcher*, UnbindInfo, fidl::internal::AnyTransport), 48>;
 
 // The async server binding. It directly owns the transport.
 class AsyncServerBinding : public AsyncBinding {

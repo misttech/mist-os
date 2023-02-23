@@ -5,7 +5,9 @@
 #ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SERVER_H_
 #define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SERVER_H_
 
+#include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl_driver/cpp/internal/server_details.h>
 #include <lib/fidl_driver/cpp/transport.h>
 
@@ -210,6 +212,173 @@ class ServerBinding final : public ::fidl::internal::ServerBindingBase<FidlProto
   // After the binding destructs, it will release references on |impl|.
   // Destroying the binding will discard the |close_handler| without calling it.
   ~ServerBinding() = default;
+};
+
+// |ServerBindingGroup| manages a collection of FIDL |ServerBinding|s. It does not own the |impl|s
+// backing those bindings. All members of a |ServerBindingGroup| collection must implement a common
+// FIDL protocol, but implementations themselves may be distinct from one another.
+//
+// Destroying a |ServerBindingGroup| will close all managed connections and release the references
+// to the implementations. If one does not require per-connection state, a common pattern is to
+// have a common server implementation own its |ServerBindingGroup|.
+//
+// ## Example
+//
+//     // Define the protocol implementation.
+//     class Impl : public fdf::Server<fuchsia_lib::MyProtocol> {
+//      public:
+//       fidl::ProtocolHandler<fuchsia_lib::MyProtocol> GetHandler() {
+//         return bindings_.CreateHandler(this, dispatcher, std::mem_fn(&Impl::OnClosed));
+//       }
+//
+//      private:
+//       void OnClosed(fidl::UnbindInfo info) {
+//         // Called when a connection to this server is closed.
+//         // This is provided to the binding group during |CreateHandler|.
+//       }
+//
+//       fdf::ServerBindingGroup<fuchsia_lib::MyProtocol> bindings_;
+//     };
+//
+//     // Instantiate the server.
+//     Impl impl;
+//
+//     // Publish the server to an outgoing directory.
+//     auto outgoing = fdf::OutgoingDirectory::Create(dispatcher);
+//     outgoing.AddService(fuchsia_lib::MyService::InstanceHandler {
+//         .member = impl.GetHandler(),
+//     });
+//
+// One may also explicitly let the binding group manage new connections using |AddBinding|:
+//
+//     // Instantiate some servers.
+//     auto a = ImplA{...};
+//     auto b = ImplB{...};
+//
+//     // Create the group.
+//     fdf::ServerBindingGroup<fuchsia_lib::MyProtocol> bindings;
+//
+//     // Add server endpoints and implementations to the group.
+//     fdf::Endpoints<fuchsia_lib::MyProtocol>() endpoints1 = ...;
+//     group.AddBinding(dispatcher, endpoints1->server, &a, OnClosed);
+//
+//     fdf::Endpoints<fuchsia_lib::MyProtocol>() endpoints2 = ...;
+//     group.AddBinding(dispatcher, endpoints2->server, &a, OnClosed);
+//
+// # Thread safety
+//
+// This class is thread-unsafe. Instances must be managed and used from a
+// synchronized async dispatcher. See
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
+template <typename FidlProtocol>
+class ServerBindingGroup final
+    : private ::fidl::internal::ServerBindingGroupBase<FidlProtocol,
+                                                       ::fidl::internal::DriverTransport> {
+ private:
+  using Base =
+      ::fidl::internal::ServerBindingGroupBase<FidlProtocol, ::fidl::internal::DriverTransport>;
+  using BindingUid = typename Base::BindingUid;
+  using Binding = typename Base::Binding;
+  using StorageType = typename Base::StorageType;
+
+ public:
+  ServerBindingGroup() = default;
+  ServerBindingGroup(const ServerBindingGroup&) = delete;
+  ServerBindingGroup(ServerBindingGroup&&) = delete;
+  ServerBindingGroup& operator=(const ServerBindingGroup&) = delete;
+  ServerBindingGroup& operator=(ServerBindingGroup&&) = delete;
+
+  // Add a binding to an unowned impl to the group.
+  //
+  // |CloseHandler| is silently discarded if |ServerBindingGroup| is destroyed, to avoid calling
+  // into a destroyed server implementation.
+  //
+  // The handler may have one of these signatures:
+  //
+  //     void(fidl::UnbindInfo info);
+  //     void(Impl* impl, fidl::UnbindInfo info);
+  //
+  // |info| contains the detailed reason for stopping message dispatch. |impl| is the pointer to the
+  // server implementation borrowed by the binding.
+  //
+  // This method allows one to bind a |CloseHandler| to the newly created server binding instance.
+  // See |ServerBinding| for more information on the behavior of the |CloseHandler|, when and how it
+  // is called, etc. This is particularly useful when passing in a |std::unique_ptr<ServerImpl>|,
+  // because one does not have to capture the server implementation pointer again:
+  //
+  //     // Define and instantiate the impl.
+  //     class Impl : fdf::WireServer<Protocol> {
+  //      public:
+  //       void OnFidlClosed(fidl::UnbindInfo) { /* handle errors */ }
+  //     };
+  //
+  //     auto impl = Impl(...);
+  //     fdf::ServerBindingGroup<Protocol> binding_group;
+  //
+  //     // Bind the server endpoint to the |Impl| instance, and hook up the
+  //     // |CloseHandler| to its |OnFidlClosed| member function.
+  //     binding_group.AddBinding(
+  //         dispatcher, std::move(server_end), &impl,
+  //         std::mem_fn(&Impl::OnFidlClosed));
+  //
+  // In cases where the binding implementation never cares to handle any errors or be notified about
+  // binding closure, one can pass |fidl::kIgnoreBindingClosure| as the |close_handler|.
+  template <typename ServerImpl, typename CloseHandler>
+  void AddBinding(fdf_dispatcher_t* dispatcher, ServerEnd<FidlProtocol> server_end,
+                  ServerImpl* impl, CloseHandler&& close_handler) {
+    Base::AddBinding(dispatcher, std::move(server_end), impl,
+                     std::forward<CloseHandler>(close_handler));
+  }
+
+  // Returns a protocol handler that binds the incoming |ServerEnd| to the passed in |impl|.
+  // All bindings will use the same |CloseHandler|.
+  template <typename ServerImpl, typename CloseHandler>
+  fidl::ProtocolHandler<FidlProtocol> CreateHandler(ServerImpl* impl, fdf_dispatcher_t* dispatcher,
+                                                    CloseHandler&& close_handler) {
+    return Base::CreateHandler(impl, dispatcher, std::forward<CloseHandler>(close_handler));
+  }
+
+  // Iterate over the bindings stored in this group.
+  void ForEachBinding(fit::function<void(const Binding&)> visitor) {
+    Base::ForEachBinding(std::move(visitor));
+  }
+
+  // Removes all bindings associated with a particular |impl| without calling their close handlers.
+  // None of the removed bindings will have its close handler called. Returns true if at least one
+  // binding was removed.
+  template <class ServerImpl>
+  bool RemoveBindings(const ServerImpl* impl) {
+    return Base::RemoveBindings(impl);
+  }
+
+  // Removes all bindings. None of the removed bindings close handlers' is called. Returns true if
+  // at least one binding was removed.
+  bool RemoveAll() { return Base::RemoveAll(); }
+
+  // Closes all bindings associated with the specified |impl|. The supplied epitaph is passed to
+  // each closed binding's close handler, which is called in turn. Returns true if at least one
+  // binding was closed. The teardown operation is asynchronous, and will not necessarily have been
+  // completed by the time this function returns.
+  template <class ServerImpl>
+  bool CloseBindings(const ServerImpl* impl, zx_status_t epitaph_value) {
+    return Base::CloseBindings(impl, epitaph_value);
+  }
+
+  // Closes all bindings. All of the closed bindings' close handlers are called. Returns true if at
+  // least one binding was closed.
+  bool CloseAll(zx_status_t epitaph_value) { return Base::CloseAll(epitaph_value); }
+
+  // The number of active bindings in this |ServerBindingGroup|.
+  size_t size() const { return Base::size(); }
+
+  // Called when a previously full |ServerBindingGroup| has been emptied. A |ServerBindingGroup| is
+  // "empty" once it contains no active bindings, and all closed bindings that it held since the
+  // last time it was empty have finished their tear down routines.
+  //
+  // This function is not called by |~ServerBindingGroup|.
+  void set_empty_set_handler(fit::closure empty_set_handler) {
+    Base::set_empty_set_handler(std::move(empty_set_handler));
+  }
 };
 
 }  // namespace fdf

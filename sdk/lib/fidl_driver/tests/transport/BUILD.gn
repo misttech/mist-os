@@ -86,6 +86,7 @@ test("fidl_driver_api_test_bin") {
   sources = [
     "api_test.cc",
     "api_test_helper.h",
+    "server_binding_group_test.cc",
     "server_binding_test.cc",
   ]
   deps = [

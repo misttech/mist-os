@@ -31,6 +31,8 @@ class UnownedServerEnd;
 template <typename Protocol>
 class ServerBindingRef;
 template <typename Protocol>
+class ServerBinding;
+template <typename Protocol>
 class WireServer;
 template <typename Protocol>
 class Server;
@@ -62,6 +64,8 @@ struct ChannelTransport {
   using UnownedServerEnd = fidl::UnownedServerEnd<Protocol>;
   template <typename Protocol>
   using ServerBindingRef = fidl::ServerBindingRef<Protocol>;
+  template <typename Protocol>
+  using ServerBinding = fidl::ServerBinding<Protocol>;
   template <typename Protocol>
   using WireServer = fidl::WireServer<Protocol>;
   template <typename Protocol>

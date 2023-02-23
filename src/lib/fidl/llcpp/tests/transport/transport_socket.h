@@ -24,6 +24,8 @@ class ServerEnd;
 template <typename Protocol>
 class ServerBindingRef;
 template <typename Protocol>
+class ServerBinding;
+template <typename Protocol>
 class WireServer;
 template <typename Protocol>
 class Server;
@@ -51,6 +53,8 @@ struct SocketTransport {
   using ServerEnd = fidl::socket::ServerEnd<Protocol>;
   template <typename Protocol>
   using ServerBindingRef = fidl::socket::ServerBindingRef<Protocol>;
+  template <typename Protocol>
+  using ServerBinding = fidl::socket::ServerBinding<Protocol>;
   template <typename Protocol>
   using WireServer = fidl::socket::WireServer<Protocol>;
   template <typename Protocol>

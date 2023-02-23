@@ -24,6 +24,8 @@ class UnownedServerEnd;
 template <typename Protocol>
 class ServerBindingRef;
 template <typename Protocol>
+class ServerBinding;
+template <typename Protocol>
 class WireServer;
 template <typename Protocol>
 class Server;
@@ -63,6 +65,8 @@ struct DriverTransport {
   using UnownedServerEnd = fdf::UnownedServerEnd<Protocol>;
   template <typename Protocol>
   using ServerBindingRef = fdf::ServerBindingRef<Protocol>;
+  template <typename Protocol>
+  using ServerBinding = fdf::ServerBinding<Protocol>;
   template <typename Protocol>
   using WireServer = fdf::WireServer<Protocol>;
   template <typename Protocol>
