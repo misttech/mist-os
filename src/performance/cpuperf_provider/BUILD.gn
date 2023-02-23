@@ -126,7 +126,7 @@ fuchsia_test_package("cpuperf_provider_tests") {
   test_specs = {
     environments = basic_envs
   }
-  subpackages = [ "//src/performance/trace_manager:trace_manager" ]
+  subpackages = [ "//src/performance/trace_manager:trace_manager_pkg" ]
 }
 
 group("tests") {

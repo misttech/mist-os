@@ -176,6 +176,7 @@
 //sdk/lib/sys/testing:testing_sdk
 //sdk/lib/syslog/structured_backend:structured_backend_sdk
 //sdk/lib/syslog:syslog
+//sdk/lib/trace:trace
 //sdk/lib/ui/scenic/cpp:cpp_sdk
 //sdk/lib/utf-utils:utf-utils_sdk
 //sdk/lib/vfs/cpp:cpp_sdk

@@ -355,6 +355,16 @@ assembly_input_bundle("common_minimal") {
           rebase_path(
               "//src/connectivity/network/meta/persistence.core_shard.cml",
               root_build_dir),
+
+          # TODO(fxbug.dev/112433): The trace manager core shard should only
+          # appear in eng builds, however, many components do not properly
+          # declare their route dependencies on it as optional causing scrutiny
+          # to fail route checking. Once the all of the component routes are
+          # properly declared optional, this shard should be removed from here
+          # and added in "common_minimal_eng" instead.
+          rebase_path(
+              "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
+              root_build_dir),
         ]
       }
     },
@@ -375,15 +385,15 @@ assembly_input_bundle("common_minimal") {
 assembly_input_bundle("common_minimal_eng") {
   testonly = true
   base_packages = [
-    # Empty placeholder for now, this is setting up the pattern, before actually
-    # moving packages into it (the next CL)
-
     # Dash launcher should be available in every engineering-mode product.
     "//src/sys/tools/debug-dash-launcher",
 
     # The fs_realm component should be available in every engineering-mode product.
     "//src/storage/fs_realm",
+
+    "//src/performance/trace_manager:trace_manager_pkg",
   ]
+
   compiled_packages = [
     {
       name = "core"

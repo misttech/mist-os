@@ -309,6 +309,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/sys/testing:testing_sdk",
     "//sdk/lib/syslog",
     "//sdk/lib/syslog/structured_backend:structured_backend_sdk",
+    "//sdk/lib/trace",
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
     "//sdk/lib/vulkan",

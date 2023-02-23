@@ -74,8 +74,16 @@ fuchsia_component("component_hermetic") {
   ]
 }
 
-fuchsia_package_with_single_component("trace_manager") {
+# TODO(fxb/112433): Soft transition the trace manager group while we remove
+# out of tree references. Rename trace_manager_pkg back to trace_manager after
+# the references are removed.
+group("trace_manager") {
+  deps = []
+}
+fuchsia_package_with_single_component("trace_manager_pkg") {
   manifest = "meta/trace_manager.cml"
+  component_name = "trace_manager"
+  package_name = "trace_manager"
   deps = [
     ":bin",
     ":tracing.config",

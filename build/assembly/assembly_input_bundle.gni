@@ -510,6 +510,7 @@ template("assembly_input_bundle") {
             "drivers",
             "bootfs",
           ]) {
+    _package_target_details = []
     _package_target_details = package_sets[set_name]
     _package_targets = []
     _manifest_entries = []

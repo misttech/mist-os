@@ -351,14 +351,6 @@ executable("provider_destruction_tests") {
   ]
 }
 
-group("trace_tests") {
-  testonly = true
-  deps = [
-    ":trace_tests_package",
-    "//src/performance/trace_manager",
-  ]
-}
-
 fuchsia_component("trace_tests_component") {
   testonly = true
   component_name = "trace_tests"
@@ -402,7 +394,7 @@ fuchsia_test_component("trace_integration_tests_component") {
   ]
 }
 
-fuchsia_test_package("trace_tests_package") {
+fuchsia_test_package("trace_tests") {
   package_name = "trace_tests"
   test_components = [
     ":detach_tests_component",

@@ -2,6 +2,7 @@ sdk://component_manifest/inspect
 sdk://component_manifest/sys/component
 sdk://component_manifest/sys/testing
 sdk://component_manifest/syslog
+sdk://component_manifest/trace
 sdk://component_manifest/vulkan
 sdk://docs/low_level
 sdk://docs/metadata_schemas

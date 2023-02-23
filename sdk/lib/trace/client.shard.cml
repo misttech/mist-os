@@ -3,15 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "syslog/client.shard.cml",
+        "trace/offer.shard.cml",
         "trace/use.shard.cml",
-    ],
-    use: [
-        {
-            protocol: [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-        },
     ],
 }

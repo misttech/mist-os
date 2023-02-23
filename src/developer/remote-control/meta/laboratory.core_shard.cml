@@ -44,6 +44,7 @@
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "#trace_manager",
             to: "#ffx-laboratory",
+            source_availability: "unknown",
         },
         {
             storage: "laboratory-data",
