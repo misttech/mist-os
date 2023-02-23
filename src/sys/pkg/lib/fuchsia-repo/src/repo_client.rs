@@ -26,6 +26,7 @@ use {
         AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
     },
     std::{
+        collections::BTreeSet,
         fmt::{self, Debug},
         time::SystemTime,
     },
@@ -477,6 +478,10 @@ where
 {
     fn spec(&self) -> RepositorySpec {
         self.tuf_client.remote_repo().spec()
+    }
+
+    fn aliases(&self) -> &BTreeSet<String> {
+        self.tuf_client.remote_repo().aliases()
     }
 
     fn fetch_metadata_range<'a>(

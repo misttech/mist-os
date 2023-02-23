@@ -16,7 +16,7 @@ use {
     camino::{Utf8Path, Utf8PathBuf},
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream, AsyncRead},
-    std::{fmt::Debug, time::SystemTime},
+    std::{collections::BTreeSet, fmt::Debug, time::SystemTime},
     tuf::{
         metadata::{MetadataPath, MetadataVersion, TargetPath},
         pouf::Pouf1,
@@ -45,6 +45,18 @@ impl PmRepositoryBuilder {
     /// Select which [CopyMode] to use when copying files into the repository.
     pub fn copy_mode(mut self, copy_mode: CopyMode) -> Self {
         self.builder = self.builder.copy_mode(copy_mode);
+        self
+    }
+
+    /// Alias this repository to this name when this repository is registered on a target.
+    pub fn alias(mut self, alias: String) -> Self {
+        self.builder = self.builder.alias(alias);
+        self
+    }
+
+    /// alias this repository to these names when this repository is registered on a target.
+    pub fn aliases(mut self, aliases: impl IntoIterator<Item = String>) -> Self {
+        self.builder = self.builder.aliases(aliases);
         self
     }
 
@@ -84,7 +96,11 @@ impl PmRepository {
 
 impl RepoProvider for PmRepository {
     fn spec(&self) -> RepositorySpec {
-        RepositorySpec::Pm { path: self.pm_repo_path.clone() }
+        RepositorySpec::Pm { path: self.pm_repo_path.clone(), aliases: self.repo.aliases().clone() }
+    }
+
+    fn aliases(&self) -> &BTreeSet<String> {
+        self.repo.aliases()
     }
 
     fn fetch_metadata_range<'a>(

@@ -7,7 +7,7 @@ use ffx_config::{self, ConfigLevel};
 use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
 use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
@@ -187,15 +187,15 @@ pub async fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
 }
 
 /// Read all the repositories from the config. This will log, but otherwise ignore invalid entries.
-pub async fn get_repositories() -> HashMap<String, RepositorySpec> {
+pub async fn get_repositories() -> BTreeMap<String, RepositorySpec> {
     let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await {
         Ok(Some(value)) => value,
         Ok(None) => {
-            return HashMap::new();
+            return BTreeMap::new();
         }
         Err(err) => {
             tracing::warn!("failed to load repositories: {:#?}", err);
-            return HashMap::new();
+            return BTreeMap::new();
         }
     };
 
@@ -203,7 +203,7 @@ pub async fn get_repositories() -> HashMap<String, RepositorySpec> {
         Value::Object(entries) => entries,
         _ => {
             tracing::warn!("expected {} to be a map, not {}", CONFIG_KEY_REPOSITORIES, value);
-            return HashMap::new();
+            return BTreeMap::new();
         }
     };
 
@@ -257,15 +257,15 @@ pub async fn get_registration(
     }
 }
 
-pub async fn get_registrations() -> HashMap<String, HashMap<String, RepositoryTarget>> {
+pub async fn get_registrations() -> BTreeMap<String, BTreeMap<String, RepositoryTarget>> {
     let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REGISTRATIONS).await {
         Ok(Some(value)) => value,
         Ok(None) => {
-            return HashMap::new();
+            return BTreeMap::new();
         }
         Err(err) => {
             tracing::warn!("failed to load registrations: {:#?}", err);
-            return HashMap::new();
+            return BTreeMap::new();
         }
     };
 
@@ -273,7 +273,7 @@ pub async fn get_registrations() -> HashMap<String, HashMap<String, RepositoryTa
         Value::Object(entries) => entries,
         _ => {
             tracing::warn!("expected {} to be a map, not {}", CONFIG_KEY_REGISTRATIONS, value);
-            return HashMap::new();
+            return BTreeMap::new();
         }
     };
 
@@ -294,11 +294,11 @@ pub async fn get_registrations() -> HashMap<String, HashMap<String, RepositoryTa
         .collect()
 }
 
-pub async fn get_repository_registrations(repo_name: &str) -> HashMap<String, RepositoryTarget> {
+pub async fn get_repository_registrations(repo_name: &str) -> BTreeMap<String, RepositoryTarget> {
     let targets = match ffx_config::get(&repository_registrations_query(repo_name)).await {
         Ok(Some(targets)) => targets,
         Ok(None) => {
-            return HashMap::new();
+            return BTreeMap::new();
         }
         Err(err) => {
             tracing::warn!("failed to load repository registrations: {:?} {:#?}", repo_name, err);
@@ -312,12 +312,12 @@ pub async fn get_repository_registrations(repo_name: &str) -> HashMap<String, Re
 fn parse_target_registrations(
     repo_name: &str,
     targets: serde_json::Value,
-) -> HashMap<String, RepositoryTarget> {
+) -> BTreeMap<String, RepositoryTarget> {
     let targets = match targets {
         Value::Object(targets) => targets,
         _ => {
             tracing::warn!("repository {:?} targets should be a map, not {:?}", repo_name, targets);
-            return HashMap::new();
+            return BTreeMap::new();
         }
     };
 
@@ -366,10 +366,13 @@ pub async fn remove_registration(repo_name: &str, target_identifier: &str) -> Re
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use maplit::hashmap;
-    use serde_json::json;
-    use std::future::Future;
+    use {
+        super::*,
+        maplit::btreemap,
+        pretty_assertions::assert_eq,
+        serde_json::json,
+        std::{collections::BTreeSet, future::Future},
+    };
 
     const CONFIG_KEY_ROOT: &str = "repository";
 
@@ -442,14 +445,16 @@ mod tests {
             assert_eq!(get_default_repository().await.unwrap(), None);
 
             // Add the repository.
-            let repository = RepositorySpec::Pm { path: "foo/bar/baz".into() };
+            let repository =
+                RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() };
             set_repository("repo", &repository).await.unwrap();
 
             // The single configured repo should be returned as the default
             assert_eq!(get_default_repository().await.unwrap(), Some(String::from("repo")));
 
             // Add a second repository.
-            let repository = RepositorySpec::Pm { path: "foo/bar/baz2".into() };
+            let repository =
+                RepositorySpec::Pm { path: "foo/bar/baz2".into(), aliases: BTreeSet::new() };
             set_repository("repo2", &repository).await.unwrap();
 
             // The single configured repo should be returned as the default
@@ -513,7 +518,10 @@ mod tests {
             assert_eq!(get_repository("repo").await.unwrap(), None);
 
             // Add the repository.
-            let repository = RepositorySpec::Pm { path: "foo/bar/baz".into() };
+            let repository = RepositorySpec::Pm {
+                path: "foo/bar/baz".into(),
+                aliases: BTreeSet::from(["example.com".into(), "fuchsia.com".into()]),
+            };
             set_repository("repo", &repository).await.unwrap();
 
             // Make sure we wrote to the config.
@@ -523,6 +531,7 @@ mod tests {
                     "repo": {
                         "type": "pm",
                         "path": "foo/bar/baz",
+                        "aliases": ["example.com", "fuchsia.com"],
                     }
                 }),
             );
@@ -553,13 +562,22 @@ mod tests {
                 .await
                 .unwrap();
 
-            set_repository("repo.name", &RepositorySpec::Pm { path: "foo/bar/baz".into() })
-                .await
-                .unwrap();
+            set_repository(
+                "repo.name",
+                &RepositorySpec::Pm {
+                    path: "foo/bar/baz".into(),
+                    aliases: BTreeSet::from(["example.com".into(), "fuchsia.com".into()]),
+                },
+            )
+            .await
+            .unwrap();
 
-            set_repository("repo%name", &RepositorySpec::Pm { path: "foo/bar/baz".into() })
-                .await
-                .unwrap();
+            set_repository(
+                "repo%name",
+                &RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() },
+            )
+            .await
+            .unwrap();
 
             assert_eq!(
                 ffx_config::get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
@@ -567,6 +585,7 @@ mod tests {
                     "repo%2Ename": {
                         "type": "pm",
                         "path": "foo/bar/baz",
+                        "aliases": ["example.com", "fuchsia.com"],
                     },
                     "repo%25name": {
                         "type": "pm",
@@ -594,7 +613,7 @@ mod tests {
             let registration = RepositoryTarget {
                 repo_name: "repo".into(),
                 target_identifier: Some("target".into()),
-                aliases: vec![],
+                aliases: None,
                 storage_type: None,
             };
             set_registration("target", &registration).await.unwrap();
@@ -607,7 +626,7 @@ mod tests {
                         "target": {
                             "repo_name": "repo",
                             "target_identifier": "target",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     }
@@ -642,7 +661,7 @@ mod tests {
                 &RepositoryTarget {
                     repo_name: "repo.name".into(),
                     target_identifier: Some("target.name".into()),
-                    aliases: vec![],
+                    aliases: None,
                     storage_type: None,
                 },
             )
@@ -654,7 +673,7 @@ mod tests {
                 &RepositoryTarget {
                     repo_name: "repo%name".into(),
                     target_identifier: Some("target%name".into()),
-                    aliases: vec![],
+                    aliases: None,
                     storage_type: None,
                 },
             )
@@ -668,7 +687,7 @@ mod tests {
                         "target%2Ename": {
                             "repo_name": "repo.name",
                             "target_identifier": "target.name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     },
@@ -676,7 +695,7 @@ mod tests {
                         "target%25name": {
                             "repo_name": "repo%name",
                             "target_identifier": "target%name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     }
@@ -694,7 +713,7 @@ mod tests {
                 .set(json!({}))
                 .await
                 .unwrap();
-            assert_eq!(get_repositories().await, hashmap! {});
+            assert_eq!(get_repositories().await, btreemap! {});
         });
     }
 
@@ -728,15 +747,18 @@ mod tests {
 
             assert_eq!(
                 get_repositories().await,
-                hashmap! {
+                btreemap! {
                     "repo-name".into() => RepositorySpec::Pm {
                         path: "foo/bar/baz".into(),
+                        aliases: BTreeSet::new(),
                     },
                     "repo.name".into() => RepositorySpec::Pm {
                         path: "foo/bar/baz".into(),
+                        aliases: BTreeSet::new(),
                     },
                     "repo%name".into() => RepositorySpec::Pm {
                         path: "foo/bar/baz".into(),
+                        aliases: BTreeSet::new(),
                     },
                 }
             );
@@ -762,7 +784,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(get_repositories().await, hashmap! {});
+            assert_eq!(get_repositories().await, btreemap! {});
         });
     }
 
@@ -775,7 +797,7 @@ mod tests {
                 .set(json!({}))
                 .await
                 .unwrap();
-            assert_eq!(get_registrations().await, hashmap! {});
+            assert_eq!(get_registrations().await, btreemap! {});
         });
     }
 
@@ -790,13 +812,12 @@ mod tests {
                         "target1": {
                             "repo_name": "repo1",
                             "target_identifier": "target1",
-                            "aliases": [],
                             "storage_type": (),
                         },
                         "target2": {
                             "repo_name": "repo1",
                             "target_identifier": "target2",
-                            "aliases": [],
+                            "aliases": ["fuchsia.com"],
                             "storage_type": (),
                         },
 
@@ -808,13 +829,11 @@ mod tests {
                         "target1": {
                             "repo_name": "repo2",
                             "target_identifier": "target1",
-                            "aliases": [],
                             "storage_type": (),
                         },
                         "target2": {
                             "repo_name": "repo2",
                             "target_identifier": "target2",
-                            "aliases": [],
                             "storage_type": (),
                         },
                     },
@@ -824,32 +843,32 @@ mod tests {
 
             assert_eq!(
                 get_registrations().await,
-                hashmap! {
-                    "repo1".into() => hashmap! {
+                btreemap! {
+                    "repo1".into() => btreemap! {
                         "target1".into() => RepositoryTarget {
                             repo_name: "repo1".into(),
                             target_identifier: Some("target1".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                         "target2".into() => RepositoryTarget {
                             repo_name: "repo1".into(),
                             target_identifier: Some("target2".into()),
-                            aliases: vec![],
+                            aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
                             storage_type: None,
                         },
                     },
-                    "repo2".into() => hashmap! {
+                    "repo2".into() => btreemap! {
                         "target1".into() => RepositoryTarget {
                             repo_name: "repo2".into(),
                             target_identifier: Some("target1".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                         "target2".into() => RepositoryTarget {
                             repo_name: "repo2".into(),
                             target_identifier: Some("target2".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                     },
@@ -871,7 +890,7 @@ mod tests {
                         "target%2Ename": {
                             "repo_name": "repo.name",
                             "target_identifier": "target.name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
 
@@ -879,7 +898,7 @@ mod tests {
                         "target%25name": {
                             "repo_name": "repo.name",
                             "target_identifier": "target%name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     },
@@ -889,7 +908,7 @@ mod tests {
                         "target-name": {
                             "repo_name": "repo%name",
                             "target_identifier": "target-name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     },
@@ -899,26 +918,26 @@ mod tests {
 
             assert_eq!(
                 get_registrations().await,
-                hashmap! {
-                    "repo.name".into() => hashmap! {
+                btreemap! {
+                    "repo.name".into() => btreemap! {
                         "target.name".into() => RepositoryTarget {
                             repo_name: "repo.name".into(),
                             target_identifier: Some("target.name".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                         "target%name".into() => RepositoryTarget {
                             repo_name: "repo.name".into(),
                             target_identifier: Some("target%name".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                     },
-                    "repo%name".into() => hashmap! {
+                    "repo%name".into() => btreemap! {
                         "target-name".into() => RepositoryTarget {
                             repo_name: "repo%name".into(),
                             target_identifier: Some("target-name".into()),
-                            aliases: vec![],
+                            aliases: None,
                             storage_type: None,
                         },
                     },
@@ -965,8 +984,8 @@ mod tests {
 
             assert_eq!(
                 get_registrations().await,
-                hashmap! {
-                    "repo-name".into() => hashmap! {},
+                btreemap! {
+                    "repo-name".into() => btreemap! {},
                 }
             );
         });
@@ -981,7 +1000,7 @@ mod tests {
                 .set(json!({}))
                 .await
                 .unwrap();
-            assert_eq!(get_repository_registrations("repo").await, hashmap! {});
+            assert_eq!(get_repository_registrations("repo").await, btreemap! {});
         });
     }
 
@@ -996,13 +1015,13 @@ mod tests {
                         "target1": {
                             "repo_name": "repo1",
                             "target_identifier": "target1",
-                            "aliases": [],
+                            "aliases": ["fuchsia.com"],
                             "storage_type": (),
                         },
                         "target2": {
                             "repo_name": "repo1",
                             "target_identifier": "target2",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
 
@@ -1015,24 +1034,24 @@ mod tests {
 
             assert_eq!(
                 get_repository_registrations("repo").await,
-                hashmap! {
+                btreemap! {
                     "target1".into() => RepositoryTarget {
                         repo_name: "repo1".into(),
                         target_identifier: Some("target1".into()),
-                        aliases: vec![],
+                        aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
                         storage_type: None,
                     },
                     "target2".into() => RepositoryTarget {
                         repo_name: "repo1".into(),
                         target_identifier: Some("target2".into()),
-                        aliases: vec![],
+                        aliases: None,
                         storage_type: None,
                     },
                 },
             );
 
             // Getting an unknown repository gets nothing.
-            assert_eq!(get_repository_registrations("unknown").await, hashmap! {});
+            assert_eq!(get_repository_registrations("unknown").await, btreemap! {});
         });
     }
 
@@ -1049,7 +1068,7 @@ mod tests {
                         "target%2Ename": {
                             "repo_name": "repo.name",
                             "target_identifier": "target.name",
-                            "aliases": [],
+                            "aliases": ["fuchsia.com"],
                             "storage_type": (),
                         },
 
@@ -1057,7 +1076,7 @@ mod tests {
                         "target%25name": {
                             "repo_name": "repo.name",
                             "target_identifier": "target%name",
-                            "aliases": [],
+                            "aliases": (),
                             "storage_type": (),
                         },
                     },
@@ -1067,17 +1086,17 @@ mod tests {
 
             assert_eq!(
                 get_repository_registrations("repo.name").await,
-                hashmap! {
+                btreemap! {
                     "target.name".into() => RepositoryTarget {
                         repo_name: "repo.name".into(),
                         target_identifier: Some("target.name".into()),
-                        aliases: vec![],
+                        aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
                         storage_type: None,
                     },
                     "target%name".into() => RepositoryTarget {
                         repo_name: "repo.name".into(),
                         target_identifier: Some("target%name".into()),
-                        aliases: vec![],
+                        aliases: None,
                         storage_type: None,
                     },
                 },
@@ -1121,9 +1140,9 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(get_repository_registrations("empty-entries").await, hashmap! {});
+            assert_eq!(get_repository_registrations("empty-entries").await, btreemap! {});
 
-            assert_eq!(get_repository_registrations("repo-name").await, hashmap! {});
+            assert_eq!(get_repository_registrations("repo-name").await, btreemap! {});
         });
     }
 }

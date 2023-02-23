@@ -21,7 +21,7 @@ use {
         header::{CONTENT_LENGTH, CONTENT_RANGE, RANGE},
         Body, Method, Request, StatusCode, Uri,
     },
-    std::{fmt::Debug, time::SystemTime},
+    std::{collections::BTreeSet, fmt::Debug, time::SystemTime},
     tuf::{
         metadata::{MetadataPath, MetadataVersion, TargetPath},
         pouf::Pouf1,
@@ -42,6 +42,7 @@ where
     tuf_repo: TufHttpRepository<C, Pouf1>,
     metadata_repo_url: Url,
     blob_repo_url: Url,
+    aliases: BTreeSet<String>,
 }
 
 impl<C> HttpRepository<C>
@@ -52,6 +53,7 @@ where
         client: Client<C, Body>,
         mut metadata_repo_url: Url,
         mut blob_repo_url: Url,
+        aliases: BTreeSet<String>,
     ) -> Self {
         // `URL.join` treats urls with a trailing slash as a directory, and without as a file.
         // In the latter case, it will strip off the last segment before joining paths. Since the
@@ -68,7 +70,7 @@ where
             TufHttpRepositoryBuilder::<_, Pouf1>::new(metadata_repo_url.clone(), client.clone())
                 .build();
 
-        Self { client, tuf_repo, metadata_repo_url, blob_repo_url }
+        Self { client, tuf_repo, metadata_repo_url, blob_repo_url, aliases }
     }
 }
 
@@ -177,7 +179,12 @@ where
         RepositorySpec::Http {
             metadata_repo_url: self.metadata_repo_url.as_str().to_owned(),
             blob_repo_url: self.blob_repo_url.as_str().to_owned(),
+            aliases: self.aliases.clone(),
         }
+    }
+
+    fn aliases(&self) -> &BTreeSet<String> {
+        &self.aliases
     }
 
     fn fetch_metadata_range<'a>(
@@ -284,6 +291,7 @@ mod tests {
                 new_client(),
                 Url::parse(&tuf_url).unwrap(),
                 Url::parse(&blob_url).unwrap(),
+                BTreeSet::new(),
             );
 
             TestEnv { tmp, repo, server, task }

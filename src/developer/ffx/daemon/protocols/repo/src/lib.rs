@@ -33,7 +33,7 @@ use {
     pkg::config as pkg_config,
     protocols::prelude::*,
     std::{
-        collections::HashSet,
+        collections::{BTreeSet, HashSet},
         convert::{TryFrom, TryInto},
         net::SocketAddr,
         rc::Rc,
@@ -196,11 +196,15 @@ async fn repo_spec_to_backend(
     inner: &Arc<RwLock<RepoInner>>,
 ) -> Result<Box<dyn RepoProvider>, ffx::RepositoryError> {
     match repo_spec {
-        RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path } => Ok(Box::new(
-            FileSystemRepository::new(metadata_repo_path.into(), blob_repo_path.into()),
+        RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => Ok(Box::new(
+            FileSystemRepository::builder(metadata_repo_path.into(), blob_repo_path.into())
+                .aliases(aliases.clone())
+                .build(),
         )),
-        RepositorySpec::Pm { path } => Ok(Box::new(PmRepository::new(path.into()))),
-        RepositorySpec::Http { metadata_repo_url, blob_repo_url } => {
+        RepositorySpec::Pm { path, aliases } => {
+            Ok(Box::new(PmRepository::builder(path.into()).aliases(aliases.clone()).build()))
+        }
+        RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
             let metadata_repo_url = Url::parse(metadata_repo_url.as_str()).map_err(|err| {
                 tracing::error!(
                     "Unable to parse metadata repo url {}: {:#}",
@@ -217,7 +221,12 @@ async fn repo_spec_to_backend(
 
             let https_client = inner.read().await.https_client.clone();
 
-            Ok(Box::new(HttpRepository::new(https_client, metadata_repo_url, blob_repo_url)))
+            Ok(Box::new(HttpRepository::new(
+                https_client,
+                metadata_repo_url,
+                blob_repo_url,
+                aliases.clone(),
+            )))
         }
         RepositorySpec::Gcs { .. } => {
             // FIXME(fxbug.dev/98994): Implement support for daemon-side GCS repositories.
@@ -348,18 +357,29 @@ async fn register_target(
         ffx::RepositoryError::InvalidUrl
     })?;
 
-    let config = repo
-        .read()
-        .await
-        .get_config(
-            repo_url,
-            mirror_url,
-            target_info.storage_type.as_ref().map(|storage_type| storage_type.clone().into()),
-        )
-        .map_err(|e| {
-            tracing::error!("failed to get config: {}", e);
-            return ffx::RepositoryError::RepositoryManagerError;
-        })?;
+    let (config, aliases) = {
+        let repo = repo.read().await;
+
+        let config = repo
+            .get_config(
+                repo_url,
+                mirror_url,
+                target_info.storage_type.as_ref().map(|storage_type| storage_type.clone().into()),
+            )
+            .map_err(|e| {
+                tracing::error!("failed to get config: {}", e);
+                return ffx::RepositoryError::RepositoryManagerError;
+            })?;
+
+        // Use the repository aliases if the registration doesn't have any.
+        let aliases = if let Some(aliases) = &target_info.aliases {
+            aliases.clone()
+        } else {
+            repo.aliases().clone()
+        };
+
+        (config, aliases)
+    };
 
     match proxy.add(config.into()).await {
         Ok(Ok(())) => {}
@@ -373,8 +393,8 @@ async fn register_target(
         }
     }
 
-    if !target_info.aliases.is_empty() {
-        let () = create_aliases(cx, repo_name, &target_nodename, &target_info.aliases).await?;
+    if !aliases.is_empty() {
+        let () = create_aliases(cx, repo_name, &target_nodename, &aliases).await?;
     }
 
     if should_make_tunnel {
@@ -436,7 +456,7 @@ fn create_repo_host(listen_addr: SocketAddr, host_address: ffx::SshHostAddrInfo)
 
 fn aliases_to_rules(
     repo_name: &str,
-    aliases: &[String],
+    aliases: &BTreeSet<String>,
 ) -> Result<Vec<Rule>, ffx::RepositoryError> {
     let rules = aliases
         .iter()
@@ -456,7 +476,7 @@ async fn create_aliases(
     cx: &Context,
     repo_name: &str,
     target_nodename: &str,
-    aliases: &[String],
+    aliases: &BTreeSet<String>,
 ) -> Result<(), ffx::RepositoryError> {
     let alias_rules = aliases_to_rules(repo_name, &aliases)?;
 
@@ -1318,6 +1338,7 @@ mod tests {
             EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
         },
         futures::TryStreamExt,
+        pretty_assertions::assert_eq,
         protocols::testing::FakeDaemonBuilder,
         std::{
             cell::RefCell,
@@ -1347,12 +1368,13 @@ mod tests {
     async fn test_repo_config(
         repo: &Rc<RefCell<Repo<TestEventHandlerProvider>>>,
     ) -> RepositoryConfig {
-        test_repo_config_with_repo_host(repo, None).await
+        test_repo_config_with_repo_host(repo, None, REPO_NAME.into()).await
     }
 
     async fn test_repo_config_with_repo_host(
         repo: &Rc<RefCell<Repo<TestEventHandlerProvider>>>,
         repo_host: Option<String>,
+        repo_name: String,
     ) -> RepositoryConfig {
         // The repository server started on a random address, so look it up.
         let inner = Arc::clone(&repo.borrow().inner);
@@ -1370,11 +1392,11 @@ mod tests {
 
         RepositoryConfig {
             mirrors: Some(vec![MirrorConfig {
-                mirror_url: Some(format!("http://{}/{}", repo_host, REPO_NAME)),
+                mirror_url: Some(format!("http://{}/{}", repo_host, repo_name)),
                 subscribe: Some(true),
                 ..MirrorConfig::EMPTY
             }]),
-            repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
+            repo_url: Some(format!("fuchsia-pkg://{}", repo_name)),
             root_keys: Some(vec![RepositoryKeyConfig::Ed25519Key(vec![
                 29, 76, 86, 76, 184, 70, 108, 73, 249, 127, 4, 47, 95, 63, 36, 35, 101, 255, 212,
                 33, 10, 154, 26, 130, 117, 157, 125, 88, 175, 214, 109, 113,
@@ -1620,7 +1642,10 @@ mod tests {
 
     fn pm_repo_spec() -> RepositorySpec {
         let path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
-        RepositorySpec::Pm { path: path.try_into().unwrap() }
+        RepositorySpec::Pm {
+            path: path.try_into().unwrap(),
+            aliases: BTreeSet::from(["anothercorp.com".into(), "mycorp.com".into()]),
+        }
     }
 
     fn filesystem_repo_spec() -> RepositorySpec {
@@ -1630,6 +1655,7 @@ mod tests {
         RepositorySpec::FileSystem {
             metadata_repo_path: metadata_repo_path.try_into().unwrap(),
             blob_repo_path: blob_repo_path.try_into().unwrap(),
+            aliases: BTreeSet::new(),
         }
     }
 
@@ -1772,20 +1798,46 @@ mod tests {
                 .level(Some(ConfigLevel::User))
                 .set(serde_json::json!({
                     "repositories": {
-                        REPO_NAME: {
+                        "repo1": {
                             "type": "pm",
-                            "path": repo_path
+                            "path": repo_path,
+                        },
+                        "repo2": {
+                            "type": "pm",
+                            "path": repo_path,
+                            "aliases": ["corp2.com"],
+                        },
+                        "repo3": {
+                            "type": "pm",
+                            "path": repo_path,
+                            "aliases": ["corp3.com"],
                         },
                     },
                     "registrations": {
-                        REPO_NAME: {
+                        "repo1": {
                             TARGET_NODENAME: {
-                                "repo_name": REPO_NAME,
+                                "repo_name": "repo1",
                                 "target_identifier": TARGET_NODENAME,
                                 "aliases": [ "fuchsia.com", "example.com" ],
                                 "storage_type": "ephemeral",
                             },
-                        }
+                        },
+                        "repo2": {
+                            TARGET_NODENAME: {
+                                "repo_name": "repo2",
+                                "target_identifier": TARGET_NODENAME,
+                                "aliases": (),
+                                "storage_type": "ephemeral",
+                            },
+                        },
+                        "repo3": {
+                            TARGET_NODENAME: {
+                                "repo_name": "repo3",
+                                "target_identifier": TARGET_NODENAME,
+                                "aliases": [ "anothercorp3.com" ],
+                                "storage_type": "ephemeral",
+                            },
+                        },
                     },
                     "server": {
                         "enabled": true,
@@ -1826,7 +1878,17 @@ mod tests {
             // Make sure we set up the repository and rewrite rules on the device.
             assert_eq!(
                 fake_repo_manager.take_events(),
-                vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }],
+                vec![
+                    RepositoryManagerEvent::Add {
+                        repo: test_repo_config_with_repo_host(&repo, None, "repo1".into()).await
+                    },
+                    RepositoryManagerEvent::Add {
+                        repo: test_repo_config_with_repo_host(&repo, None, "repo2".into()).await
+                    },
+                    RepositoryManagerEvent::Add {
+                        repo: test_repo_config_with_repo_host(&repo, None, "repo3".into()).await
+                    },
+                ],
             );
 
             assert_eq!(
@@ -1836,10 +1898,24 @@ mod tests {
                     EngineEvent::IteratorNext,
                     EngineEvent::ResetAll,
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("example.com" => "repo1", "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("fuchsia.com" => "repo1", "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionCommit,
+                    EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::ResetAll,
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("corp2.com" => "repo2", "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionCommit,
+                    EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::ResetAll,
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("anothercorp3.com" => "repo3", "/" => "/"),
                     },
                     EngineEvent::EditTransactionCommit,
                 ],
@@ -1848,25 +1924,60 @@ mod tests {
             // Make sure we can read back the repositories.
             assert_eq!(
                 get_repositories(&proxy).await,
-                vec![ffx::RepositoryConfig {
-                    name: REPO_NAME.to_string(),
-                    spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
-                        path: Some(repo_path.clone()),
-                        ..ffx::PmRepositorySpec::EMPTY
-                    }),
-                }]
+                vec![
+                    ffx::RepositoryConfig {
+                        name: "repo1".to_string(),
+                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                            path: Some(repo_path.clone()),
+                            aliases: None,
+                            ..ffx::PmRepositorySpec::EMPTY
+                        }),
+                    },
+                    ffx::RepositoryConfig {
+                        name: "repo2".to_string(),
+                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                            path: Some(repo_path.clone()),
+                            aliases: Some(vec!["corp2.com".into()]),
+                            ..ffx::PmRepositorySpec::EMPTY
+                        }),
+                    },
+                    ffx::RepositoryConfig {
+                        name: "repo3".to_string(),
+                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                            path: Some(repo_path.clone()),
+                            aliases: Some(vec!["corp3.com".into()]),
+                            ..ffx::PmRepositorySpec::EMPTY
+                        }),
+                    },
+                ]
             );
 
             // Make sure we can read back the taret registrations.
             assert_eq!(
                 get_target_registrations(&proxy).await,
-                vec![ffx::RepositoryTarget {
-                    repo_name: Some(REPO_NAME.to_string()),
-                    target_identifier: Some(TARGET_NODENAME.to_string()),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
-                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    ..ffx::RepositoryTarget::EMPTY
-                }],
+                vec![
+                    ffx::RepositoryTarget {
+                        repo_name: Some("repo1".to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        ..ffx::RepositoryTarget::EMPTY
+                    },
+                    ffx::RepositoryTarget {
+                        repo_name: Some("repo2".to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        aliases: None,
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        ..ffx::RepositoryTarget::EMPTY
+                    },
+                    ffx::RepositoryTarget {
+                        repo_name: Some("repo3".to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        aliases: Some(vec!["anothercorp3.com".to_string()]),
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        ..ffx::RepositoryTarget::EMPTY
+                    },
+                ],
             );
         });
     }
@@ -1892,7 +2003,7 @@ mod tests {
                             TARGET_NODENAME: {
                                 "repo_name": REPO_NAME,
                                 "target_identifier": TARGET_NODENAME,
-                                "aliases": [ "fuchsia.com", "example.com" ],
+                                "aliases": [ "example.com", "fuchsia.com" ],
                                 "storage_type": "ephemeral",
                             },
                         }
@@ -1951,7 +2062,7 @@ mod tests {
                 vec![ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     ..ffx::RepositoryTarget::EMPTY
                 }],
@@ -1978,10 +2089,10 @@ mod tests {
                     EngineEvent::IteratorNext,
                     EngineEvent::ResetAll,
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionCommit,
                 ],
@@ -2198,10 +2309,10 @@ mod tests {
                     EngineEvent::IteratorNext,
                     EngineEvent::ResetAll,
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionCommit,
                 ],
@@ -2214,18 +2325,18 @@ mod tests {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     ..ffx::RepositoryTarget::EMPTY
-                }],
+                },],
             );
 
             // We should have saved the registration to the config.
             assert_matches!(
                 pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await,
                 Ok(Some(reg)) if reg == RepositoryTarget {
-                    repo_name: "some-repo".to_string(),
-                    target_identifier: Some("some-target".to_string()),
-                    aliases: vec!["fuchsia.com".to_string(), "example.com".to_string()],
+                    repo_name: REPO_NAME.to_string(),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    aliases: Some(BTreeSet::from(["example.com".to_string(), "fuchsia.com".to_string()])),
                     storage_type: Some(RepositoryStorageType::Ephemeral),
                 }
             );
@@ -2246,7 +2357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_register_deregister() {
+    fn test_add_register_deregister_with_repository_aliases() {
         run_test(async {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
@@ -2286,7 +2397,7 @@ mod tests {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
+                    aliases: None,
                     ..ffx::RepositoryTarget::EMPTY
                 },
             )
@@ -2298,7 +2409,8 @@ mod tests {
                 vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }]
             );
 
-            // Adding the registration should have set up rewrite rules.
+            // Adding the registration should have set up rewrite rules from the repository
+            // aliases.
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
@@ -2306,10 +2418,10 @@ mod tests {
                     EngineEvent::IteratorNext,
                     EngineEvent::ResetAll,
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionCommit,
                 ],
@@ -2325,7 +2437,7 @@ mod tests {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string(),]),
+                    aliases: None,
                     ..ffx::RepositoryTarget::EMPTY
                 }],
             );
@@ -2336,7 +2448,123 @@ mod tests {
                 Ok(Some(reg)) if reg == RepositoryTarget {
                     repo_name: "some-repo".to_string(),
                     target_identifier: Some("some-target".to_string()),
-                    aliases: vec!["fuchsia.com".to_string(), "example.com".to_string()],
+                    aliases: None,
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                }
+            );
+
+            proxy
+                .deregister_target(REPO_NAME, Some(TARGET_NODENAME))
+                .await
+                .expect("communicated with proxy")
+                .expect("target unregistration to succeed");
+
+            // We should not have communicated with the device.
+            assert_eq!(fake_engine.take_events(), vec![]);
+
+            assert_eq!(get_target_registrations(&proxy).await, vec![]);
+
+            // The registration should have been cleared from the config.
+            assert_matches!(
+                pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await,
+                Ok(None)
+            );
+        })
+    }
+
+    #[test]
+    fn test_add_register_deregister_with_registration_aliases() {
+        run_test(async {
+            let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
+            let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
+            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_rcs, fake_rcs_closure) = FakeRcs::new();
+
+            let daemon = FakeDaemonBuilder::new()
+                .rcs_handler(fake_rcs_closure)
+                .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
+                    fake_repo_manager_closure,
+                )
+                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .inject_fidl_protocol(Rc::clone(&repo))
+                .target(ffx::TargetInfo {
+                    nodename: Some(TARGET_NODENAME.to_string()),
+                    ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                    ..ffx::TargetInfo::EMPTY
+                })
+                .build();
+
+            let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+            // Make sure there is nothing in the registry.
+            assert_eq!(fake_engine.take_events(), vec![]);
+            assert_eq!(get_repositories(&proxy).await, vec![]);
+            assert_eq!(get_target_registrations(&proxy).await, vec![]);
+
+            add_repo(&proxy, REPO_NAME).await;
+
+            // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
+            assert_eq!(fake_repo_manager.take_events(), vec![]);
+            assert_eq!(fake_engine.take_events(), vec![]);
+
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                    ..ffx::RepositoryTarget::EMPTY
+                },
+            )
+            .await;
+
+            // Registering the target should have set up a repository.
+            assert_eq!(
+                fake_repo_manager.take_events(),
+                vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }]
+            );
+
+            // Adding the registration should have set up rewrite rules from the registration
+            // aliases.
+            assert_eq!(
+                fake_engine.take_events(),
+                vec![
+                    EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::ResetAll,
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionCommit,
+                ],
+            );
+
+            // Registering a repository should create a tunnel.
+            assert_eq!(fake_rcs.take_events(), vec![RcsEvent::ReverseTcp]);
+
+            // The RepositoryRegistry should remember we set up the registrations.
+            assert_eq!(
+                get_target_registrations(&proxy).await,
+                vec![ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                    ..ffx::RepositoryTarget::EMPTY
+                }],
+            );
+
+            // We should have saved the registration to the config.
+            assert_matches!(
+                pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await,
+                Ok(Some(reg)) if reg == RepositoryTarget {
+                    repo_name: "some-repo".to_string(),
+                    target_identifier: Some("some-target".to_string()),
+                    aliases: Some(BTreeSet::from(["example.com".to_string(), "fuchsia.com".to_string()])),
                     storage_type: Some(RepositoryStorageType::Ephemeral),
                 }
             );
@@ -2416,7 +2644,9 @@ mod tests {
         .await;
 
         // Registering the target should have set up a repository.
-        let repo_config = test_repo_config_with_repo_host(&repo, Some(expected_repo_host)).await;
+        let repo_config =
+            test_repo_config_with_repo_host(&repo, Some(expected_repo_host), REPO_NAME.into())
+                .await;
         assert_eq!(
             fake_repo_manager.take_events(),
             vec![RepositoryManagerEvent::Add { repo: repo_config }]
@@ -2520,7 +2750,7 @@ mod tests {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     ..ffx::RepositoryTarget::EMPTY
                 },
             )
@@ -2546,10 +2776,10 @@ mod tests {
                         rule: rule!("fuchsia.com" => "example.com", "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
                     EngineEvent::EditTransactionCommit,
                 ],
@@ -2636,8 +2866,21 @@ mod tests {
                 vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }]
             );
 
-            // We didn't set up any aliases.
-            assert_eq!(fake_engine.take_events(), vec![]);
+            assert_eq!(
+                fake_engine.take_events(),
+                vec![
+                    EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::ResetAll,
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionCommit,
+                ],
+            );
         });
     }
 
@@ -2685,7 +2928,7 @@ mod tests {
             )
             .await;
 
-            // We should have added a repository to the device, but no rewrite rules.
+            // We should have added a repository to the device, but not added any rewrite rules.
             assert_eq!(
                 fake_repo_manager.take_events(),
                 vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }]
@@ -2749,8 +2992,22 @@ mod tests {
                 vec![RepositoryManagerEvent::Add { repo: test_repo_config(&repo).await }],
             );
 
-            // We shouldn't have made any rewrite rules.
-            assert_eq!(fake_engine.take_events(), vec![]);
+            // We should have set up the default rewrite rules.
+            assert_eq!(
+                fake_engine.take_events(),
+                vec![
+                    EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::ResetAll,
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionAdd {
+                        rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
+                    },
+                    EngineEvent::EditTransactionCommit,
+                ],
+            );
 
             assert_eq!(
                 get_target_registrations(&proxy).await,
@@ -2758,7 +3015,7 @@ mod tests {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: Some(vec![]),
+                    aliases: None,
                     ..ffx::RepositoryTarget::EMPTY
                 }],
             );
@@ -3040,6 +3297,7 @@ mod tests {
             let http_spec = RepositorySpec::Http {
                 metadata_repo_url: server.local_url() + "/tuf/",
                 blob_repo_url: server.local_url() + "/tuf/blobs/",
+                aliases: BTreeSet::new(),
             };
 
             let repo = RepoInner::new();
@@ -3052,6 +3310,7 @@ mod tests {
                     &RepositorySpec::Http {
                         metadata_repo_url: "hello there".to_string(),
                         blob_repo_url: server.local_url() + "/tuf/blobs",
+                        aliases: BTreeSet::new(),
                     },
                     &repo
                 )
@@ -3064,6 +3323,7 @@ mod tests {
                     &RepositorySpec::Http {
                         metadata_repo_url: server.local_url() + "/tuf",
                         blob_repo_url: "hello there".to_string(),
+                        aliases: BTreeSet::new(),
                     },
                     &repo
                 )

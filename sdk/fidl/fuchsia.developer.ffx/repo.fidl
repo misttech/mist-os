@@ -26,6 +26,10 @@ type FileSystemRepositorySpec = table {
 
     /// File system path to the location of the blob repository.
     2: blob_repo_path string:MAX_PATH;
+
+    /// An optional list of repository hostname aliases. A rewrite rule will be added for each
+    /// hostname in this list to resolve to this repository.
+    3: aliases vector<string:MAX_NAME>:MAX_ALIASES;
 };
 
 /// A configuration for a package repository on the local file system.
@@ -36,6 +40,10 @@ type FileSystemRepositorySpec = table {
 type PmRepositorySpec = table {
     /// File system path to the location of the pm repository.
     1: path string:MAX_PATH;
+
+    /// An optional list of repository hostname aliases. A rewrite rule will be added for each
+    /// hostname in this list to resolve to this repository.
+    2: aliases vector<string:MAX_NAME>:MAX_ALIASES;
 };
 
 /// A configuration for a package repository found on a web server.
@@ -45,6 +53,10 @@ type HttpRepositorySpec = table {
 
     /// URL of the Blob Server.
     2: blob_repo_url string:MAX_PATH;
+
+    /// An optional list of repository hostname aliases. A rewrite rule will be added for each
+    /// hostname in this list to resolve to this repository.
+    3: aliases vector<string:MAX_NAME>:MAX_ALIASES;
 };
 
 /// A configuration for a package repository found in Google Cloud Storage.
@@ -58,6 +70,10 @@ type GcsRepositorySpec = table {
 
     /// URL of the Blob Server. This must use the gs:// URL scheme.
     2: blob_repo_url string:MAX_PATH;
+
+    /// An optional list of repository hostname aliases. A rewrite rule will be added for each
+    /// hostname in this list to resolve to this repository.
+    3: aliases vector<string:MAX_NAME>:MAX_ALIASES;
 };
 
 /// Current state of the package repository server.

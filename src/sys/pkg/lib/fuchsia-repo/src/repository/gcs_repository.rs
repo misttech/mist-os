@@ -18,7 +18,7 @@ use {
     anyhow::{anyhow, Context as _},
     futures::{future::BoxFuture, AsyncRead, FutureExt as _, TryStreamExt as _},
     hyper::{header::CONTENT_LENGTH, Body, Response, StatusCode},
-    std::{fmt::Debug, io, time::SystemTime},
+    std::{collections::BTreeSet, fmt::Debug, io, time::SystemTime},
     tuf::{
         metadata::{MetadataPath, MetadataVersion, TargetPath},
         pouf::Pouf1,
@@ -58,6 +58,7 @@ pub struct GcsRepository<T = gcs::client::Client> {
     /// the gs:// URL scheme. The constructor will make sure this has a trailing slash so it is
     /// treated as a directory.
     blob_repo_url: Url,
+    aliases: BTreeSet<String>,
 }
 
 impl<T> GcsRepository<T>
@@ -88,7 +89,7 @@ where
             blob_repo_url.set_path(&format!("{}/", blob_repo_url.path()));
         }
 
-        Ok(Self { client, metadata_repo_url, blob_repo_url })
+        Ok(Self { client, metadata_repo_url, blob_repo_url, aliases: BTreeSet::new() })
     }
 
     fn get<'a>(
@@ -213,7 +214,12 @@ where
         RepositorySpec::Gcs {
             metadata_repo_url: self.metadata_repo_url.as_str().to_owned(),
             blob_repo_url: self.blob_repo_url.as_str().to_owned(),
+            aliases: self.aliases.clone(),
         }
+    }
+
+    fn aliases(&self) -> &BTreeSet<String> {
+        &self.aliases
     }
 
     fn fetch_metadata_range<'a>(

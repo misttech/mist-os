@@ -8,6 +8,7 @@ use {
     fidl_fuchsia_net_ext::SocketAddress,
     serde::{Deserialize, Serialize},
     std::{
+        collections::BTreeSet,
         convert::{TryFrom, TryInto},
         net::SocketAddr,
     },
@@ -17,13 +18,32 @@ use {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RepositorySpec {
-    FileSystem { metadata_repo_path: Utf8PathBuf, blob_repo_path: Utf8PathBuf },
+    FileSystem {
+        metadata_repo_path: Utf8PathBuf,
+        blob_repo_path: Utf8PathBuf,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
 
-    Pm { path: Utf8PathBuf },
+    Pm {
+        path: Utf8PathBuf,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
 
-    Http { metadata_repo_url: String, blob_repo_url: String },
+    Http {
+        metadata_repo_url: String,
+        blob_repo_url: String,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
 
-    Gcs { metadata_repo_url: String, blob_repo_url: String },
+    Gcs {
+        metadata_repo_url: String,
+        blob_repo_url: String,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
 }
 
 impl TryFrom<fidl::RepositorySpec> for RepositorySpec {
@@ -31,38 +51,55 @@ impl TryFrom<fidl::RepositorySpec> for RepositorySpec {
 
     fn try_from(repo: fidl::RepositorySpec) -> Result<Self, RepositoryError> {
         match repo {
-            fidl::RepositorySpec::FileSystem(filesystem_spec) => {
-                let metadata_repo_path = filesystem_spec
+            fidl::RepositorySpec::FileSystem(spec) => Ok(RepositorySpec::FileSystem {
+                metadata_repo_path: spec
                     .metadata_repo_path
-                    .ok_or(RepositoryError::MissingRepositorySpecField)?;
-                let blob_repo_path = filesystem_spec
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                blob_repo_path: spec
                     .blob_repo_path
-                    .ok_or(RepositoryError::MissingRepositorySpecField)?;
-                Ok(RepositorySpec::FileSystem {
-                    metadata_repo_path: metadata_repo_path.into(),
-                    blob_repo_path: blob_repo_path.into(),
-                })
-            }
-            fidl::RepositorySpec::Pm(pm_spec) => {
-                let path = pm_spec.path.ok_or(RepositoryError::MissingRepositorySpecField)?;
-                Ok(RepositorySpec::Pm { path: path.into() })
-            }
-            fidl::RepositorySpec::Http(http_spec) => {
-                let metadata_repo_url = http_spec
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                aliases: spec
+                    .aliases
+                    .map(|aliases| aliases.into_iter().collect())
+                    .unwrap_or_default(),
+            }),
+            fidl::RepositorySpec::Pm(spec) => Ok(RepositorySpec::Pm {
+                path: spec.path.ok_or(RepositoryError::MissingRepositorySpecField)?.into(),
+                aliases: spec
+                    .aliases
+                    .map(|aliases| aliases.into_iter().collect())
+                    .unwrap_or_default(),
+            }),
+            fidl::RepositorySpec::Http(spec) => Ok(RepositorySpec::Http {
+                metadata_repo_url: spec
                     .metadata_repo_url
-                    .ok_or(RepositoryError::MissingRepositorySpecField)?;
-                let blob_repo_url =
-                    http_spec.blob_repo_url.ok_or(RepositoryError::MissingRepositorySpecField)?;
-                Ok(RepositorySpec::Http { metadata_repo_url, blob_repo_url })
-            }
-            fidl::RepositorySpec::Gcs(gcs_spec) => {
-                let metadata_repo_url = gcs_spec
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                blob_repo_url: spec
+                    .blob_repo_url
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                aliases: spec
+                    .aliases
+                    .map(|aliases| aliases.into_iter().collect())
+                    .unwrap_or_default(),
+            }),
+            fidl::RepositorySpec::Gcs(spec) => Ok(RepositorySpec::Gcs {
+                metadata_repo_url: spec
                     .metadata_repo_url
-                    .ok_or(RepositoryError::MissingRepositorySpecField)?;
-                let blob_repo_url =
-                    gcs_spec.blob_repo_url.ok_or(RepositoryError::MissingRepositorySpecField)?;
-                Ok(RepositorySpec::Gcs { metadata_repo_url, blob_repo_url })
-            }
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                blob_repo_url: spec
+                    .blob_repo_url
+                    .ok_or(RepositoryError::MissingRepositorySpecField)?
+                    .into(),
+                aliases: spec
+                    .aliases
+                    .map(|aliases| aliases.into_iter().collect())
+                    .unwrap_or_default(),
+            }),
             fidl::RepositorySpecUnknown!() => Err(RepositoryError::UnknownRepositorySpec),
         }
     }
@@ -71,33 +108,53 @@ impl TryFrom<fidl::RepositorySpec> for RepositorySpec {
 impl From<RepositorySpec> for fidl::RepositorySpec {
     fn from(repo: RepositorySpec) -> Self {
         match repo {
-            RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path } => {
+            RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => {
                 let metadata_repo_path = metadata_repo_path.into_string();
                 let blob_repo_path = blob_repo_path.into_string();
                 fidl::RepositorySpec::FileSystem(fidl::FileSystemRepositorySpec {
                     metadata_repo_path: Some(metadata_repo_path),
                     blob_repo_path: Some(blob_repo_path),
+                    aliases: if aliases.is_empty() {
+                        None
+                    } else {
+                        Some(aliases.into_iter().collect())
+                    },
                     ..fidl::FileSystemRepositorySpec::EMPTY
                 })
             }
-            RepositorySpec::Pm { path } => {
+            RepositorySpec::Pm { path, aliases } => {
                 let path = path.into_string();
                 fidl::RepositorySpec::Pm(fidl::PmRepositorySpec {
                     path: Some(path),
+                    aliases: if aliases.is_empty() {
+                        None
+                    } else {
+                        Some(aliases.into_iter().collect())
+                    },
                     ..fidl::PmRepositorySpec::EMPTY
                 })
             }
-            RepositorySpec::Http { metadata_repo_url, blob_repo_url } => {
+            RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
                 fidl::RepositorySpec::Http(fidl::HttpRepositorySpec {
                     metadata_repo_url: Some(metadata_repo_url),
                     blob_repo_url: Some(blob_repo_url),
+                    aliases: if aliases.is_empty() {
+                        None
+                    } else {
+                        Some(aliases.into_iter().collect())
+                    },
                     ..fidl::HttpRepositorySpec::EMPTY
                 })
             }
-            RepositorySpec::Gcs { metadata_repo_url, blob_repo_url } => {
+            RepositorySpec::Gcs { metadata_repo_url, blob_repo_url, aliases } => {
                 fidl::RepositorySpec::Gcs(fidl::GcsRepositorySpec {
                     metadata_repo_url: Some(metadata_repo_url),
                     blob_repo_url: Some(blob_repo_url),
+                    aliases: if aliases.is_empty() {
+                        None
+                    } else {
+                        Some(aliases.into_iter().collect())
+                    },
                     ..fidl::GcsRepositorySpec::EMPTY
                 })
             }
@@ -170,7 +227,7 @@ impl From<RepositoryConfig> for fidl::RepositoryConfig {
 pub struct RepositoryTarget {
     pub repo_name: String,
     pub target_identifier: Option<String>,
-    pub aliases: Vec<String>,
+    pub aliases: Option<BTreeSet<String>>,
     pub storage_type: Option<RepositoryStorageType>,
 }
 
@@ -181,7 +238,7 @@ impl TryFrom<fidl::RepositoryTarget> for RepositoryTarget {
         Ok(RepositoryTarget {
             repo_name: repo_target.repo_name.ok_or(RepositoryError::MissingRepositoryName)?,
             target_identifier: repo_target.target_identifier,
-            aliases: repo_target.aliases.unwrap_or_default(),
+            aliases: repo_target.aliases.map(|aliases| aliases.into_iter().collect()),
             storage_type: repo_target.storage_type.map(|storage_type| storage_type.into()),
         })
     }
@@ -192,7 +249,7 @@ impl From<RepositoryTarget> for fidl::RepositoryTarget {
         fidl::RepositoryTarget {
             repo_name: Some(repo_target.repo_name),
             target_identifier: repo_target.target_identifier,
-            aliases: Some(repo_target.aliases),
+            aliases: repo_target.aliases.map(|aliases| aliases.into_iter().collect()),
             storage_type: repo_target.storage_type.map(|storage_type| storage_type.into()),
             ..fidl::RepositoryTarget::EMPTY
         }

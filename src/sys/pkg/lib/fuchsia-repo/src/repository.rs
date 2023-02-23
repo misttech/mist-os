@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream},
-    std::{fmt::Debug, io, sync::Arc, time::SystemTime},
+    std::{collections::BTreeSet, fmt::Debug, io, sync::Arc, time::SystemTime},
     tuf::{
         pouf::Pouf1, repository::RepositoryProvider as TufRepositoryProvider,
         repository::RepositoryStorage as TufRepositoryStorage,
@@ -74,6 +74,9 @@ pub trait RepoProvider: TufRepositoryProvider<Pouf1> + Debug + Send + Sync {
     /// Get a [RepositorySpec] for this [Repository]
     fn spec(&self) -> RepositorySpec;
 
+    /// Get the repository aliases.
+    fn aliases(&self) -> &BTreeSet<String>;
+
     /// Fetch a metadata [Resource] from this repository.
     fn fetch_metadata_range<'a>(
         &'a self,
@@ -123,6 +126,10 @@ macro_rules! impl_provider {
         impl <$($desc)+ {
             fn spec(&self) -> RepositorySpec {
                 (**self).spec()
+            }
+
+            fn aliases(&self) -> &BTreeSet<String> {
+                (**self).aliases()
             }
 
             fn fetch_metadata_range<'a>(

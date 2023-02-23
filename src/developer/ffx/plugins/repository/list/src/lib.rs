@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
-use ffx_core::ffx_plugin;
-use ffx_repository_list_args::ListCommand;
-use ffx_writer::Writer;
-use fidl;
-use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
-use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec};
-use prettytable::{cell, format::TableFormat, row, table, Table};
-use std::convert::TryInto;
+use {
+    anyhow::{Context as _, Result},
+    ffx_core::ffx_plugin,
+    ffx_repository_list_args::ListCommand,
+    ffx_writer::Writer,
+    fidl,
+    fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy},
+    fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec},
+    prettytable::{cell, format::TableFormat, row, table, Cell, Table},
+    std::{collections::BTreeSet, convert::TryInto},
+};
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn list(
@@ -65,7 +67,7 @@ fn print_table(
     writer: &mut Writer,
 ) -> Result<()> {
     let mut table = Table::new();
-    table.set_titles(row!("NAME", "TYPE", "EXTRA"));
+    table.set_titles(row!("NAME", "TYPE", "ALIASES", "EXTRA"));
     if let Some(fmt) = table_format {
         table.set_format(fmt);
     }
@@ -82,26 +84,30 @@ fn print_table(
         }
 
         match &repo.spec {
-            RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path } => {
+            RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => {
                 row.add_cell(cell!("filesystem"));
+                row.add_cell(cell_for_aliases(aliases));
                 row.add_cell(cell!(table!(
                     ["metadata", metadata_repo_path],
                     ["blobs", blob_repo_path]
                 )));
             }
-            RepositorySpec::Pm { path } => {
+            RepositorySpec::Pm { path, aliases } => {
                 row.add_cell(cell!("pm"));
+                row.add_cell(cell_for_aliases(aliases));
                 row.add_cell(cell!(path));
             }
-            RepositorySpec::Http { metadata_repo_url, blob_repo_url } => {
+            RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
                 row.add_cell(cell!("http"));
+                row.add_cell(cell_for_aliases(aliases));
                 row.add_cell(cell!(table!(
                     ["metadata", metadata_repo_url],
                     ["blobs", blob_repo_url]
                 )));
             }
-            RepositorySpec::Gcs { metadata_repo_url, blob_repo_url } => {
+            RepositorySpec::Gcs { metadata_repo_url, blob_repo_url, aliases } => {
                 row.add_cell(cell!("gcs"));
+                row.add_cell(cell_for_aliases(aliases));
                 row.add_cell(cell!(table!(
                     ["metadata", metadata_repo_url],
                     ["blobs", blob_repo_url]
@@ -121,15 +127,27 @@ fn print_table(
     return Ok(());
 }
 
+fn cell_for_aliases(aliases: &BTreeSet<String>) -> Cell {
+    if aliases.is_empty() {
+        cell!("")
+    } else {
+        cell!(aliases.iter().map(|alias| row!(alias)).collect::<Table>())
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::*;
-    use fidl_fuchsia_developer_ffx::{
-        FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest,
-        RepositoryRegistryProxy, RepositoryRegistryRequest, RepositorySpec,
+    use {
+        super::*,
+        fidl_fuchsia_developer_ffx::{
+            FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig,
+            RepositoryIteratorRequest, RepositoryRegistryProxy, RepositoryRegistryRequest,
+            RepositorySpec,
+        },
+        fuchsia_async as fasync,
+        futures::StreamExt,
+        pretty_assertions::assert_eq,
     };
-    use fuchsia_async as fasync;
-    use futures::StreamExt;
 
     fn fake_repos() -> RepositoryRegistryProxy {
         setup_fake_repos(move |req| {
@@ -165,6 +183,10 @@ mod test {
                                                         spec: RepositorySpec::Pm(
                                                             PmRepositorySpec {
                                                                 path: Some("c/d".to_owned()),
+                                                                aliases: Some(vec![
+                                                                    "example.com".into(),
+                                                                    "fuchsia.com".into(),
+                                                                ]),
                                                                 ..PmRepositorySpec::EMPTY
                                                             },
                                                         ),
@@ -197,17 +219,21 @@ mod test {
         assert_eq!(
             &out.test_output().unwrap(),
             "\
-            +-------+------------+--------------------------+\n\
-            | NAME  | TYPE       | EXTRA                    |\n\
-            +=======+============+==========================+\n\
-            | Test1 | filesystem | +----------+-----------+ |\n\
-            |       |            | | metadata | a/b/meta  | |\n\
-            |       |            | +----------+-----------+ |\n\
-            |       |            | | blobs    | a/b/blobs | |\n\
-            |       |            | +----------+-----------+ |\n\
-            +-------+------------+--------------------------+\n\
-            | Test2 | pm         | c/d                      |\n\
-            +-------+------------+--------------------------+\n",
+            +-------+------------+-----------------+--------------------------+\n\
+            | NAME  | TYPE       | ALIASES         | EXTRA                    |\n\
+            +=======+============+=================+==========================+\n\
+            | Test1 | filesystem |                 | +----------+-----------+ |\n\
+            |       |            |                 | | metadata | a/b/meta  | |\n\
+            |       |            |                 | +----------+-----------+ |\n\
+            |       |            |                 | | blobs    | a/b/blobs | |\n\
+            |       |            |                 | +----------+-----------+ |\n\
+            +-------+------------+-----------------+--------------------------+\n\
+            | Test2 | pm         | +-------------+ | c/d                      |\n\
+            |       |            | | example.com | |                          |\n\
+            |       |            | +-------------+ |                          |\n\
+            |       |            | | fuchsia.com | |                          |\n\
+            |       |            | +-------------+ |                          |\n\
+            +-------+------------+-----------------+--------------------------+\n",
         );
     }
 
@@ -234,6 +260,7 @@ mod test {
                     "spec": {
                         "type": "pm",
                         "path": "c/d",
+                        "aliases": ["example.com", "fuchsia.com"],
                     },
                 },
             ]),

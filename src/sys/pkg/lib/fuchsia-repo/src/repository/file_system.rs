@@ -19,6 +19,7 @@ use {
     },
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
+        collections::BTreeSet,
         ffi::OsStr,
         pin::Pin,
         task::{Context, Poll},
@@ -62,6 +63,7 @@ pub struct FileSystemRepositoryBuilder {
     metadata_repo_path: Utf8PathBuf,
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
+    aliases: BTreeSet<String>,
 }
 
 impl FileSystemRepositoryBuilder {
@@ -72,6 +74,7 @@ impl FileSystemRepositoryBuilder {
             metadata_repo_path,
             blob_repo_path,
             copy_mode: CopyMode::Copy,
+            aliases: BTreeSet::new(),
         }
     }
 
@@ -81,12 +84,27 @@ impl FileSystemRepositoryBuilder {
         self
     }
 
+    /// alias this repository to this name when this repository is registered on a target.
+    pub fn alias(mut self, alias: String) -> Self {
+        self.aliases.insert(alias);
+        self
+    }
+
+    /// alias this repository to these names when this repository is registered on a target.
+    pub fn aliases(mut self, aliases: impl IntoIterator<Item = String>) -> Self {
+        for alias in aliases {
+            self = self.alias(alias);
+        }
+        self
+    }
+
     /// Build a [FileSystemRepository].
     pub fn build(self) -> FileSystemRepository {
         FileSystemRepository {
             metadata_repo_path: self.metadata_repo_path.clone(),
             blob_repo_path: self.blob_repo_path,
             copy_mode: self.copy_mode,
+            aliases: self.aliases,
             tuf_repo: TufFileSystemRepositoryBuilder::new(self.metadata_repo_path)
                 .targets_prefix("targets")
                 .build(),
@@ -100,6 +118,7 @@ pub struct FileSystemRepository {
     metadata_repo_path: Utf8PathBuf,
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
+    aliases: BTreeSet<String>,
     tuf_repo: TufFileSystemRepository<Pouf1>,
 }
 
@@ -198,7 +217,12 @@ impl RepoProvider for FileSystemRepository {
         RepositorySpec::FileSystem {
             metadata_repo_path: self.metadata_repo_path.clone(),
             blob_repo_path: self.blob_repo_path.clone(),
+            aliases: self.aliases.clone(),
         }
+    }
+
+    fn aliases(&self) -> &BTreeSet<String> {
+        &self.aliases
     }
 
     fn fetch_metadata_range<'a>(

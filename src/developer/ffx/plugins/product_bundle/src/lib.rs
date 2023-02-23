@@ -24,6 +24,7 @@ use pbms::{
     select_auth, select_product_bundle, update_metadata_all, ListingMode,
 };
 use std::{
+    collections::BTreeSet,
     convert::TryInto,
     fs::{read_dir, remove_dir_all},
     io::{stderr, stdin},
@@ -231,7 +232,7 @@ where
                     match &r.spec {
                         // And the local path has to match, to make sure it's the right bundle of
                         // that name...
-                        RepositorySpec::Pm { path } => {
+                        RepositorySpec::Pm { path, .. } => {
                             path.clone().into_std_path_buf() == repo_path
                         }
                         _ => false,
@@ -444,7 +445,7 @@ async fn get_repository_name(
             cmd.force_repo ||
             // If it's already associated with the matching bundle.
             match &r.spec {
-                RepositorySpec::Pm { path } => {
+                RepositorySpec::Pm { path, .. } => {
                     path.clone().into_std_path_buf() == repo_path
                 }
                 _ => false,
@@ -519,7 +520,8 @@ async fn set_up_package_repository(
             let repo_path = repo_path
                 .canonicalize()
                 .with_context(|| format!("canonicalizing {:?}", repo_path))?;
-            let repo_spec = RepositorySpec::Pm { path: repo_path.try_into()? };
+            let repo_spec =
+                RepositorySpec::Pm { path: repo_path.try_into()?, aliases: BTreeSet::new() };
             repos
                 .add_repository(&repo_name, &mut repo_spec.into())
                 .await

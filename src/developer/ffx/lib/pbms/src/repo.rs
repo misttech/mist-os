@@ -25,6 +25,7 @@ use fuchsia_repo::{
 use futures::{stream::FuturesUnordered, TryStreamExt as _};
 use sdk_metadata::PackageBundle;
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::path::Path;
 use url::Url;
 
@@ -225,6 +226,7 @@ where
                 client,
                 repo_metadata_uri.clone(),
                 repo_blobs_uri.clone(),
+                BTreeSet::new(),
             )) as Box<dyn RepoProvider>;
 
             fetch_package_repository_from_backend(
@@ -552,6 +554,7 @@ mod tests {
             fuchsia_hyper::new_client(),
             metadata_url.clone(),
             blobs_url.clone(),
+            BTreeSet::new(),
         );
 
         // Use a fixed metadata current time so we can validate we correctly generated the timestamp

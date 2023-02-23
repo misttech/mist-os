@@ -23,7 +23,10 @@ pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) 
         .canonicalize()
         .with_context(|| format!("failed to canonicalize {:?}", cmd.pm_repo_path))?;
 
-    let repo_spec = RepositorySpec::Pm { path: full_path.try_into()? };
+    let repo_spec = RepositorySpec::Pm {
+        path: full_path.try_into()?,
+        aliases: cmd.aliases.into_iter().collect(),
+    };
 
     match repos.add_repository(repo_name, &mut repo_spec.into()).await? {
         Ok(()) => {
@@ -63,6 +66,7 @@ mod test {
             AddFromPmCommand {
                 repository: "my-repo".to_owned(),
                 pm_repo_path: tmp.path().to_path_buf(),
+                aliases: vec![],
             },
             repos,
         )
@@ -95,6 +99,7 @@ mod test {
                     AddFromPmCommand {
                         repository: name.to_owned(),
                         pm_repo_path: tmp.path().to_path_buf(),
+                        aliases: vec![],
                     },
                     repos.clone(),
                 )
