@@ -29,12 +29,14 @@ type IpVersion = strict enum {
 /// Ipv4Address is expressed in network byte order, so the most significant byte
 /// ("127" in the address "127.0.0.1") will be at index 0.
 type Ipv4Address = struct {
+    // TODO(https://fxbug.dev/21150): rename to octets.
     addr array<uint8, 4>;
 };
 
 /// Ipv6Address is expressed in network byte order, so the most significant byte
 /// ("ff" in the address "ff02::1") will be at index 0.
 type Ipv6Address = struct {
+    // TODO(https://fxbug.dev/21150): rename to octets.
     addr array<uint8, 16>;
 };
 
@@ -51,10 +53,11 @@ type Subnet = struct {
     /// The IPv4 or IPv6 address.
     addr IpAddress;
 
-    /// The prefix length of the netmask. E.g. for 192.168.1.0/24, the prefix
-    /// length is 24, corresponding to a netmask of 255.255.255.0.
-    /// For Ipv4, prefix_len must be in the range [0, 32].
-    /// For Ipv6, prefix_len must be in the range [0, 128].
+    /// The number of bits set to 1 in the subnet mask.
+    ///
+    /// When [`addr`] is [`IpAddress.ipv4`], must be in the range `[0, 32]`.
+    /// When [`addr`] is [`IpAddress.ipv6`], must be in the range `[0, 128]`.
+    // TODO(https://fxbug.dev/21150): rename to prefix_length.
     prefix_len uint8;
 };
 
