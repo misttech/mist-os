@@ -182,10 +182,6 @@ core_shard("wlancfg-core-shard") {
   shard_file = "meta/wlancfg.core_shard.cml"
 }
 
-core_shard("wlancfg-core-shard-new") {
-  shard_file = "meta/wlancfg.core_shard_new.cml"
-}
-
 config_data("config") {
   for_pkg = "wlancfg"
   if (wlancfg_config_type == "ap") {
