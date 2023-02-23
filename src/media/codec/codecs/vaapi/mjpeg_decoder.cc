@@ -62,7 +62,7 @@ MJPEGDecoder::DecodeResult MJPEGDecoder::Decode() {
       safemath::strict_cast<int>(pending_parse_result_->frame_header.visible_width),
       safemath::strict_cast<int>(pending_parse_result_->frame_header.visible_height));
 
-  // TODO(stefanbossbaly): Currently we only support YUV420
+  // TODO(fxbug.dev/122234): Currently we only support YUV420
   if (VaFormatFromFrameHeader(pending_parse_result_->frame_header) != VA_RT_FORMAT_YUV420) {
     return kDecodeError;
   }
@@ -97,7 +97,7 @@ MJPEGDecoder::DecodeResult MJPEGDecoder::Decode() {
     return kDecodeError;
   }
 
-  // TODO(stefanbossbaly): Right now we limit the caller of stream processor to only submit one
+  // TODO(fxbug.dev/122235): Right now we limit the caller of stream processor to only submit one
   // JPEG encoded frame at a time. We could update this implementation to allow the client to submit
   // fractional or multiple frames per buffer.
   return kRanOutOfStreamData;
@@ -108,7 +108,7 @@ gfx::Size MJPEGDecoder::GetPicSize() const { return pic_size_; }
 gfx::Rect MJPEGDecoder::GetVisibleRect() const { return visible_rect_; }
 
 VideoCodecProfile MJPEGDecoder::GetProfile() const {
-  // TODO(stefanbossbaly): Fix this
+  // TODO(fxbug.dev/122236): Fix this
   return VIDEO_CODEC_PROFILE_UNKNOWN;
 }
 
