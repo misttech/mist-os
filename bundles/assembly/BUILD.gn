@@ -202,6 +202,9 @@ assembly_input_bundle("common_core_realm") {
     "//src/sys/pkg/bin/pkg-cache",
     "//src/sys/pkg/bin/pkg-resolver",
 
+    # This is a required dependency of pkg-cache
+    "//src/sys/pkg/bin/system-update-committer",
+
     # Build-Information
     "//src/developer/build_info:build-info-service",
 
@@ -215,6 +218,24 @@ assembly_input_bundle("common_core_realm") {
     # Other
     "//src/sys/stash:pkg",
   ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [
+          # TODO:  These shards should be folded into the `core.cml` file itself
+          # as they are never omitted from that file.
+
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          rebase_path(
+              "//src/developer/build_info/meta/build_info.core_shard.cml",
+              root_build_dir),
+        ]
+      }
+    },
+  ]
 }
 
 # This corresponds to the "minimal" platform configuration, the most-basic
@@ -226,7 +247,6 @@ assembly_input_bundle("common_core_realm") {
 assembly_input_bundle("common_minimal") {
   base_packages = [
     # The SWD stack artifacts that enable OTAs
-    "//src/sys/pkg/bin/system-update-committer",
     "//src/sys/pkg/bin/system-updater",
 
     # Diagnostics

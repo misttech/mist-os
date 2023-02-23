@@ -71,6 +71,7 @@ if (is_fuchsia) {
     testonly = true
     public_deps = [
       ":recovery-eng",
+      ":recovery-fastboot",
       ":recovery-fdr",
       ":recovery-installer",
     ]
@@ -80,7 +81,6 @@ if (is_fuchsia) {
     "//src/connectivity/wlan/wlancfg:wlancfg-core-shard-new",
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
     "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
-    "//src/developer/build_info:build_info_core_shard",
     "//src/developer/forensics:core_shard",
     "//src/diagnostics/realm:core_shard",
     "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
@@ -135,17 +135,20 @@ if (is_fuchsia) {
                         "//src/sys/appmgr",
                         "//src/sys/appmgr:appmgr_scheme_config",
                         "//src/sys/appmgr:component_id_index_no_restrict_storage",
-                        "//src/sys/pkg:recovery",
-                        "//src/sys/stash:pkg",
-                        "//src/sys/time:recovery",
                         "//src/ui/bin/brightness_manager:auto-brightness",
+
+                        # Flattened from //src/sys/pkg:recovery
+                        "//src/sys/pkg/bin/omaha-client",
+                        "//src/sys/pkg/bin/system-updater",
+
+                        # system-update-committer is a dependency of pkg-cache,
+                        # but we don't want to do any verification in recovery
+                        # mode, so we completely disable it.
+                        "//src/sys/pkg/bin/system-update-committer:disable",
                       ]
 
   recovery_eng_packages =
       recovery_packages + [
-        # So recovery can read board name and version info:
-        "//src/developer/build_info:build-info-service",
-
         "//src/cobalt/bin/app:build_type_eng",
         "//src/cobalt/bin/app:cobalt",
         "//src/cobalt/bin/app:cobalt_registry",
@@ -181,7 +184,6 @@ if (is_fuchsia) {
         "//src/firmware/fastboot-tcp",
 
         # Support for hwinfo protocol to read regulatory region from factory.
-        "//src/hwinfo:hwinfo",
         "//src/factory/factory_store_providers",
 
         # Support privacy switch
@@ -225,17 +227,31 @@ if (is_fuchsia) {
   recovery_fdr_packages -= [ "//src/recovery/system:system_recovery" ]
   recovery_fdr_packages += [ "//src/recovery/system:system_recovery_fdr" ]
 
+  product_assembly_configuration("for-eng") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+    }
+    product = {
+    }
+  }
+
   assembled_system("recovery-eng") {
     forward_variables_from(recovery_base, "*")
     allow_eng_platform_bundle_use = true
     base_packages = recovery_eng_packages
     core_realm_definition = ":core-eng"
+
+    product_assembly_config_file =
+        get_label_info(":for-eng", "target_out_dir") +
+        "/for-eng/product_assembly_config.json"
+    product_assembly_config_dep = ":for-eng"
   }
 
   product_assembly_configuration("for-fastboot") {
     platform = {
       build_type = "user"
-      feature_set_level = "bootstrap"
+      feature_set_level = "utility"
     }
     product = {
     }
@@ -264,8 +280,6 @@ if (is_fuchsia) {
       "//src/firmware/fastboot-tcp",
       "//src/connectivity/network/mdns/bundles:services",
       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
-      "//src/sys/pkg:recovery-core",
-      "//src/developer/build_info:build-info-service",
       "//src/firmware/fastboot-usb",
     ]
 
@@ -313,6 +327,15 @@ if (is_fuchsia) {
     }
   }
 
+  product_assembly_configuration("for-fdr") {
+    platform = {
+      build_type = "user"
+      feature_set_level = "utility"
+    }
+    product = {
+    }
+  }
+
   assembled_system("recovery-fdr") {
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
@@ -323,6 +346,11 @@ if (is_fuchsia) {
 
     devmgr_config = [ "virtcon.disable=true" ]
     cmdline = []
+
+    product_assembly_config_file =
+        get_label_info(":for-fdr", "target_out_dir") +
+        "/for-fdr/product_assembly_config.json"
+    product_assembly_config_dep = ":for-fdr"
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
@@ -346,9 +374,23 @@ if (is_fuchsia) {
     }
   }
 
+  product_assembly_configuration("for-installer") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+    }
+    product = {
+    }
+  }
+
   assembled_system("recovery-installer") {
     forward_variables_from(recovery_base, "*")
     base_packages = recovery_installer_packages
+
+    product_assembly_config_file =
+        get_label_info(":for-installer", "target_out_dir") +
+        "/for-installer/product_assembly_config.json"
+    product_assembly_config_dep = ":for-installer"
 
     core_realm_definition = ":core-installer"
 
