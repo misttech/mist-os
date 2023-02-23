@@ -75,6 +75,16 @@ const zx_device::SystemPowerStateMapping kDeviceDefaultStateMapping = []() {
 }();
 }  // namespace internal
 
+namespace {
+
+#define DEBUG_ASSERT_VALID_DEVICE(dev)                                                           \
+  do {                                                                                           \
+    ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", \
+                        dev);                                                                    \
+  } while (0)
+
+}  // namespace
+
 __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent,
                                             device_add_args_t* args, zx_device_t** out) {
   zx_status_t r;
@@ -83,8 +93,7 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   if (!parent) {
     return ZX_ERR_INVALID_ARGS;
   }
-  ZX_DEBUG_ASSERT_MSG(parent && parent->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      parent);
+  DEBUG_ASSERT_VALID_DEVICE(parent);
 
   fbl::RefPtr<zx_device> parent_ref(parent);
 
@@ -229,14 +238,14 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
 
 __EXPORT void device_init_reply(zx_device_t* dev, zx_status_t status,
                                 const device_init_reply_args_t* args) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   internal::ContextForApi()->DeviceInitReply(dev_ref, status, args);
 }
 
 __EXPORT void device_async_remove(zx_device_t* dev) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   // The leaked reference in device_add_from_driver() will be recovered when
   // DriverManagerRemove() completes. We can't drop it here as we are just
@@ -246,14 +255,14 @@ __EXPORT void device_async_remove(zx_device_t* dev) {
 }
 
 __EXPORT void device_unbind_reply(zx_device_t* dev) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   internal::ContextForApi()->DeviceUnbindReply(dev_ref);
 }
 
 __EXPORT void device_suspend_reply(zx_device_t* dev, zx_status_t status, uint8_t out_state) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   internal::ContextForApi()->DeviceSuspendReply(dev_ref, status, out_state);
@@ -261,7 +270,7 @@ __EXPORT void device_suspend_reply(zx_device_t* dev, zx_status_t status, uint8_t
 
 __EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t out_power_state,
                                   uint32_t out_perf_state) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   internal::ContextForApi()->DeviceResumeReply(dev_ref, status, out_power_state, out_perf_state);
@@ -270,8 +279,7 @@ __EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t 
 __EXPORT zx_status_t device_get_profile(zx_device_t* dev, uint32_t priority, const char* name,
                                         zx_handle_t* out_profile) {
   if (dev) {
-    ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                        dev);
+    DEBUG_ASSERT_VALID_DEVICE(dev);
   }
 
   return internal::get_scheduler_profile(priority, name, out_profile);
@@ -281,8 +289,7 @@ __EXPORT zx_status_t device_get_deadline_profile(zx_device_t* device, uint64_t c
                                                  uint64_t deadline, uint64_t period,
                                                  const char* name, zx_handle_t* out_profile) {
   if (device) {
-    ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC,
-                        "Dev pointer '%p' is not a real device", device);
+    DEBUG_ASSERT_VALID_DEVICE(device);
   }
   return internal::get_scheduler_deadline_profile(capacity, deadline, period, name, out_profile);
 }
@@ -290,8 +297,7 @@ __EXPORT zx_status_t device_get_deadline_profile(zx_device_t* device, uint64_t c
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
   if (device) {
-    ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC,
-                        "Dev pointer '%p' is not a real device", device);
+    DEBUG_ASSERT_VALID_DEVICE(device);
   }
   return internal::set_scheduler_profile_by_role(thread, role, role_size);
 }
@@ -302,7 +308,7 @@ struct GenericProtocol {
 };
 
 __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_id, void* out) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   auto proto = static_cast<GenericProtocol*>(out);
   if (dev->ops()->get_protocol) {
     return dev->ops()->get_protocol(dev->ctx(), proto_id, out);
@@ -317,7 +323,7 @@ __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_
 
 __EXPORT zx_status_t device_open_protocol_session_multibindable(const zx_device_t* dev,
                                                                 uint32_t proto_id, void* out) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (dev->ops()->open_protocol_session_multibindable) {
     return dev->ops()->open_protocol_session_multibindable(dev->ctx(), proto_id, out);
   }
@@ -326,7 +332,7 @@ __EXPORT zx_status_t device_open_protocol_session_multibindable(const zx_device_
 
 __EXPORT zx_status_t device_close_protocol_session_multibindable(const zx_device_t* dev,
                                                                  void* proto) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (dev->ops()->close_protocol_session_multibindable) {
     return dev->ops()->close_protocol_session_multibindable(dev->ctx(), proto);
   }
@@ -335,7 +341,7 @@ __EXPORT zx_status_t device_close_protocol_session_multibindable(const zx_device
 
 __EXPORT zx_status_t device_service_connect(zx_device_t* dev, const char* service_name,
                                             fdf_handle_t channel) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (dev->ops()->service_connect) {
     return dev->ServiceConnectOp(service_name, channel);
   }
@@ -345,7 +351,7 @@ __EXPORT zx_status_t device_service_connect(zx_device_t* dev, const char* servic
 __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
                                                      const char* protocol_name,
                                                      fdf_handle_t request) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   auto& outgoing = dev->runtime_outgoing_dir();
   if (!outgoing) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -376,7 +382,7 @@ __EXPORT zx_handle_t get_root_resource() {
 
 __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
                                                zx_handle_t* fw, size_t* size) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   // TODO(bwb): Can we propogate zx::vmo further up?
@@ -385,7 +391,7 @@ __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* de
 
 __EXPORT void load_firmware_async_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
                                               load_firmware_callback_t callback, void* ctx) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   fbl::RefPtr<zx_device_t> dev_ref(dev);
   internal::ContextForApi()->LoadFirmwareAsync(drv, dev_ref, path, callback, ctx);
@@ -415,14 +421,14 @@ zx::result<bool> device_schedule_unbind_children(const fbl::RefPtr<zx_device_t>&
 
 __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* buf, size_t buflen,
                                          size_t* actual) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(dev);
   return internal::ContextForApi()->GetMetadata(dev_ref, type, buf, buflen, actual);
 }
 
 __EXPORT zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* out_size) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(dev);
   return internal::ContextForApi()->GetMetadataSize(dev_ref, type, out_size);
@@ -430,7 +436,7 @@ __EXPORT zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, s
 
 __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data,
                                          size_t length) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(dev);
   return internal::ContextForApi()->AddMetadata(dev_ref, type, data, length);
@@ -438,7 +444,7 @@ __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const 
 
 __EXPORT zx_status_t device_add_composite(zx_device_t* dev, const char* name,
                                           const composite_device_desc_t* comp_desc) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(dev);
   return internal::ContextForApi()->DeviceAddComposite(dev_ref, name, comp_desc);
@@ -499,7 +505,7 @@ __EXPORT void device_fidl_transaction_take_ownership(device_fidl_txn_t* txn,
 }
 
 __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (!dev->is_composite()) {
     return 0;
   }
@@ -508,7 +514,7 @@ __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
 
 __EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t* comp_list,
                                    size_t comp_count, size_t* comp_actual) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (!dev->is_composite()) {
     ZX_DEBUG_ASSERT(comp_actual != nullptr);
     *comp_actual = 0;
@@ -519,7 +525,7 @@ __EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t
 
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name,
                                                   uint32_t proto_id, void* out) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (!dev->is_composite()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -532,7 +538,7 @@ __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* 
 
 __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* name, uint32_t type,
                                                   void* buf, size_t buflen, size_t* actual) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   if (!dev->is_composite()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -545,14 +551,12 @@ __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* 
 
 __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
                                                   zx_handle_t request) {
-  ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      device);
+  DEBUG_ASSERT_VALID_DEVICE(device);
   if (!protocol_name) {
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  auto dev_ref = fbl::RefPtr(device);
-  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, {}, {}, protocol_name,
+  return internal::ContextForApi()->ConnectFidlProtocol(fbl::RefPtr(device), {}, {}, protocol_name,
                                                         zx::channel{request});
 }
 
@@ -560,22 +564,19 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            const char* fragment_name,
                                                            const char* protocol_name,
                                                            zx_handle_t request) {
-  ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      device);
+  DEBUG_ASSERT_VALID_DEVICE(device);
   if (!fragment_name || !protocol_name) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  auto dev_ref = fbl::RefPtr(device);
-  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, fragment_name, {}, protocol_name,
-                                                        zx::channel{request});
+  return internal::ContextForApi()->ConnectFidlProtocol(fbl::RefPtr(device), fragment_name, {},
+                                                        protocol_name, zx::channel{request});
 }
 
 __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
                                          size_t out_size, size_t* size_actual) {
-  ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      device);
+  DEBUG_ASSERT_VALID_DEVICE(device);
 
   char* variable = getenv(name);
   if (variable == nullptr) {
@@ -594,23 +595,20 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
 
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
-  ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  auto dev_ref = fbl::RefPtr(dev);
-  return internal::ContextForApi()->DeviceAddCompositeNodeSpec(dev_ref, name, spec);
+  return internal::ContextForApi()->DeviceAddCompositeNodeSpec(fbl::RefPtr(dev), name, spec);
 }
 
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
-  ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      device);
+  DEBUG_ASSERT_VALID_DEVICE(device);
   if (!service_name || !protocol_name) {
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  auto dev_ref = fbl::RefPtr(device);
-  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, {}, service_name, protocol_name,
-                                                        zx::channel{request});
+  return internal::ContextForApi()->ConnectFidlProtocol(fbl::RefPtr(device), {}, service_name,
+                                                        protocol_name, zx::channel{request});
 }
 
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
@@ -618,14 +616,12 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
                                                             const char* service_name,
                                                             const char* protocol_name,
                                                             zx_handle_t request) {
-  ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
-                      device);
+  DEBUG_ASSERT_VALID_DEVICE(device);
   if (!fragment_name || !service_name || !protocol_name) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  auto dev_ref = fbl::RefPtr(device);
-  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, fragment_name, service_name,
-                                                        protocol_name, zx::channel{request});
+  return internal::ContextForApi()->ConnectFidlProtocol(
+      fbl::RefPtr(device), fragment_name, service_name, protocol_name, zx::channel{request});
 }
