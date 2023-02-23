@@ -88,7 +88,16 @@ ScopedChild::~ScopedChild() {
 }
 
 void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback callback) {
+  ZX_ASSERT(callback != nullptr);
+
+  if (svc_ == nullptr) {
+    callback(fit::ok());
+    return;
+  }
+
   fuchsia::component::RealmPtr async_realm_proxy;
+  async_realm_proxy.set_error_handler(
+      [](zx_status_t status) { ZX_PANIC("%s", zx_status_get_string(status)); });
   ZX_COMPONENT_ASSERT_STATUS_OK("sys::ServiceDirectory/Connect",
                                 svc_->Connect(async_realm_proxy.NewRequest()));
 
@@ -104,9 +113,6 @@ void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback call
        _proxy = std::move(async_realm_proxy)](
           fuchsia::component::Realm_DestroyChild_Result result) mutable {
         forbid_drop.cancel();
-        if (callback == nullptr) {
-          return;
-        }
         switch (result.Which()) {
           case fuchsia::component::Realm_DestroyChild_Result::kResponse:
             callback(fit::ok());
