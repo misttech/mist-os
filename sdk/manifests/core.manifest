@@ -62,8 +62,10 @@ sdk://fidl/fuchsia.hardware.audio.signalprocessing
 sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.light
 sdk://fidl/fuchsia.hardware.network
+sdk://fidl/fuchsia.hardware.power.sensor
 sdk://fidl/fuchsia.hardware.power.statecontrol
 sdk://fidl/fuchsia.hardware.radar
+sdk://fidl/fuchsia.hardware.temperature
 sdk://fidl/fuchsia.hwinfo
 sdk://fidl/fuchsia.images
 sdk://fidl/fuchsia.input
