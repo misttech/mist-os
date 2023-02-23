@@ -473,7 +473,10 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   if (unlikely(offset + length > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, ZX_ERR_BAD_STATE);
   }
-  if (unlikely(TestFlag(InodeInfoFlag::kNoAlloc) || TestFlag(InodeInfoFlag::kInlineData))) {
+  // There's no need to touch anything when it is being purged, migrating inline data, or an
+  // orphan.
+  if (unlikely(TestFlag(InodeInfoFlag::kNoAlloc) || TestFlag(InodeInfoFlag::kInlineData) ||
+               !GetNlink())) {
     return VnodeF2fs::VmoDirty(offset, length);
   }
 

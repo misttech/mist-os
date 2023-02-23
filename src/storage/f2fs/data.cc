@@ -499,6 +499,12 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   if (unlikely(pages_or.is_error())) {
     return pages_or.take_error();
   }
+  // Here, we make sure that orphans do not touch anything. Locked |*pages_or| ensures that
+  // VnodeF2fs::ClearDirtyPagesForOrphan() don't access FileCache during locking.
+  if (file_cache_->IsOrphan()) {
+    ZX_DEBUG_ASSERT(!GetNlink());
+    return zx::ok(std::move(pages_or.value()));
+  }
   data_pages = std::move(pages_or.value());
   for (auto &page : data_pages) {
     page->WaitOnWriteback();
