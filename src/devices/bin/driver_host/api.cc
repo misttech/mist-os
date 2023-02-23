@@ -547,6 +547,9 @@ __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const cha
                                                   zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
+  if (!protocol_name) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(device);
   return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, {}, {}, protocol_name,
@@ -559,6 +562,9 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
+  if (!fragment_name || !protocol_name) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(device);
@@ -598,6 +604,9 @@ __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const ch
                                                    const char* protocol_name, zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
+  if (!service_name || !protocol_name) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(device);
   return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, {}, service_name, protocol_name,
@@ -611,6 +620,9 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
                                                             zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
+  if (!fragment_name || !service_name || !protocol_name) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(device);
