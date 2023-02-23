@@ -4,7 +4,7 @@
 
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
@@ -12,6 +12,7 @@ use crate::lock::Mutex;
 use crate::mm::{MemoryAccessor, ProcMapsFile, ProcStatFile, ProcStatusFile};
 use crate::task::{CurrentTask, Task, ThreadGroup};
 use crate::types::*;
+use crate::selinux::selinux_proc_attrs;
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
 pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
@@ -46,66 +47,15 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"cmdline", CmdlineFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"comm", CommFile::new_node(task), mode!(IFREG, 0o444));
-    dir.node(b"attr", attr_directory(task, fs));
+    dir.subdir(b"attr", 0o555, |dir| {
+        dir.entry_creds(task.as_fscred());
+        dir.dir_creds(task.as_fscred());
+        selinux_proc_attrs(task, dir);
+    });
     dir.entry(b"ns", NsDirectory { task: task.clone() }, mode!(IFDIR, 0o777));
     dir.entry(b"mountinfo", ProcMountinfoFile::new_node(task), mode!(IFREG, 0o444));
     dir.dir_creds(task.as_fscred());
     dir
-}
-
-/// Creates an [`FsNode`] that represents the `/proc/<pid>/attr` directory.
-fn attr_directory(task: &Arc<Task>, fs: &FileSystemHandle) -> Arc<FsNode> {
-    let mut dir = StaticDirectoryBuilder::new(fs);
-    // The `current` security context is, with selinux disabled, unconfined.
-    dir.entry_creds(task.as_fscred());
-    dir.entry(b"current", AttrCurrentFile::new_node(), mode!(IFREG, 0o666));
-    dir.entry(b"fscreate", SimpleFileNode::new(|| Ok(SeLinuxAttribute)), mode!(IFREG, 0o666));
-    dir.dir_creds(task.as_fscred());
-    dir.build()
-}
-
-struct AttrCurrentFile {
-    data: Mutex<Vec<u8>>,
-}
-
-impl AttrCurrentFile {
-    fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self { data: Mutex::new(b"user:role:type:level\0".to_vec()) })
-    }
-}
-
-impl BytesFileOps for AttrCurrentFile {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        *self.data.lock() = data;
-        Ok(())
-    }
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(self.data.lock().clone().into())
-    }
-}
-
-// TODO(tbodt): Make this more than a stub, use for all selinux attributes
-struct SeLinuxAttribute;
-impl FileOps for SeLinuxAttribute {
-    fileops_impl_nonseekable!();
-
-    fn read(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        Ok(0)
-    }
-
-    fn write(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        Ok(data.drain())
-    }
 }
 
 /// `FdDirectory` implements the directory listing operations for a `proc/<pid>/fd` directory.

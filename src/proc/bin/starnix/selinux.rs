@@ -11,6 +11,7 @@ use crate::types::*;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use derivative::Derivative;
 use zerocopy::AsBytes;
 
 /// The version of selinux_status_t this kernel implements.
@@ -53,7 +54,7 @@ impl SeLinuxFs {
         );
         dir.entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
         dir.entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
-        dir.entry_dev(b"null", DeviceFileNode {}, mode!(IFCHR, 0o666), DeviceType::NULL);
+        dir.entry_dev(b"null", DeviceFileNode, mode!(IFCHR, 0o666), DeviceType::NULL);
         dir.build_root();
 
         Ok(fs)
@@ -240,6 +241,58 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
                 dir.build()
             })
             .clone())
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Default)]
+pub struct SeLinuxThreadGroupState {
+    #[derivative(Default(value="b\"user:role:type:level\".to_vec()"))]
+    current_context: FsString,
+    fscreate_context: FsString,
+    exec_context: FsString,
+}
+
+pub fn selinux_proc_attrs(task: &Arc<Task>, dir: &mut StaticDirectoryBuilder<'_>) {
+    use SeLinuxContextAttr::*;
+    dir.entry(b"current", Current.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(b"fscreate", FsCreate.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(b"exec", Exec.new_node(task), mode!(IFREG, 0o666));
+}
+
+enum SeLinuxContextAttr {
+    Current,
+    Exec,
+    FsCreate,
+}
+
+impl SeLinuxContextAttr {
+    fn new_node(self, task: &Arc<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(AttrNode { attr: self, task: Arc::clone(task) })
+    }
+
+    fn access_on_task<R, F: FnOnce(&mut FsString) -> R>(&self, task: &Task, f: F) -> R {
+        let mut tg = task.thread_group.write();
+        match self {
+            Self::Current => f(&mut tg.selinux.current_context),
+            Self::FsCreate => f(&mut tg.selinux.fscreate_context),
+            Self::Exec => f(&mut tg.selinux.exec_context),
+        }
+    }
+}
+
+struct AttrNode {
+    attr: SeLinuxContextAttr,
+    task: Arc<Task>,
+}
+impl BytesFileOps for AttrNode {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        self.attr.access_on_task(&self.task, |attr| *attr = data);
+        Ok(())
+    }
+
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.attr.access_on_task(&self.task, |attr| attr.clone()).into())
     }
 }
 

@@ -13,6 +13,7 @@ use crate::device::terminal::*;
 use crate::lock::RwLock;
 use crate::logging::log_error;
 use crate::mutable_state::*;
+use crate::selinux::SeLinuxThreadGroupState;
 use crate::signals::syscalls::WaitingOptions;
 use crate::signals::*;
 use crate::task::*;
@@ -86,6 +87,8 @@ pub struct ThreadGroupMutableState {
     /// The priority of the process, a value between 1 and 40 (inclusive). Higher value means
     /// higher priority. Defaults to 20.
     pub priority: u8,
+
+    pub selinux: SeLinuxThreadGroupState,
 }
 
 pub struct ThreadGroup {
@@ -208,6 +211,7 @@ impl ThreadGroup {
                 zombie_leader: None,
                 terminating: false,
                 priority: 20,
+                selinux: Default::default(),
             }),
         });
 
