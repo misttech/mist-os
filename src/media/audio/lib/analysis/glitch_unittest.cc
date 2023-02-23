@@ -13,12 +13,12 @@ using ASF = fuchsia::media::AudioSampleFormat;
 
 namespace media::audio {
 
-TEST(GlitchDetectors, SlopeChecker) {
+TEST(GlitchSlopeChecker, Basic) {
   constexpr int32_t kTestFreq = 440;
   constexpr int32_t kSamplesPerSecond = 48000;
   auto format = Format::Create<ASF::FLOAT>(1, kSamplesPerSecond).take_value();
 
-  // Check a good signal, then inject a glitch and check that's detected.
+  // Check a good signal, then inject a glitch and check that it is detected.
   auto buf = GenerateCosineAudio(format, kTestFreq, 1);
   SlopeChecker checker(kSamplesPerSecond, kTestFreq);
   for (auto s : buf.samples()) {

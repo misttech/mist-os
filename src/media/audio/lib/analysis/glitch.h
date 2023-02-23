@@ -42,7 +42,7 @@ class SlopeChecker {
         (prev_sample_ &&
          std::abs(diff) > max_expected_slope_ + std::numeric_limits<float>::epsilon())) {
       if (print) {
-        FX_LOGS(ERROR) << tag_ << "********** slope discontinuity detected. diff " << diff
+        FX_LOGS(ERROR) << tag_ << "XXX Slope discontinuity detected. diff " << diff
                        << "; max_expected " << max_expected_slope_ << " (prev " << *prev_sample_
                        << ", new " << sample << ")";
       }

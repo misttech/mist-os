@@ -632,7 +632,7 @@ void MixStage::ReconcileClocksAndSetStepSize(::media_audio::ClockSynchronizer& c
       FX_LOGS(INFO) << "MixStage(" << this << "), stream(" << &stream
                     << "): " << source_clock.name() << "(" << &source_clock << ") ==> "
                     << dest_clock.name() << "(" << &dest_clock << ")" << clock_sync.ToDebugString()
-                    << ": timeline changed ************";
+                    << ": timeline changed XXX";
     }
     SyncSourcePositionFromClocks(clock_sync, source_clock, dest_clock, mixer, dest_frame,
                                  mono_now_from_dest, true);
@@ -658,7 +658,7 @@ void MixStage::ReconcileClocksAndSetStepSize(::media_audio::ClockSynchronizer& c
         FX_LOGS(WARNING) << "Dest discontinuity: " << state.next_dest_frame() - dest_frame
                          << " frames (" << dest_gap_duration.to_nsecs() << " nsec), will "
                          << (dest_gap_duration < kMaxErrorThresholdDuration ? "NOT" : "")
-                         << " SyncSourcePositionFromClocks **********";
+                         << " SyncSourcePositionFromClocks XXX";
       }
       dest_discontinuity_count = (dest_discontinuity_count + 1) % kLogDestDiscontinuitiesStride;
     }

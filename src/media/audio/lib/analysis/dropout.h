@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/media/audio/lib/format/audio_buffer.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
 
@@ -79,21 +80,21 @@ class PowerChecker {
           // success/fail calculation). If ANY of them fail, return false.
           pass = false;
           if (print) {
-            FX_LOGS(ERROR) << tag_ << "********** Dropout detected. Across window of "
+            FX_LOGS(ERROR) << tag_ << "XXX Dropout detected. Across window of "
                            << rms_window_in_frames_ << " frames, measured power " << std::fixed
                            << std::setprecision(6) << std::setw(8) << current_root_mean_squares
                            << " (expected " << std::fixed << std::setprecision(4) << std::setw(6)
-                           << expected_power_rms_ << ") **********";
+                           << expected_power_rms_ << ")";
           }
         } else {
           if constexpr (kSuccessLogStride) {
             if (print) {
               if (success_log_count_ == 0) {
-                FX_LOGS(INFO) << tag_ << "********** Across window of " << rms_window_in_frames_
+                FX_LOGS(INFO) << tag_ << "XXX Across window of " << rms_window_in_frames_
                               << " frames, successfully measured power " << std::fixed
                               << std::setprecision(6) << std::setw(8) << current_root_mean_squares
                               << " (expected " << std::fixed << std::setprecision(4) << std::setw(6)
-                              << expected_power_rms_ << ") **********";
+                              << expected_power_rms_ << ")";
               }
               success_log_count_ = ++success_log_count_ % kSuccessLogStride;
             }
@@ -205,9 +206,9 @@ class SilenceChecker {
   }
 
   void LogFailure(int64_t max_silent_frames_start, int64_t max_silent_frames_detected) {
-    FX_LOGS(ERROR) << tag_ << "XXX  Silence detected -- measured " << max_silent_frames_detected
+    FX_LOGS(ERROR) << tag_ << "XXX Silence detected -- measured " << max_silent_frames_detected
                    << " consecutive silent frames (max allowed: " << max_silent_frames_allowed_
-                   << ") starting at " << max_silent_frames_start << "  XXX";
+                   << ") starting at " << max_silent_frames_start;
   }
 
  private:
@@ -218,6 +219,79 @@ class SilenceChecker {
   int64_t frame_position_ = 0;
   int64_t running_silent_frame_count_ = 0;
   int64_t running_silent_frames_start_;
+};
+
+// This rudimentary checker looks for overlaps/gaps in a sequence of PTS ranges (start and length).
+//
+// When given NO_TIMESTAMP, it subsequently will not trigger (i.e. it errs toward false negative).
+// It also does not reason about continuity thresholds, nor whether a packet is submitted after the
+// PTS. These aspects may be addressed in subsequent CL or in a different class altogether.
+class BasicTimestampChecker {
+ public:
+  explicit BasicTimestampChecker(std::optional<int64_t> pts_start = std::nullopt,
+                                 const std::string_view& tag = "")
+      : last_pts_end_(pts_start),
+        tag_(tag.empty() ? tag : std::string_view(std::string(tag).append(": "))) {
+    Reset();
+  }
+
+  inline void Reset(std::optional<int64_t> pts_start = std::nullopt) { last_pts_end_ = pts_start; }
+
+  bool Check(int64_t pts_start, int64_t pts_len, bool print = false) {
+    if (pts_start == fuchsia::media::NO_TIMESTAMP) {
+      last_pts_end_ = fuchsia::media::NO_TIMESTAMP;
+      return true;
+    }
+    if (!last_pts_end_.has_value()) {
+      last_pts_end_ = pts_start + pts_len;
+      return true;
+    }
+    if (*last_pts_end_ == fuchsia::media::NO_TIMESTAMP) {
+      return true;
+    }
+
+    int64_t pts_delta = *last_pts_end_ - pts_start;
+    if (print) {
+      if (pts_delta > 0) {
+        FX_LOGS(ERROR) << tag_ << "XXX Packet overlap of " << separated_pts(pts_delta)
+                       << " detected -- prev pts_end " << separated_pts(*last_pts_end_)
+                       << ", this pts_start " << separated_pts(pts_start);
+      } else if (pts_delta < 0) {
+        FX_LOGS(ERROR) << tag_ << "XXX Gap of " << separated_pts(-pts_delta)
+                       << " detected between packets -- prev pts_end "
+                       << separated_pts(*last_pts_end_) << ", this pts_start "
+                       << separated_pts(pts_start);
+      }
+    }
+    last_pts_end_ = pts_start + pts_len;
+
+    return (pts_delta == 0);
+  }
+
+ private:
+  friend class DropoutBasicTimestampChecker;
+
+  static std::string separated_pts(int64_t pts) {
+    bool was_negative = (pts < 0);
+    if (was_negative) {
+      pts = -pts;
+    }
+
+    std::string pts_str = fxl::StringPrintf("%03zd", pts % 1000);
+    pts /= 1000;
+    while (pts > 0) {
+      pts_str = fxl::StringPrintf("%03zd", pts % 1000).append("'").append(pts_str);
+      pts /= 1000;
+    }
+
+    if (was_negative) {
+      pts_str = "-" + pts_str;
+    }
+    return pts_str;
+  }
+
+  std::optional<int64_t> last_pts_end_ = std::nullopt;
+  const std::string_view tag_;
 };
 
 }  // namespace media::audio

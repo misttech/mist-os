@@ -14,7 +14,7 @@ using ASF = fuchsia::media::AudioSampleFormat;
 
 namespace media::audio {
 
-TEST(DropoutDetectors, PowerChecker_Constant) {
+TEST(DropoutPowerChecker, Constant) {
   constexpr int32_t kSamplesPerSecond = 48000;
   constexpr float kConstValue = 0.12345f;
   const auto format = Format::Create<ASF::FLOAT>(1, kSamplesPerSecond).take_value();
@@ -48,7 +48,7 @@ TEST(DropoutDetectors, PowerChecker_Constant) {
   }
 }
 
-TEST(DropoutDetectors, PowerChecker_Sine) {
+TEST(DropoutPowerChecker, Sine) {
   constexpr int32_t kSamplesPerSecond = 48000;
   constexpr double kRelativeFreq = 1.0;
   const auto format = Format::Create<ASF::FLOAT>(1, kSamplesPerSecond).take_value();
@@ -74,7 +74,7 @@ TEST(DropoutDetectors, PowerChecker_Sine) {
   EXPECT_TRUE(checker.Check(&buf.samples()[4], 4, 4, true)) << "samples [4] to [7]";
 }
 
-TEST(DropoutDetectors, PowerChecker_Reset) {
+TEST(DropoutPowerChecker, Reset) {
   constexpr float kConstValue = 0.12345f;
   constexpr float kBadValue = 0.01234f;
   PowerChecker checker(3, 1, kConstValue);
@@ -102,7 +102,7 @@ TEST(DropoutDetectors, PowerChecker_Reset) {
 // These test cases must be carefully written, because SilenceChecker::kOnlyLogFailureOnEnd might be
 // set, which means we don't log our ERROR message (even if Check returns false) until the silent
 // range of frames ends (even if that particular Check returns true).
-TEST(DropoutDetectors, SilenceChecker_Reset) {
+TEST(DropoutSilenceChecker, Reset) {
   // Allow two consecutive silent frames, but not three.
   SilenceChecker checker(2, 1);
 
@@ -127,7 +127,7 @@ TEST(DropoutDetectors, SilenceChecker_Reset) {
 }
 
 // All samples in a frame must be silent, to qualify as a silent frame for this checker.
-TEST(DropoutDetectors, SilenceChecker_EntireFrame) {
+TEST(DropoutSilenceChecker, EntireFrame) {
   // Allow one silent frame but not two.
   SilenceChecker checker(1, 2);
 
@@ -138,7 +138,7 @@ TEST(DropoutDetectors, SilenceChecker_EntireFrame) {
   EXPECT_FALSE(checker.Check(source_data + 1, 1, 5, false));
 }
 
-TEST(DropoutDetectors, SilenceChecker_Sine) {
+TEST(DropoutSilenceChecker, Sine) {
   constexpr int32_t kSamplesPerSecond = 48000;
   constexpr double kRelativeFreq = 1.0;
   const auto format = Format::Create<ASF::FLOAT>(1, kSamplesPerSecond).take_value();
@@ -157,7 +157,7 @@ TEST(DropoutDetectors, SilenceChecker_Sine) {
 }
 
 // Values as far from zero as +/-numeric_limits<float>::epsilon() are still considered silent.
-TEST(DropoutDetectors, SilenceChecker_Epsilon) {
+TEST(DropoutSilenceChecker, Epsilon) {
   SilenceChecker checker(1, 1);
 
   float bad_vals[] = {
@@ -167,6 +167,44 @@ TEST(DropoutDetectors, SilenceChecker_Epsilon) {
   EXPECT_FALSE(checker.Check(&bad_vals[1], 1, 2, false));
 
   EXPECT_TRUE(checker.Check(&bad_vals[2], 2, 2, true));
+}
+
+class DropoutBasicTimestampChecker : public testing::Test {
+ protected:
+  static std::string SeparatedPts(int64_t pts) { return BasicTimestampChecker::separated_pts(pts); }
+};
+
+TEST_F(DropoutBasicTimestampChecker, BasicCheck) {
+  BasicTimestampChecker checker;
+
+  EXPECT_TRUE(checker.Check(0, 16, true));
+  EXPECT_TRUE(checker.Check(16, 0, true));
+  EXPECT_TRUE(checker.Check(16, 2, true));
+
+  EXPECT_FALSE(checker.Check(0, 16, false));
+}
+
+// Reset() sets the previous pts-range end to 0.
+TEST_F(DropoutBasicTimestampChecker, Reset) {
+  BasicTimestampChecker checker;
+
+  EXPECT_TRUE(checker.Check(0, 4, true));
+  EXPECT_FALSE(checker.Check(3, 4, false));
+  EXPECT_TRUE(checker.Check(7, 4, true));
+
+  checker.Reset();
+  EXPECT_TRUE(checker.Check(14, 16, true));
+
+  checker.Reset(42);
+  EXPECT_TRUE(checker.Check(42, 68, true));
+}
+
+TEST_F(DropoutBasicTimestampChecker, SeparatedPts) {
+  EXPECT_EQ(SeparatedPts(0), "000");
+  EXPECT_EQ(SeparatedPts(1234), "001'234");
+  EXPECT_EQ(SeparatedPts(7654321), "007'654'321");
+  EXPECT_EQ(SeparatedPts(-1), "-001");
+  EXPECT_EQ(SeparatedPts(-4321), "-004'321");
 }
 
 }  // namespace media::audio
