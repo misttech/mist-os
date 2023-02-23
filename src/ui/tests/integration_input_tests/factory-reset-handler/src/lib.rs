@@ -39,10 +39,13 @@ async fn assemble_realm(
     // Declare packaged components.
     let scenic_test_realm =
         PackagedComponent::new_from_modern_url("scenic-test-realm", "#meta/scenic_only.cm");
+    let a11y_test_realm =
+        PackagedComponent::new_from_modern_url("a11y-test-realm", "#meta/fake-a11y-manager.cm");
     let input_owner = PackagedComponent::new_from_modern_url("input-owner", input_owner_url);
 
     // Add packaged components and mocks to the test realm.
     b.add(&scenic_test_realm).await;
+    b.add(&a11y_test_realm).await;
     b.add(&input_owner).await;
     b.add(&sound_player_mock).await;
     b.add(&pointer_injector_mock).await;
@@ -55,6 +58,20 @@ async fn assemble_realm(
     b.route_from_parent::<fidl_fuchsia_sysmem::AllocatorMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_vulkan_loader::LoaderMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_scheduler::ProfileProviderMarker>(&scenic_test_realm).await;
+
+    // Allow the a11y manager to access the capabilities it needs.
+    b.route_to_peer::<fidl_fuchsia_ui_scenic::ScenicMarker>(&scenic_test_realm, &a11y_test_realm)
+        .await;
+    b.route_to_peer::<fidl_fuchsia_ui_observation_scope::RegistryMarker>(
+        &scenic_test_realm,
+        &a11y_test_realm,
+    )
+    .await;
+    b.route_to_peer::<fidl_fuchsia_ui_composition::FlatlandMarker>(
+        &scenic_test_realm,
+        &a11y_test_realm,
+    )
+    .await;
 
     // Allow the input pipeline to access the capabilities it needs. All of these
     // capabilities are run hermetically, so they are all routed from peers.
@@ -76,6 +93,11 @@ async fn assemble_realm(
     .await;
     b.route_to_peer::<fidl_fuchsia_ui_pointerinjector::RegistryMarker>(
         &scenic_test_realm,
+        &input_owner,
+    )
+    .await;
+    b.route_to_peer::<fidl_fuchsia_accessibility_scene::ProviderMarker>(
+        &a11y_test_realm,
         &input_owner,
     )
     .await;
