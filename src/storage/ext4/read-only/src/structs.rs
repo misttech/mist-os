@@ -776,54 +776,58 @@ impl INode {
         (self.e2di_facl_high.get() as u64) << 32 | self.e2di_facl.get() as u64
     }
 
-    fn assert_inode_size(sb: &SuperBlock) {
+    fn check_inode_size(sb: &SuperBlock) -> Result<(), ParsingError> {
         let inode_size: usize = sb.e2fs_inode_size.into();
-        assert!(inode_size >= std::mem::size_of::<INode>());
+        if inode_size < std::mem::size_of::<INode>() {
+            Err(ParsingError::Incompatible("Inode size too small.".to_string()))
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn e4di_extra_isize(&self, sb: &SuperBlock) -> LEU16 {
-        INode::assert_inode_size(sb);
-        self.e4di_extra_isize
+    pub fn e4di_extra_isize(&self, sb: &SuperBlock) -> Result<LEU16, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_extra_isize)
     }
 
-    pub fn e4di_chksum_hi(&self, sb: &SuperBlock) -> LEU16 {
-        INode::assert_inode_size(sb);
-        self.e4di_chksum_hi
+    pub fn e4di_chksum_hi(&self, sb: &SuperBlock) -> Result<LEU16, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_chksum_hi)
     }
 
-    pub fn e4di_ctime_extra(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_ctime_extra
+    pub fn e4di_ctime_extra(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_ctime_extra)
     }
 
-    pub fn e4di_mtime_extra(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_mtime_extra
+    pub fn e4di_mtime_extra(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_mtime_extra)
     }
 
-    pub fn e4di_atime_extra(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_atime_extra
+    pub fn e4di_atime_extra(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_atime_extra)
     }
 
-    pub fn e4di_crtime(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_crtime
+    pub fn e4di_crtime(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_crtime)
     }
 
-    pub fn e4di_crtime_extra(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_crtime_extra
+    pub fn e4di_crtime_extra(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_crtime_extra)
     }
 
-    pub fn e4di_version_hi(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_version_hi
+    pub fn e4di_version_hi(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_version_hi)
     }
 
-    pub fn e4di_projid(&self, sb: &SuperBlock) -> LEU32 {
-        INode::assert_inode_size(sb);
-        self.e4di_projid
+    pub fn e4di_projid(&self, sb: &SuperBlock) -> Result<LEU32, ParsingError> {
+        INode::check_inode_size(sb)?;
+        Ok(self.e4di_projid)
     }
 }
 
