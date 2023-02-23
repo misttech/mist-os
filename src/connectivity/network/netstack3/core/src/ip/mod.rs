@@ -426,6 +426,18 @@ pub(crate) trait DualStackDeviceIdContext {
 pub(crate) trait IpDeviceIdContext<I: Ip> {
     /// The type of device IDs.
     type DeviceId: IpDeviceId + 'static;
+
+    /// The type of weakly referenced device IDs.
+    type WeakDeviceId: IpDeviceId + 'static;
+
+    /// Returns a weak ID for the strong ID..
+    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId;
+
+    /// Attempts to upgrade the weak device ID to a strong ID.
+    ///
+    /// Returns `None` if the device has been removed.
+    fn upgrade_weak_device_id(&self, weak_device_id: &Self::WeakDeviceId)
+        -> Option<Self::DeviceId>;
 }
 
 /// The status of an IP address on an interface.
@@ -2693,16 +2705,56 @@ pub(crate) mod testutil {
         testutil::FakeSyncCtx,
     };
 
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
+
+    impl<D: Debug> core::fmt::Display for FakeWeakDeviceId<D> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            core::fmt::Debug::fmt(self, f)
+        }
+    }
+
+    impl<D: IpDeviceId> IpDeviceId for FakeWeakDeviceId<D> {
+        fn is_loopback(&self) -> bool {
+            let Self(inner) = self;
+            inner.is_loopback()
+        }
+    }
+
     impl<I: Ip, S, Meta, D: IpDeviceId + 'static> IpDeviceIdContext<I>
         for crate::context::testutil::FakeSyncCtx<S, Meta, D>
     {
         type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+
+        fn downgrade_device_id(&self, device_id: &D) -> FakeWeakDeviceId<D> {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<D>,
+        ) -> Option<D> {
+            Some(device_id.clone())
+        }
     }
 
     impl<I: Ip, Outer, S, Meta, D: IpDeviceId + 'static> IpDeviceIdContext<I>
         for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
     {
         type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+
+        fn downgrade_device_id(&self, device_id: &D) -> FakeWeakDeviceId<D> {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<D>,
+        ) -> Option<D> {
+            Some(device_id.clone())
+        }
     }
 
     /// A fake device ID for use in testing.
@@ -2732,6 +2784,7 @@ pub(crate) mod testutil {
         A,
         B,
     }
+
     impl MultipleDevicesId {
         pub(crate) fn all() -> [Self; 2] {
             [Self::A, Self::B]

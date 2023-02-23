@@ -29,9 +29,24 @@ use crate::{
         state::IpLinkDeviceState,
         with_loopback_state, Device, DeviceIdContext, DeviceLayerEventDispatcher, FrameDestination,
     },
-    sync::StrongRc,
+    sync::{StrongRc, WeakRc},
     DeviceId, Instant, NonSyncContext, SyncCtx,
 };
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Hash(bound = ""))]
+pub(crate) struct LoopbackWeakDeviceId<I: Instant>(
+    pub(super) WeakRc<IpLinkDeviceState<I, LoopbackDeviceState>>,
+);
+
+impl<I: Instant> PartialEq for LoopbackWeakDeviceId<I> {
+    fn eq(&self, LoopbackWeakDeviceId(other): &LoopbackWeakDeviceId<I>) -> bool {
+        let LoopbackWeakDeviceId(me) = self;
+        WeakRc::ptr_eq(me, other)
+    }
+}
+
+impl<I: Instant> Eq for LoopbackWeakDeviceId<I> {}
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]

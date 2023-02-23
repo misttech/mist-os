@@ -41,7 +41,7 @@ use crate::{
         ethernet::{
             EthernetDeviceState, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId,
         },
-        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState},
+        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackWeakDeviceId},
         queue::ReceiveQueueHandler,
         state::IpLinkDeviceState,
     },
@@ -59,7 +59,7 @@ use crate::{
         types::{AddableEntry, AddableEntryEither},
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
     },
-    sync::{KillableRc, RwLock, StrongRc},
+    sync::{KillableRc, RwLock, StrongRc, WeakRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -629,6 +629,22 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
     }
 }
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Hash(bound = ""))]
+pub(crate) struct EthernetWeakDeviceId<I: Instant>(
+    usize,
+    WeakRc<IpLinkDeviceState<I, EthernetDeviceState>>,
+);
+
+impl<I: Instant> PartialEq for EthernetWeakDeviceId<I> {
+    fn eq(&self, EthernetWeakDeviceId(other_id, other_ptr): &EthernetWeakDeviceId<I>) -> bool {
+        let EthernetWeakDeviceId(me_id, me_ptr) = self;
+        other_id == me_id && WeakRc::ptr_eq(me_ptr, other_ptr)
+    }
+}
+
+impl<I: Instant> Eq for EthernetWeakDeviceId<I> {}
+
 /// Device IDs identifying Ethernet devices.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
@@ -721,7 +737,82 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub(crate) enum DeviceIdInner<I: Instant> {
+enum WeakDeviceIdInner<I: Instant> {
+    Ethernet(EthernetWeakDeviceId<I>),
+    Loopback(LoopbackWeakDeviceId<I>),
+}
+
+/// A weak ID identifying a device.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
+pub struct WeakDeviceId<I: Instant>(WeakDeviceIdInner<I>);
+
+impl<I: Instant> From<WeakDeviceIdInner<I>> for WeakDeviceId<I> {
+    fn from(id: WeakDeviceIdInner<I>) -> WeakDeviceId<I> {
+        WeakDeviceId(id)
+    }
+}
+
+impl<I: Instant> From<EthernetWeakDeviceId<I>> for WeakDeviceId<I> {
+    fn from(id: EthernetWeakDeviceId<I>) -> WeakDeviceId<I> {
+        WeakDeviceIdInner::Ethernet(id).into()
+    }
+}
+
+impl<I: Instant> From<LoopbackWeakDeviceId<I>> for WeakDeviceId<I> {
+    fn from(id: LoopbackWeakDeviceId<I>) -> WeakDeviceId<I> {
+        WeakDeviceIdInner::Loopback(id).into()
+    }
+}
+
+impl<I: Instant> WeakDeviceId<I> {
+    fn inner(&self) -> &WeakDeviceIdInner<I> {
+        let WeakDeviceId(id) = self;
+        id
+    }
+
+    fn upgrade(&self) -> Option<DeviceId<I>> {
+        match self.inner() {
+            WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(id, ptr)) => {
+                ptr.upgrade().map(|ptr| DeviceIdInner::Ethernet(EthernetDeviceId(*id, ptr)))
+            }
+            WeakDeviceIdInner::Loopback(LoopbackWeakDeviceId(ptr)) => {
+                ptr.upgrade().map(|ptr| DeviceIdInner::Loopback(LoopbackDeviceId(ptr)))
+            }
+        }
+        .map(Into::into)
+    }
+}
+
+impl<I: Instant> IpDeviceId for WeakDeviceId<I> {
+    fn is_loopback(&self) -> bool {
+        match self.inner() {
+            WeakDeviceIdInner::Loopback(LoopbackWeakDeviceId(_)) => true,
+            WeakDeviceIdInner::Ethernet(_) => false,
+        }
+    }
+}
+
+impl<I: Instant> Display for WeakDeviceId<I> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        match self.inner() {
+            WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(id, _ptr)) => {
+                write!(f, "Weak Ethernet({})", id)
+            }
+            WeakDeviceIdInner::Loopback(LoopbackWeakDeviceId(_)) => write!(f, "Weak Loopback"),
+        }
+    }
+}
+
+impl<I: Instant> Debug for WeakDeviceId<I> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        Display::fmt(self, f)
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
+enum DeviceIdInner<I: Instant> {
     Ethernet(EthernetDeviceId<I>),
     Loopback(LoopbackDeviceId<I>),
 }
@@ -729,10 +820,7 @@ pub(crate) enum DeviceIdInner<I: Instant> {
 /// An ID identifying a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub struct DeviceId<I: Instant>(pub(crate) DeviceIdInner<I>);
-
-unsafe impl<I: Instant> Send for DeviceId<I> {}
-unsafe impl<I: Instant> Sync for DeviceId<I> {}
+pub struct DeviceId<I: Instant>(DeviceIdInner<I>);
 
 impl<I: Instant> From<DeviceIdInner<I>> for DeviceId<I> {
     fn from(id: DeviceIdInner<I>) -> DeviceId<I> {
@@ -753,9 +841,21 @@ impl<I: Instant> From<LoopbackDeviceId<I>> for DeviceId<I> {
 }
 
 impl<I: Instant> DeviceId<I> {
-    pub(crate) fn inner(&self) -> &DeviceIdInner<I> {
+    fn inner(&self) -> &DeviceIdInner<I> {
         let DeviceId(id) = self;
         id
+    }
+
+    fn downgrade(&self) -> WeakDeviceId<I> {
+        match self.inner() {
+            DeviceIdInner::Ethernet(EthernetDeviceId(id, ptr)) => {
+                WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(*id, StrongRc::downgrade(ptr)))
+            }
+            DeviceIdInner::Loopback(LoopbackDeviceId(ptr)) => {
+                WeakDeviceIdInner::Loopback(LoopbackWeakDeviceId(StrongRc::downgrade(ptr)))
+            }
+        }
+        .into()
     }
 }
 
@@ -1194,12 +1294,42 @@ impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<NonSyncCtx> {
     type DeviceId = DeviceId<NonSyncCtx::Instant>;
+    type WeakDeviceId = WeakDeviceId<NonSyncCtx::Instant>;
+
+    fn downgrade_device_id(
+        &self,
+        device_id: &DeviceId<NonSyncCtx::Instant>,
+    ) -> WeakDeviceId<NonSyncCtx::Instant> {
+        device_id.downgrade()
+    }
+
+    fn upgrade_weak_device_id(
+        &self,
+        weak_device_id: &WeakDeviceId<NonSyncCtx::Instant>,
+    ) -> Option<DeviceId<NonSyncCtx::Instant>> {
+        weak_device_id.upgrade()
+    }
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
     for Locked<'a, SyncCtx<NonSyncCtx>, L>
 {
     type DeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::DeviceId;
+    type WeakDeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::WeakDeviceId;
+
+    fn downgrade_device_id(
+        &self,
+        device_id: &DeviceId<NonSyncCtx::Instant>,
+    ) -> WeakDeviceId<NonSyncCtx::Instant> {
+        device_id.downgrade()
+    }
+
+    fn upgrade_weak_device_id(
+        &self,
+        weak_device_id: &WeakDeviceId<NonSyncCtx::Instant>,
+    ) -> Option<DeviceId<NonSyncCtx::Instant>> {
+        weak_device_id.upgrade()
+    }
 }
 
 /// Insert a static entry into this device's ARP table.

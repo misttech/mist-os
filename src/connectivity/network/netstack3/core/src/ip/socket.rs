@@ -855,7 +855,7 @@ pub(crate) mod testutil {
         ip::{
             device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
             forwarding::ForwardingTable,
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
             HopLimits, IpDeviceId, MulticastMembershipHandler, SendIpPacketMeta,
             TransportIpContext, DEFAULT_HOP_LIMITS,
         },
@@ -900,6 +900,18 @@ pub(crate) mod testutil {
         for FakeIpSocketCtx<I, DeviceId>
     {
         type DeviceId = DeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
+
+        fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<DeviceId>,
+        ) -> Option<DeviceId> {
+            Some(device_id.clone())
+        }
     }
 
     impl<
