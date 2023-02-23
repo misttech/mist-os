@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.test.logger/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -28,10 +30,21 @@
 #include "src/devices/bin/driver_manager/tests/fake_driver_index.h"
 
 constexpr char kDriverPath[] = "/pkg/driver/mock-device.so";
+constexpr char kDriverUrl[] = "#driver/mock-device.so";
 
 static CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
 
 namespace {
+
+zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
+                        DriverLoadCallback func) {
+  zx::result vmo_result = load_vmo(kDriverPath);
+  if (vmo_result.is_error()) {
+    return vmo_result.status_value();
+  }
+
+  return load_driver_vmo(boot_args, kDriverUrl, std::move(*vmo_result), std::move(func));
+}
 
 class FidlTransaction : public fidl::Transaction {
  public:
@@ -137,7 +150,7 @@ TEST(MiscTestCase, LoadDriver) {
     delete drv;
     found_driver = true;
   };
-  load_driver(nullptr, kDriverPath, callback);
+  ASSERT_OK(load_driver(nullptr, callback));
   ASSERT_TRUE(found_driver);
 }
 
@@ -153,7 +166,7 @@ TEST(MiscTestCase, LoadDisabledDriver) {
     delete drv;
     found_driver = true;
   };
-  load_driver(&client, kDriverPath, callback);
+  ASSERT_OK(load_driver(&client, callback));
   ASSERT_FALSE(found_driver);
 }
 
@@ -196,21 +209,20 @@ TEST(MiscTestCase, BindDevices) {
 
   std::unique_ptr<Driver> driver;
   // Load the driver and force bind it to the device.
-  load_driver(nullptr, kDriverPath,
-              [&coordinator, &dev, &driver](Driver* drv, const char* version) {
-                driver = std::unique_ptr<Driver>(drv);
+  ASSERT_OK(load_driver(nullptr, [&coordinator, &dev, &driver](Driver* drv, const char* version) {
+    driver = std::unique_ptr<Driver>(drv);
 
-                MatchedDriverInfo info;
-                info.driver = driver.get();
-                info.colocate = true;
-                ASSERT_OK(coordinator.AttemptBind(info, dev));
-              });
+    MatchedDriverInfo info;
+    info.driver = driver.get();
+    info.colocate = true;
+    ASSERT_OK(coordinator.AttemptBind(info, dev));
+  }));
   loop.RunUntilIdle();
   ASSERT_NO_FATAL_FAILURE();
 
   // Check the BindDriver request.
   ASSERT_NO_FATAL_FAILURE(
-      CheckBindDriverReceived(controller_endpoints->server, fidl::StringView(kDriverPath)));
+      CheckBindDriverReceived(controller_endpoints->server, fidl::StringView(kDriverUrl)));
   loop.RunUntilIdle();
 
   // Reset the fake driver_host connection.

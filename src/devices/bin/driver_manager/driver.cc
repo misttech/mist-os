@@ -4,8 +4,6 @@
 
 #include "driver.h"
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/binding.h>
 #include <lib/fdio/directory.h>
@@ -119,42 +117,6 @@ void found_driver(zircon_driver_note_payload_t* note, void* cookie) {
 
 }  // namespace
 
-void find_loadable_drivers(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                           const std::string& path, DriverLoadCallback func) {
-  DIR* dir = opendir(path.c_str());
-  if (dir == nullptr) {
-    return;
-  }
-  AddContext context = {boot_args, "", std::move(func), zx::vmo{}};
-
-  struct dirent* de;
-  while ((de = readdir(dir)) != nullptr) {
-    if (de->d_name[0] == '.') {
-      continue;
-    }
-    if (de->d_type != DT_REG) {
-      continue;
-    }
-    auto libname = fbl::StringPrintf("%s/%s", path.c_str(), de->d_name);
-    context.libname = libname.data();
-
-    int fd = openat(dirfd(dir), de->d_name, O_RDONLY);
-    if (fd < 0) {
-      continue;
-    }
-    zx_status_t status = di_read_driver_info(fd, &context, found_driver);
-    close(fd);
-
-    if (status == ZX_ERR_NOT_FOUND) {
-      LOGF(INFO, "Missing info from driver '%s'", libname.data());
-    } else if (status != ZX_OK) {
-      LOGF(ERROR, "Failed to read info from driver '%s': %s", libname.data(),
-           zx_status_get_string(status));
-    }
-  }
-  closedir(dir);
-}
-
 zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                             std::string_view libname_view, zx::vmo vmo, DriverLoadCallback func) {
   std::string libname(libname_view);
@@ -207,24 +169,4 @@ zx::result<zx::vmo> load_vmo(std::string_view libname_view) {
     return zx::error(status);
   }
   return zx::ok(std::move(vmo));
-}
-
-void load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args, const char* path,
-                 DriverLoadCallback func) {
-  // TODO: check for duplicate driver add
-  int fd = open(path, O_RDONLY);
-  if (fd < 0) {
-    LOGF(ERROR, "Cannot open driver '%s'", path);
-    return;
-  }
-
-  AddContext context = {boot_args, path, std::move(func), zx::vmo{}};
-  zx_status_t status = di_read_driver_info(fd, &context, found_driver);
-  close(fd);
-
-  if (status == ZX_ERR_NOT_FOUND) {
-    LOGF(INFO, "Missing info from driver '%s'", path);
-  } else if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to read info from driver '%s': %s", path, zx_status_get_string(status));
-  }
 }

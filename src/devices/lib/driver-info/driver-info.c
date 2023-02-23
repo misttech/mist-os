@@ -100,14 +100,6 @@ static zx_status_t callback(void* note, size_t sz, void* _ctx) {
   return ZX_OK;
 }
 
-static zx_status_t di_pread(void* obj, void* data, size_t len, size_t off) {
-  if (pread(*((int*)obj), data, len, off) == (ssize_t)len) {
-    return ZX_OK;
-  } else {
-    return ZX_ERR_IO;
-  }
-}
-
 zx_status_t di_read_driver_info_etc(void* obj, di_read_func_t rfunc, void* cookie,
                                     di_info_func_t func) {
   context ctx = {
@@ -116,16 +108,6 @@ zx_status_t di_read_driver_info_etc(void* obj, di_read_func_t rfunc, void* cooki
   };
   uint8_t data[4096];
   return for_each_note(obj, rfunc, ZIRCON_NOTE_NAME, ZIRCON_NOTE_DRIVER, data, sizeof(data),
-                       callback, &ctx);
-}
-
-zx_status_t di_read_driver_info(int fd, void* cookie, di_info_func_t func) {
-  context ctx = {
-      .cookie = cookie,
-      .func = func,
-  };
-  uint8_t data[4096];
-  return for_each_note(&fd, di_pread, ZIRCON_NOTE_NAME, ZIRCON_NOTE_DRIVER, data, sizeof(data),
                        callback, &ctx);
 }
 

@@ -14,8 +14,6 @@ __BEGIN_CDECLS
 
 typedef void (*di_info_func_t)(zircon_driver_note_payload_t* note, void* cookie);
 
-zx_status_t di_read_driver_info(int fd, void* cookie, di_info_func_t func);
-
 typedef zx_status_t (*di_read_func_t)(void* obj, void* data, size_t len, size_t off);
 
 zx_status_t di_read_driver_info_etc(void* obj, di_read_func_t rfunc, void* cookie,

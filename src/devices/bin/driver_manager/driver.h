@@ -70,12 +70,8 @@ using MatchedDriver =
 
 using DriverLoadCallback = fit::function<void(Driver* driver, const char* version)>;
 
-void load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args, const char* path,
-                 DriverLoadCallback func);
 zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                             std::string_view libname, zx::vmo vmo, DriverLoadCallback func);
 zx::result<zx::vmo> load_vmo(std::string_view libname);
-void find_loadable_drivers(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                           const std::string& path, DriverLoadCallback func);
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_H_
