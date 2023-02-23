@@ -896,8 +896,10 @@ group("tokio-rustls") {
   public_deps = [ ":tokio-rustls-v0_22_0" ]
 }
 
-group("tokio-stream") {
-  public_deps = [ ":tokio-stream-v0_1_11" ]
+if (!(current_os == "fuchsia")) {
+  group("tokio-stream") {
+    public_deps = [ ":tokio-stream-v0_1_11" ]
+  }
 }
 
 group("toml") {
