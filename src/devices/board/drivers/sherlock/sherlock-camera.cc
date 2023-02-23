@@ -10,7 +10,11 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/arm/platform/cpp/bind.h>
+#include <bind/fuchsia/camerasensor2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gdc/cpp/bind.h>
 #include <bind/fuchsia/ge2d/cpp/bind.h>
@@ -23,7 +27,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/camera-gdc-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-ge2d-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-isp-bind.h"
 #include "src/devices/board/drivers/sherlock/imx227-sensor-bind.h"
@@ -102,9 +105,9 @@ static const fpbus::Node gdc_dev = []() {
   // GDC
   fpbus::Node dev = {};
   dev.name() = "gdc";
-  dev.vid() = PDEV_VID_ARM;
-  dev.pid() = PDEV_PID_GDC;
-  dev.did() = PDEV_DID_ARM_MALI_IV010;
+  dev.vid() = bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_VID_ARM;
+  dev.pid() = bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_PID_GDC;
+  dev.did() = bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_DID_MALI_IV010;
   dev.mmio() = gdc_mmios;
   dev.bti() = gdc_btis;
   dev.irq() = gdc_irqs;
@@ -261,19 +264,36 @@ zx_status_t Sherlock::CameraInit() {
     return result->error_value();
   }
 
-  result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, gdc_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, gdc_fragments, std::size(gdc_fragments)),
-      "camera-sensor");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(gdc_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+  auto bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+  };
+
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = bind_rules,
+          .properties = properties,
+      }},
+  };
+
+  auto composite_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "gdc", .parents = parents}};
+
+  auto spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, gdc_dev), fidl::ToWire(fidl_arena, composite_spec));
+  if (!spec_result.ok()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(gdc_dev) request failed: %s", __func__,
+           spec_result.FormatDescription().data());
+    return spec_result.status();
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(gdc_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (spec_result->is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(gdc_dev) failed: %s", __func__,
+           zx_status_get_string(spec_result->error_value()));
+    return spec_result->error_value();
   }
 
   result =
