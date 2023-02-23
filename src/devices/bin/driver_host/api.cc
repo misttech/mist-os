@@ -547,12 +547,10 @@ __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const cha
                                                   zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_fidl_proxy()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->fidl_proxy()
-      ->ConnectToProtocol(protocol_name, zx::channel(request))
-      .status_value();
+  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
+  auto dev_ref = fbl::RefPtr(device);
+  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, nullptr, nullptr, protocol_name,
+                                                        zx::channel{request});
 }
 
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
@@ -561,14 +559,11 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                                            zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_composite()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_device_t* fragment;
-  if (!device->composite()->GetFragment(fragment_name, &fragment)) {
-    return ZX_ERR_NOT_FOUND;
-  }
-  return device_connect_fidl_protocol(fragment, protocol_name, request);
+
+  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
+  auto dev_ref = fbl::RefPtr(device);
+  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, fragment_name, nullptr,
+                                                        protocol_name, zx::channel{request});
 }
 
 __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
@@ -603,12 +598,10 @@ __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const ch
                                                    const char* protocol_name, zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_fidl_proxy()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->fidl_proxy()
-      ->ConnectToProtocol(service_name, protocol_name, zx::channel(request))
-      .status_value();
+  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
+  auto dev_ref = fbl::RefPtr(device);
+  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, nullptr, service_name,
+                                                        protocol_name, zx::channel{request});
 }
 
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
@@ -618,12 +611,9 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
                                                             zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_composite()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_device_t* fragment;
-  if (!device->composite()->GetFragment(fragment_name, &fragment)) {
-    return ZX_ERR_NOT_FOUND;
-  }
-  return device_connect_fidl_protocol2(fragment, service_name, protocol_name, request);
+
+  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
+  auto dev_ref = fbl::RefPtr(device);
+  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, fragment_name, service_name,
+                                                        protocol_name, zx::channel{request});
 }

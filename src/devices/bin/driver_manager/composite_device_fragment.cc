@@ -61,13 +61,6 @@ bool CompositeDeviceFragment::TryMatch(const fbl::RefPtr<Device>& dev) const {
 zx_status_t CompositeDeviceFragment::Bind(const fbl::RefPtr<Device>& dev) {
   ZX_ASSERT(!bound_device_);
 
-  if (dev->has_outgoing_directory()) {
-    bound_device_ = dev;
-    dev->push_fragment(this);
-    dev->flags |= DEV_CTX_BOUND;
-    return ZX_OK;
-  }
-
   uses_fragment_driver_ = true;
   zx_status_t status = dev->coordinator->AttemptBind(
       MatchedDriverInfo{.driver = dev->coordinator->LoadFragmentDriver(), .colocate = true}, dev);
