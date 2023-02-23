@@ -99,7 +99,7 @@ class KTraceState {
   ssize_t ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) TA_EXCL(lock_, write_lock_);
 
   uint32_t grpmask() const {
-    return static_cast<uint32_t>(grpmask_.load(ktl::memory_order_acquire));
+    return static_cast<uint32_t>(grpmask_and_inflight_writes_.load(ktl::memory_order_acquire));
   }
 
   bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
@@ -109,28 +109,17 @@ class KTraceState {
     return (bitmask & grpmask()) != 0;
   }
 
-  // Atomically increments in-flight-writes iff writes are enabled and returns true.
-  //
-  // Returns false if the value was not incremented because writes are not enabled.
-  [[nodiscard]] bool IncPendingWrite() {
-    uint64_t desired;
-    uint64_t expected = write_state_.load(std::memory_order_relaxed);
-    do {
-      // Are writes enabled?
-      if ((expected & kWritesEnabledMask) == 0) {
-        return false;
-      }
-      desired = expected + 1;
-    } while (!write_state_.compare_exchange_weak(expected, desired, std::memory_order_acq_rel,
-                                                 std::memory_order_relaxed));
-    // Did we overflow?
-    DEBUG_ASSERT((desired & kWritesInFlightMask) > 0);
-    return true;
+  uint32_t IncPendingWrite() {
+    const uint64_t previous_value =
+        grpmask_and_inflight_writes_.fetch_add(kInflightWritesInc, ktl::memory_order_acq_rel);
+    DEBUG_ASSERT((previous_value & kInflightWritesMask) != kInflightWritesMask);
+    return previous_value & ~kInflightWritesMask;
   }
 
   void DecPendingWrite() {
-    [[maybe_unused]] uint64_t previous_value = write_state_.fetch_sub(1, ktl::memory_order_release);
-    DEBUG_ASSERT((previous_value & kWritesInFlightMask) > 0);
+    [[maybe_unused]] uint64_t previous_value =
+        grpmask_and_inflight_writes_.fetch_sub(kInflightWritesInc, ktl::memory_order_release);
+    DEBUG_ASSERT((previous_value & kInflightWritesMask) > 0);
   }
 
   // A RAII that implements the FXT Writer protocol and automatically commits the record after a
@@ -138,7 +127,7 @@ class KTraceState {
   class PendingCommit {
    public:
     PendingCommit(uint64_t* ptr, uint64_t header, KTraceState* ks)
-        : ptr_{ptr}, header_{header}, ks_{ks} {}
+        : ptr_{ptr}, header_{header}, ks_{ks}, observed_grpmask_{ks_->IncPendingWrite()} {}
 
     // No copy.
     PendingCommit(const PendingCommit&) = delete;
@@ -151,6 +140,7 @@ class KTraceState {
       ptr_ = other.ptr_;
       header_ = other.header_;
       ks_ = other.ks_;
+      observed_grpmask_ = other.observed_grpmask_;
       other.ptr_ = nullptr;
       other.ks_ = nullptr;
       return *this;
@@ -184,6 +174,7 @@ class KTraceState {
     uint64_t* ptr_{nullptr};
     uint64_t header_{0};
     KTraceState* ks_{nullptr};
+    uint32_t observed_grpmask_{0};
   };
 
   // Reserve enough bytes of contiguous space in the buffer to fit the FXT Record described by
@@ -191,11 +182,8 @@ class KTraceState {
   zx::result<PendingCommit> Reserve(uint64_t header) {
     uint64_t* const ptr = ReserveRaw(fxt::RecordFields::RecordSize::Get<uint32_t>(header));
     if (ptr == nullptr) {
-      ClearMaskDisableWrites();
+      DisableGroupMask();
       return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    if (!IncPendingWrite()) {
-      return zx::error(ZX_ERR_BAD_STATE);
     }
     return zx::ok(PendingCommit(ptr, header, this));
   }
@@ -241,16 +229,13 @@ class KTraceState {
   // fails.
   uint64_t* ReserveRaw(uint32_t num_words);
 
-  // Set the group mask, but don't modify the writes-enable state.
-  void SetGroupMask(uint32_t new_mask) { grpmask_.store(new_mask, ktl::memory_order_release); }
+  void DisableGroupMask() {
+    grpmask_and_inflight_writes_.fetch_and(kInflightWritesMask, ktl::memory_order_release);
+  }
 
-  // Enable writes, but don't modify the group mask.
-  void EnableWrites() { write_state_.fetch_or(kWritesEnabledMask, ktl::memory_order_release); }
-
-  // Clear the group mask and disable writes.
-  void ClearMaskDisableWrites() {
-    grpmask_.store(0, ktl::memory_order_release);
-    write_state_.fetch_and(~kWritesEnabledMask, ktl::memory_order_release);
+  void SetGroupMask(uint32_t new_mask) {
+    grpmask_and_inflight_writes_.fetch_and(kInflightWritesMask, ktl::memory_order_relaxed);
+    grpmask_and_inflight_writes_.fetch_or(new_mask, ktl::memory_order_release);
   }
 
   // Convert an absolute read or write pointer into an offset into the circular
@@ -262,57 +247,37 @@ class KTraceState {
   }
 
   uint32_t inflight_writes() const {
-    return static_cast<uint32_t>(write_state_.load(ktl::memory_order_acquire) &
-                                 kWritesInFlightMask);
+    return static_cast<uint32_t>(
+        (grpmask_and_inflight_writes_.load(ktl::memory_order_acquire) & kInflightWritesMask) >> 32);
   }
 
   // Allow diagnostic dprintf'ing or not.  Overridden by test code.
   bool disable_diags_printfs_{false};
 
-  // An atomic state variable which tracks whether writes are enabled (bit 63)
-  // and the number of writes in-flight (bits 0-62).
+  // An atomic state variable which tracks the currently active group mask (in
+  // its lower 32 bits) and the current in-flight write count (in its upper 32
+  // bits).
   //
   // Write operations consist of:
   //
-  // 1) Optionally observing the group mask with acquire semantics to determine
-  //    if the category is enabled for this write.
-  // 2) Atomically checking whether writes are enabled and incrementing the
-  //    in-flight count with acq/rel semantics.
-  // 3) Completing or aborting the write operation.
-  // 4) Decrementing the in-flight count portion of the state with release
+  // 1) Observing the group mask with acquire semantics to determine if the
+  //    write should proceed.
+  // 2) Incrementing the in-flight-write count portion of the state with acq/rel
+  //    semantics to indicate that a write operation has begun.
+  // 3) Completing the operation, or aborting it if the group mask has been
+  //    disabled for this write since step #1.
+  // 4) Decrementing the in-flight-write count portion of the state with release
   //    semantics to indicate that the write is finished.
   //
   // This allows Stop operations to synchronize with any in-flight writes by:
   //
-  // 1) Clearing the writes-enabled bit with release semantics.
-  // 2) Spinning on the in-flight-writes with acquire semantics until an
-  // in-flight count of zero is observed.
+  // 1) Clearing the grpmask portion of the state with release semantics.
+  // 2) Spinning on the in-flight-writes portion of the mask with acquire
+  //    semantics until an in-flight count of zero is observed.
   //
-  //
-  // Notes:
-  //
-  // * Once a writer has incremented the in-flight count, they must also
-  // decrement in a reasonable amount of time to ensure a trace can be stopped.
-  //
-  // * The algorithm above has a race (the ABA problem) where a writer may end
-  // up writing a record of a category that's not enabled.  Consumers of the
-  // data are expected to handle finding unexpected records in the trace buffer.
-  // The race goes like this: Category A is enabled and a writer is attempting
-  // to emit a record for category A.  The writer checks the group mask (step
-  // 1), sees that A is enabled and proceeds to step 2.  Prior to executing step
-  // 2, a different thread stops the trace, disabling writes and clearing the
-  // group mask.  A new trace is started with only category B enabled.  The
-  // writer resumes step 2 and atomically checks that writes are enabled,
-  // increments the in-flight count and proceeds to write a category A record.
-
-  // Bit-wise AND with |write_state_| to read writes-enabled.
-  static constexpr uint64_t kWritesEnabledMask = 1ul << 63;
-  // Bit-wise AND with |write_state_| to read in-flight-writes count.
-  static constexpr uint64_t kWritesInFlightMask = ~kWritesEnabledMask;
-
-  ktl::atomic<uint64_t> write_state_{0};
-
-  ktl::atomic<uint32_t> grpmask_{0};
+  static constexpr uint64_t kInflightWritesMask = 0xFFFFFFFF00000000;
+  static constexpr uint64_t kInflightWritesInc = 0x0000000100000000;
+  ktl::atomic<uint64_t> grpmask_and_inflight_writes_{0};
 
   // The target buffer size (in bytes) we would like to use, when we eventually
   // call AllocBuffer.  Set during the call to Init.
