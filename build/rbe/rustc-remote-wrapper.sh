@@ -964,31 +964,46 @@ test "${#link_sysroot[@]}" = 0 || {
 
 remote_inputs=(
   "$remote_rustc_relative"
-  "${rust_lld_remote[@]}"
   "${remote_rustc_shlibs[@]}"
   "${extra_rust_stdlibs[@]}"
   "$top_source"
   "${remote_depfile_inputs[@]}"
   "${extern_paths[@]}"
   "${envvar_files[@]}"
-  "${remote_linker[@]}"
-  "${lld_remote[@]}"
-  "${link_arg_files[@]}"
   "${extra_inputs_rel_project_root[@]}"
+
+  # Link arguments like static libs are checked for existence
+  # but not necessarily used until linking a binary.
+  # This is why we need to includes link_arg_files unconditionally,
+  # whereas the linker tools themselves can be dropped until linking binaries.
+  "${link_arg_files[@]}"
 )
 
-# sysroot and runtime libraries are only used for linking binary crate types,
-# so ignore them in other cases.
+# Linkers, sysroot libraries, and runtime libraries are only used for
+# linking binary crate types, so ignore them in other cases.
+# See https://doc.rust-lang.org/reference/linkage.html for a description
+# of link methods vs. crate types.
+# TODO(http://fxbug.dev/122120): trim unnecessary flags in GN configs,
+# and perhaps diagnose certain unused arguments as errors.
 case "$crate_type" in
   bin | proc-macro | dylib | cdylib )
     remote_inputs+=(
+      "${lld_remote[@]}"
+      "${rust_lld_remote[@]}"
+      "${remote_linker[@]}"
       "${sysroot_files[@]}"
       "${rt_libdir_remote[@]}"
       "${libcxx_remote[@]}"
     )
     ;;
-  *) test "${#sysroot_files[@]}" = 0 ||
-       vmsg "Warning: Ignoring sysroot files for crate type: $crate_type" ;;
+  *)
+    test "${#remote_linker[@]}" = 0 ||
+      vmsg "Warning: Ignoring -Clinker for crate type: $crate_type"
+    test "${#sysroot_files[@]}" = 0 ||
+      vmsg "Warning: Ignoring sysroot files for crate type: $crate_type"
+    test "${#rt_libdir_remote[@]}" = 0 ||
+      vmsg "Warning: Ignoring runtime lib dir for crate type: $crate_type"
+    ;;
 esac
 
 # List inputs in a file to avoid exceeding shell limit.
