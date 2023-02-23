@@ -18,7 +18,7 @@ use netstack_testing_common::{
     get_component_moniker,
     interfaces::add_address_wait_assigned,
     realms::{
-        constants, KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestRealmExt as _,
+        constants, KnownServiceProvider, Netstack, NetstackVersion, TestRealmExt as _,
         TestSandboxExt as _,
     },
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -37,12 +37,11 @@ use packet_formats::{
 use test_case::test_case;
 
 #[netstack_test]
-async fn log_packets(name: &str) {
+async fn log_packets<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // Modify debug netstack args so that it does not log packets.
     let (realm, stack_log) = {
-        let mut netstack =
-            fnetemul::ChildDef::from(&KnownServiceProvider::Netstack(Netstack2::VERSION));
+        let mut netstack = fnetemul::ChildDef::from(&KnownServiceProvider::Netstack(N::VERSION));
         let fnetemul::ChildDef { program_args, .. } = &mut netstack;
         assert_eq!(
             std::mem::replace(program_args, Some(vec!["--verbosity=debug".to_string()])),
@@ -357,7 +356,7 @@ fn test_forwarding_v6(
         Some(ForwardingConfiguration::Iface2Only(fidl_fuchsia_net::IpVersion::V6)),
         false,
     ); "v6_iface2_forward_v6_icmp_v6")]
-async fn test_forwarding<I: IpExt + IcmpIpExt>(
+async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
     test_name: &str,
     sub_test_name: &str,
     test_case: ForwardingTestCase<I>,
@@ -385,7 +384,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt>(
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let sandbox = &sandbox;
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create netstack realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
     let realm = &realm;
 
     let net_ep_iface = |net_num: u8, addr: fidl_fuchsia_net::Subnet| async move {
