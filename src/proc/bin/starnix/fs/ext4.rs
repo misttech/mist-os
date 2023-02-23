@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ext4_read_only::parser::Parser as ExtParser;
+use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::{self as ext4_readers, VmoReader as ExtVmoReader};
 use ext4_read_only::structs as ext_structs;
 use fuchsia_zircon as zx;
@@ -29,11 +29,11 @@ impl FileSystemOps for Arc<ExtFilesystem> {
     }
 }
 
-#[derive(Clone)]
 struct ExtNode {
     fs: Weak<ExtFilesystem>,
     inode_num: u32,
-    inode: Arc<ext_structs::INode>,
+    inode: ext_structs::INode,
+    xattrs: ExtXattrMap,
 }
 
 impl ExtFilesystem {
@@ -42,7 +42,9 @@ impl ExtFilesystem {
         let vmo_reader = ExtVmoReader::new(Arc::new(fidl_fuchsia_mem::Buffer { vmo, size }));
         let parser = ExtParser::new(AndroidSparseReader::new(vmo_reader).map_err(|_| errno!(EIO))?);
         let fs = Arc::new(Self { parser });
-        let ops = ExtDirectory { inner: ExtNode::new(fs.clone(), ext_structs::ROOT_INODE_NUM)? };
+        let ops = ExtDirectory {
+            inner: Arc::new(ExtNode::new(fs.clone(), ext_structs::ROOT_INODE_NUM)?),
+        };
         let mut root = FsNode::new_root(ops);
         root.inode_num = ext_structs::ROOT_INODE_NUM as ino_t;
         let fs = FileSystem::new(kernel, fs);
@@ -53,20 +55,38 @@ impl ExtFilesystem {
 
 impl ExtNode {
     fn new(fs: Arc<ExtFilesystem>, inode_num: u32) -> Result<ExtNode, Errno> {
-        let inode = Arc::new(fs.parser.inode(inode_num).map_err(ext_error)?);
-        Ok(ExtNode { fs: Arc::downgrade(&fs), inode_num, inode })
+        let inode = fs.parser.inode(inode_num).map_err(ext_error)?;
+        let xattrs = fs.parser.inode_xattrs(inode_num).unwrap_or_default();
+        Ok(ExtNode { fs: Arc::downgrade(&fs), inode_num, inode, xattrs })
     }
 
     fn fs(&self) -> Arc<ExtFilesystem> {
         self.fs.upgrade().unwrap()
     }
+
+    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+        Ok(self.xattrs.keys().map(FsString::clone).collect())
+    }
+
+    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
+        self.xattrs.get(name).map(FsString::clone).ok_or_else(|| errno!(ENODATA))
+    }
+
+    fn set_xattr(&self, _name: &FsStr, _value: &FsStr, _op: XattrOp) -> Result<(), Errno> {
+        error!(ENOSYS)
+    }
+    fn remove_xattr(&self, _name: &FsStr) -> Result<(), Errno> {
+        error!(ENOSYS)
+    }
 }
 
 struct ExtDirectory {
-    inner: ExtNode,
+    inner: Arc<ExtNode>,
 }
 
 impl FsNodeOps for ExtDirectory {
+    fs_node_impl_xattr_delegate!(self, self.inner);
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -91,29 +111,30 @@ impl FsNodeOps for ExtDirectory {
         let inode_num = ext_node.inode_num as ino_t;
         node.fs().get_or_create_node(Some(inode_num as ino_t), |inode_num| {
             let entry_type = ext_structs::EntryType::from_u8(entry.e2d_type).map_err(ext_error)?;
-            let ops: Box<dyn FsNodeOps> = match entry_type {
-                ext_structs::EntryType::RegularFile => {
-                    Box::new(ExtFile::new(ext_node.clone(), name))
-                }
-                ext_structs::EntryType::Directory => {
-                    Box::new(ExtDirectory { inner: ext_node.clone() })
-                }
-                ext_structs::EntryType::SymLink => Box::new(ExtSymlink { inner: ext_node.clone() }),
-                _ => {
-                    log_warn!(current_task, "unhandled ext entry type {:?}", entry_type);
-                    Box::new(ExtFile::new(ext_node.clone(), name))
-                }
-            };
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
                 FsCred { uid: ext_node.inode.e2di_uid.into(), gid: ext_node.inode.e2di_gid.into() };
+            let size = u32::from(ext_node.inode.e2di_size) as usize;
+            let nlink = ext_node.inode.e2di_nlink.into();
+
+            let ops: Box<dyn FsNodeOps> = match entry_type {
+                ext_structs::EntryType::RegularFile => Box::new(ExtFile::new(ext_node, name)),
+                ext_structs::EntryType::Directory => {
+                    Box::new(ExtDirectory { inner: Arc::new(ext_node) })
+                }
+                ext_structs::EntryType::SymLink => Box::new(ExtSymlink { inner: ext_node }),
+                _ => {
+                    log_warn!(current_task, "unhandled ext entry type {:?}", entry_type);
+                    Box::new(ExtFile::new(ext_node, name))
+                }
+            };
+
             let child = FsNode::new_uncached(ops, &node.fs(), inode_num, mode, owner);
-
-            let mut info = child.info_write();
-            info.size = u32::from(ext_node.inode.e2di_size) as usize;
-            info.link_count = ext_node.inode.e2di_nlink.into();
-            std::mem::drop(info);
-
+            {
+                let mut info = child.info_write();
+                info.size = size;
+                info.link_count = nlink;
+            }
             Ok(child)
         })
     }
@@ -132,6 +153,8 @@ impl ExtFile {
 }
 
 impl FsNodeOps for ExtFile {
+    fs_node_impl_xattr_delegate!(self, self.inner);
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -161,6 +184,7 @@ struct ExtSymlink {
 
 impl FsNodeOps for ExtSymlink {
     fs_node_impl_symlink!();
+    fs_node_impl_xattr_delegate!(self, self.inner);
 
     fn readlink(
         &self,
@@ -173,7 +197,7 @@ impl FsNodeOps for ExtSymlink {
 }
 
 struct ExtDirFileObject {
-    inner: ExtNode,
+    inner: Arc<ExtNode>,
 }
 
 impl FileOps for ExtDirFileObject {
