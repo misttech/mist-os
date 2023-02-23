@@ -158,7 +158,7 @@ void CheckCreateDeviceReceived(
                                 .handle_metadata = handle_metadata,
                                 .handle_capacity = ZX_CHANNEL_MAX_MSG_HANDLES,
                             });
-  ASSERT_TRUE(msg.ok());
+  ASSERT_TRUE(msg.ok(), "FIDL message status: %s", zx_status_get_string(msg.status()));
 
   auto* header = msg.header();
   FidlTransaction txn(header->txid, zx::unowned(controller.channel()));
@@ -1379,38 +1379,6 @@ TEST_F(CompositeTestCase, DeviceIteratorCompositeChild) {
   ASSERT_EQ(it, children.end());
 }
 
-TEST_F(CompositeTestCase, DeviceIteratorCompositeChildNoFragment) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-
-  size_t parent_index;
-  ASSERT_NO_FATAL_FAILURE(AddDevice(platform_bus()->device, "parent-device", 1 /* protocol id */,
-                                    "", true, true, true, fdm::AddDeviceConfig::kMustIsolate,
-                                    std::move(endpoints->client), zx::vmo(), &parent_index));
-
-  // If a parent device has these properties, any composite devices will be
-  // created without an intermediate fragment device.
-  ASSERT_TRUE(device(parent_index)->device->has_outgoing_directory());
-  ASSERT_TRUE(device(parent_index)->device->flags & DEV_CTX_MUST_ISOLATE);
-
-  uint32_t protocol_id = 1;
-  ASSERT_NO_FATAL_FAILURE(
-      BindCompositeDefineComposite(platform_bus()->device, &protocol_id, 1, "composite"));
-
-  DeviceState fidl_proxy;
-  ASSERT_NO_FATAL_FAILURE(CheckCreateFidlProxyDeviceReceived(driver_host_server(), &fidl_proxy));
-
-  // Make sure the composite comes up
-  DeviceState composite;
-  ASSERT_NO_FATAL_FAILURE(
-      CheckCreateCompositeDeviceReceived(driver_host_server(), "composite", 1, &composite));
-
-  ASSERT_FALSE(device(parent_index)->device->children().empty());
-  for (auto& d : device(parent_index)->device->children()) {
-    ASSERT_EQ(d->name(), "composite");
-  }
-}
-
 TEST_F(CompositeTestCase, DeviceIteratorCompositeSibling) {
   size_t parent_index;
   ASSERT_NO_FATAL_FAILURE(
@@ -1461,23 +1429,18 @@ TEST_F(CompositeTestCase, MultibindWithOutgoingDirectory) {
   ASSERT_NO_FATAL_FAILURE(
       BindCompositeDefineComposite(platform_bus()->device, &protocol_id, 1, "composite-1"));
 
-  DeviceState fidl_proxy;
-  ASSERT_NO_FATAL_FAILURE(CheckCreateFidlProxyDeviceReceived(driver_host_server(), &fidl_proxy));
-
   // Make sure the composite comes up.
   DeviceState composite;
-  ASSERT_NO_FATAL_FAILURE(
-      CheckCreateCompositeDeviceReceived(driver_host_server(), "composite-1", 1, &composite));
+  size_t fragment_device_indexes;
+  ASSERT_NO_FATAL_FAILURE(CheckCompositeCreation("composite-1", &parent_index, 1,
+                                                 &fragment_device_indexes, &composite));
 
   uint32_t protocol_id2 = 1;
   ASSERT_NO_FATAL_FAILURE(
       BindCompositeDefineComposite(platform_bus()->device, &protocol_id2, 1, "composite-2"));
 
-  DeviceState fidl_proxy2;
-  ASSERT_NO_FATAL_FAILURE(CheckCreateFidlProxyDeviceReceived(driver_host_server(), &fidl_proxy2));
-
   // Make sure a second composite comes up.
   DeviceState composite2;
-  ASSERT_NO_FATAL_FAILURE(
-      CheckCreateCompositeDeviceReceived(driver_host_server(), "composite-2", 1, &composite2));
+  ASSERT_NO_FATAL_FAILURE(CheckCompositeCreation("composite-2", &parent_index, 1,
+                                                 &fragment_device_indexes, &composite2));
 }

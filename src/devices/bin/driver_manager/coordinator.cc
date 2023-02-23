@@ -296,7 +296,8 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
              }()),
       package_resolver_(config_.boot_args),
       driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
-                     dispatcher, config_.delay_fallback_until_base_drivers_indexed, &package_resolver_) {
+                     dispatcher, config_.delay_fallback_until_base_drivers_indexed,
+                     &package_resolver_) {
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
 
   device_manager_ = std::make_unique<DeviceManager>(this, config_.crash_policy);
@@ -648,15 +649,17 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     return ZX_ERR_BAD_STATE;
   }
 
-  // A driver is colocated with its parent device in two circumstances:
+  // A driver is colocated with its parent device in three circumstances:
   //
   //   (1) The parent device is a composite device. Colocation for composites is handled when the
   //       composite is created, and the child of the composite is always colocated. Note that the
   //       other devices that the composite comprises may still be in separate hosts from the child
   //       driver.
-  //   (2) The driver specified `colocate = true` in its component manifest, AND the parent device
+  //   (2) The driver being bound is the fragment driver, which is always colocated.
+  //   (3) The driver specified `colocate = true` in its component manifest, AND the parent device
   //       did not enforce isolation with the MUST_ISOLATE flag.
-  if (dev->is_composite() || (matched_driver.colocate && !(dev->flags & DEV_CTX_MUST_ISOLATE))) {
+  if (dev->is_composite() || std::string_view{driver.libname.c_str()} == fdf::kFragmentDriverUrl ||
+      (matched_driver.colocate && !(dev->flags & DEV_CTX_MUST_ISOLATE))) {
     VLOGF(1, "Binding driver to %s in same driver host as parent", dev->name().data());
     // non-busdev is pretty simple
     if (dev->host() == nullptr) {

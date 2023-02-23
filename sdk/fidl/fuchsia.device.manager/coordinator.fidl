@@ -393,4 +393,23 @@ protocol Coordinator {
         name string:DEVICE_NAME_MAX;
         spec CompositeNodeSpecDescriptor;
     }) -> () error zx.status;
+
+    /// Connects the given FIDL protocol inside of a FIDL service. Connection is completed
+    /// asynchronously due to pipelining. Returning `ZX_OK` does not imply the service exists. A
+    /// two way call to the service via the retained client end of the channel pair must be issued
+    /// in order to ascertain whether the connection has been successfully established.
+    /// + |fragment_name| should be specified if the parent is a composite node.
+    /// + |service_name| should be specified if attempting to connect to a service. This will be
+    ///   mandatory in the future: http://fxbug.dev/107155.
+    /// * error Reports `ZX_ERR_UNAVAILABLE` if the parent (or fragment) does not have an outgoing
+    ///   directory.
+    /// * error Reports `ZX_ERR_NOT_FOUND` if |fragment_name| is not the name of a parent.
+    /// * error Reports `ZX_ERR_NOT_SUPPORTED` if |fragment_name| is specified by the device is not
+    ///   a composite node
+    ConnectFidlProtocol(resource struct {
+        fragment_name string:<DEVICE_NAME_MAX, optional>;
+        service_name string:<STR_LENGTH_MAX, optional>;
+        protocol_name string:STR_LENGTH_MAX;
+        server zx.handle:CHANNEL;
+    }) -> () error zx.status;
 };

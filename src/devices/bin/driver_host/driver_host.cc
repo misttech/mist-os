@@ -567,6 +567,24 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
   return new_driver->status();
 }
 
+zx_status_t DriverHostContext::ConnectFidlProtocol(const fbl::RefPtr<zx_device_t>& dev,
+                                                   std::string_view fragment_name,
+                                                   std::string_view service_name,
+                                                   std::string_view protocol_name,
+                                                   zx::channel request) {
+  fidl::WireResult result = dev->coordinator_client.sync()->ConnectFidlProtocol(
+      fidl::StringView::FromExternal(fragment_name), fidl::StringView::FromExternal(service_name),
+      fidl::StringView::FromExternal(protocol_name), std::move(request));
+  if (!result.ok()) {
+    return result.status();
+  }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
+  return ZX_OK;
+}
+
 namespace internal {
 
 namespace {

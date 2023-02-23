@@ -107,6 +107,10 @@ class DriverHostContext {
   zx_status_t FindDriver(std::string_view libname, zx::vmo vmo, fbl::RefPtr<zx_driver_t>* out,
                          fbl::RefPtr<Driver>* out_driver);
 
+  zx_status_t ConnectFidlProtocol(const fbl::RefPtr<zx_device_t>& dev,
+                                  std::string_view fragment_name, std::string_view service_name,
+                                  std::string_view protocol_name, zx::channel request);
+
   void AddDriver(fbl::RefPtr<dfv2::Driver> driver);
   void RemoveDriver(dfv2::Driver& driver);
 

@@ -71,6 +71,10 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
   void ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
+  void ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
+                           ConnectFidlProtocolCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
   uint32_t bind_count() { return bind_count_.load(); }
 
@@ -143,6 +147,34 @@ class CoreTest : public zxtest::Test {
   fbl::RefPtr<Driver> driver_obj_;
   FakeCoordinator coordinator_;
 };
+
+TEST_F(CoreTest, ConnectFidlReturnsError) {
+  fbl::RefPtr<zx_device> dev;
+  ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
+
+  zx_protocol_device_t ops = {};
+  dev->set_ops(&ops);
+  ASSERT_NO_FATAL_FAILURE(Connect(dev));
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  ASSERT_OK(endpoints);
+  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED,
+                device_connect_fidl_protocol(dev.get(), "test-protocol",
+                                             endpoints->server.TakeChannel().release()));
+
+  ctx_.loop().Quit();
+  ctx_.loop().JoinThreads();
+  ASSERT_OK(ctx_.loop().ResetQuit());
+  ASSERT_OK(ctx_.loop().RunUntilIdle());
+
+  dev->set_flag(DEV_FLAG_DEAD);
+  {
+    fbl::AutoLock lock(&ctx_.api_lock());
+    dev->removal_cb = [](zx_status_t) {};
+    ctx_.DriverManagerRemove(std::move(dev));
+  }
+  ASSERT_OK(ctx_.loop().RunUntilIdle());
+}
 
 TEST_F(CoreTest, LastDeviceUnbindStopsAsyncLoop) {
   EXPECT_EQ(0, driver_obj_->device_count());
