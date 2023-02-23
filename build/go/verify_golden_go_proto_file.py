@@ -27,15 +27,26 @@ To acknowledge this change, please run:
 
 def filter_line(line):
     """Filter input .pb.go line to ignore non-problematic differences."""
-    # Strip the compiler and plugin version numbers. The expected lines
-    # look like:
+    # Strip the compiler and plugin version numbers.
+    #
+    # protoc-gen-go generates:
     #
     #   // <tab>protoc-gen-go v1.26.0\n
     #   // <tab>protoc        v3.12.4\n
     #
+    # protoc-gen-go-grpc generates:
+    #
+    #   // - protoc-gen-go v1.26.0\n
+    #   // - protoc        v3.12.4\n
+    #
     # Note that protoc-gen-go-grpc does not embed its version number
     # in its output, so isn't checked here.
-    for version_prefix in ('// \tprotoc ', '// \tprotoc-gen-go '):
+    for version_prefix in (
+            '// \tprotoc ',
+            '// \tprotoc-gen-go ',
+            '// - protoc ',
+            '// - protoc-gen-go-grpc ',
+    ):
         if line.startswith(version_prefix):
             return version_prefix + '\n'
 

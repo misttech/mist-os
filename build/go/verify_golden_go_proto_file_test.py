@@ -19,6 +19,8 @@ class VerifyGoldenGoProtoFileTests(unittest.TestCase):
         cases = [
             ('// \tprotoc v1.2.3', '// \tprotoc \n'),
             ('// \tprotoc-gen-go v1.2.3', '// \tprotoc-gen-go \n'),
+            ('// - protoc v1.2.3', '// - protoc \n'),
+            ('// - protoc-gen-go-grpc v1.2.3', '// - protoc-gen-go-grpc \n'),
             ('some text with no    comments', 'some text with no    comments'),
             (
                 'a line with //    comments     with       spaces',
