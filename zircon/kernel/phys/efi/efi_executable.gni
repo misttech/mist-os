@@ -84,3 +84,6 @@ if (is_efi) {
     configs = default_executable_configs
   }
 }
+
+# TODO(mcgrathr): EFI compilation not there yet on RISC-V
+have_efi = current_cpu != "riscv64"

@@ -8,6 +8,7 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_NOP_H_
 
 #include <lib/arch/arm64/nop.h>
+#include <lib/arch/riscv64/nop.h>
 #include <lib/arch/x86/nop.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -38,6 +39,8 @@ template <typename NopTraits
           = Arm64NopTraits
 #elif defined(__x86_64__) || defined(__i386__)
           = X86NopTraits
+#elif defined(__riscv)
+          = RiscvNopTraits
 #endif
           >
 void NopFill(cpp20::span<std::byte> instructions) {

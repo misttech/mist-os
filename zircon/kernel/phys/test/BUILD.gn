@@ -149,10 +149,12 @@ if (current_toolchain != default_toolchain) {
     group(target_name) {
       testonly = true
       deps = [
-        ":efi-$target_name",
         ":qemu-$target_name",
         ":zbi-$target_name",
       ]
+      if (have_efi) {
+        deps += [ ":efi-$target_name" ]
+      }
     }
   }
 
@@ -467,9 +469,6 @@ if (current_toolchain != default_toolchain) {
     testonly = true
     deps = [
       ":backtrace-test",
-      ":efi-memory-test",
-      ":efi-shell-smoke-test",
-      ":elf-physboot-core-tests",
       ":hello-world-test",
       ":phys-unittests",
       ":trampoline-boot-zbi-test",
@@ -484,6 +483,15 @@ if (current_toolchain != default_toolchain) {
       "code-patching",
       "elf-loading",
     ]
+    if (have_efi) {
+      deps += [
+        ":efi-memory-test",
+        ":efi-shell-smoke-test",
+      ]
+    }
+    if (current_cpu != "riscv64") {  # TODO(mcgrathr): kernel not ready
+      deps += [ ":elf-physboot-core-tests" ]
+    }
     if (current_cpu == "x64") {
       deps += [ ":qemu-memory-test" ]
     }

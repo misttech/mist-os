@@ -171,7 +171,51 @@ static inline uint64_t MmioRead64(MMIO_PTR const volatile uint64_t* buffer) {
 
 #endif  // __x86_64__
 
-#else  // __x86_64__ || __i386__
+#elif defined(__riscv)
+
+// RISC-V doesn't have any fancier load/store flavors anyway.
+
+__NONNULL((2))
+static inline void MmioWrite8(uint8_t data, MMIO_PTR volatile uint8_t* buffer) {
+  *(volatile uint8_t*)buffer = data;
+}
+
+__NONNULL((2))
+static inline void MmioWrite16(uint16_t data, MMIO_PTR volatile uint16_t* buffer) {
+  *(volatile uint16_t*)buffer = data;
+}
+
+__NONNULL((2))
+static inline void MmioWrite32(uint32_t data, MMIO_PTR volatile uint32_t* buffer) {
+  *(volatile uint32_t*)buffer = data;
+}
+
+__NONNULL((2))
+static inline void MmioWrite64(uint64_t data, MMIO_PTR volatile uint64_t* buffer) {
+  *(volatile uint64_t*)buffer = data;
+}
+
+__NONNULL((1))
+static inline uint8_t MmioRead8(MMIO_PTR const volatile uint8_t* buffer) {
+  return *(volatile uint8_t*)buffer;
+}
+
+__NONNULL((1))
+static inline uint16_t MmioRead16(MMIO_PTR const volatile uint16_t* buffer) {
+  return *(volatile uint16_t*)buffer;
+}
+
+__NONNULL((1))
+static inline uint32_t MmioRead32(MMIO_PTR const volatile uint32_t* buffer) {
+  return *(volatile uint32_t*)buffer;
+}
+
+__NONNULL((1))
+static inline uint64_t MmioRead64(MMIO_PTR const volatile uint64_t* buffer) {
+  return *(volatile uint64_t*)buffer;
+}
+
+#else
 
 // We may need other machine-specific implementations here in the future.
 #error "No MMIO access implementation for this arch."

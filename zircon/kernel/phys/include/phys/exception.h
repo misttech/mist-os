@@ -42,6 +42,19 @@ struct alignas(BOOT_STACK_ALIGN) PhysExceptionState {
   uint64_t fp() const { return regs.rbp; }
   uint64_t shadow_call_sp() const { return 0; }
 
+#elif defined(__riscv)
+
+  uint64_t pc() const { return regs.pc; }
+  uint64_t sp() const { return regs.sp; }
+  uint64_t psr() const { return 0; }
+  uint64_t fp() const { return regs.s0; }
+  uint64_t shadow_call_sp() const {
+#if __has_feature(shadow_call_stack)
+    return regs.s2;
+#endif
+    return 0;
+  }
+
 #endif
 
   zx_thread_state_general_regs_t regs;

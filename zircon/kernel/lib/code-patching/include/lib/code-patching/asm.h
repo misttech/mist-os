@@ -91,6 +91,13 @@ _.code_patching.end.reset
   .rept \size
   int3
   .endr
+#elif defined(__riscv)
+  .if (\size) % 2
+  .error ".code_patching.trap_fill size \size not a multiple of instruction size"
+  .endif
+  .rept (\size) / 2
+  unimp
+  .endr
 #else
 #error "unknown architecture"
 #endif

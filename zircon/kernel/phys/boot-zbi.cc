@@ -434,7 +434,7 @@ void BootZbi::Log() {
 [[noreturn]] void BootZbi::Boot(ktl::optional<void*> argument) {
   ZX_ASSERT_MSG(KernelCanLoadInPlace(), "Has Load() been called?");
   auto kernel_hdr = const_cast<zircon_kernel_t*>(kernel_);
-  arch::ZbiBoot(kernel_hdr, argument.value_or(data_.storage().data()));
+  ZbiBoot(kernel_hdr, argument.value_or(data_.storage().data()));
 }
 
 #define ADDR "0x%016" PRIx64

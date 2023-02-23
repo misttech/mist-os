@@ -319,6 +319,14 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  source_set("arch-boot-zbi") {
+    sources = [ "arch-boot-zbi.cc" ]
+    deps = [
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:boot-zbi.deps",
+    ]
+  }
+
   # This is where code is actually loaded both for the Multiboot spec and for
   # the original/legacy x86 ZBI booting spec.
   config("load-1mb") {

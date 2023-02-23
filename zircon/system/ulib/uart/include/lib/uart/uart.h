@@ -277,6 +277,17 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
   BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio)
       : pio_size_(pio_size) {
     auto ptr = map_mmio(cfg.mmio_phys);
+    // TODO(fxbug.dev/121917): This used to use hwreg::RegisterPio if
+    // pio_size!=0; even on x86 that always boiled down to RegisterMmioPio,
+    // which RegisterMmio but with the offsets scaled by 4. That's not right
+    // for the riscv64 qemu virt machine's MMIO 16550, so that's disabled here.
+    // It's not clear how different MMIO-based 16550/8250-compatible UARTs
+    // actually deal with offset scaling and MMIO access size, so that will
+    // have to be figured out to cleanly support both the riscv case and the
+    // scaled access cases.
+#ifdef __riscv
+    pio_size = 0;
+#endif
     if (pio_size != 0) {
       // This is PIO via MMIO, i.e. scaled MMIO.
       io_.emplace<hwreg::RegisterPio>(ptr);
@@ -284,6 +295,8 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
       // This is normal MMIO.
       io_.emplace<hwreg::RegisterMmio>(ptr);
     }
+    // This is normal MMIO.
+    io_.emplace<hwreg::RegisterMmio>(ptr);
   }
 
   BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size)

@@ -128,7 +128,7 @@ class TrampolineBoot::Trampoline {
         .entry = entry_address,
     };
     ZX_ASSERT(args.entry == entry_address);
-    arch::ZbiBootRaw(reinterpret_cast<uintptr_t>(code_), &args);
+    ZbiBootRaw(reinterpret_cast<uintptr_t>(code_), &args);
   }
 
  private:
@@ -235,7 +235,7 @@ class TrampolineBoot::Trampoline {
           [zbi_backwards] "i"(offsetof(TrampolineArgs, zbi.backwards)),        //
           [data_zbi] "i"(offsetof(TrampolineArgs, data_zbi)),                  //
           [entry] "i"(offsetof(TrampolineArgs, entry)));
-#elif __aarch64__  // arm64
+#elif defined(__aarch64__)
     __asm__(
         R""(
 .pushsection .rodata.trampoline, "a?", %%progbits
@@ -309,6 +309,75 @@ mov %[size], (.Ltrampoline_end.%= - .Ltrampoline_start.%=)
           [count_offset] "i"(offsetof(RelocateTarget, count)),
           [zbi_dst_offset] "i"(offsetof(TrampolineArgs, data_zbi)),
           [entry] "i"(offsetof(TrampolineArgs, entry)));
+#elif defined(__riscv)
+    const ktl::byte* code_end;
+    // This starts with the hart ID in a0 and the "data pointer" in a1.
+    // a0 is left alone throughout to pass it along to the real kernel.
+    // a1 points to the TrampolineArgs and is replaced with args.data_zbi.
+    //
+    // TODO(mcgrathr): maybe unroll the copying loops some
+    __asm__(
+        R"""(
+        .pushsection .rodata.trampoline, "a?", %%progbits
+        .Ltrampoline_start.%=:
+
+          add t0, a1, %[data_offset]
+          jal .Lcopy_start.%=
+          add t0, a1, %[kernel_offset]
+          jal .Lcopy_start.%=
+
+          mv s0, zero
+          mv ra, zero
+          mv sp, zero
+          mv gp, zero
+          mv tp, zero
+          ld t0, %[entry](a1)
+          ld a1, %[zbi_dst_offset](a1)
+          jr t0
+
+        .Lcopy_start.%=:
+          ld t1, %[src_offset](t0)
+          ld t2, %[dst_offset](t0)
+          ld t3, %[count_offset](t0)
+          ld t4, %[backwards_offset](t0)
+          bnez t4, .Lcopy_backwards.%=
+
+        .Lcopy_forward.%=:
+          ld t4, (t1)
+          sd t4, (t2)
+          add t3, t3, -8
+          add t1, t1, 8
+          add t2, t2, 8
+          beqz t3, .Lcopy_forward.%=
+          ret
+
+        .Lcopy_backwards.%=:
+          ld t4, -8(t1)
+          sd t4, -8(t2)
+          add t3, t3, -8
+          add t1, t1, -8
+          add t2, t2, -8
+          beqz t3, .Lcopy_backwards.%=
+          ret
+
+        .Ltrampoline_end.%=:
+        .popsection
+
+        lla %[start], .Ltrampoline_start.%=
+        lla %[end], .Ltrampoline_end.%=
+        )"""
+        : [start] "=r"(code), [end] "=r"(code_end)
+        : [kernel_offset] "i"(offsetof(TrampolineArgs, kernel)),
+          [data_offset] "i"(offsetof(TrampolineArgs, zbi)),
+          [src_offset] "i"(offsetof(RelocateTarget, src)),
+          [dst_offset] "i"(offsetof(RelocateTarget, src)),
+          [count_offset] "i"(offsetof(RelocateTarget, count)),
+          [backwards_offset] "i"(offsetof(RelocateTarget, backwards)),
+          [zbi_dst_offset] "i"(offsetof(TrampolineArgs, data_zbi)),
+          [entry] "i"(offsetof(TrampolineArgs, entry)));
+    size = code_end - code;
+#else
+#error "what architecture?"
 #endif
     return {code, size};
   }

@@ -13,7 +13,8 @@ variant("strict-align") {
   cflags = [ "-mstrict-align" ]
 }
 
-if (current_cpu == "arm64" && toolchain_environment == "kernel.phys") {
+if (toolchain_environment == "kernel.phys" ||
+    toolchain_environment == "kernel.efi") {
   # arm64-specific definitions for things in <phys/address-space.h>.
   static_library("address-space") {
     visibility = [ "//zircon/kernel/phys:address-space" ]
@@ -78,6 +79,14 @@ if (current_cpu == "arm64" && toolchain_environment == "kernel.phys") {
     sources = [ "arch-on-physload-handoff.cc" ]
     include_dirs = [ "//zircon/kernel/phys" ]
     deps = [ "//zircon/kernel/phys:physload.header" ]
+  }
+
+  source_set("arch-boot-zbi") {
+    sources = [ "arch-boot-zbi.cc" ]
+    deps = [
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:boot-zbi.deps",
+    ]
   }
 }
 

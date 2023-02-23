@@ -1,0 +1,70 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/config/riscv64/riscv64.gni")
+import("//build/toolchain/toolchain_environment.gni")
+
+if (toolchain_base_environment == "kernel") {
+  # These set the ABI contract between C++ and assembly code.
+  # This is kept consistent between the kernel proper and phys
+  # so (pure PIC) assembly code should be callable from either.
+  config("abi") {
+    # This is RV64GC minus F and D.  No FP state should be touched by compiled
+    # code in the kernel.
+    _march = "rv64imac"
+    _features = fuchsia_riscv_profile.u64_mandatory
+
+    # These are implied by G, which we don't use because it implies F and D.
+    _features += [
+      "zicsr",
+      "zifencei",
+    ]
+
+    # We always use the `pause` instruction even though it's optional in the
+    # RVA20U64 profile. It's a HINT instruction so it's treated as a NOP by
+    # CPUs that don't support it.
+    _features += [ "zihintpause" ]
+
+    foreach(feature, _features) {
+      _march += "_$feature"
+    }
+
+    cflags = [
+      "-march=$_march",
+      "-mabi=lp64",  # vs lp64d for userland.
+    ]
+
+    # This is the default for -fPIC and Clang warns about specifying it.
+    if (!toolchain_variant.is_pic_default) {
+      # Don't use .sdata/.sbss sections so the linker won't ever relax accesses
+      # into using the gp register, which we reserve in the kernel for percpu.
+      cflags += [ "-msmall-data-limit=0" ]
+    }
+
+    if (!is_gcc) {
+      cflags += [
+        # Use shadow-call-stack rather than safe-stack for the kernel,
+        # regardless of the compiler's default.
+        "-fno-sanitize=safe-stack",
+        "-fsanitize=shadow-call-stack",
+      ]
+    }
+
+    # Assembly code needs to use `#if __has_feature(...)` so make sure
+    # it always sees all the same `-fsanitize=...` flags and the like.
+    asmflags = cflags
+    ldflags = cflags
+  }
+
+  # This is used pervasively throughout the kernel on riscv64.
+  config("kernel") {
+    # For #include <arch/foo.h>.
+    include_dirs = [ "include" ]
+  }
+
+  source_set("riscv64") {
+  }
+}

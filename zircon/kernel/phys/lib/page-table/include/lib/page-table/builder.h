@@ -18,6 +18,9 @@ namespace page_table {
 using AddressSpaceBuilder = ::page_table::x86::AddressSpaceBuilder;
 #elif defined(__aarch64__)
 using AddressSpaceBuilder = ::page_table::arm64::AddressSpaceBuilder;
+#elif defined(__riscv)
+// TODO(mcgrathr): stub for now
+using AddressSpaceBuilder = AddressSpaceBuilderInterface;
 #else
 #error Unknown architecture.
 #endif

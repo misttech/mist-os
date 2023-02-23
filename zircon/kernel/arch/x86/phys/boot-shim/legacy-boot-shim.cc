@@ -7,6 +7,7 @@
 #include "legacy-boot-shim.h"
 
 #include <lib/acpi_lite.h>
+#include <lib/arch/zbi-boot.h>
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>

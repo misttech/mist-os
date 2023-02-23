@@ -16,6 +16,10 @@
 #elif defined(__x86_64__)
   add %rdi, %rdi
   lea (%rdi, %rdi, 4), %rax
+#elif defined(__riscv)
+  sll a1, a0, 2
+  add a1, a1, a0
+  sll a0, a1, 1
 #else
   .error "unknown architecture"
 #endif

@@ -9,7 +9,6 @@ import("//build/info/info.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zircon/zircon_cpu.gni")
-import("//zircon/kernel/arch/$zircon_cpu/phys/phys.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/params.gni")
 import("kernel_elf_binary.gni")
@@ -51,7 +50,7 @@ if (current_toolchain == default_toolchain) {
 
       toolchain_tags = [ "kernel" ]
 
-      configs = [ "//zircon/kernel/phys:phys_config" ] + phys_configs
+      configs = [ "//zircon/kernel/phys:phys_config" ]
 
       # Always enable frame pointers. This works because frame_pointers
       # is added as part of :phys_config below.
@@ -62,10 +61,17 @@ if (current_toolchain == default_toolchain) {
         "instrumentation-runtime",
       ]
 
-      # Append the arch-specific lists.  The phys/phys.gni file in each
-      # arch subdirectory defines phys_* lists to append to the parameters.
-      toolchain_tags += phys_tags
-      exclude_variant_tags += phys_exclude_variant_tags
+      # Append the arch-specific lists.  The phys/phys.gni file in each arch
+      # subdirectory defines phys_* lists to append to the parameters.  Since
+      # this is evaluated in the default toolchain where current_cpu is not
+      # necessarily the same as the cpu we're defining for, import the right
+      # phys.gni file only into a local scope.
+      phys = {
+        import("//zircon/kernel/arch/$kernel_cpu/phys/phys.gni")
+      }
+      configs += phys.phys_configs
+      toolchain_tags += phys.phys_tags
+      exclude_variant_tags += phys.phys_exclude_variant_tags
     }
   }
 } else if (toolchain_environment == "kernel.phys") {
@@ -458,20 +464,28 @@ if (toolchain_environment == "kernel.phys" ||
     ]
   }
 
-  source_set("boot-zbi") {
+  source_set("boot-zbi.deps") {
+    visibility = [
+      ":boot-zbi",
+      "$arch_phys:arch-boot-zbi",
+    ]
     public = [ "include/phys/boot-zbi.h" ]
-    sources = [ "boot-zbi.cc" ]
     public_deps = [
       ":allocation",
       ":main",
       ":stdio",
       "//src/lib/zbitl",
-      "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/system/ulib/pretty",
       "//zircon/system/ulib/zx",
     ]
+  }
+
+  source_set("boot-zbi") {
+    sources = [ "boot-zbi.cc" ]
+    public_deps = [ ":boot-zbi.deps" ]
+    deps = [ "$arch_phys:arch-boot-zbi" ]
   }
 
   source_set("handoff-entropy") {
@@ -598,10 +612,10 @@ group("boot_tests") {
   ]
   if (all_cpu_phys_boot_tests) {
     foreach(cpu, standard_fuchsia_cpus) {
-      deps += [
-        "efi:boot_tests(//zircon/kernel/phys/efi:kernel.efi_$cpu)",
-        "test:$cpu",
-      ]
+      deps += [ "test:$cpu" ]
+      if (cpu != "riscv64") {  # TODO(mcgrathr): EFI not there yet
+        deps += [ "efi:boot_tests(//zircon/kernel/phys/efi:kernel.efi_$cpu)" ]
+      }
     }
   }
 }

@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_
 
-#include <lib/arch/zbi-boot.h>
 #include <lib/fit/result.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/view.h>
@@ -142,6 +141,10 @@ class BootZbi {
 
   void InitKernel(Allocation kernel);
   void InitData(Allocation data);
+
+  // Front-end for arch::ZbiBoot(Raw) with arch-specific extra arguments.
+  [[noreturn]] static void ZbiBoot(zircon_kernel_t* kernel, void* arg);
+  [[noreturn]] static void ZbiBootRaw(uintptr_t entry, void* data);
 
  private:
   void InitKernelFromItem();

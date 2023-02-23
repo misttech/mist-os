@@ -7,6 +7,7 @@
 #include "physboot.h"
 
 #include <inttypes.h>
+#include <lib/arch/zbi-boot.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/code-patches.h>
 #include <lib/code-patching/code-patching.h>

@@ -64,12 +64,12 @@ if (current_cpu == "x64") {
     },
   ]
 }
-if (current_cpu == "arm64") {
+if (current_cpu == "arm64" || current_cpu == "riscv64") {
   qemu_boot_formats += [
     {
       name = "linuxboot"
       environment = phys_toolchain
-      deps = [ "//zircon/kernel/arch/arm64/phys:linuxboot" ]
+      deps = [ "//zircon/kernel/arch/$current_cpu/phys:linuxboot" ]
       timeout = qemu_short_timeout
     },
   ]

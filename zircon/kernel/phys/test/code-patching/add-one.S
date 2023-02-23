@@ -20,6 +20,9 @@
   mov %rdi, %rax
 0:
   add $1, %rax
+#elif defined(__riscv)
+0:
+  add a0, a0, 1
 #else
   .error "unknown architecture"
 #endif
