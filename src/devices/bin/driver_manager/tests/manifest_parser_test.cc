@@ -6,32 +6,6 @@
 
 #include <zxtest/zxtest.h>
 
-TEST(ManifestParserTest, BootUrl) {
-  json_parser::JSONParser parser;
-  auto doc = parser.ParseFromString(
-      "[ { \"driver_url\": \"fuchsia-boot:///#driver/my-driver.so\"} ]", "test");
-  ASSERT_FALSE(parser.HasError());
-
-  auto result = ParseDriverManifest(std::move(doc));
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  ASSERT_EQ(result.value().size(), 1);
-  ASSERT_EQ(result.value()[0].driver_url, "fuchsia-boot:///#driver/my-driver.so");
-}
-
-TEST(ManifestParserTest, FuchsiaUrl) {
-  json_parser::JSONParser parser;
-  auto doc = parser.ParseFromString(
-      "[ { \"driver_url\": \"fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so\"} ]",
-      "test");
-  ASSERT_FALSE(parser.HasError());
-
-  auto result = ParseDriverManifest(std::move(doc));
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  ASSERT_EQ(result.value().size(), 1);
-  ASSERT_EQ(result.value()[0].driver_url,
-            "fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so");
-}
-
 TEST(ManifestParserTest, FuchsiaUrlToPath) {
   auto result = GetPathFromUrl("fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so");
   ASSERT_EQ(result.status_value(), ZX_OK);

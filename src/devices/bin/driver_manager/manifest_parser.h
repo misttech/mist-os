@@ -7,8 +7,9 @@
 
 #include <lib/zx/result.h>
 
+#include <string>
+
 #include "src/devices/lib/log/log.h"
-#include "src/lib/json_parser/json_parser.h"
 
 // Get the path to the base directory of a package.
 zx::result<std::string> GetBasePathFromUrl(const std::string& url);
@@ -20,14 +21,5 @@ zx::result<std::string> GetPathFromUrl(const std::string& url);
 
 // Returns true if url starts with 'fuchsia-boot://'
 bool IsFuchsiaBootScheme(std::string_view url);
-
-struct DriverManifestEntry {
-  std::string driver_url;
-};
-
-using DriverManifestEntries = std::vector<DriverManifestEntry>;
-
-zx::result<DriverManifestEntries> ParseDriverManifestFromPath(const std::string& path);
-zx::result<DriverManifestEntries> ParseDriverManifest(rapidjson::Document manifest);
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_MANIFEST_PARSER_H_

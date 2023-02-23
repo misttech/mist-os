@@ -3,13 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/cpp_fuzzer.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":driver-manager-fuzzers" ]
+  deps = []
 
   # TODO(fxbug.dev/86747): Failed test disabled on coverage.
   # Please fix the failure and remove the condition below.
@@ -56,7 +55,6 @@ source_set("manifest_parser") {
   public_deps = [
     "//sdk/lib/fdio",
     "//src/devices/lib/log",
-    "//src/lib/json_parser",
     "//src/lib/pkg_url",
     "//zircon/system/ulib/zx",
   ]
@@ -275,20 +273,6 @@ executable("manifest_parser_test") {
 
 fuchsia_unittest_component("manifest_parser_test_component") {
   deps = [ ":manifest_parser_test" ]
-}
-
-cpp_fuzzer("manifest-parser-fuzzer") {
-  sources = [ "manifest_parser_fuzzer.cc" ]
-  deps = [ ":manifest_parser" ]
-}
-
-fuchsia_fuzzer_component("manifest-parser-fuzzer-component") {
-  manifest = "meta/manifest-parser-fuzzer.cml"
-  deps = [ ":manifest-parser-fuzzer" ]
-}
-
-fuchsia_fuzzer_package("driver-manager-fuzzers") {
-  cpp_fuzzer_components = [ ":manifest-parser-fuzzer-component" ]
 }
 
 fuchsia_test_package("driver-manager-tests") {
