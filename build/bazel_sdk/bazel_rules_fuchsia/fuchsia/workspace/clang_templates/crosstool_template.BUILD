@@ -34,7 +34,6 @@ filegroup(
     srcs = [
         "//:bin/clang",
         "//:bin/clang++",
-        "//:bin/clang-%{CLANG_VERSION}",
         "//:bin/clang-cpp",
         "//:bin/llvm-strip",
     ],
