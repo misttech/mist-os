@@ -13,17 +13,18 @@
 #include <lib/zx/time.h>
 #include <threads.h>
 
-#include <optional>
+#include <vector>
 
 #include <ddktl/device.h>
-#include <fbl/array.h>
 #include <soc/aml-common/aml-i2c.h>
 
 namespace aml_i2c {
 
 class AmlI2cDev {
  public:
-  AmlI2cDev() = default;
+  AmlI2cDev(zx::interrupt irq, zx::event event, fdf::MmioBuffer regs_iobuff)
+      : irq_(std::move(irq)), event_(std::move(event)), regs_iobuff_(std::move(regs_iobuff)) {}
+
   ~AmlI2cDev() {
     irq_.destroy();
     if (irqthrd_) {
@@ -31,16 +32,25 @@ class AmlI2cDev {
     }
   }
 
-  zx_status_t Init(unsigned index, aml_i2c_delay_values delay, ddk::PDev pdev);
+  // Move constructor must exist to be able to use std::vector, but should not be called.
+  AmlI2cDev(AmlI2cDev&& other) noexcept
+      : irq_(std::move(other.irq_)),
+        event_(std::move(other.event_)),
+        regs_iobuff_(std::move(other.regs_iobuff_)) {
+    ZX_DEBUG_ASSERT_MSG(false, "Move constructor called");
+  }
+  AmlI2cDev& operator=(AmlI2cDev&& other) = delete;
 
   zx_status_t Transact(const i2c_impl_op_t* rws, size_t count) const;
+
+  void StartIrqThread();
 
  private:
   friend class AmlI2cTest;
 
-  zx_status_t SetTargetAddr(uint16_t addr) const;
-  zx_status_t StartXfer() const;
-  zx_status_t WaitEvent(uint32_t sig_mask) const;
+  void SetTargetAddr(uint16_t addr) const;
+  void StartXfer() const;
+  zx_status_t WaitTransferComplete() const;
 
   zx_status_t Read(uint8_t* buff, uint32_t len, bool stop) const;
   zx_status_t Write(const uint8_t* buff, uint32_t len, bool stop) const;
@@ -49,7 +59,7 @@ class AmlI2cDev {
 
   zx::interrupt irq_;
   zx::event event_;
-  std::optional<fdf::MmioBuffer> regs_iobuff_;
+  fdf::MmioBuffer regs_iobuff_;
   zx::duration timeout_ = zx::sec(1);
   thrd_t irqthrd_{};
 };
@@ -61,8 +71,7 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  AmlI2c(zx_device_t* parent, fbl::Array<AmlI2cDev> i2c_devs)
-      : DeviceType(parent), i2c_devs_(std::move(i2c_devs)) {}
+  explicit AmlI2c(zx_device_t* parent) : DeviceType(parent) {}
 
   void DdkRelease() { delete this; }
 
@@ -75,7 +84,9 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  private:
   friend class AmlI2cTest;
 
-  const fbl::Array<AmlI2cDev> i2c_devs_;
+  zx_status_t InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDev pdev);
+
+  std::vector<AmlI2cDev> i2c_devs_;
 };
 
 }  // namespace aml_i2c
