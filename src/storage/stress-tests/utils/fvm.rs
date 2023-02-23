@@ -102,9 +102,9 @@ impl FvmInstance {
         self.ramdisk.as_dir()
     }
 
-    /// Takes the DirectoryProxy of the ramdisk.
-    pub fn ramdisk_take_dir(&mut self) -> Option<fio::DirectoryProxy> {
-        self.ramdisk.take_dir()
+    /// Shuts down the FVM instance and ramdisk that's hosting it.
+    pub async fn shutdown(self) {
+        self.ramdisk.destroy_and_wait_for_removal().await.expect("failed to shutdown ramdisk");
     }
 }
 

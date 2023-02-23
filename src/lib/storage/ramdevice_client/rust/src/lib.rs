@@ -14,6 +14,8 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
+    futures::stream::TryStreamExt as _,
+    std::path::PathBuf,
 };
 
 const GUID_LEN: usize = 16;
@@ -106,6 +108,8 @@ pub struct RamdiskClient {
     block_dir: Option<fio::DirectoryProxy>,
     block_controller: Option<ControllerProxy>,
     ramdisk_controller: Option<ControllerProxy>,
+    dev_root: fio::DirectoryProxy,
+    instance_name: PathBuf,
 }
 
 impl RamdiskClient {
@@ -131,6 +135,8 @@ impl RamdiskClient {
             block_dir: Some(block_dir),
             block_controller: Some(block_controller),
             ramdisk_controller: Some(ramdisk_controller),
+            dev_root,
+            instance_name: PathBuf::from(instance_name),
         })
     }
 
@@ -182,12 +188,49 @@ impl RamdiskClient {
         Ok(block_client_end)
     }
 
-    /// Remove the underlying ramdisk. This deallocates all resources for this ramdisk, which will
-    /// remove all data written to the associated ramdisk.
+    /// Starts unbinding the underlying ramdisk and returns before the device is removed. This
+    /// deallocates all resources for this ramdisk, which will remove all data written to the
+    /// associated ramdisk.
     pub async fn destroy(mut self) -> Result<(), Error> {
         let proxy =
             self.ramdisk_controller.take().ok_or_else(|| anyhow!("ControllerProxy is invalid"))?;
         Ok(proxy.schedule_unbind().await?.map_err(zx::Status::from_raw)?)
+    }
+
+    /// Unbinds the underlying ramdisk and waits for the device and all child devices to be removed.
+    /// This deallocates all resources for this ramdisk, which will remove all data written to the
+    /// associated ramdisk.
+    pub async fn destroy_and_wait_for_removal(mut self) -> Result<(), Error> {
+        // Calling `schedule_unbind` on the ramdisk controller initiates the unbind process but
+        // doesn't wait for anything to complete. The unbinding process starts at the ramdisk and
+        // propagates down through the child devices. FIDL connections are closed during the unbind
+        // process so the ramdisk controller connection will be closed before connections to the
+        // child block device. After unbinding, the drivers are removed starting at the children and
+        // ending at the ramdisk. During the removal phase, the devices are removed from devfs.
+        // Waiting for the removal of the ramdisk from devfs should be sufficient to ensure that no
+        // clients can interact with the ramdisk or its descendant devices after this function
+        // returns.
+
+        let ramdisk_controller = self
+            .ramdisk_controller
+            .take()
+            .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
+        let ramctl =
+            device_watcher::recursive_wait_and_open_directory(&self.dev_root, RAMCTL_PATH).await?;
+        // Create the watcher before unbinding the device so the remove event won't be missed.
+        let mut watcher = fuchsia_vfs_watcher::Watcher::new(&ramctl).await?;
+
+        ramdisk_controller.schedule_unbind().await?.map_err(zx::Status::from_raw)?;
+
+        while let Some(msg) = watcher.try_next().await? {
+            if msg.event == fuchsia_vfs_watcher::WatchEvent::REMOVE_FILE
+                && msg.filename == self.instance_name
+            {
+                break;
+            }
+        }
+
+        Ok(())
     }
 
     /// Consume the RamdiskClient without destroying the underlying ramdisk. The caller must
@@ -213,7 +256,7 @@ impl Drop for RamdiskClient {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {super::*, assert_matches::assert_matches};
 
     // Note that if these tests flake, all downstream tests that depend on this crate may too.
 
@@ -295,5 +338,38 @@ mod tests {
         assert_eq!(protocol, fio::NODE_PROTOCOL_NAME.as_bytes());
 
         ramdisk.destroy().await.expect("failed to destroy the ramdisk");
+    }
+
+    #[fuchsia::test]
+    async fn destroy_and_wait_for_removal() {
+        let mut ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
+        let instance_name = ramdisk.instance_name.to_str().unwrap().to_string();
+        let ramctl =
+            device_watcher::recursive_wait_and_open_directory(&ramdisk.dev_root, RAMCTL_PATH)
+                .await
+                .unwrap();
+
+        // Sanity check that the ramdisk is in devfs.
+        fuchsia_fs::directory::open_directory(&ramctl, &instance_name, fio::OpenFlags::empty())
+            .await
+            .expect("The ramdisk should be openable");
+        let block_controller = ramdisk.take_controller().unwrap();
+
+        ramdisk.destroy_and_wait_for_removal().await.unwrap();
+
+        // After `destroy_and_wait_for_removal`, connections to the child block device should be
+        // closed and the ramdisk should no longer be in devfs.
+        let err =
+            block_controller.get_topological_path().await.expect_err("channel should be closed");
+        assert_matches!(
+            err,
+            fidl::Error::ClientChannelClosed { status: zx::Status::PEER_CLOSED, protocol_name: _ }
+        );
+
+        let err =
+            fuchsia_fs::directory::open_directory(&ramctl, &instance_name, fio::OpenFlags::empty())
+                .await
+                .expect_err("The ramdisk should not be openable");
+        assert_matches!(err, fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND));
     }
 }
