@@ -14,18 +14,6 @@
 
 #include <ddktl/device.h>
 
-// This header defines three classes: SpiChild, SpiFidlChild, and SpiBanjoChild. They are arranged
-// in the node topology as follows:
-//
-//   spi --> SpiDevice (from spi.h)
-//     spi-0-0 --> SpiChild
-//       spi-fidl-0-0 --> SpiFidlChild
-//       spi-banjo-0-0 --> SpiBanjoChild
-//
-// SpiDevice and SpiChild implement the actual SPI logic; SpiFidlChild and SpiBanjoChild serve the
-// fuchsia.hardware.spi protocols over FIDL and Banjo, respectively, but delegate to their SpiChild
-// parent for the SPI operations. SpiChild also exposes a /dev/class/spi entry.
-
 namespace spi {
 
 class SpiDevice;
@@ -36,7 +24,7 @@ using SpiChildType =
                 ddk::Unbindable>;
 
 class SpiChild : public SpiChildType,
-                 public ddk::SpiProtocol<SpiChild>,
+                 public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
                  public fidl::WireServer<fuchsia_hardware_spi::Device> {
  public:
   SpiChild(zx_device_t* parent, ddk::SpiImplProtocolClient spi, uint32_t chip_select,
@@ -45,7 +33,8 @@ class SpiChild : public SpiChildType,
         spi_(spi),
         cs_(chip_select),
         has_siblings_(has_siblings),
-        dispatcher_(dispatcher) {}
+        dispatcher_(dispatcher),
+        outgoing_(dispatcher) {}
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -80,7 +69,7 @@ class SpiChild : public SpiChildType,
   void Bind(async_dispatcher_t* dispatcher,
             fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end);
 
-  spi_protocol_ops_t& spi_protocol_ops() { return spi_protocol_ops_; }
+  zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
  private:
   const ddk::SpiImplProtocolClient spi_;
@@ -94,47 +83,7 @@ class SpiChild : public SpiChildType,
     std::optional<ddk::UnbindTxn> unbind_txn;
   };
   std::optional<Binding> binding_;
-};
-
-class SpiFidlChild;
-using SpiFidlChildType = ddk::Device<SpiFidlChild>;
-
-// An SPI child device that serves the fuchsia.hardware.spi/Device FIDL
-// protocol. Note that while SpiChild also serves this protocol, it does not
-// expose it in its outgoing directory for its children to use, while
-// SpiFidlChild does. Otherwise, it simply delegates all its FIDL methods to
-// SpiChild.
-//
-// See SpiBanjoChild for the corresponding Banjo sibling device.
-class SpiFidlChild : public SpiFidlChildType {
- public:
-  SpiFidlChild(zx_device_t* parent, SpiChild* spi, async_dispatcher_t* dispatcher);
-
-  void DdkRelease();
-
-  zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
-
- private:
-  // SpiChild is the parent of SpiFidlChild so it is guaranteed to outlive it,
-  // and this pointer will always remain valid.
-  SpiChild* spi_;
   component::OutgoingDirectory outgoing_;
-};
-
-class SpiBanjoChild;
-using SpiBanjoChildType = ddk::Device<SpiBanjoChild, ddk::GetProtocolable>;
-
-class SpiBanjoChild : public SpiBanjoChildType {
- public:
-  SpiBanjoChild(zx_device_t* parent, SpiChild* spi) : SpiBanjoChildType(parent), spi_(spi) {}
-
-  void DdkRelease() { delete this; }
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
-
- private:
-  // SpiChild is the parent of SpiBanjoChild so it is guaranteed to outlive it,
-  // and this pointer will always remain valid.
-  SpiChild* spi_;
 };
 
 }  // namespace spi
