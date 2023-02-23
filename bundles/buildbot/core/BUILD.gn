@@ -62,7 +62,7 @@ group("no_e2e_dep") {
     "//src/media/bundles:examples",
     "//src/media/bundles:services",
     "//src/media/bundles:tools",
-    "//third_party/go:tests",
+    "//third_party:tests",
 
     # Used by tests
     "//src/diagnostics/archivist:archivist-for-embedding",

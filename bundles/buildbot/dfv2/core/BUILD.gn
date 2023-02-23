@@ -59,7 +59,7 @@ group("core") {
     "//src/media/bundles:examples",
     "//src/media/bundles:services",
     "//src/media/bundles:tools",
-    "//third_party/go:tests",
+    "//third_party:tests",
     "//tools:tests_no_e2e",
   ]
 
@@ -178,7 +178,6 @@ group("core") {
     "//third_party/boringssl:boringssl-fuzzers",
     "//third_party/boringssl:boringssl_tests",
     "//third_party/libc-tests:nacl-libc-tests",
-    "//third_party/pigweed:tests",
     "//tools/whereiscl:whereiscl_test($host_toolchain)",
   ]
 
