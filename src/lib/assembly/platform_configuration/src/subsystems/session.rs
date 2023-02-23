@@ -8,20 +8,27 @@ use anyhow::ensure;
 pub(crate) struct SessionConfig;
 impl DefineSubsystemConfiguration<String> for SessionConfig {
     fn define_configuration(
-        _context: &ConfigurationContext<'_>,
+        context: &ConfigurationContext<'_>,
         session_url: &String,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // Configure the session URL.
-        ensure!(
-            session_url.is_empty() || session_url.starts_with("fuchsia-pkg://"),
-            "valid session URLs must start with `fuchsia-pkg://`, got `{}`",
-            session_url
-        );
-        builder
-            .package("session_manager")
-            .component("meta/session_manager.cm")?
-            .field("session_url", session_url.to_owned())?;
+        if *context.feature_set_level == FeatureSupportLevel::Minimal {
+            // Configure the session URL.
+            ensure!(
+                session_url.is_empty() || session_url.starts_with("fuchsia-pkg://"),
+                "valid session URLs must start with `fuchsia-pkg://`, got `{}`",
+                session_url
+            );
+            builder
+                .package("session_manager")
+                .component("meta/session_manager.cm")?
+                .field("session_url", session_url.to_owned())?;
+        } else {
+            ensure!(
+                session_url.is_empty(),
+                "sessions are only supported with the 'Minimal' feature set level"
+            );
+        }
 
         Ok(())
     }

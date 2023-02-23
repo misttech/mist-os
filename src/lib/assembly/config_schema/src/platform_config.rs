@@ -111,6 +111,13 @@ pub struct PlatformConfig {
 ///   +--> minimal.gni  (Minimal)
 ///         +--> core.gni
 ///               +--> (everything else)
+///
+/// The `Utility` level is between `Bootstrap` and `Minimal`, adding the `/core`
+/// realm and those children of `/core` needed by all systems that include
+/// `/core`.
+///
+/// The standard (default) level is `Minimal`. It is the level that should be
+/// used by products' main system.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Default)]
 pub enum FeatureSupportLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
@@ -127,6 +134,12 @@ pub enum FeatureSupportLevel {
     #[serde(alias = "bringup")]
     #[serde(rename = "bootstrap")]
     Bootstrap,
+
+    /// This is the smallest configuration that includes the `/core` realm, and
+    /// is best suited for utility-type systems such as recovery.  The "main"
+    /// system for a product should not use this, and instead use the default.
+    #[serde(rename = "utility")]
+    Utility,
 
     /// This is the smallest "full Fuchsia" configuration.  This has a netstack,
     /// can update itself, and has all the subsystems that are required to

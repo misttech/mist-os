@@ -83,6 +83,9 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             (FeatureSupportLevel::Bootstrap, _) => {
                 vec!["common_bootstrap"]
             }
+            (FeatureSupportLevel::Utility, _) => {
+                vec!["common_bootstrap", "common_core_realm"]
+            }
             (FeatureSupportLevel::Minimal, BuildType::Eng) => {
                 vec![
                     "common_bootstrap",

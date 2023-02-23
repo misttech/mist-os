@@ -28,8 +28,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut archivist_config = builder.bootfs().component("meta/archivist.cm")?;
 
         match (context.build_type, context.feature_set_level) {
-            // Always clear bind_services for bootstrap (bringup).
-            (_, FeatureSupportLevel::Bootstrap) => {
+            // Always clear bind_services for bootstrap (bringup) and utility
+            // systems.
+            (_, FeatureSupportLevel::Bootstrap) | (_, FeatureSupportLevel::Utility) => {
                 bind_services.clear();
             }
             // Detect isn't present on user builds.

@@ -22,6 +22,13 @@ use assembly_config_schema::{BoardInformation, BuildType};
 ///         +--> core.gni
 ///               +--> (everything else)
 ///
+/// The `Utility` level is between `Bootstrap` and `Minimal`, adding the `/core`
+/// realm and those children of `/core` needed by all systems that include
+/// `/core`.
+///
+/// The standard, default, level is `Minimal`, and is the level that should be
+/// used by products' main system.
+///
 /// Note:  This version of the enum does not contain the
 /// `assembly_config_schema::FeatureSetLevel::Empty` option, as that is instead
 /// represented as `Option::None`, with the other values as an
@@ -34,6 +41,11 @@ pub(crate) enum FeatureSupportLevel {
     ///
     /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
     Bootstrap,
+
+    /// This is the smallest configuration that includes the `/core` realm, and
+    /// is best suited for utility-type systems such as recovery.  The "main"
+    /// system for a product should not use this, and instead use the default.
+    Utility,
 
     /// This is the smallest "full Fuchsia" configuration.  This has a netstack,
     /// can update itself, and has all the subsystems that are required to
@@ -52,6 +64,9 @@ impl FeatureSupportLevel {
             assembly_config_schema::FeatureSupportLevel::Empty => None,
             assembly_config_schema::FeatureSupportLevel::Bootstrap => {
                 Some(FeatureSupportLevel::Bootstrap)
+            }
+            assembly_config_schema::FeatureSupportLevel::Utility => {
+                Some(FeatureSupportLevel::Utility)
             }
             assembly_config_schema::FeatureSupportLevel::Minimal => {
                 Some(FeatureSupportLevel::Minimal)
