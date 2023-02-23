@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    component_debug::{capability, list, show},
+    component_debug::{capability, cli::*},
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
@@ -11,46 +11,41 @@ use {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn list() {
-    let explorer = connect_to_protocol::<fsys::RealmExplorerMarker>().unwrap();
-    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let mut instances = list::get_all_instances(&explorer, &query, None).await.unwrap();
+    let mut instances = list_cmd_serialized(None, realm_query).await.unwrap();
 
     assert_eq!(instances.len(), 3);
 
     let instance = instances.remove(0);
-    assert_eq!(instance.state, list::InstanceState::Started);
     assert_eq!(instance.moniker, AbsoluteMoniker::root());
-    assert!(instance.url.unwrap().ends_with("#meta/test.cm"));
-    assert!(!instance.is_cmx);
+    assert!(instance.url.ends_with("#meta/test.cm"));
+    let resolved = instance.resolved_info.unwrap();
+    resolved.execution_info.unwrap();
 
     let instance = instances.remove(0);
     assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/echo_server").unwrap());
-    assert_eq!(instance.url.unwrap(), "#meta/echo_server.cm");
-    assert!(!instance.is_cmx);
+    assert!(instance.url.ends_with("#meta/echo_server.cm"));
 
     let instance = instances.remove(0);
     assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/foo").unwrap());
-    assert_eq!(instance.url.unwrap(), "#meta/foo.cm");
-    assert!(!instance.is_cmx);
+    assert!(instance.url.ends_with("#meta/foo.cm"));
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn show() {
-    let explorer = connect_to_protocol::<fsys::RealmExplorerMarker>().unwrap();
-    let query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     let mut instances =
-        show::find_instances("test.cm".to_string(), &explorer, &query).await.unwrap();
+        show_cmd_serialized("test.cm".to_string(), realm_query.clone()).await.unwrap();
 
     assert_eq!(instances.len(), 1);
     let instance = instances.remove(0);
 
     assert!(instance.url.ends_with("#meta/test.cm"));
     assert!(instance.moniker.is_root());
-    assert!(!instance.is_cmx);
-    assert!(instance.resolved.is_some());
     let resolved = instance.resolved.unwrap();
+    assert!(resolved.resolved_url.ends_with("#meta/test.cm"));
 
     assert!(resolved.config.is_none());
 
@@ -68,17 +63,18 @@ async fn show() {
     // minfs
     assert_eq!(resolved.exposed_capabilities.len(), 3);
 
+    // This package must have a merkle root.
+    assert!(resolved.merkle_root.is_some());
+
     // We do not verify the contents of the execution, because they are largely dependent on
     // the Rust Test Runner
-    assert!(resolved.started.is_some());
+    resolved.started.unwrap();
 
-    let mut instances =
-        show::find_instances("foo.cm".to_string(), &explorer, &query).await.unwrap();
+    let mut instances = show_cmd_serialized("foo.cm".to_string(), realm_query).await.unwrap();
     assert_eq!(instances.len(), 1);
     let instance = instances.remove(0);
     assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/foo").unwrap());
-    assert_eq!(instance.url, "#meta/foo.cm");
-    assert!(!instance.is_cmx);
+    assert!(instance.url.ends_with("#meta/foo.cm"));
 
     let resolved = instance.resolved.unwrap();
     assert!(resolved.started.is_none());

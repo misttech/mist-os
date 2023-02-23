@@ -5,7 +5,8 @@ use {
     crate::io::Directory,
     anyhow::Result,
     fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd, ServerEnd},
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_config as fcconfig, fidl_fuchsia_component_decl as fcdecl,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_io::DirectoryProxy,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_async::Task,
@@ -64,12 +65,13 @@ fn serve_manifest_bytes_iterator(
 }
 
 pub fn serve_realm_query_instances(instances: Vec<fsys::Instance>) -> fsys::RealmQueryProxy {
-    serve_realm_query(instances, HashMap::new(), HashMap::new())
+    serve_realm_query(instances, HashMap::new(), HashMap::new(), HashMap::new())
 }
 
 pub fn serve_realm_query(
     instances: Vec<fsys::Instance>,
     manifests: HashMap<String, fcdecl::Component>,
+    configs: HashMap<String, fcconfig::ResolvedConfig>,
     dirs: HashMap<(String, fsys::OpenDirType), TempDir>,
 ) -> fsys::RealmQueryProxy {
     let (client, mut stream) = create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
@@ -84,6 +86,14 @@ pub fn serve_realm_query(
     Task::spawn(async move {
         loop {
             match stream.next().await.unwrap().unwrap() {
+                fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
+                    eprintln!("GetInstance call for {}", moniker);
+                    if let Some(instance) = instance_map.get(&moniker) {
+                        responder.send(&mut Ok(instance.clone())).unwrap();
+                    } else {
+                        responder.send(&mut Err(fsys::GetInstanceError::InstanceNotFound)).unwrap();
+                    }
+                }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
                     eprintln!("GetManifest call for {}", moniker);
                     if let Some(manifest) = manifests.get(&moniker) {
@@ -91,6 +101,16 @@ pub fn serve_realm_query(
                         responder.send(&mut Ok(iterator)).unwrap();
                     } else {
                         responder.send(&mut Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                    }
+                }
+                fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
+                    eprintln!("GetStructuredConfig call for {}", moniker);
+                    if let Some(config) = configs.get(&moniker) {
+                        responder.send(&mut Ok(config.clone())).unwrap();
+                    } else {
+                        responder
+                            .send(&mut Err(fsys::GetStructuredConfigError::InstanceNotFound))
+                            .unwrap();
                     }
                 }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {

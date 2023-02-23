@@ -12,11 +12,9 @@ pub mod doctor;
 pub mod explore;
 pub mod io;
 pub mod lifecycle;
-pub mod list;
 pub mod path;
 pub mod query;
 pub mod realm;
-pub mod show;
 pub mod storage;
 
 #[cfg(test)]
