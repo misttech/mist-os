@@ -79,6 +79,7 @@ class Engine {
 
   flatland::GlobalTopologyData last_global_topology_data_ = {};
 
+  bool first_frame_with_image_is_rendered_ = false;
   uint64_t last_rendered_frame_ = 0;
 
   // TODO(fxbug.dev/76640): hack so that we can call DisplayCompositor::AddDisplay() when we first

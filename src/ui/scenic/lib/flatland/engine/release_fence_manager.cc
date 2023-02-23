@@ -42,8 +42,10 @@ void ReleaseFenceManager::OnDirectScanoutFrame(
 }
 
 void ReleaseFenceManager::OnVsync(uint64_t frame_number, zx::time timestamp) {
+#ifndef NDEBUG
   FX_DCHECK(frame_number >= last_vsync_frame_number_);
   last_vsync_frame_number_ = frame_number;
+#endif
 
   // Any previous frames which haven't already been presented have been skipped; they will never
   // show up on-screen.  Any release fences associated with them should be signaled at this time.
@@ -115,6 +117,13 @@ void ReleaseFenceManager::MaybeEraseFrameRecord(FrameRecordIterator it) {
 
 void ReleaseFenceManager::SignalOrScheduleSignalForReleaseFences(
     uint64_t frame_number, FrameRecord& current_frame, std::vector<zx::event> release_fences) {
+#ifndef NDEBUG
+  if (!first_frame_number_) {
+    first_frame_number_ = frame_number - 1;
+    last_frame_number_ = first_frame_number_.value();
+    last_vsync_frame_number_ = first_frame_number_.value();
+  }
+#endif
   auto previous_frame_it = FindFrameRecord(frame_number - 1);
   if (previous_frame_it == frame_records_.end()) {
     // Signal the fences immediately, since there is no previous frame whose content corresponds to
@@ -208,8 +217,10 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewDirect
 
 void ReleaseFenceManager::StashFrameRecord(uint64_t frame_number,
                                            std::unique_ptr<FrameRecord> record) {
+#ifndef NDEBUG
   FX_DCHECK(frame_number == last_frame_number_ + 1);
   last_frame_number_ = frame_number;
+#endif
   frame_records_[frame_number] = std::move(record);
 }
 
@@ -217,11 +228,13 @@ ReleaseFenceManager::FrameRecordIterator ReleaseFenceManager::FindFrameRecord(
     uint64_t frame_number) {
   auto it = frame_records_.find(frame_number);
 
+#ifndef NDEBUG
   // This is an invariant that should be maintained by the rest of ReleaseFenceManager.  However,
   // if it is violated, this method is nevertheless careful not to return a pointer to bogus memory.
-  FX_DCHECK((frame_number == 0) == (it == frame_records_.end()))
-      << "Should find a record for any frame #, except frame 0.  Requested frame #: "
+  FX_DCHECK((frame_number == first_frame_number_) == (it == frame_records_.end()))
+      << "Should find a record for any frame #, except first frame.  Requested frame #: "
       << frame_number;
+#endif
 
   return it;
 }

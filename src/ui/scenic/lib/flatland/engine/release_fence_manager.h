@@ -10,6 +10,7 @@
 #include <lib/zx/event.h>
 
 #include <map>
+#include <optional>
 #include <vector>
 
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
@@ -176,8 +177,11 @@ class ReleaseFenceManager final {
 
   FrameRecordMap frame_records_;
 
+#ifndef NDEBUG
+  std::optional<uint64_t> first_frame_number_ = std::nullopt;
   uint64_t last_frame_number_ = 0;
   uint64_t last_vsync_frame_number_ = 0;
+#endif
 };
 
 }  // namespace flatland

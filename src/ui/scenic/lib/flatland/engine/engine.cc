@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 
+#include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
@@ -127,6 +128,18 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                  hw_display->height_in_px());
 
   last_global_topology_data_ = std::move(scene_state.topology_data);
+
+  // Don't render any initial frames if there is no image that could actually be rendered. We do
+  // this to avoid triggering any changes in the display until we have content ready to render. We
+  // invoke |callback| to continue the render loop.
+  if (!first_frame_with_image_is_rendered_) {
+    if (scene_state.images.empty()) {
+      const auto now = async::Now(async_get_default_dispatcher());
+      callback({now, now});
+      return;
+    }
+    first_frame_with_image_is_rendered_ = true;
+  }
 
   flatland_compositor_->RenderFrame(frame_number, presentation_time,
                                     {{.rectangles = std::move(scene_state.image_rectangles),
