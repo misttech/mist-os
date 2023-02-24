@@ -128,6 +128,13 @@ config("internal.config") {
     "ZSTDLIB_VISIBLE=",
   ]
 
+  if (is_fuchsia) {
+    defines += [
+      "PLATFORM_POSIX_VERSION=200112L",
+      "ZSTD_SETPRIORITY_SUPPORT=0",
+    ]
+  }
+
   if (!is_fuchsia && !is_kernel) {
     defines += [ "ZSTD_MULTITHREAD" ]
   }
@@ -237,6 +244,17 @@ if (!is_kernel) {
       "src/programs/zstdcli_trace.c",
       "src/programs/zstdcli_trace.h",
     ]
+
+    # TODO(fxbug.dev/122487): temporary for soft transition
+    _zstd_changelog = read_file("src/CHANGELOG", "list lines")
+    _zstd_v154 = _zstd_changelog[0] == "v1.5.4 (Feb 2023)"
+    if (_zstd_v154) {
+      sources += [
+        "src/programs/fileio_asyncio.c",
+        "src/programs/fileio_asyncio.h",
+      ]
+    }
+
     configs += [
       ":internal.config",
       "//build/config:Wno-strict-prototypes",
