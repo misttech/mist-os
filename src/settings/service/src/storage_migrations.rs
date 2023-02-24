@@ -4,7 +4,6 @@
 
 use crate::base::SettingType;
 use crate::migration::{MigrationError, MigrationManager, MigrationManagerBuilder};
-use crate::policy::PolicyType;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
 use std::collections::HashSet;
@@ -16,7 +15,6 @@ mod v1653667210_light_migration_teardown;
 
 pub(crate) fn register_migrations(
     settings: &HashSet<SettingType>,
-    _policies: &HashSet<PolicyType>,
     migration_dir: DirectoryProxy,
     store_proxy: StoreProxy,
 ) -> Result<MigrationManager, MigrationError> {
@@ -63,11 +61,10 @@ mod tests {
         let _ = settings.insert(SettingType::NightMode);
         let _ = settings.insert(SettingType::Privacy);
         let _ = settings.insert(SettingType::Setup);
-        let policies = HashSet::new();
         let (directory_proxy, _) = create_proxy::<DirectoryMarker>().unwrap();
         let (store_proxy, _) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
-        if let Err(e) = register_migrations(&settings, &policies, directory_proxy, store_proxy) {
+        if let Err(e) = register_migrations(&settings, directory_proxy, store_proxy) {
             panic!("Unable to register migrations: Err({e:?})");
         }
     }

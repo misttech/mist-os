@@ -29,7 +29,7 @@ use crate::job;
 #[cfg(test)]
 use crate::message::base::MessengerType;
 use crate::message::message_hub;
-use crate::policy::{self, PolicyType};
+use crate::policy;
 use crate::storage;
 
 pub struct MessageHub;
@@ -62,7 +62,6 @@ pub(crate) mod message {
 #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
 pub enum Address {
     Handler(SettingType),
-    PolicyHandler(PolicyType),
     EventSource(event::Address),
     Storage,
     /// This value is reserved for testing purposes.

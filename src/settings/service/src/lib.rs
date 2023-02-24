@@ -449,8 +449,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
         let mut settings = HashSet::new();
         settings.extend(self.settings);
 
-        let policies = HashSet::new();
-
         for registrant in &self.registrants {
             for dependency in registrant.get_dependencies() {
                 match dependency {
@@ -488,7 +486,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
 
                 let migration_manager = storage_migrations::register_migrations(
                     &settings,
-                    &policies,
                     Clone::clone(&storage_dir),
                     store_proxy,
                 )
