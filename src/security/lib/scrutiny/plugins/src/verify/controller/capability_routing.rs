@@ -35,45 +35,41 @@ enum ResultBySeverity {
 
 impl From<VerifyRouteResult> for ResultBySeverity {
     fn from(verify_route_result: VerifyRouteResult) -> Self {
-        match verify_route_result.result {
-            Ok(route) => OkResult {
+        match verify_route_result.error {
+            None => OkResult {
                 using_node: verify_route_result.using_node,
                 capability: verify_route_result.capability,
-                route,
+                route: verify_route_result.route,
             }
             .into(),
-            Err(error) => {
+            Some(error) => {
                 match error {
                     // It is expected that some components in a build may have
                     // children that are not included in the build.
-                    CapabilityRouteError::ComponentNotFound(_)
-                    | CapabilityRouteError::ValidationNotImplemented(_)
-                    | CapabilityRouteError::AnalyzerModelError(
-                        AnalyzerModelError::ComponentInstanceError(
-                            ComponentInstanceError::InstanceNotFound { .. },
-                        ),
+                    AnalyzerModelError::ComponentInstanceError(
+                        ComponentInstanceError::InstanceNotFound { .. },
                     )
-                    | CapabilityRouteError::AnalyzerModelError(AnalyzerModelError::RoutingError(
+                    | AnalyzerModelError::RoutingError(
                         RoutingError::EnvironmentFromChildInstanceNotFound { .. },
-                    ))
-                    | CapabilityRouteError::AnalyzerModelError(AnalyzerModelError::RoutingError(
+                    )
+                    | AnalyzerModelError::RoutingError(
                         RoutingError::ExposeFromChildInstanceNotFound { .. },
-                    ))
-                    | CapabilityRouteError::AnalyzerModelError(AnalyzerModelError::RoutingError(
+                    )
+                    | AnalyzerModelError::RoutingError(
                         RoutingError::OfferFromChildInstanceNotFound { .. },
-                    ))
-                    | CapabilityRouteError::AnalyzerModelError(AnalyzerModelError::RoutingError(
+                    )
+                    | AnalyzerModelError::RoutingError(
                         RoutingError::UseFromChildInstanceNotFound { .. },
-                    )) => WarningResult {
+                    ) => WarningResult {
                         using_node: verify_route_result.using_node,
                         capability: verify_route_result.capability,
-                        warning: error.into(),
+                        warning: CapabilityRouteError::AnalyzerModelError(error).into(),
                     }
                     .into(),
                     _ => ErrorResult {
                         using_node: verify_route_result.using_node,
                         capability: verify_route_result.capability,
-                        error: error.into(),
+                        error: CapabilityRouteError::AnalyzerModelError(error).into(),
                     }
                     .into(),
                 }

@@ -9,11 +9,11 @@ use {
             ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
         },
         error::RoutingError,
+        mapper::DebugRouteMapper,
         router::{
             find_matching_expose, CapabilityVisitor, ErrorNotFoundInChild, Expose, ExposeVisitor,
             Offer, OfferVisitor, RoutingStrategy, Sources,
         },
-        DebugRouteMapper,
     },
     async_trait::async_trait,
     cm_rust::{

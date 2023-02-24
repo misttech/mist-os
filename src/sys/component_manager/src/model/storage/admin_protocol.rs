@@ -44,7 +44,7 @@ use {
     },
     lazy_static::lazy_static,
     moniker::{AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
-    routing::component_instance::ComponentInstanceInterface,
+    routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     std::{
         convert::{From, TryFrom},
         path::PathBuf,
@@ -305,10 +305,14 @@ impl StorageAdmin {
         })?;
 
         let storage_capability_source_info = {
-            match route_capability(RouteRequest::StorageBackingDirectory(storage_decl), &component)
-                .await?
+            match route_capability(
+                RouteRequest::StorageBackingDirectory(storage_decl),
+                &component,
+                &mut NoopRouteMapper,
+            )
+            .await?
             {
-                (RouteSource::StorageBackingDirectory(storage_source), ()) => storage_source,
+                RouteSource::StorageBackingDirectory(storage_source) => storage_source,
                 _ => unreachable!("expected RouteSource::StorageBackingDirectory"),
             }
         };
@@ -777,10 +781,12 @@ impl StorageAdmin {
                 match ::routing::route_storage_and_backing_directory(
                     use_storage.clone(),
                     &component,
+                    &mut NoopRouteMapper,
+                    &mut NoopRouteMapper,
                 )
                 .await
                 {
-                    Ok((storage_source_info, relative_moniker, _, _))
+                    Ok((storage_source_info, relative_moniker))
                         if storage_source_info == storage_capability_source_info =>
                     {
                         storage_users.push(relative_moniker);

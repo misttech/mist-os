@@ -7,7 +7,6 @@ use {
         component_model::{BuildAnalyzerModelError, Child},
         environment::EnvironmentForAnalyzer,
         node_path::NodePath,
-        route::RouteMapper,
     },
     async_trait::async_trait,
     cm_moniker::{InstancedAbsoluteMoniker, InstancedChildMoniker},
@@ -162,7 +161,6 @@ impl ComponentInstanceForAnalyzer {
 #[async_trait]
 impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     type TopInstance = TopInstanceForAnalyzer;
-    type DebugRouteMapper = RouteMapper;
 
     fn instanced_moniker(&self) -> &InstancedAbsoluteMoniker {
         &self.instanced_moniker
@@ -210,10 +208,6 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         ComponentInstanceError,
     > {
         self.resolve()
-    }
-
-    fn new_route_mapper() -> RouteMapper {
-        RouteMapper::new()
     }
 }
 

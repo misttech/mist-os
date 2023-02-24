@@ -80,7 +80,7 @@ impl ComponentResolversVisitor {
                 routing::RouteRequest::Resolver(resolver),
                 &resolver_register_instance,
             ) {
-                Ok((source, _route)) => {
+                (Ok(source), _route) => {
                     match source {
                         RouteSource::Resolver(resolver) => {
                             match resolver.source_instance().upgrade()? {
@@ -97,7 +97,7 @@ impl ComponentResolversVisitor {
                         }
                     }
                 }
-                Err(err) => {
+                (Err(err), _route) => {
                     eprintln!(
                         "Ignoring invalid resolver configuration for {}: {:#}",
                         instance.abs_moniker(),

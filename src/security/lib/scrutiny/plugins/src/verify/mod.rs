@@ -19,11 +19,10 @@ use {
         },
     },
     cm_fidl_analyzer::{
-        node_path::NodePath,
-        route::{CapabilityRouteError, RouteSegment},
-        serde_ext::ErrorWithMessage,
+        node_path::NodePath, route::CapabilityRouteError, serde_ext::ErrorWithMessage,
     },
     cm_rust::{CapabilityName, CapabilityTypeName},
+    routing::mapper::RouteSegment,
     scrutiny::prelude::*,
     serde::{Deserialize, Serialize},
     std::{collections::HashSet, path::PathBuf, sync::Arc},
@@ -1184,7 +1183,7 @@ mod tests {
                                       "target_path": "/",
                                       "type": "directory"
                                   },
-                                  "node_path": "/child"
+                                  "moniker": "/child"
                               },
                               {
                                   "action": "offer_by",
@@ -1204,7 +1203,7 @@ mod tests {
                                       "target_name": "good_dir",
                                       "type": "directory"
                                   },
-                                  "node_path": "/"
+                                  "moniker": "/"
                               },
                               {
                                   "action": "declare_by",
@@ -1214,7 +1213,7 @@ mod tests {
                                       "source_path": null,
                                       "type": "directory"
                                   },
-                                  "node_path": "/"
+                                  "moniker": "/"
                               }
                           ],
                           "using_node": "/child"

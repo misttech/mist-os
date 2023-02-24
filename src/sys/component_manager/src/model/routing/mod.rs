@@ -30,7 +30,8 @@ use {
     },
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
-        error::AvailabilityRoutingError, route_capability, route_storage_and_backing_directory,
+        error::AvailabilityRoutingError, mapper::NoopRouteMapper, route_capability,
+        route_storage_and_backing_directory,
     },
     cm_moniker::{InstancedExtendedMoniker, InstancedRelativeMoniker},
     cm_rust::{ExposeDecl, UseDecl, UseStorageDecl},
@@ -57,15 +58,21 @@ pub(super) async fn route_and_open_capability(
 ) -> Result<(), ModelError> {
     match route_request {
         RouteRequest::UseStorage(use_storage_decl) => {
-            let (storage_source_info, relative_moniker, _storage_route, _dir_route) =
-                route_storage_and_backing_directory(use_storage_decl, target).await?;
+            let (storage_source_info, relative_moniker) = route_storage_and_backing_directory(
+                use_storage_decl,
+                target,
+                &mut NoopRouteMapper,
+                &mut NoopRouteMapper,
+            )
+            .await?;
             open_storage_capability(&storage_source_info, relative_moniker, target, open_options)
                 .await
         }
         _ => {
             let optional_use = route_request.target_use_optional();
-            let (route_source, _route) =
-                route_capability(route_request, target).await.map_err(|err| {
+            let route_source = route_capability(route_request, target, &mut NoopRouteMapper)
+                .await
+                .map_err(|err| {
                     if optional_use {
                         match err {
                             RoutingError::AvailabilityRoutingError(_) => {
@@ -104,10 +111,16 @@ pub async fn route(
 ) -> Result<(), RoutingError> {
     match route_request {
         RouteRequest::UseStorage(use_storage_decl) => {
-            route_storage_and_backing_directory(use_storage_decl, target).await?;
+            route_storage_and_backing_directory(
+                use_storage_decl,
+                target,
+                &mut NoopRouteMapper,
+                &mut NoopRouteMapper,
+            )
+            .await?;
         }
         _ => {
-            route_capability(route_request, target).await?;
+            route_capability(route_request, target, &mut NoopRouteMapper).await?;
         }
     }
     Ok(())
@@ -412,8 +425,13 @@ pub(super) async fn route_and_delete_storage(
     use_storage_decl: UseStorageDecl,
     target: &Arc<ComponentInstance>,
 ) -> Result<(), ModelError> {
-    let (storage_source_info, relative_moniker, _storage_route, _dir_route) =
-        route_storage_and_backing_directory(use_storage_decl, target).await?;
+    let (storage_source_info, relative_moniker) = route_storage_and_backing_directory(
+        use_storage_decl,
+        target,
+        &mut NoopRouteMapper,
+        &mut NoopRouteMapper,
+    )
+    .await?;
 
     storage::delete_isolated_storage(
         storage_source_info,

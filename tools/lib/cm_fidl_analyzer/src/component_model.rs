@@ -7,7 +7,7 @@ use {
         component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer},
         match_absolute_component_urls,
         node_path::NodePath,
-        route::{RouteMap, RouteSegment, VerifyRouteResult},
+        route::VerifyRouteResult,
         PkgUrlMatch,
     },
     anyhow::{anyhow, Context, Result},
@@ -38,9 +38,10 @@ use {
             component_has_relative_url, find_first_absolute_ancestor_url, RunnerRegistry,
         },
         error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
+        mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
         route_capability, route_event_stream_capability, route_storage_and_backing_directory,
-        DebugRouteMapper, RouteInfo, RouteRequest, RouteSource,
+        RouteInfo, RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{
@@ -660,20 +661,23 @@ impl ComponentModelForAnalyzer {
             }
         };
 
-        match Self::route_capability_sync(route_request, target) {
-            Ok((source, route)) => match self.check_use_source(&source) {
+        let (route_result, route) = Self::route_capability_sync(route_request, target);
+        match route_result {
+            Ok(source) => match self.check_use_source(&source) {
                 Ok(()) => {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: capability.clone(),
-                        result: Ok(route.into()),
+                        error: None,
+                        route,
                     });
                 }
                 Err(err) => {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: capability.clone(),
-                        result: Err(err.into()),
+                        error: Some(err),
+                        route,
                     });
                 }
             },
@@ -685,7 +689,8 @@ impl ComponentModelForAnalyzer {
             Err(err) => results.push(VerifyRouteResult {
                 using_node: target.node_path(),
                 capability: capability.clone(),
-                result: Err(AnalyzerModelError::from(err).into()),
+                error: Some(err.into()),
+                route,
             }),
         };
 
@@ -757,6 +762,10 @@ impl ComponentModelForAnalyzer {
 
     /// Given a `UseDecl` for a capability at an instance `target`, first routes the capability
     /// to its source and then validates the source.
+    ///
+    /// This returns a vector of route results because some capabilities (storage) cause
+    /// multiple route verifications (route storage + backing directory) and both results
+    /// are relevant.
     pub fn check_use_capability(
         self: &Arc<Self>,
         use_decl: &UseDecl,
@@ -766,89 +775,100 @@ impl ComponentModelForAnalyzer {
         let route_result = match use_decl.clone() {
             UseDecl::Directory(use_directory_decl) => {
                 let capability = use_directory_decl.source_name.clone();
-                match Self::route_capability_sync(
+                let (result, route) = Self::route_capability_sync(
                     RouteRequest::UseDirectory(use_directory_decl),
                     target,
-                ) {
-                    Ok((source, route)) => (Ok((source, vec![route])), capability),
-                    // Ignore any route that failed due to a void offer to a target with an
-                    // optional dependency on the capability.
-                    Err(RoutingError::AvailabilityRoutingError(
-                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                    )) => return vec![],
-                    Err(err) => (Err(err.into()), capability),
+                );
+
+                // Ignore any route that failed due to a void offer to a target with an
+                // optional dependency on the capability.
+                if let Err(RoutingError::AvailabilityRoutingError(
+                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                )) = result
+                {
+                    return vec![];
                 }
+
+                (result.map_err(|e| e.into()), vec![route], capability)
             }
             UseDecl::Event(use_event_decl) => {
                 let capability = use_event_decl.target_name.clone();
-                match self.uses_event_source_protocol(&target.decl) {
-                    true => {
-                        match Self::route_capability_sync(
-                            RouteRequest::UseEvent(use_event_decl),
-                            target,
-                        ) {
-                            Ok((source, route)) => (Ok((source, vec![route])), capability),
-                            // Ignore any route that failed due to a void offer to a target with an
-                            // optional dependency on the capability.
-                            Err(RoutingError::AvailabilityRoutingError(
-                                AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                            )) => return vec![],
-                            Err(err) => (Err(err.into()), capability),
-                        }
+                if self.uses_event_source_protocol(&target.decl) {
+                    let (result, route) =
+                        Self::route_capability_sync(RouteRequest::UseEvent(use_event_decl), target);
+
+                    // Ignore any route that failed due to a void offer to a target with an
+                    // optional dependency on the capability.
+                    if let Err(RoutingError::AvailabilityRoutingError(
+                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                    )) = result
+                    {
+                        return vec![];
                     }
-                    false => (
+
+                    (result.map_err(|e| e.into()), vec![route], capability)
+                } else {
+                    (
                         Err(AnalyzerModelError::MissingEventSourceProtocol(capability.to_string())),
+                        vec![],
                         capability,
-                    ),
+                    )
                 }
             }
             UseDecl::Protocol(use_protocol_decl) => {
                 let capability = use_protocol_decl.source_name.clone();
-                match Self::route_capability_sync(
+                let (result, route) = Self::route_capability_sync(
                     RouteRequest::UseProtocol(use_protocol_decl),
                     target,
-                ) {
-                    Ok((source, route)) => (Ok((source, vec![route])), capability),
-                    // Ignore any route that failed due to a void offer to a target with an
-                    // optional dependency on the capability.
-                    Err(RoutingError::AvailabilityRoutingError(
-                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                    )) => return vec![],
-                    Err(err) => (Err(err.into()), capability),
+                );
+
+                // Ignore any route that failed due to a void offer to a target with an
+                // optional dependency on the capability.
+                if let Err(RoutingError::AvailabilityRoutingError(
+                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                )) = result
+                {
+                    return vec![];
                 }
+
+                (result.map_err(|e| e.into()), vec![route], capability)
             }
             UseDecl::Service(use_service_decl) => {
                 let capability = use_service_decl.source_name.clone();
-                match Self::route_capability_sync(
+                let (result, route) = Self::route_capability_sync(
                     RouteRequest::UseService(use_service_decl.clone()),
                     target,
-                ) {
-                    Ok((source, route)) => (Ok((source, vec![route])), capability),
-                    // Ignore any route that failed due to a void offer to a target with an
-                    // optional dependency on the capability.
-                    Err(RoutingError::AvailabilityRoutingError(
-                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                    )) => return vec![],
-                    Err(err) => (Err(err.into()), capability),
+                );
+
+                // Ignore any route that failed due to a void offer to a target with an
+                // optional dependency on the capability.
+                if let Err(RoutingError::AvailabilityRoutingError(
+                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                )) = result
+                {
+                    return vec![];
                 }
+
+                (result.map_err(|e| e.into()), vec![route], capability)
             }
             UseDecl::Storage(use_storage_decl) => {
                 let capability = use_storage_decl.source_name.clone();
-                match Self::route_storage_and_backing_directory_sync(use_storage_decl, target) {
-                    Ok((storage_source, _relative_moniker, storage_route, dir_route)) => (
-                        Ok((
-                            RouteSource::StorageBackingDirectory(storage_source),
-                            vec![storage_route, dir_route],
-                        )),
-                        capability,
-                    ),
-                    // Ignore any route that failed due to a void offer to a target with an
-                    // optional dependency on the capability.
-                    Err(RoutingError::AvailabilityRoutingError(
-                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                    )) => return vec![],
-                    Err(err) => (Err(err.into()), capability),
+                let (result, storage_route, dir_route) =
+                    Self::route_storage_and_backing_directory_sync(use_storage_decl, target);
+
+                // Ignore any route that failed due to a void offer to a target with an
+                // optional dependency on the capability.
+                if let Err(RoutingError::AvailabilityRoutingError(
+                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                )) = result
+                {
+                    return vec![];
                 }
+
+                let result = result
+                    .map(|(source, _)| RouteSource::StorageBackingDirectory(source))
+                    .map_err(|e| e.into());
+                (result, vec![storage_route, dir_route], capability)
             }
             UseDecl::EventStream(use_event_stream_decl) => {
                 let capability = use_event_stream_decl.source_name.clone();
@@ -856,36 +876,45 @@ impl ComponentModelForAnalyzer {
                     RouteRequest::UseEventStream(use_event_stream_decl),
                     target,
                 ) {
-                    Ok((source, route)) => (Ok((source, vec![route])), capability),
-                    Err(err) => (Err(err.into()), capability),
+                    (Ok(source), route) => (Ok(source), vec![route], capability),
+                    (Err(err), route) => (Err(err.into()), vec![route], capability),
                 }
             }
             _ => unimplemented![],
         };
         match route_result {
-            (Ok((source, routes)), capability) => match self.check_use_source(&source) {
+            (Ok(source), routes, capability) => match self.check_use_source(&source) {
                 Ok(()) => {
                     for route in routes.into_iter() {
                         results.push(VerifyRouteResult {
                             using_node: target.node_path(),
                             capability: capability.clone(),
-                            result: Ok(route.into()),
+                            error: None,
+                            route,
                         });
                     }
                 }
                 Err(err) => {
+                    for route in routes.into_iter() {
+                        results.push(VerifyRouteResult {
+                            using_node: target.node_path(),
+                            capability: capability.clone(),
+                            error: Some(err.clone()),
+                            route,
+                        });
+                    }
+                }
+            },
+            (Err(err), routes, capability) => {
+                for route in routes.into_iter() {
                     results.push(VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: capability.clone(),
-                        result: Err(err.into()),
+                        error: Some(err.clone()),
+                        route,
                     });
                 }
-            },
-            (Err(err), capability) => results.push(VerifyRouteResult {
-                using_node: target.node_path(),
-                capability: capability.clone(),
-                result: Err(err.into()),
-            }),
+            }
         }
         results
     }
@@ -900,17 +929,14 @@ impl ComponentModelForAnalyzer {
     ) -> Option<VerifyRouteResult> {
         match self.request_from_expose(expose_decl) {
             Some(request) => {
-                let result = match Self::route_capability_sync(request, target) {
-                    Ok((source, route)) => match self.check_use_source(&source) {
-                        Ok(()) => Ok(route.into()),
-                        Err(err) => Err(err.into()),
-                    },
-                    Err(err) => Err(AnalyzerModelError::from(err).into()),
-                };
+                let (result, route) = Self::route_capability_sync(request, target);
+                let error =
+                    result.map_err(|e| e.into()).and_then(|s| self.check_use_source(&s)).err();
                 Some(VerifyRouteResult {
                     using_node: target.node_path(),
                     capability: expose_decl.target_name().clone(),
-                    result,
+                    error,
+                    route,
                 })
             }
             None => None,
@@ -926,23 +952,20 @@ impl ComponentModelForAnalyzer {
     ) -> Option<VerifyRouteResult> {
         match program_decl.runner {
             Some(ref runner) => {
-                let mut route = RouteMap::from_segments(vec![RouteSegment::RequireRunner {
-                    node_path: target.node_path(),
-                    runner: runner.clone(),
-                }]);
-                match Self::route_capability_sync(RouteRequest::Runner(runner.clone()), target) {
-                    Ok((_source, mut segments)) => {
-                        route.append(&mut segments);
-                        Some(VerifyRouteResult {
-                            using_node: target.node_path(),
-                            capability: runner.clone(),
-                            result: Ok(route.into()),
-                        })
-                    }
+                let (result, route) =
+                    Self::route_capability_sync(RouteRequest::Runner(runner.clone()), target);
+                match result {
+                    Ok(_source) => Some(VerifyRouteResult {
+                        using_node: target.node_path(),
+                        capability: runner.clone(),
+                        error: None,
+                        route,
+                    }),
                     Err(err) => Some(VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: runner.clone(),
-                        result: Err(AnalyzerModelError::from(err).into()),
+                        error: Some(err.into()),
+                        route,
                     }),
                 }
             }
@@ -959,70 +982,59 @@ impl ComponentModelForAnalyzer {
     ) -> VerifyRouteResult {
         let url = Url::parse(target.url()).expect("failed to parse target URL");
         let scheme = url.scheme();
-        let mut route = vec![RouteSegment::RequireResolver {
-            node_path: target.node_path(),
-            scheme: scheme.to_string(),
-        }];
 
-        let check_route = match target.environment.get_registered_resolver(scheme) {
+        match target.environment.get_registered_resolver(scheme) {
             Ok(Some((ExtendedInstanceInterface::Component(instance), resolver))) => {
-                match Self::route_capability_sync(
+                let (route_result, route) = Self::route_capability_sync(
                     RouteRequest::Resolver(resolver.clone()),
                     &instance,
-                ) {
-                    Ok((_source, route)) => VerifyRouteResult {
+                );
+                match route_result {
+                    Ok(_source) => VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: resolver.resolver,
-                        result: Ok(route.into()),
+                        error: None,
+                        route,
                     },
                     Err(err) => VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: resolver.resolver,
-                        result: Err(AnalyzerModelError::from(err).into()),
+                        error: Some(err.into()),
+                        route,
                     },
                 }
             }
             Ok(Some((ExtendedInstanceInterface::AboveRoot(_), resolver))) => {
                 match self.get_builtin_resolver_decl(&resolver) {
                     Ok(decl) => {
-                        let mut route = RouteMap::new();
-                        route.push(RouteSegment::ProvideAsBuiltin { capability: decl });
+                        let route = vec![RouteSegment::ProvideAsBuiltin { capability: decl }];
                         VerifyRouteResult {
                             using_node: target.node_path(),
                             capability: resolver.resolver,
-                            result: Ok(route.into()),
+                            error: None,
+                            route,
                         }
                     }
                     Err(err) => VerifyRouteResult {
                         using_node: target.node_path(),
                         capability: resolver.resolver,
-                        result: Err(err.into()),
+                        error: Some(err),
+                        route: vec![],
                     },
                 }
             }
             Ok(None) => VerifyRouteResult {
                 using_node: target.node_path(),
                 capability: "".into(),
-                result: Err(AnalyzerModelError::MissingResolverForScheme(scheme.to_string()).into()),
+                error: Some(AnalyzerModelError::MissingResolverForScheme(scheme.to_string())),
+                route: vec![],
             },
             Err(err) => VerifyRouteResult {
                 using_node: target.node_path(),
                 capability: "".into(),
-                result: Err(AnalyzerModelError::from(err).into()),
+                error: Some(AnalyzerModelError::from(err)),
+                route: vec![],
             },
-        };
-
-        let check_result = match check_route.result {
-            Ok(mut segments) => {
-                route.append(&mut segments);
-                Ok(route.into())
-            }
-            Err(err) => Err(err.into()),
-        };
-        VerifyRouteResult {
-            using_node: target.node_path(),
-            capability: check_route.capability,
-            result: check_result,
         }
     }
 
@@ -1213,30 +1225,26 @@ impl ComponentModelForAnalyzer {
     pub fn route_capability_sync(
         request: RouteRequest,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Result<
-        (
-            RouteSource<ComponentInstanceForAnalyzer>,
-            <<ComponentInstanceForAnalyzer as ComponentInstanceInterface>::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-        ),
-        RoutingError>
-    {
-        route_capability(request, target).now_or_never().expect("future was not ready immediately")
+    ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
+        let mut mapper = RouteMapper::new();
+        let result = route_capability(request, target, &mut mapper)
+            .now_or_never()
+            .expect("future was not ready immediately");
+        (result, mapper.get_route())
     }
 
     pub fn route_event_stream_sync(
         request: UseEventStreamDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-        map: &mut Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ExposeEventStreamDecl>>,
-    ) -> Result<
-        (
-            RouteSource<ComponentInstanceForAnalyzer>,
-            <<ComponentInstanceForAnalyzer as ComponentInstanceInterface>::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-        ),
-        RoutingError>
-    {
-        route_event_stream_capability(request, target, map)
+        map: &mut Vec<
+            RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ExposeEventStreamDecl>,
+        >,
+    ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
+        let mut mapper = RouteMapper::new();
+        let result = route_event_stream_capability(request, target, map, &mut mapper)
             .now_or_never()
-            .expect("future was not ready immediately")
+            .expect("future was not ready immediately");
+        (result, mapper.get_route())
     }
 
     // Routes a storage capability and its backing directory from a `ComponentInstanceForAnalyzer` and
@@ -1247,18 +1255,25 @@ impl ComponentModelForAnalyzer {
     fn route_storage_and_backing_directory_sync(
         use_decl: UseStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Result<
-            (
-                StorageCapabilitySource<ComponentInstanceForAnalyzer>,
-                InstancedRelativeMoniker,
-                <<ComponentInstanceForAnalyzer as ComponentInstanceInterface>::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-                <<ComponentInstanceForAnalyzer as ComponentInstanceInterface>::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-            ),
-        RoutingError>
-    {
-        route_storage_and_backing_directory(use_decl, target)
-            .now_or_never()
-            .expect("future was not ready immediately")
+    ) -> (
+        Result<
+            (StorageCapabilitySource<ComponentInstanceForAnalyzer>, InstancedRelativeMoniker),
+            RoutingError,
+        >,
+        Vec<RouteSegment>,
+        Vec<RouteSegment>,
+    ) {
+        let mut storage_mapper = RouteMapper::new();
+        let mut backing_dir_mapper = RouteMapper::new();
+        let result = route_storage_and_backing_directory(
+            use_decl,
+            target,
+            &mut storage_mapper,
+            &mut backing_dir_mapper,
+        )
+        .now_or_never()
+        .expect("future was not ready immediately");
+        (result, storage_mapper.get_route(), backing_dir_mapper.get_route())
     }
 
     pub fn collect_config_by_url(&self) -> anyhow::Result<BTreeMap<String, ConfigFields>> {

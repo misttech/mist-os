@@ -40,7 +40,6 @@ use {
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
-        DebugRouteMapper,
     },
     async_trait::async_trait,
     cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
@@ -1055,20 +1054,9 @@ fn offer_target_mut(offer: &mut fdecl::Offer) -> Option<&mut Option<fdecl::Ref>>
     }
 }
 
-// A unit struct that implements `DebugRouteMapper` without recording any capability routes.
-#[derive(Debug, Clone)]
-pub struct NoopRouteMapper;
-
-impl DebugRouteMapper for NoopRouteMapper {
-    type RouteMap = ();
-
-    fn get_route(self) -> () {}
-}
-
 #[async_trait]
 impl ComponentInstanceInterface for ComponentInstance {
     type TopInstance = ComponentManagerInstance;
-    type DebugRouteMapper = NoopRouteMapper;
 
     fn instanced_moniker(&self) -> &InstancedAbsoluteMoniker {
         &self.instanced_moniker
@@ -1113,10 +1101,6 @@ impl ComponentInstanceInterface for ComponentInstance {
                 err: err.into(),
             }
         })?))
-    }
-
-    fn new_route_mapper() -> NoopRouteMapper {
-        NoopRouteMapper
     }
 }
 

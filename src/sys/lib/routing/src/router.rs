@@ -14,7 +14,8 @@ use {
             TopInstanceInterface,
         },
         error::RoutingError,
-        DebugRouteMapper, RegistrationDecl, RouteInfo,
+        mapper::DebugRouteMapper,
+        RegistrationDecl, RouteInfo,
     },
     cm_rust::{
         name_mappings_to_map, Availability, CapabilityDecl, CapabilityDeclCommon, CapabilityName,

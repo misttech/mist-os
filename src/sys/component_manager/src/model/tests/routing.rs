@@ -28,6 +28,7 @@ use {
     ::routing::{
         capability_source::{AggregateCapability, ComponentCapability, InternalCapability},
         error::ComponentInstanceError,
+        mapper::NoopRouteMapper,
         resolving::ResolverError,
         route_capability,
     },
@@ -2028,9 +2029,13 @@ async fn use_with_destroyed_parent() {
 
     // Now attempt to route the service from "c". Should fail because "b" does not exist so we
     // cannot follow it.
-    let err = route_capability(RouteRequest::UseProtocol(use_protocol_decl), &realm_c)
-        .await
-        .expect_err("routing unexpectedly succeeded");
+    let err = route_capability(
+        RouteRequest::UseProtocol(use_protocol_decl),
+        &realm_c,
+        &mut NoopRouteMapper,
+    )
+    .await
+    .expect_err("routing unexpectedly succeeded");
     assert_matches!(
         err,
         RoutingError::ComponentInstanceError(
@@ -2586,9 +2591,10 @@ async fn route_service_from_parent_collection() {
     let test = RoutingTestBuilder::new("a", components).build().await;
     let b_component = test.model.look_up(&vec!["b"].try_into().unwrap()).await.expect("b instance");
     let a_component = test.model.look_up(&AbsoluteMoniker::root()).await.expect("root instance");
-    let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &b_component)
-        .await
-        .expect("failed to route service");
+    let source =
+        route_capability(RouteRequest::UseService(use_decl), &b_component, &mut NoopRouteMapper)
+            .await
+            .expect("failed to route service");
     match source {
         RouteSource::Service(CapabilitySource::Collection {
             collection_name,
@@ -2703,9 +2709,13 @@ async fn list_service_instances_from_collection() {
 
     let client_component =
         test.model.look_up(&vec!["client"].try_into().unwrap()).await.expect("client instance");
-    let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &client_component)
-        .await
-        .expect("failed to route service");
+    let source = route_capability(
+        RouteRequest::UseService(use_decl),
+        &client_component,
+        &mut NoopRouteMapper,
+    )
+    .await
+    .expect("failed to route service");
     let aggregate_capability_provider = match source {
         RouteSource::Service(CapabilitySource::Collection {
             aggregate_capability_provider,

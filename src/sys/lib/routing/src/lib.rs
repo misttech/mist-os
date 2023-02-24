@@ -11,6 +11,7 @@ pub mod config;
 pub mod environment;
 pub mod error;
 pub mod event;
+pub mod mapper;
 pub mod path;
 pub mod policy;
 pub mod resolving;
@@ -35,6 +36,7 @@ use {
         environment::DebugRegistration,
         error::RoutingError,
         event::EventFilter,
+        mapper::DebugRouteMapper,
         path::PathBufExt,
         rights::Rights,
         router::{
@@ -45,14 +47,14 @@ use {
     },
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityName, DirectoryDecl, EventDecl, ExposeDecl,
-        ExposeDirectoryDecl, ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl,
-        ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDecl, OfferDirectoryDecl,
-        OfferEventDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
-        RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
-        SourceName, StorageDecl, StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventDecl,
-        UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        Availability, CapabilityName, DirectoryDecl, EventDecl, ExposeDirectoryDecl,
+        ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+        ExposeServiceDecl, ExposeSource, OfferDirectoryDecl, OfferEventDecl, OfferEventStreamDecl,
+        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
+        OfferStorageDecl, RegistrationDeclCommon, RegistrationSource, ResolverDecl,
+        ResolverRegistration, RunnerDecl, RunnerRegistration, SourceName, StorageDecl,
+        StorageDirectorySource, UseDirectoryDecl, UseEventDecl, UseEventStreamDecl,
+        UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
@@ -152,130 +154,88 @@ pub enum RouteSource<C: ComponentInstanceInterface> {
     StorageBackingDirectory(StorageCapabilitySource<C>),
 }
 
-/// Provides methods to record and retrieve a summary of a capability route.
-pub trait DebugRouteMapper: Send + Sync + Clone {
-    type RouteMap: std::fmt::Debug;
-
-    #[allow(unused_variables)]
-    fn add_use(&mut self, abs_moniker: AbsoluteMoniker, use_decl: UseDecl) {}
-
-    #[allow(unused_variables)]
-    fn add_offer(&mut self, abs_moniker: AbsoluteMoniker, offer_decl: OfferDecl) {}
-
-    #[allow(unused_variables)]
-    fn add_expose(&mut self, abs_moniker: AbsoluteMoniker, expose_decl: ExposeDecl) {}
-
-    #[allow(unused_variables)]
-    fn add_registration(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        registration_decl: RegistrationDecl,
-    ) {
-    }
-
-    #[allow(unused_variables)]
-    fn add_component_capability(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        capability_decl: CapabilityDecl,
-    ) {
-    }
-
-    #[allow(unused_variables)]
-    fn add_framework_capability(&mut self, capability_name: CapabilityName) {}
-
-    #[allow(unused_variables)]
-    fn add_builtin_capability(&mut self, capability_decl: CapabilityDecl) {}
-
-    #[allow(unused_variables)]
-    fn add_namespace_capability(&mut self, capability_decl: CapabilityDecl) {}
-
-    fn get_route(self) -> Self::RouteMap;
-}
-
 /// Routes a capability to its source.
 ///
 /// If the capability is not allowed to be routed to the `target`, per the
 /// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
-pub async fn route_capability<C>(
+///
+/// The `mapper` is invoked on every step in the routing process and can
+/// be used to record the routing steps.
+pub async fn route_capability<C, M>(
     request: RouteRequest,
     target: &Arc<C>,
-) -> Result<(RouteSource<C>, <C::DebugRouteMapper as DebugRouteMapper>::RouteMap), RoutingError>
+    mapper: &mut M,
+) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
-    let mut mapper = C::new_route_mapper();
-    let source = match request {
+    match request {
         // Route from an ExposeDecl
         RouteRequest::ExposeDirectory(expose_directory_decl) => {
-            route_directory_from_expose(expose_directory_decl, target, &mut mapper).await?
+            route_directory_from_expose(expose_directory_decl, target, mapper).await
         }
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
-            route_protocol_from_expose(expose_protocol_decl, target, &mut mapper).await?
+            route_protocol_from_expose(expose_protocol_decl, target, mapper).await
         }
         RouteRequest::ExposeService(expose_service_decl) => {
-            route_service_from_expose(expose_service_decl, target, &mut mapper).await?
+            route_service_from_expose(expose_service_decl, target, mapper).await
         }
 
         // Route a resolver or runner from an environment
         RouteRequest::Resolver(resolver_registration) => {
-            route_resolver(resolver_registration, target, &mut mapper).await?
+            route_resolver(resolver_registration, target, mapper).await
         }
-        RouteRequest::Runner(runner_name) => {
-            route_runner(&runner_name, target, &mut mapper).await?
-        }
+        RouteRequest::Runner(runner_name) => route_runner(&runner_name, target, mapper).await,
         // Route the backing directory for a storage capability
         RouteRequest::StorageBackingDirectory(storage_decl) => {
-            route_storage_backing_directory(storage_decl, target, &mut mapper).await?
+            route_storage_backing_directory(storage_decl, target, mapper).await
         }
 
         // Route from a UseDecl
         RouteRequest::UseDirectory(use_directory_decl) => {
-            route_directory(use_directory_decl, target, &mut mapper).await?
+            route_directory(use_directory_decl, target, mapper).await
         }
-        RouteRequest::UseEvent(use_event_decl) => {
-            route_event(use_event_decl, target, &mut mapper).await?
-        }
+        RouteRequest::UseEvent(use_event_decl) => route_event(use_event_decl, target, mapper).await,
         RouteRequest::UseEventStream(use_event_stream_decl) => {
-            route_event_stream(use_event_stream_decl, target, &mut mapper).await?
+            route_event_stream(use_event_stream_decl, target, mapper).await
         }
         RouteRequest::UseProtocol(use_protocol_decl) => {
-            route_protocol(use_protocol_decl, target, &mut mapper).await?
+            route_protocol(use_protocol_decl, target, mapper).await
         }
         RouteRequest::UseService(use_service_decl) => {
-            route_service(use_service_decl, target, &mut mapper).await?
+            route_service(use_service_decl, target, mapper).await
         }
         RouteRequest::UseStorage(use_storage_decl) => {
-            route_storage(use_storage_decl, target, &mut mapper).await?
+            route_storage(use_storage_decl, target, mapper).await
         }
 
         // Route from a OfferDecl
         RouteRequest::OfferProtocol(offer_protocol_decl) => {
-            route_protocol_from_offer(offer_protocol_decl, target, &mut mapper).await?
+            route_protocol_from_offer(offer_protocol_decl, target, mapper).await
         }
         RouteRequest::OfferDirectory(offer_directory_decl) => {
-            route_directory_from_offer(offer_directory_decl, target, &mut mapper).await?
+            route_directory_from_offer(offer_directory_decl, target, mapper).await
         }
         RouteRequest::OfferStorage(offer_storage_decl) => {
-            route_storage_from_offer(offer_storage_decl, target, &mut mapper).await?
+            route_storage_from_offer(offer_storage_decl, target, mapper).await
         }
         RouteRequest::OfferService(offer_service_decl) => {
-            route_service_from_offer(offer_service_decl, target, &mut mapper).await?
+            route_service_from_offer(offer_service_decl, target, mapper).await
         }
         RouteRequest::OfferEvent(offer_event_decl) => {
-            route_event_from_offer(offer_event_decl, target, &mut mapper).await?
+            route_event_from_offer(offer_event_decl, target, mapper).await
         }
         RouteRequest::OfferEventStream(offer_event_stream_decl) => {
-            route_event_stream_from_offer(offer_event_stream_decl, target, &mut mapper).await?
+            route_event_stream_from_offer(offer_event_stream_decl, target, mapper).await
         }
         RouteRequest::OfferRunner(offer_runner_decl) => {
-            route_runner_from_offer(offer_runner_decl, target, &mut mapper).await?
+            route_runner_from_offer(offer_runner_decl, target, mapper).await
         }
         RouteRequest::OfferResolver(offer_resolver_decl) => {
-            route_resolver_from_offer(offer_resolver_decl, target, &mut mapper).await?
+            route_resolver_from_offer(offer_resolver_decl, target, mapper).await
         }
-    };
-    Ok((source, mapper.get_route()))
+    }
 }
 
 /// Route information regarding an offer/expose or collection hop
@@ -292,13 +252,14 @@ pub struct RouteInfo<C, O, E> {
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `offer_decl`.
-async fn route_protocol_from_offer<C>(
+async fn route_protocol_from_offer<C, M>(
     offer_decl: OfferProtocolDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut availability_visitor = AvailabilityProtocolVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new()
@@ -325,13 +286,14 @@ where
 /// Routes a Directory capability from `target` to its source, starting from `offer_decl`.
 /// Returns the capability source, along with a `DirectoryState` accumulated from traversing
 /// the route.
-async fn route_directory_from_offer<C>(
+async fn route_directory_from_offer<C, M>(
     offer_decl: OfferDirectoryDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut state = DirectoryState {
         rights: WalkState::new(),
@@ -351,13 +313,14 @@ where
     Ok(RouteSource::Directory(source, state))
 }
 
-async fn route_service_from_offer<C>(
+async fn route_service_from_offer<C, M>(
     offer_decl: OfferServiceDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut availability_visitor = AvailabilityServiceVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
@@ -377,13 +340,14 @@ where
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `offer_decl`.
-async fn route_event_stream_from_offer<C>(
+async fn route_event_stream_from_offer<C, M>(
     offer_decl: OfferEventStreamDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
 
@@ -403,13 +367,14 @@ where
     Ok(RouteSource::EventStream(source))
 }
 
-async fn route_storage_from_offer<C>(
+async fn route_storage_from_offer<C, M>(
     offer_decl: OfferStorageDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut availability_visitor = AvailabilityStorageVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component();
@@ -431,13 +396,14 @@ where
     Ok(RouteSource::Storage(source))
 }
 
-async fn route_event_from_offer<C>(
+async fn route_event_from_offer<C, M>(
     offer_decl: OfferEventDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources =
         AllowedSourcesBuilder::new().framework(InternalCapability::Event).builtin();
@@ -463,13 +429,14 @@ where
     Ok(RouteSource::Event(source))
 }
 
-async fn route_runner_from_offer<C>(
+async fn route_runner_from_offer<C, M>(
     offer_decl: OfferRunnerDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
 
@@ -482,13 +449,14 @@ where
     Ok(RouteSource::Runner(source))
 }
 
-async fn route_resolver_from_offer<C>(
+async fn route_resolver_from_offer<C, M>(
     offer_decl: OfferResolverDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
 
@@ -505,17 +473,17 @@ where
 ///
 /// If the capability is not allowed to be routed to the `target`, per the
 /// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
-pub async fn route_event_stream_capability<C>(
+pub async fn route_event_stream_capability<C, M>(
     request: UseEventStreamDecl,
     target: &Arc<C>,
     route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ExposeEventStreamDecl>>,
-) -> Result<(RouteSource<C>, <C::DebugRouteMapper as DebugRouteMapper>::RouteMap), RoutingError>
+    mapper: &mut M,
+) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
-    let mut mapper = C::new_route_mapper();
-    let source = route_event_stream_with_route(request, target, &mut mapper, route).await?;
-    Ok((source, mapper.get_route()))
+    route_event_stream_with_route(request, target, mapper, route).await
 }
 
 /// Routes a storage capability and its backing directory capability to their sources,
@@ -523,25 +491,21 @@ where
 ///
 /// If either capability is not allowed to be routed to the `target`, per the
 /// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
-pub async fn route_storage_and_backing_directory<C>(
+pub async fn route_storage_and_backing_directory<C, SM, BDM>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
-) -> Result<
-    (
-        StorageCapabilitySource<C>,
-        InstancedRelativeMoniker,
-        <C::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-        <C::DebugRouteMapper as DebugRouteMapper>::RouteMap,
-    ),
-    RoutingError,
->
+    storage_mapper: &mut SM,
+    backing_dir_mapper: &mut BDM,
+) -> Result<(StorageCapabilitySource<C>, InstancedRelativeMoniker), RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    SM: DebugRouteMapper + 'static,
+    BDM: DebugRouteMapper + 'static,
 {
     // First route the storage capability to its source.
-    let (storage_source, storage_route) = {
-        match route_capability(RouteRequest::UseStorage(use_decl), target).await? {
-            (RouteSource::Storage(source), route) => (source, route),
+    let storage_source = {
+        match route_capability(RouteRequest::UseStorage(use_decl), target, storage_mapper).await? {
+            RouteSource::Storage(source) => source,
             _ => unreachable!("expected RouteSource::Storage"),
         }
     };
@@ -566,24 +530,26 @@ where
     match route_capability(
         RouteRequest::StorageBackingDirectory(storage_decl),
         &storage_component_instance,
+        backing_dir_mapper,
     )
     .await?
     {
-        (RouteSource::StorageBackingDirectory(storage_source_info), dir_route) => {
-            Ok((storage_source_info, instanced_relative_moniker, storage_route, dir_route))
+        RouteSource::StorageBackingDirectory(storage_source_info) => {
+            Ok((storage_source_info, instanced_relative_moniker))
         }
         _ => unreachable!("expected RouteSource::StorageBackingDirectory"),
     }
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `use_decl`.
-async fn route_protocol<C>(
+async fn route_protocol<C, M>(
     use_decl: UseProtocolDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new()
         .framework(InternalCapability::Protocol)
@@ -686,13 +652,14 @@ where
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `expose_decl`.
-async fn route_protocol_from_expose<C>(
+async fn route_protocol_from_expose<C, M>(
     expose_decl: ExposeProtocolDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     // This is a noop visitor for exposes
     let mut availability_visitor = AvailabilityProtocolVisitor::required();
@@ -719,13 +686,14 @@ where
     Ok(RouteSource::Protocol(source))
 }
 
-async fn route_service<C>(
+async fn route_service<C, M>(
     use_decl: UseServiceDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     match use_decl.source {
         UseSource::Self_ => {
@@ -753,13 +721,14 @@ where
     }
 }
 
-async fn route_service_from_expose<C>(
+async fn route_service_from_expose<C, M>(
     expose_decl: ExposeServiceDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut availability_visitor = AvailabilityServiceVisitor::required();
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
@@ -868,13 +837,14 @@ impl CapabilityVisitor for DirectoryState {
 /// Routes a Directory capability from `target` to its source, starting from `use_decl`.
 /// Returns the capability source, along with a `DirectoryState` accumulated from traversing
 /// the route.
-async fn route_directory<C>(
+async fn route_directory<C, M>(
     use_decl: UseDirectoryDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     match use_decl.source {
         UseSource::Self_ => {
@@ -915,13 +885,14 @@ where
 /// Routes a Directory capability from `target` to its source, starting from `expose_decl`.
 /// Returns the capability source, along with a `DirectoryState` accumulated from traversing
 /// the route.
-async fn route_directory_from_expose<C>(
+async fn route_directory_from_expose<C, M>(
     expose_decl: ExposeDirectoryDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut state = DirectoryState {
         rights: WalkState::new(),
@@ -973,13 +944,14 @@ where
 
 /// Routes a Storage capability from `target` to its source, starting from `use_decl`.
 /// Returns the StorageDecl and the storage component's instance.
-pub async fn route_to_storage_decl<C>(
+pub async fn route_to_storage_decl<C, M>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<CapabilitySourceInterface<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let mut availability_visitor = AvailabilityStorageVisitor::new(&use_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component();
@@ -993,13 +965,14 @@ where
 
 /// Routes a Storage capability from `target` to its source, starting from `use_decl`.
 /// The backing Directory capability is then routed to its source.
-async fn route_storage<C>(
+async fn route_storage<C, M>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let source = route_to_storage_decl(use_decl, &target, mapper).await?;
     verify_instance_in_component_id_index(&source, target)?;
@@ -1009,13 +982,14 @@ where
 
 /// Routes the backing Directory capability of a Storage capability from `target` to its source,
 /// starting from `storage_decl`.
-async fn route_storage_backing_directory<C>(
+async fn route_storage_backing_directory<C, M>(
     storage_decl: StorageDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     // Storage rights are always READ+WRITE.
     let mut state = DirectoryState::new(fio::RW_STAR_DIR, None, &Availability::Required);
@@ -1056,13 +1030,14 @@ make_noop_visitor!(RunnerVisitor, {
 
 /// Finds a Runner capability that matches `runner` in the `target`'s environment, and then
 /// routes the Runner capability from the environment's component instance to its source.
-async fn route_runner<C>(
+async fn route_runner<C, M>(
     runner: &CapabilityName,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
     let source = match target.environment().get_registered_runner(&runner)? {
@@ -1116,13 +1091,14 @@ make_noop_visitor!(ResolverVisitor, {
 });
 
 /// Routes a Resolver capability from `target` to its source, starting from `registration_decl`.
-async fn route_resolver<C>(
+async fn route_resolver<C, M>(
     registration: ResolverRegistration,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
     let source = RoutingStrategy::new()
@@ -1166,13 +1142,14 @@ impl CapabilityVisitor for EventState {
 }
 
 /// Routes an Event capability from `target` to its source, starting from `use_decl`.
-async fn route_event<C>(
+async fn route_event<C, M>(
     use_decl: UseEventDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources =
         AllowedSourcesBuilder::new().framework(InternalCapability::Event).builtin();
@@ -1192,13 +1169,14 @@ where
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
-async fn route_event_stream<C>(
+async fn route_event_stream<C, M>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
 
@@ -1214,14 +1192,15 @@ where
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
-async fn route_event_stream_with_route<C>(
+async fn route_event_stream_with_route<C, M>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
-    mapper: &mut C::DebugRouteMapper,
+    mapper: &mut M,
     route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ExposeEventStreamDecl>>,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
 {
     let allowed_sources =
         AllowedSourcesBuilder::new().framework(InternalCapability::EventStream).builtin();

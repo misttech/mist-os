@@ -9,15 +9,15 @@ use {
     },
     anyhow::{anyhow, Context, Error, Result},
     cm_fidl_analyzer::{
-        component_model::ComponentModelForAnalyzer,
+        component_model::{AnalyzerModelError, ComponentModelForAnalyzer},
         node_path::NodePath,
-        route::{CapabilityRouteError, RouteSegment, VerifyRouteResult},
+        route::VerifyRouteResult,
     },
     cm_rust::{
         CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ComponentDecl,
         ExposeDecl, OfferDecl, UseDecl,
     },
-    routing::component_instance::ComponentInstanceInterface,
+    routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
     scrutiny::model::{controller::DataController, model::DataModel},
     serde::{Deserialize, Serialize},
     serde_json::{self, json, value::Value},
@@ -290,7 +290,7 @@ pub struct Source {
 /// against routes in the component tree.
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub enum RouteSourceError {
-    CapabilityRouteError(CapabilityRouteError),
+    AnalyzerModelError(AnalyzerModelError),
     RouteSegmentWithoutComponent(RouteSegment),
     RouteSegmentNodePathNotFoundInTree(RouteSegment),
     ComponentInstanceLookupByUrlFailed(String),
@@ -452,13 +452,14 @@ fn check_pkg_source(
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,
 ) -> Option<RouteSourceError> {
-    let node_path = route_segment.node_path();
-    if node_path.is_none() {
+    let moniker = route_segment.moniker();
+    if moniker.is_none() {
         return Some(RouteSourceError::RouteSegmentWithoutComponent(route_segment.clone()));
     }
-    let node_path = node_path.unwrap();
+    let moniker = moniker.unwrap();
+    let node_path = NodePath::from(moniker);
 
-    let get_instance_result = component_model.get_instance(node_path);
+    let get_instance_result = component_model.get_instance(&node_path);
     if get_instance_result.is_err() {
         return Some(RouteSourceError::RouteSegmentNodePathNotFoundInTree(route_segment.clone()));
     }
@@ -497,26 +498,26 @@ fn process_verify_result<'a>(
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,
 ) -> Result<Result<Source, RouteSourceError>> {
-    match verify_result.result {
-        Ok(route_details) => {
-            for route_segment in route_details.iter() {
+    match verify_result.error {
+        None => {
+            for route_segment in verify_result.route.iter() {
                 if let Some(err) = check_pkg_source(route_segment, component_model, components) {
                     return Ok(Err(err));
                 }
             }
 
-            let route_source = route_details.last().ok_or_else(|| {
+            let route_source = verify_result.route.last().ok_or_else(|| {
                 anyhow!(
                     "Route verifier traced empty route for capability matching {:?}",
                     json_or_unformatted(&route.route_match.target, "route target")
                 )
             })?;
-            if let RouteSegment::DeclareBy { node_path, capability } = route_source {
-                let source =
-                    Source { node_path: node_path.clone(), capability: capability.clone() };
+            if let RouteSegment::DeclareBy { moniker, capability } = route_source {
+                let node_path = NodePath::from(moniker.clone());
+                let source = Source { node_path, capability: capability.clone() };
                 let matches_result: Result<Vec<bool>> = vec![
                     route.route_match.source.capability.matches(capability),
-                    route.route_match.source.capability.matches(&route_details),
+                    route.route_match.source.capability.matches(&verify_result.route),
                 ]
                 .into_iter()
                 .map(|r| r)
@@ -535,7 +536,7 @@ fn process_verify_result<'a>(
                 Ok(Err(RouteSourceError::MissingSourceCapability(route_source.clone())))
             }
         }
-        Err(err) => Ok(Err(RouteSourceError::CapabilityRouteError(err))),
+        Some(err) => Ok(Err(RouteSourceError::AnalyzerModelError(err))),
     }
 }
 
@@ -632,9 +633,7 @@ mod tests {
             verify::{collection::V2ComponentModel, collector::component_model::DEFAULT_ROOT_URL},
         },
         anyhow::Result,
-        cm_fidl_analyzer::{
-            component_model::ModelBuilderForAnalyzer, node_path::NodePath, route::RouteSegment,
-        },
+        cm_fidl_analyzer::{component_model::ModelBuilderForAnalyzer, node_path::NodePath},
         cm_rust::{
             Availability, CapabilityPath, CapabilityTypeName, ChildDecl, ComponentDecl,
             DependencyType, DirectoryDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
@@ -646,7 +645,7 @@ mod tests {
         maplit::{hashmap, hashset},
         routing::{
             component_id_index::ComponentIdIndex, config::RuntimeConfig,
-            environment::RunnerRegistry,
+            environment::RunnerRegistry, mapper::RouteSegment,
         },
         scrutiny::prelude::{DataController, DataModel},
         scrutiny_testing::fake::fake_data_model,
@@ -2183,7 +2182,7 @@ mod tests {
                         VerifyRouteSourcesResult{
                             query: config.component_routes[0].routes_to_verify[0].clone(),
                             result: Err(RouteSourceError::RouteSegmentComponentFromUntrustedSource(RouteSegment::UseBy {
-                                node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                                moniker: vec!["two_dir_user"].try_into().unwrap(),
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_root".into(),
@@ -2198,7 +2197,7 @@ mod tests {
                         VerifyRouteSourcesResult{
                             query: config.component_routes[0].routes_to_verify[1].clone(),
                             result: Err(RouteSourceError::RouteSegmentComponentFromUntrustedSource(RouteSegment::UseBy {
-                                node_path: NodePath::absolute_from_vec(vec!["two_dir_user"]),
+                                moniker: vec!["two_dir_user"].try_into().unwrap(),
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_provider".into(),

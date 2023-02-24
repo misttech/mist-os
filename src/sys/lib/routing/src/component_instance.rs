@@ -10,7 +10,6 @@ use {
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
         resolving::{ComponentAddress, ComponentResolutionContext},
-        DebugRouteMapper,
     },
     async_trait::async_trait,
     cm_moniker::InstancedAbsoluteMoniker,
@@ -27,7 +26,6 @@ use {
 #[async_trait]
 pub trait ComponentInstanceInterface: Sized + Send + Sync {
     type TopInstance: TopInstanceInterface + Send + Sync;
-    type DebugRouteMapper: DebugRouteMapper;
 
     /// Returns a new `WeakComponentInstanceInterface<Self>` pointing to `self`.
     fn as_weak(self: &Arc<Self>) -> WeakComponentInstanceInterface<Self> {
@@ -71,9 +69,6 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
     ) -> Result<Box<dyn ResolvedInstanceInterface<Component = Self> + 'a>, ComponentInstanceError>;
-
-    /// Returns a new mapper for recording a capability route during routing.
-    fn new_route_mapper() -> Self::DebugRouteMapper;
 }
 
 /// A trait providing a representation of a resolved component instance.

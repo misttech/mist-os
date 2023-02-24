@@ -61,6 +61,7 @@ rustc_library("routing") {
     "src/error.rs",
     "src/event.rs",
     "src/lib.rs",
+    "src/mapper.rs",
     "src/path.rs",
     "src/policy.rs",
     "src/resolving.rs",

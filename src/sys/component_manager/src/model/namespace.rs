@@ -16,7 +16,8 @@ use {
     },
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
-        rights::Rights, route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
+        mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
+        verify_instance_in_component_id_index, RouteRequest,
     },
     clonable_error::ClonableError,
     cm_logger::scoped::ScopedLogger,
@@ -249,9 +250,9 @@ async fn add_storage_use(
             // children, this resolution will walk the cache-happy path.
             // TODO(dgonyeo): Eventually combine this logic with the general-purpose startup
             // capability check.
-            let mut noop_mapper = ComponentInstance::new_route_mapper();
             if let Ok(source) =
-                route_to_storage_decl(use_storage_decl.clone(), &component, &mut noop_mapper).await
+                route_to_storage_decl(use_storage_decl.clone(), &component, &mut NoopRouteMapper)
+                    .await
             {
                 verify_instance_in_component_id_index(&source, &component)
                     .map_err(|e| NamespacePopulateError::InstanceNotInInstanceIdIndex(e))?;

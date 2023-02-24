@@ -42,6 +42,7 @@ use {
         },
         error::RoutingError,
         event::EventSubscription,
+        mapper::NoopRouteMapper,
         route_capability, RouteRequest, RouteSource,
     },
     std::{
@@ -1865,14 +1866,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expected_source_moniker = AbsoluteMoniker::parse_str("/b").unwrap();
 
         assert_matches!(
-        route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance).await,
-            Ok((RouteSource::Protocol(
+        route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
+            Ok(RouteSource::Protocol(
                 CapabilitySourceInterface::<
                     <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
                     >::Component {
                         capability: ComponentCapability::Protocol(protocol_decl),
                         component,
-                    }), _route)
+                    })
             ) if protocol_decl == expected_protocol_decl && component.abs_moniker == expected_source_moniker
         );
     }
@@ -2139,7 +2140,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
-                &d_component
+                &d_component,
+                &mut NoopRouteMapper
             )
             .await,
             Err(RoutingError::UnsupportedRouteSource { source_type: _ })
@@ -2235,7 +2237,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let d_component =
             model.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
 
-        let (source, _route) = route_capability(
+        let source = route_capability(
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
                 source_name: "foo".into(),
@@ -2244,6 +2246,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 availability: Availability::Required,
             }),
             &d_component,
+            &mut NoopRouteMapper,
         )
         .await
         .expect("failed to route service");
@@ -2351,7 +2354,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
-                &d_component
+                &d_component,
+                &mut NoopRouteMapper
             )
             .await,
             Err(RoutingError::UnsupportedRouteSource { source_type: _ })
@@ -2455,7 +2459,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
-                &d_component
+                &d_component,
+                &mut NoopRouteMapper
             )
             .await,
             Err(RoutingError::UnsupportedRouteSource { source_type: _ })
@@ -4489,9 +4494,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let a_component =
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("root instance");
-        let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &b_component)
-            .await
-            .expect("failed to route service");
+        let source = route_capability(
+            RouteRequest::UseService(use_decl),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route service");
         match source {
             RouteSource::Service(CapabilitySourceInterface::<
                 <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
@@ -4554,9 +4563,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("root instance");
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &a_component)
-            .await
-            .expect("failed to route service");
+        let source = route_capability(
+            RouteRequest::UseService(use_decl),
+            &a_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route service");
         match source {
             RouteSource::Service(CapabilitySourceInterface::<
                 <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
@@ -4630,9 +4643,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &b_component)
-            .await
-            .expect("failed to route service");
+        let source = route_capability(
+            RouteRequest::UseService(use_decl),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route service");
 
         // Verify this source comes from `c`.
         match source {
@@ -4710,9 +4727,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &b_component)
-            .await
-            .expect("failed to route service");
+        let source = route_capability(
+            RouteRequest::UseService(use_decl),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route service");
 
         // Verify this source comes from `c`.
         match source {
@@ -4804,9 +4825,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &b_component)
-            .await
-            .expect("failed to route service");
+        let source = route_capability(
+            RouteRequest::UseService(use_decl),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route service");
 
         // Verify this source comes from `c`.
         match source {
@@ -4870,10 +4895,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let (source, _route) =
-            route_capability(RouteRequest::Runner("hobbit".into()), &b_component)
-                .await
-                .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this source comes from `a`.
         match source {
@@ -4947,10 +4975,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) =
-            route_capability(RouteRequest::Runner("hobbit".into()), &c_component)
-                .await
-                .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &c_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this source comes from `a`.
         match source {
@@ -5022,10 +5053,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) =
-            route_capability(RouteRequest::Runner("hobbit".into()), &c_component)
-                .await
-                .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &c_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this source comes from `b`.
         match source {
@@ -5099,10 +5133,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
-        let (source, _route) =
-            route_capability(RouteRequest::Runner("hobbit".into()), &c_component)
-                .await
-                .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &c_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this source comes from `a`.
         match source {
@@ -5159,8 +5196,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_result =
-            route_capability(RouteRequest::Runner("hobbit".into()), &b_component).await;
+        let route_result = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
 
         assert_matches!(
             route_result,
@@ -5214,10 +5255,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let (source, _route) =
-            route_capability(RouteRequest::Runner("hobbit".into()), &b_component)
-                .await
-                .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this is a built-in source.
         match source {
@@ -5249,9 +5293,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component =
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
-        let (source, _route) = route_capability(RouteRequest::Runner("elf".into()), &a_component)
-            .await
-            .expect("failed to route runner");
+        let source = route_capability(
+            RouteRequest::Runner("elf".into()),
+            &a_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
 
         // Verify this is a built-in source.
         match source {
@@ -5302,8 +5350,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_result =
-            route_capability(RouteRequest::Runner("hobbit".into()), &b_component).await;
+        let route_result = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
 
         assert_matches!(
             route_result,
@@ -5332,8 +5384,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component =
             model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
-        let route_result =
-            route_capability(RouteRequest::Runner("hobbit".into()), &a_component).await;
+        let route_result = route_capability(
+            RouteRequest::Runner("hobbit".into()),
+            &a_component,
+            &mut NoopRouteMapper,
+        )
+        .await;
 
         assert_matches!(
             route_result,
