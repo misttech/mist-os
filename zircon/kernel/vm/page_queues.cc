@@ -93,6 +93,24 @@ void PageQueues::StartThreads(zx_duration_t min_mru_rotate_time,
   lru_thread_ = lru_thread;
 }
 
+void PageQueues::StartDebugCompressor() {
+  // The debug compressor should not be enabled without debug asserts as we guard all usages of the
+  // debug compressor with compile time checks so that it cannot impact the performance of release
+  // versions.
+  ASSERT(DEBUG_ASSERT_IMPLEMENTED);
+#if DEBUG_ASSERT_IMPLEMENTED
+  fbl::AllocChecker ac;
+  ktl::unique_ptr<VmDebugCompressor> dc(new (&ac) VmDebugCompressor);
+  if (!ac.check()) {
+    panic("Failed to allocate VmDebugCompressor");
+  }
+  zx_status_t status = dc->Init();
+  ASSERT(status == ZX_OK);
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  debug_compressor_ = ktl::move(dc);
+#endif
+}
+
 void PageQueues::StopThreads() {
   // Cannot wait for threads to complete with the lock held, so update state and then perform any
   // joins outside the lock.
@@ -187,6 +205,22 @@ void PageQueues::DisableAging() {
   // Take the aging token. This will both wait for the aging thread to complete any in progress
   // aging, and prevent it from aging until we return it.
   aging_token_.Wait();
+#if DEBUG_ASSERT_IMPLEMENTED
+  // Pause might drop the last reference to a VMO and trigger VMO destruction, which would then call
+  // back into the page queues, so we must not hold the lock_ over the operation. We can utilize the
+  // fact that once the debug_compressor_ is set it is never destroyed, so can take a raw pointer to
+  // it.
+  VmDebugCompressor* dc = nullptr;
+  {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    if (debug_compressor_) {
+      dc = &*debug_compressor_;
+    }
+  }
+  if (dc) {
+    dc->Pause();
+  }
+#endif
 }
 
 void PageQueues::EnableAging() {
@@ -199,6 +233,12 @@ void PageQueues::EnableAging() {
 
   // Return the aging token, allowing the aging thread to proceed if it was waiting.
   dps.Pend(PendingSignal::AgingToken);
+#if DEBUG_ASSERT_IMPLEMENTED
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  if (debug_compressor_) {
+    debug_compressor_->Resume();
+  }
+#endif
 }
 
 const char* PageQueues::string_from_age_reason(PageQueues::AgeReason reason) {
@@ -790,12 +830,23 @@ void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page
   DEBUG_ASSERT(object);
   SetQueueBacklinkLocked(page, object, page_offset,
                          kAnonymousIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+#if DEBUG_ASSERT_IMPLEMENTED
+  if (debug_compressor_) {
+    debug_compressor_->Add(page, object, page_offset);
+  }
+#endif
 }
 
 void PageQueues::MoveToAnonymous(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   MoveToQueueLocked(page, kAnonymousIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+#if DEBUG_ASSERT_IMPLEMENTED
+  if (debug_compressor_) {
+    debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
+                           page->object.get_page_offset());
+  }
+#endif
 }
 
 void PageQueues::SetPagerBacked(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
@@ -836,6 +887,11 @@ void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint6
   SetQueueBacklinkLocked(page, object, page_offset,
                          kZeroForkIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymousZeroFork,
                          dps);
+#if DEBUG_ASSERT_IMPLEMENTED
+  if (debug_compressor_) {
+    debug_compressor_->Add(page, object, page_offset);
+  }
+#endif
 }
 
 void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
@@ -843,6 +899,12 @@ void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
   Guard<SpinLock, IrqSave> guard{&lock_};
   MoveToQueueLocked(page, kZeroForkIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymousZeroFork,
                     dps);
+#if DEBUG_ASSERT_IMPLEMENTED
+  if (debug_compressor_) {
+    debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
+                           page->object.get_page_offset());
+  }
+#endif
 }
 
 void PageQueues::ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {

@@ -760,6 +760,16 @@ This value was chosen to consume, in the worst case, 5% CPU on a lower-end
 arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 
+### kernel.compression.random-debug-compress=\<bool>
+
+**Default:** `false`
+
+Enables a testing option that causes the VM to random immediately compress pages, regardless of
+their age. This is intended to facilitate testing of the compression paths without needing to wait
+for pages to age and put the system into a low memory state. It is an error to enable this option
+if the kernel is not built with debugging assertions enabled, or if a compression and storage
+strategy are not set.
+
 ### kernel.compression.strategy=\[none | lz4\]
 
 **Default:** `none`

@@ -384,6 +384,13 @@ static void scanner_init_func(uint level) {
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
     zx_status_t status = pmm_set_page_compression(ktl::move(compression));
     ASSERT_MSG(status == ZX_OK, "status: %d", status);
+    if (gBootOptions->random_debug_compress) {
+      pmm_page_queues()->StartDebugCompressor();
+      printf("scanner: kernel.compression.random-debug-compress enabled\n");
+    }
+  } else {
+    // It is an error to set the random-debug-compress option if no compression was specified.
+    ASSERT(!gBootOptions->random_debug_compress);
   }
 
   thread->Resume();

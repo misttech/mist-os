@@ -15,6 +15,7 @@ zx_library("vm") {
     "compression.cc",
     "compressor.cc",
     "content_size_manager.cc",
+    "debug_compressor.cc",
     "discardable_vmo_tracker.cc",
     "evictor.cc",
     "kstack.cc",

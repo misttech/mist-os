@@ -19,6 +19,7 @@
 #include <kernel/semaphore.h>
 #include <ktl/array.h>
 #include <ktl/optional.h>
+#include <vm/debug_compressor.h>
 #include <vm/page.h>
 
 class VmCowPages;
@@ -316,6 +317,11 @@ class PageQueues {
   // relevant for unittests that may wish to avoid starting the threads for some tests.
   // It is the responsibility of the caller to only call this once, otherwise it will panic.
   void StartThreads(zx_duration_t min_mru_rotate_time, zx_duration_t max_mru_rotate_time);
+
+  // Initializes and starts the debug compression, which attempts to immediately compress a random
+  // subset of pages added to the page queues. It is an error to call this if there is no compressor
+  // or if not running in debug mode.
+  void StartDebugCompressor();
 
   // Sets the active ratio multiplier.
   void SetActiveRatioMultiplier(uint32_t multiplier);
@@ -763,6 +769,12 @@ class PageQueues {
   ktl::atomic<bool> shutdown_threads_ = false;
   Thread* mru_thread_ TA_GUARDED(lock_) = nullptr;
   Thread* lru_thread_ TA_GUARDED(lock_) = nullptr;
+
+  // Debug compressor is only available when debug asserts are also enabled. This ensures it can
+  // never have an impact on production builds.
+#if DEBUG_ASSERT_IMPLEMENTED
+  ktl::unique_ptr<VmDebugCompressor> debug_compressor_ TA_GUARDED(lock_);
+#endif
 
   // Queue rotation parameters. These are not locked as they are only read by the mru thread, and
   // are set before the mru thread is started.

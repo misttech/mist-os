@@ -648,6 +648,15 @@ arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 )""")
 
+DEFINE_OPTION("kernel.compression.random-debug-compress", bool, random_debug_compress, {false},
+              R"""(
+Enables a testing option that causes the VM to random immediately compress pages, regardless of
+their age. This is intended to facilitate testing of the compression paths without needing to wait
+for pages to age and put the system into a low memory state. It is an error to enable this option
+if the kernel is not built with debugging assertions enabled, or if a compression and storage
+strategy are not set.
+)""")
+
 DEFINE_OPTION("kernel.compression.strategy", CompressionStrategy, compression_strategy, {CompressionStrategy::kNone}, R"""(
 Supported compression strategies are:
 - `none`
