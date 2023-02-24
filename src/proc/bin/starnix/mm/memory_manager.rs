@@ -1136,7 +1136,7 @@ impl MemoryManager {
                 let vmo = mapping.vmo.clone();
                 state.unmap(new_end, delta)?;
                 let vmo_offset = new_end - brk.base;
-                vmo.op_range(zx::VmoOp::DECOMMIT, vmo_offset as u64, delta as u64)
+                vmo.op_range(zx::VmoOp::ZERO, vmo_offset as u64, delta as u64)
                     .map_err(impossible_error)?;
             }
             std::cmp::Ordering::Greater => {

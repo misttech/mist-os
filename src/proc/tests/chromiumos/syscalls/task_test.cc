@@ -18,6 +18,7 @@
 #include <linux/sched.h>
 
 #include "src/lib/files/directory.h"
+#include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 namespace {
 
@@ -326,4 +327,24 @@ TEST(Task, Vfork) {
   uint64_t elapsed_us = ((int64_t)end.tv_sec - (int64_t)begin.tv_sec) * 1000000ll +
                         ((int64_t)end.tv_usec - (int64_t)begin.tv_usec);
   EXPECT_GT(elapsed_us, kCloneVforkSleepUS);
+}
+
+TEST(Task, BrkShrinkAfterFork) {
+  // Tests that a program can shrink their break after forking.
+  const void* SBRK_ERROR = reinterpret_cast<void*>(-1);
+  ForkHelper helper;
+
+  constexpr int brk_increment = 0x4000;
+  ASSERT_NE(SBRK_ERROR, sbrk(brk_increment));
+  void* old_brk = sbrk(0);
+  ASSERT_NE(SBRK_ERROR, old_brk);
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(old_brk, sbrk(0));
+    ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
+  });
+
+  // Make sure fork didn't change our current break.
+  ASSERT_EQ(old_brk, sbrk(0));
+  // Restore the old brk.
+  ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
 }
