@@ -762,13 +762,6 @@
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
-                "RawSocketICMPTest.SendAndReceiveBadChecksum",
-                "RawSocketICMPTest.SendAndReceive",
-                "RawSocketICMPTest.MultipleSocketReceive",
-                "RawSocketICMPTest.RawAndPingSockets",
-                "RawSocketICMPTest.SendAndReceiveViaConnect",
-                "RawSocketICMPTest.BindSendAndReceive",
-                "RawSocketICMPTest.BindConnectSendAndReceive",
 
                 // raw_socket_test
                 "RawSocketTest.ReceiveIPPacketInfo",

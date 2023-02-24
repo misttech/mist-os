@@ -695,11 +695,12 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
         let message = format!(
             "add@/devices/virtual/misc/device-mapper\0ACTION=add\0DEVPATH=/devices/virtual/misc/device-mapper\0SUBSYSTEM=misc\0SYNTH_UUID=0\0MAJOR=10\0MINOR=236\0DEVNAME=mapper/control\0SEQNUM={seqnum}\0"
         );
-        let mut ancillary_data = vec![];
+        let ancillary_data = AncillaryData::Unix(UnixControlData::Credentials(Default::default()));
+        let mut ancillary_data = vec![ancillary_data];
         // Ignore write errors
         let _ = self.lock().write_to_queue(
             &mut VecInputBuffer::new(message.as_bytes()),
-            Some(NetlinkAddress::default()),
+            Some(NetlinkAddress { pid: 0, groups: 1 }),
             &mut ancillary_data,
         );
     }

@@ -418,7 +418,14 @@ fn recvmsg_internal(
 
     message_header.msg_controllen = cmsg_bytes_written;
 
-    // TODO: Handle info.address.
+    match info.address {
+        Some(address) if !message_header.msg_name.is_null() => {
+            let bytes = address.to_bytes();
+            let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
+            current_task.mm.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
+        }
+        _ => {}
+    };
 
     if info.bytes_read != info.message_length {
         message_header.msg_flags |= MSG_TRUNC as u64;
