@@ -4,7 +4,8 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load(":cc_toolchain_config.bzl", "cc_toolchain_config", "feature_flag")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_package_resource_group")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cpu_filter_dict", "fuchsia_cpu_select", "fuchsia_debug_symbols", "fuchsia_package_resource_group")
+load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
 
 licenses(["notice"])
 
@@ -12,18 +13,27 @@ package(default_visibility = ["//visibility:public"])
 
 cc_toolchain_suite(
     name = "toolchain",
-    toolchains = {
-        "aarch64|llvm": ":cc-compiler-aarch64",
-        "aarch64": ":cc-compiler-aarch64",
-        "x86_64|llvm": ":cc-compiler-x86_64",
-        "x86_64": ":cc-compiler-x86_64",
-    },
+    toolchains = fuchsia_cpu_filter_dict(
+        {
+            "arm64": {
+                "aarch64|llvm": ":cc-compiler-aarch64",
+                "aarch64": ":cc-compiler-aarch64",
+            },
+            "x64": {
+                "x86_64|llvm": ":cc-compiler-x86_64",
+                "x86_64": ":cc-compiler-x86_64",
+            },
+        },
+        sdk_constants.target_cpus,
+    ),
 )
 
-TARGET_CPUS = [
-    "aarch64",
-    "x86_64",
-]
+_TO_BAZEL_CPU_MAP = {
+    "x64": "x86_64",
+    "arm64": "aarch64",
+}
+
+TARGET_CPUS = [_TO_BAZEL_CPU_MAP.get(cpu, cpu) for cpu in sdk_constants.target_cpus]
 
 filegroup(
     name = "empty",
@@ -241,60 +251,88 @@ fuchsia_debug_symbols(
 
 fuchsia_package_resource_group(
     name = "dist",
-    srcs = select({
-        ":arm_novariant": [
-            "//:lib/aarch64-unknown-fuchsia/libc++.so.2",
-            "//:lib/aarch64-unknown-fuchsia/libc++abi.so.1",
-            "//:lib/aarch64-unknown-fuchsia/libunwind.so.1",
-        ],
-        ":arm_asan_variant": [
-            "//:lib/aarch64-unknown-fuchsia/asan/libc++.so.2",
-            "//:lib/aarch64-unknown-fuchsia/asan/libc++abi.so.1",
-            "//:lib/aarch64-unknown-fuchsia/asan/libunwind.so.1",
-        ],
-        ":x86_novariant": [
-            "//:lib/x86_64-unknown-fuchsia/libc++.so.2",
-            "//:lib/x86_64-unknown-fuchsia/libc++abi.so.1",
-            "//:lib/x86_64-unknown-fuchsia/libunwind.so.1",
-        ],
-        ":x86_asan_variant": [
-            "//:lib/x86_64-unknown-fuchsia/asan/libc++.so.2",
-            "//:lib/x86_64-unknown-fuchsia/asan/libc++abi.so.1",
-            "//:lib/x86_64-unknown-fuchsia/asan/libunwind.so.1",
-        ],
-    }),
+    srcs = fuchsia_cpu_select(
+        {
+            "arm64": {
+                ":arm_novariant": [
+                    "//:lib/aarch64-unknown-fuchsia/libc++.so.2",
+                    "//:lib/aarch64-unknown-fuchsia/libc++abi.so.1",
+                    "//:lib/aarch64-unknown-fuchsia/libunwind.so.1",
+                ],
+                ":arm_asan_variant": [
+                    "//:lib/aarch64-unknown-fuchsia/asan/libc++.so.2",
+                    "//:lib/aarch64-unknown-fuchsia/asan/libc++abi.so.1",
+                    "//:lib/aarch64-unknown-fuchsia/asan/libunwind.so.1",
+                ],
+            },
+            "x64": {
+                ":x86_novariant": [
+                    "//:lib/x86_64-unknown-fuchsia/libc++.so.2",
+                    "//:lib/x86_64-unknown-fuchsia/libc++abi.so.1",
+                    "//:lib/x86_64-unknown-fuchsia/libunwind.so.1",
+                ],
+                ":x86_asan_variant": [
+                    "//:lib/x86_64-unknown-fuchsia/asan/libc++.so.2",
+                    "//:lib/x86_64-unknown-fuchsia/asan/libc++abi.so.1",
+                    "//:lib/x86_64-unknown-fuchsia/asan/libunwind.so.1",
+                ],
+            },
+        },
+        sdk_constants.target_cpus,
+    ),
     dest = "lib" + select({
         ":asan_variant": "/asan",
         "//conditions:default": "",
     }),
-    strip_prefix = select({
-        ":arm_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
-        ":arm_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
-        ":x86_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
-        ":x86_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
-    }),
+    strip_prefix = fuchsia_cpu_select(
+        {
+            "arm64": {
+                ":arm_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
+                ":arm_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
+            },
+            "x64": {
+                ":x86_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
+                ":x86_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
+            },
+        },
+        sdk_constants.target_cpus,
+    ),
     visibility = ["//visibility:public"],
 )
 
 fuchsia_package_resource_group(
     name = "runtime",
-    srcs = select({
-        ":arm_asan_variant": [
-            "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so",
-        ],
-        ":x86_asan_variant": [
-            "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = fuchsia_cpu_select(
+        {
+            "arm64": {
+                ":arm_asan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so",
+                ],
+            },
+            "x64": {
+                ":x86_asan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so",
+                ],
+            },
+        },
+        sdk_constants.target_cpus,
+        default = [],
+    ),
     dest = "lib" + select({
         ":asan_variant": "/asan",
         "//conditions:default": "",
     }),
-    strip_prefix = select({
-        ":arm_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
-        ":x86_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
-    }),
+    strip_prefix = fuchsia_cpu_select(
+        {
+            "arm64": {
+                ":arm_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
+            },
+            "x64": {
+                ":x86_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
+            },
+        },
+        sdk_constants.target_cpus,
+    ),
     visibility = ["//visibility:public"],
 )
 

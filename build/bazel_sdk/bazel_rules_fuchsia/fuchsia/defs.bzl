@@ -90,6 +90,11 @@ load(
     _if_fuchsia = "if_fuchsia",
 )
 load(
+    "//fuchsia/private:fuchsia_cpu_select.bzl",
+    _fuchsia_cpu_filter_dict = "fuchsia_cpu_filter_dict",
+    _fuchsia_cpu_select = "fuchsia_cpu_select",
+)
+load(
     "//fuchsia/private:compilation_database.bzl",
     _clangd_compilation_database = "clangd_compilation_database",
 )
@@ -140,6 +145,8 @@ fuchsia_local_package_repository = _fuchsia_local_package_repository
 fuchsia_package_group = _fuchsia_package_group
 fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 fuchsia_select = _fuchsia_select
+fuchsia_cpu_select = _fuchsia_cpu_select
+fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info
