@@ -119,6 +119,157 @@ type RingBufferProperties = table {
     /// audio samples played or captured is not acceptable.
     /// If not included `turn_on_delay` is unknown.
     4: turn_on_delay zx.duration;
+
+    /// Size (in bytes) representing a temporary buffer used by the driver/HW in order to transfer
+    /// (consume or produce) the ring buffer contents.
+    ///
+    /// The ring buffer contents must be produced and consumed at the rate specified with the
+    /// `CreateRingBuffer` command; however, some amount of buffering is required when the data is
+    /// written into and read from the ring buffer. For playback, the data is consumed by the driver
+    /// by reading ahead up to `driver_transfer_bytes`. For capture, the data is produced by the
+    /// driver holding up to `driver_transfer_bytes` at a time before committing it to the ring
+    /// buffer.
+    ///
+    /// Let's define ‘begin pointer’ and 'end pointer' as position pointers in the ring buffer,
+    /// represented as 'B' and 'E' in the figures below, that bound the portion of the ring buffer
+    /// that are unsafe for reading or writing by the client at a given point in time.
+    ///
+    /// ## Playback
+    ///
+    /// For playback, it is safe for a client to write only to the part of the ring buffer that is
+    /// not simultaneously being read by the driver/HW. Before the ring buffer is started, clients
+    /// of output devices may write initial data starting at the very beginning of the ring buffer
+    /// at least `driver_transfer_bytes` of audio since they must always stay at least that far
+    /// ahead of where the driver/HW is reading. Note that if the client does not write to the
+    /// beginning of the ring buffer, then it is relying on the zeroed-out contents of the VMO as
+    /// the initial audio to be read by the driver/HW.
+    /// It is therefore not safe for the client to copy additional data to the ring buffer between
+    /// 'B' and 'E', the part already in use which may or may not already be consumed. The client
+    /// may safely write to any other portion of the ring buffer from 'E' to '0/B'.
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +-------------------------+-------------------------------------------------------------+
+    ///  |<---      unsafe     --->|<---                  safe (empty)                       --->|
+    ///  |<`driver_transfer_bytes`>|                                                             |
+    ///  +-------------------------+-------------------------------------------------------------+
+    /// 0/B                        E                                                             0
+    /// ```
+    ///
+    /// As time passes, the driver/HW reads the data in chunks of unknown size (up to the amount of
+    /// `driver_transfer_bytes`) at the rate specified in `CreateRingBuffer`, and the begin/end
+    /// pointers move to the right of '0' at the same rate. As a result, the area to which it is
+    /// unsafe for the client to write moves gradually forward through the ring buffer, but
+    /// maintains a constant size equal to `driver_transfer_bytes`. For instance after some time we
+    /// now have:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +------------+-------------------------+------------------------------------------------+
+    ///  [<-- safe -->|<---      unsafe     --->|<--               safe (empty)               -->|
+    ///  |            |<`driver_transfer_bytes`>|                                                |
+    ///  +------------+-------------------------+------------------------------------------------+
+    ///  0            B                         E                                                0
+    /// ```
+    ///
+    /// In steady state, i.e. once the process has wrapped around the ring buffer, any area outside
+    /// of the pointers 'B' and 'E' is safe to write:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +--------------------------------+-------------------------+----------------------------+
+    ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
+    ///  |                                |<`driver_transfer_bytes`>|                            |
+    ///  +--------------------------------+-------------------------+----------------------------+
+    ///  0                                B                         E                            0
+    /// ```
+    ///
+    ///
+    /// ## Recording
+    ///
+    /// For recording, it is safe for a client to read only the part of the ring buffer that is not
+    /// simultaneously being written by the driver/HW. At the moment when the ring buffer is started
+    /// by the client, the driver has not written any amount of data to the ring buffer, so there
+    /// is nothing for the client to read:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +---------------------------------------------------------------------------------------+
+    ///  [<---                                   empty                                        -->|
+    ///  +---------------------------------------------------------------------------------------+
+    ///0/B/E                                                                                     0
+    /// ```
+    ///
+    /// The driver/HW begins writing to the ring buffer starting at '0'. As time passes, the
+    /// driver/HW writes data in chunks of unknown size (up to `driver_transfer_bytes`) at the rate
+    /// specified in `CreateRingBuffer`. Until an amount of data equal to `driver_transfer_bytes`
+    /// has been written into the ring buffer by the driver/HW, it is not safe for the client to
+    /// read any data:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +----------------+----------------------------------------------------------------------+
+    ///  [<--- unsafe --->|<--                               empty                            -->|
+    ///  |<`driver_transfer_bytes`>|                                                             |
+    ///  +----------------+----------------------------------------------------------------------+
+    /// 0/B               E                                                                      0
+    /// ```
+    ///
+    /// Once `driver_transfer_bytes` of data have been copied into the ring buffer by the driver/HW,
+    /// it is safe for the client to read the data from '0' to 'B'. It is unsafe to read the data
+    /// from ‘B’ to ‘E’, the area in which the driver/HW is simultaneously writing. This unsafe
+    /// area moves gradually forward through the ring buffer, but maintains a constant size equal
+    /// to `driver_transfer_bytes`. For instance after some time we now have:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +------------+-------------------------+------------------------------------------------+
+    ///  [<-- safe -->|<---      unsafe     --->|<--                  empty                   -->|
+    ///  |            |<`driver_transfer_bytes`>|                                                |
+    ///  +------------+-------------------------+------------------------------------------------+
+    ///  0            B                         E                                                0
+    /// ```
+    ///
+    /// In steady state, i.e. once the process has wrapped around the ring buffer, any area outside
+    /// of the pointers 'B' and 'E' is safe to read:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +--------------------------------+-------------------------+----------------------------+
+    ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
+    ///  |                                |<`driver_transfer_bytes`>|                            |
+    ///  +--------------------------------+-------------------------+----------------------------+
+    ///  0                                B                         E                            0
+    /// ```
+    ///
+    /// ## Hardware versus software
+    ///
+    /// The ring buffer data may be directly consumed/generated by hardware, i.e.
+    /// `driver_transfer_bytes` can be mapped directly to the size of a hardware FIFO block, since a
+    /// hardware FIFO block determines the upper limit amount of data read ahead or held back.
+    /// Note that if the FIFO buffer is used in a "ping pong" manner (such that only half the FIFO
+    /// buffer size is copied at a time), and this is true not only on steady state but also the
+    /// very first time the driver copies data to or from the ring buffer, then
+    /// `driver_transfer_bytes` may be set to half the FIFO buffer size. If the hardware at any time
+    /// copies data to/from the ring buffer in an amount equal to the entire FIFO buffer size (for
+    /// instance the first copy from the ring buffer to fill an initially empty hardware FIFO), then
+    /// `driver_transfer_bytes` must be set to the entire size of the FIFO buffer.
+    ///
+    /// The ring buffer data may instead be consumed/generated by audio driver software that is
+    /// conceptually situated between the ring buffer and the audio hardware. In this case, for
+    /// playback, the `driver_transfer_bytes` read ahead amount is set large enough such that the
+    /// driver guarantees no undetected underruns, this assuming the client is generating the data
+    /// as determined by the `CreateRingBuffer` and `Start` commands. For capture, the
+    /// `driver_transfer_bytes` held back amount is set large enough such that the driver guarantees
+    /// no undetected underruns when generating the data as determined by the `CreateRingBuffer` and
+    /// `Start` commands.
+    ///
+    /// This size must not include any delays added by any software or hardware abstracted by the
+    /// driver, for instance `DelayInfo` `external_delay`.
+    ///
+    /// Required.
+    @available(added=HEAD)
+    5: driver_transfer_bytes uint32;
 };
 
 type RingBufferPositionInfo = struct {
