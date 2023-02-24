@@ -132,11 +132,13 @@ do
     shift
     continue
   fi
+
   # Extract optarg from --opt=optarg
+  optarg=
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
+
   case "$opt" in
     --help|-h) usage ; exit ;;
     --dry-run) dry_run=1 ;;
@@ -331,17 +333,14 @@ do
     continue
   fi
 
-  # Extract optarg from --opt=optarg
-  # optkey is the left side of =
+  # Extract --optkey and optarg from --optkey=optarg
+  # Partition at the first '=' if there are multiple of them.
+  optarg=
+  optkey=
   case "$opt" in
-    *=?*)
-      optarg=$(expr "X$opt" : '[^=]*=\(.*\)')
-      optkey=$(expr "$opt" : '\([^=]*\)=.*')
-      ;;
-    *=)
-      optarg=
-      # remove '=' suffix
-      optkey="${opt%=}"
+    *=*)
+      optarg="${opt#*=}"  # remove-prefix, shortest-match
+      optkey="${opt%%=*}"  # remove-suffix, longest-match
       ;;
   esac
 

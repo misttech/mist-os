@@ -49,11 +49,13 @@ do
     shift
     continue
   fi
+
   # Extract optarg from --opt=optarg
+  optarg=
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
+
   case "$opt" in
     --help|-h) usage; exit;;
     # Forward all other options to remotetool

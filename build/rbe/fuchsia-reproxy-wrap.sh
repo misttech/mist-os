@@ -97,11 +97,13 @@ do
     shift
     continue
   fi
+
   # Extract optarg from --opt=optarg
+  optarg=
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
+
   case "$opt" in
     --cfg=*) config="$optarg" ;;
     --cfg) prev_opt=config ;;

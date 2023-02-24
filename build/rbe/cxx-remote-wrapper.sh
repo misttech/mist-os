@@ -84,11 +84,13 @@ do
     shift
     continue
   fi
+
   # Extract optarg from --opt=optarg
+  optarg=
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
+
   case "$opt" in
     --help|-h) usage ; exit ;;
     --dry-run) dry_run=1 ;;
@@ -213,9 +215,9 @@ do
   fi
 
   # Extract optarg from --opt=optarg
+  optarg=
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
 
   # Reject absolute paths, for the sake of build artifact portability,
@@ -390,7 +392,6 @@ test "$is_clang" != 1 || cpreprocess_command+=( -fno-blocks )
 # Change the input to use the .ii file, and remove options that are
 # related to preprocessing.
 cc_using_ii_command=()
-delete_optarg=0
 prev_opt=
 for opt in "${cc_command[@]}"
 do
