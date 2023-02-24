@@ -54,12 +54,11 @@ template("test_assembly_config") {
   }
 
   labels = {
-    ffx = "//src/developer/ffx:host"
+    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_versioned($host_toolchain)"
   }
 
   files = {
-    # ffx itself is always found here
-    ffx = "$root_build_dir/host-tools/ffx"
+    ffx_tool = get_label_info(labels.ffx_tool, "root_out_dir") + "/ffx-assembly"
   }
 
   if (is_host) {
@@ -164,7 +163,7 @@ template("test_assembly_config") {
       binary_label = ":bin"
       args = [
                "--ffx-bin",
-               rebase_path(files.ffx, root_build_dir),
+               rebase_path(files.ffx_tool, root_build_dir),
                "--product-assembly-config",
                rebase_path(fuchsia_files.assembly_config, root_build_dir),
                "--legacy-bundle",
@@ -179,11 +178,11 @@ template("test_assembly_config") {
       deps = [
                ":${product_config_label}",
                ":input_bundle",
-               labels.ffx,
+               labels.ffx_tool,
                platform_bundles_target,
              ] + additional_deps_param
       inputs = [
-        files.ffx,
+        files.ffx_tool,
         fuchsia_files.assembly_config,
       ]
       outputs = [
