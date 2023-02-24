@@ -85,6 +85,7 @@ void FtdiI2c::DdkInit(ddk::InitTxn txn) {
   }
   fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata(allocator);
   metadata.set_channels(allocator, i2c_channels);
+  metadata.set_bus_id(0);
   fit::result persisted = fidl::Persist(metadata);
   if (!persisted.is_ok()) {
     zxlogf(ERROR, "encoding device metadata failed: %s\n",
