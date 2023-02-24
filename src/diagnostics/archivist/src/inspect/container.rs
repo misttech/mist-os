@@ -341,6 +341,7 @@ impl State {
 /// UnpopulatedInspectDataContainer is the container that holds
 /// all information needed to retrieve Inspect data
 /// for a given component, when requested.
+#[derive(Debug)]
 pub struct UnpopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
     /// DirectoryProxy for the out directory that this

@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use derivative::Derivative;
 use fidl_fuchsia_diagnostics::StreamMode;
 use futures::prelude::*;
 use std::{
     collections::VecDeque,
     default::Default,
+    fmt::Debug,
     pin::Pin,
     // TODO(https://fxbug.dev/106877) make this an async lock
     sync::{Arc, Mutex},
@@ -183,10 +185,13 @@ struct CursorId(u64);
 /// for ~580 consecutive years before ID allocations will wrap around. This eventuality is *not*
 /// accounted for in the implementation. If you're reading this after observing a bug due to that,
 /// congratulations.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Cursor<T> {
     id: CursorId,
     last_id_seen: Option<u64>,
     until_id: u64,
+    #[derivative(Debug = "ignore")]
     list: ArcList<T>,
     mode: StreamMode,
 }
@@ -295,16 +300,6 @@ impl<T> Stream for Cursor<T> {
             // register for a wakeup.
             self.maybe_register_for_wakeup(cx)
         }
-    }
-}
-
-impl<T> std::fmt::Debug for Cursor<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cursor")
-            .field("id", &self.id)
-            .field("last_id_seen", &self.last_id_seen)
-            .field("until_id", &self.until_id)
-            .finish()
     }
 }
 

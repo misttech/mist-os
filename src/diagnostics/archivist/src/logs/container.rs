@@ -15,6 +15,7 @@ use crate::{
     utils::AutoCall,
 };
 use async_lock::Mutex;
+use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
 use fidl::prelude::*;
 use fidl_fuchsia_diagnostics::{Interest as FidlInterest, LogInterestSelector, StreamMode};
@@ -39,6 +40,8 @@ use std::{
 };
 use tracing::{debug, error, warn};
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct LogsArtifactsContainer {
     /// The source of logs in this container.
     pub identity: Arc<ComponentIdentity>,
@@ -51,6 +54,7 @@ pub struct LogsArtifactsContainer {
     budget: BudgetHandle,
 
     /// Buffer for all log messages.
+    #[derivative(Debug = "ignore")]
     buffer: ArcList<StoredMessage>,
 
     /// Mutable state for the container.
@@ -77,6 +81,8 @@ enum TestState {
 }
 
 type InterestSender = oneshot::Sender<Result<FidlInterest, InterestChangeError>>;
+
+#[derive(Debug)]
 struct ContainerState {
     /// Number of sockets currently being drained for this component.
     num_active_sockets: u64,

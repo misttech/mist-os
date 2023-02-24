@@ -40,6 +40,7 @@ impl BudgetManager {
     }
 }
 
+#[derive(Debug)]
 struct BudgetState {
     current: usize,
     capacity: usize,
@@ -110,6 +111,7 @@ impl BudgetState {
     }
 }
 
+#[derive(Debug)]
 pub struct BudgetHandle {
     /// We keep a weak pointer to the budget state to avoid this ownership cycle:
     ///

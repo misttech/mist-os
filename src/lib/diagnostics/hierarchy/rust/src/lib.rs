@@ -657,6 +657,7 @@ impl<T: Borrow<Selector>> TryFrom<Vec<T>> for HierarchyMatcher {
     }
 }
 
+#[derive(Debug)]
 struct OrdStringSelector(StringSelector);
 
 impl From<StringSelector> for OrdStringSelector {
@@ -699,7 +700,7 @@ impl PartialEq for OrdStringSelector {
 
 impl Eq for OrdStringSelector {}
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HierarchyMatcher {
     nodes: BTreeMap<OrdStringSelector, HierarchyMatcher>,
     properties: Vec<OrdStringSelector>,

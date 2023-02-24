@@ -11,22 +11,22 @@ use std::{cmp::Eq, collections::HashMap, fmt::Debug, hash::Hash};
 
 /// Trie mapping a sequence of key fragments to nodes that
 /// are able to store a value which is identifiable by the same key sequence.
+#[derive(Debug)]
 pub struct Trie<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     root: TrieNode<K, V>,
 }
 
 impl<K, V> Trie<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     /// Creates a new empty Trie
-    pub fn new() -> Self
-    where
-        K: Hash + Eq,
-    {
+    pub fn new() -> Self {
         Trie { root: TrieNode::new() }
     }
 
@@ -44,10 +44,7 @@ where
     /// Takes a key fragment sequence in vector form and removes the node identified
     /// by that key fragment sequence if it exists. Removes all values that exist on the
     /// node.
-    pub fn remove(&mut self, key: &[K])
-    where
-        K: Hash + Eq + Debug,
-    {
+    pub fn remove(&mut self, key: &[K]) {
         if key.is_empty() {
             return;
         }
@@ -57,10 +54,7 @@ where
 
     /// Retrieves a node identified by the key fragment vector `key` if it
     /// exists in the prefix trie, else None.
-    pub fn get(&self, key: &[K]) -> Option<&V>
-    where
-        K: Hash + Eq + Debug,
-    {
+    pub fn get(&self, key: &[K]) -> Option<&V> {
         key.iter()
             .try_fold(&self.root, |curr_node, key_fragment| curr_node.children.get(key_fragment))
             .and_then(|node| node.get_value())
@@ -69,10 +63,7 @@ where
     /// Takes a key fragment sequence in vector form, and a value defined by the
     /// key sequence, and populates the trie creating new nodes where needed, before
     /// inserting the value into the vector of values defined by the provided sequence.
-    pub fn set(&mut self, key: impl IntoIterator<Item = K>, value: V)
-    where
-        K: Hash + Eq + Debug,
-    {
+    pub fn set(&mut self, key: impl IntoIterator<Item = K>, value: V) {
         let key_trie_node = key.into_iter().fold(&mut self.root, |curr_node, key_fragment| {
             curr_node.children.entry(key_fragment).or_insert_with(|| TrieNode::new())
         });
@@ -80,10 +71,7 @@ where
         key_trie_node.value = Some(value);
     }
 
-    fn remove_helper(curr_node: &mut TrieNode<K, V>, key: &[K], level: usize) -> bool
-    where
-        K: Hash + Eq + Debug,
-    {
+    fn remove_helper(curr_node: &mut TrieNode<K, V>, key: &[K], level: usize) -> bool {
         if level == key.len() {
             curr_node.value = None;
             return curr_node.children.is_empty();
@@ -109,9 +97,11 @@ where
 }
 
 /// A node of a `Trie`.
+#[derive(Debug)]
 struct TrieNode<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     value: Option<V>,
     children: HashMap<K, TrieNode<K, V>>,
@@ -119,13 +109,11 @@ where
 
 impl<K, V> TrieNode<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     /// Creates a new empty `Node`.
-    pub fn new() -> Self
-    where
-        K: Hash + Eq,
-    {
+    pub fn new() -> Self {
         TrieNode { value: None, children: HashMap::new() }
     }
 
@@ -136,16 +124,20 @@ where
 }
 
 /// An iterator for a `Trie`.
+#[derive(Debug)]
 pub struct TrieIterator<'a, K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     work_stack: Vec<WorkStackEntry<'a, K, V>>,
 }
 
+#[derive(Debug)]
 struct WorkStackEntry<'a, K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     current_node: &'a TrieNode<K, V>,
     current_key: Vec<&'a K>,
@@ -153,7 +145,8 @@ where
 
 impl<'a, K, V> TrieIterator<'a, K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     fn new(trie: &'a Trie<K, V>) -> Self {
         let root = trie.get_root();
@@ -163,7 +156,8 @@ where
 
 impl<'a, K, V> Iterator for TrieIterator<'a, K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Debug,
+    V: Debug,
 {
     /// Each item is a path to the node plus the value in that node.
     type Item = (Vec<&'a K>, Option<&'a V>);

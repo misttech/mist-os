@@ -68,6 +68,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pin-project",
