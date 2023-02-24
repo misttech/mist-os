@@ -6,6 +6,8 @@
 
 #include <lib/devicetree/devicetree.h>
 
+#include <vector>
+
 #include <zxtest/zxtest.h>
 
 #include "zbi.h"
@@ -14,17 +16,18 @@
 // with a shim that provides a ZBI_TYPE_DEVICETREE ZBI item: our QEMU arm64
 // board is such an example.
 //
-// TODO(fxbug.dev/73350): Investigate devicetree blob corruption.S
+// TODO(fxbug.dev/73350): Investigate devicetree blob corruption.
 TEST(DevicetreeTest, DISABLED_SystemDevicetree) {
   if (auto item = DevicetreeItem::Get(); item.is_error()) {
     ASSERT_OK(item.error_value(), "failed to get ZBI item");
   } else {
     ASSERT_GT(item->size, 0);
 
-    auto fdt = std::make_unique<uint8_t[]>(item->size);
-    ASSERT_OK(item->vmo.read(fdt.get(), 0, item->size));
+    std::vector<std::byte> fdt;
+    fdt.resize(item->size);
+    ASSERT_OK(item->vmo.read(fdt.data(), 0, item->size));
 
-    devicetree::Devicetree dt({fdt.get(), item->size});
+    devicetree::Devicetree dt(fdt);
     int node_count = 0;
     dt.Walk([&node_count](const auto& path, auto props) {
       ++node_count;

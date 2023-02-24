@@ -67,7 +67,7 @@ class MatchTest : public zxtest::Test {
          H
   */
   devicetree::Devicetree no_prop_tree() {
-    return devicetree::Devicetree({fdt_no_props.data(), fdt_no_props.size()});
+    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_no_props}));
   }
 
   /*
@@ -86,7 +86,7 @@ class MatchTest : public zxtest::Test {
     bar = /E/F
 */
   devicetree::Devicetree with_alias_tree() {
-    return devicetree::Devicetree({fdt_with_alias.data(), fdt_with_alias.size()});
+    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_with_alias}));
   }
 
   /*
@@ -105,7 +105,7 @@ aliases:
   bar = /E/F
 */
   devicetree::Devicetree with_alias_first_tree() {
-    return devicetree::Devicetree({fdt_with_alias_first.data(), fdt_with_alias_first.size()});
+    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_with_alias_first}));
   }
 
  private:

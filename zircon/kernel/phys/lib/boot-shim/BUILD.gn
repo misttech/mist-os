@@ -4,8 +4,6 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/components.gni")
-import("//build/test.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("boot-shim") {
@@ -73,6 +71,17 @@ zx_library("boot-shim") {
 }
 
 if (!is_kernel) {
+  import("//build/components.gni")
+  import("//build/test.gni")
+
+  group("tests") {
+    testonly = true
+    deps = [
+      ":boot-shim-tests",
+      ":boot-shim-unittests($host_toolchain)",
+    ]
+  }
+
   zx_library("boot-shim-test") {
     testonly = true
 
@@ -85,44 +94,36 @@ if (!is_kernel) {
       "//zircon/system/ulib/zxtest",
     ]
   }
-}
 
-group("tests") {
-  testonly = true
-  deps = [
-    ":boot-shim-tests",
-    ":boot-shim-unittests($host_toolchain)",
-  ]
-}
-
-test("boot-shim-unittests") {
-  sources = [
-    "acpi-tests.cc",
-    "boot-shim-tests.cc",
-    "debugdata-tests.cc",
-    "devicetree-boot-shim-tests.cc",
-    "efi-boot-shim-tests.cc",
-    "efi-tests.cc",
-    "pool-mem-config-tests.cc",
-    "test-serial-number-tests.cc",
-    "uart-tests.cc",
-  ]
-  deps = [
-    ":boot-shim",
-    ":boot-shim-test",
-    "//zircon/kernel/lib/acpi_lite",
-    "//zircon/kernel/lib/devicetree/tests:test_helper",
-    "//zircon/kernel/phys/lib/memalloc",
-    "//zircon/system/ulib/zxtest",
-  ]
-  if (is_host) {
-    deps += [ "//zircon/kernel/lib/devicetree/tests:host-test-data" ]
+  test("boot-shim-unittests") {
+    sources = [
+      "acpi-tests.cc",
+      "boot-shim-tests.cc",
+      "debugdata-tests.cc",
+      "devicetree-boot-shim-tests.cc",
+      "efi-boot-shim-tests.cc",
+      "efi-tests.cc",
+      "pool-mem-config-tests.cc",
+      "test-serial-number-tests.cc",
+      "uart-tests.cc",
+    ]
+    deps = [
+      ":boot-shim",
+      ":boot-shim-test",
+      "//zircon/kernel/lib/acpi_lite",
+      "//zircon/kernel/lib/devicetree/tests:test_helper",
+      "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/system/ulib/zxtest",
+    ]
+    if (is_host) {
+      deps += [ "//zircon/kernel/lib/devicetree/tests:host-test-data" ]
+    }
   }
-}
 
-fuchsia_unittest_package("boot-shim-tests") {
-  deps = [
-    ":boot-shim-unittests",
-    "//zircon/kernel/lib/devicetree/tests:dtb_resources",
-  ]
+  fuchsia_unittest_package("boot-shim-tests") {
+    deps = [
+      ":boot-shim-unittests",
+      "//zircon/kernel/lib/devicetree/tests:dtb_resources",
+    ]
+  }
 }

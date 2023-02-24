@@ -493,6 +493,7 @@ if (current_toolchain != default_toolchain) {
       ":zbi-physload-test",
       "code-patching",
       "elf-loading",
+      "//zircon/kernel/arch/$zircon_cpu/phys:tests",
     ]
     if (have_efi) {
       deps += [

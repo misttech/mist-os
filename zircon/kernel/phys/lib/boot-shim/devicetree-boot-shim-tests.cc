@@ -122,7 +122,9 @@ class DevicetreeBootShimTest : public zxtest::Test {
   foo = /A/C
   bar = /E/F
 */
-  devicetree::Devicetree fdt() { return devicetree::Devicetree({fdt_.data(), fdt_.size()}); }
+  devicetree::Devicetree fdt() {
+    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_}));
+  }
 
  private:
   static std::array<uint8_t, kMaxSize> fdt_;

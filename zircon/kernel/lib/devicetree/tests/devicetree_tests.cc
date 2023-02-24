@@ -48,7 +48,7 @@ TEST(DevicetreeTest, SplitNodeName) {
 TEST(DevicetreeTest, EmptyTree) {
   uint8_t fdt[kMaxSize];
   ReadTestData("empty.dtb", fdt);
-  devicetree::Devicetree dt({fdt, kMaxSize});
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   size_t seen = 0;
   auto walker = [&seen](const devicetree::NodePath& path, devicetree::Properties) {
@@ -132,7 +132,7 @@ TEST(DevicetreeTest, NodesAreVisitedDepthFirst) {
   */
   uint8_t fdt[kMaxSize];
   ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt({fdt, kMaxSize});
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1},
@@ -168,7 +168,7 @@ TEST(DevicetreeTest, SubtreesArePruned) {
   */
   uint8_t fdt[kMaxSize];
   ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt({fdt, kMaxSize});
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1},
@@ -201,7 +201,7 @@ TEST(DevicetreeTest, WholeTreeIsPruned) {
 
   uint8_t fdt[kMaxSize];
   ReadTestData("complex_no_properties.dtb", fdt);
-  devicetree::Devicetree dt({fdt, kMaxSize});
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   constexpr auto nodes = cpp20::to_array<Node>({
       {.name = "", .size = 1, .prune = true},
@@ -222,7 +222,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
   */
   uint8_t fdt[kMaxSize];
   ReadTestData("simple_with_properties.dtb", fdt);
-  devicetree::Devicetree dt({fdt, kMaxSize});
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   size_t seen = 0;
   auto walker = [&seen](const devicetree::NodePath& path, devicetree::Properties props) {
@@ -320,7 +320,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
 TEST(DevicetreeTest, MemoryReservations) {
   uint8_t fdt[kMaxSize];
   ReadTestData("memory_reservations.dtb", fdt);
-  const devicetree::Devicetree dt({fdt, kMaxSize});
+  const devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   unsigned int i = 0;
   for (auto [start, size] : dt.memory_reservations()) {

@@ -185,9 +185,11 @@ Devicetree::Devicetree(ByteView blob) {
   mem_rsvmap_ = mem_rsvmap;
 }
 
-ByteView Devicetree::EndOfPropertyBlock(ByteView prop) { return ReadPropertyBlock(prop).tail; }
+ByteView Devicetree::EndOfPropertyBlock(ByteView prop) const {
+  return ReadPropertyBlock(prop).tail;
+}
 
-void Devicetree::WalkTree(NodeVisitor pre_order_visitor, NodeVisitor post_order_visitor) {
+void Devicetree::WalkTree(NodeVisitor pre_order_visitor, NodeVisitor post_order_visitor) const {
   // |path| will point to stack-owned Nodes as we recurse.
   NodePath path;
   ByteView unprocessed = struct_block_;
@@ -212,7 +214,7 @@ void Devicetree::WalkTree(NodeVisitor pre_order_visitor, NodeVisitor post_order_
 // It should be invariant that the subtree begins just after the
 // FDT_BEGIN_NODE token.
 ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& pre_order_visitor,
-                                 NodeVisitor& post_order_visitor, bool visit) {
+                                 NodeVisitor& post_order_visitor, bool visit) const {
   ByteView unprocessed = subtree;
 
   // The node name follows the begin token.

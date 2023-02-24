@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_DEVICETREE_H_
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_DEVICETREE_H_
 
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
@@ -327,6 +328,11 @@ class Devicetree {
   // be dereferenced.
   explicit Devicetree(ByteView fdt);
 
+  explicit Devicetree(cpp20::span<const std::byte> fdt)
+      : Devicetree(ByteView{reinterpret_cast<const uint8_t*>(fdt.data()), fdt.size()}) {}
+
+  ByteView fdt() const { return fdt_; }
+
   // The size in bytes of the flattened devicetree blob.
   size_t size_bytes() const { return fdt_.size(); }
 
@@ -358,13 +364,13 @@ class Devicetree {
   // with this templated wrapper calling that with a captureless lambda to call
   // the templated walker.
   template <typename Visitor>
-  void Walk(Visitor&& visitor) {
+  void Walk(Visitor&& visitor) const {
     return Walk(std::forward<Visitor>(visitor),
                 [](const auto& NodePath, Properties props) { return true; });
   }
 
   template <typename PreOrderVisitor, typename PostOrderVisitor>
-  void Walk(PreOrderVisitor&& pre_order_visitor, PostOrderVisitor&& post_order_visitor) {
+  void Walk(PreOrderVisitor&& pre_order_visitor, PostOrderVisitor&& post_order_visitor) const {
     WalkInternal(pre_order_visitor, post_order_visitor);
   }
 
@@ -380,19 +386,19 @@ class Devicetree {
 
   // Given a byte span that starts at a flattened property block, returns the
   // iterator in that span pointing to the 4-byte aligned end of that block.
-  ByteView EndOfPropertyBlock(ByteView bytes);
+  ByteView EndOfPropertyBlock(ByteView bytes) const;
 
   // Extra step for dealing with rvalue references.
   template <typename T, typename U>
-  void WalkInternal(T& pre, U& post) {
+  void WalkInternal(T& pre, U& post) const {
     WalkTree(NodeVisitor(pre), NodeVisitor(post));
   }
 
   // Walks the tree with the provided walker arguments.
-  void WalkTree(NodeVisitor pre_walker, NodeVisitor post_walker);
+  void WalkTree(NodeVisitor pre_walker, NodeVisitor post_walker) const;
 
   ByteView WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& pre_walker,
-                       NodeVisitor& post_walker, bool visit);
+                       NodeVisitor& post_walker, bool visit) const;
 
   ByteView fdt_;
   // https://devicetree-specification.readthedocs.io/en/v0.3/flattened-format.html#structure-block

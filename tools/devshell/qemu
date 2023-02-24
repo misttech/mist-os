@@ -130,10 +130,10 @@ CLEANUP_LIST+=("$imgdir")
 if (( $UEFI )); then
   args+=(--uefi)
 else
-  KERNEL_IMAGE="$(fx-command-run list-build-artifacts --type kernel --name qemu-kernel images)"
+  KERNEL_IMAGE="$(fx-command-run list-build-artifacts --cpu "$FUCHSIA_ARCH" --type kernel --name qemu-kernel images)"
   build_targets+=( "${KERNEL_IMAGE}" )
   if [[ -z "${ZBI_IMAGE}" ]]; then
-    ZBI_IMAGE="$(fx-command-run list-build-artifacts --type zbi --name zircon-a images)"
+    ZBI_IMAGE="$(fx-command-run list-build-artifacts --cpu "$FUCHSIA_ARCH" --type zbi --name zircon-a images)"
     build_targets+=( "${ZBI_IMAGE}" )
     ZBI_IMAGE="${FUCHSIA_BUILD_DIR}/${ZBI_IMAGE}"
   fi
