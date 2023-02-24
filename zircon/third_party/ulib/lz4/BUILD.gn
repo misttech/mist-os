@@ -40,10 +40,6 @@ zx_library("lz4") {
   ]
 }
 
-config("undefined_behavior_null_pointer_arithmetic") {
-  cflags = [ "-fno-sanitize=pointer-overflow" ]
-}
-
 group("tests") {
   testonly = true
   deps = [ "test:tests" ]
