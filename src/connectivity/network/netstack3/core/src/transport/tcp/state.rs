@@ -1955,9 +1955,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         }
     }
 
-    pub(crate) fn send_buffer_size(&self) -> usize {
+    pub(crate) fn send_buffer_size(&self) -> Option<usize> {
         match self {
-            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => 0,
+            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => None,
             State::Listen(Listen {
                 iss: _,
                 buffer_sizes: BufferSizes { send },
@@ -1981,14 +1981,16 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 buffer_sizes: BufferSizes { send },
                 device_mss: _,
                 default_mss: _,
-            }) => *send,
+            }) => Some(*send),
             State::Established(Established { snd, rcv: _ })
             | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                snd.target_capacity()
+                Some(snd.target_capacity())
             }
             State::FinWait1(FinWait1 { snd, rcv: _ })
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
-            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.target_capacity(),
+            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
+                Some(snd.target_capacity())
+            }
         }
     }
 }

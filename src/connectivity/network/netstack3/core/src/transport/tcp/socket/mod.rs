@@ -1089,7 +1089,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     ) -> R;
 
     fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, ctx: &mut C, id: Id) -> usize;
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, ctx: &mut C, id: Id) -> Option<usize>;
 
     fn set_reuseaddr_unbound(&mut self, id: UnboundId<I>, reuse: bool);
     fn set_reuseaddr_bound(&mut self, id: BoundId<I>, reuse: bool)
@@ -1762,7 +1762,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         })
     }
 
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, _ctx: &mut C, id: Id) -> usize {
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, _ctx: &mut C, id: Id) -> Option<usize> {
         self.with_tcp_sockets(|sockets| {
             let Sockets { port_alloc: _, inactive, socketmap } = sockets;
             let get_listener = match id.into() {
@@ -1770,7 +1770,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     let Unbound { bound_device: _, buffer_sizes, socket_options: _, sharing: _ } =
                         inactive.get(id.into()).expect("invalid unbound ID");
                     let BufferSizes { send } = buffer_sizes;
-                    return *send;
+                    return Some(*send);
                 }
                 SocketId::Connection(id) => {
                     let (conn, _, _): &(_, SharingState, ConnAddr<_, _, _, _>) =
@@ -1802,7 +1802,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     socket_options: _,
                 }) => buffer_sizes,
             };
-            *send
+            Some(*send)
         })
     }
 
@@ -2666,7 +2666,7 @@ pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
-) -> usize {
+) -> Option<usize> {
     let IpInvariant(size) = I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id.into()),
         |(IpInvariant((sync_ctx, ctx)), id)| {

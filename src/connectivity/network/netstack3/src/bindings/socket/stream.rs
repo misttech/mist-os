@@ -904,6 +904,9 @@ where
             SocketId::Connection(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Listener(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
         }
+        // If the socket doesn't have a send buffer (e.g. because it was shut
+        // down for writing and all the data was sent to the peer), return 0.
+        .unwrap_or(0)
         .try_into()
         .ok_checked::<TryFromIntError>()
         .unwrap_or(u64::MAX)
