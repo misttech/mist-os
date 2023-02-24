@@ -195,56 +195,67 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 	go func() {
 		const threadProfile = "fuchsia.netstack.go-worker"
 		const handlesPerRead = 1
+		const bytesPerRead = 1
 
 		channel := zx.GetThreadsChannel()
 		for {
+			defer func() {
+				_ = provider.Close()
+			}()
 			var handles [handlesPerRead]zx.HandleInfo
+			var bytes [bytesPerRead]byte
 			var nb, nh uint32
 			if err := zxwait.WithRetryContext(ctx, func() error {
 				var err error
-				nb, nh, err = channel.ReadEtc(nil, handles[:], 0)
+				nb, nh, err = channel.ReadEtc(bytes[:], handles[:], 0)
 				return err
 			}, *channel.Handle(), zx.SignalChannelReadable, zx.SignalChannelPeerClosed); err != nil {
 				_ = syslog.Errorf("stopped observing for thread profiles: %s", err)
 				return
 			}
-			if nb != 0 {
-				panic(fmt.Sprintf("unexpected %d bytes in channel message", nb))
-			}
 			if nh != handlesPerRead {
 				panic(fmt.Sprintf("unexpected %d handles in channel message", nh))
 			}
-			for _, handleInfo := range handles {
-				// Retrieve the koid before transferring the handle.
-				koid := func() string {
-					info, err := handleInfo.Handle.GetInfoHandleBasic()
-					if err != nil {
-						return fmt.Sprintf("<%s>", err)
-					}
-					return fmt.Sprintf("%d", info.Koid)
-				}()
 
-				// Attempt to install our thread profile.
-				status, err := provider.SetProfileByRole(ctx, handleInfo.Handle, threadProfile)
-				if err, ok := err.(*zx.Error); ok {
-					switch err.Status {
-					case zx.ErrNotFound, zx.ErrPeerClosed, zx.ErrUnavailable:
-						_ = syslog.Warnf("connection to %s closed; will not set thread profiles; FIDL error: %s", req.Name(), err)
-						return
-					}
-				}
-				if err != nil {
-					_ = syslog.Errorf("failed to set thread profile for koid=%s; FIDL error: %s", koid, err)
-					continue
-				}
+			handleInfo := handles[0]
 
-				if status := zx.Status(status); status != zx.ErrOk {
-					_ = syslog.Errorf("failed to set thread profile for koid=%s; rejected with %s", koid, status)
-					continue
-				}
-
-				_ = syslog.Debugf("successfully set thread profile for koid=%s to %s", koid, threadProfile)
+			// TODO(https://fxbug.dev/122472): This is enabling a
+			// soft-transition on the go-runtime exposing the thread types.
+			// Remove the hard-coded constants once runtime is updated.
+			//
+			// The 1 value maps to WorkerThread in https://fxrev.dev/808487.
+			if nb != 0 && bytes[0] != 1 {
+				continue
 			}
+			// Retrieve the koid before transferring the handle.
+			koid := func() string {
+				info, err := handleInfo.Handle.GetInfoHandleBasic()
+				if err != nil {
+					return fmt.Sprintf("<%s>", err)
+				}
+				return fmt.Sprintf("%d", info.Koid)
+			}()
+
+			// Attempt to install our thread profile.
+			status, err := provider.SetProfileByRole(ctx, handleInfo.Handle, threadProfile)
+			if err, ok := err.(*zx.Error); ok {
+				switch err.Status {
+				case zx.ErrNotFound, zx.ErrPeerClosed, zx.ErrUnavailable:
+					_ = syslog.Warnf("connection to %s closed; will not set thread profiles; FIDL error: %s", req.Name(), err)
+					return
+				}
+			}
+			if err != nil {
+				_ = syslog.Errorf("failed to set thread profile for koid=%s; FIDL error: %s", koid, err)
+				continue
+			}
+
+			if status := zx.Status(status); status != zx.ErrOk {
+				_ = syslog.Errorf("failed to set thread profile for koid=%s; rejected with %s", koid, status)
+				continue
+			}
+
+			_ = syslog.Debugf("successfully set thread profile for koid=%s to %s", koid, threadProfile)
 		}
 	}()
 }

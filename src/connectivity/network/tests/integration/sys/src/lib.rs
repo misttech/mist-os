@@ -73,20 +73,21 @@ where
 #[fuchsia::test]
 async fn ns2_sets_thread_profiles() {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_realm, fs) =
+    let (_realm, mut fs) =
         create_netstack_with_mock_endpoint::<fidl_fuchsia_scheduler::ProfileProviderRequestStream>(
             &sandbox,
             fidl_fuchsia_scheduler::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
             "ns2_sets_thread_profiles",
         );
 
+    let mut profile_provider_request_stream = fs.next().await.expect("fs terminated unexpectedly");
+
     // And expect that we'll see a connection to profile provider.
-    let (thread, profile, responder) = fs
-        .flatten()
+    let (thread, profile, responder) = profile_provider_request_stream
         .try_next()
         .await
-        .expect("fs failure")
-        .expect("fs terminated unexpectedly")
+        .expect("request failure")
+        .expect("profile provider request stream ended unexpectedly")
         .into_set_profile_by_role()
         .expect("unexpected request");
     assert_eq!(profile, "fuchsia.netstack.go-worker");
