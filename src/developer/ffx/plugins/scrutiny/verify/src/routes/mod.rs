@@ -5,7 +5,8 @@
 mod allowlist;
 
 use allowlist::{AllowlistFilter, UnversionedAllowlist, V0Allowlist, V1Allowlist};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use errors::ffx_bail;
 use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
@@ -95,31 +96,63 @@ pub async fn verify(
     config.runtime.logging.silent_mode = true;
 
     let results = launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-    let route_analysis: CapabilityRouteResults = serde_json5::from_str(&results)
+    let route_analysis: CapabilityRouteResults = serde_json::from_str(&results)
         .context(format!("Failed to deserialize verify routes results: {}", results))?;
 
     let allowlist_filter = load_allowlist(&query.allowlist_paths)
         .context("Failed to parse all allowlist fragments from supported format")?;
 
-    let filtered_analysis = allowlist_filter.filter_analysis(route_analysis.results);
-    for entry in filtered_analysis.iter() {
-        if !entry.results.errors.is_empty() {
-            bail!(
-                "
+    let mut filtered_analysis = allowlist_filter.filter_analysis(route_analysis.results);
+    let mut human_readable_errors = vec![];
+
+    for entry in filtered_analysis.iter_mut() {
+        // If there are any errors, produce the human-readable version of each.
+        for error in entry.results.errors.iter_mut() {
+            // Remove all route segments so they don't show up in allowlist JSON snippet.
+            let mut context: Vec<String> = error
+                .route
+                .drain(..)
+                .enumerate()
+                .map(|(i, s)| {
+                    let step = format!("step {}", i + 1);
+                    format!("{:>8}: {}", step, s)
+                })
+                .collect();
+
+            // Add the failure to the route segments
+            let error = format!("❌ ERROR: {}", error.error.message);
+            context.push(error);
+
+            // The context must begin from the point of failure
+            context.reverse();
+
+            // Chain the error context into a single string
+            let error_with_context = context.join("\n");
+            human_readable_errors.push(error_with_context);
+        }
+    }
+
+    if !human_readable_errors.is_empty() {
+        ffx_bail!(
+            "
 Static Capability Flow Analysis Error:
 The route verifier failed to verify all capability routes in this build.
 
 See https://fuchsia.dev/go/components/static-analysis-errors
 
 If the broken route is required for a transition it can be temporarily added
-to the allowlist located at: {:?}
+to the JSON allowlist located at: {:?}
 
-Verification Errors:
+>>>>>> START OF JSON SNIPPET
+{}
+<<<<<< END OF JSON SNIPPET
+
+Alternatively, attempt to fix the following errors:
 {}",
-                query.allowlist_paths,
-                serde_json::to_string_pretty(&filtered_analysis).unwrap()
-            );
-        }
+            query.allowlist_paths,
+            serde_json::to_string_pretty(&filtered_analysis).unwrap(),
+            human_readable_errors.join("\n\n")
+        );
     }
 
     Ok(route_analysis.deps)

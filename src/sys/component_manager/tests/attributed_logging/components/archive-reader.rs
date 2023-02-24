@@ -30,9 +30,8 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `/root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent`",
-            "`/root/routing-tests/offers-to-children-unavailable` tried to offer \
-            `fidl.test.components.Trigger` from its parent",
-            "but the parent does not offer",
+            "`fidl.test.components.Trigger` was not offered to",
+            "`/root/routing-tests/offers-to-children-unavailable` by parent",
         ]],
     );
     treasure.insert(
@@ -43,9 +42,8 @@ async fn main() {
             "not available for target component \
             `/root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent`",
             "Target optionally uses capability that was not available",
-            "`/root/routing-tests/offers-to-children-unavailable-but-optional` tried to offer \
-            `fidl.test.components.Trigger` from its parent",
-            "but the parent does not offer",
+            "`fidl.test.components.Trigger` was not offered to",
+            "`/root/routing-tests/offers-to-children-unavailable-but-optional` by parent",
         ]],
     );
     treasure.insert(
@@ -55,8 +53,8 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `/root/routing-tests/child`",
-            "`/root/routing-tests/child` tried to use `fidl.test.components.Trigger` from its parent",
-            "but the parent does not offer",
+            "`fidl.test.components.Trigger` was not offered to",
+            "`/root/routing-tests/child` by parent",
         ]],
     );
     treasure.insert(
@@ -67,9 +65,8 @@ async fn main() {
             "not available for target component \
             `/root/routing-tests/child-with-optional-use`",
             "Target optionally uses capability that was not available",
-            "`/root/routing-tests/child-with-optional-use` tried to use \
-            `fidl.test.components.Trigger` from its parent",
-            "but the parent does not offer",
+            "`fidl.test.components.Trigger` was not offered to",
+            "`/root/routing-tests/child-with-optional-use` by parent",
         ]],
     );
     treasure.insert(
@@ -79,9 +76,8 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `/root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling`",
-            "`/root/routing-tests/offers-to-children-unavailable` tried to offer",
-            "from its child `#child-that-doesnt-expose`",
-            "`#child-that-doesnt-expose` does not expose `fidl.test.components.Trigger`",
+            "`fidl.test.components.Trigger` was not exposed to `/root/routing-tests/offers-to-children-unavailable`",
+            "from child `#child-that-doesnt-expose`"
         ]],
     );
     treasure.insert(
@@ -92,9 +88,8 @@ async fn main() {
             "not available for target component \
             `/root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling`",
             "Target optionally uses capability that was not available",
-            "`/root/routing-tests/offers-to-children-unavailable-but-optional` tried to offer",
-            "from its child `#child-that-doesnt-expose`",
-            "`#child-that-doesnt-expose` does not expose `fidl.test.components.Trigger`",
+            "`fidl.test.components.Trigger` was not exposed to `/root/routing-tests/offers-to-children-unavailable-but-optional`",
+            "from child `#child-that-doesnt-expose`"
         ]],
     );
     treasure.insert(

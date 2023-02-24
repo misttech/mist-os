@@ -5,13 +5,19 @@
 if (is_fuchsia) {
   group("tests") {
     testonly = true
-    deps = [ "structured_config:tests" ]
+    deps = [
+      "route_verification:tests",
+      "structured_config:tests",
+    ]
   }
 }
 
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ "structured_config:host_tests" ]
+    deps = [
+      "route_verification:host_tests",
+      "structured_config:host_tests",
+    ]
   }
 }

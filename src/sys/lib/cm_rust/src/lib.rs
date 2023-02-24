@@ -937,6 +937,16 @@ pub struct ChildRef {
     pub collection: Option<FlyStr>,
 }
 
+impl std::fmt::Display for ChildRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(collection) = &self.collection {
+            write!(f, "{}:{}", collection, self.name)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
+}
+
 impl FidlIntoNative<ChildRef> for fdecl::ChildRef {
     fn fidl_into_native(self) -> ChildRef {
         ChildRef { name: self.name.into(), collection: self.collection.map(Into::into) }
@@ -1869,6 +1879,19 @@ pub enum UseSource {
     Child(String),
 }
 
+impl std::fmt::Display for UseSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Framework => write!(f, "framework"),
+            Self::Parent => write!(f, "parent"),
+            Self::Debug => write!(f, "debug environment"),
+            Self::Self_ => write!(f, "self"),
+            Self::Capability(c) => write!(f, "capability `{}`", c),
+            Self::Child(c) => write!(f, "child `#{}`", c),
+        }
+    }
+}
+
 impl FidlIntoNative<UseSource> for fdecl::Ref {
     fn fidl_into_native(self) -> UseSource {
         match self {
@@ -1942,6 +1965,20 @@ pub enum OfferSource {
     Void,
 }
 
+impl std::fmt::Display for OfferSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Framework => write!(f, "framework"),
+            Self::Parent => write!(f, "parent"),
+            Self::Child(c) => write!(f, "child `#{}`", c),
+            Self::Collection(c) => write!(f, "collection `#{}`", c),
+            Self::Self_ => write!(f, "self"),
+            Self::Capability(c) => write!(f, "capability `{}`", c),
+            Self::Void => write!(f, "void"),
+        }
+    }
+}
+
 impl OfferSource {
     pub fn static_child(name: String) -> Self {
         Self::Child(ChildRef { name: name.into(), collection: None })
@@ -1989,6 +2026,18 @@ pub enum ExposeSource {
     Capability(CapabilityName),
 }
 
+impl std::fmt::Display for ExposeSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Framework => write!(f, "framework"),
+            Self::Child(c) => write!(f, "child `#{}`", c),
+            Self::Collection(c) => write!(f, "collection `#{}`", c),
+            Self::Self_ => write!(f, "self"),
+            Self::Capability(c) => write!(f, "capability `{}`", c),
+        }
+    }
+}
+
 impl FidlIntoNative<ExposeSource> for fdecl::Ref {
     fn fidl_into_native(self) -> ExposeSource {
         match self {
@@ -2023,6 +2072,15 @@ impl NativeIntoFidl<fdecl::Ref> for ExposeSource {
 pub enum ExposeTarget {
     Parent,
     Framework,
+}
+
+impl std::fmt::Display for ExposeTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Framework => write!(f, "framework"),
+            Self::Parent => write!(f, "parent"),
+        }
+    }
 }
 
 impl FidlIntoNative<ExposeTarget> for fdecl::Ref {
@@ -2124,6 +2182,15 @@ pub enum OfferTarget {
 impl OfferTarget {
     pub fn static_child(name: String) -> Self {
         Self::Child(ChildRef { name: name.into(), collection: None })
+    }
+}
+
+impl std::fmt::Display for OfferTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Child(c) => write!(f, "child `#{}`", c),
+            Self::Collection(c) => write!(f, "collection `#{}`", c),
+        }
     }
 }
 

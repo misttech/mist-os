@@ -55,6 +55,13 @@ impl<'de> Visitor<'de> for OptionFio2OperationsVisitor {
     {
         Ok(None)
     }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
 }
 
 /// Custom serialization for Option<fidl_fuchsia_io::Operations> bitflags.

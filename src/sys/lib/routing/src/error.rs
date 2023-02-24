@@ -95,38 +95,11 @@ impl PartialEq for ComponentInstanceError {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RoutingError {
-    #[error("Instance identified as source of capability is not running: `{}`.", moniker)]
-    SourceInstanceStopped { moniker: AbsoluteMoniker },
-
     #[error(
-        "Instance identified as source of capability is a non-executable component: `{}`.",
-        moniker
-    )]
-    SourceInstanceNotExecutable { moniker: AbsoluteMoniker },
-
-    #[error(
-        "Source for directory backing storage from `{}` must be a component or component manager's namespace, but was {}.",
-        storage_moniker,
-        source_type
-    )]
-    StorageDirectorySourceInvalid { source_type: String, storage_moniker: AbsoluteMoniker },
-
-    #[error(
-        "Source for directory storage from `{}` was a child `{}`, but this child was not found.",
-        storage_moniker,
-        child_moniker
-    )]
-    StorageDirectorySourceChildNotFound {
-        storage_moniker: AbsoluteMoniker,
-        child_moniker: ChildMoniker,
-    },
-
-    #[error(
-        "A `storage` declaration with a backing directory from child `{}` was found at `{}` for \
-        `{}`, but no matching `expose` declaration was found in the child.",
-        child_moniker,
+        "Backing directory `{}` was not exposed to `{}` from child `#{}`.",
+        capability_id,
         moniker,
-        capability_id
+        child_moniker
     )]
     StorageFromChildExposeNotFound {
         child_moniker: ChildMoniker,
@@ -141,62 +114,26 @@ pub enum RoutingError {
     )]
     ComponentNotInIdIndex { moniker: AbsoluteMoniker },
 
-    #[error(
-        "A `use from parent` declaration was found at `/` for `{}`, or a `register from parent` \
-        declaration was found in the root environment or one of the root component's declared environments, \
-        but no built-in capability matches.",
-        capability_id
-    )]
+    #[error("`{}` is not a built-in capability.", capability_id)]
     UseFromComponentManagerNotFound { capability_id: String },
 
-    #[error(
-        "A `register from parent` declaration was found at `/` or in one of the root component's declared \
-        environments for `{}` but no built-in capability matches.",
-        capability_id
-    )]
+    #[error("`{}` is not a built-in capability.", capability_id)]
     RegisterFromComponentManagerNotFound { capability_id: String },
 
-    #[error(
-        "An `offer from parent` declaration was found at `/` for `{}`, \
-        but no built-in capability matches.",
-        capability_id
-    )]
+    #[error("`{}` is not a built-in capability.", capability_id)]
     OfferFromComponentManagerNotFound { capability_id: String },
 
-    #[error(
-        "A `storage` declaration with a backing directory was found at `/` for `{}`, \
-        but no built-in capability matches.",
-        capability_id
-    )]
-    StorageFromComponentManagerNotFound { capability_id: String },
-
-    #[error(
-        "`{}` tried to use `{}` from its parent, but the parent does not offer that capability. \
-        Note, use clauses in CML default to using from parent.",
-        moniker,
-        capability_id
-    )]
+    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
     UseFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
-    #[error(
-        "`{}` tried to use `{}` from its child `#{}`, but no such child was found.",
-        moniker,
-        capability_id,
-        child_moniker
-    )]
+    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     UseFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
         capability_id: String,
     },
 
-    #[error(
-        "`{}` tried to use {} `{}` from its environment, but no matching {} registration was found.",
-        moniker,
-        capability_type,
-        capability_name,
-        capability_type
-    )]
+    #[error("`{}` was not registered in environment of `{}`.", capability_name, moniker)]
     UseFromEnvironmentNotFound {
         moniker: AbsoluteMoniker,
         capability_type: String,
@@ -215,14 +152,7 @@ pub enum RoutingError {
         capability_name: CapabilityName,
     },
 
-    #[error(
-        "`{}` tried to register {} `{}` from its parent in its environment, but the parent \
-        does not offer `{}`.",
-        moniker,
-        capability_type,
-        capability_name,
-        capability_name
-    )]
+    #[error("`{}` was not offered to `{}` by parent.", capability_name, moniker)]
     EnvironmentFromParentNotFound {
         moniker: AbsoluteMoniker,
         capability_type: String,
@@ -230,14 +160,10 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to register {} `{}` from its child `#{}` in its environment, but `#{}` \
-        does not expose `{}`.",
-        moniker,
-        capability_type,
+        "`{}` was not exposed to `{}` from child `#{}`.",
         capability_name,
-        child_moniker,
-        child_moniker,
-        capability_name
+        moniker,
+        child_moniker
     )]
     EnvironmentFromChildExposeNotFound {
         child_moniker: ChildMoniker,
@@ -246,14 +172,7 @@ pub enum RoutingError {
         capability_name: CapabilityName,
     },
 
-    #[error(
-        "`{}` tried to register {} `{}` from its child `#{}` in its environment, but no such child
-        was found.",
-        moniker,
-        capability_type,
-        capability_name,
-        child_moniker
-    )]
+    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     EnvironmentFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
@@ -261,39 +180,20 @@ pub enum RoutingError {
         capability_type: String,
     },
 
-    #[error(
-        "`{}` tried to offer `{}` from its parent, but the parent does not offer that capability.",
-        moniker,
-        capability_id
-    )]
+    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
     OfferFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
-    #[error(
-        "`{}` tried to use a storage capability `{}` from its parent, but the parent does not \
-        offer that capability. Note, use clauses in CML default to using from parent.",
-        moniker,
-        capability_id
-    )]
+    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
     StorageFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
-    #[error(
-        "`{}` tried to offer `{}` from `#{}`, but no such child was found.",
-        moniker,
-        capability_id,
-        child_moniker
-    )]
+    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     OfferFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
         capability_id: String,
     },
 
-    #[error(
-        "`{}` tried to offer `{}` from the collection `#{}`, but no such collection was found.",
-        moniker,
-        capability,
-        collection
-    )]
+    #[error("`{}` does not have collection `#{}`.", moniker, collection)]
     OfferFromCollectionNotFound {
         collection: String,
         moniker: AbsoluteMoniker,
@@ -301,12 +201,10 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to offer `{}` from its child `#{}`, but `#{}` does not expose `{}`.",
-        moniker,
+        "`{}` was not exposed to `{}` from child `#{}`.",
         capability_id,
-        child_moniker,
-        child_moniker,
-        capability_id
+        moniker,
+        child_moniker
     )]
     OfferFromChildExposeNotFound {
         child_moniker: ChildMoniker,
@@ -315,12 +213,7 @@ pub enum RoutingError {
     },
 
     // TODO: Could this be distinguished by use/offer/expose?
-    #[error(
-        "A framework capability was sourced to `{}` with id `{}`, but no such \
-        framework capability was found.",
-        moniker,
-        capability_id
-    )]
+    #[error("`{}` is not a framework capability.", capability_id)]
     CapabilityFromFrameworkNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
     #[error(
@@ -331,11 +224,7 @@ pub enum RoutingError {
     CapabilityFromCapabilityNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
     // TODO: Could this be distinguished by use/offer/expose?
-    #[error(
-        "A capability was sourced to component manager with id `{}`, but no matching \
-        capability was found.",
-        capability_id
-    )]
+    #[error("`{}` is not a framework capability.", capability_id)]
     CapabilityFromComponentManagerNotFound { capability_id: String },
 
     #[error(
@@ -346,24 +235,14 @@ pub enum RoutingError {
     )]
     CapabilityFromStorageCapabilityNotFound { storage_capability: String, capability_id: String },
 
-    #[error(
-        "`{}` tried to expose `{}` from its child `#{}`, but no such child was found.",
-        moniker,
-        capability_id,
-        child_moniker
-    )]
+    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     ExposeFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
         moniker: AbsoluteMoniker,
         capability_id: String,
     },
 
-    #[error(
-        "`{}` tried to expose `{}` from the collection `#{}`, but no such collection was found.",
-        moniker,
-        capability,
-        collection
-    )]
+    #[error("`{}` does not have collection `#{}`.", moniker, collection)]
     ExposeFromCollectionNotFound {
         collection: String,
         moniker: AbsoluteMoniker,
@@ -371,12 +250,10 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to expose `{}` from its child `#{}`, but `#{}` does not expose `{}`.",
-        moniker,
+        "`{}` was not exposed to `{}` from child `#{}`.",
         capability_id,
-        child_moniker,
-        child_moniker,
-        capability_id
+        moniker,
+        child_moniker
     )]
     ExposeFromChildExposeNotFound {
         child_moniker: ChildMoniker,
@@ -392,12 +269,10 @@ pub enum RoutingError {
     ExposeFromFrameworkNotFound { moniker: AbsoluteMoniker, capability_id: String },
 
     #[error(
-        "`{}` tried to use `{}` from its child `#{}`, but `#{}` does not expose `{}`.",
-        moniker,
+        "`{}` was not exposed to `{}` from child `#{}`.",
         capability_id,
-        child_moniker,
-        child_moniker,
-        capability_id
+        moniker,
+        child_moniker
     )]
     UseFromChildExposeNotFound {
         child_moniker: ChildMoniker,
@@ -448,34 +323,6 @@ impl RoutingError {
         }
     }
 
-    pub fn source_instance_stopped(moniker: &AbsoluteMoniker) -> Self {
-        Self::SourceInstanceStopped { moniker: moniker.clone() }
-    }
-
-    pub fn source_instance_not_executable(moniker: &AbsoluteMoniker) -> Self {
-        Self::SourceInstanceNotExecutable { moniker: moniker.clone() }
-    }
-
-    pub fn storage_directory_source_invalid(
-        source_type: impl Into<String>,
-        storage_moniker: &AbsoluteMoniker,
-    ) -> Self {
-        Self::StorageDirectorySourceInvalid {
-            source_type: source_type.into(),
-            storage_moniker: storage_moniker.clone(),
-        }
-    }
-
-    pub fn storage_directory_source_child_not_found(
-        storage_moniker: &AbsoluteMoniker,
-        child_moniker: &ChildMoniker,
-    ) -> Self {
-        Self::StorageDirectorySourceChildNotFound {
-            storage_moniker: storage_moniker.clone(),
-            child_moniker: child_moniker.clone(),
-        }
-    }
-
     pub fn storage_from_child_expose_not_found(
         child_moniker: &ChildMoniker,
         moniker: &AbsoluteMoniker,
@@ -498,10 +345,6 @@ impl RoutingError {
 
     pub fn offer_from_component_manager_not_found(capability_id: impl Into<String>) -> Self {
         Self::OfferFromComponentManagerNotFound { capability_id: capability_id.into() }
-    }
-
-    pub fn storage_from_component_manager_not_found(capability_id: impl Into<String>) -> Self {
-        Self::StorageFromComponentManagerNotFound { capability_id: capability_id.into() }
     }
 
     pub fn use_from_parent_not_found(

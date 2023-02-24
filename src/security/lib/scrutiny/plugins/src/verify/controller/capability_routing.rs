@@ -70,6 +70,7 @@ impl From<VerifyRouteResult> for ResultBySeverity {
                         using_node: verify_route_result.using_node,
                         capability: verify_route_result.capability,
                         error: CapabilityRouteError::AnalyzerModelError(error).into(),
+                        route: verify_route_result.route,
                     }
                     .into(),
                 }

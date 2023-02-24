@@ -1,0 +1,218 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_partitions_config.gni")
+import("//build/assembly/update_package.gni")
+import("//build/components.gni")
+import("//build/images/args.gni")
+import("//build/product.gni")
+import("//build/python/python_binary.gni")
+import("//build/sdk/product_bundle.gni")
+import("//build/testing/host_test.gni")
+import("//src/sys/core/build/core.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+if (is_fuchsia) {
+  group("tests") {
+    testonly = true
+    deps = []
+  }
+
+  fuchsia_component("component_with_broken_use") {
+    testonly = true
+    manifest = "meta/component_with_broken_use.cml"
+
+    # We don't intend to run this component, just make its manifest visible to scrutiny.
+    check_references = false
+  }
+
+  fuchsia_package("package") {
+    testonly = true
+    package_name = "package_for_scrutiny_testing"
+    deps = [ ":component_with_broken_use" ]
+  }
+
+  core_shard("core_shard") {
+    shard_file = "meta/core_shard.cml"
+  }
+
+  core_realm_definition("core_realm") {
+    deps = [ ":core_shard" ]
+  }
+
+  files = {
+    images_config = "$target_out_dir/fuchsia.images_config.json"
+    partitions_config = "$target_out_dir/partitions_config.json"
+
+    outdir = target_out_dir + "/assembly"
+    packages_json = "${outdir}/packages.json"
+    images_json = "${outdir}/images.json"
+
+    blobfs = "${outdir}/blob.blk"
+    zbi = "${outdir}/assembly.zbi"
+    zbi_signed = "${outdir}/assembly.zbi.signed"
+    vbmeta = "${outdir}/assembly.vbmeta"
+    fvm = "${outdir}/fvm.blk"
+    fvm_sparse = "${outdir}/fvm.sparse.blk"
+    fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
+    fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+
+    if (target_cpu == "x64") {
+      qemu_kernel = "$root_build_dir/multiboot.bin"
+    } else {
+      qemu_kernel = "$root_build_dir/qemu-boot-shim.bin"
+    }
+
+    product_bundle = target_out_dir + "/product_bundle"
+  }
+
+  assembled_system("assembly") {
+    testonly = true
+
+    # Needed for scrutiny to find root.cm and other component config.
+    bootfs_labels = [ "//build/input:bootfs" ]
+    base_packages = [ ":package" ]
+
+    generate_image_metadata = false
+
+    # Needed for scrutiny to find things for the component model.
+    include_component_id_index = true
+    core_realm_definition = ":core_realm"
+  }
+
+  generated_partitions_config("partitions_config") {
+    testonly = true
+    output_path = files.partitions_config
+    hw_revision = board_name
+  }
+
+  update_package("update") {
+    testonly = true
+    deps = [
+      ":assembly",
+      ":partitions_config",
+      "//build/info:latest-commit-date",
+    ]
+    partitions = files.partitions_config
+    packages = files.packages_json
+    system_a = files.images_json
+    version_file = build_info_files.version
+    board_name = "fake_board"
+    epoch = "1"
+  }
+
+  product_bundle("product_bundle") {
+    testonly = true
+    skip_scrutiny = true
+    skip_scrutiny_recovery = true
+    deps = [
+      ":assembly",
+      ":partitions_config",
+      "//build/info:latest-commit-date",
+    ]
+
+    update = {
+      version_file = build_info_files.version
+      epoch = "1"
+    }
+
+    partitions = files.partitions_config
+    system_a = files.images_json
+
+    # Create lists of the files that are referenced by the assembly manifests.
+    _assembly_contents = [
+      files.blobfs,
+      files.fvm,
+      files.fvm_sparse,
+      files.fvm_blob_sparse,
+      files.qemu_kernel,
+    ]
+    if (fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false) {
+      _assembly_contents += [ files.fvm_fastboot ]
+    }
+    if (custom_signing_script != "" || use_vboot) {
+      _assembly_contents += [ files.zbi_signed ]
+    } else {
+      _assembly_contents += [ files.zbi ]
+    }
+    if (use_vbmeta) {
+      _assembly_contents += [ files.vbmeta ]
+    }
+
+    system_a_contents = _assembly_contents
+  }
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [ ":test_route_verification" ]
+  }
+
+  labels = {
+    image_assembler = ":assembly.image_assembler($target_toolchain)"
+    product_bundle = ":product_bundle($target_toolchain)"
+    update_package = ":update($target_toolchain)"
+  }
+
+  files = {
+    ffx = "$root_build_dir/host-tools/ffx"
+
+    product_bundle_target_out_dir =
+        get_label_info(labels.product_bundle, "target_out_dir")
+    product_bundle_target_name = get_label_info(labels.product_bundle, "name")
+
+    product_bundle_dir =
+        "$product_bundle_target_out_dir/$product_bundle_target_name"
+  }
+
+  python_binary("test_route_verification_bin") {
+    main_source = "test_route_verification.py"
+  }
+
+  host_test_data("failed_route_verify_test_data") {
+    sources = get_target_outputs(":test_route_verification_bin")
+    sources += [
+      files.ffx,
+      files.product_bundle_dir,
+    ]
+    deps = [
+      ":test_route_verification_bin",
+      "//src/developer/ffx:host",
+      labels.product_bundle,
+    ]
+  }
+
+  test_route_verification_binary =
+      get_target_outputs(":test_route_verification_bin")
+  test_route_verification_binary = test_route_verification_binary[0]
+
+  host_test("test_route_verification") {
+    binary_path = python_exe_src
+
+    depfile = "$target_out_dir/test_route_verification.d"
+    args = [
+      rebase_path(test_route_verification_binary, root_build_dir),
+      "--ffx-bin",
+      rebase_path(files.ffx, root_build_dir),
+      "--fail-protocol",
+      "fuchsia.foo.bar",
+      "--fail-moniker",
+      "/core/component_with_broken_use",
+      "--success-protocol",
+      "fuchsia.logger.LogSink",
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "--product-bundle",
+      rebase_path(files.product_bundle_dir, root_build_dir),
+    ]
+    depfile = [ depfile ]
+
+    deps = [
+      ":failed_route_verify_test_data",
+      "//build/python:interpreter",
+    ]
+  }
+}

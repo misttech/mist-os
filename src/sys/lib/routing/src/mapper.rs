@@ -4,7 +4,10 @@
 
 use {
     crate::RegistrationDecl,
-    cm_rust::{CapabilityDecl, CapabilityName, ExposeDecl, OfferDecl, UseDecl},
+    cm_rust::{
+        CapabilityDecl, CapabilityName, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
+        SourceName, UseDecl, UseDeclCommon,
+    },
     moniker::AbsoluteMoniker,
 };
 
@@ -42,6 +45,57 @@ pub enum RouteSegment {
 
     /// This is a capability available in component manager's namespace.
     ProvideFromNamespace { capability: CapabilityDecl },
+}
+
+impl std::fmt::Display for RouteSegment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UseBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` used `{}` from {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source()
+                )
+            }
+            Self::OfferBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` offered `{}` from {} to {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source(),
+                    capability.target()
+                )
+            }
+            Self::ExposeBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` exposed `{}` from {} to {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source(),
+                    capability.target()
+                )
+            }
+            Self::DeclareBy { moniker, capability } => {
+                write!(f, "`{}` declared capability `{}`", moniker, capability.name())
+            }
+            Self::RegisterBy { moniker, capability } => {
+                write!(f, "`{}` registered capability {:?}", moniker, capability)
+            }
+            Self::ProvideAsBuiltin { capability } => {
+                write!(f, "`{}` is a built-in capability", capability.name())
+            }
+            Self::ProvideFromFramework { capability } => {
+                write!(f, "`{}` is a framework capability", capability)
+            }
+            Self::ProvideFromNamespace { capability } => {
+                write!(f, "`{}` exists in component manager's namespace", capability.name())
+            }
+        }
+    }
 }
 
 impl RouteSegment {

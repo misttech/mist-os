@@ -85,11 +85,24 @@ pub struct ResultsBySeverity {
 }
 
 /// Error-severity results from `CapabilityRouteController`.
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ErrorResult {
     pub using_node: NodePath,
     pub capability: CapabilityName,
     pub error: ErrorWithMessage<CapabilityRouteError>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub route: Vec<RouteSegment>,
+}
+
+impl PartialEq for ErrorResult {
+    fn eq(&self, other: &Self) -> bool {
+        // The route is not serialized to the Scrutiny allowlist file.
+        // It is only used to produce a human-readable error message.
+        // When filtering error results, ignore the route.
+        self.using_node == other.using_node
+            && self.capability == other.capability
+            && self.error == other.error
+    }
 }
 
 /// Warning-severity results from `CapabilityRouteController`.
@@ -1085,9 +1098,25 @@ mod tests {
                                             }
                                         }
                                     },
-                                    "message": "`/child` tried to use `bad_dir` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent."
+                                    "message": "`bad_dir` was not offered to `/child` by parent.",
                                 },
                                 "using_node": "/child",
+                                "route": [
+                                    {
+                                        "action": "use_by",
+                                        "capability": {
+                                            "availability": "required",
+                                            "dependency_type": "strong",
+                                            "rights": 1,
+                                            "source": "parent",
+                                            "source_name": "bad_dir",
+                                            "subdir": null,
+                                            "target_path": "/",
+                                            "type": "directory",
+                                        },
+                                        "moniker": "/child",
+                                    },
+                                ],
                             },
                         ],
                         "ok": [
@@ -1116,7 +1145,7 @@ mod tests {
                                             }
                                         }
                                     },
-                                    "message": "`/` tried to offer `protocol` from `#missing_child`, but no such child was found."
+                                    "message": "`/` does not have child `#missing_child`.",
                                 },
                                 "using_node": "/child",
                             },
@@ -1162,9 +1191,25 @@ mod tests {
                                       }
                                   }
                               },
-                              "message": "`/child` tried to use `bad_dir` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent."
+                              "message": "`bad_dir` was not offered to `/child` by parent.",
                           },
                           "using_node": "/child",
+                          "route": [
+                              {
+                                  "action": "use_by",
+                                  "capability": {
+                                      "availability": "required",
+                                      "dependency_type": "strong",
+                                      "rights": 1,
+                                      "source": "parent",
+                                      "source_name": "bad_dir",
+                                      "subdir": null,
+                                      "target_path": "/",
+                                      "type": "directory",
+                                  },
+                                  "moniker": "/child",
+                              },
+                          ],
                       },
                   ],
                   "ok": [
@@ -1239,7 +1284,7 @@ mod tests {
                                     }
                                 }
                             },
-                            "message": "`/` tried to offer `protocol` from `#missing_child`, but no such child was found."
+                            "message": "`/` does not have child `#missing_child`.",
                         },
                         "using_node": "/child",
                     },
@@ -1285,9 +1330,25 @@ mod tests {
                                       }
                                   }
                               },
-                              "message": "`/child` tried to use `bad_dir` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent."
+                              "message": "`bad_dir` was not offered to `/child` by parent.",
                           },
                           "using_node": "/child",
+                          "route": [
+                              {
+                                  "action": "use_by",
+                                  "capability": {
+                                      "availability": "required",
+                                      "dependency_type": "strong",
+                                      "rights": 1,
+                                      "source": "parent",
+                                      "source_name": "bad_dir",
+                                      "subdir": null,
+                                      "target_path": "/",
+                                      "type": "directory",
+                                  },
+                                  "moniker": "/child",
+                              },
+                          ],
                       },
                   ]
               }
@@ -1311,7 +1372,7 @@ mod tests {
                                           }
                                       }
                                   },
-                                  "message": "`/` tried to offer `protocol` from `#missing_child`, but no such child was found."
+                                  "message": "`/` does not have child `#missing_child`.",
                               }
                           }
                       ]
@@ -1356,9 +1417,25 @@ mod tests {
                                       }
                                   }
                               },
-                              "message": "`/child` tried to use `bad_dir` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent."
+                              "message": "`bad_dir` was not offered to `/child` by parent.",
                           },
                           "using_node": "/child",
+                          "route": [
+                              {
+                                  "action": "use_by",
+                                  "capability": {
+                                      "availability": "required",
+                                      "dependency_type": "strong",
+                                      "rights": 1,
+                                      "source": "parent",
+                                      "source_name": "bad_dir",
+                                      "subdir": null,
+                                      "target_path": "/",
+                                      "type": "directory",
+                                  },
+                                  "moniker": "/child",
+                              },
+                          ],
                       }
                   ]
               }
