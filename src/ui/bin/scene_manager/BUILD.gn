@@ -99,7 +99,6 @@ group("scene_manager_component_for_test") {
 
 fuchsia_package("scene_manager") {
   deps = [ ":scene_manager_component" ]
-  subpackages = [ "//src/session/bin/cursor" ]
 }
 
 fuchsia_unittest_package("scene_manager_tests") {

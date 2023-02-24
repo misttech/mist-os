@@ -11,12 +11,6 @@
         runner: "elf",
         binary: "bin/scene_manager",
     },
-    children: [
-        {
-            name: "cursor",
-            url: "cursor#meta/cursor.cm",
-        },
-    ],
     capabilities: [
         {
             protocol: [
@@ -69,25 +63,6 @@
         {
             protocol: "fuchsia.ui.shortcut.Manager",
             availability: "optional",
-        },
-        {
-            protocol: "fuchsia.ui.app.ViewProvider",
-            from: "#cursor",
-        },
-    ],
-    offer: [
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: [ "#cursor" ],
         },
     ],
     expose: [
