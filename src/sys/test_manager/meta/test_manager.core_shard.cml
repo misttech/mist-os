@@ -219,11 +219,12 @@
         {
             // Note: Please check with tq-scenic-team@google.com before
             // offering this protocol, as its provider will change.
-            // TODO(fxbug.dev/121453): Update to `from: "#session-manager"`
+            // TODO(fxbug.dev/121453): Update to `from: "#ui"` once scene manager
+            // is enabled everywhere, then update to `from: "#session-manager"`
             // once the tests which rely on direct access to scene manager are
             // fixed.
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
-            from: "#ui",
+            from: "void",
             to: "#test_manager",
             availability: "optional",
             source_availability: "unknown",
