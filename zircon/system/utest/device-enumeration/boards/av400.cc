@@ -55,7 +55,7 @@ TEST_F(DeviceEnumerationTest, Av400Test) {
       "sys/platform/05:07:24/ram",
 
       "sys/platform/05:07:1/aml-gpio/gpio-35/av400-buttons/hid-buttons",
-      "sys/platform/05:07:1c/aml-nna",
+      "sys/platform/05:07:1c/aml_nna",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

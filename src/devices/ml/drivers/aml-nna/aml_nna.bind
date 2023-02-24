@@ -1,15 +1,26 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.amlogic.platform;
+composite aml_nna;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.NNA;
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+using fuchsia.platform;
+using fuchsia.amlogic.platform;
+using fuchsia.registers;
+
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.NNA;
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+  }
+}
+
+node "register-reset" {
+  fuchsia.BIND_PROTOCOL == fuchsia.registers.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_REGISTER_ID == fuchsia.amlogic.platform.BIND_REGISTER_ID.NNA_RESET_LEVEL2;
 }

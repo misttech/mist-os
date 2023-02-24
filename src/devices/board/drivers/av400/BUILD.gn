@@ -279,16 +279,6 @@ driver_bind_rules("av400-dsp-bind") {
   ]
 }
 
-driver_bind_rules("av400-nna-bind") {
-  rules = "bind/av400-nna.bind"
-  header_output = "av400-nna-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
-  ]
-}
-
 driver_bind_rules("av400-i2c-bind") {
   rules = "bind/av400-i2c.bind"
   header_output = "av400-i2c-bind.h"
@@ -338,7 +328,6 @@ fuchsia_driver("av400-driver") {
     ":av400-dsp-bind_header",
     ":av400-emmc-bind_header",
     ":av400-i2c-bind_header",
-    ":av400-nna-bind_header",
     ":av400-power-domain-bind_header",
     ":av400-power-regulator-bind_header",
     ":av400-sdio-bind_header",
@@ -365,6 +354,10 @@ fuchsia_driver("av400-driver") {
     "//sdk/fidl/fuchsia.hardware.gpio.init:fuchsia.hardware.gpio.init_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.registers:fuchsia.registers_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",

@@ -43,7 +43,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
       "sys/platform/05:04:15/aml-mipi",
-      "sys/platform/05:04:1c/aml-nna",
+      "sys/platform/05:04:1c/aml_nna",
       "sys/platform/05:04:1d",  // pwm
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/gdc",
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",

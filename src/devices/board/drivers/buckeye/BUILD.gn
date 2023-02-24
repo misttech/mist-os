@@ -198,16 +198,6 @@ driver_bind_rules("buckeye-buttons-bind") {
   ]
 }
 
-driver_bind_rules("buckeye-nna-bind") {
-  rules = "bind/buckeye-nna.bind"
-  header_output = "buckeye-nna-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
-  ]
-}
-
 fuchsia_driver("buckeye-driver") {
   output_name = "buckeye"
   configs += [
@@ -243,7 +233,6 @@ fuchsia_driver("buckeye-driver") {
     ":buckeye-buttons-bind_header",
     ":buckeye-cpu-bind_header",
     ":buckeye-emmc-bind_header",
-    ":buckeye-nna-bind_header",
     ":buckeye-power-domain-bind_header",
     ":buckeye-power-regulator-bind_header",
     ":buckeye-sdio-bind_header",
@@ -268,6 +257,10 @@ fuchsia_driver("buckeye-driver") {
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.registers:fuchsia.registers_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",

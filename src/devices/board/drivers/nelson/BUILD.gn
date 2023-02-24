@@ -84,18 +84,6 @@ driver_bind_rules("nelson_mali_bind") {
   ]
 }
 
-driver_bind_rules("nelson_aml_nna_bind") {
-  rules = "bind/nelson_aml_nna.bind"
-  header_output = "nelson_aml_nna_bind.h"
-  bind_output = "nelson_aml_nna_bind.bc"
-  tests = "bind-tests/nelson_aml_nna-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
-  ]
-}
-
 driver_bind_rules("ti_ina231_mlb_bind") {
   rules = "bind/ti_ina231_mlb.bind"
   header_output = "ti_ina231_mlb_bind.h"
@@ -366,7 +354,6 @@ fuchsia_driver("nelson-module-driver") {
     ":brownout_protection_bind_header",
     ":gt6853_touch_bind_header",
     ":nelson-bind",
-    ":nelson_aml_nna_bind_header",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
     ":nelson_bt_uart_bind_header",
@@ -408,6 +395,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+    "//src/devices/bind/fuchsia.registers:fuchsia.registers_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
@@ -463,7 +451,6 @@ group("tests") {
     ":brownout_protection_bind_test",
     ":gt6853_touch_bind_test",
     ":nelson-bind_test",
-    ":nelson_aml_nna_bind_test",
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",

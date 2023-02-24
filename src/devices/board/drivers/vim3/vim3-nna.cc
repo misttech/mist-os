@@ -4,15 +4,17 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/registers/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/board/drivers/vim3/vim3-nna-bind.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -70,9 +72,9 @@ static const std::vector<fpbus::Metadata> nna_metadata{
 static const fpbus::Node nna_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-nna";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_NNA;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_NNA;
   dev.mmio() = vim3_nna_mmios;
   dev.bti() = nna_btis;
   dev.irq() = nna_irqs;
@@ -83,11 +85,33 @@ static const fpbus::Node nna_dev = []() {
 zx_status_t Vim3::NnaInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('NNA_');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, nna_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, vim3_nna_fragments,
-                                               std::size(vim3_nna_fragments)),
-      "pdev");
+
+  auto aml_nna_register_reset_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::REGISTER_ID,
+                  bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
+                                bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
+          },
+  }};
+
+  auto aml_nna_composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "aml_nna",
+      .parents = {{aml_nna_register_reset_node}},
+  }};
+
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, nna_dev), fidl::ToWire(fidl_arena, aml_nna_composite_spec));
+
   if (!result.ok()) {
     zxlogf(ERROR, "%s: AddComposite Nna(nna_dev) request failed: %s", __func__,
            result.FormatDescription().data());

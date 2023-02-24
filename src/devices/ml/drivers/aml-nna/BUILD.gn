@@ -12,7 +12,15 @@ driver_bind_rules("aml_nna_bind") {
   header_output = "aml_nna_bind.h"
   bind_output = "aml-nna.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.registers",
+  ]
 }
 
 fuchsia_driver("aml-nna-driver") {
@@ -41,7 +49,7 @@ fuchsia_driver_component("aml-nna") {
   component_name = "aml-nna"
   deps = [ ":aml-nna-driver" ]
   info = "aml-nna-info.json"
-  colocate = true
+  colocate = false
 }
 
 test("aml-nna-test-bin") {

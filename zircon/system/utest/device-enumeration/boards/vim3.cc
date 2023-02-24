@@ -22,7 +22,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:7/aml_sd/aml-sd-emmc",
       "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
-      "sys/platform/05:06:1c/aml-nna",
+      "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:06:17/mali/aml-gpu",
       "sys/platform/05:00:10/aml-canvas",
