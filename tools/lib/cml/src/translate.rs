@@ -8,8 +8,8 @@ use {
         CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigValueType,
         DebugRegistration, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
         EventSubscriptionsClause, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer,
-        OfferToRef, OneOrMany, Path, PathClause, Program, ResolverRegistration, RightsClause,
-        RunnerRegistration, SourceAvailability, Use, UseFromRef,
+        OfferFromRef, OfferToRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
+        RightsClause, RunnerRegistration, SourceAvailability, Use, UseFromRef,
     },
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -580,11 +580,13 @@ fn maybe_generate_direct_offer_from_all(
         let mut local_offer = offer_to_all.clone();
         local_offer.protocol = Some(OneOrMany::One(individual_protocol.clone()));
 
+        let disallowed_offer_source = OfferFromRef::Named(target.clone());
         if direct_offers.iter().all(|direct| {
             // Assume that the cml being parsed is valid, which is the only
             // way that this function errors
             !offer_to_all_would_duplicate(&local_offer, direct, target).unwrap()
-        }) {
+        }) && !local_offer.from.iter().any(|from| from == &disallowed_offer_source)
+        {
             local_offer.to = OneOrMany::One(OfferToRef::Named((*target).clone()));
             returned_offers.push(local_offer);
         }
@@ -2142,6 +2144,91 @@ mod tests {
                     durability: Some(fdecl::Durability::Transient),
                     ..fdecl::Collection::EMPTY
                 }]),
+                ..default_component_decl()
+            },
+        },
+
+        test_compile_offer_to_all_from_child => {
+            input = json!({
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
+                    },
+                    {
+                        "name": "something",
+                        "url": "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm",
+                    },
+                    {
+                        "name": "something-v2",
+                        "url": "fuchsia-pkg://fuchsia.com/something/stable#meta/something-v2.cm",
+                    },
+                ],
+                "offer": [
+                    {
+                        "protocol": "fuchsia.logger.LogSink",
+                        "from": "#logger",
+                        "to": "all",
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                offers: Some(vec![
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "logger".into(),
+                            collection: None,
+                        })),
+                        source_name: Some("fuchsia.logger.LogSink".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "something".into(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.LogSink".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        availability: Some(fdecl::Availability::Required),
+                        ..fdecl::OfferProtocol::EMPTY
+                    }),
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "logger".into(),
+                            collection: None,
+                        })),
+                        source_name: Some("fuchsia.logger.LogSink".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "something-v2".into(),
+                            collection: None,
+                        })),
+                        target_name: Some("fuchsia.logger.LogSink".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        availability: Some(fdecl::Availability::Required),
+                        ..fdecl::OfferProtocol::EMPTY
+                    }),
+                ]),
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("logger".into()),
+                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".into()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..fdecl::Child::EMPTY
+                    },
+                    fdecl::Child {
+                        name: Some("something".into()),
+                        url: Some(
+                            "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
+                        ),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..fdecl::Child::EMPTY
+                    },
+                    fdecl::Child {
+                        name: Some("something-v2".into()),
+                        url: Some(
+                            "fuchsia-pkg://fuchsia.com/something/stable#meta/something-v2.cm".into(),
+                        ),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..fdecl::Child::EMPTY
+                    },
+                ]),
                 ..default_component_decl()
             },
         },
