@@ -1,0 +1,23 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "on_and_off_link_route_discovery_ns3*",
+                "sends_mld_reports_ns3*",
+                "sends_router_solicitations_ns3::router",
+                "slaac_regeneration_after_dad_failure_ns3",
+                "slaac_with_privacy_extensions_ns3::router",
+            ],
+        },
+    ],
+}

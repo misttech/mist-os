@@ -30,9 +30,7 @@ use netstack_testing_common::{
         self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
         fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
     },
-    realms::{
-        constants, KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _,
-    },
+    realms::{constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
     setup_network, setup_network_with, sleep, ASYNC_EVENT_CHECK_INTERVAL,
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
@@ -133,7 +131,7 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
 /// Test that across netstack runs, a device will initially be assigned the same
 /// IPv6 addresses.
 #[netstack_test]
-async fn consistent_initial_ipv6_addrs(name: &str) {
+async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
         .create_realm(
@@ -142,7 +140,13 @@ async fn consistent_initial_ipv6_addrs(name: &str) {
                 // This test exercises stash persistence. Netstack-debug, which
                 // is the default used by test helpers, does not use
                 // persistence.
-                KnownServiceProvider::Netstack(NetstackVersion::ProdNetstack2),
+                KnownServiceProvider::Netstack(match N::VERSION {
+                    NetstackVersion::Netstack2 => NetstackVersion::ProdNetstack2,
+                    NetstackVersion::Netstack3 => NetstackVersion::Netstack3,
+                    v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                        panic!("netstack_test should only ever be parameterized with Netstack2 or Netstack3: got {:?}", v)
+                    }
+                }),
                 KnownServiceProvider::SecureStash,
             ],
         )
@@ -152,7 +156,7 @@ async fn consistent_initial_ipv6_addrs(name: &str) {
 
     // Make sure netstack uses the same addresses across runs for a device.
     let first_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<Netstack2>(&realm, &endpoint, name).await;
+        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
 
     // Stop the netstack.
     let () = realm
@@ -161,7 +165,7 @@ async fn consistent_initial_ipv6_addrs(name: &str) {
         .expect("failed to stop netstack");
 
     let second_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<Netstack2>(&realm, &endpoint, name).await;
+        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
     assert_eq!(first_run_addrs, second_run_addrs);
 }
 
@@ -195,19 +199,6 @@ async fn sends_router_solicitations<N: Netstack>(
     sub_test_name: &str,
     forwarding: bool,
 ) {
-    match (N::VERSION, forwarding) {
-        (NetstackVersion::Netstack3, true) => {
-            // TODO(https://fxbug.dev/76987): Enable this when forwarding is supported.
-            return;
-        }
-        (NetstackVersion::Netstack3, false)
-        | (
-            NetstackVersion::Netstack2
-            | NetstackVersion::Netstack2WithFastUdp
-            | NetstackVersion::ProdNetstack2,
-            true | false,
-        ) => (),
-    }
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
@@ -327,19 +318,6 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     sub_test_name: &str,
     forwarding: bool,
 ) {
-    match (N::VERSION, forwarding) {
-        (NetstackVersion::Netstack3, true) => {
-            // TODO(https://fxbug.dev/76987): Enable this when forwarding is supported.
-            return;
-        }
-        (NetstackVersion::Netstack3, false)
-        | (
-            NetstackVersion::Netstack2
-            | NetstackVersion::Netstack2WithFastUdp
-            | NetstackVersion::ProdNetstack2,
-            true | false,
-        ) => (),
-    }
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -641,7 +619,11 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 #[netstack_test]
 #[test_case("host", false ; "host")]
 #[test_case("router", true ; "router")]
-async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, forwarding: bool) {
+async fn on_and_off_link_route_discovery<N: Netstack>(
+    test_name: &str,
+    sub_test_name: &str,
+    forwarding: bool,
+) {
     pub const SUBNET_WITH_MORE_SPECIFIC_ROUTE: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = unsafe {
         net_types_ip::Subnet::new_unchecked(
             net_types_ip::Ipv6Addr::new([0xa001, 0xf1f0, 0x4060, 0x0001, 0, 0, 0, 0]),
@@ -678,9 +660,7 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     const METRIC: u32 = 200;
     let (_network, realm, iface, fake_ep) =
-        setup_network::<Netstack2>(&sandbox, name, Some(METRIC))
-            .await
-            .expect("failed to setup network");
+        setup_network::<N>(&sandbox, name, Some(METRIC)).await.expect("failed to setup network");
 
     let stack =
         realm.connect_to_protocol::<net_stack::StackMarker>().expect("failed to get stack proxy");
@@ -799,14 +779,10 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     }
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, iface, fake_ep) = setup_network_with::<Netstack2, _>(
-        &sandbox,
-        name,
-        None,
-        &[KnownServiceProvider::SecureStash],
-    )
-    .await
-    .expect("error setting up network");
+    let (_network, realm, iface, fake_ep) =
+        setup_network_with::<N, _>(&sandbox, name, None, &[KnownServiceProvider::SecureStash])
+            .await
+            .expect("error setting up network");
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
@@ -959,7 +935,7 @@ fn check_mldv1_report(
 #[netstack_test]
 #[test_case(fnet_interfaces_admin::MldVersion::V1, check_mldv1_report)]
 #[test_case(fnet_interfaces_admin::MldVersion::V2, check_mldv2_report)]
-async fn sends_mld_reports(
+async fn sends_mld_reports<N: Netstack>(
     name: &str,
     mld_version: fnet_interfaces_admin::MldVersion,
     check_mld_report: fn(
@@ -969,9 +945,8 @@ async fn sends_mld_reports(
     ) -> bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
-    let (_network, _realm, iface, fake_ep) = setup_network::<Netstack2>(&sandbox, name, None)
-        .await
-        .expect("error setting up networking");
+    let (_network, _realm, iface, fake_ep) =
+        setup_network::<N>(&sandbox, name, None).await.expect("error setting up networking");
 
     {
         let gen_config = |mld_version| fnet_interfaces_admin::Configuration {
