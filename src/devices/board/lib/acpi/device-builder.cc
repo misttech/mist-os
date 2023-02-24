@@ -272,6 +272,7 @@ zx::result<std::vector<uint8_t>> DeviceBuilder::FidlEncodeMetadata() {
           }
           auto channels = fidl::VectorView<I2CChannel>::FromExternal(arg);
           metadata.set_channels(allocator, channels);
+          metadata.set_bus_id(GetBusId());
           return zx::result<std::vector<uint8_t>>{
               fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
         } else {
@@ -440,7 +441,7 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t c
   }
 
   std::visit(
-      [&ret, child_index](auto&& arg) {
+      [&ret, child_index, bus_id = GetBusId()](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
         using SpiChannel = fuchsia_hardware_spi_businfo::wire::SpiChannel;
         using I2CChannel = fuchsia_hardware_i2c_businfo::wire::I2CChannel;
@@ -452,7 +453,7 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t c
           ret.push_back(BI_ABORT_IF(NE, BIND_SPI_CHIP_SELECT, chan.cs()));
         } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
           I2CChannel& chan = arg[child_index];
-          ret.push_back(BI_ABORT_IF(NE, BIND_I2C_BUS_ID, chan.bus_id()));
+          ret.push_back(BI_ABORT_IF(NE, BIND_I2C_BUS_ID, bus_id));
           ret.push_back(BI_ABORT_IF(NE, BIND_I2C_ADDRESS, chan.address()));
           ret.push_back(BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C));
         }
