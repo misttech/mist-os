@@ -4,17 +4,75 @@
 
 #include "src/devices/bin/driver_manager/inspect.h"
 
+#include <lib/ddk/binding.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/component/cpp/service.h>
 
 #include <utility>
 
-#include <driver-info/driver-info.h>
-
 #include "src/devices/bin/driver_manager/device.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
+
+namespace {
+const char* BindParamName(uint32_t param_num) {
+  switch (param_num) {
+    case BIND_FLAGS:
+      return "Flags";
+    case BIND_PROTOCOL:
+      return "Protocol";
+    case BIND_AUTOBIND:
+      return "Autobind";
+    case BIND_PCI_VID:
+      return "PCI.VID";
+    case BIND_PCI_DID:
+      return "PCI.DID";
+    case BIND_PCI_CLASS:
+      return "PCI.Class";
+    case BIND_PCI_SUBCLASS:
+      return "PCI.Subclass";
+    case BIND_PCI_INTERFACE:
+      return "PCI.Interface";
+    case BIND_PCI_REVISION:
+      return "PCI.Revision";
+    case BIND_PCI_TOPO:
+      return "PCI.Topology";
+    case BIND_USB_VID:
+      return "USB.VID";
+    case BIND_USB_PID:
+      return "USB.PID";
+    case BIND_USB_CLASS:
+      return "USB.Class";
+    case BIND_USB_SUBCLASS:
+      return "USB.Subclass";
+    case BIND_USB_PROTOCOL:
+      return "USB.Protocol";
+    case BIND_PLATFORM_DEV_VID:
+      return "PlatDev.VID";
+    case BIND_PLATFORM_DEV_PID:
+      return "PlatDev.PID";
+    case BIND_PLATFORM_DEV_DID:
+      return "PlatDev.DID";
+    case BIND_ACPI_BUS_TYPE:
+      return "ACPI.BusType";
+    case BIND_IHDA_CODEC_VID:
+      return "IHDA.Codec.VID";
+    case BIND_IHDA_CODEC_DID:
+      return "IHDA.Codec.DID";
+    case BIND_IHDA_CODEC_MAJOR_REV:
+      return "IHDACodec.MajorRev";
+    case BIND_IHDA_CODEC_MINOR_REV:
+      return "IHDACodec.MinorRev";
+    case BIND_IHDA_CODEC_VENDOR_REV:
+      return "IHDACodec.VendorRev";
+    case BIND_IHDA_CODEC_VENDOR_STEP:
+      return "IHDACodec.VendorStep";
+    default:
+      return NULL;
+  }
+}
+}  // namespace
 
 zx::result<> InspectDevfs::Publish(const fbl::RefPtr<Device>& dev) { return AddClassDirEntry(dev); }
 
@@ -203,7 +261,7 @@ void DeviceInspect::set_properties(const fbl::Array<const zx_device_prop_t>& pro
 
   for (uint32_t i = 0; i < props.size(); ++i) {
     const zx_device_prop_t* p = &props[i];
-    const char* param_name = di_bind_param_name(p->id);
+    const char* param_name = BindParamName(p->id);
     auto property = properties_array.CreateChild(std::to_string(i));
     property.CreateUint("value", p->value, &static_values_);
     if (param_name) {

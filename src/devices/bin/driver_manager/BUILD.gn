@@ -149,7 +149,6 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//src/bringup/lib/mexec",
     "//src/devices/lib/bind:bind-lib",
-    "//src/devices/lib/driver-info",
     "//src/devices/lib/log",
     "//src/lib/ddk",
     "//src/lib/files",

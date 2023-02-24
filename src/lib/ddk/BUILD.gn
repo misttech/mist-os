@@ -121,7 +121,6 @@ library_headers("ddk-deprecated-binding-headers") {
     "//src/devices/bus/drivers/pci:*",
     "//src/devices/bus/drivers/platform:*",
     "//src/devices/bus/drivers/platform/test:*",
-    "//src/devices/lib/driver-info:driver-info",
     "//src/devices/nand/drivers/ram-nand:*",
     "//src/devices/tests/bind-test:*",
     "//src/devices/tests/bind-test-v2:*",

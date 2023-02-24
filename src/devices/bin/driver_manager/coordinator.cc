@@ -45,7 +45,6 @@
 #include <utility>
 #include <vector>
 
-#include <driver-info/driver-info.h>
 #include <fbl/string_printf.h>
 #include <inspector/inspector.h>
 #include <src/bringup/lib/mexec/mexec.h>
