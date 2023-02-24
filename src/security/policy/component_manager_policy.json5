@@ -259,6 +259,7 @@
                     "/core/test_manager/starnix_test_runners/starnix_unit_test_runner",
                     "/core/test_manager/starnix-tests:**",
                     "/core/test_manager/system-tests:**",
+                    "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
 
                     // debug-dash-launcher is used in engineering builds to launch dash shells.
@@ -476,8 +477,11 @@
                     "/core/system-update-checker",
                     "/core/system-updater",
 
+                    // TODO(crbug.com/1326674): Is this still needed for one
+                    // or both realms?
                     // TODO(fxbug.dev/91934): Once we can define test realms out of tree
                     // we should remove this.
+                    "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
                 ],
             },
@@ -725,6 +729,8 @@
                     "/core/sl4f",
                     "/core/sshd-host",
                     "/core/termina-guest-manager",
+                    // TODO(fxbug.dev/121700): Is Chromium still using this?
+                    "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
                     "/core/test_manager/devices-tests:**",
                     "/core/test_manager/drm-tests:**",
