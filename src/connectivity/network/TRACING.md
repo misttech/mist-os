@@ -5,12 +5,25 @@ _system netstack._
 
 You can enable tracing for the netstack by swapping out the network realm
 package included in your build for the network realm that has tracing enabled.
-You can do this by adding these lines to the args.gn file in your current build
-directory via `fx args`.
+You can do this by adding a couple lines to the args.gn file in your current
+build directory via `fx args`. Which package you swap in depends on whether you
+are tracing on a product that uses the default network realm, or the "basic" one
+which has advanced features disabled.
+
+If you're tracing on a product that uses the default network realm (such as an
+emulator or workstation product), add:
 
 ```
 legacy_base_package_labels -= [ "//src/connectivity/network" ]
 legacy_base_package_labels += [ "//src/connectivity/network:network-with-tracing" ]
+```
+
+If it's a product that uses the basic network realm (such as a smart display
+product), add:
+
+```
+legacy_base_package_labels -= [ "//src/connectivity/network:network-basic" ]
+legacy_base_package_labels += [ "//src/connectivity/network:network-with-tracing-basic" ]
 ```
 
 Note that this change needs to be repeated after running commands that

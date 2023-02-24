@@ -88,6 +88,13 @@ network_package("network-with-tracing") {
   basic = false
 }
 
+# TODO(https://fxbug.dev/85450): use subassembly-based product assembly to
+# create this variant.
+network_package("network-with-tracing-basic") {
+  netstack_component = "netstack:component-with-tracing"
+  basic = true
+}
+
 core_shard("virtualization-core-shard") {
   shard_file = "meta/virtualization.core_shard.cml"
 }
