@@ -43,7 +43,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/phys/BUILD.gn:31
+From //zircon/kernel/phys/BUILD.gn:30
 
 ### all_font_file_paths
 
@@ -61,7 +61,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1795
+From //build/config/BUILDCONFIG.gn:1808
 
 ### allow_legacy_data_partition_names
 
@@ -2556,7 +2556,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:76
+From //zircon/kernel/params.gni:79
 
 ### dont_profile_source_files
 
@@ -2652,7 +2652,7 @@ Enable kernel lock dependency tracking.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:35
+From //zircon/kernel/params.gni:38
 
 ### enable_lock_dep_tests
 
@@ -2663,7 +2663,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:142
+From //zircon/kernel/params.gni:145
 
 ### enable_mdns_trace
 
@@ -2904,7 +2904,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:100
+From //zircon/kernel/params.gni:103
 
 ### ermine_app_entries
 
@@ -3063,7 +3063,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1542
+From //build/config/BUILDCONFIG.gn:1555
 
 ### extra_vbmeta_descriptors
 
@@ -3538,7 +3538,7 @@ Enables kernel tracing of futex interactions
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:58
+From //zircon/kernel/params.gni:61
 
 ### fvm_emmc_partition_size
 
@@ -4219,25 +4219,25 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:117
+From //zircon/kernel/params.gni:120
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:118
+From //zircon/kernel/params.gni:121
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:119
+From //zircon/kernel/params.gni:122
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:120
+From //zircon/kernel/params.gni:123
 
 ### kernel_base
 
@@ -4252,7 +4252,7 @@ on ProcessDispatcher creation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:124
+From //zircon/kernel/params.gni:127
 
 ### kernel_debug_level
 
@@ -4265,7 +4265,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:88
+From //zircon/kernel/params.gni:91
 
 ### kernel_debug_print_level
 
@@ -4277,7 +4277,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:95
+From //zircon/kernel/params.gni:98
 
 ### kernel_extra_defines
 
@@ -4286,7 +4286,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:80
+From //zircon/kernel/params.gni:83
 
 ### kernel_version_string
 
@@ -4472,7 +4472,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1356
+From //build/config/BUILDCONFIG.gn:1369
 
 ### legacy_base_driver_package_labels
 
@@ -4586,7 +4586,7 @@ Enable lock contention tracing.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:38
+From //zircon/kernel/params.gni:41
 
 ### log_startup_sleep
 
@@ -5528,7 +5528,7 @@ in testing but disable for production.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/params.gni:134
+From //zircon/kernel/params.gni:137
 
 ### partitions_config_contents
 
@@ -5651,7 +5651,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:107
+From //zircon/kernel/params.gni:110
 
 ### platform_enable_user_pci
 
@@ -7156,7 +7156,7 @@ Set to true to make C++ compiles preserve timestamps of unchanged outputs.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/restat.gni:16
+From //build/toolchain/restat.gni:22
 
 ### restat_rust
 
@@ -7164,7 +7164,7 @@ Set to true to make Rust compiles preserve timestamps of unchanged outputs.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/restat.gni:13
+From //build/toolchain/restat.gni:19
 
 ### roboto_font_path
 
@@ -7370,7 +7370,7 @@ debugging changes to the scheduler's behavior.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:55
+From //zircon/kernel/params.gni:58
 
 ### scheduler_queue_tracing_enabled
 
@@ -7379,7 +7379,7 @@ analysis.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:51
+From //zircon/kernel/params.gni:54
 
 ### scheduler_tracing_level
 
@@ -7393,7 +7393,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:47
+From //zircon/kernel/params.gni:50
 
 ### scudo_default_options
 
@@ -7527,7 +7527,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1785
+From //build/config/BUILDCONFIG.gn:1798
 
 ### select_variant_canonical
 
@@ -7537,7 +7537,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1790
+From //build/config/BUILDCONFIG.gn:1803
 
 ### select_variant_shortcuts
 
@@ -7589,7 +7589,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1588
+From //build/config/BUILDCONFIG.gn:1601
 
 ### size_checker_input
 
@@ -7972,7 +7972,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:101
+From //build/config/BUILDCONFIG.gn:114
 
 ### tsan_default_options
 
@@ -8025,7 +8025,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1572
+From //build/config/BUILDCONFIG.gn:1585
 
 ### universe_package_labels
 
@@ -8151,7 +8151,7 @@ value.
 
 **Current value (from the default):** `false`
 
-From //src/chromium/BUILD.gn:35
+From //src/chromium/BUILD.gn:34
 
 ### use_dbus
 
@@ -8182,12 +8182,12 @@ From //src/storage/fshost/generated_fshost_config.gni:42
 Use the physload ZBI kernel and the ELF physboot module rather than
 monolithic physboot ZBI kernel.
 
-**TODO(mcgrathr):** Eventually ELF physboot become the default and the old
-ZBI physboot will be removed.
+**TODO(mcgrathr):** This switch will be removed soon and the ELF-based
+physboot will be the only build.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //zircon/kernel/phys/BUILD.gn:25
+From //zircon/kernel/phys/BUILD.gn:24
 
 ### use_flatland_by_default
 
@@ -8349,7 +8349,7 @@ From //src/media/lib/ffmpeg/BUILD.gn:31
 If true, use scene_manager as the scene owner component (via ui.cml).
 Otherwise use root_presenter (via ui_with_root_presenter.cml).
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/ui/build_args.gni:8
 
@@ -8519,7 +8519,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:72
+From //zircon/kernel/params.gni:75
 
 ### vulkan_host_runtime_dir
 
@@ -8558,7 +8558,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:63
+From //zircon/kernel/params.gni:66
 
 ### warn_on_sdk_changes
 
@@ -8750,7 +8750,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:118
+From //build/config/BUILDCONFIG.gn:131
 
 ### zircon_tracelog
 
