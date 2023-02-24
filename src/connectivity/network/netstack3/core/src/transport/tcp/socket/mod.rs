@@ -4192,9 +4192,6 @@ mod tests {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
 
-        // TODO(https://fxbug.dev/110625): Enhance this test to read back and
-        // verify the values once we support getting the send buffer size for
-        // TCP sockets.
         let mut local_send_size: usize = 2048;
         let mut remote_send_size: usize = 1024;
 
@@ -4236,7 +4233,12 @@ mod tests {
                         non_sync_ctx,
                         local,
                         local_send_size,
-                    )
+                    );
+                    if let Some(size) =
+                        SocketHandler::send_buffer_size(sync_ctx, non_sync_ctx, local)
+                    {
+                        assert_eq!(size, local_send_size);
+                    }
                 });
                 net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
                     SocketHandler::set_send_buffer_size(
@@ -4244,7 +4246,12 @@ mod tests {
                         non_sync_ctx,
                         remote,
                         remote_send_size,
-                    )
+                    );
+                    if let Some(size) =
+                        SocketHandler::send_buffer_size(sync_ctx, non_sync_ctx, remote)
+                    {
+                        assert_eq!(size, remote_send_size);
+                    }
                 });
                 if net.step(handle_frame, handle_timer).is_idle() {
                     break;
