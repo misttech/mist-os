@@ -108,11 +108,6 @@ core_shard("core_shard") {
   shard_file = "meta/detect.core_shard.cml"
 }
 
-# TODO(fxbug.dev/120916) Remove this after we add the diagnostics sub-realm.
-core_shard("core_shard_new") {
-  shard_file = "meta/detect.core_shard_new.cml"
-}
-
 group("tests") {
   testonly = true
   deps = [
