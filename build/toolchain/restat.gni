@@ -5,8 +5,14 @@
 # Ninja `restat` can lead to on-the-fly pruning of the overall action graph.
 # This script transforms any command to be restat-friendly by redirecting
 # outputs to a temporary location, followed by move-if-changed.
-# This is suitable for both local and remote (RBE) actions.
+# re-client supports this behavior directly with
+# --preserve_unchanged_output_mtime (which suppresses downloading over
+# unchanged files), so this script is only needed for non-RBE build actions.
 restat_wrapper = "//build/tracer/output_cacher.py"
+
+# The following script helps pack the restat_wrapper invocation
+# into a single token that rewrapper --local_wrapper can accept.
+restat_wrapper_local_wrapper = "//build/tracer/output_cacher_local_wrapper.sh"
 
 declare_args() {
   # Set to true to make Rust compiles preserve timestamps of unchanged outputs.

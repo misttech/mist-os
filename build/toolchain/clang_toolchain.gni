@@ -123,19 +123,32 @@ template("clang_toolchain") {
       prefix = invoker.prefix
     }
 
-    if (enable_rust) {
-      # Configure builds to be restat-friendly by preserving timestamps of
-      # unchanged outputs.
-      _restat_rustc_prefix = ""
-      if (restat_rust) {
-        _restat_rust_wrapper =
-            string_join(" ",
-                        [
-                          rebase_path(python_exe_src, root_build_dir),
-                          "-S",
-                          rebase_path(restat_wrapper, root_build_dir),
-                        ])
-        _restat_rustc_prefix = "$_restat_rust_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+    # Configure builds to be restat-friendly by preserving timestamps of
+    # unchanged outputs, for both local and remote builds.
+    _restat_rustc_prefix = ""
+    if (restat_rust) {
+      _restat_rust_wrapper =
+          string_join(" ",
+                      [
+                        rebase_path(python_exe_src, root_build_dir),
+                        "-S",
+                        rebase_path(restat_wrapper, root_build_dir),
+                      ])
+      _restat_cmd_args = "$_restat_rust_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+      if (rust_rbe_enable) {
+        # To make sure local and remote execution consistently preserve
+        # output timestamps, we need to stage local execution outputs to
+        # temporaries.  This makes --exec_strategy=racing mode safe.
+        # The --local_wrapper argument must be a single shell token,
+        # and restat_wrapper_local_wrapper writes to a temporary file.
+        # By hiding shell-syntax inside the temporary wrapper, this form also
+        # composes cleanly with the action-tracer.
+        _restat_rustc_prefix =
+            rebase_path(restat_wrapper_local_wrapper, root_build_dir) + " " +
+            _restat_cmd_args
+      } else {
+        # Local-only execution may use the wrapper script directly.
+        _restat_rustc_prefix = _restat_cmd_args
       }
     }
     _restat_cc_prefix = ""
@@ -185,12 +198,16 @@ template("clang_toolchain") {
             _rewrapper_flags = " --exec_strategy=racing"
           }
         }
+        if (restat_rust) {
+          # re-client has built-in support for write-if-changed behavior
+          _rewrapper_flags += " --preserve_unchanged_output_mtime"
+        }
         _rustc_wrapper = rebase_path(rustc_remote_wrapper, root_build_dir) +
                          _rewrapper_flags + " -- "
-        _rust_concurrent_jobs = concurrent_jobs.remote
-      } else {
-        _rust_concurrent_jobs = concurrent_jobs.local
       }
+      _rust_concurrent_jobs = concurrent_jobs.remote
+    } else {
+      _rust_concurrent_jobs = concurrent_jobs.local
     }
 
     # Set all tools to defaults

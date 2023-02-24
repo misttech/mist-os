@@ -50,6 +50,8 @@ current_platform = "${current_os}-${current_cpu}"
 
 host_platform = "${host_os}-${host_cpu}"
 
+import("//build/toolchain/rbe.gni")
+
 if (target_os == "fuchsia") {
   target_toolchain = "//build/toolchain/fuchsia:${target_cpu}"
 } else {
@@ -92,6 +94,17 @@ restat_wrapper_inputs = [
   python_exe_src,
   restat_wrapper,
 ]
+
+restat_rust_wrapper_inputs = []
+if (restat_rust) {
+  restat_rust_wrapper_inputs += restat_wrapper_inputs
+  if (rust_rbe_enable) {
+    # reclient supports a single-token --local_wrapper prefix
+    # for the local execution case (local-fallback or racing strategies).
+    # Used in build/toolchain/clang_toolchain.gni.
+    restat_rust_wrapper_inputs += [ restat_wrapper_local_wrapper ]
+  }
+}
 
 declare_args() {
   # *This should never be set as a build argument.*
@@ -2133,13 +2146,10 @@ template("_fuchsia_binary") {
           # search path, so provide it here.
           deps += [ "//sdk/lib/fdio" ]
         }
-      }
-
-      if (restat_rust) {
         if (!defined(inputs)) {
           inputs = []
         }
-        inputs += restat_wrapper_inputs
+        inputs += restat_rust_wrapper_inputs
       }
     }
   }
@@ -2224,11 +2234,11 @@ template("variant_target") {
       output_name = target_name
     }
 
-    if (defined(crate_root) && restat_rust) {
+    if (defined(crate_root)) {
       if (!defined(inputs)) {
         inputs = []
       }
-      inputs += restat_wrapper_inputs
+      inputs += restat_rust_wrapper_inputs
     }
   }
 
@@ -3020,11 +3030,11 @@ template("executable") {
       }
     }
 
-    if (defined(crate_root) && restat_rust) {
+    if (defined(crate_root)) {
       if (!defined(inputs)) {
         inputs = []
       }
-      inputs += restat_wrapper_inputs
+      inputs += restat_rust_wrapper_inputs
     }
 
     rebased_output_file = rebase_path(output_file, root_build_dir)
@@ -3317,11 +3327,11 @@ if (is_fuchsia && zircon_toolchain == false) {
       }
       deps += [ "//zircon/public/sysroot:headers" ]
 
-      if (defined(crate_root) && restat_rust) {
+      if (defined(crate_root)) {
         if (!defined(inputs)) {
           inputs = []
         }
-        inputs += restat_wrapper_inputs
+        inputs += restat_rust_wrapper_inputs
       }
       metadata = {
         if (defined(invoker.metadata)) {
@@ -3348,9 +3358,7 @@ template("rust_library") {
     if (!defined(inputs)) {
       inputs = []
     }
-    if (restat_rust) {
-      inputs += restat_wrapper_inputs
-    }
+    inputs += restat_rust_wrapper_inputs
     if (!defined(output_dir)) {
       output_dir = get_label_info(":$target_name", "target_out_dir")
     }
@@ -3399,9 +3407,7 @@ template("rust_proc_macro") {
       if (!defined(inputs)) {
         inputs = []
       }
-      if (restat_rust) {
-        inputs += restat_wrapper_inputs
-      }
+      inputs += restat_rust_wrapper_inputs
       if (!defined(output_dir)) {
         output_dir = get_label_info(":$target_name", "target_out_dir")
       }
