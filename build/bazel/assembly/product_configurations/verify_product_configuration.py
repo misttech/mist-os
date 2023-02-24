@@ -46,6 +46,8 @@ def normalize_product(
 
             for pkg in packages[pkg_set]:
                 p = os.path.join(root_dir, pkg["manifest"])
+                # Follow links for depfile entry. See https://fxbug.dev/122513.
+                p = os.path.relpath(os.path.realpath(p))
                 with open(p, "r") as f:
                     manifest = json.load(f)
                     extra_files_read.append(p)
@@ -82,6 +84,7 @@ def normalize_product(
                     config_data.pop("source", None)
                     config_data["package_name"] = pkg["name"]
                     # Follow links for depfile entry.
+                    # See https://fxbug.dev/122513.
                     p = os.path.relpath(os.path.realpath(p))
                     config_data["source_sha1"] = file_sha1(p)
                     extra_files_read.append(p)

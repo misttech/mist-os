@@ -33,7 +33,7 @@ def replace_with_file_hash(dict, key, root_dir, extra_files_read):
     # sufficnet since these verifications are meant to be temporary until we
     # finish GN->Bazel migration for assembly.
     p = rewrite_legacy_ninja_build_outputs_path(p)
-    # Follow links for depfile entry.
+    # Follow links for depfile entry. See https://fxbug.dev/122513.
     p = os.path.relpath(os.path.realpath(p))
     dict[key] = file_sha1(p)
     extra_files_read.append(p)

@@ -22,7 +22,7 @@ def file_sha1(path):
 def replace_with_file_hash(dict, key, root_dir, extra_files_read):
     p = os.path.join(root_dir, dict[key])
     dict[key] = file_sha1(p)
-    # Follow links for depfile entry.
+    # Follow links for depfile entry. See https://fxbug.dev/122513.
     p = os.path.relpath(os.path.realpath(p))
     extra_files_read.append(p)
 
