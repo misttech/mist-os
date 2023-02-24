@@ -436,10 +436,29 @@ protocol DisplayControllerImpl {
     ///
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
+    ///
+    /// TODO(fxbug.dev/121411): Deprecated by ImportImage2().
     ImportImage(struct {
         @in_out
         image Image;
         collection ZxUnownedHandle;
+        index uint32;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Imports an image from a imported BufferCollection into the driver.
+    ///
+    /// Sets `image->handle` iff the image is imported successfully.
+    ///
+    /// Returns ZX_OK if the image is imported succesfully.
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
+    ImportImage2(struct {
+        @in_out
+        image Image;
+        collection_id uint64;
         index uint32;
     }) -> (struct {
         s zx.status;
@@ -456,8 +475,30 @@ protocol DisplayControllerImpl {
     ///
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
+    ///
+    /// TODO(fxbug.dev/121411): Deprecated by ImportImageForCapture2().
     ImportImageForCapture(struct {
         collection ZxUnownedHandle;
+        index uint32;
+    }) -> (struct {
+        s zx.status;
+        capture_handle uint64;
+    });
+
+    /// Import BufferCollection backed VMO pointed to by `index`.
+    /// Importing the VMO usually involves pinning the VMO and updating display
+    /// controller hardware registers with the physical address of the VMO to be
+    /// used for capture. Returns out_capture_handle which maps to the allocated
+    /// resource.
+    ///
+    /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED and
+    /// the value of `capture_handle` will be undefined.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
+    /// allocated.
+    ImportImageForCapture2(struct {
+        collection_id uint64;
         index uint32;
     }) -> (struct {
         s zx.status;
@@ -552,9 +593,23 @@ protocol DisplayControllerImpl {
 
     // Set sysmem buffer collection contraints needed to ensure an image can be imported with config
     // |config| on the fuchsia.sysmem.BufferCollection handle |collection|.
+    //
+    // TODO(fxbug.dev/121411): Deprecated by SetBufferCollectionConstraints2().
     SetBufferCollectionConstraints(struct {
         config Image;
         collection ZxUnownedHandle;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Set sysmem buffer collection contraints needed to ensure an image can be
+    /// imported with `config` on the imported BufferCollecition with
+    /// `collection_id`.
+    ///
+    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    SetBufferCollectionConstraints2(struct {
+        config Image;
+        collection_id uint64;
     }) -> (struct {
         s zx.status;
     });
