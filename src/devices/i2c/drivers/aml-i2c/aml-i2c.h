@@ -71,7 +71,7 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  explicit AmlI2c(zx_device_t* parent) : DeviceType(parent) {}
+  AmlI2c(zx_device_t* parent, uint32_t bus_base) : DeviceType(parent), bus_base_(bus_base) {}
 
   void DdkRelease() { delete this; }
 
@@ -84,9 +84,16 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  private:
   friend class AmlI2cTest;
 
+  // Checks the I2C channel metadata to see if only devices on a single bus are present. If so, the
+  // bus base value can be set appropriately to allow multiple aml-i2c instances to coexist. If not,
+  // zero is returned, which allows the driver to operate with multiple buses as it did previously.
+  // This way board drivers can be migrated to the single-bus model individually.
+  static uint32_t GetBusBase(zx_device_t* parent, uint32_t controller_count);
+
   zx_status_t InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDev pdev);
 
   std::vector<AmlI2cDev> i2c_devs_;
+  const uint32_t bus_base_;
 };
 
 }  // namespace aml_i2c

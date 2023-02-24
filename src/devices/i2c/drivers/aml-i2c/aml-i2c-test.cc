@@ -4,6 +4,7 @@
 
 #include "aml-i2c.h"
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/zx/clock.h>
@@ -776,6 +777,146 @@ TEST_F(AmlI2cTest, MmioIrqMismatch) {
   EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 
+TEST_F(AmlI2cTest, BusBaseSetByChannelMetadata) {
+  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
+  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+
+  fidl::Arena arena;
+
+  fidl::VectorView<I2CChannel> channels(arena, 3);
+  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[2] = I2CChannel::Builder(arena).bus_id(2).Build();
+
+  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
+
+  auto result = fidl::Persist(metadata);
+  ASSERT_TRUE(result.is_ok());
+
+  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
+
+  EXPECT_NO_FATAL_FAILURE(Init(1));
+
+  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
+  EXPECT_TRUE(i2c.is_valid());
+
+  EXPECT_EQ(i2c.GetBusBase(), 2);
+  EXPECT_EQ(i2c.GetBusCount(), 1);
+
+  uint8_t buffer;
+  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
+  // Do one transaction on this bus to make sure the ID is recognized.
+  EXPECT_OK(i2c.Transact(2, &op, 1));
+
+  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(1, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(3, &op, 1));
+}
+
+TEST_F(AmlI2cTest, BusBaseSetByBusIdIgnoreChannels) {
+  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
+  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+
+  fidl::Arena arena;
+
+  fidl::VectorView<I2CChannel> channels(arena, 3);
+  channels[0] = I2CChannel::Builder(arena).bus_id(1).Build();
+  channels[1] = I2CChannel::Builder(arena).bus_id(1).Build();
+  channels[2] = I2CChannel::Builder(arena).bus_id(1).Build();
+
+  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).bus_id(2).Build();
+
+  auto result = fidl::Persist(metadata);
+  ASSERT_TRUE(result.is_ok());
+
+  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
+
+  EXPECT_NO_FATAL_FAILURE(Init(1));
+
+  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
+  EXPECT_TRUE(i2c.is_valid());
+
+  EXPECT_EQ(i2c.GetBusBase(), 2);
+  EXPECT_EQ(i2c.GetBusCount(), 1);
+
+  uint8_t buffer;
+  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
+  // Do one transaction on this bus to make sure the ID is recognized.
+  EXPECT_OK(i2c.Transact(2, &op, 1));
+
+  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(1, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(3, &op, 1));
+}
+
+TEST_F(AmlI2cTest, BusMetadataIgnoredMultipleControllers) {
+  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
+  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+
+  fidl::Arena arena;
+
+  fidl::VectorView<I2CChannel> channels(arena, 3);
+  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[2] = I2CChannel::Builder(arena).bus_id(2).Build();
+
+  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
+
+  auto result = fidl::Persist(metadata);
+  ASSERT_TRUE(result.is_ok());
+
+  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
+
+  // Initialize the device with three controllers, which causes the channel bus IDs to be ignored
+  // when determining the bus base value.
+  EXPECT_NO_FATAL_FAILURE(Init(3));
+
+  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
+  EXPECT_TRUE(i2c.is_valid());
+
+  // Having multiple controllers causes the bus metadata to be ignored.
+  EXPECT_EQ(i2c.GetBusBase(), 0);
+  EXPECT_EQ(i2c.GetBusCount(), 3);
+
+  uint8_t buffer;
+  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
+  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(1, &op, 1));
+  EXPECT_OK(i2c.Transact(2, &op, 1));
+}
+
+TEST_F(AmlI2cTest, BusMetadataIgnoredMultipleBusIds) {
+  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
+  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+
+  fidl::Arena arena;
+
+  fidl::VectorView<I2CChannel> channels(arena, 3);
+  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
+  channels[2] = I2CChannel::Builder(arena).bus_id(5).Build();
+
+  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
+
+  auto result = fidl::Persist(metadata);
+  ASSERT_TRUE(result.is_ok());
+
+  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
+
+  EXPECT_NO_FATAL_FAILURE(Init(1));
+
+  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
+  EXPECT_TRUE(i2c.is_valid());
+
+  EXPECT_EQ(i2c.GetBusBase(), 0);
+  EXPECT_EQ(i2c.GetBusCount(), 1);
+
+  uint8_t buffer;
+  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
+  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(2, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(5, &op, 1));
+}
 }  // namespace aml_i2c
 
 namespace ddk {
