@@ -52,7 +52,8 @@ TEST(StructuredLogging, ThreadInitialization) {
     while (running) {
       zx::channel temp[2];
       zx::channel::create(0, &temp[0], &temp[1]);
-      syslog_backend::SetLogSettings(syslog::LogSettings{.log_sink = temp[0].release()});
+      syslog_backend::SetLogSettings(
+          syslog::LogSettings{.log_sink = temp[0].release(), .wait_for_initial_interest = false});
     }
   });
   std::thread thread_b([&]() {
@@ -69,12 +70,13 @@ TEST(StructuredLogging, ThreadInitialization) {
 
     zx::channel temp[2];
     zx::channel::create(0, &temp[0], &temp[1]);
-    syslog_backend::SetLogSettings(syslog::LogSettings{.log_sink = temp[0].release()});
+    syslog_backend::SetLogSettings(
+        syslog::LogSettings{.log_sink = temp[0].release(), .wait_for_initial_interest = false});
     FX_SLOG(WARNING, "test_log", KV("foo", "bar"));
   }
   thread_a.join();
   thread_b.join();
-  syslog_backend::SetLogSettings(syslog::LogSettings{});
+  syslog_backend::SetLogSettings(syslog::LogSettings{.wait_for_initial_interest = false});
 }
 
 TEST(StructuredLogging, BackendDirect) {

@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use diagnostics_log_encoding::{Severity, SeverityExt};
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_diagnostics_stream::Record;
-use fidl_fuchsia_logger::LogSinkProxy;
+use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
+use fuchsia_zircon as zx;
 use std::sync::{Mutex, RwLock};
 use std::{future::Future, sync::Arc};
 use tracing::{subscriber::Subscriber, Metadata};
@@ -20,9 +22,30 @@ pub(crate) struct InterestFilter {
 impl InterestFilter {
     /// Constructs a new `InterestFilter` and a future which should be polled to listen
     /// to changes in the LogSink's interest.
-    pub fn new(proxy: LogSinkProxy, interest: Interest) -> (Self, impl Future<Output = ()>) {
+    pub fn new(
+        proxy: LogSinkProxy,
+        interest: Interest,
+        wait_for_initial_interest: bool,
+    ) -> (Self, impl Future<Output = ()>) {
         let default_severity = interest.min_severity.unwrap_or(Severity::Info);
-        let min_severity = Arc::new(RwLock::new(default_severity));
+        let (proxy, min_severity) = if wait_for_initial_interest {
+            let sync_proxy = LogSinkSynchronousProxy::new(proxy.into_channel().unwrap().into());
+            let initial_severity = match sync_proxy.wait_for_interest_change(zx::Time::INFINITE) {
+                Ok(Ok(initial_interest)) => {
+                    initial_interest.min_severity.unwrap_or(default_severity)
+                }
+                _ => default_severity,
+            };
+            (
+                LogSinkProxy::new(
+                    fidl::AsyncChannel::from_channel(sync_proxy.into_channel()).unwrap(),
+                ),
+                Arc::new(RwLock::new(initial_severity)),
+            )
+        } else {
+            (proxy, Arc::new(RwLock::new(default_severity)))
+        };
+
         let listener = Arc::new(Mutex::new(None));
         let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
@@ -83,7 +106,6 @@ mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
-    use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use std::sync::Mutex;
     use tracing::{debug, error, info, trace, warn, Event};
@@ -128,7 +150,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn default_filter_is_info_when_unspecified() {
         let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let (filter, _on_changes) = InterestFilter::new(proxy, Interest::EMPTY);
+        let (filter, _on_changes) = InterestFilter::new(proxy, Interest::EMPTY, false);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
         tracing::subscriber::set_global_default(
             Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
@@ -172,10 +194,11 @@ mod tests {
         let (filter, on_changes) = InterestFilter::new(
             proxy,
             Interest { min_severity: Some(Severity::Warn), ..Interest::EMPTY },
+            false,
         );
         let (send, mut recv) = mpsc::unbounded();
         filter.set_interest_listener(InterestChangedListener(send));
-        let _on_changes_task = fasync::Task::spawn(on_changes);
+        let _on_changes_task = fuchsia_async::Task::spawn(on_changes);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
         tracing::subscriber::set_global_default(
             Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
@@ -226,5 +249,31 @@ mod tests {
 
         trace!("spew");
         assert_eq!(&*observed.lock().unwrap(), &expected, "should not increment counters");
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_initial_interest() {
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let t = std::thread::spawn(move || {
+            // Unused, but its existence is needed by AsyncChannel.
+            let _executor = fuchsia_async::LocalExecutor::new();
+            let (filter, _on_changes) = InterestFilter::new(proxy, Interest::EMPTY, true);
+            filter
+        });
+        if let Some(Ok(request)) = requests.next().await {
+            match request {
+                LogSinkRequest::WaitForInterestChange { responder } => {
+                    responder
+                        .send(&mut Ok(Interest {
+                            min_severity: Some(Severity::Trace),
+                            ..Interest::EMPTY
+                        }))
+                        .expect("sent initial interest");
+                }
+                other => panic!("Got unexpected: {:?}", other),
+            };
+        }
+        let filter = t.join().unwrap();
+        assert_eq!(*filter.min_severity.read().unwrap(), Severity::Trace);
     }
 }

@@ -51,6 +51,10 @@ struct LogSettings {
   // in the pogram incoming namespace will be used.
   zx_handle_t log_sink = ZX_HANDLE_INVALID;
 #endif
+
+  // When set to true, it will block log initialization on receiving the initial interest to define
+  // the minimum severity.
+  bool wait_for_initial_interest = true;
 };
 static_assert(std::is_copy_constructible<LogSettings>::value);
 

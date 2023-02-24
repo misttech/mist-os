@@ -90,13 +90,20 @@ async fn demux_fidl(
 ) -> Result<(Socket, LogSinkWaitForInterestChangeResponder), Error> {
     let mut interest_listener = None;
     let mut log_socket = None;
+    let mut got_initial_interest_request = false;
     loop {
         match stream.next().await.unwrap()? {
             LogSinkRequest::Connect { socket: _, control_handle: _ } => {
                 return Err(anyhow::format_err!("shouldn't ever receive legacy connections"))
             }
             LogSinkRequest::WaitForInterestChange { responder } => {
-                interest_listener = Some(responder);
+                if got_initial_interest_request {
+                    interest_listener = Some(responder);
+                } else {
+                    info!("Unblocking component by sending an empty interest.");
+                    responder.send(&mut Ok(Interest::EMPTY))?;
+                    got_initial_interest_request = true;
+                }
             }
             LogSinkRequest::ConnectStructured { socket, control_handle: _ } => {
                 log_socket = Some(socket);
@@ -196,12 +203,15 @@ impl Puppet {
 
         info!("Waiting for first LogSink connection (from Component Manager) (to be ignored).");
         let _ = incoming_log_sink_requests.next().await.unwrap();
+
         info!("Waiting for second LogSink connection.");
         let mut stream = incoming_log_sink_requests.next().await.unwrap();
+
+        info!("Waiting for LogSink.ConnectStructured call.");
+        let (socket, interest_listener) = demux_fidl(&mut stream).await?;
+
         info!("Requesting info from the puppet.");
         let info = proxy.get_info().await?;
-        info!("Waiting for LogSink.Connect call.");
-        let (socket, interest_listener) = demux_fidl(&mut stream).await?;
         info!("Ensuring we received the init message.");
         assert!(!socket.is_closed());
         let mut puppet = Self {

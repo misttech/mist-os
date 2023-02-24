@@ -268,8 +268,8 @@ static std::string RetrieveLogs(zx::channel remote) {
 zx::channel SetupLog() {
   zx::channel channels[2];
   zx::channel::create(0, &channels[0], &channels[1]);
-  syslog::LogSettings settings;
-  settings.log_sink = channels[0].release();
+  syslog::LogSettings settings{.log_sink = channels[0].release(),
+                               .wait_for_initial_interest = false};
   syslog::SetLogSettings(settings);
   return std::move(channels[1]);
 }

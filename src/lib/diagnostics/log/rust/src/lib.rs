@@ -86,20 +86,31 @@ pub struct PublishOptions<'t> {
     /// An interest filter to apply to messages published. Defaults to empty which implies `INFO`
     /// level filtering.
     pub interest: Interest,
+
+    /// Metatags applied to all published events.
+    ///
+    /// When set to an empty set (the default), no metatags are applied.
+    pub metatags: HashSet<Metatag>,
+
     /// Tags applied to all published events.
     ///
     /// When set to an empty slice (the default), events are tagged with the name of the
     /// component in which they are recorded.
     pub tags: &'t [&'t str],
-    /// Metatags applied to all published events.
-    ///
-    /// When set to an empty set (the default), no metatags are applied.
-    pub metatags: HashSet<Metatag>,
+
+    /// Whether or not to block on initial runtime interest being received before starting to emit
+    /// log records using the default interest configured.
+    pub wait_for_initial_interest: bool,
 }
 
 impl<'t> Default for PublishOptions<'t> {
     fn default() -> Self {
-        Self { interest: Interest::EMPTY, tags: &[], metatags: HashSet::new() }
+        Self {
+            interest: Interest::EMPTY,
+            tags: &[],
+            metatags: HashSet::new(),
+            wait_for_initial_interest: true,
+        }
     }
 }
 
@@ -160,11 +171,11 @@ impl Publisher {
         proxy: LogSinkProxy,
         options: PublishOptions<'_>,
     ) -> Result<(Self, impl Future<Output = ()>), PublishError> {
-        let PublishOptions { interest, tags, metatags } = options;
+        let PublishOptions { interest, tags, metatags, wait_for_initial_interest } = options;
         let mut sink = Sink::new(&proxy)?;
         sink.tags = tags.iter().copied().map(str::to_string).collect();
         sink.metatags = metatags;
-        let (filter, on_change) = InterestFilter::new(proxy, interest);
+        let (filter, on_change) = InterestFilter::new(proxy, interest, wait_for_initial_interest);
 
         Ok((Self { inner: Registry::default().with(sink).with(filter) }, on_change))
     }

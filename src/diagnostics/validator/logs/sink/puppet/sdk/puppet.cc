@@ -24,7 +24,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
  public:
   explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
     context_->outgoing()->AddPublicService(sink_bindings_.GetHandler(this));
-    ConnectAsync();
+    ConnectAsync(true);
   }
 
   void HandleInterest() {
@@ -82,7 +82,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
     }
   }
 
-  void ConnectAsync() {
+  void ConnectAsync(bool wait_for_initial_interest) {
     zx::channel logger, logger_request;
     if (zx::channel::create(0, &logger, &logger_request) != ZX_OK) {
       return;
@@ -91,6 +91,19 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
     if (fdio_service_connect("/svc/fuchsia.logger.LogSink", logger_request.release()) != ZX_OK) {
       return;
     }
+
+    if (wait_for_initial_interest) {
+      fuchsia::logger::LogSinkSyncPtr sync_log_sink;
+      sync_log_sink.Bind(std::move(logger));
+      fuchsia::logger::LogSink_WaitForInterestChange_Result interest_result;
+      sync_log_sink->WaitForInterestChange(&interest_result);
+      auto interest = std::move(interest_result.response().data);
+      if (interest.has_min_severity()) {
+        min_log_level_ = IntoLogSeverity(interest.min_severity());
+      }
+      logger = sync_log_sink.Unbind().TakeChannel();
+    }
+
     if (log_sink_.Bind(std::move(logger)) != ZX_OK) {
       return;
     }
@@ -106,7 +119,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   void StopInterestListener(StopInterestListenerCallback callback) override {
     min_log_level_ = FUCHSIA_LOG_TRACE;
     // Reconnect per C++ behavior.
-    ConnectAsync();
+    ConnectAsync(false);
     callback();
   }
 

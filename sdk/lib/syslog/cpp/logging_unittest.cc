@@ -50,7 +50,9 @@ namespace {
 class LoggingFixture : public ::testing::Test {
  public:
   LoggingFixture() : old_severity_(GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
-  ~LoggingFixture() { SetLogSettings({.min_log_level = old_severity_}); }
+  ~LoggingFixture() {
+    SetLogSettings({.min_log_level = old_severity_, .wait_for_initial_interest = true});
+  }
 
  private:
   LogSeverity old_severity_;
@@ -220,6 +222,7 @@ static std::string RetrieveLogs(std::string guid, zx::channel remote) {
 
 TEST_F(LoggingFixture, Log) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -260,6 +263,7 @@ TEST_F(LoggingFixture, LogFirstN) {
   static_assert(kCycles > kLimit);
 
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -295,6 +299,7 @@ TEST_F(LoggingFixture, LogFirstN) {
 
 TEST_F(LoggingFixture, LogT) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -332,6 +337,7 @@ TEST_F(LoggingFixture, LogT) {
 TEST_F(LoggingFixture, VLogT) {
   LogSettings new_settings;
   new_settings.min_log_level = (LOG_INFO - 2);  // verbosity = 2
+  new_settings.wait_for_initial_interest = false;
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
   zx::channel local;
@@ -366,6 +372,7 @@ TEST_F(LoggingFixture, VLogT) {
 
 TEST_F(LoggingFixture, VlogVerbosity) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 
   EXPECT_EQ(0, GetVlogVerbosity());
@@ -388,6 +395,7 @@ TEST_F(LoggingFixture, VlogVerbosity) {
 
 TEST_F(LoggingFixture, DVLogNoMinLevel) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -415,6 +423,7 @@ TEST_F(LoggingFixture, DVLogNoMinLevel) {
 
 TEST_F(LoggingFixture, DVLogWithMinLevel) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
   new_settings.min_log_level = (LOG_INFO - 1);
 #ifdef __Fuchsia__
@@ -450,6 +459,7 @@ TEST_F(LoggingFixtureDeathTest, CheckFailed) { ASSERT_DEATH(FX_CHECK(false), "")
 #if defined(__Fuchsia__)
 TEST_F(LoggingFixture, Plog) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -479,6 +489,7 @@ TEST_F(LoggingFixture, Plog) {
 
 TEST_F(LoggingFixture, PlogT) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -515,6 +526,7 @@ TEST_F(LoggingFixture, PlogT) {
 
 TEST_F(LoggingFixture, SLog) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -576,6 +588,7 @@ TEST_F(LoggingFixture, SLog) {
 
 TEST_F(LoggingFixture, BackendDirect) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
@@ -637,6 +650,7 @@ TEST(StructuredLogging, LOGS) {
 // since all logs are now structured.
 TEST(StructuredLogging, Remaining) {
   LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
 #ifdef __Fuchsia__
   auto guid = uuid::Generate();
   zx::channel local;

@@ -383,6 +383,7 @@ class LogState {
   size_t num_tags_ = 0;
   async_dispatcher_t* interest_listener_dispatcher_;
   bool serve_interest_listener_;
+  bool wait_for_initial_interest_;
   // Handle to a fuchsia.logger.LogSink instance.
   zx_handle_t provided_log_sink_ = ZX_HANDLE_INVALID;
 };
@@ -458,6 +459,22 @@ void LogState::ConnectAsync() {
     logger = zx::channel(provided_log_sink_);
     provided_log_sink_ = ZX_HANDLE_INVALID;
   }
+
+  if (wait_for_initial_interest_) {
+    fuchsia::logger::LogSinkSyncPtr sync_log_sink;
+    sync_log_sink.Bind(std::move(logger));
+    fuchsia::logger::LogSink_WaitForInterestChange_Result interest_result;
+    sync_log_sink->WaitForInterestChange(&interest_result);
+    auto interest = std::move(interest_result.response().data);
+    if (!interest.has_min_severity()) {
+      min_severity_ = default_severity_;
+    } else {
+      min_severity_ = IntoLogSeverity(interest.min_severity());
+    }
+    handler_(handler_context_, min_severity_);
+    logger = sync_log_sink.Unbind().TakeChannel();
+  }
+
   if (log_sink_.Bind(std::move(logger), loop_.dispatcher()) != ZX_OK) {
     return;
   }
@@ -465,8 +482,8 @@ void LogState::ConnectAsync() {
   if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
     return;
   }
-  HandleInterest();
   log_sink_->ConnectStructured(std::move(remote));
+  HandleInterest();
   descriptor_ = std::move(local);
 }
 
@@ -791,7 +808,8 @@ LogState::LogState(const syslog::LogSettings& in_settings,
     : loop_(&kAsyncLoopConfigNeverAttachToThread),
       executor_(loop_.dispatcher()),
       min_severity_(in_settings.min_log_level),
-      default_severity_(in_settings.min_log_level) {
+      default_severity_(in_settings.min_log_level),
+      wait_for_initial_interest_(in_settings.wait_for_initial_interest) {
   syslog::LogSettings settings = in_settings;
   interest_listener_dispatcher_ =
       static_cast<async_dispatcher_t*>(settings.single_threaded_dispatcher);
