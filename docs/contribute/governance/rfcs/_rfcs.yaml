@@ -2736,3 +2736,16 @@
   reviewers: ['rashaeqbal@google.com', 'eieio@google.com', 'tombergan@google.com']
   consulted: ['andresoportus@google.com']
   reviewed: '2023-02-15'
+
+- name: 'RFC-0210'
+  title: 'Virtualization Capability Routing'
+  short_description: 'Define how virtualization capbailities will be routed between the platform and products.'
+  authors: ['tjdetwiler@google.com']
+  file: '0210_virtualization_capability_routing.md'
+  area: ['Virtualization']
+  issue: ['115651']
+  gerrit_change_id: ['754859']
+  status: 'Accepted'
+  reviewers: ['aaronwood@google.com', 'abdulla@google.com', 'alerad@google.com', 'jsankey@google.com', 'ypomortsev@google.com' ]
+  submitted: '2022-11-07'
+  reviewed: '2023-02-23'

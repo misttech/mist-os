@@ -434,3 +434,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0208_distributing_packages_with_the_sdk.md
   - title: 'RFC-0209: Memory priority profiles'
     path: /docs/contribute/governance/rfcs/0209_memory_priority_profiles.md
+  - title: "RFC-0210: Virtualization Capability Routing"
+    path: /docs/contribute/governance/rfcs/0210_virtualization_capability_routing.md
