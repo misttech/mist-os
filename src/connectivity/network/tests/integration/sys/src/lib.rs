@@ -80,22 +80,57 @@ async fn ns2_sets_thread_profiles() {
             "ns2_sets_thread_profiles",
         );
 
-    let mut profile_provider_request_stream = fs.next().await.expect("fs terminated unexpectedly");
+    let profile_provider_request_stream = fs.next().await.expect("fs terminated unexpectedly");
 
-    // And expect that we'll see a connection to profile provider.
-    let (thread, profile, responder) = profile_provider_request_stream
-        .try_next()
-        .await
-        .expect("request failure")
-        .expect("profile provider request stream ended unexpectedly")
-        .into_set_profile_by_role()
-        .expect("unexpected request");
-    assert_eq!(profile, "fuchsia.netstack.go-worker");
-    assert_eq!(
-        thread.basic_info().expect("failed to get basic info").rights,
-        zx::Rights::TRANSFER | zx::Rights::MANAGE_THREAD
-    );
-    responder.send(zx::Status::OK.into_raw()).expect("failed to respond");
+    #[derive(Default, Debug)]
+    struct ExpectProfiles {
+        sysmon: bool,
+        worker: bool,
+    }
+
+    impl ExpectProfiles {
+        fn all_done(&self) -> bool {
+            let Self { sysmon, worker } = self;
+            *sysmon && *worker
+        }
+
+        fn update(&mut self, profile: &str) {
+            let Self { sysmon, worker } = self;
+            match profile {
+                "fuchsia.netstack.go-worker" => {
+                    *worker = true;
+                }
+                "fuchsia.netstack.go-sysmon" => {
+                    assert!(!*sysmon, "sysmon observed more than once");
+                    *sysmon = true;
+                }
+                other => panic!("unexpected profile {other}"),
+            }
+        }
+    }
+
+    let result = async_utils::fold::fold_while(
+        profile_provider_request_stream,
+        ExpectProfiles::default(),
+        |mut expect, r| {
+            let (thread, profile, responder) =
+                r.expect("request failure").into_set_profile_by_role().expect("unexpected request");
+            expect.update(profile.as_str());
+            assert_eq!(
+                thread.basic_info().expect("failed to get basic info").rights,
+                zx::Rights::TRANSFER | zx::Rights::MANAGE_THREAD
+            );
+            responder.send(zx::Status::OK.into_raw()).expect("failed to respond");
+
+            futures::future::ready(if expect.all_done() {
+                async_utils::fold::FoldWhile::Done(())
+            } else {
+                async_utils::fold::FoldWhile::Continue(expect)
+            })
+        },
+    )
+    .await;
+    result.short_circuited().expect("didn't observe all profiles installed");
 }
 
 #[fuchsia::test]

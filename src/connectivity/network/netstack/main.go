@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"syscall/zx"
 	"syscall/zx/fidl"
@@ -193,7 +194,6 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 	componentCtx.ConnectToEnvService(req)
 
 	go func() {
-		const threadProfile = "fuchsia.netstack.go-worker"
 		const handlesPerRead = 1
 		const bytesPerRead = 1
 
@@ -213,18 +213,30 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 				_ = syslog.Errorf("stopped observing for thread profiles: %s", err)
 				return
 			}
+			if nb != bytesPerRead {
+				panic(fmt.Sprintf("unexpected %d bytes in channel message", nb))
+			}
 			if nh != handlesPerRead {
 				panic(fmt.Sprintf("unexpected %d handles in channel message", nh))
 			}
 
 			handleInfo := handles[0]
+			threadType := runtime.ThreadType(bytes[0])
 
-			// TODO(https://fxbug.dev/122472): This is enabling a
-			// soft-transition on the go-runtime exposing the thread types.
-			// Remove the hard-coded constants once runtime is updated.
-			//
-			// The 1 value maps to WorkerThread in https://fxrev.dev/808487.
-			if nb != 0 && bytes[0] != 1 {
+			threadProfile := func() string {
+				switch threadType {
+				case runtime.WorkerThread:
+					return "fuchsia.netstack.go-worker"
+				case runtime.SysmonThread:
+					return "fuchsia.netstack.go-sysmon"
+				default:
+					return ""
+				}
+			}()
+			// Skip if no profile is chosen.
+			if len(threadProfile) == 0 {
+				_ = syslog.Infof("no thread profile for thread type %d", threadType)
+				_ = handleInfo.Handle.Close()
 				continue
 			}
 			// Retrieve the koid before transferring the handle.
@@ -241,17 +253,17 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 			if err, ok := err.(*zx.Error); ok {
 				switch err.Status {
 				case zx.ErrNotFound, zx.ErrPeerClosed, zx.ErrUnavailable:
-					_ = syslog.Warnf("connection to %s closed; will not set thread profiles; FIDL error: %s", req.Name(), err)
+					_ = syslog.Warnf("connection to %s closed; will not set thread profile %s; FIDL error: %s", req.Name(), threadProfile, err)
 					return
 				}
 			}
 			if err != nil {
-				_ = syslog.Errorf("failed to set thread profile for koid=%s; FIDL error: %s", koid, err)
+				_ = syslog.Errorf("failed to set thread profile %s for koid=%s; FIDL error: %s", threadProfile, koid, err)
 				continue
 			}
 
 			if status := zx.Status(status); status != zx.ErrOk {
-				_ = syslog.Errorf("failed to set thread profile for koid=%s; rejected with %s", koid, status)
+				_ = syslog.Errorf("failed to set thread profile %s for koid=%s; rejected with %s", threadProfile, koid, status)
 				continue
 			}
 
