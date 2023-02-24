@@ -6,12 +6,20 @@ _system netstack._
 You can enable tracing for the netstack by swapping out the network realm
 package included in your build for the network realm that has tracing enabled.
 You can do this by adding these lines to the args.gn file in your current build
-directory.
+directory via `fx args`.
 
 ```
 legacy_base_package_labels -= [ "//src/connectivity/network" ]
 legacy_base_package_labels += [ "//src/connectivity/network:network-with-tracing" ]
 ```
+
+Note that this change needs to be repeated after running commands that
+overwrite the args.gn file, such as `fx set`. Also, ensure that your `fx
+set` includes `--with-base //bundles/tools`, otherwise Netstack will fail
+to connect to `trace_manager` at initialization time.
+
+Make sure to rebuild and reboot your emulator or OTA/flash your device to
+ensure the system picks up the changes.
 
 ## How to run a trace
 
