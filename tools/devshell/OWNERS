@@ -1,6 +1,3 @@
-abarth@google.com
-gboone@google.com
-mangini@google.com
 olivernewman@google.com
 
 per-file             add-update-source,build-push,lib/updates.sh = file: /src/sys/pkg/OWNERS
@@ -10,7 +7,7 @@ per-file             push-package,ota,serve,serve-remote,serve-updates,update = 
 
 per-file             flash,flash-migration,flash-remote                = file: /src/firmware/OWNERS
 # per-file-COMPONENT flash,flash-migration,flash-remote                = Firmware
-per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuaseaton@google.com,mangini@google.com,surajmalhotra@google.com
+per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuaseaton@google.com,surajmalhotra@google.com
 # per-file-COMPONENT pave,pave-remote,pave-zedboot,pave-zedboot-remote = Zircon>FW-Services
 
 per-file             args,build,clean,clean-build,gen,get-build-artifacts = file: /build/OWNERS
@@ -40,7 +37,6 @@ per-file go = olivernewman@google.com
 per-file symbolize = dangyi@google.com,frousseau@google.com
 # per-file-COMPONENT symbolize = Tools>symbolize
 
-per-file report-bug=gboone@google.com
 # per-file-COMPONENT report-bug=Tools>fx
 
 per-file cmc.fx = file: /tools/cmc/OWNERS
