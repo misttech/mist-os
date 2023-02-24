@@ -96,10 +96,6 @@ core_shard("persistence-core-shard") {
   shard_file = "meta/persistence.core_shard.cml"
 }
 
-core_shard("persistence-core-shard-transitional") {
-  shard_file = "meta/persistence.core_shard_transitional.cml"
-}
-
 # TODO(https://fxbug.dev/104268): Remove from all base package sets
 # and replace with a testing package included in the universe package
 # set.
