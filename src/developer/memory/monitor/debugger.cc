@@ -14,10 +14,14 @@ MemoryDebugger::MemoryDebugger(sys::ComponentContext* context, PressureNotifier*
   FX_CHECK(context);
   zx_status_t status = context->outgoing()->AddPublicService(bindings_.GetHandler(this));
   FX_CHECK(status == ZX_OK);
+  status = context->outgoing()->AddPublicService(deprecated_bindings_.GetHandler(this));
+  FX_CHECK(status == ZX_OK);
 }
 
 void MemoryDebugger::SignalMemoryPressure(fuchsia::memorypressure::Level level) {
   notifier_->DebugNotify(level);
 }
+
+void MemoryDebugger::Signal(fuchsia::memorypressure::Level level) { notifier_->DebugNotify(level); }
 
 }  // namespace monitor

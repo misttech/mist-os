@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
 #include <fuchsia/memory/cpp/fidl.h>
+#include <fuchsia/memory/inspection/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
@@ -33,7 +34,7 @@ class MonitorUnitTest;
 class MemoryBandwidthInspectTest;
 }  // namespace test
 
-class Monitor : public fuchsia::memory::Monitor {
+class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspection::Collector {
  public:
   Monitor(std::unique_ptr<sys::ComponentContext> context, const fxl::CommandLine& command_line,
           async_dispatcher_t* dispatcher, bool send_metrics, bool watch_memory_pressure,
@@ -45,17 +46,24 @@ class Monitor : public fuchsia::memory::Monitor {
 
   void Watch(fidl::InterfaceHandle<fuchsia::memory::Watcher> watcher) override;
 
-  // Deprecated. Use `WriteJsonCaptureAndBuckets` instead.
+  // Deprecated. Use `CollectJsonStats` instead.
   // Writes a memory capture to |socket| in JSON, in UTF-8.
   // See //src//developer/memory/metrics/printer.h for a
   // description of the format of the JSON.
   void WriteJsonCapture(zx::socket socket) override;
 
+  // Deprecated. Use `CollectJsonStats` instead.
   // Writes a memory capture and the bucket definition to |socket| in JSON,
   // in UTF-8.
   // See //src//developer/memory/metrics/printer.h for a
   // description of the format of the memory capture JSON.
   void WriteJsonCaptureAndBuckets(zx::socket socket) override;
+
+  // Writes a memory capture and the bucket definition to |socket| in JSON,
+  // in UTF-8.
+  // See the fuchsia.memory.inspection FIDL library for a
+  // description of the format of the JSON.
+  void CollectJsonStats(zx::socket socket) override;
 
   static const char kTraceName[];
 
@@ -95,7 +103,8 @@ class Monitor : public fuchsia::memory::Monitor {
   async_dispatcher_t* dispatcher_;
   std::unique_ptr<sys::ComponentContext> component_context_;
   fuchsia::metrics::MetricEventLoggerSyncPtr metric_event_logger_;
-  fidl::BindingSet<fuchsia::memory::Monitor> bindings_;
+  fidl::BindingSet<fuchsia::memory::inspection::Collector> bindings_;
+  fidl::BindingSet<fuchsia::memory::Monitor> deprecated_bindings_;
   std::vector<fuchsia::memory::WatcherPtr> watchers_;
   trace::TraceObserver trace_observer_;
   sys::ComponentInspector inspector_;

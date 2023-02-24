@@ -163,7 +163,10 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       },
       &inspector_);
 
-  component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
+  zx_status_t status = component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
+  FX_CHECK(status == ZX_OK);
+  status = component_context_->outgoing()->AddPublicService(deprecated_bindings_.GetHandler(this));
+  FX_CHECK(status == ZX_OK);
 
   if (command_line.HasOption("help")) {
     PrintHelp();
@@ -186,7 +189,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       exit(-1);
     }
     prealloc_size_ *= (1024 * 1024);
-    auto status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
+    status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "zx::vmo::create() returns " << zx_status_get_string(status);
       exit(-1);
@@ -292,7 +295,9 @@ void Monitor::WriteJsonCapture(zx::socket socket) {
   fsl::BlockingCopyFromString(json_string, socket);
 }
 
-void Monitor::WriteJsonCaptureAndBuckets(zx::socket socket) {
+void Monitor::WriteJsonCaptureAndBuckets(zx::socket socket) { CollectJsonStats(std::move(socket)); }
+
+void Monitor::CollectJsonStats(zx::socket socket) {
   // Capture state.
   Capture capture;
   const zx_status_t capture_status = GetCapture(&capture);

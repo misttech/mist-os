@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
 
 #include <fuchsia/memory/cpp/fidl.h>
+#include <fuchsia/memory/debug/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 
@@ -13,13 +14,19 @@
 
 namespace monitor {
 
-class MemoryDebugger : public fuchsia::memory::Debugger {
+class MemoryDebugger : public fuchsia::memory::Debugger,
+                       public fuchsia::memory::debug::MemoryPressure {
  public:
   MemoryDebugger(sys::ComponentContext *context, PressureNotifier *notifier);
+  // Deprecated. Use `Signal`.
   void SignalMemoryPressure(fuchsia::memorypressure::Level level) final;
+  // Signals registered watchers of the fuchsia.memorypressure service with the
+  // specified memory pressure `level`.
+  void Signal(fuchsia::memorypressure::Level level) final;
 
  private:
-  fidl::BindingSet<fuchsia::memory::Debugger> bindings_;
+  fidl::BindingSet<fuchsia::memory::Debugger> deprecated_bindings_;
+  fidl::BindingSet<fuchsia::memory::debug::MemoryPressure> bindings_;
   PressureNotifier *const notifier_;
 };
 

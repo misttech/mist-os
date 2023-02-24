@@ -28,6 +28,8 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_hlcpp",
     "//sdk/fidl/fuchsia.memory:fuchsia.memory_hlcpp",
+    "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_hlcpp",
+    "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_hlcpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/lib/sys/cpp",
