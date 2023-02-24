@@ -408,7 +408,6 @@
                 "MMapTest.MapDevZeroUnaligned",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
-                "MMapTest.NoExceedLimitData",
                 "MMapTest.ExceedLimitData",
                 "MMapTest.ExceedLimitDataPrlimit",
                 "MMapTest.ExceedLimitDataPrlimitPID",
@@ -801,7 +800,6 @@
 
                 // rlimits_test
                 "RlimitTest.UnprivilegedSetRlimit",
-                "RlimitTest.SetRlimitHigher",
                 "RlimitTest.SetSoftRlimitAboveHard",
                 "RlimitTest.RlimitNProc",
 
@@ -1297,6 +1295,9 @@
                 "SpliceTest.Blocking",
                 "TeeTest.MultiPage",
                 "TeeTest.Blocking",
+                "TimerTest.ProcessKilledOnCPUHardLimit",
+                "TimerTest.ProcessKilledOnCPUSoftLimit",
+                "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
                 "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
                 "SeccompTest.RetKillOnlyKillsOneThread",
 

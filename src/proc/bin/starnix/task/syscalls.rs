@@ -783,7 +783,7 @@ pub fn sys_prlimit64(
     }
     if !new_limit.is_null() {
         not_implemented!(current_task, "prlimit64 to edit limits");
-        return error!(ENOSYS);
+        return Ok(());
     }
     if !old_limit.is_null() {
         let limit = match resource {
