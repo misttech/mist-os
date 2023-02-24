@@ -33,4 +33,5 @@ extend uint fuchsia.BIND_I2C_ADDRESS {
   TI_INA231_MLB = 0x49,
   TI_INA231_SPEAKERS = 0x40,
   TI_INA231_MLB_PROTO = 0x46,
+  SHERLOCK = 0x36,
 };

@@ -1,10 +1,47 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite imx227_sensor;
+
+using fuchsia.clock;
+using fuchsia.gpio;
+using fuchsia.i2c;
+using fuchsia.mipicsi;
+using fuchsia.platform;
 using fuchsia.sony.platform;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.SONY;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.sony.platform.BIND_PLATFORM_DEV_PID.IMX227;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.sony.platform.BIND_PLATFORM_DEV_DID.CAMERA_SENSOR;
+primary node "mipicsi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.mipicsi.BIND_PROTOCOL.DEVICE;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.SONY;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.sony.platform.BIND_PLATFORM_DEV_PID.IMX227;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.sony.platform.BIND_PLATFORM_DEV_DID.CAMERA_SENSOR;
+}
+
+node "i2c" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+node "gpio-reset" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.CAM_RESET;
+}
+
+node "gpio-vana" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VANA_ENABLE;
+}
+
+node "gpio-vdig" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VDIG_ENABLE;
+}
+
+node "clock-sensor" {
+  fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.CAMERA_SENSOR;
+}

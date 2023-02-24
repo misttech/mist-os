@@ -1,37 +1,93 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "mipicsi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.mipicsi.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.GENERIC",
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Vendor"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.SONY",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_PID.IMX227",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_DID.CAMERA_SENSOR",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "42",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "1",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.SONY"
-        },
-        "expected": "abort",
-        "name": "Device"
+        "node": "i2c",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "18",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "1",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.sony.platform.BIND_PLATFORM_DEV_VID.SONY"
-        },
-        "expected": "match",
-        "name": "Sony IMX227"
+        "node": "gpio-reset",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.gpio.FUNCTION": " fuchsia.gpio.FUNCTION.CAM_RESET"
+                }
+            }
+        ]
+    },
+    {
+        "node": "gpio-vana",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.gpio.FUNCTION": " fuchsia.gpio.FUNCTION.VANA_ENABLE"
+                }
+            }
+        ]
+    },
+    {
+        "node": "gpio-vdig",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.gpio.FUNCTION": " fuchsia.gpio.FUNCTION.VDIG_ENABLE"
+                }
+            }
+        ]
+    },
+    {
+        "node": "clock-sensor",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.clock.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.clock.FUNCTION": " fuchsia.clock.FUNCTION.CAMERA_SENSOR"
+                }
+            }
+        ]
     }
 ]

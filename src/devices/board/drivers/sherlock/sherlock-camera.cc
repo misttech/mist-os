@@ -13,12 +13,19 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/camerasensor2/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gdc/cpp/bind.h>
 #include <bind/fuchsia/ge2d/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
+#include <bind/fuchsia/mipicsi/cpp/bind.h>
+#include <bind/fuchsia/sony/platform/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -29,7 +36,6 @@
 #include "sherlock.h"
 #include "src/devices/board/drivers/sherlock/camera-ge2d-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-isp-bind.h"
-#include "src/devices/board/drivers/sherlock/imx227-sensor-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace sherlock {
@@ -216,9 +222,9 @@ static const fpbus::Node mipi_dev = []() {
 static const fpbus::Node sensor_dev_sherlock = []() {
   fpbus::Node dev = {};
   dev.name() = "imx227-sensor";
-  dev.vid() = PDEV_VID_SONY;
-  dev.pid() = PDEV_PID_SONY_IMX227;
-  dev.did() = PDEV_DID_CAMERA_SENSOR;
+  dev.vid() = bind_fuchsia_sony_platform::BIND_PLATFORM_DEV_VID_SONY;
+  dev.pid() = bind_fuchsia_sony_platform::BIND_PLATFORM_DEV_PID_IMX227;
+  dev.did() = bind_fuchsia_sony_platform::BIND_PLATFORM_DEV_DID_CAMERA_SENSOR;
   return dev;
 }();
 
@@ -247,21 +253,118 @@ zx_status_t Sherlock::CameraInit() {
     }
   }
 
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, sensor_dev_sherlock),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, imx227_sensor_fragments,
-                                               std::size(imx227_sensor_fragments)),
-      "mipicsi");
+  auto imx227_sensor_mipicsi_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules = std::vector{fdf::MakeAcceptBindRule(
+          bind_fuchsia::PROTOCOL, bind_fuchsia_mipicsi::BIND_PROTOCOL_DEVICE)},
+      .properties = {fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                       bind_fuchsia_mipicsi::BIND_PROTOCOL_DEVICE)},
+  }};
 
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(sensor_dev_sherlock) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+  auto imx227_sensor_i2c_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
+                                      bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
+              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_SHERLOCK),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+  }};
+
+  auto imx227_sensor_gpio_reset_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                                      bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_0),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_CAM_RESET),
+          },
+  }};
+
+  auto imx227_sensor_gpio_vana_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                                      bind_fuchsia_amlogic_platform_t931::GPIOA_PIN_ID_PIN_6),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
+                                bind_fuchsia_gpio::FUNCTION_VANA_ENABLE),
+          },
+  }};
+
+  auto imx227_sensor_gpio_vdig_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                                      bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_12),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
+                                bind_fuchsia_gpio::FUNCTION_VDIG_ENABLE),
+          },
+  }};
+
+  auto imx227_sensor_clock_sensor_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_clock::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::CLOCK_ID,
+                  bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_CAM_INCK_24M),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_clock::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                                bind_fuchsia_clock::FUNCTION_CAMERA_SENSOR),
+          },
+  }};
+
+  auto composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "imx227_sensor",
+      .parents = {{
+          imx227_sensor_mipicsi_spec,
+          imx227_sensor_i2c_spec,
+          imx227_sensor_gpio_reset_spec,
+          imx227_sensor_gpio_vana_spec,
+          imx227_sensor_gpio_vdig_spec,
+          imx227_sensor_clock_sensor_spec,
+      }},
+  }};
+
+  fdf::WireUnownedResult spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, sensor_dev_sherlock), fidl::ToWire(fidl_arena, composite_spec));
+
+  if (!spec_result.ok()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(sensor_dev_sherlock) request failed: %s",
+           __func__, spec_result.FormatDescription().data());
+    return spec_result.status();
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(sensor_dev_sherlock) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (spec_result->is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(sensor_dev_sherlock) failed: %s", __func__,
+           zx_status_get_string(spec_result->error_value()));
+    return spec_result->error_value();
   }
 
   auto bind_rules = std::vector{
@@ -280,11 +383,10 @@ zx_status_t Sherlock::CameraInit() {
       }},
   };
 
-  auto composite_spec =
-      fuchsia_driver_framework::CompositeNodeSpec{{.name = "gdc", .parents = parents}};
+  composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "gdc", .parents = parents}};
 
-  auto spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, gdc_dev), fidl::ToWire(fidl_arena, composite_spec));
+  spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, gdc_dev),
+                                                          fidl::ToWire(fidl_arena, composite_spec));
   if (!spec_result.ok()) {
     zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(gdc_dev) request failed: %s", __func__,
            spec_result.FormatDescription().data());
@@ -296,7 +398,7 @@ zx_status_t Sherlock::CameraInit() {
     return spec_result->error_value();
   }
 
-  result =
+  fdf::WireUnownedResult result =
       pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, ge2d_dev),
                                         platform_bus_composite::MakeFidlFragment(
                                             fidl_arena, ge2d_fragments, std::size(ge2d_fragments)),

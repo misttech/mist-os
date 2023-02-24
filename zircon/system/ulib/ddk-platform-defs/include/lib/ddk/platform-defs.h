@@ -29,7 +29,7 @@ __BEGIN_CDECLS
 #define PDEV_DID_OPTEE                  0x0E  // OP-TEE OS Driver
 // 0x10 unused
 // 0x11 unused
-#define PDEV_DID_CAMERA_SENSOR          0x12  // Camera Sensor
+// PDEV_DID_CAMERA_SENSOR was 0x12  // Camera Sensor
 #define PDEV_DID_HID_BUTTONS            0x13  // HID Buttons
 #define PDEV_DID_MUSB_PERIPHERAL        0x14  // MUSB in peripheral role
 #define PDEV_DID_MUSB_HOST              0x15  // MUSB in host role
@@ -229,8 +229,8 @@ __BEGIN_CDECLS
 #define PDEV_DID_MEDIATEK_SPI       0x0E
 
 // Sony
-#define PDEV_VID_SONY               0x0E
-#define PDEV_PID_SONY_IMX227        0x01
+// PDEV_VID_SONY was 0x0E
+// PDEV_PID_SONY_IMX227 was 0x01
 #define PDEV_PID_SONY_IMX355        0x02
 
 // Hisilicon

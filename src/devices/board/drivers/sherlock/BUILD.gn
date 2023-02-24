@@ -299,23 +299,6 @@ driver_bind_rules("sherlock-wifi-bind") {
   ]
 }
 
-driver_bind_rules("imx227-sensor-bind") {
-  rules = "bind/imx227-sensor.bind"
-  header_output = "imx227-sensor-bind.h"
-  bind_output = "imx227-sensor-bind.bc"
-  tests = "bind-tests/imx227-sensor-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.mipicsi",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sony.platform",
-  ]
-}
-
 driver_bind_rules("camera-ge2d-bind") {
   rules = "bind/camera-ge2d.bind"
   header_output = "camera-ge2d-bind.h"
@@ -422,7 +405,6 @@ template("sherlock_driver") {
     deps = [
       ":camera-ge2d-bind_header",
       ":camera-isp-bind_header",
-      ":imx227-sensor-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
@@ -466,17 +448,22 @@ template("sherlock_driver") {
       "//src/connectivity/openthread/lib/ot-radio",
       "//src/devices/bind/fuchsia:fuchsia_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+      "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",
       "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
       "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
       "//src/devices/bind/fuchsia.camerasensor2:fuchsia.camerasensor2_cpp",
+      "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
       "//src/devices/bind/fuchsia.gdc:fuchsia.gdc_cpp",
       "//src/devices/bind/fuchsia.ge2d:fuchsia.ge2d_cpp",
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
       "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
       "//src/devices/bind/fuchsia.isp:fuchsia.isp_cpp",
+      "//src/devices/bind/fuchsia.mipicsi:fuchsia.mipicsi_cpp",
+      "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+      "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",
@@ -541,7 +528,6 @@ group("tests") {
   deps = [
     ":camera-ge2d-bind_test",
     ":camera-isp-bind_test",
-    ":imx227-sensor-bind_test",
     ":sherlock-aml-usb-phy-v2-bind_test",
     ":sherlock-bind_test",
     ":sherlock-dwc2-phy-bind_test",
