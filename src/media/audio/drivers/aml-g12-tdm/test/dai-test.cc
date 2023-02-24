@@ -477,6 +477,7 @@ TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {
     ASSERT_OK(ring_buffer.GetProperties(&properties));
 
     EXPECT_EQ(properties.fifo_depth(), 1024);
+    EXPECT_EQ(properties.driver_transfer_bytes(), 1024);
     EXPECT_EQ(properties.external_delay(), 0);
     EXPECT_TRUE(properties.needs_cache_flush_or_invalidate());
   }

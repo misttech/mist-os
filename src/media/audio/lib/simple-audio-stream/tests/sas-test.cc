@@ -1151,6 +1151,32 @@ TEST_F(SimpleAudioTest, WatchPositionAndCloseRingBufferBeforeReply) {
   mock_ddk::ReleaseFlaggedDevices(root_.get());
 }
 
+TEST_F(SimpleAudioTest, GetDriverTransferBytes) {
+  auto server = SimpleAudioStream::Create<MockSimpleAudio>(root_.get());
+  ASSERT_NOT_NULL(server);
+
+  auto stream_client = GetStreamClient(GetClient(server.get()));
+  ASSERT_TRUE(stream_client.is_valid());
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+  ASSERT_OK(endpoints.status_value());
+  auto [local, remote] = std::move(endpoints.value());
+
+  fidl::Arena allocator;
+  audio_fidl::wire::Format format(allocator);
+  format.set_pcm_format(allocator, GetDefaultPcmFormat());
+  auto result0 = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+  ASSERT_EQ(ZX_OK, result0.status());  // CreateRingBuffer is sent successfully.
+
+  auto result1 = fidl::WireCall(local)->GetProperties();
+  ASSERT_OK(result1.status());
+  ASSERT_EQ(result1.value().properties.driver_transfer_bytes(), MockSimpleAudio::kTestFifoDepth);
+
+  loop_.Shutdown();
+  server->DdkAsyncRemove();
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+}
+
 TEST_F(SimpleAudioTest, WatchDelays) {
   auto server = SimpleAudioStream::Create<MockSimpleAudio>(root_.get());
   ASSERT_NOT_NULL(server);

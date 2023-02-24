@@ -690,6 +690,7 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.
   ASSERT_GT(result.value().properties.fifo_depth(), 0);
+  ASSERT_GT(result.value().properties.driver_transfer_bytes(), 0);
   ASSERT_EQ(result.value().properties.needs_cache_flush_or_invalidate(), true);
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
@@ -900,6 +901,7 @@ TEST_F(UsbAudioTest, Unplug) {
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.
   ASSERT_GT(result.value().properties.fifo_depth(), 0);
+  ASSERT_GT(result.value().properties.driver_transfer_bytes(), 0);
   ASSERT_EQ(result.value().properties.needs_cache_flush_or_invalidate(), true);
 
   constexpr uint32_t kNumberOfPositionNotifications = 5;
@@ -926,6 +928,36 @@ TEST_F(UsbAudioTest, Unplug) {
 
   auto properties = stream_client->GetProperties();
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, properties.status());
+}
+
+TEST_F(UsbAudioTest, GetDriverTransferBytes) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
+
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
+
+  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+  ASSERT_OK(endpoints2.status_value());
+  auto [local, remote] = std::move(endpoints2.value());
+
+  fidl::Arena allocator;
+  audio_fidl::wire::Format format(allocator);
+  format.set_pcm_format(allocator, GetDefaultPcmFormat());
+  auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+  ASSERT_OK(rb.status());
+
+  auto result = fidl::WireCall(local)->GetProperties();
+  ASSERT_OK(result.status());
+  // transfer bytes is 1152 = 6 ms x 48'000 Hz x 4 frame size.
+  ASSERT_EQ(result.value().properties.driver_transfer_bytes(), 1'152);
 }
 
 }  // namespace audio::usb
