@@ -16,7 +16,7 @@ use {
     fuchsia_component::server as fserver,
     fuchsia_component_test::{
         error::Error as RealmBuilderError, Capability, ChildOptions, DirectoryContents,
-        LocalComponentHandles, RealmBuilder, Ref, Route,
+        LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
     },
     fuchsia_fs,
     futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
@@ -1707,7 +1707,10 @@ async fn read_only_directory() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn from_fragment() -> Result<(), Error> {
-    let builder = RealmBuilder::from_relative_url(ECHO_REALM_FRAGMENT_URL).await?;
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().from_relative_url(ECHO_REALM_FRAGMENT_URL),
+    )
+    .await?;
 
     let echo_client_decl_file = fuchsia_fs::file::open_in_namespace(
         "/pkg/meta/echo_client.cm",
@@ -1752,12 +1755,19 @@ async fn from_fragment() -> Result<(), Error> {
 async fn from_fragment_invalid_manifest() -> Result<(), Error> {
     // The file referenced here is intentionally not a component manifest
     assert_matches!(
-        RealmBuilder::from_relative_url("#data/component_manager_realm_builder_config").await,
+        RealmBuilder::with_params(
+            RealmBuilderParams::new()
+                .from_relative_url("#data/component_manager_realm_builder_config")
+        )
+        .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::DeclReadError))
     );
 
     assert_matches!(
-        RealmBuilder::from_relative_url("#meta/does-not-exist.cm").await,
+        RealmBuilder::with_params(
+            RealmBuilderParams::new().from_relative_url("#meta/does-not-exist.cm")
+        )
+        .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::DeclNotFound))
     );
 

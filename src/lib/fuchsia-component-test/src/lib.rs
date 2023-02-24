@@ -641,6 +641,40 @@ impl RealmInstance {
     }
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct RealmBuilderParams {
+    component_realm_proxy: Option<fcomponent::RealmProxy>,
+    collection_name: Option<String>,
+    fragment_only_url: Option<String>,
+    pkg_dir_proxy: Option<fio::DirectoryProxy>,
+}
+
+impl RealmBuilderParams {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_realm_proxy(mut self, realm_proxy: fcomponent::RealmProxy) -> Self {
+        self.component_realm_proxy = Some(realm_proxy);
+        self
+    }
+
+    pub fn in_collection(mut self, collection_name: impl Into<String>) -> Self {
+        self.collection_name = Some(collection_name.into());
+        self
+    }
+
+    pub fn from_relative_url(mut self, fragment_only_url: impl Into<String>) -> Self {
+        self.fragment_only_url = Some(fragment_only_url.into());
+        self
+    }
+
+    pub fn with_pkg_dir_proxy(mut self, pkg_dir_proxy: fio::DirectoryProxy) -> Self {
+        self.pkg_dir_proxy = Some(pkg_dir_proxy);
+        self
+    }
+}
+
 /// The `RealmBuilder` struct can be used to assemble and create a component realm at runtime.
 /// For more information on what can be done with this struct, please see the [documentation on
 /// fuchsia.dev](https://fuchsia.dev/fuchsia-src/development/testing/components/realm_builder)
@@ -648,6 +682,7 @@ impl RealmInstance {
 pub struct RealmBuilder {
     root_realm: SubRealmBuilder,
     builder_proxy: ftest::BuilderProxy,
+    component_realm_proxy: fcomponent::RealmProxy,
     local_component_runner_builder: LocalComponentRunnerBuilder,
     collection_name: String,
 }
@@ -655,46 +690,43 @@ pub struct RealmBuilder {
 impl RealmBuilder {
     /// Creates a new, empty Realm Builder.
     pub async fn new() -> Result<Self, Error> {
-        Self::create(DEFAULT_COLLECTION_NAME.to_string(), None).await
+        Self::with_params(RealmBuilderParams::default()).await
     }
 
-    /// Creates a new Realm Builder initialized with the contents of the
-    /// manifest located in the test package at the path indicated by the
-    /// fragment-only component URL (for example, `#meta/other-component.cm`;
-    /// see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
-    pub async fn from_relative_url(fragment_only_url: impl Into<String>) -> Result<Self, Error> {
-        Self::create(DEFAULT_COLLECTION_NAME.to_string(), Some(fragment_only_url.into())).await
-    }
-
-    /// Creates a new Realm Builder initialized with the contents of the
-    /// manifest located in the test package at the path indicated by the
-    /// fragment-only component URL (for example, `#meta/other-component.cm`;
-    /// see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
-    /// When `RealmBuilder::build` is called, the realm will be launched in the
-    /// collection named `collection_name`.
-    pub async fn from_relative_url_with_collection(
-        fragment_only_url: impl Into<String>,
-        collection_name: impl Into<String>,
-    ) -> Result<Self, Error> {
-        Self::create(collection_name.into(), Some(fragment_only_url.into())).await
-    }
-
-    /// Creates a new, empty Realm Builder. When `RealmBuilder::build` is called, the realm will be
-    /// launched in the collection named `collection_name`.
-    pub async fn new_with_collection(collection_name: impl Into<String>) -> Result<Self, Error> {
-        Self::create(collection_name.into(), None).await
+    pub async fn with_params(params: RealmBuilderParams) -> Result<Self, Error> {
+        let component_realm_proxy = match params.component_realm_proxy {
+            Some(r) => r,
+            None => fclient::connect_to_protocol::<fcomponent::RealmMarker>()
+                .map_err(Error::ConnectToServer)?,
+        };
+        let pkg_dir_proxy = match params.pkg_dir_proxy {
+            Some(p) => p,
+            None => fuchsia_fs::directory::open_in_namespace(
+                "/pkg",
+                fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
+            )
+            .map_err(Error::FailedToOpenPkgDir)?,
+        };
+        let collection_name = params.collection_name.unwrap_or(DEFAULT_COLLECTION_NAME.into());
+        Self::create(
+            component_realm_proxy,
+            collection_name,
+            params.fragment_only_url,
+            pkg_dir_proxy,
+        )
+        .await
     }
 
     async fn create(
+        component_realm_proxy: fcomponent::RealmProxy,
         collection_name: String,
         fragment_only_url: Option<String>,
+        pkg_dir_proxy: fio::DirectoryProxy,
     ) -> Result<Self, Error> {
-        let realm_proxy = fclient::connect_to_protocol::<fcomponent::RealmMarker>()
-            .map_err(Error::ConnectToServer)?;
         let (exposed_dir_proxy, exposed_dir_server_end) =
             endpoints::create_proxy::<fio::DirectoryMarker>()
                 .expect("failed to create channel pair");
-        realm_proxy
+        component_realm_proxy
             .open_exposed_dir(
                 &mut fdecl::ChildRef {
                     name: REALM_BUILDER_SERVER_CHILD_NAME.to_string(),
@@ -710,12 +742,6 @@ impl RealmBuilder {
             ftest::RealmBuilderFactoryMarker,
         >(&exposed_dir_proxy)
         .map_err(Error::ConnectToServer)?;
-
-        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-            "/pkg",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .map_err(Error::FailedToOpenPkgDir)?;
 
         let (realm_proxy, realm_server_end) =
             create_proxy::<ftest::RealmMarker>().expect("failed to create channel pair");
@@ -742,10 +768,11 @@ impl RealmBuilder {
                     .await??;
             }
         }
-        Self::build_struct(realm_proxy, builder_proxy, collection_name)
+        Self::build_struct(component_realm_proxy, realm_proxy, builder_proxy, collection_name)
     }
 
     fn build_struct(
+        component_realm_proxy: fcomponent::RealmProxy,
         realm_proxy: ftest::RealmProxy,
         builder_proxy: ftest::BuilderProxy,
         collection_name: String,
@@ -757,6 +784,7 @@ impl RealmBuilder {
                 realm_path: vec![],
                 local_component_runner_builder: local_component_runner_builder.clone(),
             },
+            component_realm_proxy,
             builder_proxy,
             local_component_runner_builder,
             collection_name,
@@ -784,9 +812,9 @@ impl RealmBuilder {
             self.local_component_runner_builder.build().await?;
         let root_url = self.builder_proxy.build(component_runner_client_end).await??;
 
-        let root = ScopedInstance::new(self.collection_name, root_url)
-            .await
-            .map_err(Error::FailedToCreateChild)?;
+        let factory = ScopedInstanceFactory::new(self.collection_name)
+            .with_realm_proxy(self.component_realm_proxy);
+        let root = factory.new_instance(root_url).await.map_err(Error::FailedToCreateChild)?;
         root.connect_to_binder().map_err(Error::FailedToBind)?;
 
         Ok(RealmInstance {
@@ -806,7 +834,10 @@ impl RealmBuilder {
             self.local_component_runner_builder.build().await?;
         let root_url = self.builder_proxy.build(component_runner_client_end).await??;
 
-        let root = ScopedInstance::new_with_name(child_name.into(), self.collection_name, root_url)
+        let factory = ScopedInstanceFactory::new(self.collection_name)
+            .with_realm_proxy(self.component_realm_proxy);
+        let root = factory
+            .new_named_instance(child_name.into(), root_url)
             .await
             .map_err(Error::FailedToCreateChild)?;
         root.connect_to_binder().map_err(Error::FailedToBind)?;
@@ -852,7 +883,9 @@ impl RealmBuilder {
         // Note this presumes that component manager is pointed to a config with the following line:
         //
         //     realm_builder_resolver_and_runner: "namespace",
-        let component_manager_realm = RealmBuilder::new_with_collection(collection_name).await?;
+        let component_manager_realm =
+            RealmBuilder::with_params(RealmBuilderParams::new().in_collection(collection_name))
+                .await?;
         component_manager_realm
             .add_child(
                 "component_manager",
@@ -2770,9 +2803,12 @@ mod tests {
             let _builder_task = builder_task;
             handle_realm_stream(realm_stream, realm_report_requests).await
         });
+        let component_realm_proxy =
+            fclient::connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
 
         (
             RealmBuilder::build_struct(
+                component_realm_proxy,
                 realm_proxy,
                 builder_proxy,
                 crate::DEFAULT_COLLECTION_NAME.to_string(),

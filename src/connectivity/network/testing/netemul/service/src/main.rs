@@ -15,7 +15,7 @@ use {
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
     fuchsia_component_test::{
         self as fcomponent, Capability, ChildOptions, LocalComponentHandles, RealmBuilder,
-        RealmInstance, Ref, Route,
+        RealmBuilderParams, RealmInstance, Ref, Route,
     },
     fuchsia_zircon as zx,
     futures::pin_mut,
@@ -178,7 +178,10 @@ async fn create_realm_instance(
     // those components can be extracted and modified.
     let mut modified_program_args = HashMap::new();
 
-    let builder = RealmBuilder::new_with_collection(REALM_COLLECTION_NAME.to_string()).await?;
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().in_collection(REALM_COLLECTION_NAME.to_string()),
+    )
+    .await?;
     let netemul_services = builder
         .add_local_child(
             NETEMUL_SERVICES_COMPONENT_NAME,
@@ -828,9 +831,11 @@ async fn setup_network_realm(sandbox_name: impl std::fmt::Display) -> Result<Rea
     let relative_url = |component_name: &str| format!("#meta/{}.cm", component_name);
     let network_context_package_url = relative_url(NETWORK_CONTEXT_COMPONENT_NAME);
 
-    let builder = RealmBuilder::new_with_collection(REALM_COLLECTION_NAME.to_string())
-        .await
-        .context("error creating new realm builder")?;
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().in_collection(REALM_COLLECTION_NAME.to_string()),
+    )
+    .await
+    .context("error creating new realm builder")?;
     let network_context_child = builder
         .add_child(NETWORK_CONTEXT_COMPONENT_NAME, network_context_package_url, ChildOptions::new())
         .await

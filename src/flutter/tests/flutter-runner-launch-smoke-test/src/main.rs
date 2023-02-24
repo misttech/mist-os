@@ -18,7 +18,7 @@ mod tests {
         fidl_test_fuchsia_flutter as fidl_ping,
         fuchsia_async::DurationExt,
         fuchsia_component_test::{
-            Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
+            Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
         },
         fuchsia_scenic as scenic, fuchsia_zircon as zx,
         futures::future::Either,
@@ -58,7 +58,10 @@ mod tests {
         let component_url = &derive_component_url(package, component_name);
         info!("Attempting to launch {}", component_url);
 
-        let builder = RealmBuilder::new_with_collection("flutter_runner_collection").await?;
+        let builder = RealmBuilder::with_params(
+            RealmBuilderParams::new().in_collection("flutter_runner_collection"),
+        )
+        .await?;
 
         let text_manager = builder
             .add_child(

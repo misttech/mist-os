@@ -30,8 +30,8 @@ use {
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root},
     fuchsia_component_test::{
-        error::Error as RealmBuilderError, Capability, ChildOptions, RealmBuilder, RealmInstance,
-        Ref, Route,
+        error::Error as RealmBuilderError, Capability, ChildOptions, RealmBuilder,
+        RealmBuilderParams, RealmInstance, Ref, Route,
     },
     fuchsia_url::AbsoluteComponentUrl,
     fuchsia_zircon as zx,
@@ -561,7 +561,10 @@ async fn get_realm(
     resolver: Arc<ResolverProxy>,
     debug_data_sender: DebugDataSender,
 ) -> Result<(RealmBuilder, async_utils::event::Event), RealmBuilderError> {
-    let builder = RealmBuilder::new_with_collection(suite_facet.collection.to_string()).await?;
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().in_collection(suite_facet.collection.to_string()),
+    )
+    .await?;
     let wrapper_realm =
         builder.add_child_realm(WRAPPER_REALM_NAME, ChildOptions::new().eager()).await?;
 
