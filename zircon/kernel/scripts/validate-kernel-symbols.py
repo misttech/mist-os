@@ -33,14 +33,16 @@ def main():
     parser.add_argument('depfile', help='path to the depfile to generate')
     args = parser.parse_args()
 
-    # Write the depfile.
-    with open(args.depfile, 'w') as depfile:
-        print(
-            '{:s}: {:s}'.format(args.output, args.zircon_elf_rsp), file=depfile)
-
     # Read the path to zircon.elf.
     with open(args.zircon_elf_rsp, 'r') as zircon_rsp_elf:
         zircon_elf = zircon_rsp_elf.read().rstrip('\n')
+
+    # Write the depfile.
+    with open(args.depfile, 'w') as depfile:
+        print(
+            '{:s}: {:s} {:s}'.format(
+                args.output, args.zircon_elf_rsp, zircon_elf),
+            file=depfile)
 
     # Create a list of guard variables for function scoped statics.
     nm = subprocess.Popen(
