@@ -95,12 +95,6 @@ impl DataSourceApi for DataSource {
 /// Errors that may be encountered in `ProductBundleBuilder::build`.
 #[derive(Debug, Error)]
 pub enum ProductBundleBuilderError {
-    #[error("attempted to build product bundle without specifying a directory")]
-    MissingDirectory,
-    #[error("attempted to build product bundle without specifying a system slot (e.g., A, B, R)")]
-    MissingSystemSlot,
-    #[error("attempted to build product bundle without specifying a repository name")]
-    MissingRepositoryName,
     #[error("product bundle directory path is not a valid UTF8 string: {directory:?}")]
     InvalidDirectory { directory: PathBuf },
     #[error("failed to deserialize product bundle: {error}")]
@@ -115,49 +109,29 @@ pub enum ProductBundleBuilderError {
 
 /// Builder pattern for constructing instances of [`ProductBundle`].
 pub struct ProductBundleBuilder {
-    directory: Option<PathBuf>,
-    system_slot: Option<SystemSlot>,
-    repository_name: Option<String>,
+    directory: PathBuf,
+    system_slot: SystemSlot,
+    repository_name: String,
 }
 
 impl ProductBundleBuilder {
-    /// Constructs a new [`ProductBundleBuilder`].
-    pub fn new() -> Self {
-        Self { directory: None, system_slot: None, repository_name: None }
-    }
-
-    /// Associates this builder with a product bundle directory.
-    pub fn directory(mut self, directory: PathBuf) -> Self {
-        self.directory = Some(directory);
-        self
-    }
-
-    /// Associates this builder with a system slot. A product bundle JSON may refer to several
-    /// system slots (e.g., A, B, R), but only one will be associated with the [`ProductBundle`]
-    /// instance constructed by this builder.
-    pub fn system_slot(mut self, system: SystemSlot) -> Self {
-        self.system_slot = Some(system);
-        self
-    }
-
-    /// Associates this builder with a particular repository, by name. A product bundle JSON may
-    /// refer to several repositories, but only onw will be associated with the [`ProductBundle`]
-    /// instance constructed by this builder.
-    pub fn repository_name(mut self, repository_name: String) -> Self {
-        self.repository_name = Some(repository_name);
-        self
+    /// Constructs a new [`ProductBundleBuilder`] for building a [`ProductBundle`].
+    pub fn new<P: AsRef<Path>, S: ToString>(
+        directory: P,
+        system_slot: SystemSlot,
+        repository_name: S,
+    ) -> Self {
+        Self {
+            directory: directory.as_ref().to_path_buf(),
+            system_slot,
+            repository_name: repository_name.to_string(),
+        }
     }
 
     /// Builds a [`ProductBundle`] based on data encoded in this builder.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<ProductBundle, ProductBundleBuilderError> {
-        let directory =
-            self.directory.ok_or_else(|| ProductBundleBuilderError::MissingDirectory)?;
-        let system_slot =
-            self.system_slot.ok_or_else(|| ProductBundleBuilderError::MissingSystemSlot)?;
-        let repository_name =
-            self.repository_name.ok_or_else(|| ProductBundleBuilderError::MissingRepositoryName)?;
-        let utf8_directory = Utf8PathBuf::from_path_buf(directory)
+        let utf8_directory = Utf8PathBuf::from_path_buf(self.directory)
             .map_err(|directory| ProductBundleBuilderError::InvalidDirectory { directory })?;
         let product_bundle = SdkProductBundle::try_load_from(&utf8_directory)
             .map_err(|error| ProductBundleBuilderError::DeserializationFailure { error })?;
@@ -172,11 +146,11 @@ impl ProductBundleBuilder {
         if product_bundle
             .repositories
             .iter()
-            .find(|repository| repository.name == repository_name)
+            .find(|repository| repository.name == self.repository_name)
             .is_none()
         {
             return Err(ProductBundleBuilderError::RepositoryNotFound {
-                repository_name,
+                repository_name: self.repository_name,
                 available_repositories: product_bundle
                     .repositories
                     .iter()
@@ -187,8 +161,8 @@ impl ProductBundleBuilder {
         Ok(ProductBundle::new(ProductBundleData {
             directory: utf8_directory.into(),
             product_bundle,
-            system_slot,
-            repository_name,
+            system_slot: self.system_slot,
+            repository_name: self.repository_name,
         }))
     }
 }
@@ -208,8 +182,12 @@ pub struct ProductBundle(Rc<ProductBundleData>);
 
 impl ProductBundle {
     /// Constructs a builder for a new [`ProductBundle`].
-    pub fn builder() -> ProductBundleBuilder {
-        ProductBundleBuilder::new()
+    pub fn builder<P: AsRef<Path>, S: ToString>(
+        directory: P,
+        system_slot: SystemSlot,
+        repository_name: S,
+    ) -> ProductBundleBuilder {
+        ProductBundleBuilder::new(directory, system_slot, repository_name)
     }
 
     /// Constructs a data source that refers to this product bundle's repository.
@@ -348,7 +326,7 @@ impl ProductBundleRepositoryBlobs {
     pub fn blob_set(
         &self,
     ) -> Result<ProductBundleRepositoryBlobSet, BlobDirectoryBlobSetBuilderError> {
-        let blob_set = BlobDirectoryBlobSet::builder().directory(self.directory()).build()?;
+        let blob_set = BlobDirectoryBlobSet::builder(self.directory()).build()?;
         Ok(ProductBundleRepositoryBlobSet::new(self.clone(), blob_set))
     }
 
@@ -586,48 +564,13 @@ mod tests {
 
     #[fuchsia::test]
     fn test_builder_simple_failures() {
-        assert_eq!(
-            format!(
-                "{}",
-                ProductBundleBuilder::new()
-                    .directory("/pb/dir".into())
-                    .system_slot(SystemSlot::A)
-                    .build()
-                    .unwrap_err()
-            ),
-            format!("{}", ProductBundleBuilderError::MissingRepositoryName),
-        );
-
-        assert_eq!(
-            format!(
-                "{}",
-                ProductBundleBuilder::new()
-                    .system_slot(SystemSlot::B)
-                    .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-                    .build()
-                    .unwrap_err()
-            ),
-            format!("{}", ProductBundleBuilderError::MissingDirectory),
-        );
-
-        assert_eq!(
-            format!(
-                "{}",
-                ProductBundleBuilder::new()
-                    .directory("/pb/dir".into())
-                    .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-                    .build()
-                    .unwrap_err()
-            ),
-            format!("{}", ProductBundleBuilderError::MissingSystemSlot),
-        );
-
-        match ProductBundleBuilder::new()
-            .directory("/definitely/does/not/exist".into())
-            .system_slot(SystemSlot::R)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap_err()
+        match ProductBundleBuilder::new(
+            "/definitely/does/not/exist",
+            SystemSlot::R,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap_err()
         {
             ProductBundleBuilderError::DeserializationFailure { .. } => {}
             _ => {
@@ -639,12 +582,13 @@ mod tests {
     #[fuchsia::test]
     fn test_missing_json_file() {
         let temp_dir = TempDir::new().unwrap();
-        match ProductBundleBuilder::new()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap_err()
+        match ProductBundleBuilder::new(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap_err()
         {
             ProductBundleBuilderError::DeserializationFailure { .. } => {}
             _ => {
@@ -659,12 +603,13 @@ mod tests {
         let mut product_bundle_file =
             File::create(temp_dir.path().join("product_bundle.json")).unwrap();
         write!(product_bundle_file, "}}{{").unwrap();
-        match ProductBundleBuilder::new()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap_err()
+        match ProductBundleBuilder::new(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap_err()
         {
             ProductBundleBuilderError::DeserializationFailure { .. } => {}
             _ => {
@@ -700,12 +645,13 @@ mod tests {
                 }
             })
         ).unwrap();
-        match ProductBundleBuilder::new()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap_err()
+        match ProductBundleBuilder::new(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap_err()
         {
             ProductBundleBuilderError::InvalidVerison { .. } => {}
             _ => {
@@ -725,12 +671,13 @@ mod tests {
         v2_sdk_a_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
 
         // Instantiate product bundle under test.
-        let product_bundle = ProductBundleBuilder::new()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap();
+        let product_bundle = ProductBundleBuilder::new(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap();
 
         //
         // Check product bundle.
@@ -802,12 +749,13 @@ mod tests {
         }
 
         // Instantiate product bundle under test.
-        let product_bundle = ProductBundleBuilder::new()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .unwrap();
+        let product_bundle = ProductBundleBuilder::new(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .unwrap();
 
         // Attempt to construct blob set from repository of interest. This should fail because
         // the blobs directory contains malformed entries.

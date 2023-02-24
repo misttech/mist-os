@@ -234,8 +234,6 @@ mod blobfs {
     /// Errors that may be emitted by `BlobFsBlobSetBuilder::build`.
     #[derive(Debug, Error)]
     pub(crate) enum BlobFsBlobSetBuilderError {
-        #[error("attempt to build blobfs set without specifying an archive path")]
-        MissingArchivePath,
         #[error("failed to open blobfs archive: {0}")]
         OpenError(#[from] io::Error),
         #[error("error preparing blobfs archive reader: {0}")]
@@ -246,31 +244,20 @@ mod blobfs {
 
     /// Builder pattern for constructing [`BlobFsBlobSet`].
     pub(crate) struct BlobFsBlobSetBuilder {
-        archive_path: Option<PathBuf>,
+        archive_path: PathBuf,
     }
 
     impl BlobFsBlobSetBuilder {
         /// Instantiates empty builder.
-        pub fn new() -> Self {
-            Self { archive_path: None }
-        }
-
-        /// Associates builder with blobfs archive specified by `archive_path`.
-        pub fn archive<P: AsRef<Path>>(mut self, archive_path: P) -> Self {
-            self.archive_path = Some(archive_path.as_ref().to_path_buf());
-            self
+        pub fn new<P: AsRef<Path>>(archive_path: P) -> Self {
+            Self { archive_path: archive_path.as_ref().to_path_buf() }
         }
 
         /// Builds a [`BlobFsBlobSet`] based on data accumulated in builder.
         #[tracing::instrument(level = "trace", skip_all)]
         pub fn build(self) -> Result<BlobFsBlobSet, BlobFsBlobSetBuilderError> {
-            if self.archive_path.is_none() {
-                return Err(BlobFsBlobSetBuilderError::MissingArchivePath);
-            }
-
-            let archive_path = self.archive_path.unwrap();
             let reader_seeker =
-                TryClonableBufReaderFile::from(BufReader::new(File::open(&archive_path)?));
+                TryClonableBufReaderFile::from(BufReader::new(File::open(&self.archive_path)?));
             let blobfs_reader = BlobFsReaderBuilder::new().archive(reader_seeker)?.build()?;
             let blob_ids = blobfs_reader
                 .blob_paths()
@@ -279,7 +266,7 @@ mod blobfs {
                 })
                 .collect::<Result<Vec<Hash>, BlobFsBlobSetBuilderError>>()?;
             Ok(BlobFsBlobSet(Rc::new(BlobFsBlobSetData {
-                archive_path,
+                archive_path: self.archive_path,
                 blob_ids,
                 reader: Rc::new(RefCell::new(blobfs_reader)),
             })))
@@ -296,8 +283,8 @@ pub struct BlobDirectoryBlobSet(Rc<BlobDirectoryBlobSetData>);
 
 impl BlobDirectoryBlobSet {
     /// Creates a builder for a [`BlobDirectoryBlobSet`].
-    pub fn builder() -> BlobDirectoryBlobSetBuilder {
-        BlobDirectoryBlobSetBuilder::new()
+    pub fn builder<P: AsRef<Path>>(directory: P) -> BlobDirectoryBlobSetBuilder {
+        BlobDirectoryBlobSetBuilder::new(directory)
     }
 
     /// Gets the path to this blobs directory.
@@ -527,8 +514,6 @@ impl BlobApi for Blob {
 /// Errors that may be emitted by `BlobDirectoryBlobSetBuilder::build`.
 #[derive(Debug, Error)]
 pub enum BlobDirectoryBlobSetBuilderError {
-    #[error("attempt to build blob directory blob set without specifying a directory")]
-    MissingDirectory,
     #[error("failed to list files in blob directory: {0}")]
     ListError(io::Error),
     #[error("failed to stat directory entry: {0}")]
@@ -545,19 +530,13 @@ pub enum BlobDirectoryBlobSetBuilderError {
 
 /// Builder pattern for constructing [`BlobDirectoryBlobSet`].
 pub struct BlobDirectoryBlobSetBuilder {
-    directory: Option<PathBuf>,
+    directory: PathBuf,
 }
 
 impl BlobDirectoryBlobSetBuilder {
     /// Instantiates empty builder.
-    pub fn new() -> Self {
-        Self { directory: None }
-    }
-
-    /// Associates builder with directory specified by `directory`.
-    pub fn directory<P: AsRef<Path>>(mut self, directory: P) -> Self {
-        self.directory = Some(directory.as_ref().to_path_buf());
-        self
+    pub fn new<P: AsRef<Path>>(directory: P) -> Self {
+        Self { directory: directory.as_ref().to_path_buf() }
     }
 
     /// Builds a [`BlobDirectoryBlobSet`] based on data accumulated in builder. This builder
@@ -570,13 +549,8 @@ impl BlobDirectoryBlobSetBuilder {
     /// [`BlobDirectoryBlobSet`] constructor.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<BlobDirectoryBlobSet, BlobDirectoryBlobSetBuilderError> {
-        if self.directory.is_none() {
-            return Err(BlobDirectoryBlobSetBuilderError::MissingDirectory);
-        }
-
-        let directory = self.directory.unwrap();
         let paths =
-            fs::read_dir(&directory).map_err(BlobDirectoryBlobSetBuilderError::ListError)?;
+            fs::read_dir(&self.directory).map_err(BlobDirectoryBlobSetBuilderError::ListError)?;
         let dir_entries: Vec<_> = paths
             .collect::<Result<Vec<_>, _>>()
             .map_err(BlobDirectoryBlobSetBuilderError::DirEntryError)?;
@@ -610,7 +584,7 @@ impl BlobDirectoryBlobSetBuilder {
             .collect::<Result<Vec<_>, _>>()?;
         blob_ids.sort();
 
-        Ok(BlobDirectoryBlobSet::new(directory, blob_ids))
+        Ok(BlobDirectoryBlobSet::new(self.directory, blob_ids))
     }
 }
 
@@ -679,7 +653,7 @@ mod tests {
     #[fuchsia::test]
     fn empty_blobs_dir() {
         let temp_dir = tempdir().unwrap();
-        BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+        BlobDirectoryBlobSetBuilder::new(temp_dir.path()).build().unwrap();
     }
 
     #[fuchsia::test]
@@ -690,8 +664,7 @@ mod tests {
         let temp_dir = mk_temp_dir!(hashmap! {
             fuchsia_hash!(blob_data.as_bytes()) => blob_data.as_bytes(),
         });
-        let blob_set =
-            BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+        let blob_set = BlobDirectoryBlobSetBuilder::new(temp_dir.path()).build().unwrap();
 
         let hash_not_in_set = Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE]));
 
@@ -727,8 +700,7 @@ mod tests {
             fuchsia_hash!(blob_data[1].as_bytes()) => blob_data[1].as_bytes(),
         };
         let temp_dir = mk_temp_dir!(&temp_dir_map);
-        let blob_set =
-            BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+        let blob_set = BlobDirectoryBlobSetBuilder::new(temp_dir.path()).build().unwrap();
 
         let hash_not_in_set = Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE]));
 
@@ -758,19 +730,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn blob_dir_builder_incomplete() {
-        match BlobDirectoryBlobSetBuilder::new().build().err().unwrap() {
-            BlobDirectoryBlobSetBuilderError::MissingDirectory => {}
-            err => {
-                assert!(false, "Expected MissingDirectory error, but got {:?}", err);
-            }
-        };
-    }
-
-    #[fuchsia::test]
     fn blob_dir_directory_does_not_exist() {
-        match BlobDirectoryBlobSetBuilder::new()
-            .directory("/this/directory/definitely/does/not/exist")
+        match BlobDirectoryBlobSetBuilder::new("/this/directory/definitely/does/not/exist")
             .build()
             .err()
             .unwrap()
@@ -790,7 +751,7 @@ mod tests {
         let subdir_path = dir_path.join("subdir");
         fs::create_dir(subdir_path).unwrap();
 
-        match BlobDirectoryBlobSetBuilder::new().directory(dir_path).build().err().unwrap() {
+        match BlobDirectoryBlobSetBuilder::new(dir_path).build().err().unwrap() {
             BlobDirectoryBlobSetBuilderError::PathError(
                 ParseHashPathError::NonFuchsiaMerkleRoot { path_string, .. },
             ) => {
@@ -811,7 +772,7 @@ mod tests {
         let subdir_path = dir_path.join(&valid_merkle_root);
         fs::create_dir(subdir_path).unwrap();
 
-        match BlobDirectoryBlobSetBuilder::new().directory(dir_path).build().err().unwrap() {
+        match BlobDirectoryBlobSetBuilder::new(dir_path).build().err().unwrap() {
             BlobDirectoryBlobSetBuilderError::ReadBlobError(_) => {}
             err => {
                 assert!(false, "Expected ReadBlobError error, but got {:?}", err);
@@ -835,7 +796,7 @@ mod tests {
         };
         let temp_dir = mk_temp_dir!(&temp_dir_map);
 
-        match BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().err().unwrap() {
+        match BlobDirectoryBlobSetBuilder::new(temp_dir.path()).build().err().unwrap() {
             BlobDirectoryBlobSetBuilderError::HashMismatch { hash_from_path, computed_hash } => {
                 let (world_hash, universe_hash): (Hash, Hash) =
                     (world_hash.into(), universe_hash.into());
@@ -853,7 +814,7 @@ mod tests {
     // meaningful.
     #[fuchsia::test]
     fn exercise_blobfs_blob_set_api() {
-        let _ = BlobFsBlobSetBuilder::new().archive("/some/path").build();
+        let _ = BlobFsBlobSetBuilder::new("/some/path").build();
     }
 }
 

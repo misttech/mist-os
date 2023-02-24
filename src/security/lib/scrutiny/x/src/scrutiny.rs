@@ -241,12 +241,13 @@ mod tests {
         v2_sdk_a_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
 
         // Construct product bundle.
-        let product_bundle = ProductBundle::builder()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .expect("product bundle from well-formed manifest");
+        let product_bundle = ProductBundle::builder(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .expect("product bundle from well-formed manifest");
 
         // Ensure blobs directory is missing.
         fs::remove_dir_all(&temp_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH))
@@ -314,12 +315,13 @@ mod tests {
         .expect("write r blob");
 
         // Test against a slot.
-        let a_product_bundle = ProductBundle::builder()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::A)
-            .repository_name(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .expect("product bundle from well-formed manifest and directories");
+        let a_product_bundle = ProductBundle::builder(
+            temp_dir.path(),
+            SystemSlot::A,
+            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .expect("product bundle from well-formed manifest and directories");
         let a_scrutiny = Scrutiny::builder(a_product_bundle)
             .build()
             .expect("scrutiny from well-formed product bundle");
@@ -334,12 +336,13 @@ mod tests {
         assert_eq!(a_blob_contents.as_bytes(), a_blob_read_contents.as_slice());
 
         // Test against b slot.
-        let b_product_bundle = ProductBundle::builder()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::B)
-            .repository_name(V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .expect("product bundle from well-formed manifest and directories");
+        let b_product_bundle = ProductBundle::builder(
+            temp_dir.path(),
+            SystemSlot::B,
+            V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .expect("product bundle from well-formed manifest and directories");
         let b_scrutiny = Scrutiny::builder(b_product_bundle)
             .build()
             .expect("scrutiny from well-formed product bundle");
@@ -354,12 +357,13 @@ mod tests {
         assert_eq!(b_blob_contents.as_bytes(), b_blob_read_contents.as_slice());
 
         // Test against r slot.
-        let r_product_bundle = ProductBundle::builder()
-            .directory(temp_dir.path().to_path_buf())
-            .system_slot(SystemSlot::R)
-            .repository_name(V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string())
-            .build()
-            .expect("product bundle from well-formed manifest and directories");
+        let r_product_bundle = ProductBundle::builder(
+            temp_dir.path(),
+            SystemSlot::R,
+            V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME,
+        )
+        .build()
+        .expect("product bundle from well-formed manifest and directories");
         let r_scrutiny = Scrutiny::builder(r_product_bundle)
             .build()
             .expect("scrutiny from well-formed product bundle");

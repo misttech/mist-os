@@ -91,10 +91,7 @@ fn build_scrutiny_instance(
     system_slot: SystemSlot,
 ) -> Result<impl Scrutiny> {
     ScrutinyBuilder::new(
-        ProductBundleBuilder::new()
-            .directory(product_bundle)
-            .repository_name(repository_name)
-            .system_slot(SystemSlot::A)
+        ProductBundleBuilder::new(product_bundle, SystemSlot::A, repository_name)
             .build()
             .expect("product bundle"),
     )
