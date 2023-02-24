@@ -1112,19 +1112,25 @@ template("assembled_system") {
       }
 
       if (generate_image_metadata) {
-        _label = get_label_info(":$target_name", "label_with_toolchain")
+        # (Mostly) common fields across all image metadata.
+        _common_metadata = {
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          cpu = current_cpu
+        }
+
         images += [
           # ZBI
           {
             name = image_name
             type = "zbi"
+
+            forward_variables_from(_common_metadata, "*")
             if (defined(invoker.output_dir)) {
               label = get_label_info(labels.copy_zbi, "label_with_toolchain")
               path = rebase_path("${invoker.output_dir}/" +
                                      get_path_info(files.zbi, "file"),
                                  root_build_dir)
             } else {
-              label = _label
               path = rebase_path(files.zbi, root_build_dir)
             }
             forward_variables_from(_image_overrides["zbi"], "*")
@@ -1134,28 +1140,28 @@ template("assembled_system") {
           images += [
             # BlobFS
             {
-              label = _label
               name = "${image_name}.blob"
               path = rebase_path(files.blobfs, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["blobfs"], "*")
             },
 
             # FVM
             {
-              label = _label
               name = "${image_name}.fvm"
               path = rebase_path(files.fvm, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fvm"], "*")
             },
 
             # Sparse FVM
             {
-              label = _label
               name = "${image_name}.fvm_sparse"
               path = rebase_path(files.fvm_sparse, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fvm_sparse"], "*")
             },
           ]
@@ -1167,6 +1173,8 @@ template("assembled_system") {
             {
               name = image_name
               type = "zbi.signed"
+
+              forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
                 label = get_label_info(labels.copy_zbi_signed,
                                        "label_with_toolchain")
@@ -1174,7 +1182,6 @@ template("assembled_system") {
                                        get_path_info(files.zbi_signed, "file"),
                                    root_build_dir)
               } else {
-                label = _label
                 path = rebase_path(files.zbi_signed, root_build_dir)
               }
               forward_variables_from(_image_overrides["zbi_signed"], "*")
@@ -1188,6 +1195,7 @@ template("assembled_system") {
             {
               name = image_name
               type = "vbmeta"
+              forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
                 label =
                     get_label_info(labels.copy_vbmeta, "label_with_toolchain")
@@ -1195,7 +1203,6 @@ template("assembled_system") {
                                        get_path_info(files.vbmeta, "file"),
                                    root_build_dir)
               } else {
-                label = _label
                 path = rebase_path(files.vbmeta, root_build_dir)
               }
               forward_variables_from(_image_overrides["vbmeta"], "*")
@@ -1207,10 +1214,10 @@ template("assembled_system") {
         if (include_fvm_blob_sparse) {
           images += [
             {
-              label = _label
               name = "${image_name}.fvm_blob_sparse"
               path = rebase_path(files.fvm_blob_sparse, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fvm_blob_sparse"], "*")
             },
           ]
@@ -1220,10 +1227,10 @@ template("assembled_system") {
         if (fvm_partition != "") {
           images += [
             {
-              label = _label
               name = "${image_name}.fvm_fastboot"
               path = rebase_path(files.fvm_fastboot, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fvm_fastboot"], "*")
             },
           ]
