@@ -203,11 +203,11 @@ if (toolchain_environment == "kernel.phys" ||
   # This is used implicitly by zbi_executable() targets.
   source_set("zbi_executable.deps") {
     sources = [
-      "exception.cc",
       "zbi-header.S",
       "zbi-main.cc",
     ]
     deps = [
+      ":exception",
       ":main",
       ":stdio",
       ":uart",
@@ -218,6 +218,16 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/crypto:crypto-entropy-src",
       "//zircon/system/ulib/uart",
     ]
+  }
+
+  static_library("exception") {
+    if (toolchain_environment == "kernel.phys") {
+      sources = [ "exception.cc" ]
+      deps = [
+        ":main",
+        "//zircon/kernel/lib/libc",
+      ]
+    }
   }
 
   static_library("kernel-package") {

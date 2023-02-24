@@ -100,7 +100,9 @@ void ArchSetUp(void* zbi) {
   // Hereafter any machine exceptions should be handled.
   ArmSetVbar(phys_exception);
 
-  ArmPsciSetup(FindPsciConfig(zbi));
+  if (zbi) {
+    ArmPsciSetup(FindPsciConfig(zbi));
+  }
 }
 
 uint64_t PhysExceptionResume(PhysExceptionState& state, uint64_t pc, uint64_t sp, uint64_t psr) {

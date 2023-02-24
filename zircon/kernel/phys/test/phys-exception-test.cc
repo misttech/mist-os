@@ -25,12 +25,16 @@ const uint64_t kExceptionResume = reinterpret_cast<uintptr_t>(ExceptionResume);
 
 #if defined(__aarch64__)
 uint64_t& TestRegister(PhysExceptionState& state) { return state.regs.r[0]; }
+#elif defined(__riscv)
+uint64_t& TestRegister(PhysExceptionState& state) { return state.regs.a0; }
 #elif defined(__x86_64__)
 uint64_t& TestRegister(PhysExceptionState& state) { return state.regs.rax; }
 #endif
 
 PHYS_SINGLETHREAD uint64_t HandleExpectedException(uint64_t vector, const char* vector_name,
                                                    PhysExceptionState& state) {
+  printf("%s: Handling exception %#" PRIx64 " (%s)\n", ProgramName(), vector, vector_name);
+
   PrintPhysException(vector, vector_name, state);
 
   ZX_ASSERT(state.pc() == kExceptionSite);
@@ -72,6 +76,18 @@ ExceptionResume:
       : [after] "=r"(interrupted_register)
       : [before] "r"(interrupted_register)
       : "x0");
+#elif defined(__riscv)
+  __asm__(
+      R"""(
+      mv a0, %[before]
+ExceptionSite:
+      unimp
+ExceptionResume:
+      mv %[after], a0
+      )"""
+      : [after] "=r"(interrupted_register)
+      : [before] "r"(interrupted_register)
+      : "a0");
 #elif defined(__x86_64__)
   __asm__(
       R"""(

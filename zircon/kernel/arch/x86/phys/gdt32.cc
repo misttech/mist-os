@@ -9,6 +9,14 @@
 
 #include <array>
 
+#ifndef GENERATE
+
+#include <phys/main.h>
+
+void ArchSetUp(void* zbi) {}
+
+#endif
+
 namespace {
 
 enum Segments { kNull, kCode32, kData32, kGs32, kCode64, kNumEntries };

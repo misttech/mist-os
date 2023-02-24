@@ -19,16 +19,18 @@ if (toolchain_environment == "kernel.phys" ||
   static_library("phys") {
     public = [ "riscv64.h" ]
     sources = [
+      "exception.S",
+      "exception.cc",
       "reset.cc",
       "setup.cc",
       "shadow-call-stack.S",
       "start.S",
     ]
+    public_deps = [ "//zircon/kernel/phys:main" ]
     deps = [
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
-      "//zircon/kernel/phys:main",
     ]
   }
 

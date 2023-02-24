@@ -198,6 +198,37 @@ class SysReg {
 #define ARCH_X86_SYSREG(RegisterTag, RegisterName) class SysReg
 #endif
 
+// <lib/arch/riscv64/*.h> headers use this to declare RISC-V CSRs.
+// RegisterTag is an unique C++ type that has a static Get() method.
+// RegisterName is a string literal of the assembly name for the CSR.
+//
+// When compiling for RISC-V, this makes arch::SysReg()::Io<RegisterTag>()
+// and arch::SysReg()::Read<RegisterTag>() available.  It does nothing at all
+// when compiling for other machines.
+//
+// For example:
+//   ARCH_RISCV64_SYSREG(Stvec, "stvec");
+//   ARCH_RISCV64_SYSREG(Sstatus, "status");
+//
+#ifdef __riscv
+#define ARCH_RISCV64_SYSREG(RegisterTag, RegisterName)                                     \
+  template <>                                                                              \
+  inline void SysReg::WriteRegister<RegisterTag>(typename RegisterTag::ValueType value) {  \
+    __asm__ volatile("csrw " RegisterName ", %0" : : "JKr"(static_cast<uint64_t>(value))); \
+  }                                                                                        \
+  template <>                                                                              \
+  inline typename RegisterTag::ValueType SysReg::ReadRegister<RegisterTag>() {             \
+    uint64_t value;                                                                        \
+    __asm__ volatile("csrr %0, " RegisterName : "=r"(value));                              \
+    return value;                                                                          \
+  }                                                                                        \
+  class SysReg
+// The extra incomplete redeclaration just consumes a semicolon in the macro.
+#else
+// These are not callable and will cause a compilation failure if used.
+#define ARCH_RISCV64_SYSREG(RegisterTag, RegisterName) class SysReg
+#endif
+
 // arch::SysRegBase provides a shorthand for defining register types.  The
 // standard boilerplate of `struct T : public hwreg::RegisterBase<T, uint64_t>`
 // is replaced with `struct T : public arch::SysRegBase<T>`.  This provides the

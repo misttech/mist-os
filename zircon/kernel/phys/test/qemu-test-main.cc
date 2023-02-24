@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-options/boot-options.h>
 #include <lib/uart/qemu.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,12 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
 
   static uart::qemu::KernelDriver<> uart;
   SetUartConsole(uart.uart());
+
+  static BootOptions boot_opts;
+  boot_opts.serial = uart.uart();
+  gBootOptions = &boot_opts;
+
+  ArchSetUp(nullptr);
 
   // Early boot may have filled the screen with logs. Add a newline to
   // terminate any previous line, and another newline to leave a blank.

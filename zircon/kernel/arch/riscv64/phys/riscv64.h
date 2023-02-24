@@ -7,9 +7,27 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_RISCV64_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_RISCV64_H_
 
+#define PHYS_EXCEPTION_STATE_SIZE ((32 + 4) * 8)
+
+#ifndef __ASSEMBLER__
+
 #include <stdint.h>
+
+#include <phys/exception.h>
+
+static_assert(offsetof(PhysExceptionState, regs.pc) == 0);
+static_assert(sizeof(PhysExceptionState{}.regs) == 32 * 8);
+static_assert(PHYS_EXCEPTION_STATE_SIZE == sizeof(PhysExceptionState));
+
+// Defined in exception.S, calls C++ ArchPhysException.
+extern "C" void ArchPhysExceptionEntry();
+
+// Defined in exception.cc, calls generic PhysException.
+extern "C" uint64_t ArchPhysException(PhysExceptionState& state);
 
 // This is set by start.S from the value passed in by the boot loader / SBI.
 extern uint64_t gBootHartId;
+
+#endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_RISCV64_H_

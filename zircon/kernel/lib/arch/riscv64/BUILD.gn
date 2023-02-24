@@ -5,11 +5,14 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/cpp/library_headers.gni")
+import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 library_headers("headers") {
   visibility = [ "../*" ]
 
   headers = []
+
+  public_deps = [ ":gen-riscv64-system-asm" ]
 }
 
 static_library("riscv64") {
@@ -29,4 +32,12 @@ static_library("riscv64") {
       "//zircon/kernel/lib/libc",
     ]
   }
+}
+
+hwreg_asm_header("gen-riscv64-system-asm") {
+  visibility = [ ":*" ]
+  output_name = "lib/arch/riscv64/system-asm.h"
+  defines = [ "LIB_ARCH_PRINTERS" ]
+  sources = [ "gen-riscv64-system-asm.cc" ]
+  deps = [ ".." ]
 }

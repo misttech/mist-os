@@ -44,9 +44,11 @@ if (current_toolchain != default_toolchain) {
     sources = [ "qemu-test-main.cc" ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
     deps = [
+      "..:exception",
       "..:stdio",
       "..:uart",
       "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/libc",
       "//zircon/system/ulib/uart",
     ]
@@ -353,6 +355,15 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
+  qemu_kernel_test("qemu-phys-exception-test") {
+    sources = [ "phys-exception-test.cc" ]
+    deps = [
+      ":test-main",
+      "..:exception",
+      "//zircon/kernel/lib/libc",
+    ]
+  }
+
   # turkey
   zbi_executable("trampoline-boot-test") {
     testonly = true
@@ -495,8 +506,13 @@ if (current_toolchain != default_toolchain) {
     if (current_cpu == "x64") {
       deps += [ ":qemu-memory-test" ]
     }
-    if (current_cpu == "arm64") {  # TODO(mcgrathr): support on x86
+    if (current_cpu != "x64") {  # TODO(mcgrathr): support on x86
       deps += [ ":zbi-phys-exception-test" ]
+    }
+
+    # x86 qemu is 32-bit and we don't do exceptions for 32-bit.
+    if (current_cpu != "x64") {
+      deps += [ ":qemu-phys-exception-test" ]
     }
   }
 } else {  # current_toolchain == default_toolchain

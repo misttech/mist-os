@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/asm.h>
+#include <lib/arch/riscv64/system-asm.h>
 #include <zircon/tls.h>
 
 #include <phys/stack.h>
@@ -36,6 +37,7 @@
   mv gp, zero
 
   // Mask all interrupts in case the boot loader left them on.
+  csrc sstatus, SSTATUS_SIE
   csrw sie, zero
 
   // Reset the trap vector base address register in case the boot loader

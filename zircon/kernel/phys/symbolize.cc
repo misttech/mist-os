@@ -170,7 +170,7 @@ ShadowCallStackBacktrace Symbolize::GetShadowCallStackBacktrace(uintptr_t scsp) 
 #ifndef __i386__
 
 void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
-  Printf("%s: Registers stored at %p: {{{hexdump:", name_, &exc);
+  Printf("%s: Registers stored at %p: {{{hexdict:", name_, &exc);
 
 // TODO(fxbug.dev/91214): Replace with a hexdict abstraction from
 // libsymbolizer-markup.
@@ -188,10 +188,39 @@ void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
   Printf("%s:   ESR: 0x%016" PRIx64 "  FAR: 0x%016" PRIx64 "\n", name_, exc.exc.arch.u.arm_64.esr,
          exc.exc.arch.u.arm_64.far);
 
+#elif defined(__riscv)
+
+  Printf("\n%s:   PC: 0x%016" PRIx64 "  RA: 0x%016" PRIx64 "  SP: 0x%016" PRIx64
+         "  GP: 0x%016" PRIx64 "\n",
+         name_, exc.regs.pc, exc.regs.ra, exc.regs.sp, exc.regs.gp);
+  Printf("%s:   TP: 0x%016" PRIx64 "  T0: 0x%016" PRIx64 "  T1: 0x%016" PRIx64 "  T2: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.tp, exc.regs.t0, exc.regs.t1, exc.regs.t2);
+  Printf("%s:   S0: 0x%016" PRIx64 "  S1: 0x%016" PRIx64 "  A0: 0x%016" PRIx64 "  A1: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.s0, exc.regs.s1, exc.regs.a0, exc.regs.a1);
+  Printf("%s:   A2: 0x%016" PRIx64 "  A3: 0x%016" PRIx64 "  A4: 0x%016" PRIx64 "  A5: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.a2, exc.regs.a3, exc.regs.a4, exc.regs.a5);
+  Printf("%s:   A6: 0x%016" PRIx64 "  A7: 0x%016" PRIx64 "  S2: 0x%016" PRIx64 "  S3: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.a6, exc.regs.a7, exc.regs.s2, exc.regs.s3);
+  Printf("%s:   S4: 0x%016" PRIx64 "  S5: 0x%016" PRIx64 "  S6: 0x%016" PRIx64 "  S7: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.s4, exc.regs.s5, exc.regs.s6, exc.regs.s7);
+  Printf("%s:   S8: 0x%016" PRIx64 "  S9: 0x%016" PRIx64 " S10: 0x%016" PRIx64 " S11: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.s8, exc.regs.s9, exc.regs.s10, exc.regs.s11);
+  Printf("%s:   T3: 0x%016" PRIx64 "  T4: 0x%016" PRIx64 "  T5: 0x%016" PRIx64 "  T6: 0x%016" PRIx64
+         "\n",
+         name_, exc.regs.t3, exc.regs.t4, exc.regs.t6, exc.regs.t6);
+  Printf("%s:   SCAUSE: 0x%016" PRIx64 "  STVAL: 0x%016" PRIx64 "\n", name_,
+         exc.exc.arch.u.riscv_64.cause, exc.exc.arch.u.riscv_64.tval);
+
 #elif defined(__x86_64__)
 
-  Printf("%s:  RAX: 0x%016" PRIx64 " RBX: 0x%016" PRIx64 " RCX: 0x%016" PRIx64 " RDX: 0x%016" PRIx64
-         "\n",
+  Printf("\n%s:  RAX: 0x%016" PRIx64 " RBX: 0x%016" PRIx64 " RCX: 0x%016" PRIx64
+         " RDX: 0x%016" PRIx64 "\n",
          name_, exc.regs.rax, exc.regs.rbx, exc.regs.rcx, exc.regs.rdx);
   Printf("%s:  RSI: 0x%016" PRIx64 " RDI: 0x%016" PRIx64 " RBP: 0x%016" PRIx64 " RSP: 0x%016" PRIx64
          "\n",
