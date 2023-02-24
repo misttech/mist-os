@@ -19,9 +19,9 @@ declare_args() {
   # Use the physload ZBI kernel and the ELF physboot module rather than
   # monolithic physboot ZBI kernel.
   #
-  # **TODO(mcgrathr):** This switch will be removed soon and the ELF-based
-  # physboot will be the only build.
-  use_elf_physboot = true
+  # **TODO(mcgrathr):** Eventually ELF physboot become the default and the old
+  # ZBI physboot will be removed.
+  use_elf_physboot = false
 }
 
 declare_args() {
