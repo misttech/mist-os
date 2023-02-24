@@ -277,13 +277,9 @@ mod tests {
         // Create the devices (will start DAD at the same time).
         let make_ctx_and_dev = || {
             let mut ctx = crate::testutil::FakeCtx::default();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-            let device_id = crate::device::add_ethernet_device(
-                sync_ctx,
-                non_sync_ctx,
-                mac,
-                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            );
+            let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+            let device_id =
+                crate::device::add_ethernet_device(sync_ctx, mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
             (ctx, device_id)
         };
 
@@ -468,7 +464,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let dev_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -515,7 +510,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let dev_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -675,7 +669,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let dev_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -791,7 +784,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let dev_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1121,7 +1113,6 @@ mod tests {
         let hw_mtu = Mtu::new(5000);
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac(),
             ethernet::MaxFrameSize::from_mtu(hw_mtu).unwrap(),
         );
@@ -1224,7 +1215,6 @@ mod tests {
         assert_empty(non_sync_ctx.frames_sent());
         let device_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1318,7 +1308,6 @@ mod tests {
         assert_empty(non_sync_ctx.frames_sent());
         let device_id = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1390,7 +1379,6 @@ mod tests {
 
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1476,7 +1464,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1636,7 +1623,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -1772,7 +1758,6 @@ mod tests {
         let mut sync_ctx = &*sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2086,7 +2071,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2134,7 +2118,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2359,7 +2342,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2577,7 +2559,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2731,7 +2712,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -2865,7 +2845,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -3048,7 +3027,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -3403,7 +3381,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );

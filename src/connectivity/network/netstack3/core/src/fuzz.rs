@@ -342,7 +342,6 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
     let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
     let device_id = crate::device::add_ethernet_device(
         sync_ctx,
-        non_sync_ctx,
         UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap(),
         ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
     );

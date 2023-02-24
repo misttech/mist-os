@@ -4187,7 +4187,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -4279,7 +4278,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             cfg.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
@@ -4419,7 +4417,6 @@ mod tests {
             let local_mac = v6_config.local_mac;
             let device = crate::device::add_ethernet_device(
                 &mut sync_ctx,
-                &mut non_sync_ctx,
                 local_mac,
                 IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             );
@@ -4664,8 +4661,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, mut device_ids) = builder.build();
         let mut sync_ctx = &sync_ctx;
         let loopback_id =
-            crate::device::add_loopback_device(sync_ctx, &mut non_sync_ctx, Ipv6::MINIMUM_LINK_MTU)
-                .unwrap();
+            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap();
         crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
         crate::add_ip_addr_subnet(
             sync_ctx,

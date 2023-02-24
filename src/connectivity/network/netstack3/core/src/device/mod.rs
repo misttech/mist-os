@@ -24,7 +24,6 @@ use net_types::{
     ethernet::Mac,
     ip::{
         AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
-        Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
@@ -56,7 +55,6 @@ use crate::{
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
-        types::{AddableEntry, AddableEntryEither},
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
     },
     sync::{KillableRc, RwLock, StrongRc, WeakRc},
@@ -1125,75 +1123,25 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
     }
 }
 
-/// Adds a new Ethernet device to the stack and installs routes for it.
-///
-/// Adds a new Ethernet device and installs routes for the link-local subnet and
-/// the multicast subnets.
+/// Adds a new Ethernet device to the stack.
 pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
 ) -> DeviceId<NonSyncCtx::Instant> {
-    let id = sync_ctx.state.device.add_ethernet_device(mac, max_frame_size);
-
-    const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
-    crate::add_route(
-        sync_ctx,
-        ctx,
-        AddableEntry::without_gateway(LINK_LOCAL_SUBNET.into(), id.clone()).into(),
-    )
-    // Adding the link local route must succeed: we're providing correct
-    // arguments and the device has just been created.
-    .unwrap_or_else(|e| unreachable!("add link local route: {e}"));
-
-    add_multicast_routes(sync_ctx, ctx, &id);
-
-    id
+    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size)
 }
 
-/// Adds a new loopback device to the stack and installs routes for it.
+/// Adds a new loopback device to the stack.
 ///
-/// Adds a new loopback device to the stack and installs routes for the loopback
-/// subnet and multicast subnets for the device. Only one loopback device may be
+/// Adds a new loopback device to the stack. Only one loopback device may be
 /// installed at any point in time, so if there is one already, an error is
 /// returned.
 pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
     mtu: Mtu,
 ) -> Result<DeviceId<NonSyncCtx::Instant>, crate::error::ExistsError> {
-    let id = sync_ctx.state.device.add_loopback_device(mtu)?;
-
-    for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(Ipv4::LOOPBACK_SUBNET, id.clone())),
-        AddableEntryEither::from(AddableEntry::without_gateway(Ipv6::LOOPBACK_SUBNET, id.clone())),
-    ] {
-        crate::add_route(sync_ctx, ctx, entry.clone())
-            // Adding the loopback route must succeed: we're providing correct
-            // arguments and the device has just been created.
-            .unwrap_or_else(|e| unreachable!("add loopback route for {:?} failed: {:?}", entry, e));
-    }
-
-    add_multicast_routes(sync_ctx, ctx, &id);
-
-    Ok(id)
-}
-
-fn add_multicast_routes<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
-    id: &DeviceId<NonSyncCtx::Instant>,
-) {
-    for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, id.clone())),
-        AddableEntryEither::from(AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, id.clone())),
-    ] {
-        crate::add_route(sync_ctx, ctx, entry.clone())
-            // Adding the multicast routes must succeed: we're providing correct
-            // arguments and the device has just been created.
-            .unwrap_or_else(|e| unreachable!("add multicast route {entry:?} for {id:?}: {e}"));
-    }
+    sync_ctx.state.device.add_loopback_device(mtu)
 }
 
 /// Receive a device layer frame from the network.
@@ -1454,7 +1402,7 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::{collections::HashMap, vec::Vec};
 
-    use net_declare::{net_mac, net_subnet_v4, net_subnet_v6};
+    use net_declare::net_mac;
     use net_types::ip::SubnetEither;
     use nonzero_ext::nonzero;
 
@@ -1478,7 +1426,7 @@ mod tests {
 
     #[test]
     fn test_iter_devices() {
-        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
 
         fn check(sync_ctx: &mut &FakeSyncCtx, expected: &[DeviceId<FakeInstant>]) {
@@ -1495,9 +1443,8 @@ mod tests {
         }
         check(&mut sync_ctx, &[][..]);
 
-        let loopback_device =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, Mtu::new(55))
-                .expect("error adding loopback device");
+        let loopback_device = crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
+            .expect("error adding loopback device");
         check(&mut sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
@@ -1509,7 +1456,6 @@ mod tests {
         } = FAKE_CONFIG_V4;
         let ethernet_device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::MIN,
         );
@@ -1532,41 +1478,20 @@ mod tests {
     }
 
     #[test]
-    fn test_add_loopback_device_routes() {
-        let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+    fn test_no_default_routes() {
+        let Ctx { mut sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
 
-        let loopback_device =
-            crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, Mtu::new(55))
-                .expect("error adding loopback device");
+        let loopback_device = crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
+            .expect("error adding loopback device");
 
-        let expected = [
-            net_subnet_v4!("127.0.0.0/8").into(),
-            net_subnet_v6!("::1/128").into(),
-            net_subnet_v4!("224.0.0.0/4").into(),
-            net_subnet_v6!("ff00::/8").into(),
-        ]
-        .map(|s: SubnetEither| (s, None));
-        assert_eq!(get_routes(&sync_ctx, &loopback_device), HashMap::from(expected));
-    }
-
-    #[test]
-    fn test_add_ethernet_device_routes() {
-        let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        assert_eq!(get_routes(&sync_ctx, &loopback_device), HashMap::new());
 
         let ethernet_device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::MIN,
         );
-
-        let expected = [
-            net_subnet_v6!("fe80::/64").into(),
-            net_subnet_v4!("224.0.0.0/4").into(),
-            net_subnet_v6!("ff00::/8").into(),
-        ]
-        .map(|s: SubnetEither| (s, None));
-        assert_eq!(get_routes(&sync_ctx, &ethernet_device), HashMap::from(expected));
+        assert_eq!(get_routes(&sync_ctx, &ethernet_device), HashMap::new());
     }
 
     #[test]
@@ -1575,7 +1500,6 @@ mod tests {
 
         let ethernet_device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
         );

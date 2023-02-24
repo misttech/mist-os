@@ -1278,12 +1278,9 @@ mod tests {
         let binding_id = {
             let mut ctx = ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-            let core_id = netstack3_core::device::add_loopback_device(
-                sync_ctx,
-                non_sync_ctx,
-                DEFAULT_LOOPBACK_MTU,
-            )
-            .expect("failed to add loopback to core");
+            let core_id =
+                netstack3_core::device::add_loopback_device(sync_ctx, DEFAULT_LOOPBACK_MTU)
+                    .expect("failed to add loopback to core");
             non_sync_ctx
                 .devices
                 .add_device(core_id, build_fake_dev_info)

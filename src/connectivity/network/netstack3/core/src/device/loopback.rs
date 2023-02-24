@@ -273,7 +273,7 @@ mod tests {
         const MTU: Mtu = Mtu::new(66);
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device = crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, MTU)
+        let device = crate::device::add_loopback_device(&mut sync_ctx, MTU)
             .expect("error adding loopback device");
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 

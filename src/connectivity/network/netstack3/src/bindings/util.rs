@@ -1023,7 +1023,6 @@ mod tests {
             let [core, invalid_core] = [(); 2].map(|()| {
                 netstack3_core::device::add_ethernet_device(
                     &mut state.sync_ctx,
-                    &mut state.non_sync_ctx,
                     UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap(),
                     ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
                 )

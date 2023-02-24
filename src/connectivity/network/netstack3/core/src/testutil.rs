@@ -550,7 +550,6 @@ impl FakeEventDispatcherBuilder {
             .map(|(mac, ip_subnet)| {
                 let id = crate::device::add_ethernet_device(
                     sync_ctx,
-                    non_sync_ctx,
                     mac,
                     IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                 );

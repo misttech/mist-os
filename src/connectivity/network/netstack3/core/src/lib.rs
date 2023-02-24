@@ -548,7 +548,6 @@ mod tests {
         let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let device = crate::device::add_ethernet_device(
             &mut sync_ctx,
-            &mut non_sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );

@@ -672,7 +672,8 @@ async fn test_list_del_routes() {
         // Loopback routes are added on netstack creation.
         AddableEntry::without_gateway(Ipv4::LOOPBACK_SUBNET, loopback.clone()).into(),
         AddableEntry::without_gateway(Ipv6::LOOPBACK_SUBNET, loopback.clone()).into(),
-        // Multicast routes are added automatically by core.
+        // Multicast routes are added automatically after the device is
+        // installed.
         AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, loopback.clone()).into(),
         AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, loopback).into(),
         AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, device.clone()).into(),

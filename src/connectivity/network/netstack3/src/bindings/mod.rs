@@ -608,6 +608,40 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
+/// Adds the IPv4 and IPv6 Loopback and multicast subnet routes.
+///
+/// Note that if an error is encountered while installing a route, any routes
+/// that were successfully installed prior to the error will not be removed.
+fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &mut SyncCtx<NonSyncCtx>,
+    non_sync_ctx: &mut NonSyncCtx,
+    loopback: &DeviceId<NonSyncCtx::Instant>,
+) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
+    use netstack3_core::ip::types::AddableEntry;
+    use netstack3_core::ip::types::AddableEntryEither;
+    for entry in [
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv4::LOOPBACK_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv6::LOOPBACK_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv4::MULTICAST_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv6::MULTICAST_SUBNET,
+            loopback.clone(),
+        )),
+    ] {
+        netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;
+    }
+    Ok(())
+}
+
 type NetstackContext = Arc<Mutex<Ctx<BindingsNonSyncCtxImpl>>>;
 
 /// The netstack.
@@ -683,12 +717,8 @@ impl Netstack {
 
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
-        let loopback = netstack3_core::device::add_loopback_device(
-            sync_ctx,
-            non_sync_ctx,
-            DEFAULT_LOOPBACK_MTU,
-        )
-        .expect("error adding loopback device");
+        let loopback = netstack3_core::device::add_loopback_device(sync_ctx, DEFAULT_LOOPBACK_MTU)
+            .expect("error adding loopback device");
         let devices: &mut Devices<_> = non_sync_ctx.as_mut();
         let (control_sender, control_receiver) =
             interfaces_admin::OwnedControlHandle::new_channel();
@@ -750,6 +780,8 @@ impl Netstack {
         );
         add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
             .expect("error adding loopback addresses");
+        add_loopback_routes(sync_ctx, non_sync_ctx, &loopback)
+            .expect("error adding loopback routes");
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 

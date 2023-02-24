@@ -82,7 +82,6 @@ lib_deps = [
   # remove this module.
   "fakealloc",
   "lock-order",
-  "//src/connectivity/lib/net-declare",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/packet-formats",
   "//src/connectivity/network/lib/explicit",

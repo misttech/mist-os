@@ -14,6 +14,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
+use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
     device::ethernet,
@@ -28,7 +29,8 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, StackTime,
+    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, NonSyncContext,
+    StackTime, SyncCtx,
 };
 
 #[derive(Clone)]
@@ -261,12 +263,8 @@ impl DeviceHandler {
 
         let max_frame_size = ethernet::MaxFrameSize::new(max_eth_frame_size)
             .ok_or(Error::ConfigurationNotSupported)?;
-        let core_id = netstack3_core::device::add_ethernet_device(
-            sync_ctx,
-            non_sync_ctx,
-            mac_addr,
-            max_frame_size,
-        );
+        let core_id =
+            netstack3_core::device::add_ethernet_device(sync_ctx, mac_addr, max_frame_size);
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
@@ -322,14 +320,47 @@ impl DeviceHandler {
             })
         };
 
-        Ok((
-            ctx.non_sync_ctx
-                .devices
-                .add_device(core_id, make_info)
-                .expect("duplicate core id in set"),
-            status_stream,
-        ))
+        let binding_id = non_sync_ctx
+            .devices
+            .add_device(core_id.clone(), make_info)
+            .expect("duplicate core id in set");
+
+        add_default_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
+
+        Ok((binding_id, status_stream))
     }
+}
+
+/// Adds the IPv4 and IPv6 multicast subnet routes and the IPv6 link-local subnet
+/// route.
+///
+/// Note that if an error is encountered while installing a route, any routes
+/// that were successfully installed prior to the error will not be removed.
+fn add_default_routes<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &mut SyncCtx<NonSyncCtx>,
+    non_sync_ctx: &mut NonSyncCtx,
+    loopback: &DeviceId<NonSyncCtx::Instant>,
+) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
+    use netstack3_core::ip::types::AddableEntry;
+    use netstack3_core::ip::types::AddableEntryEither;
+    const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
+    for entry in [
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            LINK_LOCAL_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv4::MULTICAST_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            Ipv6::MULTICAST_SUBNET,
+            loopback.clone(),
+        )),
+    ] {
+        netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;
+    }
+    Ok(())
 }
 
 pub struct PortHandler {

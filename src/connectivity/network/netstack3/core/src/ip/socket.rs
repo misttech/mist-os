@@ -1234,6 +1234,7 @@ mod tests {
                 IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
                 IpDeviceNonSyncContext,
             },
+            types::AddableEntryEither,
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
@@ -1423,12 +1424,9 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
         let mut sync_ctx = &sync_ctx;
-        let loopback_device_id = crate::device::add_loopback_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            Mtu::new(u16::MAX as u32),
-        )
-        .expect("create the loopback interface");
+        let loopback_device_id =
+            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
+                .expect("create the loopback interface");
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1589,12 +1587,9 @@ mod tests {
             .expect("install IPv6 device route on a fresh stack without routes"),
         }
 
-        let loopback_device_id = crate::device::add_loopback_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            Mtu::new(u16::MAX as u32),
-        )
-        .expect("create the loopback interface");
+        let loopback_device_id =
+            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
+                .expect("create the loopback interface");
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1842,8 +1837,14 @@ mod tests {
         )
         .unwrap();
 
-        // Use multicast remote addresses since there are default routes
-        // installed for them.
+        // Use multicast remote addresses since unicast addresses would trigger
+        // ARP/NDP requests.
+        crate::add_route(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            AddableEntryEither::without_gateway(I::MULTICAST_SUBNET.into(), device_id.clone()),
+        )
+        .expect("add device route");
         let remote_ip = I::multicast_addr(0);
         let options = SetHopLimitFor(remote_ip);
         let other_remote_ip = I::multicast_addr(1);
