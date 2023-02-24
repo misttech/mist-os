@@ -4,26 +4,29 @@
 
 //! A trie data structure used for matching inspect properties.
 
-use std::{cmp::Eq, collections::HashMap, fmt::Debug, hash::Hash};
+use std::{cmp::Eq, collections::HashMap, fmt, hash::Hash};
 
 //TODO(fxbug.dev/38342): Move this mod to its own lib to avoid leaking its existance in the
 //             fuchsia_inspect documentation.
 
 /// Trie mapping a sequence of key fragments to nodes that
 /// are able to store a value which is identifiable by the same key sequence.
-#[derive(Debug)]
 pub struct Trie<K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     root: TrieNode<K, V>,
 }
 
+impl<K: fmt::Debug + Hash + Eq, V: fmt::Debug> fmt::Debug for Trie<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Trie").field("root", &self.root).finish()
+    }
+}
+
 impl<K, V> Trie<K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     /// Creates a new empty Trie
     pub fn new() -> Self {
@@ -97,20 +100,26 @@ where
 }
 
 /// A node of a `Trie`.
-#[derive(Debug)]
 struct TrieNode<K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     value: Option<V>,
     children: HashMap<K, TrieNode<K, V>>,
 }
 
+impl<K: fmt::Debug + Hash + Eq, V: fmt::Debug> fmt::Debug for TrieNode<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrieNode")
+            .field("value", &self.value)
+            .field("children", &self.children)
+            .finish()
+    }
+}
+
 impl<K, V> TrieNode<K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     /// Creates a new empty `Node`.
     pub fn new() -> Self {
@@ -124,29 +133,39 @@ where
 }
 
 /// An iterator for a `Trie`.
-#[derive(Debug)]
 pub struct TrieIterator<'a, K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     work_stack: Vec<WorkStackEntry<'a, K, V>>,
 }
 
-#[derive(Debug)]
+impl<'a, K: fmt::Debug + Hash + Eq, V: fmt::Debug> fmt::Debug for TrieIterator<'a, K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrieIterator").field("work_stack", &self.work_stack).finish()
+    }
+}
+
 struct WorkStackEntry<'a, K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     current_node: &'a TrieNode<K, V>,
     current_key: Vec<&'a K>,
 }
 
+impl<'a, K: fmt::Debug + Hash + Eq, V: fmt::Debug> fmt::Debug for WorkStackEntry<'a, K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkStackEntry")
+            .field("current_node", &self.current_node)
+            .field("currenty_key", &self.current_key)
+            .finish()
+    }
+}
+
 impl<'a, K, V> TrieIterator<'a, K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     fn new(trie: &'a Trie<K, V>) -> Self {
         let root = trie.get_root();
@@ -156,8 +175,7 @@ where
 
 impl<'a, K, V> Iterator for TrieIterator<'a, K, V>
 where
-    K: Hash + Eq + Debug,
-    V: Debug,
+    K: Hash + Eq,
 {
     /// Each item is a path to the node plus the value in that node.
     type Item = (Vec<&'a K>, Option<&'a V>);
