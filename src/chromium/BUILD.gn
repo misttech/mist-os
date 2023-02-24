@@ -22,8 +22,7 @@ generate_chrome_browser_targets("chromium") {
 archive_path_suffix = ""
 
 # TODO(crbug.com/1385930): Change this to "chromium.org".
-# Also override or templatize `./config/http_scheme_map.config` and
-# `./config/web_context_provider.core_shard.cml.
+# Also override or templatize `./config/web_context_provider.core_shard.cml.
 repository = "fuchsia.com"
 
 declare_args() {
@@ -45,10 +44,6 @@ if (use_chromium_canary) {
     },
     {
       name = "web_engine_shell_pkg"
-      flavor = "canary"
-    },
-    {
-      name = "web_runner_pkg"
       flavor = "canary"
     },
   ]

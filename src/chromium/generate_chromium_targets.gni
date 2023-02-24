@@ -223,10 +223,6 @@ template("generate_fuchsia_web_test_targets") {
         name = "web_engine_shell_pkg"
         flavor = "custom"
       },
-      {
-        name = "web_runner_pkg"
-        flavor = "custom"
-      },
     ]
   }
 
@@ -242,27 +238,6 @@ template("generate_fuchsia_web_test_targets") {
     selections = package_flavor_selections
 
     testonly = true
-  }
-
-  group("web_runner") {
-    visibility += [ "*" ]
-    deps = [
-      ":web_runner_config",
-      ":web_runner_pkg",
-    ]
-  }
-
-  generate_fuchsia_web_package_flavors("web_runner") {
-    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
-
-    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/runners/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
-  }
-
-  generate_config("web_runner") {
-    for_pkg = "appmgr"
-    sources = [ "//src/chromium/config/http_scheme_map.config" ]
-    outputs = [ "scheme_map/http.config" ]
   }
 }
 
@@ -330,9 +305,16 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
+      disabled_tests = [
+        # TODO(fxbug.dev/90466): Remove this once the prebuilt from chromium
+        # without this test has rolled into fuchsia
+        {
+          component_name = "web_runner_integration_tests.cm"
+          package = "web_runner_integration_tests"
+        },
+      ]
       deps = [
         ":web_engine",
-        ":web_runner",
 
         # web_engine_integration_tests needs the following packages (it's a
         # non-hermetic test), which aren't otherwise included.

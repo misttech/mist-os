@@ -93,10 +93,7 @@ legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
 
 # These were previously included in "//sdk/bundles:tools".
 # TODO(fxbug.dev/119075): Remove these.
-legacy_cache_package_labels += [
-  "//src/chromium:web_engine",
-  "//src/chromium:web_runner",
-]
+legacy_cache_package_labels += [ "//src/chromium:web_engine" ]
 
 core_realm_shards += [
   "//src/media/codec:codec_factory_shard",
