@@ -214,8 +214,15 @@ type EndpointSetup = struct {
 closed protocol SetupHandle {};
 
 /// Main entry point to manage virtual networks and endpoints.
+///
+/// Every new connection to NetworkContext provides access to a an isolated
+/// namespace for networks and endpoints. `Clone` is the only means by which a
+/// client can acquire a new connection to the same network context.
 @discoverable
 closed protocol NetworkContext {
+    strict Clone(resource struct {
+        network_context server_end:NetworkContext;
+    });
     strict GetNetworkManager(resource struct {
         net_manager server_end:NetworkManager;
     });

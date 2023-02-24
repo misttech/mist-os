@@ -55,6 +55,10 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     svc_loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_OK(svc_loop_->StartThread("testloop"));
     svc_ = std::make_unique<NetworkContext>(svc_loop_->dispatcher());
+    // Always install bindings in the service dispatcher thread.
+    async::PostTask(svc_loop_->dispatcher(), [this, req = network_context_.NewRequest()]() mutable {
+      svc_->GetHandler()(std::move(req));
+    });
 
     svc_->SetNetworkTunHandler([this](fidl::InterfaceRequest<fuchsia::net::tun::Control> req) {
       real_services_->Connect(std::move(req));
@@ -62,15 +66,11 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   }
 
   void GetNetworkManager(fidl::InterfaceRequest<FNetworkManager> nm) {
-    fidl::InterfacePtr<FNetworkContext> netc;
-    GetNetworkContext(netc.NewRequest());
-    netc->GetNetworkManager(std::move(nm));
+    network_context_->GetNetworkManager(std::move(nm));
   }
 
   void GetEndpointManager(fidl::InterfaceRequest<FEndpointManager> epm) {
-    fidl::InterfacePtr<FNetworkContext> netc;
-    GetNetworkContext(netc.NewRequest());
-    netc->GetEndpointManager(std::move(epm));
+    network_context_->GetEndpointManager(std::move(epm));
   }
 
   static Endpoint::Config GetDefaultEndpointConfig() {
@@ -81,18 +81,14 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
 
   void GetServices(fidl::InterfaceRequest<FNetworkManager> nm,
                    fidl::InterfaceRequest<FEndpointManager> epm) {
-    fidl::InterfacePtr<FNetworkContext> netc;
-    GetNetworkContext(netc.NewRequest());
-    netc->GetNetworkManager(std::move(nm));
-    netc->GetEndpointManager(std::move(epm));
+    network_context_->GetNetworkManager(std::move(nm));
+    network_context_->GetEndpointManager(std::move(epm));
   }
 
   void StartServices() { GetServices(net_manager_.NewRequest(), endp_manager_.NewRequest()); }
 
   void GetNetworkContext(fidl::InterfaceRequest<NetworkContext::FNetworkContext> req) {
-    // Always install bindings in the service dispatcher thread.
-    async::PostTask(svc_loop_->dispatcher(),
-                    [this, req = std::move(req)]() mutable { svc_->GetHandler()(std::move(req)); });
+    network_context_->Clone(std::move(req));
   }
 
   void CreateNetwork(const char* name, fidl::SynchronousInterfacePtr<FNetwork>* netout,
@@ -186,8 +182,6 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   void CreateSimpleNetwork(Network::Config config,
                            fidl::InterfaceHandle<NetworkContext::FSetupHandle>* setup_handle,
                            ClientWithAttachedPort* dev1, ClientWithAttachedPort* dev2) {
-    fidl::SynchronousInterfacePtr<FNetworkContext> context;
-    GetNetworkContext(context.NewRequest());
     zx_status_t status;
     std::vector<NetworkSetup> net_setup;
     auto& net1 = net_setup.emplace_back();
@@ -200,7 +194,7 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     ep2_setup.name = "ep2";
     ep2_setup.link_up = true;
 
-    ASSERT_OK(context->Setup(std::move(net_setup), &status, setup_handle));
+    ASSERT_OK(network_context_->Setup(std::move(net_setup), &status, setup_handle));
     ASSERT_OK(status);
     fidl::InterfaceHandle<Endpoint::FEndpoint> ep1_handle, ep2_handle;
     ASSERT_OK(endp_manager_->GetEndpoint("ep1", &ep1_handle));
@@ -238,13 +232,16 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   }
 
   void TearDown() override {
+    // Intentionally leak the `std::unique_ptr` to let the `NetworkContext`
+    // clean itself up when all clients' connections to it are closed.
+    [[maybe_unused]] auto ptr = svc_.release();
     svc_loop_ = nullptr;
-    svc_ = nullptr;
   }
 
   std::shared_ptr<sys::ServiceDirectory> real_services_;
   std::unique_ptr<async::Loop> svc_loop_;
   std::unique_ptr<NetworkContext> svc_;
+  fidl::SynchronousInterfacePtr<FNetworkContext> network_context_;
   fidl::SynchronousInterfacePtr<FNetworkManager> net_manager_;
   fidl::SynchronousInterfacePtr<FEndpointManager> endp_manager_;
 };

@@ -6,7 +6,7 @@ use {
     anyhow::{anyhow, Context as _},
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_logger as flogger,
     fidl_fuchsia_netemul::{
         self as fnetemul, ChildDef, ChildUses, ManagedRealmMarker, ManagedRealmRequest,
         RealmOptions, SandboxRequest, SandboxRequestStream,
@@ -162,7 +162,6 @@ impl<'a> UniqueCapability<'a> {
 async fn create_realm_instance(
     RealmOptions { name, children, .. }: RealmOptions,
     prefix: &str,
-    network_realm: Arc<RealmInstance>,
     devfs: Arc<SimpleMutableDir>,
     devfs_proxy: fio::DirectoryProxy,
 ) -> Result<RealmInstance, CreateRealmError> {
@@ -186,11 +185,15 @@ async fn create_realm_instance(
         .add_local_child(
             NETEMUL_SERVICES_COMPONENT_NAME,
             move |handles: LocalComponentHandles| {
-                Box::pin(run_netemul_services(
-                    handles,
-                    network_realm.clone(),
-                    Clone::clone(&devfs_proxy),
-                ))
+                let devfs_proxy = Clone::clone(&devfs_proxy);
+                Box::pin(async {
+                    let mut fs = ServiceFs::new();
+                    fs.add_remote(DEVFS, devfs_proxy)
+                        .serve_connection(handles.outgoing_dir)?
+                        .collect::<()>()
+                        .await;
+                    Ok(())
+                })
             },
             ChildOptions::new(),
         )
@@ -338,7 +341,7 @@ async fn create_realm_instance(
                                                 fnetemul_network::NetworkContextMarker,
                                             >(
                                             ))
-                                            .from(&netemul_services)
+                                            .from(Ref::parent())
                                             .to(&child_ref),
                                     )
                                     .await?;
@@ -786,32 +789,6 @@ async fn open_or_create_dir(
     Ok(root)
 }
 
-async fn run_netemul_services(
-    handles: LocalComponentHandles,
-    network_realm: impl std::ops::Deref<Target = RealmInstance> + 'static,
-    devfs: fio::DirectoryProxy,
-) -> Result {
-    let mut fs = ServiceFs::new();
-    let _: &mut ServiceFsDir<'_, _> = fs
-        .add_remote(DEVFS, devfs)
-        .dir("svc")
-        .add_service_at(fnetemul_network::NetworkContextMarker::PROTOCOL_NAME, |channel| {
-            Some(ServerEnd::<fnetemul_network::NetworkContextMarker>::new(channel))
-        });
-    let _: &mut ServiceFs<_> = fs.serve_connection(handles.outgoing_dir)?;
-    let () = fs
-        .for_each_concurrent(None, |server_end| {
-            futures::future::ready(
-                network_realm
-                    .root
-                    .connect_request_to_protocol_at_exposed_dir(server_end)
-                    .unwrap_or_else(|e| error!("failed to open protocol in directory: {:?}", e)),
-            )
-        })
-        .await;
-    Ok(())
-}
-
 fn make_devfs() -> Result<(fio::DirectoryProxy, Arc<SimpleMutableDir>)> {
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
         .context("create directory proxy")?;
@@ -825,89 +802,27 @@ fn make_devfs() -> Result<(fio::DirectoryProxy, Arc<SimpleMutableDir>)> {
     Ok((proxy, dir))
 }
 
-const NETWORK_CONTEXT_COMPONENT_NAME: &str = "network-context";
-
-async fn setup_network_realm(sandbox_name: impl std::fmt::Display) -> Result<RealmInstance> {
-    let relative_url = |component_name: &str| format!("#meta/{}.cm", component_name);
-    let network_context_package_url = relative_url(NETWORK_CONTEXT_COMPONENT_NAME);
-
-    let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().in_collection(REALM_COLLECTION_NAME.to_string()),
-    )
-    .await
-    .context("error creating new realm builder")?;
-    let network_context_child = builder
-        .add_child(NETWORK_CONTEXT_COMPONENT_NAME, network_context_package_url, ChildOptions::new())
-        .await
-        .context("error adding network-context component")?;
-    let () = builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fnetemul_network::NetworkContextMarker>())
-                .from(&network_context_child)
-                .to(Ref::parent()),
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "error adding route exposing capability '{}' from component '{}'",
-                fnetemul_network::NetworkContextMarker::PROTOCOL_NAME,
-                NETWORK_CONTEXT_COMPONENT_NAME
-            )
-        })?;
-    let () = builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fnet_tun::ControlMarker>())
-                .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                .from(Ref::parent())
-                .to(&network_context_child),
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "error adding route offering capabilities to component '{}'",
-                NETWORK_CONTEXT_COMPONENT_NAME
-            )
-        })?;
-    let instance = builder
-        .build_with_name(format!("{}-network-realm", sandbox_name))
-        .await
-        .context("error creating realm instance")?;
-    Ok(instance)
-}
-
 async fn handle_sandbox(
     stream: SandboxRequestStream,
     sandbox_name: impl std::fmt::Display,
 ) -> Result {
     let (tx, rx) = mpsc::channel(1);
     let realm_index = AtomicU64::new(0);
-    // TODO(https://fxbug.dev/74534): define only one instance of `network-context` and associated
-    // components, and do routing statically, once we no longer need `isolated-devmgr`.
-    let network_realm = Arc::new(
-        setup_network_realm(&sandbox_name).await.context("failed to setup network realm")?,
-    );
+    let network_context =
+        fuchsia_component::client::connect_to_protocol::<fnetemul_network::NetworkContextMarker>()
+            .context("connect to network context")?;
     let sandbox_fut = stream.err_into::<anyhow::Error>().try_for_each_concurrent(None, |request| {
         let mut tx = tx.clone();
         let sandbox_name = &sandbox_name;
         let realm_index = &realm_index;
-        let network_realm = &network_realm;
+        let network_context = &network_context;
         async move {
             match request {
                 SandboxRequest::CreateRealm { realm: server_end, options, control_handle: _ } => {
                     let index = realm_index.fetch_add(1, Ordering::SeqCst);
                     let prefix = format!("{}{}", sandbox_name, index);
                     let (proxy, devfs) = make_devfs().context("creating devfs")?;
-                    match create_realm_instance(
-                        options,
-                        &prefix,
-                        network_realm.clone(),
-                        devfs.clone(),
-                        proxy,
-                    )
-                    .await
-                    {
+                    match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
                         Ok(realm) => tx
                             .send(ManagedRealm { server_end, realm, devfs })
                             .await
@@ -920,12 +835,12 @@ async fn handle_sandbox(
                         }
                     }
                 }
-                SandboxRequest::GetNetworkContext { network_context, control_handle: _ } => {
-                    network_realm
-                        .root
-                        .connect_request_to_protocol_at_exposed_dir(network_context)
-                        .unwrap_or_else(|e| error!("error getting NetworkContext: {:?}", e))
-                }
+                SandboxRequest::GetNetworkContext {
+                    network_context: server_end,
+                    control_handle: _,
+                } => network_context
+                    .clone(server_end)
+                    .unwrap_or_else(|e| error!("error cloning NetworkContext: {:?}", e)),
             }
             Ok(())
         }
@@ -1431,6 +1346,15 @@ mod tests {
                 .await
                 .expect("calling create network");
             let () = zx::Status::ok(status).expect("network creation");
+            let (status, _network) = net_mgr1
+                .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
+                .await
+                .expect("calling create network");
+            assert_eq!(zx::Status::from_raw(status), zx::Status::ALREADY_EXISTS);
+            // Try re-connecting to the network manager for sandbox1 to ensure
+            // it connects us to the same network manager instead of spawning a
+            // new one.
+            let net_mgr1 = get_network_manager(&sandbox1);
             let (status, _network) = net_mgr1
                 .create_network("network", fnetemul_network::NetworkConfig::EMPTY)
                 .await

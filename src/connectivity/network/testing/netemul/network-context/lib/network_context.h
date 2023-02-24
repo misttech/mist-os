@@ -34,6 +34,7 @@ class NetworkContext : public fuchsia::netemul::network::NetworkContext {
 
   zx_status_t Setup(std::vector<NetworkSetup> setup, fidl::InterfaceRequest<FSetupHandle> req);
 
+  void Clone(::fidl::InterfaceRequest<FNetworkContext> network_context) override;
   void GetNetworkManager(
       ::fidl::InterfaceRequest<NetworkManager::FNetworkManager> net_manager) override;
   void GetEndpointManager(

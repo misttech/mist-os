@@ -8,6 +8,10 @@
     ],
     children: [
         {
+            name: "network-context",
+            url: "#meta/network-context.cm",
+        },
+        {
             name: "network-tun",
             url: "#meta/network-tun.cm",
         },
@@ -19,23 +23,38 @@
             durability: "transient",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.netemul.network.NetworkContext",
+            from: "#network-context",
+        },
+    ],
     offer: [
         {
-            protocol: [ "fuchsia.process.Launcher" ],
+            protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#netemul",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
                 "#netemul",
+                "#network-context",
                 "#network-tun",
             ],
         },
         {
-            protocol: [ "fuchsia.net.tun.Control" ],
+            protocol: "fuchsia.net.tun.Control",
             from: "#network-tun",
+            to: [
+                "#netemul",
+                "#network-context",
+            ],
+        },
+        {
+            protocol: "fuchsia.netemul.network.NetworkContext",
+            from: "#network-context",
             to: "#netemul",
         },
         {

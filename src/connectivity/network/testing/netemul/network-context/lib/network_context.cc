@@ -51,6 +51,9 @@ NetworkContext::NetworkContext(async_dispatcher_t* dispatcher)
     dispatcher = async_get_default_dispatcher();
   }
   dispatcher_ = dispatcher;
+
+  // Clean up the NetworkContext once all client connections are closed.
+  bindings_.set_empty_set_handler([this]() { delete this; });
 }
 
 NetworkContext::~NetworkContext() = default;
@@ -58,6 +61,10 @@ NetworkContext::~NetworkContext() = default;
 void NetworkContext::GetNetworkManager(
     ::fidl::InterfaceRequest<NetworkManager::FNetworkManager> net_manager) {
   network_manager_.Bind(std::move(net_manager));
+}
+
+void NetworkContext::Clone(::fidl::InterfaceRequest<FNetworkContext> network_context) {
+  bindings_.AddBinding(this, std::move(network_context));
 }
 
 void NetworkContext::GetEndpointManager(
