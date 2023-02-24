@@ -22,6 +22,8 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/bus/lib/virtio/trace.h"
+#include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "virtio_gpu.h"
 
 #define LOCAL_TRACE 0
@@ -144,6 +146,57 @@ zx_status_t GpuDevice::GetVmoAndStride(
   *pixel_size_out = ImageFormatStrideBytesPerWidthPixel(format_constraints.pixel_format);
   *row_bytes_out = minimum_row_bytes;
   *vmo_out = std::move(collection_info.buffers[index].vmo);
+  return ZX_OK;
+}
+
+zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
+                                                                   zx::channel collection_token) {
+  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+
+  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+
+  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
+      std::move(collection_server_endpoint));
+  if (!bind_result.ok()) {
+    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+           bind_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+
+  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
+  // we need to set null constraints in order not to block the sysmem Allocator.
+  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
+  // correctly implemented.
+  fidl::OneWayStatus status =
+      buffer_collections_.at(collection_id)->SetConstraints(/*has_constraints=*/false, {});
+  if (!status.ok()) {
+    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  buffer_collections_.erase(collection_id);
   return ZX_OK;
 }
 
@@ -619,6 +672,32 @@ zx_status_t GpuDevice::virtio_gpu_start() {
   return ZX_OK;
 }
 
+zx_status_t GpuDevice::InitSysmemAllocatorClient() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+  auto& [client, server] = endpoints.value();
+  auto connect_result = sysmem_->ConnectServer(std::move(server));
+  if (!connect_result.ok()) {
+    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
+           connect_result.status_string());
+    return connect_result.status();
+  }
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+
+  std::string debug_name =
+      fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
+      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t GpuDevice::Init() {
   LTRACE_ENTRY;
 
@@ -636,6 +715,13 @@ zx_status_t GpuDevice::Init() {
   }
 
   sysmem_ = fidl::WireSyncClient(std::move(endpoints->client));
+
+  status = InitSysmemAllocatorClient();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: Failed to create sysmem Allocator client: %s", tag(),
+           zx_status_get_string(status));
+    return status;
+  }
 
   DeviceReset();
 

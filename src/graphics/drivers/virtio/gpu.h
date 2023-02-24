@@ -62,12 +62,8 @@ class GpuDevice : public Device,
   }
 
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                          zx::channel collection_token);
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
 
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
@@ -107,6 +103,12 @@ class GpuDevice : public Device,
 
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
+  zx_status_t SetAndInitSysmemForTesting(
+      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem) {
+    sysmem_ = std::move(sysmem);
+    return InitSysmemAllocatorClient();
+  }
+
  private:
   // Internal routines
   template <typename RequestType, typename ResponseType>
@@ -123,6 +125,13 @@ class GpuDevice : public Device,
   zx_status_t transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height);
 
   zx_status_t virtio_gpu_start();
+
+  // Initializes the sysmem Allocator client used to import incoming buffer
+  // collection tokens.
+  //
+  // On success, returns ZX_OK and the sysmem allocator client will be open
+  // until the device is released.
+  zx_status_t InitSysmemAllocatorClient();
 
   thrd_t start_thread_ = {};
 
@@ -151,6 +160,13 @@ class GpuDevice : public Device,
 
   display_controller_interface_protocol_t dc_intf_ = {};
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+
+  // Imported sysmem buffer collections.
+  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+      buffer_collections_;
 
   struct imported_image* latest_fb_ = nullptr;
   struct imported_image* displayed_fb_ = nullptr;

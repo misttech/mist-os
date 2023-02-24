@@ -31,6 +31,7 @@ source_set("gpu_lib") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
+    "//src/lib/fsl",
     "//zircon/system/ulib/image-format",
   ]
 }
@@ -45,6 +46,7 @@ fuchsia_driver("virtio_gpu-driver") {
   deps = [
     ":gpu_lib",
     ":virtio_gpu_bind",
+    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
