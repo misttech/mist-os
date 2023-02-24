@@ -1,14 +1,13 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "stdio_impl.h"
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
-ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restrict f) {
-  char* tmp;
-  unsigned char* z;
+ssize_t getdelim(char **restrict s, size_t *restrict n, int delim, FILE *restrict f) {
+  char *tmp;
+  unsigned char *z;
   size_t k;
   size_t i = 0;
   int c;
@@ -16,6 +15,7 @@ ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restric
   FLOCK(f);
 
   if (!n || !s) {
+    f->mode |= f->mode - 1;
     f->flags |= F_ERR;
     FUNLOCK(f);
     errno = EINVAL;
@@ -26,11 +26,14 @@ ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restric
     *n = 0;
 
   for (;;) {
-    z = memchr(f->rpos, delim, f->rend - f->rpos);
-    k = z ? z - f->rpos + 1 : f->rend - f->rpos;
-    if (i + k + 1 >= *n) {
-      if (k >= SIZE_MAX / 2 - i)
-        goto oom;
+    if (f->rpos != f->rend) {
+      z = memchr(f->rpos, delim, f->rend - f->rpos);
+      k = z ? z - f->rpos + 1 : f->rend - f->rpos;
+    } else {
+      z = 0;
+      k = 0;
+    }
+    if (i + k >= *n) {
       size_t m = i + k + 2;
       if (!z && m < SIZE_MAX / 4)
         m += m / 2;
@@ -38,15 +41,27 @@ ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restric
       if (!tmp) {
         m = i + k + 2;
         tmp = realloc(*s, m);
-        if (!tmp)
-          goto oom;
+        if (!tmp) {
+          /* Copy as much as fits and ensure no
+           * pushback remains in the FILE buf. */
+          k = *n - i;
+          memcpy(*s + i, f->rpos, k);
+          f->rpos += k;
+          f->mode |= f->mode - 1;
+          f->flags |= F_ERR;
+          FUNLOCK(f);
+          errno = ENOMEM;
+          return -1;
+        }
       }
       *s = tmp;
       *n = m;
     }
-    memcpy(*s + i, f->rpos, k);
-    f->rpos += k;
-    i += k;
+    if (k) {
+      memcpy(*s + i, f->rpos, k);
+      f->rpos += k;
+      i += k;
+    }
     if (z)
       break;
     if ((c = getc_unlocked(f)) == EOF) {
@@ -56,7 +71,11 @@ ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restric
       }
       break;
     }
-    if (((*s)[i++] = c) == delim)
+    /* If the byte read by getc won't fit without growing the
+     * output buffer, push it back for next iteration. */
+    if (i + 1 >= *n)
+      *--f->rpos = c;
+    else if (((*s)[i++] = c) == delim)
       break;
   }
   (*s)[i] = 0;
@@ -64,11 +83,6 @@ ssize_t getdelim(char** restrict s, size_t* restrict n, int delim, FILE* restric
   FUNLOCK(f);
 
   return i;
-oom:
-  f->flags |= F_ERR;
-  FUNLOCK(f);
-  errno = ENOMEM;
-  return -1;
 }
 
 weak_alias(getdelim, __getdelim);
