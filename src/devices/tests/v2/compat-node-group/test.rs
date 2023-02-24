@@ -4,12 +4,11 @@
 
 use {
     anyhow::{anyhow, Error, Result},
+    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_compat_nodegroup_test as fcdt, fidl_fuchsia_driver_test as fdt,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
+    fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
@@ -44,7 +43,7 @@ async fn test_compat_nodegroup() -> Result<()> {
 
     // Create the RealmBuilder.
     let builder = RealmBuilder::new().await?;
-    builder.driver_test_realm_manifest_setup("#meta/realm.cm").await?;
+    builder.driver_test_realm_setup().await?;
     let waiter = builder
         .add_local_child(
             WAITER_NAME,
@@ -54,19 +53,12 @@ async fn test_compat_nodegroup() -> Result<()> {
             ChildOptions::new(),
         )
         .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fcdt::WaiterMarker>())
-                .from(&waiter)
-                .to(Ref::child(fuchsia_driver_test::COMPONENT_NAME)),
-        )
-        .await?;
+    builder.driver_test_realm_add_offer::<fcdt::WaiterMarker>((&waiter).into()).await?;
 
     let instance = builder.build().await?;
 
     let offers = vec![fdt::Offer {
-        protocol_name: "fuchsia.compat.nodegroup.test.Waiter".to_string(),
+        protocol_name: fcdt::WaiterMarker::PROTOCOL_NAME.to_string(),
         collection: fdt::Collection::BootDrivers,
     }];
 

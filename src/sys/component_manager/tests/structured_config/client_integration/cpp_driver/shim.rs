@@ -8,7 +8,7 @@ use {
     fidl_test_structuredconfig_receiver as scr, fidl_test_structuredconfig_receiver_shim as scrs,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, RealmBuilder, Ref, Route},
+    fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     futures::StreamExt,
     std::time::Duration,
@@ -48,19 +48,12 @@ async fn connect_to_config_service(
 async fn main() -> anyhow::Result<()> {
     // Create the RealmBuilder and start the driver.
     let builder = RealmBuilder::new().await?;
-    builder.driver_test_realm_manifest_setup("#meta/realm.cm").await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::service::<scrs::ConfigServiceMarker>())
-                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                .to(Ref::parent()),
-        )
-        .await?;
+    builder.driver_test_realm_setup().await?;
+    builder.driver_test_realm_add_expose::<scrs::ConfigServiceMarker>().await?;
     let realm = builder.build().await?;
 
     let exposes = vec![fdt::Expose {
-        service_name: "test.structuredconfig.receiver.shim.ConfigService".to_string(),
+        service_name: scrs::ConfigServiceMarker::SERVICE_NAME.to_string(),
         collection: fdt::Collection::PackageDrivers,
     }];
 

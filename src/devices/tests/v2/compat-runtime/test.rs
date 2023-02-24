@@ -4,10 +4,10 @@
 
 use {
     anyhow::Result,
-    fidl::endpoints::Proxy,
+    fidl::endpoints::{DiscoverableProtocolMarker, Proxy},
     fidl_fuchsia_compat_runtime_test as ft, fidl_fuchsia_driver_test as fdt,
     fuchsia_async as fasync,
-    fuchsia_component_test::RealmBuilder,
+    fuchsia_component_test::{RealmBuilder, Ref},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
 };
 
@@ -15,11 +15,12 @@ use {
 async fn test_compat_runtime() -> Result<()> {
     // Create the RealmBuilder.
     let builder = RealmBuilder::new().await?;
-    builder.driver_test_realm_manifest_setup("#meta/realm.cm").await?;
+    builder.driver_test_realm_setup().await?;
+    builder.driver_test_realm_add_offer::<ft::WaiterMarker>(Ref::parent()).await?;
     let instance = builder.build().await?;
 
     let offers = vec![fdt::Offer {
-        protocol_name: "fuchsia.compat.runtime.test.Waiter".to_string(),
+        protocol_name: ft::WaiterMarker::PROTOCOL_NAME.to_string(),
         collection: fdt::Collection::BootDrivers,
     }];
 

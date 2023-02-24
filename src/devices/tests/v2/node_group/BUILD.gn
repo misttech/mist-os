@@ -84,6 +84,7 @@ rustc_test("bin") {
     ":fuchsia.nodegroup.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
@@ -91,19 +92,6 @@ rustc_test("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
-}
-
-cmc_merge("realm.cml") {
-  sources = [
-    "//sdk/lib/driver_test_realm/meta/driver_test_realm.cml",
-    "meta/realm.shard.cml",
-  ]
-}
-
-fuchsia_test_component("realm") {
-  manifest = "${target_out_dir}/realm.cml"
-  manifest_deps = [ ":realm.cml" ]
-  deps = [ "//sdk/lib/driver_test_realm:bin" ]
 }
 
 fuchsia_unittest_package("nodegroup_test") {
@@ -115,8 +103,8 @@ fuchsia_unittest_package("nodegroup_test") {
   deps = [
     ":bin",
     ":leaf",
-    ":realm",
     ":root",
+    "//sdk/lib/driver_test_realm:driver_test_realm_component",
     "//src/devices/bin/driver_host2:component",
   ]
 }
