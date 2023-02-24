@@ -6,7 +6,6 @@
 //! agent.
 
 use crate::base::{SettingInfo, SettingType};
-use crate::policy::{PolicyInfo, PolicyType};
 use fuchsia_trace as ftrace;
 use settings_storage::UpdateState;
 
@@ -29,7 +28,6 @@ pub enum StorageRequest {
 #[derive(Clone, PartialEq, Debug)]
 pub enum StorageType {
     SettingType(SettingType),
-    PolicyType(PolicyType),
 }
 
 impl From<SettingType> for StorageType {
@@ -38,27 +36,14 @@ impl From<SettingType> for StorageType {
     }
 }
 
-impl From<PolicyType> for StorageType {
-    fn from(policy_data_type: PolicyType) -> Self {
-        StorageType::PolicyType(policy_data_type)
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum StorageInfo {
     SettingInfo(SettingInfo),
-    PolicyInfo(PolicyInfo),
 }
 
 impl From<SettingInfo> for StorageInfo {
     fn from(setting_info: SettingInfo) -> Self {
         StorageInfo::SettingInfo(setting_info)
-    }
-}
-
-impl From<PolicyInfo> for StorageInfo {
-    fn from(policy_info: PolicyInfo) -> Self {
-        StorageInfo::PolicyInfo(policy_info)
     }
 }
 

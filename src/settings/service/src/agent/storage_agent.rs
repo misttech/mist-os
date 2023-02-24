@@ -30,8 +30,6 @@ use crate::message::base::{MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::night_mode::types::NightModeInfo;
 use crate::payload_convert;
-use crate::policy;
-use crate::policy::{PolicyInfo, PolicyType};
 use crate::privacy::types::PrivacyInfo;
 use crate::service::{self, Address};
 use crate::setup::types::SetupInfo;
@@ -166,7 +164,6 @@ macro_rules! into_storage_info {
 
 #[cfg(test)]
 into_storage_info!(UnknownInfo => SettingInfo);
-into_storage_info!(policy::UnknownInfo => PolicyInfo);
 into_storage_info!(AccessibilityInfo => SettingInfo);
 into_storage_info!(AudioInfo => SettingInfo);
 into_storage_info!(DisplayInfo => SettingInfo);
@@ -301,9 +298,6 @@ where
                     SettingType::Setup => self.read::<SetupInfo>(id, responder).await,
                 }
             }
-            StorageRequest::Read(StorageType::PolicyType(policy_type), id) => match policy_type {
-                PolicyType::Unknown => self.read::<policy::UnknownInfo>(id, responder).await,
-            },
             StorageRequest::Write(StorageInfo::SettingInfo(setting_info), id) => match setting_info
             {
                 #[cfg(test)]
@@ -326,9 +320,6 @@ where
                 SettingInfo::NightMode(info) => self.write(info, responder).await,
                 SettingInfo::Privacy(info) => self.write(info, responder).await,
                 SettingInfo::Setup(info) => self.write(info, responder).await,
-            },
-            StorageRequest::Write(StorageInfo::PolicyInfo(policy_info), _id) => match policy_info {
-                PolicyInfo::Unknown(info) => self.write(info, responder).await,
             },
         }
     }
