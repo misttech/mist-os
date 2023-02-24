@@ -42,8 +42,8 @@ def _fuchsia_virtual_device_impl(ctx):
                     "pointing_device": "touch",
                 },
                 "window_size": {
-                    "height": 800,
-                    "width": 1280,
+                    "height": ctx.attr.window_height_px,
+                    "width": ctx.attr.window_width_px,
                     "units": "pixels",
                 },
                 "memory": {
@@ -91,6 +91,14 @@ fuchsia_virtual_device = rule(
             doc = "The architecture of the cpu",
             values = [ARCH.X64, ARCH.ARM64],
             mandatory = True,
+        ),
+        "window_width_px": attr.int(
+            doc = "Width of the virtual device's screen, in pixels",
+            default = 1200,
+        ),
+        "window_height_px": attr.int(
+            doc = "Height of the virtual device's screen, in pixels",
+            default = 800,
         ),
         "_start_up_args_template": attr.label(
             allow_single_file = True,
