@@ -4,6 +4,9 @@
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/defer.h>
 
 #include <zxtest/zxtest.h>
@@ -11,7 +14,10 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/v2/node.h"
 
-namespace fdf = fuchsia_driver_framework;
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 namespace fdi = fuchsia_driver_index;
 
 class FakeCompositeNodeSpec : public CompositeNodeSpec {
@@ -256,44 +262,33 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
                 .status_value());
 }
 
-TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
+TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
   fidl::Arena allocator;
 
   // Add the first composite node spec.
-  fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
-  auto prop_vals_1 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 1);
-  prop_vals_1[0] = fdf::wire::NodePropertyValue::WithIntValue(10);
-  bind_rules_1[0] = fdf::wire::BindRule{
-      .key = fdf::wire::NodePropertyKey::WithIntValue(1),
-      .condition = fdf::wire::Condition::kAccept,
-      .values = prop_vals_1,
+  auto bind_rules_1 = std::vector{
+      fdf::MakeAcceptBindRule(1, 10),
+  };
+  auto props_1 = std::vector{
+      fdf::MakeProperty(30, 1),
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
-  props_1[0] = fdf::wire::NodeProperty{.key = fdf::wire::NodePropertyKey::WithIntValue(30),
-                                       .value = fdf::wire::NodePropertyValue::WithIntValue(1)};
-
-  fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
-  auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
-  prop_vals_2[0] = fdf::wire::NodePropertyValue::WithIntValue(10);
-  bind_rules_2[0] = fdf::wire::BindRule{
-      .key = fdf::wire::NodePropertyKey::WithIntValue(1),
-      .condition = fdf::wire::Condition::kAccept,
-      .values = prop_vals_2,
+  auto bind_rules_2 = std::vector{
+      fdf::MakeAcceptBindRule(5, 10),
+  };
+  auto props_2 = std::vector{
+      fdf::MakeProperty(20, 10),
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
-  props_2[0] = fdf::wire::NodeProperty{.key = fdf::wire::NodePropertyKey::WithIntValue(20),
-                                       .value = fdf::wire::NodePropertyValue::WithIntValue(10)};
-
-  fidl::VectorView<fdf::wire::ParentSpec> parents_1(allocator, 2);
-  parents_1[0] = fdf::wire::ParentSpec{
-      .bind_rules = bind_rules_1,
-      .properties = props_1,
-  };
-  parents_1[1] = fdf::wire::ParentSpec{
-      .bind_rules = bind_rules_2,
-      .properties = props_2,
+  auto parent_specs_1 = std::vector{
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_1,
+          .properties = props_1,
+      }},
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_2,
+          .properties = props_2,
+      }},
   };
 
   auto spec_name_1 = "test_name";
@@ -304,21 +299,22 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
       {.composite = matched_info_1, .node_names = {{"node-0", "node-1"}}}};
 
   bridge_.AddSpecMatch(spec_name_1, match_1);
-  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                          .name(fidl::StringView(allocator, spec_name_1))
-                          .parents(std::move(parents_1))
-                          .Build())
-                  .is_ok());
+
+  auto composite_node_spec_1 = fdf::CompositeNodeSpec{{
+      .name = spec_name_1,
+      .parents = parent_specs_1,
+  }};
+  ASSERT_TRUE(AddSpec(fidl::ToWire(allocator, composite_node_spec_1)).is_ok());
   ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs().size());
 
   // Add a second composite node spec with a node that's the same as one in the first composite node
   // spec.
-  fidl::VectorView<fdf::wire::ParentSpec> parents_2(allocator, 1);
-  parents_2[0] = fdf::wire::ParentSpec{
-      .bind_rules = bind_rules_2,
-      .properties = props_2,
+  auto parent_specs_2 = std::vector{
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_2,
+          .properties = props_2,
+      }},
   };
-
   auto spec_name_2 = "test_name2";
   auto matched_info_2 = fdi::MatchedCompositeInfo{{
       .composite_name = "grosbeak",
@@ -327,11 +323,12 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
       {.composite = matched_info_2, .node_names = {{"node-0"}}}};
 
   bridge_.AddSpecMatch(spec_name_2, match_2);
-  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                          .name(fidl::StringView(allocator, spec_name_2))
-                          .parents(std::move(parents_2))
-                          .Build())
-                  .is_ok());
+
+  auto composite_node_spec_2 = fdf::CompositeNodeSpec{{
+      .name = spec_name_2,
+      .parents = parent_specs_2,
+  }};
+  ASSERT_TRUE(AddSpec(fidl::ToWire(allocator, composite_node_spec_2)).is_ok());
   ASSERT_EQ(1, composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs().size());
 
   // Bind the node that's in both device specs(). The node should only bind to one
@@ -355,13 +352,108 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
   }});
 
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
-                                                         std::weak_ptr<dfv2::Node>()));
+                                                         std::weak_ptr<dfv2::Node>(), false));
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 
   // Bind the node again. Both composite node specs should now have the bound node.
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
-                                                         std::weak_ptr<dfv2::Node>()));
+                                                         std::weak_ptr<dfv2::Node>(), false));
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
+}
+
+TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
+  fidl::Arena allocator;
+
+  // Add the first composite node spec.
+  auto bind_rules_1 = std::vector{
+      fdf::MakeAcceptBindRule(1, 10),
+  };
+  auto props_1 = std::vector{
+      fdf::MakeProperty(30, 1),
+  };
+
+  auto bind_rules_2 = std::vector{
+      fdf::MakeAcceptBindRule(5, 10),
+  };
+  auto props_2 = std::vector{
+      fdf::MakeProperty(20, 10),
+  };
+
+  auto parent_specs_1 = std::vector{
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_1,
+          .properties = props_1,
+      }},
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_2,
+          .properties = props_2,
+      }},
+  };
+
+  auto spec_name_1 = "test_name";
+  auto matched_info_1 = fdi::MatchedCompositeInfo{{
+      .composite_name = "waxwing",
+  }};
+  fdi::MatchedCompositeNodeSpecInfo match_1{
+      {.composite = matched_info_1, .node_names = {{"node-0", "node-1"}}}};
+
+  bridge_.AddSpecMatch(spec_name_1, match_1);
+
+  auto composite_node_spec_1 = fdf::CompositeNodeSpec{{
+      .name = spec_name_1,
+      .parents = parent_specs_1,
+  }};
+  ASSERT_TRUE(AddSpec(fidl::ToWire(allocator, composite_node_spec_1)).is_ok());
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs().size());
+
+  // Add a second composite node spec with a node that's the same as one in the first composite node
+  // spec.
+  auto parent_specs_2 = std::vector{
+      fdf::ParentSpec{{
+          .bind_rules = bind_rules_2,
+          .properties = props_2,
+      }},
+  };
+
+  auto spec_name_2 = "test_name2";
+  auto matched_info_2 = fdi::MatchedCompositeInfo{{
+      .composite_name = "grosbeak",
+  }};
+  fdi::MatchedCompositeNodeSpecInfo match_2{
+      {.composite = matched_info_2, .node_names = {{"node-0"}}}};
+
+  bridge_.AddSpecMatch(spec_name_2, match_2);
+
+  auto composite_node_spec_2 = fdf::CompositeNodeSpec{{
+      .name = spec_name_2,
+      .parents = parent_specs_2,
+  }};
+  ASSERT_TRUE(AddSpec(fidl::ToWire(allocator, composite_node_spec_2)).is_ok());
+  ASSERT_EQ(1, composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs().size());
+
+  // Bind the node that's in both specs. The node should bind to both.
+  auto matched_node = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
+  }};
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
+      .name = spec_name_1,
+      .node_index = 1,
+      .composite = matched_info_1,
+      .num_nodes = 2,
+      .node_names = {{"node-0", "node-1"}},
+  }});
+  matched_node.specs()->push_back(fdi::MatchedCompositeNodeSpecInfo{{
+      .name = spec_name_2,
+      .node_index = 0,
+      .composite = matched_info_2,
+      .num_nodes = 1,
+      .node_names = {{"node-0"}},
+  }});
+
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
+                                                         std::weak_ptr<dfv2::Node>(), true));
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 }
