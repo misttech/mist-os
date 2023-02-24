@@ -142,6 +142,20 @@ impl<T> Strong<T> {
         Weak(alloc::sync::Arc::downgrade(arc))
     }
 
+    /// Returns true if the inner value has since been killed.
+    pub fn killed(Self(arc): &Self) -> bool {
+        let Inner { killed, data: _ } = arc.as_ref();
+        // `Ordering::Acquire` because we want to synchronize with with the
+        // `Ordering::Release` write to `killed` so that all memory writes
+        // before the reference was killed is visible here.
+        killed.load(Ordering::Acquire)
+    }
+
+    /// Returns true if the two pointers point to the same allocation.
+    pub fn weak_ptr_eq(Self(this): &Self, Weak(other): &Weak<T>) -> bool {
+        core::ptr::eq(alloc::sync::Arc::as_ptr(this), other.as_ptr())
+    }
+
     /// Returns true if the two pointers point to the same allocation.
     pub fn ptr_eq(Self(this): &Self, Self(other): &Self) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)

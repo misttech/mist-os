@@ -936,6 +936,14 @@ impl<A: ScopeableAddress + SpecifiedAddress, Z> ZonedAddr<A, Z> {
             ZonedAddr::Zoned(addr_and_zone) => addr_and_zone.specified_addr(),
         }
     }
+
+    /// Translates the zone identifier using the provided function.
+    pub fn map_zone<Y>(self, f: impl FnOnce(Z) -> Y) -> ZonedAddr<A, Y> {
+        match self {
+            ZonedAddr::Unzoned(u) => ZonedAddr::Unzoned(u),
+            ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(f)),
+        }
+    }
 }
 
 impl<A, Z> From<SpecifiedAddr<A>> for ZonedAddr<A, Z> {

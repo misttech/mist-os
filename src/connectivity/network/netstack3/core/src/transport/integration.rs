@@ -10,7 +10,7 @@ use crate::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
         udp,
     },
-    DeviceId, NonSyncContext, SyncCtx,
+    NonSyncContext, SyncCtx,
 };
 
 impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
@@ -23,7 +23,7 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
         F: FnOnce(
             &mut Self,
             &IsnGenerator<C::Instant>,
-            &mut tcp::socket::Sockets<Ipv4, Self::DeviceId, C>,
+            &mut tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>,
         ) -> O,
     >(
         &mut self,
@@ -34,7 +34,7 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
         cb(&mut s, isn_generator, &mut sockets.lock())
     }
 
-    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv4, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>) -> O>(
         &self,
         cb: F,
     ) -> O {
@@ -53,7 +53,7 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
         F: FnOnce(
             &mut Self,
             &IsnGenerator<C::Instant>,
-            &mut tcp::socket::Sockets<Ipv6, Self::DeviceId, C>,
+            &mut tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>,
         ) -> O,
     >(
         &mut self,
@@ -64,7 +64,7 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
         cb(&mut s, isn_generator, &mut sockets.lock())
     }
 
-    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv6, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>) -> O>(
         &self,
         cb: F,
     ) -> O {
@@ -78,7 +78,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv4, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
@@ -88,7 +88,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv4, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
@@ -106,7 +106,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv6, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
@@ -116,7 +116,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv6, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,

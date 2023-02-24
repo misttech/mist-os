@@ -240,7 +240,9 @@ mod tests {
         },
         device::FrameDestination,
         ip::{
-            device::Ipv6DeviceTimerId, receive_ipv6_packet, testutil::FakeDeviceId,
+            device::Ipv6DeviceTimerId,
+            receive_ipv6_packet,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
             IPV6_DEFAULT_SUBNET,
         },
         testutil::{
@@ -253,6 +255,13 @@ mod tests {
     #[derive(Default)]
     struct FakeIpv6RouteDiscoveryContext {
         state: Ipv6RouteDiscoveryState,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeIpv6RouteDiscoveryContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+            &self.ip_device_id_ctx
+        }
     }
 
     type FakeCtxImpl = FakeSyncCtx<FakeIpv6RouteDiscoveryContext, (), FakeDeviceId>;
@@ -269,7 +278,7 @@ mod tests {
             &FakeDeviceId: &Self::DeviceId,
             cb: F,
         ) {
-            let FakeIpv6RouteDiscoveryContext { state } = self.get_mut();
+            let FakeIpv6RouteDiscoveryContext { state, ip_device_id_ctx: _ } = self.get_mut();
             cb(state)
         }
     }

@@ -436,7 +436,7 @@ mod tests {
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, QueryReceivedGenericAction,
             },
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
@@ -452,6 +452,7 @@ mod tests {
         groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
     }
 
     impl Default for FakeMldCtx {
@@ -460,7 +461,14 @@ mod tests {
                 groups: MulticastGroupSet::default(),
                 mld_enabled: true,
                 ipv6_link_local: None,
+                ip_device_id_ctx: Default::default(),
             }
+        }
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeMldCtx {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+            &self.ip_device_id_ctx
         }
     }
 
@@ -496,7 +504,8 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, mld_enabled, ipv6_link_local: _ } = self.get_mut();
+            let FakeMldCtx { groups, mld_enabled, ipv6_link_local: _, ip_device_id_ctx: _ } =
+                self.get_mut();
             cb(GmpState { enabled: *mld_enabled, groups })
         }
     }

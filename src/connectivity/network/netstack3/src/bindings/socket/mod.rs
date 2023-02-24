@@ -493,9 +493,10 @@ impl IntoErrno for ConnectListenerError {
 impl IntoErrno for SetMulticastMembershipError {
     fn into_errno(self) -> Errno {
         match self {
-            Self::AddressNotAvailable | Self::NoDeviceWithAddress | Self::NoDeviceAvailable => {
-                Errno::Enodev
-            }
+            Self::AddressNotAvailable
+            | Self::DeviceDoesNotExist
+            | Self::NoDeviceWithAddress
+            | Self::NoDeviceAvailable => Errno::Enodev,
             Self::NoMembershipChange => Errno::Eaddrinuse,
             Self::WrongDevice => Errno::Einval,
         }

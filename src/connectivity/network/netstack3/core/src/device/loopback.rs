@@ -46,6 +46,12 @@ impl<I: Instant> PartialEq for LoopbackWeakDeviceId<I> {
     }
 }
 
+impl<I: Instant> PartialEq<LoopbackDeviceId<I>> for LoopbackWeakDeviceId<I> {
+    fn eq(&self, other: &LoopbackDeviceId<I>) -> bool {
+        <LoopbackDeviceId<I> as PartialEq<LoopbackWeakDeviceId<I>>>::eq(other, self)
+    }
+}
+
 impl<I: Instant> Eq for LoopbackWeakDeviceId<I> {}
 
 #[derive(Derivative)]
@@ -58,6 +64,13 @@ impl<I: Instant> PartialEq for LoopbackDeviceId<I> {
     fn eq(&self, LoopbackDeviceId(other): &LoopbackDeviceId<I>) -> bool {
         let LoopbackDeviceId(me) = self;
         StrongRc::ptr_eq(me, other)
+    }
+}
+
+impl<I: Instant> PartialEq<LoopbackWeakDeviceId<I>> for LoopbackDeviceId<I> {
+    fn eq(&self, LoopbackWeakDeviceId(other): &LoopbackWeakDeviceId<I>) -> bool {
+        let LoopbackDeviceId(me) = self;
+        StrongRc::weak_ptr_eq(me, other)
     }
 }
 

@@ -30,7 +30,7 @@ use net_types::{
 };
 use net_types::{SpecifiedAddr, Witness};
 use netstack3_core::{
-    device::DeviceId,
+    device::{DeviceId, WeakDeviceId},
     error::{ExistsError, NetstackError, NotFoundError},
     ip::{
         forwarding::AddRouteError,
@@ -877,6 +877,39 @@ impl TryIntoFidlWithContext<NonZeroU64> for DeviceId<StackTime> {
         ctx: &C,
     ) -> Result<NonZeroU64, DeviceNotFoundError> {
         ctx.get_binding_id(self).and_then(NonZeroU64::new).ok_or(DeviceNotFoundError)
+    }
+}
+
+impl TryIntoFidlWithContext<Never> for WeakDeviceId<StackTime> {
+    type Error = DeviceNotFoundError;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<Never, Self::Error> {
+        Err(DeviceNotFoundError)
+    }
+}
+
+impl TryIntoFidlWithContext<u64> for WeakDeviceId<StackTime> {
+    type Error = DeviceNotFoundError;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<u64, DeviceNotFoundError> {
+        self.upgrade().and_then(|d| ctx.get_binding_id(d)).ok_or(DeviceNotFoundError)
+    }
+}
+
+impl TryIntoFidlWithContext<NonZeroU64> for WeakDeviceId<StackTime> {
+    type Error = DeviceNotFoundError;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<NonZeroU64, DeviceNotFoundError> {
+        self.upgrade()
+            .and_then(|d| ctx.get_binding_id(d))
+            .and_then(NonZeroU64::new)
+            .ok_or(DeviceNotFoundError)
     }
 }
 

@@ -61,19 +61,20 @@ impl<A: SocketMapAddrSpec> From<ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::Rem
     }
 }
 
-impl<A: SocketMapAddrSpec> From<ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>>
+impl<A: SocketMapAddrSpec> From<ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>>
     for AddrVec<A>
 {
-    fn from(listener: ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>) -> Self {
+    fn from(listener: ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>) -> Self {
         AddrVec::Listen(listener)
     }
 }
 
 impl<A: SocketMapAddrSpec>
-    From<ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>> for AddrVec<A>
+    From<ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>>
+    for AddrVec<A>
 {
     fn from(
-        conn: ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        conn: ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
     ) -> Self {
         AddrVec::Conn(conn)
     }
@@ -90,7 +91,7 @@ impl<A: SocketMapAddrSpec> Iterator for PosixAddrVecIter<A> {
 }
 
 impl<A: SocketMapAddrSpec> PosixAddrVecIter<A> {
-    pub(crate) fn with_device(addr: impl Into<IpAddrVec<A>>, device: A::DeviceId) -> Self {
+    pub(crate) fn with_device(addr: impl Into<IpAddrVec<A>>, device: A::WeakDeviceId) -> Self {
         Self(AddrVecIter::with_device(addr.into(), device))
     }
 }
@@ -327,7 +328,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        ip::{testutil::FakeDeviceId, IpExt},
+        ip::{
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            IpExt,
+        },
         socket::{BoundSocketMap, InsertError},
     };
 
@@ -374,7 +378,7 @@ mod tests {
         type IpAddr = I::Addr;
         type RemoteIdentifier = NonZeroU16;
         type LocalIdentifier = NonZeroU16;
-        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
     }
 
     impl<I: Ip> PosixSocketStateSpec for TransportSocketPosixSpec<I> {
@@ -411,7 +415,7 @@ mod tests {
     fn listen_device<I: Ip + IpExt>(
         ip: I::Addr,
         port: u16,
-        device: FakeDeviceId,
+        device: FakeWeakDeviceId<FakeDeviceId>,
     ) -> AddrVec<TransportSocketPosixSpec<I>> {
         let addr = SpecifiedAddr::new(ip);
         let port = NonZeroU16::new(port).expect("port must be nonzero");
@@ -478,20 +482,20 @@ mod tests {
         (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
             Err(InsertError::ShadowAddrExists); "conn_shadows_listener_reuse_port_exclusive")]
     #[test_case([
-        (listen_device(ip_v4!("1.1.1.1"), 1, FakeDeviceId), PosixSharingOptions::Exclusive),
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
         (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
             Err(InsertError::IndirectConflict); "conn_indirect_conflict_specific_listener")]
     #[test_case([
-        (listen_device(ip_v4!("0.0.0.0"), 1, FakeDeviceId), PosixSharingOptions::Exclusive),
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
         (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
             Err(InsertError::IndirectConflict); "conn_indirect_conflict_any_listener")]
     #[test_case([
         (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
-        (listen_device(ip_v4!("1.1.1.1"), 1, FakeDeviceId), PosixSharingOptions::Exclusive)],
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
             Err(InsertError::IndirectConflict); "specific_listener_indirect_conflict_conn")]
     #[test_case([
         (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
-        (listen_device(ip_v4!("0.0.0.0"), 1, FakeDeviceId), PosixSharingOptions::Exclusive)],
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
             Err(InsertError::IndirectConflict); "any_listener_indirect_conflict_conn")]
     fn bind_sequence<
         C: IntoIterator<Item = (AddrVec<TransportSocketPosixSpec<Ipv4>>, PosixSharingOptions)>,

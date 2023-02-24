@@ -55,14 +55,15 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
+    device::{DeviceId, WeakDeviceId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         socket::{
             BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
             IpSockCreationError, IpSocketHandler as _, Mms,
         },
-        BufferTransportIpContext, IpDeviceId, IpDeviceIdContext, IpExt, IpLayerIpExt,
-        TransportIpContext as _,
+        BufferTransportIpContext, EitherDeviceId, IpDeviceId, IpDeviceIdContext, IpExt,
+        IpLayerIpExt, TransportIpContext as _, WeakIpDeviceId,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -76,7 +77,7 @@ use crate::{
         state::{CloseError, Closed, Initial, State, Takeable},
         BufferSizes, Mss, SocketOptions,
     },
-    DeviceId, Instant, SyncCtx,
+    Instant, SyncCtx,
 };
 
 /// Timer ID for TCP connections.
@@ -147,8 +148,13 @@ pub trait NonSyncContext: TimerContext<TimerId> {
 pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     IpDeviceIdContext<I>
 {
-    type IpTransportCtx: BufferTransportIpContext<I, C, Buf<Vec<u8>>, DeviceId = Self::DeviceId>
-        + DeviceIpSocketHandler<I, C>;
+    type IpTransportCtx: BufferTransportIpContext<
+            I,
+            C,
+            Buf<Vec<u8>>,
+            DeviceId = Self::DeviceId,
+            WeakDeviceId = Self::WeakDeviceId,
+        > + DeviceIpSocketHandler<I, C>;
 
     /// Calls the function with a `Self::IpTransportCtx`, immutable reference to
     /// an initial sequence number generator and a mutable reference to TCP
@@ -158,7 +164,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
         F: FnOnce(
             &mut Self::IpTransportCtx,
             &IsnGenerator<C::Instant>,
-            &mut Sockets<I, Self::DeviceId, C>,
+            &mut Sockets<I, Self::WeakDeviceId, C>,
         ) -> O,
     >(
         &mut self,
@@ -169,7 +175,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     /// to TCP socket state.
     fn with_ip_transport_ctx_and_tcp_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpTransportCtx, &mut Sockets<I, Self::DeviceId, C>) -> O,
+        F: FnOnce(&mut Self::IpTransportCtx, &mut Sockets<I, Self::WeakDeviceId, C>) -> O,
     >(
         &mut self,
         cb: F,
@@ -180,7 +186,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     }
 
     /// Calls the function with a mutable reference to TCP socket state.
-    fn with_tcp_sockets_mut<O, F: FnOnce(&mut Sockets<I, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets_mut<O, F: FnOnce(&mut Sockets<I, Self::WeakDeviceId, C>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -190,7 +196,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     }
 
     /// Calls the function with an immutable reference to TCP socket state.
-    fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, Self::DeviceId, C>) -> O>(&self, cb: F) -> O;
+    fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, Self::WeakDeviceId, C>) -> O>(&self, cb: F) -> O;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -382,7 +388,7 @@ impl<I: Ip> SocketMapAddrStateSpec for ListenerAddrState<I> {
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
     SocketMapUpdateSharingPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
@@ -589,7 +595,7 @@ impl Default for SharingState {
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
@@ -645,7 +651,7 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
         SharingState,
@@ -752,13 +758,13 @@ struct Unbound<D> {
 }
 
 /// Holds all the TCP socket states.
-pub(crate) struct Sockets<I: IpExt, D: IpDeviceId, C: NonSyncContext> {
+pub(crate) struct Sockets<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> {
     port_alloc: PortAlloc<BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>>,
     inactive: IdMap<Unbound<D>>,
     socketmap: BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> PortAllocImpl
+impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>
 {
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
@@ -786,7 +792,7 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> PortAllocImpl
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> Sockets<I, D, C> {
+impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> Sockets<I, D, C> {
     fn get_listener_by_id_mut(
         &mut self,
         id: ListenerId<I>,
@@ -935,7 +941,7 @@ impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
 }
 
 impl<I: IpExt> ConnectionId<I> {
-    fn get_from_socketmap<D: IpDeviceId, C: NonSyncContext>(
+    fn get_from_socketmap<D: WeakIpDeviceId, C: NonSyncContext>(
         self,
         socketmap: &BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -949,7 +955,7 @@ impl<I: IpExt> ConnectionId<I> {
         (conn, *sharing, addr)
     }
 
-    fn get_from_socketmap_mut<D: IpDeviceId, C: NonSyncContext>(
+    fn get_from_socketmap_mut<D: WeakIpDeviceId, C: NonSyncContext>(
         self,
         socketmap: &mut BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -1029,7 +1035,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         _ctx: &mut C,
         id: ListenerId<I>,
     ) -> Result<
-        (ConnectionId<I>, SocketAddr<I::Addr, Self::DeviceId>, C::ReturnedBuffers),
+        (ConnectionId<I>, SocketAddr<I::Addr, Self::WeakDeviceId>, C::ReturnedBuffers),
         AcceptError,
     >;
 
@@ -1056,10 +1062,13 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     fn remove_bound(&mut self, id: BoundId<I>);
     fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>;
 
-    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<Self::DeviceId>;
-    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::DeviceId>;
-    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, Self::DeviceId>;
-    fn get_connection_info(&self, id: ConnectionId<I>) -> ConnectionInfo<I::Addr, Self::DeviceId>;
+    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<Self::WeakDeviceId>;
+    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
+    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
+    fn get_connection_info(
+        &self,
+        id: ConnectionId<I>,
+    ) -> ConnectionInfo<I::Addr, Self::WeakDeviceId>;
     fn do_send(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
     fn handle_timer(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
 
@@ -1150,20 +1159,21 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         // Extract the specified address and the device. The
                         // device is either the one from the address or the one
                         // to which the socket was previously bound.
-                        let (addr, required_device) = crate::transport::resolve_addr_with_device(
-                            addr,
-                            bound_device.as_ref(),
-                        )?;
+                        let (addr, required_device) =
+                            crate::transport::resolve_addr_with_device(addr, bound_device.clone())?;
 
                         let mut assigned_to = ip_transport_ctx.get_devices_with_assigned_addr(addr);
-                        if !assigned_to
-                            .any(|d| required_device.as_ref().map_or(true, |device| &d == device))
-                        {
+                        if !assigned_to.any(|d| {
+                            required_device
+                                .as_ref()
+                                .map_or(true, |device| device == &EitherDeviceId::Strong(d))
+                        }) {
                             return Err(LocalAddressError::AddressMismatch);
                         }
+
                         (Some(addr), required_device)
                     }
-                    None => (None, bound_device.clone()),
+                    None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
                 };
 
                 let bound = socketmap
@@ -1171,7 +1181,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     .try_insert(
                         ListenerAddr {
                             ip: ListenerIpAddr { addr: local_ip, identifier: port },
-                            device,
+                            device: device.map(|d| d.as_weak(ip_transport_ctx).into_owned()),
                         },
                         MaybeListener::Bound(bound_state),
                         ListenerSharingState { sharing: *sharing, listening: false },
@@ -1235,7 +1245,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         _ctx: &mut C,
         id: ListenerId<I>,
     ) -> Result<
-        (ConnectionId<I>, SocketAddr<I::Addr, Self::DeviceId>, C::ReturnedBuffers),
+        (ConnectionId<I>, SocketAddr<I::Addr, Self::WeakDeviceId>, C::ReturnedBuffers),
         AcceptError,
     > {
         self.with_tcp_sockets_mut(|sockets| {
@@ -1274,12 +1284,12 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 let ListenerIpAddr { addr: local_ip, identifier: local_port } = *ip;
 
                 let (remote_ip, device) =
-                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.as_ref())?;
+                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.clone())?;
 
                 let ip_sock = ip_transport_ctx
                     .new_ip_socket(
                         ctx,
-                        device.as_ref(),
+                        device.as_ref().map(|d| d.as_ref()),
                         local_ip,
                         remote_ip,
                         IpProto::Tcp.into(),
@@ -1297,7 +1307,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     },
                 )?;
 
-                let device = device.clone();
                 let ListenerSharingState { sharing, listening: _ } = *sharing;
                 let conn_id = connect_inner(
                     isn,
@@ -1338,12 +1347,12 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     inactive.get();
 
                 let (remote_ip, device) =
-                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.as_ref())?;
+                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.clone())?;
 
                 let ip_sock = ip_transport_ctx
                     .new_ip_socket(
                         ctx,
-                        device.as_ref(),
+                        device.as_ref().map(|d| d.as_ref()),
                         None,
                         remote_ip,
                         IpProto::Tcp.into(),
@@ -1361,11 +1370,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     None => return Err(ConnectError::NoPort),
                 };
 
-                let entry = sockets.inactive.entry(id.into());
-                let inactive = match entry {
-                    IdMapEntry::Vacant(_v) => panic!("invalid unbound ID"),
-                    IdMapEntry::Occupied(o) => o,
-                };
                 let Unbound { buffer_sizes, bound_device: _, socket_options, sharing } =
                     inactive.get();
 
@@ -1499,11 +1503,11 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         id: UnboundId<I>,
         device: Option<Self::DeviceId>,
     ) {
-        self.with_tcp_sockets_mut(|sockets| {
+        self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
             let Sockets { inactive, port_alloc: _, socketmap: _ } = sockets;
             let Unbound { bound_device, buffer_sizes: _, socket_options: _, sharing: _ } =
                 inactive.get_mut(id.into()).expect("invalid unbound socket ID");
-            *bound_device = device;
+            *bound_device = device.map(|d| sync_ctx.downgrade_device_id(&d));
         })
     }
 
@@ -1511,24 +1515,29 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         &mut self,
         _ctx: &mut C,
         id: impl Into<MaybeListenerId<I>>,
-        device: Option<Self::DeviceId>,
+        new_device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError> {
-        self.with_tcp_sockets_mut(|sockets| {
+        self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
             let Sockets { socketmap, inactive: _, port_alloc: _ } = sockets;
             let entry = socketmap.listeners_mut().entry(&id.into()).expect("invalid ID");
             let (_, _, addr): &(MaybeListener<_, _>, ListenerSharingState, _) = entry.get();
             let ListenerAddr { device: old_device, ip: ip_addr } = addr;
             let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
-            if let Some(ip) = ip {
-                if crate::socket::must_have_zone(ip) {
-                    debug_assert!(old_device.is_some());
-                    if &device != old_device {
-                        return Err(SetDeviceError::ZoneChange);
-                    }
-                }
+
+            if !crate::socket::can_device_change(
+                ip.as_ref(), /* local_ip */
+                None,        /* remote_ip */
+                old_device.as_ref(),
+                new_device.as_ref(),
+            ) {
+                return Err(SetDeviceError::ZoneChange);
             }
+
             let ip = *ip_addr;
-            match entry.try_update_addr(ListenerAddr { device, ip }) {
+            match entry.try_update_addr(ListenerAddr {
+                device: new_device.map(|d| sync_ctx.downgrade_device_id(&d)),
+                ip,
+            }) {
                 Ok(_entry) => Ok(()),
                 Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
             }
@@ -1546,23 +1555,23 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 let entry = socketmap.conns_mut().entry(&id.into()).expect("invalid conn ID");
                 let (_, _, addr): &(Connection<_, _, _, _, _, _>, SharingState, _) = entry.get();
                 let ConnAddr {
-                    device,
+                    device: old_device,
                     ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
                 } = addr;
 
-                if crate::socket::must_have_zone(local_ip)
-                    || crate::socket::must_have_zone(remote_ip)
-                {
-                    debug_assert!(device.is_some());
-                    if &new_device != device {
-                        return Err(SetDeviceError::ZoneChange);
-                    }
+                if !crate::socket::can_device_change(
+                    Some(local_ip),
+                    Some(remote_ip),
+                    old_device.as_ref(),
+                    new_device.as_ref(),
+                ) {
+                    return Err(SetDeviceError::ZoneChange);
                 }
 
                 let new_socket = ip_transport_ctx
                     .new_ip_socket(
                         ctx,
-                        new_device.as_ref(),
+                        new_device.as_ref().map(EitherDeviceId::Strong),
                         Some(*local_ip),
                         *remote_ip,
                         IpProto::Tcp.into(),
@@ -1573,11 +1582,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     })?;
 
                 let addr = addr.clone();
-                let mut new_entry =
-                    match entry.try_update_addr(ConnAddr { device: new_device.clone(), ..addr }) {
-                        Ok(entry) => Ok(entry),
-                        Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
-                    }?;
+                let mut new_entry = match entry.try_update_addr(ConnAddr {
+                    device: new_device.map(|d| ip_transport_ctx.downgrade_device_id(&d)),
+                    ..addr
+                }) {
+                    Ok(entry) => Ok(entry),
+                    Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+                }?;
                 let Connection { ip_sock, acceptor: _, state: _, defunct: _, socket_options: _ } =
                     new_entry.get_state_mut();
                 *ip_sock = new_socket;
@@ -1586,14 +1597,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
-    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<SC::DeviceId> {
+    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let Sockets { socketmap: _, inactive, port_alloc: _ } = sockets;
             inactive.get(id.into()).expect("invalid unbound ID").into()
         })
     }
 
-    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, SC::DeviceId> {
+    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let (bound, _, bound_addr): &(_, ListenerSharingState, _) =
                 sockets.socketmap.listeners().get_by_id(&id.into()).expect("invalid bound ID");
@@ -1603,7 +1614,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         .into()
     }
 
-    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, SC::DeviceId> {
+    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let (listener, _, addr): &(_, ListenerSharingState, _) =
                 sockets.socketmap.listeners().get_by_id(&id.into()).expect("invalid listener ID");
@@ -1613,7 +1624,10 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         .into()
     }
 
-    fn get_connection_info(&self, id: ConnectionId<I>) -> ConnectionInfo<I::Addr, SC::DeviceId> {
+    fn get_connection_info(
+        &self,
+        id: ConnectionId<I>,
+    ) -> ConnectionInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let (_conn, _, addr): (_, SharingState, _) = id.get_from_socketmap(&sockets.socketmap);
             addr.clone()
@@ -1906,13 +1920,13 @@ fn do_send_inner<I, SC, C>(
     conn_id: MaybeClosedConnectionId<I>,
     conn: &mut Connection<
         I,
-        SC::DeviceId,
+        SC::WeakDeviceId,
         C::Instant,
         C::ReceiveBuffer,
         C::SendBuffer,
         C::ProvidedBuffers,
     >,
-    addr: &ConnAddr<I::Addr, SC::DeviceId, NonZeroU16, NonZeroU16>,
+    addr: &ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
 ) where
@@ -2148,7 +2162,7 @@ pub fn accept<I: Ip, C>(
     ctx: &mut C,
     id: ListenerId<I>,
 ) -> Result<
-    (ConnectionId<I>, SocketAddr<I::Addr, DeviceId<C::Instant>>, C::ReturnedBuffers),
+    (ConnectionId<I>, SocketAddr<I::Addr, WeakDeviceId<C::Instant>>, C::ReturnedBuffers),
     AcceptError,
 >
 where
@@ -2253,11 +2267,14 @@ where
 
 fn connect_inner<I, SC, C>(
     isn: &IsnGenerator<C::Instant>,
-    socketmap: &mut BoundSocketMap<IpPortSpec<I, SC::DeviceId>, TcpSocketSpec<I, SC::DeviceId, C>>,
+    socketmap: &mut BoundSocketMap<
+        IpPortSpec<I, SC::WeakDeviceId>,
+        TcpSocketSpec<I, SC::WeakDeviceId, C>,
+    >,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
-    ip_sock: IpSock<I, SC::DeviceId, DefaultSendOptions>,
-    device: Option<SC::DeviceId>,
+    ip_sock: IpSock<I, SC::WeakDeviceId, DefaultSendOptions>,
+    device: Option<EitherDeviceId<SC::DeviceId, SC::WeakDeviceId>>,
     local_port: NonZeroU16,
     remote_port: NonZeroU16,
     netstack_buffers: C::ProvidedBuffers,
@@ -2281,7 +2298,7 @@ where
             local: (ip_sock.local_ip().clone(), local_port),
             remote: (ip_sock.remote_ip().clone(), remote_port),
         },
-        device,
+        device: device.map(|d| d.as_weak(ip_transport_ctx).into_owned()),
     };
     let now = ctx.now();
     let (syn_sent, syn) = Closed::<Initial>::connect(
@@ -2550,7 +2567,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for Co
 pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: UnboundId<I>,
-) -> UnboundInfo<DeviceId<C::Instant>> {
+) -> UnboundInfo<WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_unbound_info(sync_ctx, id),
@@ -2562,7 +2579,7 @@ pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
-) -> BoundInfo<I::Addr, DeviceId<C::Instant>> {
+) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_bound_info(sync_ctx, id),
@@ -2574,7 +2591,7 @@ pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: ListenerId<I>,
-) -> BoundInfo<I::Addr, DeviceId<C::Instant>> {
+) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_listener_info(sync_ctx, id),
@@ -2586,7 +2603,7 @@ pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_connection_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: ConnectionId<I>,
-) -> ConnectionInfo<I::Addr, DeviceId<C::Instant>> {
+) -> ConnectionInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_connection_info(sync_ctx, id),
@@ -2796,7 +2813,7 @@ mod tests {
                 testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
                 MmsError, SendOptions,
             },
-            testutil::{FakeDeviceId, MultipleDevicesId},
+            testutil::{FakeDeviceId, FakeStrongIpDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             BufferIpTransportContext as _, SendIpPacketMeta,
         },
         testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
@@ -2808,6 +2825,13 @@ mod tests {
     };
 
     use super::*;
+
+    impl<A: IpAddress, D> SocketAddr<A, D> {
+        fn map_zone<Y>(self, f: impl FnOnce(D) -> Y) -> SocketAddr<A, Y> {
+            let Self { ip, port } = self;
+            SocketAddr { ip: ip.map_zone(f), port }
+        }
+    }
 
     trait TcpTestIpExt: IpExt + TestIpExt + IpDeviceStateIpExt + IpLayerIpExt {
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
@@ -2824,12 +2848,12 @@ mod tests {
         D,
     >;
 
-    struct FakeTcpState<I: TcpTestIpExt, D: IpDeviceId> {
+    struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongIpDeviceId> {
         isn_generator: IsnGenerator<FakeInstant>,
-        sockets: Sockets<I, D, TcpNonSyncCtx>,
+        sockets: Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>,
     }
 
-    impl<I: TcpTestIpExt, D: IpDeviceId> Default for FakeTcpState<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId> Default for FakeTcpState<I, D> {
         fn default() -> Self {
             Self {
                 isn_generator: Default::default(),
@@ -2851,7 +2875,7 @@ mod tests {
 
     type TcpCtx<I, D> = FakeCtxWithSyncCtx<TcpSyncCtx<I, D>, TimerId, (), ()>;
 
-    impl<I: TcpTestIpExt, D: IpDeviceId>
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId>
         AsMut<FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>>
         for TcpCtx<I, D>
     {
@@ -2862,7 +2886,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: IpDeviceId> FakeNetworkContext for TcpCtx<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId> FakeNetworkContext for TcpCtx<I, D> {
         type TimerId = TimerId;
         type SendMeta = SendIpPacketMeta<I, FakeDeviceId, SpecifiedAddr<<I as Ip>::Addr>>;
     }
@@ -2997,19 +3021,21 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: IpDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
         for FakeBufferIpTransportCtx<I, D>
     {
         fn get_mms<O: SendOptions<I>>(
             &mut self,
             _ctx: &mut TcpNonSyncCtx,
-            _ip_sock: &IpSock<I, D, O>,
+            _ip_sock: &IpSock<I, FakeWeakDeviceId<D>, O>,
         ) -> Result<Mms, MmsError> {
             Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
         }
     }
 
-    impl<I: TcpTestIpExt, D: IpDeviceId + 'static> SyncContext<I, TcpNonSyncCtx> for TcpSyncCtx<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId + 'static> SyncContext<I, TcpNonSyncCtx>
+        for TcpSyncCtx<I, D>
+    {
         type IpTransportCtx = FakeBufferIpTransportCtx<I, D>;
 
         fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
@@ -3017,7 +3043,7 @@ mod tests {
             F: FnOnce(
                 &mut FakeBufferIpTransportCtx<I, D>,
                 &IsnGenerator<FakeInstant>,
-                &mut Sockets<I, D, TcpNonSyncCtx>,
+                &mut Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>,
             ) -> O,
         >(
             &mut self,
@@ -3030,7 +3056,10 @@ mod tests {
             cb(ip_transport_ctx, isn_generator, sockets)
         }
 
-        fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, D, TcpNonSyncCtx>) -> O>(&self, cb: F) -> O {
+        fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>) -> O>(
+            &self,
+            cb: F,
+        ) -> O {
             let WrappedFakeSyncCtx { outer: FakeTcpState { isn_generator: _, sockets }, inner: _ } =
                 self;
             cb(sockets)
@@ -3170,11 +3199,13 @@ mod tests {
         .expect("failed to deliver bytes");
     }
 
-    impl<I: TcpTestIpExt, D: IpDeviceId, NewIp: TcpTestIpExt> GenericOverIp<NewIp> for TcpCtx<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId, NewIp: TcpTestIpExt> GenericOverIp<NewIp>
+        for TcpCtx<I, D>
+    {
         type Type = TcpCtx<NewIp, D>;
     }
 
-    fn handle_timer<I: Ip + TcpTestIpExt, D: IpDeviceId + 'static>(
+    fn handle_timer<I: Ip + TcpTestIpExt, D: FakeStrongIpDeviceId + 'static>(
         ctx: &mut TcpCtx<I, D>,
         _: &mut (),
         timer_id: TimerId,
@@ -3740,7 +3771,10 @@ mod tests {
         } else {
             SocketHandler::get_bound_info(&sync_ctx, bound)
         };
-        assert_eq!(info, BoundInfo { addr, port, device: None });
+        assert_eq!(
+            info,
+            BoundInfo { addr: addr.map(|a| a.map_zone(FakeWeakDeviceId)), port, device: None }
+        );
     }
 
     #[ip_test]
@@ -3775,7 +3809,11 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_connection_info(&sync_ctx, connected),
-            ConnectionInfo { local_addr: local, remote_addr: remote, device: None }
+            ConnectionInfo {
+                local_addr: local.map_zone(FakeWeakDeviceId),
+                remote_addr: remote.map_zone(FakeWeakDeviceId),
+                device: None,
+            },
         );
     }
 
@@ -3896,9 +3934,9 @@ mod tests {
         assert_eq!(
             SocketHandler::get_bound_info(&sync_ctx, bound),
             BoundInfo {
-                addr: Some(local_addr.ip),
+                addr: Some(local_addr.ip.map_zone(FakeWeakDeviceId)),
                 port: local_addr.port,
-                device: Some(FakeDeviceId)
+                device: Some(FakeWeakDeviceId(FakeDeviceId))
             }
         );
 
@@ -3913,7 +3951,11 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_connection_info(&sync_ctx, connected),
-            ConnectionInfo { local_addr, remote_addr, device: Some(FakeDeviceId) }
+            ConnectionInfo {
+                local_addr: local_addr.map_zone(FakeWeakDeviceId),
+                remote_addr: remote_addr.map_zone(FakeWeakDeviceId),
+                device: Some(FakeWeakDeviceId(FakeDeviceId))
+            }
         );
     }
 

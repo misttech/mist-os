@@ -13,7 +13,7 @@ use net_types::{
 };
 
 use crate::{
-    ip::{IpDeviceId, IpExt},
+    ip::{IpExt, WeakIpDeviceId},
     socket::{AddrVec, SocketMapAddrSpec},
 };
 
@@ -51,10 +51,10 @@ pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
 /// with IP addresses and 16-bit local and remote port identifiers.
 pub(crate) struct IpPortSpec<I, D>(PhantomData<(I, D)>, Never);
 
-impl<I: Ip + IpExt, D: IpDeviceId> SocketMapAddrSpec for IpPortSpec<I, D> {
+impl<I: Ip + IpExt, D: WeakIpDeviceId> SocketMapAddrSpec for IpPortSpec<I, D> {
     type IpVersion = I;
     type IpAddr = I::Addr;
-    type DeviceId = D;
+    type WeakDeviceId = D;
     type RemoteIdentifier = NonZeroU16;
     type LocalIdentifier = NonZeroU16;
 }
@@ -75,7 +75,7 @@ pub(crate) enum IpAddrVec<A: SocketMapAddrSpec> {
 }
 
 impl<A: SocketMapAddrSpec> IpAddrVec<A> {
-    fn with_device(self, device: Option<A::DeviceId>) -> AddrVec<A> {
+    fn with_device(self, device: Option<A::WeakDeviceId>) -> AddrVec<A> {
         match self {
             IpAddrVec::Listener(ip) => AddrVec::Listen(ListenerAddr { ip, device }),
             IpAddrVec::Connected(ip) => AddrVec::Conn(ConnAddr { ip, device }),
@@ -110,7 +110,7 @@ impl<A: SocketMapAddrSpec> IpAddrVec<A> {
 }
 
 enum AddrVecIterInner<A: SocketMapAddrSpec> {
-    WithDevice { device: A::DeviceId, emitted_device: bool, addr: IpAddrVec<A> },
+    WithDevice { device: A::WeakDeviceId, emitted_device: bool, addr: IpAddrVec<A> },
     NoDevice { addr: IpAddrVec<A> },
     Done,
 }
@@ -164,7 +164,7 @@ impl<A: SocketMapAddrSpec> Iterator for AddrVecIterInner<A> {
 pub(crate) struct AddrVecIter<A: SocketMapAddrSpec>(AddrVecIterInner<A>);
 
 impl<A: SocketMapAddrSpec> AddrVecIter<A> {
-    pub(crate) fn with_device(addr: IpAddrVec<A>, device: A::DeviceId) -> Self {
+    pub(crate) fn with_device(addr: IpAddrVec<A>, device: A::WeakDeviceId) -> Self {
         Self(AddrVecIterInner::WithDevice { device, emitted_device: false, addr })
     }
 

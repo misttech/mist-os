@@ -32,7 +32,7 @@ use net_types::{
 };
 use netstack3_core::{
     data_structures::id_map_collection::{IdMapCollection, IdMapCollectionKey},
-    device::DeviceId,
+    device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, SocketError},
     ip::{icmp, socket::IpSockSendError, IpExt},
     socket::datagram::{
@@ -266,9 +266,9 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> {
         ctx: &mut C,
         id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     );
 
@@ -276,16 +276,16 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier);
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>>, Self::LocalIdentifier);
 
     fn remove_conn<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     );
 
@@ -293,7 +293,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier);
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>>, Self::LocalIdentifier);
 
     fn remove_unbound<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::UnboundId);
 
@@ -308,7 +308,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> {
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
         id: SocketId<I, Self>,
-    ) -> Option<DeviceId<C::Instant>>;
+    ) -> Option<WeakDeviceId<C::Instant>>;
 
     fn set_reuse_port<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -491,9 +491,9 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     ) {
         let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
@@ -505,7 +505,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier) {
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>>, Self::LocalIdentifier) {
         let udp::ListenerInfo { local_ip, local_port } =
             udp::get_udp_listener_info(sync_ctx, ctx, id);
         (local_ip, local_port)
@@ -516,9 +516,9 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     ) {
         let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
@@ -530,7 +530,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier) {
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<C::Instant>>>, Self::LocalIdentifier) {
         let udp::ListenerInfo { local_ip, local_port } =
             udp::remove_udp_listener(sync_ctx, ctx, id);
         (local_ip, local_port)
@@ -565,7 +565,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
         id: SocketId<I, Self>,
-    ) -> Option<DeviceId<C::Instant>> {
+    ) -> Option<WeakDeviceId<C::Instant>> {
         udp::get_udp_bound_device(sync_ctx, ctx, id.into())
     }
 
@@ -1016,9 +1016,9 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _ctx: &mut NonSyncCtx,
         _id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>,
         Self::RemoteIdentifier,
     ) {
         todo!("https://fxbug.dev/47321: needs Core implementation")
@@ -1028,7 +1028,8 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _sync_ctx: &SyncCtx<NonSyncCtx>,
         _ctx: &mut NonSyncCtx,
         _id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>>, Self::LocalIdentifier) {
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>>, Self::LocalIdentifier)
+    {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
@@ -1037,9 +1038,9 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _ctx: &mut NonSyncCtx,
         _id: Self::ConnId,
     ) -> (
-        ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>,
         Self::LocalIdentifier,
-        ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>,
+        ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>,
         Self::RemoteIdentifier,
     ) {
         todo!("https://fxbug.dev/47321: needs Core implementation")
@@ -1049,7 +1050,8 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _sync_ctx: &SyncCtx<NonSyncCtx>,
         _ctx: &mut NonSyncCtx,
         _id: Self::ListenerId,
-    ) -> (Option<ZonedAddr<I::Addr, DeviceId<NonSyncCtx::Instant>>>, Self::LocalIdentifier) {
+    ) -> (Option<ZonedAddr<I::Addr, WeakDeviceId<NonSyncCtx::Instant>>>, Self::LocalIdentifier)
+    {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
@@ -1074,7 +1076,7 @@ impl<I: IcmpEchoIpExt> TransportState<I> for IcmpEcho {
         _sync_ctx: &SyncCtx<NonSyncCtx>,
         _ctx: &NonSyncCtx,
         _id: SocketId<I, Self>,
-    ) -> Option<DeviceId<NonSyncCtx::Instant>> {
+    ) -> Option<WeakDeviceId<NonSyncCtx::Instant>> {
         todo!("https://fxbug.dev/47321: needs Core implementation")
     }
 
@@ -1467,8 +1469,10 @@ where
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
-    DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
-        + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    DeviceId<StackTime>:
+        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    WeakDeviceId<StackTime>:
+        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
     BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     /// Starts servicing events from the provided event stream.
@@ -1648,8 +1652,10 @@ where
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
-    DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
-        + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    DeviceId<StackTime>:
+        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    WeakDeviceId<StackTime>:
+        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
     BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     async fn handle_request(

@@ -519,7 +519,7 @@ mod tests {
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
             },
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
@@ -534,6 +534,7 @@ mod tests {
         groups: MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv4, FakeDeviceId>,
     }
 
     impl Default for FakeIgmpCtx {
@@ -542,7 +543,14 @@ mod tests {
                 groups: MulticastGroupSet::default(),
                 igmp_enabled: true,
                 addr_subnet: None,
+                ip_device_id_ctx: Default::default(),
             }
+        }
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv4, FakeDeviceId>> for FakeIgmpCtx {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv4, FakeDeviceId> {
+            &self.ip_device_id_ctx
         }
     }
 
@@ -577,7 +585,8 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeIgmpCtx { groups, igmp_enabled, addr_subnet: _ } = self.get_mut();
+            let FakeIgmpCtx { groups, igmp_enabled, addr_subnet: _, ip_device_id_ctx: _ } =
+                self.get_mut();
             cb(GmpState { enabled: *igmp_enabled, groups })
         }
     }

@@ -66,8 +66,9 @@ use net_types::{
 
 use crate::{
     convert::OwnedOrCloned,
-    device::DeviceId,
+    device::WeakDeviceId,
     error::ZonedAddressError,
+    ip::EitherDeviceId,
     transport::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
@@ -103,10 +104,10 @@ impl TransportStateBuilder {
 
 /// The state associated with the transport layer.
 pub(crate) struct TransportLayerState<C: tcp::socket::NonSyncContext> {
-    udpv4: UdpState<Ipv4, DeviceId<C::Instant>>,
-    udpv6: UdpState<Ipv6, DeviceId<C::Instant>>,
-    tcpv4: TcpState<Ipv4, DeviceId<C::Instant>, C>,
-    tcpv6: TcpState<Ipv6, DeviceId<C::Instant>, C>,
+    udpv4: UdpState<Ipv4, WeakDeviceId<C::Instant>>,
+    udpv6: UdpState<Ipv6, WeakDeviceId<C::Instant>>,
+    tcpv4: TcpState<Ipv4, WeakDeviceId<C::Instant>, C>,
+    tcpv6: TcpState<Ipv6, WeakDeviceId<C::Instant>, C>,
 }
 
 /// The identifier for timer events in the transport layer.
@@ -162,20 +163,20 @@ fn maybe_with_zone<A: IpAddress, D>(
 /// for the socket. If `addr` and `device` require inconsistent devices,
 /// or if `addr` requires a zone but there is none specified (by `addr` or
 /// `device`), an error is returned.
-pub(crate) fn resolve_addr_with_device<A: IpAddress, D: PartialEq + Clone>(
-    addr: ZonedAddr<A, D>,
-    device: Option<&D>,
-) -> Result<(SpecifiedAddr<A>, Option<D>), ZonedAddressError> {
+pub(crate) fn resolve_addr_with_device<A: IpAddress, S: PartialEq, W: PartialEq + PartialEq<S>>(
+    addr: ZonedAddr<A, S>,
+    device: Option<W>,
+) -> Result<(SpecifiedAddr<A>, Option<EitherDeviceId<S, W>>), ZonedAddressError> {
     let (addr, zone) = addr.into_addr_zone();
     let device = match (zone, device) {
         (Some(zone), Some(device)) => {
-            if &zone != device {
+            if device != zone {
                 return Err(ZonedAddressError::DeviceZoneMismatch);
             }
-            Some(device.clone())
+            Some(EitherDeviceId::Strong(zone))
         }
-        (Some(zone), None) => Some(zone),
-        (None, Some(device)) => Some(device.clone()),
+        (Some(zone), None) => Some(EitherDeviceId::Strong(zone)),
+        (None, Some(device)) => Some(EitherDeviceId::Weak(device)),
         (None, None) => {
             if crate::socket::must_have_zone(&addr) {
                 return Err(ZonedAddressError::RequiredZoneNotProvided);

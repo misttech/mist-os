@@ -55,7 +55,7 @@ use crate::{
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
-        DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
+        DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext, StrongIpDeviceId, WeakIpDeviceId,
     },
     sync::{KillableRc, RwLock, StrongRc, WeakRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -641,6 +641,12 @@ impl<I: Instant> PartialEq for EthernetWeakDeviceId<I> {
     }
 }
 
+impl<I: Instant> PartialEq<EthernetDeviceId<I>> for EthernetWeakDeviceId<I> {
+    fn eq(&self, other: &EthernetDeviceId<I>) -> bool {
+        <EthernetDeviceId<I> as PartialEq<EthernetWeakDeviceId<I>>>::eq(other, self)
+    }
+}
+
 impl<I: Instant> Eq for EthernetWeakDeviceId<I> {}
 
 /// Device IDs identifying Ethernet devices.
@@ -655,6 +661,13 @@ impl<I: Instant> PartialEq for EthernetDeviceId<I> {
     fn eq(&self, EthernetDeviceId(other_id, other_ptr): &EthernetDeviceId<I>) -> bool {
         let EthernetDeviceId(me_id, me_ptr) = self;
         other_id == me_id && StrongRc::ptr_eq(me_ptr, other_ptr)
+    }
+}
+
+impl<I: Instant> PartialEq<EthernetWeakDeviceId<I>> for EthernetDeviceId<I> {
+    fn eq(&self, EthernetWeakDeviceId(other_id, other_ptr): &EthernetWeakDeviceId<I>) -> bool {
+        let EthernetDeviceId(me_id, me_ptr) = self;
+        other_id == me_id && StrongRc::weak_ptr_eq(me_ptr, other_ptr)
     }
 }
 
@@ -740,6 +753,12 @@ enum WeakDeviceIdInner<I: Instant> {
     Loopback(LoopbackWeakDeviceId<I>),
 }
 
+impl<I: Instant> PartialEq<DeviceId<I>> for WeakDeviceId<I> {
+    fn eq(&self, other: &DeviceId<I>) -> bool {
+        <DeviceId<I> as PartialEq<WeakDeviceId<I>>>::eq(other, self)
+    }
+}
+
 /// A weak ID identifying a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
@@ -769,7 +788,8 @@ impl<I: Instant> WeakDeviceId<I> {
         id
     }
 
-    fn upgrade(&self) -> Option<DeviceId<I>> {
+    /// Attempts to upgrade the ID.
+    pub fn upgrade(&self) -> Option<DeviceId<I>> {
         match self.inner() {
             WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(id, ptr)) => {
                 ptr.upgrade().map(|ptr| DeviceIdInner::Ethernet(EthernetDeviceId(*id, ptr)))
@@ -789,6 +809,10 @@ impl<I: Instant> IpDeviceId for WeakDeviceId<I> {
             WeakDeviceIdInner::Ethernet(_) => false,
         }
     }
+}
+
+impl<I: Instant> WeakIpDeviceId for WeakDeviceId<I> {
+    type Strong = DeviceId<I>;
 }
 
 impl<I: Instant> Display for WeakDeviceId<I> {
@@ -820,6 +844,17 @@ enum DeviceIdInner<I: Instant> {
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
 pub struct DeviceId<I: Instant>(DeviceIdInner<I>);
 
+impl<I: Instant> PartialEq<WeakDeviceId<I>> for DeviceId<I> {
+    fn eq(&self, other: &WeakDeviceId<I>) -> bool {
+        match (self.inner(), other.inner()) {
+            (DeviceIdInner::Ethernet(strong), WeakDeviceIdInner::Ethernet(weak)) => strong == weak,
+            (DeviceIdInner::Loopback(strong), WeakDeviceIdInner::Loopback(weak)) => strong == weak,
+            (DeviceIdInner::Loopback(_), WeakDeviceIdInner::Ethernet(_))
+            | (DeviceIdInner::Ethernet(_), WeakDeviceIdInner::Loopback(_)) => false,
+        }
+    }
+}
+
 impl<I: Instant> From<DeviceIdInner<I>> for DeviceId<I> {
     fn from(id: DeviceIdInner<I>) -> DeviceId<I> {
         DeviceId(id)
@@ -844,7 +879,7 @@ impl<I: Instant> DeviceId<I> {
         id
     }
 
-    fn downgrade(&self) -> WeakDeviceId<I> {
+    pub(crate) fn downgrade(&self) -> WeakDeviceId<I> {
         match self.inner() {
             DeviceIdInner::Ethernet(EthernetDeviceId(id, ptr)) => {
                 WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(*id, StrongRc::downgrade(ptr)))
@@ -855,6 +890,13 @@ impl<I: Instant> DeviceId<I> {
         }
         .into()
     }
+
+    fn removed(&self) -> bool {
+        match self.inner() {
+            DeviceIdInner::Ethernet(EthernetDeviceId(_id, rc)) => StrongRc::killed(rc),
+            DeviceIdInner::Loopback(LoopbackDeviceId(rc)) => StrongRc::killed(rc),
+        }
+    }
 }
 
 impl<I: Instant> IpDeviceId for DeviceId<I> {
@@ -864,6 +906,10 @@ impl<I: Instant> IpDeviceId for DeviceId<I> {
             DeviceIdInner::Ethernet(_) => false,
         }
     }
+}
+
+impl<I: Instant> StrongIpDeviceId for DeviceId<I> {
+    type Weak = WeakDeviceId<I>;
 }
 
 impl<I: Instant> Display for DeviceId<I> {
@@ -1257,6 +1303,10 @@ impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<Non
     ) -> Option<DeviceId<NonSyncCtx::Instant>> {
         weak_device_id.upgrade()
     }
+
+    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx::Instant>) -> bool {
+        !device_id.removed()
+    }
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
@@ -1277,6 +1327,10 @@ impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
         weak_device_id: &WeakDeviceId<NonSyncCtx::Instant>,
     ) -> Option<DeviceId<NonSyncCtx::Instant>> {
         weak_device_id.upgrade()
+    }
+
+    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx::Instant>) -> bool {
+        !device_id.removed()
     }
 }
 

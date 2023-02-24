@@ -1581,7 +1581,9 @@ mod tests {
         device::FrameDestination,
         ip::{
             device::testutil::with_assigned_ipv6_addr_subnets,
-            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ipv6_packet, testutil::FakeDeviceId,
+            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+            receive_ipv6_packet,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
         },
         testutil::{
             assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
@@ -1596,6 +1598,13 @@ mod tests {
         retrans_timer: Duration,
         iid: [u8; 8],
         slaac_addrs: FakeSlaacAddrs,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeSlaacContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+            &self.ip_device_id_ctx
+        }
     }
 
     type FakeCtxImpl = FakeSyncCtx<FakeSlaacContext, (), FakeDeviceId>;
@@ -1701,8 +1710,14 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeSlaacContext { config, dad_transmits, retrans_timer, iid, slaac_addrs } =
-                self.get_mut();
+            let FakeSlaacContext {
+                config,
+                dad_transmits,
+                retrans_timer,
+                iid,
+                slaac_addrs,
+                ip_device_id_ctx: _,
+            } = self.get_mut();
             let mut slaac_addrs = slaac_addrs;
             cb(SlaacAddrsMutAndConfig {
                 addrs: &mut slaac_addrs,
@@ -1753,6 +1768,7 @@ mod tests {
                 retrans_timer: DEFAULT_RETRANS_TIMER,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         SlaacHandler::apply_slaac_update(
@@ -1786,6 +1802,7 @@ mod tests {
                 retrans_timer: DEFAULT_RETRANS_TIMER,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         let valid_lifetime_secs = preferred_lifetime_secs + 1;
@@ -1856,6 +1873,7 @@ mod tests {
                     // SLAAC.
                     non_slaac_addr: Some(addr_sub.addr()),
                 },
+                ip_device_id_ctx: Default::default(),
             }));
 
         const LIFETIME_SECS: u32 = 1;
@@ -1885,6 +1903,7 @@ mod tests {
                 retrans_timer: DEFAULT_RETRANS_TIMER,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         const LIFETIME_SECS: u32 = 1;
@@ -2055,6 +2074,7 @@ mod tests {
                 retrans_timer: DEFAULT_RETRANS_TIMER,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         let addr_sub = calculate_addr_sub(SUBNET, IID);
@@ -2273,6 +2293,7 @@ mod tests {
                 retrans_timer,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         SlaacHandler::apply_slaac_update(
@@ -2409,6 +2430,7 @@ mod tests {
                 retrans_timer,
                 iid: IID,
                 slaac_addrs: Default::default(),
+                ip_device_id_ctx: Default::default(),
             }));
 
         let mut dup_rng = non_sync_ctx.rng().clone();

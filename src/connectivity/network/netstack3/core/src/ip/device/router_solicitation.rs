@@ -240,7 +240,7 @@ mod tests {
             testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
             InstantContext as _, SendFrameContext as _,
         },
-        ip::testutil::FakeDeviceId,
+        ip::testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
     };
 
     struct FakeRsContext {
@@ -248,6 +248,13 @@ mod tests {
         router_soliciations_remaining: Option<NonZeroU8>,
         source_address: Option<UnicastAddr<Ipv6Addr>>,
         link_layer_bytes: Option<Vec<u8>>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeRsContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+            &self.ip_device_id_ctx
+        }
     }
 
     #[derive(Debug, PartialEq)]
@@ -274,6 +281,7 @@ mod tests {
                 router_soliciations_remaining,
                 source_address: _,
                 link_layer_bytes: _,
+                ip_device_id_ctx: _,
             } = self.get_mut();
             cb(router_soliciations_remaining, *max_router_solicitations)
         }
@@ -284,6 +292,7 @@ mod tests {
                 router_soliciations_remaining: _,
                 source_address: _,
                 link_layer_bytes,
+                ip_device_id_ctx: _,
             } = self.get_ref();
             link_layer_bytes.clone()
         }
@@ -305,6 +314,7 @@ mod tests {
                 router_soliciations_remaining: _,
                 source_address,
                 link_layer_bytes: _,
+                ip_device_id_ctx: _,
             } = self.get_ref();
             self.send_frame(ctx, RsMessageMeta { message }, body(*source_address))
         }
@@ -320,6 +330,7 @@ mod tests {
                 router_soliciations_remaining: None,
                 source_address: None,
                 link_layer_bytes: None,
+                ip_device_id_ctx: Default::default(),
             }));
         RsHandler::start_router_solicitation(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
 
@@ -379,6 +390,7 @@ mod tests {
                 router_soliciations_remaining: None,
                 source_address,
                 link_layer_bytes,
+                ip_device_id_ctx: Default::default(),
             }));
         RsHandler::start_router_solicitation(&mut sync_ctx, &mut non_sync_ctx, &FakeDeviceId);
 

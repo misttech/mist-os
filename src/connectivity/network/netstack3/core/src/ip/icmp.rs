@@ -59,7 +59,7 @@ use crate::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockCreationError,
             IpSockSendError, IpSocketHandler,
         },
-        BufferIpLayerHandler, BufferIpTransportContext, IpDeviceIdContext, IpExt,
+        BufferIpLayerHandler, BufferIpTransportContext, EitherDeviceId, IpDeviceIdContext, IpExt,
         IpTransportContext, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{ConnSocketEntry, ConnSocketMap},
@@ -680,7 +680,7 @@ pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>>:
     /// Calls the function with an immutable reference to ICMP sockets.
     fn with_icmp_sockets<
         O,
-        F: FnOnce(&IcmpSockets<I::Addr, IpSock<I, Self::DeviceId, DefaultSendOptions>>) -> O,
+        F: FnOnce(&IcmpSockets<I::Addr, IpSock<I, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
     >(
         &self,
         cb: F,
@@ -689,7 +689,7 @@ pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>>:
     /// Calls the function with a mutable reference to ICMP sockets.
     fn with_icmp_sockets_mut<
         O,
-        F: FnOnce(&mut IcmpSockets<I::Addr, IpSock<I, Self::DeviceId, DefaultSendOptions>>) -> O,
+        F: FnOnce(&mut IcmpSockets<I::Addr, IpSock<I, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
     >(
         &mut self,
         cb: F,
@@ -2458,7 +2458,7 @@ fn send_icmpv4_error_message<
         ctx,
         sync_ctx.send_oneshot_ip_packet(
             ctx,
-            Some(device),
+            Some(EitherDeviceId::Strong(device)),
             None,
             original_src_ip,
             Ipv4Proto::Icmp,
@@ -2511,7 +2511,7 @@ fn send_icmpv6_error_message<
         ctx,
         sync_ctx.send_oneshot_ip_packet(
             ctx,
-            Some(device),
+            Some(EitherDeviceId::Strong(device)),
             None,
             original_src_ip,
             Ipv6Proto::Icmpv6,
@@ -3012,7 +3012,7 @@ mod tests {
             path_mtu::testutil::FakePmtuState,
             receive_ipv4_packet, receive_ipv6_packet,
             socket::testutil::FakeIpSocketCtx,
-            testutil::FakeDeviceId,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeWeakDeviceId},
             SendIpPacketMeta,
         },
         testutil::{
@@ -3887,13 +3887,15 @@ mod tests {
 
     struct FakeIcmpv4Ctx {
         inner: FakeIcmpCtx<Ipv4, FakeDeviceId>,
-        sockets: IcmpSockets<Ipv4Addr, IpSock<Ipv4, FakeDeviceId, DefaultSendOptions>>,
+        sockets:
+            IcmpSockets<Ipv4Addr, IpSock<Ipv4, FakeWeakDeviceId<FakeDeviceId>, DefaultSendOptions>>,
         error_send_bucket: TokenBucket<FakeInstant>,
     }
 
     struct FakeIcmpv6Ctx {
         inner: FakeIcmpCtx<Ipv6, FakeDeviceId>,
-        sockets: IcmpSockets<Ipv6Addr, IpSock<Ipv6, FakeDeviceId, DefaultSendOptions>>,
+        sockets:
+            IcmpSockets<Ipv6Addr, IpSock<Ipv6, FakeWeakDeviceId<FakeDeviceId>, DefaultSendOptions>>,
         error_send_bucket: TokenBucket<FakeInstant>,
     }
 
@@ -3957,6 +3959,12 @@ mod tests {
             impl AsMut<FakePmtuState<<$ip as Ip>::Addr>> for $outer_sync_ctx {
                 fn as_mut(&mut self) -> &mut FakePmtuState<<$ip as Ip>::Addr> {
                     &mut self.get_mut().inner.pmtu_state
+                }
+            }
+
+            impl AsRef<FakeIpDeviceIdCtx<$ip, FakeDeviceId>> for $inner {
+                fn as_ref(&self) -> &FakeIpDeviceIdCtx<$ip, FakeDeviceId> {
+                    self.inner.socket_ctx.as_ref()
                 }
             }
 
@@ -4032,7 +4040,7 @@ mod tests {
                     }
                 }
 
-                fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<<$ip as Ip>::Addr, IpSock<$ip, FakeDeviceId, DefaultSendOptions>>) -> O>(
+                fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<<$ip as Ip>::Addr, IpSock<$ip, FakeWeakDeviceId<FakeDeviceId>, DefaultSendOptions>>) -> O>(
                     &self,
                     cb: F,
                 ) -> O {
@@ -4041,7 +4049,7 @@ mod tests {
 
                 fn with_icmp_sockets_mut<
                     O,
-                F: FnOnce(&mut IcmpSockets<<$ip as Ip>::Addr, IpSock<$ip, FakeDeviceId, DefaultSendOptions>>) -> O,
+                F: FnOnce(&mut IcmpSockets<<$ip as Ip>::Addr, IpSock<$ip, FakeWeakDeviceId<FakeDeviceId>, DefaultSendOptions>>) -> O,
                 >(
                     &mut self,
                     cb: F,

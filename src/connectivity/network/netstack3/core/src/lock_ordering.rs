@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub(crate) use lock_order::Unlocked;
+
 use core::{convert::Infallible as Never, marker::PhantomData};
 
-use lock_order::{impl_lock_after, relation::LockAfter, Unlocked};
+use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
 pub(crate) enum Ipv4StateNextPacketId {}

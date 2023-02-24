@@ -17,8 +17,9 @@ pub(crate) mod reassembly;
 pub mod socket;
 pub mod types;
 
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
+    borrow::Borrow,
     cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
@@ -375,7 +376,10 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
 
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
-            Some(device) => HopLimits { unicast: self.get_hop_limit(device), ..DEFAULT_HOP_LIMITS },
+            Some(device) => HopLimits {
+                unicast: IpDeviceContext::<Ipv4, _>::get_hop_limit(self, device),
+                ..DEFAULT_HOP_LIMITS
+            },
             None => DEFAULT_HOP_LIMITS,
         }
     }
@@ -399,8 +403,89 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
 
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
-            Some(device) => HopLimits { unicast: self.get_hop_limit(device), ..DEFAULT_HOP_LIMITS },
+            Some(device) => HopLimits {
+                unicast: IpDeviceContext::<Ipv6, _>::get_hop_limit(self, device),
+                ..DEFAULT_HOP_LIMITS
+            },
             None => DEFAULT_HOP_LIMITS,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum EitherDeviceId<S, W> {
+    Strong(S),
+    Weak(W),
+}
+
+impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, W> {
+    fn eq(&self, other: &EitherDeviceId<S, W>) -> bool {
+        match (self, other) {
+            (EitherDeviceId::Strong(this), EitherDeviceId::Strong(other)) => this == other,
+            (EitherDeviceId::Strong(this), EitherDeviceId::Weak(other)) => other == this,
+            (EitherDeviceId::Weak(this), EitherDeviceId::Strong(other)) => this == other,
+            (EitherDeviceId::Weak(this), EitherDeviceId::Weak(other)) => this == other,
+        }
+    }
+}
+
+impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<&'_ S, &'_ W> {
+    fn as_strong_ref<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+        &'a self,
+        sync_ctx: &SC,
+    ) -> Option<Cow<'a, SC::DeviceId>> {
+        match self {
+            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
+            EitherDeviceId::Weak(w) => sync_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
+        }
+    }
+
+    pub(crate) fn as_weak_ref<
+        'a,
+        I: Ip,
+        SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>,
+    >(
+        &'a self,
+        sync_ctx: &SC,
+    ) -> Cow<'a, SC::WeakDeviceId> {
+        match self {
+            EitherDeviceId::Strong(s) => Cow::Owned(sync_ctx.downgrade_device_id(s)),
+            EitherDeviceId::Weak(w) => Cow::Borrowed(w),
+        }
+    }
+}
+
+impl<S, W> EitherDeviceId<S, W> {
+    pub(crate) fn as_ref<'a, S2, W2>(&'a self) -> EitherDeviceId<&'a S2, &'a W2>
+    where
+        S: Borrow<S2>,
+        W: Borrow<W2>,
+    {
+        match self {
+            EitherDeviceId::Strong(s) => EitherDeviceId::Strong(s.borrow()),
+            EitherDeviceId::Weak(w) => EitherDeviceId::Weak(w.borrow()),
+        }
+    }
+}
+
+impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
+    pub(crate) fn as_strong<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+        &'a self,
+        sync_ctx: &SC,
+    ) -> Option<Cow<'a, SC::DeviceId>> {
+        match self {
+            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
+            EitherDeviceId::Weak(w) => sync_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
+        }
+    }
+
+    pub(crate) fn as_weak<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+        &'a self,
+        sync_ctx: &SC,
+    ) -> Cow<'a, SC::WeakDeviceId> {
+        match self {
+            EitherDeviceId::Strong(s) => Cow::Owned(sync_ctx.downgrade_device_id(s)),
+            EitherDeviceId::Weak(w) => Cow::Borrowed(w),
         }
     }
 }
@@ -409,6 +494,14 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
 pub trait IpDeviceId: Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync {
     /// Returns true if the device is a loopback device.
     fn is_loopback(&self) -> bool;
+}
+
+pub(crate) trait StrongIpDeviceId: IpDeviceId {
+    type Weak: WeakIpDeviceId<Strong = Self>;
+}
+
+pub(crate) trait WeakIpDeviceId: IpDeviceId + PartialEq<Self::Strong> {
+    type Strong: StrongIpDeviceId<Weak = Self>;
 }
 
 pub(crate) trait DualStackDeviceIdContext {
@@ -425,12 +518,12 @@ pub(crate) trait DualStackDeviceIdContext {
 /// as when ICMP delivers an MLD packet to the `mld` module for processing).
 pub(crate) trait IpDeviceIdContext<I: Ip> {
     /// The type of device IDs.
-    type DeviceId: IpDeviceId + 'static;
+    type DeviceId: StrongIpDeviceId<Weak = Self::WeakDeviceId> + 'static;
 
     /// The type of weakly referenced device IDs.
-    type WeakDeviceId: IpDeviceId + 'static;
+    type WeakDeviceId: WeakIpDeviceId<Strong = Self::DeviceId> + 'static;
 
-    /// Returns a weak ID for the strong ID..
+    /// Returns a weak ID for the strong ID.
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId;
 
     /// Attempts to upgrade the weak device ID to a strong ID.
@@ -438,6 +531,9 @@ pub(crate) trait IpDeviceIdContext<I: Ip> {
     /// Returns `None` if the device has been removed.
     fn upgrade_weak_device_id(&self, weak_device_id: &Self::WeakDeviceId)
         -> Option<Self::DeviceId>;
+
+    /// Returns true if the device has not been removed.
+    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool;
 }
 
 /// The status of an IP address on an interface.
@@ -477,17 +573,19 @@ pub(crate) enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub(crate) trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<I: Instant, DeviceId>: AsRef<IpStateInner<Self, I, DeviceId>>;
+    type State<I: Instant, StrongDeviceId: StrongIpDeviceId>: AsRef<
+        IpStateInner<Self, I, StrongDeviceId>,
+    >;
 }
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<I: Instant, DeviceId> = Ipv4State<I, DeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongIpDeviceId> = Ipv4State<I, StrongDeviceId>;
 }
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<I: Instant, DeviceId> = Ipv6State<I, DeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongIpDeviceId> = Ipv6State<I, StrongDeviceId>;
 }
 
 /// The state context provided to the IP layer.
@@ -497,14 +595,26 @@ impl IpLayerIpExt for Ipv6 {
 pub(crate) trait IpStateContext<I: IpLayerIpExt, Instant: crate::Instant>:
     IpDeviceIdContext<I>
 {
+    type IpDeviceIdCtx<'a>: IpDeviceIdContext<
+        I,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
     /// Calls the function with an immutable reference to IP routing table.
-    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<I, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
 
     /// Calls the function with a mutable reference to IP routing table.
-    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<I, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
@@ -752,14 +862,26 @@ impl<
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
-    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+    type IpDeviceIdCtx<'a> =
+        <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
+            Ipv4,
+            NonSyncCtx::Instant,
+        >>::IpDeviceIdCtx<'a>;
+
+    fn with_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
         IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
     }
 
-    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -778,14 +900,26 @@ impl<NonSyncCtx: NonSyncContext> Ipv4StateContext<NonSyncCtx::Instant> for &'_ S
 impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
     for &'_ SyncCtx<NonSyncCtx>
 {
-    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+    type IpDeviceIdCtx<'a> =
+        <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
+            Ipv6,
+            NonSyncCtx::Instant,
+        >>::IpDeviceIdCtx<'a>;
+
+    fn with_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv6, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
         IpStateContext::<Ipv6, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
     }
 
-    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv6, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -804,40 +938,62 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     IpStateContext<Ipv4, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+    type IpDeviceIdCtx<'a> =
+        Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
+
+    fn with_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
-        let cache = self.read_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
-        cb(&cache)
+        let (cache, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
+        cb(&mut locked, &cache)
     }
 
-    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv4, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
-        let mut cache = self.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
-        cb(&mut cache)
+        let (mut cache, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
+        cb(&mut locked, &mut cache)
     }
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     IpStateContext<Ipv6, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_routing_table<O, F: FnOnce(&ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+    type IpDeviceIdCtx<'a> =
+        Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
+
+    fn with_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv6, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
-        let cache = self.read_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
-        cb(&cache)
+        let (cache, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
+        cb(&mut locked, &cache)
     }
 
-    fn with_ip_routing_table_mut<O, F: FnOnce(&mut ForwardingTable<Ipv6, Self::DeviceId>) -> O>(
+    fn with_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv6, Self::DeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
-        let mut cache = self.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
-        cb(&mut cache)
+        let (mut cache, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
+        cb(&mut locked, &mut cache)
     }
 }
 
@@ -1028,7 +1184,9 @@ impl Ipv4StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, D>(self) -> Ipv4State<Instant, D> {
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId>(
+        self,
+    ) -> Ipv4State<Instant, StrongDeviceId> {
         let Ipv4StateBuilder { icmp } = self;
 
         Ipv4State {
@@ -1051,21 +1209,25 @@ impl Ipv6StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, D>(self) -> Ipv6State<Instant, D> {
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId>(
+        self,
+    ) -> Ipv6State<Instant, StrongDeviceId> {
         let Ipv6StateBuilder { icmp } = self;
 
         Ipv6State { inner: Default::default(), icmp: icmp.build() }
     }
 }
 
-pub(crate) struct Ipv4State<Instant: crate::Instant, D> {
-    inner: IpStateInner<Ipv4, Instant, D>,
-    icmp: Icmpv4State<Instant, IpSock<Ipv4, D, DefaultSendOptions>>,
+pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId> {
+    inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
+    icmp: Icmpv4State<Instant, IpSock<Ipv4, StrongDeviceId::Weak, DefaultSendOptions>>,
     next_packet_id: AtomicU16,
 }
 
-impl<I: Instant, DeviceId> AsRef<IpStateInner<Ipv4, I, DeviceId>> for Ipv4State<I, DeviceId> {
-    fn as_ref(&self) -> &IpStateInner<Ipv4, I, DeviceId> {
+impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
+    for Ipv4State<I, StrongDeviceId>
+{
+    fn as_ref(&self) -> &IpStateInner<Ipv4, I, StrongDeviceId> {
         &self.inner
     }
 }
@@ -1081,13 +1243,15 @@ fn gen_ipv4_packet_id<I: Instant, C: Ipv4StateContext<I>>(sync_ctx: &mut C) -> u
     })
 }
 
-pub(crate) struct Ipv6State<Instant: crate::Instant, D> {
-    inner: IpStateInner<Ipv6, Instant, D>,
-    icmp: Icmpv6State<Instant, IpSock<Ipv6, D, DefaultSendOptions>>,
+pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId> {
+    inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
+    icmp: Icmpv6State<Instant, IpSock<Ipv6, StrongDeviceId::Weak, DefaultSendOptions>>,
 }
 
-impl<I: Instant, DeviceId> AsRef<IpStateInner<Ipv6, I, DeviceId>> for Ipv6State<I, DeviceId> {
-    fn as_ref(&self) -> &IpStateInner<Ipv6, I, DeviceId> {
+impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
+    for Ipv6State<I, StrongDeviceId>
+{
+    fn as_ref(&self) -> &IpStateInner<Ipv6, I, StrongDeviceId> {
         &self.inner
     }
 }
@@ -2270,7 +2434,7 @@ fn lookup_route_table<
     device: Option<&SC::DeviceId>,
     dst_ip: SpecifiedAddr<I::Addr>,
 ) -> Option<Destination<I::Addr, SC::DeviceId>> {
-    sync_ctx.with_ip_routing_table(|table| table.lookup(device, dst_ip))
+    sync_ctx.with_ip_routing_table(|sync_ctx, table| table.lookup(sync_ctx, device, dst_ip))
 }
 
 /// Add a route to the forwarding table, returning `Err` if the subnet
@@ -2285,7 +2449,8 @@ pub(crate) fn add_route<
     subnet: Subnet<I::Addr>,
     next_hop: SpecifiedAddr<I::Addr>,
 ) -> Result<(), AddRouteError> {
-    sync_ctx.with_ip_routing_table_mut(|table| table.add_route(subnet, next_hop))
+    sync_ctx
+        .with_ip_routing_table_mut(|sync_ctx, table| table.add_route(sync_ctx, subnet, next_hop))
 }
 
 /// Add a device route to the forwarding table, returning `Err` if the
@@ -2300,7 +2465,7 @@ pub(crate) fn add_device_route<
     subnet: Subnet<I::Addr>,
     device: SC::DeviceId,
 ) -> Result<(), ExistsError> {
-    sync_ctx.with_ip_routing_table_mut(|table| {
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
         table.add_device_route(subnet, device.clone()).map(|()| {
             ctx.on_event(IpLayerEvent::DeviceRouteAdded { device, subnet });
         })
@@ -2318,7 +2483,7 @@ pub(crate) fn del_route<
     ctx: &mut C,
     subnet: Subnet<I::Addr>,
 ) -> Result<(), NotFoundError> {
-    sync_ctx.with_ip_routing_table_mut(|table| {
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
         table.del_route(subnet).map(|removed| {
             removed.into_iter().for_each(|types::Entry { subnet, device, gateway }| match gateway {
                 None => ctx.on_event(IpLayerEvent::DeviceRouteRemoved { device, subnet }),
@@ -2337,7 +2502,7 @@ pub(crate) fn del_device_routes<
     _ctx: &mut C,
     to_delete: &SC::DeviceId,
 ) {
-    sync_ctx.with_ip_routing_table_mut(|table| {
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
         table.retain(|types::Entry { subnet: _, device, gateway: _ }| device != to_delete)
     })
 }
@@ -2591,7 +2756,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_icmp_sockets<
         O,
-        F: FnOnce(&IcmpSockets<Ipv4Addr, IpSock<Ipv4, DeviceId<C::Instant>, DefaultSendOptions>>) -> O,
+        F: FnOnce(&IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
     >(
         &self,
         cb: F,
@@ -2602,7 +2767,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv4, C> for &'_ SyncCtx<C> {
     fn with_icmp_sockets_mut<
         O,
         F: FnOnce(
-            &mut IcmpSockets<Ipv4Addr, IpSock<Ipv4, DeviceId<C::Instant>, DefaultSendOptions>>,
+            &mut IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>,
         ) -> O,
     >(
         &mut self,
@@ -2656,7 +2821,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_icmp_sockets<
         O,
-        F: FnOnce(&IcmpSockets<Ipv6Addr, IpSock<Ipv6, DeviceId<C::Instant>, DefaultSendOptions>>) -> O,
+        F: FnOnce(&IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
     >(
         &self,
         cb: F,
@@ -2667,7 +2832,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv6, C> for &'_ SyncCtx<C> {
     fn with_icmp_sockets_mut<
         O,
         F: FnOnce(
-            &mut IcmpSockets<Ipv6Addr, IpSock<Ipv6, DeviceId<C::Instant>, DefaultSendOptions>>,
+            &mut IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>,
         ) -> O,
     >(
         &mut self,
@@ -2697,6 +2862,8 @@ pub(crate) fn dispatch_receive_ip_packet_name<I: Ip>() -> &'static str {
 pub(crate) mod testutil {
     use super::*;
 
+    use alloc::collections::HashSet;
+
     use net_types::{ip::IpAddr, MulticastAddr};
 
     use crate::{
@@ -2705,8 +2872,21 @@ pub(crate) mod testutil {
         testutil::FakeSyncCtx,
     };
 
+    pub(crate) trait FakeStrongIpDeviceId:
+        StrongIpDeviceId<Weak = FakeWeakDeviceId<Self>>
+    {
+    }
+    impl<D: StrongIpDeviceId<Weak = FakeWeakDeviceId<Self>>> FakeStrongIpDeviceId for D {}
+
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
+
+    impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
+        fn eq(&self, other: &D) -> bool {
+            let Self(this) = self;
+            this == other
+        }
+    }
 
     impl<D: Debug> core::fmt::Display for FakeWeakDeviceId<D> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -2721,39 +2901,51 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: Ip, S, Meta, D: IpDeviceId + 'static> IpDeviceIdContext<I>
-        for crate::context::testutil::FakeSyncCtx<S, Meta, D>
-    {
-        type DeviceId = D;
-        type WeakDeviceId = FakeWeakDeviceId<D>;
+    impl<D: FakeStrongIpDeviceId> WeakIpDeviceId for FakeWeakDeviceId<D> {
+        type Strong = D;
+    }
 
-        fn downgrade_device_id(&self, device_id: &D) -> FakeWeakDeviceId<D> {
-            FakeWeakDeviceId(device_id.clone())
+    impl<I: Ip, S: AsRef<FakeIpDeviceIdCtx<I, D>>, Meta, D: FakeStrongIpDeviceId + 'static>
+        IpDeviceIdContext<I> for crate::context::testutil::FakeSyncCtx<S, Meta, D>
+    {
+        type DeviceId = <FakeIpDeviceIdCtx<I, D> as IpDeviceIdContext<I>>::DeviceId;
+        type WeakDeviceId = <FakeIpDeviceIdCtx<I, D> as IpDeviceIdContext<I>>::WeakDeviceId;
+
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            self.get_ref().as_ref().downgrade_device_id(device_id)
         }
 
-        fn upgrade_weak_device_id(
-            &self,
-            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<D>,
-        ) -> Option<D> {
-            Some(device_id.clone())
+        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
+            self.get_ref().as_ref().upgrade_weak_device_id(device_id)
+        }
+
+        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+            self.get_ref().as_ref().is_device_installed(device_id)
         }
     }
 
-    impl<I: Ip, Outer, S, Meta, D: IpDeviceId + 'static> IpDeviceIdContext<I>
-        for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
+    impl<
+            I: Ip,
+            Outer,
+            S: AsRef<FakeIpDeviceIdCtx<I, D>>,
+            Meta,
+            D: FakeStrongIpDeviceId + 'static,
+        > IpDeviceIdContext<I> for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
     {
-        type DeviceId = D;
-        type WeakDeviceId = FakeWeakDeviceId<D>;
+        type DeviceId =
+            <crate::context::testutil::FakeSyncCtx<S, Meta, D> as IpDeviceIdContext<I>>::DeviceId;
+        type WeakDeviceId = <crate::context::testutil::FakeSyncCtx<S, Meta, D> as IpDeviceIdContext<I>>::WeakDeviceId;
 
-        fn downgrade_device_id(&self, device_id: &D) -> FakeWeakDeviceId<D> {
-            FakeWeakDeviceId(device_id.clone())
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            self.inner.downgrade_device_id(device_id)
         }
 
-        fn upgrade_weak_device_id(
-            &self,
-            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<D>,
-        ) -> Option<D> {
-            Some(device_id.clone())
+        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
+            self.inner.upgrade_weak_device_id(device_id)
+        }
+
+        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+            self.inner.is_device_installed(device_id)
         }
     }
 
@@ -2769,6 +2961,10 @@ pub(crate) mod testutil {
         fn is_loopback(&self) -> bool {
             false
         }
+    }
+
+    impl StrongIpDeviceId for FakeDeviceId {
+        type Weak = FakeWeakDeviceId<Self>;
     }
 
     impl Display for FakeDeviceId {
@@ -2800,6 +2996,52 @@ pub(crate) mod testutil {
     impl IpDeviceId for MultipleDevicesId {
         fn is_loopback(&self) -> bool {
             false
+        }
+    }
+
+    impl StrongIpDeviceId for MultipleDevicesId {
+        type Weak = FakeWeakDeviceId<Self>;
+    }
+
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub(crate) struct FakeIpDeviceIdCtx<I, D> {
+        devices_removed: HashSet<D>,
+        _marker: core::marker::PhantomData<(I, D)>,
+    }
+
+    impl<I, D: Eq + Hash> FakeIpDeviceIdCtx<I, D> {
+        pub(crate) fn set_device_removed(&mut self, device: D, removed: bool) {
+            let Self { devices_removed, _marker } = self;
+            let _existed: bool = if removed {
+                devices_removed.insert(device)
+            } else {
+                devices_removed.remove(&device)
+            };
+        }
+    }
+
+    impl<I: Ip, DeviceId: FakeStrongIpDeviceId + 'static> IpDeviceIdContext<I>
+        for FakeIpDeviceIdCtx<I, DeviceId>
+    {
+        type DeviceId = DeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
+
+        fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<DeviceId>,
+        ) -> Option<DeviceId> {
+            let Self { devices_removed, _marker } = self;
+            (!devices_removed.contains(&device_id)).then(|| device_id.clone())
+        }
+
+        fn is_device_installed(&self, device_id: &DeviceId) -> bool {
+            let Self { devices_removed, _marker } = self;
+            !devices_removed.contains(&device_id)
         }
     }
 
@@ -2844,8 +3086,8 @@ pub(crate) mod testutil {
     impl<
             I: Ip + IpDeviceStateIpExt,
             C: RngContext + InstantContext<Instant = FakeInstant>,
-            D: IpDeviceId + 'static,
-            State: AsMut<FakeIpSocketCtx<I, D>>,
+            D: FakeStrongIpDeviceId + 'static,
+            State: AsMut<FakeIpSocketCtx<I, D>> + AsRef<FakeIpDeviceIdCtx<I, D>>,
             Meta,
         > MulticastMembershipHandler<I, C>
         for crate::context::testutil::FakeSyncCtx<State, Meta, D>

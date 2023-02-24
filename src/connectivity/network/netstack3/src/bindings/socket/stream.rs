@@ -30,7 +30,7 @@ use net_types::{
     ZonedAddr,
 };
 use netstack3_core::{
-    device::DeviceId,
+    device::{DeviceId, WeakDeviceId},
     ip::IpExt,
     transport::tcp::{
         self,
@@ -533,8 +533,10 @@ fn spawn_send_task<I: IpExt>(
 
 impl<I: IpSockAddrExt + IpExt> SocketWorker<I>
 where
-    DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
-        + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    DeviceId<StackTime>:
+        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    WeakDeviceId<StackTime>:
+        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
 {
     fn spawn(mut self, request_stream: fposix_socket::StreamSocketRequestStream) {
         fasync::Task::spawn(async move {

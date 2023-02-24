@@ -39,12 +39,14 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged as _},
     },
+    device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, SocketError, ZonedAddressError},
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         BufferIpTransportContext, BufferTransportIpContext, IpDeviceId, IpDeviceIdContext, IpExt,
         IpTransportContext, MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
+        WeakIpDeviceId,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -62,7 +64,7 @@ use crate::{
         AddrVec, Bound, BoundSocketMap, InsertError, SocketAddrType, SocketMapAddrSpec,
     },
     sync::RwLock,
-    transport, DeviceId, SyncCtx,
+    transport, SyncCtx,
 };
 
 /// A builder for UDP layer state.
@@ -100,7 +102,7 @@ impl UdpStateBuilder {
         self
     }
 
-    pub(crate) fn build<I: IpExt, D: IpDeviceId>(self) -> UdpState<I, D> {
+    pub(crate) fn build<I: IpExt, D: WeakIpDeviceId>(self) -> UdpState<I, D> {
         UdpState { sockets: Default::default(), send_port_unreachable: self.send_port_unreachable }
     }
 }
@@ -111,7 +113,7 @@ type UdpBoundSocketMap<I, D> = BoundSocketMap<IpPortSpec<I, D>, Udp<I, D>>;
 /// A collection of UDP sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct Sockets<I: Ip + IpExt, D: IpDeviceId> {
+pub(crate) struct Sockets<I: Ip + IpExt, D: WeakIpDeviceId> {
     sockets: DatagramSockets<IpPortSpec<I, D>, Udp<I, D>>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
@@ -120,12 +122,12 @@ pub(crate) struct Sockets<I: Ip + IpExt, D: IpDeviceId> {
 /// The state associated with the UDP protocol.
 ///
 /// `D` is the device ID type.
-pub(crate) struct UdpState<I: IpExt, D: IpDeviceId> {
+pub(crate) struct UdpState<I: IpExt, D: WeakIpDeviceId> {
     pub(crate) sockets: RwLock<Sockets<I, D>>,
     pub(crate) send_port_unreachable: bool,
 }
 
-impl<I: IpExt, D: IpDeviceId> Default for UdpState<I, D> {
+impl<I: IpExt, D: WeakIpDeviceId> Default for UdpState<I, D> {
     fn default() -> UdpState<I, D> {
         UdpStateBuilder::default().build()
     }
@@ -135,7 +137,7 @@ impl<I: IpExt, D: IpDeviceId> Default for UdpState<I, D> {
 struct Udp<I, D>(PhantomData<(I, D)>, Never);
 
 /// Produces an iterator over eligible receiving socket addresses.
-fn iter_receiving_addrs<I: Ip + IpExt, D: IpDeviceId>(
+fn iter_receiving_addrs<I: Ip + IpExt, D: WeakIpDeviceId>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     device: D,
 ) -> impl Iterator<Item = AddrVec<IpPortSpec<I, D>>> {
@@ -343,7 +345,7 @@ impl<I: IpExt, D: IpDeviceId> PosixSocketStateSpec for Udp<I, D> {
     type ConnState = ConnState<I, D>;
 }
 
-impl<I: IpExt, D: IpDeviceId> PosixConflictPolicy<IpPortSpec<I, D>> for Udp<I, D> {
+impl<I: IpExt, D: WeakIpDeviceId> PosixConflictPolicy<IpPortSpec<I, D>> for Udp<I, D> {
     fn check_posix_sharing(
         new_sharing: PosixSharingOptions,
         addr: AddrVec<IpPortSpec<I, D>>,
@@ -353,12 +355,12 @@ impl<I: IpExt, D: IpDeviceId> PosixConflictPolicy<IpPortSpec<I, D>> for Udp<I, D
     }
 }
 
-impl<I: IpExt, D: IpDeviceId> DatagramSocketStateSpec for Udp<I, D> {
+impl<I: IpExt, D: WeakIpDeviceId> DatagramSocketStateSpec for Udp<I, D> {
     type UnboundId = UnboundId<I>;
     type UnboundSharingState = PosixSharingOptions;
 }
 
-impl<I: IpExt, D: IpDeviceId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
+impl<I: IpExt, D: WeakIpDeviceId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
     type Serializer<B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
     fn make_packet<B: BufferMut>(
         body: B,
@@ -415,15 +417,15 @@ impl<T> PosixAddrState<T> {
 enum AddrEntry<'a, A: SocketMapAddrSpec> {
     Listen(
         &'a PosixAddrState<ListenerId<<A::IpAddr as IpAddress>::Version>>,
-        ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+        ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
     ),
     Conn(
         &'a PosixAddrState<ConnId<<A::IpAddr as IpAddress>::Version>>,
-        ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
     ),
 }
 
-impl<'a, I: Ip + IpExt, D: IpDeviceId + 'a> AddrEntry<'a, IpPortSpec<I, D>> {
+impl<'a, I: Ip + IpExt, D: WeakIpDeviceId + 'a> AddrEntry<'a, IpPortSpec<I, D>> {
     /// Returns an iterator that yields a `LookupResult` for each contained ID.
     fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<I, D>> + 'a {
         match self {
@@ -448,7 +450,7 @@ impl<'a, I: Ip + IpExt, D: IpDeviceId + 'a> AddrEntry<'a, IpPortSpec<I, D>> {
     }
 }
 
-impl<I: Ip + IpExt, D: IpDeviceId> UdpBoundSocketMap<I, D> {
+impl<I: Ip + IpExt, D: WeakIpDeviceId> UdpBoundSocketMap<I, D> {
     /// Finds the socket(s) that should receive an incoming packet.
     ///
     /// Uses the provided addresses and receiving device to look up sockets that
@@ -495,7 +497,7 @@ impl<I: Ip + IpExt, D: IpDeviceId> UdpBoundSocketMap<I, D> {
 /// Helper function to allocate a listen port.
 ///
 /// Finds a random ephemeral port that is not in the provided `used_ports` set.
-fn try_alloc_listen_port<I: IpExt, C: StateNonSyncContext<I>, D: IpDeviceId>(
+fn try_alloc_listen_port<I: IpExt, C: StateNonSyncContext<I>, D: WeakIpDeviceId>(
     ctx: &mut C,
     is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
 ) -> Option<NonZeroU16> {
@@ -512,7 +514,7 @@ fn try_alloc_listen_port<I: IpExt, C: StateNonSyncContext<I>, D: IpDeviceId>(
     None
 }
 
-impl<I: IpExt, D: IpDeviceId> PortAllocImpl for UdpBoundSocketMap<I, D> {
+impl<I: IpExt, D: WeakIpDeviceId> PortAllocImpl for UdpBoundSocketMap<I, D> {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
     type Id = ProtocolFlowId<I::Addr>;
@@ -735,7 +737,7 @@ impl<I: Ip> From<ListenerId<I>> for BoundId<I> {
     }
 }
 
-impl<I: Ip + IpExt, D: IpDeviceId> From<BoundId<I>> for DatagramBoundId<Udp<I, D>> {
+impl<I: Ip + IpExt, D: WeakIpDeviceId> From<BoundId<I>> for DatagramBoundId<Udp<I, D>> {
     fn from(id: BoundId<I>) -> Self {
         match id {
             BoundId::Connected(id) => DatagramBoundId::Connected(id),
@@ -780,7 +782,7 @@ impl<I: Ip> From<ConnId<I>> for SocketId<I> {
     }
 }
 
-impl<I: IpExt, D: IpDeviceId> From<SocketId<I>> for DatagramSocketId<Udp<I, D>> {
+impl<I: IpExt, D: WeakIpDeviceId> From<SocketId<I>> for DatagramSocketId<Udp<I, D>> {
     fn from(id: SocketId<I>) -> Self {
         match id {
             SocketId::Unbound(id) => Self::Unbound(id),
@@ -825,11 +827,11 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
-    type IpSocketsCtx: TransportIpContext<I, C, DeviceId = Self::DeviceId>
+    type IpSocketsCtx: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + MulticastMembershipHandler<I, C>;
 
     /// Calls the function with an immutable reference to UDP sockets.
-    fn with_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::DeviceId>) -> O>(
+    fn with_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -837,7 +839,7 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
     /// Calls the function with a mutable reference to UDP sockets.
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
@@ -895,13 +897,20 @@ impl<I: IpExt, B: BufferMut, C: StateNonSyncContext<I> + BufferNonSyncContext<I,
 pub(crate) trait BufferStateContext<I: IpExt, C: BufferStateNonSyncContext<I, B>, B: BufferMut>:
     StateContext<I, C, IpSocketsCtx = Self::BufferIpSocketsCtx>
 {
-    type BufferIpSocketsCtx: BufferTransportIpContext<I, C, B, DeviceId = Self::DeviceId>;
+    type BufferIpSocketsCtx: BufferTransportIpContext<
+        I,
+        C,
+        B,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
 }
 
 impl<I: IpExt, B: BufferMut, C: BufferStateNonSyncContext<I, B>, SC: StateContext<I, C>>
     BufferStateContext<I, C, B> for SC
 where
-    SC::IpSocketsCtx: BufferTransportIpContext<I, C, B, DeviceId = SC::DeviceId>,
+    SC::IpSocketsCtx:
+        BufferTransportIpContext<I, C, B, DeviceId = SC::DeviceId, WeakDeviceId = SC::WeakDeviceId>,
 {
     type BufferIpSocketsCtx = SC::IpSocketsCtx;
 }
@@ -936,10 +945,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
         if let (Some(src_ip), Some(src_port), Some(dst_port)) =
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
-            sync_ctx.with_sockets(|_sync_ctx, state| {
-        let Sockets {sockets: DatagramSockets{bound, unbound: _, }, lazy_port_alloc: _} = state;
+            sync_ctx.with_sockets(|sync_ctx, state| {
+                let Sockets {sockets: DatagramSockets{bound, unbound: _, }, lazy_port_alloc: _} = state;
                 let receiver = bound
-                    .lookup(src_ip, dst_ip, src_port, dst_port, device.clone())
+                    .lookup(src_ip, dst_ip, src_port, dst_port, sync_ctx.downgrade_device_id(device))
                     .next();
 
                 if let Some(id) = receiver {
@@ -978,7 +987,7 @@ impl<
 
         let send_port_unreachable = sync_ctx.should_send_port_unreachable();
 
-        sync_ctx.with_sockets(|_sync_ctx, state| {
+        sync_ctx.with_sockets(|sync_ctx, state| {
             let packet = if let Ok(packet) =
                 buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
             {
@@ -990,10 +999,18 @@ impl<
             let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
 
+            let device_weak = sync_ctx.downgrade_device_id(device);
+
             let recipients: Vec<LookupResult<_, _>> = SpecifiedAddr::new(src_ip)
                 .and_then(|src_ip| {
                     packet.src_port().map(|src_port| {
-                        bound.lookup(dst_ip, src_ip, packet.dst_port(), src_port, device.clone())
+                        bound.lookup(
+                            dst_ip,
+                            src_ip,
+                            packet.dst_port(),
+                            src_port,
+                            device_weak.clone(),
+                        )
                     })
                 })
                 .into_iter()
@@ -1084,7 +1101,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError>;
 
-    fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::DeviceId>;
+    fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId>;
 
     fn set_udp_posix_reuse_port(&mut self, ctx: &mut C, id: UnboundId<I>, reuse_port: bool);
 
@@ -1135,13 +1152,17 @@ pub(crate) trait SocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
         remote_port: NonZeroU16,
     ) -> Result<ConnId<I>, (ConnectListenerError, ConnId<I>)>;
 
-    fn remove_udp_conn(&mut self, ctx: &mut C, id: ConnId<I>) -> ConnInfo<I::Addr, Self::DeviceId>;
+    fn remove_udp_conn(
+        &mut self,
+        ctx: &mut C,
+        id: ConnId<I>,
+    ) -> ConnInfo<I::Addr, Self::WeakDeviceId>;
 
     fn get_udp_conn_info(
         &mut self,
         ctx: &mut C,
         id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::DeviceId>;
+    ) -> ConnInfo<I::Addr, Self::WeakDeviceId>;
 
     fn listen_udp(
         &mut self,
@@ -1155,13 +1176,13 @@ pub(crate) trait SocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
         &mut self,
         ctx: &mut C,
         id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::DeviceId>;
+    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId>;
 
     fn get_udp_listener_info(
         &mut self,
         ctx: &mut C,
         id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::DeviceId>;
+    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId>;
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<I, C> for SC {
@@ -1210,7 +1231,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         datagram::set_connected_device(self, ctx, id, device_id)
     }
 
-    fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::DeviceId> {
+    fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId> {
         datagram::get_bound_device(self, ctx, id)
     }
 
@@ -1344,7 +1365,11 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         crate::socket::datagram::reconnect(self, ctx, id, remote_ip, remote_port)
     }
 
-    fn remove_udp_conn(&mut self, ctx: &mut C, id: ConnId<I>) -> ConnInfo<I::Addr, Self::DeviceId> {
+    fn remove_udp_conn(
+        &mut self,
+        ctx: &mut C,
+        id: ConnId<I>,
+    ) -> ConnInfo<I::Addr, Self::WeakDeviceId> {
         let addr = datagram::remove_conn(self, ctx, id);
         addr.into()
     }
@@ -1353,7 +1378,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         &mut self,
         _ctx: &mut C,
         id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::DeviceId> {
+    ) -> ConnInfo<I::Addr, Self::WeakDeviceId> {
         self.with_sockets(|_sync_ctx, state| {
             let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
@@ -1377,7 +1402,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         &mut self,
         ctx: &mut C,
         id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::DeviceId> {
+    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId> {
         datagram::remove_listener(self, ctx, id).into()
     }
 
@@ -1385,7 +1410,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         &mut self,
         _ctx: &mut C,
         id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::DeviceId> {
+    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId> {
         self.with_sockets(|_sync_ctx, state| {
             let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
@@ -1604,16 +1629,16 @@ pub fn send_udp_listener<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
-    DatagramStateContext<IpPortSpec<I, SC::DeviceId>, C, Udp<I, SC::DeviceId>> for SC
+    DatagramStateContext<IpPortSpec<I, SC::WeakDeviceId>, C, Udp<I, SC::WeakDeviceId>> for SC
 {
     type IpSocketsCtx = SC::IpSocketsCtx;
-    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::DeviceId>>>;
+    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::WeakDeviceId>>>;
 
     fn with_sockets<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx,
-            &DatagramSockets<IpPortSpec<I, SC::DeviceId>, Udp<I, SC::DeviceId>>,
+            &DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
         ) -> O,
     >(
         &mut self,
@@ -1628,7 +1653,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx,
-            &mut DatagramSockets<IpPortSpec<I, SC::DeviceId>, Udp<I, SC::DeviceId>>,
+            &mut DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -1641,7 +1666,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: StateNonSyncContext<I>>
+impl<I: IpExt, D: WeakIpDeviceId, C: StateNonSyncContext<I>>
     DatagramStateNonSyncContext<IpPortSpec<I, D>> for C
 {
     fn try_alloc_listen_identifier(
@@ -1652,7 +1677,7 @@ impl<I: IpExt, D: IpDeviceId, C: StateNonSyncContext<I>>
     }
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, D: IpDeviceId>
+impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakIpDeviceId>
     LocalIdentifierAllocator<IpPortSpec<I, D>, C, Udp<I, D>>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
@@ -1834,8 +1859,8 @@ pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: SocketId<I>,
-) -> Option<DeviceId<C::Instant>> {
-    let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<DeviceId<C::Instant>>>>(
+) -> Option<WeakDeviceId<C::Instant>> {
+    let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<C::Instant>>>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             IpInvariant(SocketHandler::<Ipv4, _>::get_udp_bound_device(sync_ctx, ctx, id))
@@ -2142,7 +2167,7 @@ pub fn remove_udp_conn<I: IpExt, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
-) -> ConnInfo<I::Addr, DeviceId<C::Instant>> {
+) -> ConnInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2163,7 +2188,7 @@ pub fn get_udp_conn_info<I: IpExt, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
-) -> ConnInfo<I::Addr, DeviceId<C::Instant>> {
+) -> ConnInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2222,7 +2247,7 @@ pub fn remove_udp_listener<I: IpExt, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-) -> ListenerInfo<I::Addr, DeviceId<C::Instant>> {
+) -> ListenerInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2244,7 +2269,7 @@ pub fn get_udp_listener_info<I: IpExt, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-) -> ListenerInfo<I::Addr, DeviceId<C::Instant>> {
+) -> ListenerInfo<I::Addr, WeakDeviceId<C::Instant>> {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2296,7 +2321,10 @@ mod tests {
                 testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
                 IpSockRouteError, IpSockUnroutableError,
             },
-            testutil::{FakeDeviceId, MultipleDevicesId},
+            testutil::{
+                FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId,
+                MultipleDevicesId,
+            },
             SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector},
@@ -2329,8 +2357,8 @@ mod tests {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeUdpState<I: TestIpExt, D: IpDeviceId> {
-        sockets: Sockets<I, D>,
+    struct FakeUdpState<I: TestIpExt, D: FakeStrongIpDeviceId> {
+        sockets: Sockets<I, FakeWeakDeviceId<D>>,
     }
 
     impl<I: TestIpExt> Default for FakeUdpSyncCtx<I, FakeDeviceId> {
@@ -2351,7 +2379,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip + TestIpExt, D: IpDeviceId> FakeUdpSyncCtx<I, D> {
+    impl<I: Ip + TestIpExt, D: FakeStrongIpDeviceId> FakeUdpSyncCtx<I, D> {
         fn with_state(state: FakeBufferIpSocketCtx<I, D>) -> Self {
             FakeUdpSyncCtx::with_inner_and_outer_state(state, FakeUdpState::default())
         }
@@ -2408,12 +2436,15 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt, D: IpDeviceId + 'static> StateContext<I, FakeUdpNonSyncCtx<I>>
+    impl<I: TestIpExt, D: FakeStrongIpDeviceId + 'static> StateContext<I, FakeUdpNonSyncCtx<I>>
         for FakeUdpSyncCtx<I, D>
     {
         type IpSocketsCtx = FakeBufferSyncCtx<I, D>;
 
-        fn with_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::DeviceId>) -> O>(
+        fn with_sockets<
+            O,
+            F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::WeakDeviceId>) -> O,
+        >(
             &mut self,
             cb: F,
         ) -> O {
@@ -2424,7 +2455,7 @@ mod tests {
 
         fn with_sockets_mut<
             O,
-            F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::DeviceId>) -> O,
+            F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
             cb: F,
@@ -2493,7 +2524,7 @@ mod tests {
     }
 
     /// Helper function to inject an UDP packet with the provided parameters.
-    fn receive_udp_packet<I: TestIpExt, D: IpDeviceId + 'static>(
+    fn receive_udp_packet<I: TestIpExt, D: FakeStrongIpDeviceId + 'static>(
         sync_ctx: &mut FakeUdpSyncCtx<I, D>,
         ctx: &mut FakeUdpNonSyncCtx<I>,
         device: D,
@@ -2523,7 +2554,9 @@ mod tests {
     const LOCAL_PORT: NonZeroU16 = nonzero!(100u16);
     const REMOTE_PORT: NonZeroU16 = nonzero!(200u16);
 
-    fn conn_addr<I>(device: Option<FakeDeviceId>) -> AddrVec<IpPortSpec<I, FakeDeviceId>>
+    fn conn_addr<I>(
+        device: Option<FakeWeakDeviceId<FakeDeviceId>>,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2536,7 +2569,9 @@ mod tests {
         .into()
     }
 
-    fn local_listener<I>(device: Option<FakeDeviceId>) -> AddrVec<IpPortSpec<I, FakeDeviceId>>
+    fn local_listener<I>(
+        device: Option<FakeWeakDeviceId<FakeDeviceId>>,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2545,7 +2580,9 @@ mod tests {
             .into()
     }
 
-    fn wildcard_listener<I>(device: Option<FakeDeviceId>) -> AddrVec<IpPortSpec<I, FakeDeviceId>>
+    fn wildcard_listener<I>(
+        device: Option<FakeWeakDeviceId<FakeDeviceId>>,
+    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2553,19 +2590,19 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(conn_addr(Some(FakeDeviceId)), [
-            conn_addr(None), local_listener(Some(FakeDeviceId)), local_listener(None),
-            wildcard_listener(Some(FakeDeviceId)), wildcard_listener(None)
+    #[test_case(conn_addr(Some(FakeWeakDeviceId(FakeDeviceId))), [
+            conn_addr(None), local_listener(Some(FakeWeakDeviceId(FakeDeviceId))), local_listener(None),
+            wildcard_listener(Some(FakeWeakDeviceId(FakeDeviceId))), wildcard_listener(None)
         ]; "conn with device")]
-    #[test_case(local_listener(Some(FakeDeviceId)),
-        [local_listener(None), wildcard_listener(Some(FakeDeviceId)), wildcard_listener(None)];
+    #[test_case(local_listener(Some(FakeWeakDeviceId(FakeDeviceId))),
+        [local_listener(None), wildcard_listener(Some(FakeWeakDeviceId(FakeDeviceId))), wildcard_listener(None)];
         "local listener with device")]
-    #[test_case(wildcard_listener(Some(FakeDeviceId)), [wildcard_listener(None)];
+    #[test_case(wildcard_listener(Some(FakeWeakDeviceId(FakeDeviceId))), [wildcard_listener(None)];
         "wildcard listener with device")]
     #[test_case(conn_addr(None), [local_listener(None), wildcard_listener(None)]; "conn no device")]
     #[test_case(local_listener(None), [wildcard_listener(None)]; "local listener no device")]
     #[test_case(wildcard_listener(None), []; "wildcard listener no device")]
-    fn test_udp_addr_vec_iter_shadows_conn<I: Ip + IpExt, D: IpDeviceId, const N: usize>(
+    fn test_udp_addr_vec_iter_shadows_conn<I: Ip + IpExt, D: WeakIpDeviceId, const N: usize>(
         addr: AddrVec<IpPortSpec<I, D>>,
         expected_shadows: [AddrVec<IpPortSpec<I, D>>; N],
     ) {
@@ -2579,16 +2616,16 @@ mod tests {
             remote: (remote_ip::<I>(), REMOTE_PORT),
         };
         assert_eq!(
-            iter_receiving_addrs::<I, _>(addr, FakeDeviceId).collect::<Vec<_>>(),
+            iter_receiving_addrs::<I, _>(addr, FakeWeakDeviceId(FakeDeviceId)).collect::<Vec<_>>(),
             vec![
                 // A socket connected on exactly the receiving vector has precedence.
-                conn_addr(Some(FakeDeviceId)),
+                conn_addr(Some(FakeWeakDeviceId(FakeDeviceId))),
                 // Connected takes precedence over listening with device match.
                 conn_addr(None),
-                local_listener(Some(FakeDeviceId)),
+                local_listener(Some(FakeWeakDeviceId(FakeDeviceId))),
                 // Specific IP takes precedence over device match.
                 local_listener(None),
-                wildcard_listener(Some(FakeDeviceId)),
+                wildcard_listener(Some(FakeWeakDeviceId(FakeDeviceId))),
                 // Fallback to least specific
                 wildcard_listener(None)
             ]
@@ -2841,6 +2878,57 @@ mod tests {
         assert_eq!(result, Err(LocalAddressError::CannotBindToAddress));
     }
 
+    fn set_device_removed<I: TestIpExt>(
+        sync_ctx: &mut UdpFakeDeviceSyncCtx<I>,
+        device_removed: bool,
+    ) {
+        let sync_ctx: &mut FakeSyncCtx<_, _, _> = sync_ctx.as_mut();
+        let sync_ctx: &mut FakeIpDeviceIdCtx<_, _> = sync_ctx.get_mut().as_mut();
+        sync_ctx.set_device_removed(FakeDeviceId, device_removed);
+    }
+
+    #[ip_test]
+    #[test_case(
+        true,
+        Err(IpSockCreationError::Route(IpSockRouteError::Unroutable(
+            IpSockUnroutableError::NoRouteToRemoteAddr,
+        )).into()); "remove device"
+    )]
+    #[test_case(false, Ok(()); "dont remove device")]
+    fn test_udp_conn_device_removed<I: Ip + TestIpExt>(
+        remove_device: bool,
+        expected: Result<(), SockCreationError>,
+    ) {
+        set_logger_for_test();
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        SocketHandler::set_unbound_udp_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            Some(&FakeDeviceId),
+        );
+
+        if remove_device {
+            set_device_removed(&mut sync_ctx, remove_device);
+        }
+
+        let remote_ip = remote_ip::<I>();
+        assert_eq!(
+            SocketHandler::<I, _>::connect_udp(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                unbound,
+                ZonedAddr::Unzoned(remote_ip),
+                NonZeroU16::new(100).unwrap(),
+            )
+            .map(|_: ConnId<I>| ()),
+            expected,
+        );
+    }
+
     /// Tests that UDP connections fail with an appropriate error when local
     /// ports are exhausted.
     #[ip_test]
@@ -2851,7 +2939,7 @@ mod tests {
 
         let local_ip = local_ip::<I>();
         // Exhaust local ports to trigger FailedToAllocateLocalPort error.
-        for port_num in UdpBoundSocketMap::<I, FakeDeviceId>::EPHEMERAL_RANGE {
+        for port_num in UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE {
             let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
             let _: ListenerId<_> = SocketHandler::listen_udp(
                 &mut sync_ctx,
@@ -2933,7 +3021,8 @@ mod tests {
             conn.into()
         ));
         assert_eq!(
-            sync_ctx.inner.get_ref().as_ref().multicast_memberships(),
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
             HashMap::from([((FakeDeviceId, multicast_addr), nonzero!(1usize))])
         );
         assert_eq!(
@@ -3012,7 +3101,8 @@ mod tests {
             listener.into()
         ));
         assert_eq!(
-            sync_ctx.inner.get_ref().as_ref().multicast_memberships(),
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
             HashMap::from([((FakeDeviceId, multicast_addr), nonzero!(1usize))])
         );
         assert_eq!(
@@ -3077,9 +3167,9 @@ mod tests {
         assert_eq!(
             SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             ConnInfo {
-                local_ip,
+                local_ip: local_ip.map_zone(FakeWeakDeviceId),
                 local_port,
-                remote_ip: other_remote_ip,
+                remote_ip: other_remote_ip.map_zone(FakeWeakDeviceId),
                 remote_port: other_remote_port
             }
         );
@@ -3128,7 +3218,12 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, socket),
-            ConnInfo { local_ip, local_port: LOCAL_PORT, remote_ip, remote_port: REMOTE_PORT }
+            ConnInfo {
+                local_ip: local_ip.map_zone(FakeWeakDeviceId),
+                local_port: LOCAL_PORT,
+                remote_ip: remote_ip.map_zone(FakeWeakDeviceId),
+                remote_port: REMOTE_PORT
+            }
         );
     }
 
@@ -3235,6 +3330,52 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(send_err, IpSockSendError::Mtu);
+    }
+
+    #[ip_test]
+    fn test_send_udp_conn_device_removed<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+        let remote_ip = remote_ip::<I>();
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        SocketHandler::set_unbound_udp_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            Some(&FakeDeviceId),
+        );
+        let conn = SocketHandler::<I, _>::connect_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            ZonedAddr::Unzoned(remote_ip),
+            NonZeroU16::new(200).unwrap(),
+        )
+        .expect("connect_udp failed");
+
+        for (device_removed, expected_res) in [
+            (false, Ok(())),
+            (
+                true,
+                Err((
+                    Buf::new(Vec::new(), ..),
+                    IpSockSendError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr),
+                )),
+            ),
+        ] {
+            set_device_removed(&mut sync_ctx, device_removed);
+
+            assert_eq!(
+                BufferSocketHandler::send_udp_conn(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    conn,
+                    Buf::new(Vec::new(), ..),
+                ),
+                expected_res,
+            )
+        }
     }
 
     /// Tests that if we have multiple listeners and connections, demuxing the
@@ -4077,7 +4218,7 @@ mod tests {
         .expect("connect_udp failed");
         let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
-        let valid_range = &UdpBoundSocketMap::<I, FakeDeviceId>::EPHEMERAL_RANGE;
+        let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
         let port_a = assert_matches!(bound.conns().get_by_id(&conn_a),
             Some((_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})) => local_identifier)
         .get();
@@ -4181,12 +4322,10 @@ mod tests {
                 _,
                 ListenerAddr{ ip: ListenerIpAddr {identifier, addr: _}, device: None}
             )) => identifier);
-        assert!(
-            UdpBoundSocketMap::<I, FakeDeviceId>::EPHEMERAL_RANGE.contains(&wildcard_port.get())
-        );
-        assert!(
-            UdpBoundSocketMap::<I, FakeDeviceId>::EPHEMERAL_RANGE.contains(&specified_port.get())
-        );
+        assert!(UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE
+            .contains(&wildcard_port.get()));
+        assert!(UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE
+            .contains(&specified_port.get()));
         assert_ne!(wildcard_port, specified_port);
     }
 
@@ -4301,9 +4440,9 @@ mod tests {
         .expect("connect_udp failed");
         let info = SocketHandler::remove_udp_conn(&mut sync_ctx, &mut non_sync_ctx, conn);
         // Assert that the info gotten back matches what was expected.
-        assert_eq!(info.local_ip, local_ip);
+        assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
-        assert_eq!(info.remote_ip, remote_ip);
+        assert_eq!(info.remote_ip, remote_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.remote_port, remote_port);
 
         // Assert that that connection id was removed from the connections
@@ -4332,7 +4471,7 @@ mod tests {
         )
         .expect("listen_udp failed");
         let info = SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
-        assert_eq!(info.local_ip.unwrap(), local_ip);
+        assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
         let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
@@ -4383,7 +4522,8 @@ where {
             true,
         );
 
-        let memberships_snapshot = sync_ctx.inner.get_ref().as_ref().multicast_memberships();
+        let memberships_snapshot = AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+            .multicast_memberships();
         if let Ok(()) = result {
             SocketHandler::set_udp_multicast_membership(
                 &mut sync_ctx,
@@ -4395,7 +4535,11 @@ where {
             )
             .expect("leaving group failed");
         }
-        assert_eq!(sync_ctx.inner.get_ref().as_ref().multicast_memberships(), HashMap::default());
+        assert_eq!(
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
+            HashMap::default()
+        );
 
         (result, memberships_snapshot)
     }
@@ -4526,6 +4670,47 @@ where {
     }
 
     #[ip_test]
+    fn test_multicast_membership_with_removed_device<I: Ip + TestIpExt>() {
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        SocketHandler::set_unbound_udp_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound.into(),
+            Some(&FakeDeviceId),
+        );
+
+        set_device_removed(&mut sync_ctx, true);
+
+        let group = I::get_multicast_addr(4);
+        assert_eq!(
+            SocketHandler::set_udp_multicast_membership(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                unbound.into(),
+                group,
+                // Will use the socket's bound device.
+                MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute,
+                true,
+            ),
+            Err(SetMulticastMembershipError::DeviceDoesNotExist),
+        );
+
+        // Should not have updated the device's multicast state.
+        //
+        // Note that even though we mock the device being removed above, its
+        // state still exists in the fake IP socket context so we can inspect
+        // it here.
+        assert_eq!(
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
+            HashMap::default(),
+        );
+    }
+
+    #[ip_test]
     fn test_remove_udp_unbound_leaves_multicast_groups<I: Ip + TestIpExt>() {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
@@ -4543,12 +4728,17 @@ where {
         .expect("join group failed");
 
         assert_eq!(
-            sync_ctx.inner.get_ref().as_ref().multicast_memberships(),
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
             HashMap::from([((MultipleDevicesId::A, group), nonzero!(1usize))])
         );
 
         SocketHandler::remove_udp_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound);
-        assert_eq!(sync_ctx.inner.get_ref().as_ref().multicast_memberships(), HashMap::default());
+        assert_eq!(
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
+            HashMap::default()
+        );
     }
 
     #[ip_test]
@@ -4590,7 +4780,8 @@ where {
         .expect("join group failed");
 
         assert_eq!(
-            sync_ctx.inner.get_ref().as_ref().multicast_memberships(),
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
             HashMap::from([
                 ((MultipleDevicesId::A, first_group), nonzero!(1usize)),
                 ((MultipleDevicesId::A, second_group), nonzero!(1usize))
@@ -4599,7 +4790,11 @@ where {
 
         let _: ListenerInfo<_, _> =
             SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
-        assert_eq!(sync_ctx.inner.get_ref().as_ref().multicast_memberships(), HashMap::default());
+        assert_eq!(
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
+            HashMap::default()
+        );
     }
 
     #[ip_test]
@@ -4641,7 +4836,8 @@ where {
         .expect("join group failed");
 
         assert_eq!(
-            sync_ctx.inner.get_ref().as_ref().multicast_memberships(),
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
             HashMap::from([
                 ((MultipleDevicesId::A, first_group), nonzero!(1usize)),
                 ((MultipleDevicesId::A, second_group), nonzero!(1usize))
@@ -4650,7 +4846,11 @@ where {
 
         let _: ConnInfo<_, _> =
             SocketHandler::remove_udp_conn(&mut sync_ctx, &mut non_sync_ctx, conn);
-        assert_eq!(sync_ctx.inner.get_ref().as_ref().multicast_memberships(), HashMap::default());
+        assert_eq!(
+            AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
+                .multicast_memberships(),
+            HashMap::default()
+        );
     }
 
     #[ip_test]
@@ -4707,9 +4907,9 @@ where {
         )
         .expect("connect_udp_listener failed");
         let info = SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn);
-        assert_eq!(info.local_ip, local_ip);
+        assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port.get(), 100);
-        assert_eq!(info.remote_ip, remote_ip);
+        assert_eq!(info.remote_ip, remote_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.remote_port.get(), 200);
     }
 
@@ -4730,7 +4930,7 @@ where {
         )
         .expect("listen_udp failed");
         let info = SocketHandler::get_udp_listener_info(&mut sync_ctx, &mut non_sync_ctx, list);
-        assert_eq!(info.local_ip.unwrap(), local_ip);
+        assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port.get(), 100);
 
         // Check getting info on wildcard listener.
@@ -4828,7 +5028,7 @@ where {
         );
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }
 
@@ -4854,7 +5054,7 @@ where {
         .expect("failed to listen");
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, listen.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
         SocketHandler::set_listener_udp_device(
@@ -4892,7 +5092,7 @@ where {
         .expect("failed to connect");
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, conn.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
         SocketHandler::set_conn_udp_device(&mut sync_ctx, &mut non_sync_ctx, conn.into(), None)
             .expect("failed to set device");
@@ -5091,7 +5291,7 @@ where {
 
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &mut non_sync_ctx, listener.into()),
-            Some(MultipleDevicesId::A)
+            Some(FakeWeakDeviceId(MultipleDevicesId::A))
         );
 
         assert_eq!(
@@ -5205,7 +5405,7 @@ where {
         assert_eq!(
             SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn),
             ConnInfo {
-                local_ip: zoned_local_addr,
+                local_ip: zoned_local_addr.map_zone(FakeWeakDeviceId),
                 local_port: LOCAL_PORT,
                 remote_ip: ZonedAddr::Unzoned(remote_ip::<Ipv6>()),
                 remote_port: REMOTE_PORT,
@@ -5218,10 +5418,10 @@ where {
         Err(ConnectListenerError::Zone(ZonedAddressError::DeviceZoneMismatch));
         "connect to different zone")]
     #[test_case(ZonedAddr::Unzoned(SpecifiedAddr::new(net_ip_v6!("fe80::3")).unwrap()),
-        Ok(MultipleDevicesId::A); "connect implicit zone")]
+        Ok(FakeWeakDeviceId(MultipleDevicesId::A)); "connect implicit zone")]
     fn test_udp_ipv6_bind_zoned(
         remote_addr: ZonedAddr<Ipv6Addr, MultipleDevicesId>,
-        expected: Result<MultipleDevicesId, ConnectListenerError>,
+        expected: Result<FakeWeakDeviceId<MultipleDevicesId>, ConnectListenerError>,
     ) {
         let remote_ips = vec![SpecifiedAddr::new(net_ip_v6!("fe80::3")).unwrap()];
 
@@ -5507,7 +5707,7 @@ where {
 
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
         let listener =
@@ -5515,7 +5715,7 @@ where {
 
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
-            bind_device
+            bind_device.map(FakeWeakDeviceId),
         );
     }
 
@@ -5554,14 +5754,14 @@ where {
 
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
         let listener =
             SocketHandler::disconnect_udp_connected(&mut sync_ctx, &mut non_sync_ctx, conn);
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }
 
@@ -5597,7 +5797,7 @@ where {
 
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
         // This is a no-op functionally since the socket is already bound to the
@@ -5615,7 +5815,7 @@ where {
             SocketHandler::disconnect_udp_connected(&mut sync_ctx, &mut non_sync_ctx, conn);
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listener.into()),
-            Some(FakeDeviceId)
+            Some(FakeWeakDeviceId(FakeDeviceId))
         );
     }
 

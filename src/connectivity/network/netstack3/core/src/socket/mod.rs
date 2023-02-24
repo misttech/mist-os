@@ -26,7 +26,7 @@ use crate::{
         },
     },
     error::ExistsError,
-    ip::{IpDeviceId, IpExt},
+    ip::{IpExt, StrongIpDeviceId, WeakIpDeviceId},
     socket::address::{ConnAddr, ListenerAddr, ListenerIpAddr},
 };
 
@@ -37,6 +37,32 @@ use crate::{
 /// link-local addresses and false for all others.
 pub(crate) fn must_have_zone<A: IpAddress>(addr: &SpecifiedAddr<A>) -> bool {
     try_into_null_zoned(addr).is_some()
+}
+
+/// Determines where a change in device is allowed given the local and remote
+/// addresses.
+pub(crate) fn can_device_change<
+    A: IpAddress,
+    W: WeakIpDeviceId<Strong = S>,
+    S: StrongIpDeviceId,
+>(
+    local_ip: Option<&SpecifiedAddr<A>>,
+    remote_ip: Option<&SpecifiedAddr<A>>,
+    old_device: Option<&W>,
+    new_device: Option<&S>,
+) -> bool {
+    let must_have_zone =
+        local_ip.map_or(false, must_have_zone) || remote_ip.map_or(false, must_have_zone);
+
+    if !must_have_zone {
+        return true;
+    }
+
+    let old_device = old_device.as_ref().unwrap_or_else(|| {
+        panic!("local_ip={:?} or remote_ip={:?} must have zone", local_ip, remote_ip)
+    });
+
+    new_device.as_ref().map_or(false, |new_device| old_device == new_device)
 }
 
 /// Converts into a [`AddrAndZone<A, ()>`] if the address requires a zone.
@@ -98,7 +124,7 @@ pub(crate) trait SocketMapAddrSpec {
     /// The type of IP addresses in the socket address.
     type IpAddr: IpAddress<Version = Self::IpVersion>;
     /// The type of the device component of a socket address.
-    type DeviceId: IpDeviceId;
+    type WeakDeviceId: WeakIpDeviceId;
     /// The local identifier portion of a socket address.
     type LocalIdentifier: Clone + Debug + Hash + Eq;
     /// The remote identifier portion of a socket address.
@@ -258,16 +284,16 @@ pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
     Hash(bound = "")
 )]
 pub(crate) enum AddrVec<A: SocketMapAddrSpec + ?Sized> {
-    Listen(ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>),
-    Conn(ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>),
+    Listen(ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>),
+    Conn(ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
 impl<A: SocketMapAddrSpec, S: SocketMapStateSpec> Tagged<AddrVec<A>> for Bound<S>
 where
     S::ListenerAddrState:
-        Tagged<ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>, Tag = S::AddrVecTag>,
+        Tagged<ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>, Tag = S::AddrVecTag>,
     S::ConnAddrState: Tagged<
-        ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
         Tag = S::AddrVecTag,
     >,
 {
@@ -355,12 +381,12 @@ where
     listener_id_to_sock: IdMap<(
         S::ListenerState,
         S::ListenerSharingState,
-        ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+        ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
     )>,
     conn_id_to_sock: IdMap<(
         S::ConnState,
         S::ConnSharingState,
-        ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
     )>,
     addr_to_state: SocketMap<AddrVec<A>, Bound<S>>,
 }
@@ -696,7 +722,7 @@ where
         &IdMap<(
             S::ListenerState,
             S::ListenerSharingState,
-            ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
         )>,
         &SocketMap<AddrVec<A>, Bound<S>>,
         S::ListenerAddrState,
@@ -704,7 +730,7 @@ where
     >
     where
         S: SocketMapConflictPolicy<
-            ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
             <S as SocketMapStateSpec>::ListenerSharingState,
             A,
         >,
@@ -721,7 +747,7 @@ where
         &mut IdMap<(
             S::ListenerState,
             S::ListenerSharingState,
-            ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
         )>,
         &mut SocketMap<AddrVec<A>, Bound<S>>,
         S::ListenerAddrState,
@@ -729,7 +755,7 @@ where
     >
     where
         S: SocketMapConflictPolicy<
-            ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+            ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
             <S as SocketMapStateSpec>::ListenerSharingState,
             A,
         >,
@@ -750,7 +776,7 @@ where
         &IdMap<(
             S::ConnState,
             S::ConnSharingState,
-            ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
         )>,
         &SocketMap<AddrVec<A>, Bound<S>>,
         S::ConnAddrState,
@@ -758,7 +784,7 @@ where
     >
     where
         S: SocketMapConflictPolicy<
-            ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
             <S as SocketMapStateSpec>::ConnSharingState,
             A,
         >,
@@ -775,7 +801,7 @@ where
         &mut IdMap<(
             S::ConnState,
             S::ConnSharingState,
-            ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
         )>,
         &mut SocketMap<AddrVec<A>, Bound<S>>,
         S::ConnAddrState,
@@ -783,7 +809,7 @@ where
     >
     where
         S: SocketMapConflictPolicy<
-            ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
             <S as SocketMapStateSpec>::ConnSharingState,
             A,
         >,
@@ -833,13 +859,15 @@ impl<A: SocketMapAddrSpec, S: SocketMapStateSpec>
     ConvertSocketTypeState<
         A,
         S,
-        ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>,
+        ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
         S::ListenerAddrState,
     > for BoundSocketMap<A, S>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
-    fn to_addr_vec(addr: &ListenerAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier>) -> AddrVec<A> {
+    fn to_addr_vec(
+        addr: &ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>,
+    ) -> AddrVec<A> {
         AddrVec::Listen(addr.clone())
     }
 
@@ -866,14 +894,14 @@ impl<A: SocketMapAddrSpec, S: SocketMapStateSpec>
     ConvertSocketTypeState<
         A,
         S,
-        ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
         S::ConnAddrState,
     > for BoundSocketMap<A, S>
 where
     Bound<S>: Tagged<AddrVec<A>>,
 {
     fn to_addr_vec(
-        addr: &ConnAddr<A::IpAddr, A::DeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+        addr: &ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
     ) -> AddrVec<A> {
         AddrVec::Conn(addr.clone())
     }
@@ -910,7 +938,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        ip::testutil::FakeDeviceId,
+        ip::testutil::{FakeDeviceId, FakeWeakDeviceId},
         socket::address::{ConnIpAddr, ListenerIpAddr},
         testutil::set_logger_for_test,
     };
@@ -1000,7 +1028,7 @@ mod tests {
     impl SocketMapAddrSpec for FakeAddrSpec {
         type IpVersion = Ipv4;
         type IpAddr = Ipv4Addr;
-        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
         type LocalIdentifier = u16;
         type RemoteIdentifier = ();
     }
@@ -1129,15 +1157,16 @@ mod tests {
         }
     }
 
-    const LISTENER_ADDR: ListenerAddr<Ipv4Addr, FakeDeviceId, u16> = ListenerAddr {
-        ip: ListenerIpAddr {
-            addr: Some(unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
-            identifier: 0,
-        },
-        device: None,
-    };
+    const LISTENER_ADDR: ListenerAddr<Ipv4Addr, FakeWeakDeviceId<FakeDeviceId>, u16> =
+        ListenerAddr {
+            ip: ListenerIpAddr {
+                addr: Some(unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
+                identifier: 0,
+            },
+            device: None,
+        };
 
-    const CONN_ADDR: ConnAddr<Ipv4Addr, FakeDeviceId, u16, ()> = ConnAddr {
+    const CONN_ADDR: ConnAddr<Ipv4Addr, FakeWeakDeviceId<FakeDeviceId>, u16, ()> = ConnAddr {
         ip: unsafe {
             ConnIpAddr {
                 local: (SpecifiedAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
@@ -1251,7 +1280,7 @@ mod tests {
         let addr = LISTENER_ADDR;
         let shadows_addr = {
             assert_eq!(addr.device, None);
-            ListenerAddr { device: Some(FakeDeviceId), ..addr }
+            ListenerAddr { device: Some(FakeWeakDeviceId(FakeDeviceId)), ..addr }
         };
 
         let _: Listener = bound.listeners_mut().try_insert(addr, 0, 'a').unwrap().id();

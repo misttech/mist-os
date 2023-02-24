@@ -20,7 +20,7 @@ use crate::{
     ip::{
         device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
         forwarding::Destination,
-        IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, SendIpPacketMeta,
+        EitherDeviceId, IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, SendIpPacketMeta,
     },
 };
 
@@ -47,12 +47,12 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
     fn new_ip_socket<O>(
         &mut self,
         ctx: &mut C,
-        device: Option<&Self::DeviceId>,
+        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         remote_ip: SpecifiedAddr<I::Addr>,
         proto: I::Proto,
         options: O,
-    ) -> Result<IpSock<I, Self::DeviceId, O>, (IpSockCreationError, O)>;
+    ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)>;
 }
 
 /// An error in sending a packet on an IP socket.
@@ -112,7 +112,7 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
     fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
         &mut self,
         ctx: &mut C,
-        socket: &IpSock<I, Self::DeviceId, O>,
+        socket: &IpSock<I, Self::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockSendError)>;
@@ -149,7 +149,7 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
     >(
         &mut self,
         ctx: &mut C,
-        device: Option<&Self::DeviceId>,
+        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         remote_ip: SpecifiedAddr<I::Addr>,
         proto: I::Proto,
@@ -197,12 +197,15 @@ impl Mms {
 }
 
 /// Possible errors when retrieving the maximum transport message size.
+#[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MmsError {
     /// Cannot find the device that is used for the ip socket, possibly because
     /// there is no route.
-    NoDevice(IpSockRouteError),
+    #[error("cannot find the device: {}", _0)]
+    NoDevice(#[from] IpSockRouteError),
     /// The MTU provided by the device is too small such that there is no room
     /// for a transport message at all.
+    #[error("invalid MTU: {:?}", _0)]
     MTUTooSmall(Mtu),
 }
 
@@ -219,7 +222,7 @@ where
     fn get_mms<O: SendOptions<I>>(
         &mut self,
         ctx: &mut C,
-        ip_sock: &IpSock<I, Self::DeviceId, O>,
+        ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError>;
 }
 
@@ -404,12 +407,29 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
     fn new_ip_socket<O>(
         &mut self,
         ctx: &mut C,
-        device: Option<&SC::DeviceId>,
+        device: Option<EitherDeviceId<&SC::DeviceId, &SC::WeakDeviceId>>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         remote_ip: SpecifiedAddr<I::Addr>,
         proto: I::Proto,
         options: O,
-    ) -> Result<IpSock<I, SC::DeviceId, O>, (IpSockCreationError, O)> {
+    ) -> Result<IpSock<I, SC::WeakDeviceId, O>, (IpSockCreationError, O)> {
+        let device = if let Some(device) = device.as_ref() {
+            if let Some(device) = device.as_strong_ref(self) {
+                Some(device)
+            } else {
+                return Err((
+                    IpSockCreationError::Route(IpSockRouteError::Unroutable(
+                        IpSockUnroutableError::NoRouteToRemoteAddr,
+                    )),
+                    options,
+                ));
+            }
+        } else {
+            None
+        };
+
+        let device = device.as_ref().map(|d| d.as_ref());
+
         // Make sure the remote is routable with a local address before creating
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
@@ -420,7 +440,12 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
                 Err(e) => return Err((e.into(), options)),
             };
 
-        let definition = IpSockDefinition { local_ip, remote_ip, device: device.cloned(), proto };
+        let definition = IpSockDefinition {
+            local_ip,
+            remote_ip,
+            device: device.map(|d| self.downgrade_device_id(&d)),
+            proto,
+        };
         Ok(IpSock { definition: definition, options })
     }
 }
@@ -469,12 +494,22 @@ fn send_ip_packet<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    socket: &IpSock<I, SC::DeviceId, O>,
+    socket: &IpSock<I, SC::WeakDeviceId, O>,
     body: S,
     mtu: Option<u32>,
 ) -> Result<(), (S, IpSockSendError)> {
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;
+
+    let device = if let Some(device) = device {
+        let Some(device) = sync_ctx.upgrade_weak_device_id(device) else {
+            return Err((body, IpSockUnroutableError::NoRouteToRemoteAddr.into()));
+        };
+        Some(device)
+    } else {
+        None
+    };
+
     let IpSockRoute { local_ip: got_local_ip, destination: Destination { device, next_hop } } =
         match sync_ctx.lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
             Ok(o) => o,
@@ -517,7 +552,7 @@ impl<
     fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
         &mut self,
         ctx: &mut C,
-        ip_sock: &IpSock<I, SC::DeviceId, O>,
+        ip_sock: &IpSock<I, SC::WeakDeviceId, O>,
         body: S,
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockSendError)> {
@@ -541,9 +576,17 @@ impl<
     fn get_mms<O: SendOptions<I>>(
         &mut self,
         ctx: &mut C,
-        ip_sock: &IpSock<I, Self::DeviceId, O>,
+        ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
     ) -> Result<Mms, MmsError> {
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
+        let device = device
+            .as_ref()
+            .map(|d| {
+                self.upgrade_weak_device_id(d)
+                    .ok_or(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr))
+            })
+            .transpose()?;
+
         let IpSockRoute { destination: Destination { next_hop: _, device }, local_ip: _ } = self
             .lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
@@ -855,9 +898,9 @@ pub(crate) mod testutil {
         ip::{
             device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
             forwarding::ForwardingTable,
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            HopLimits, IpDeviceId, MulticastMembershipHandler, SendIpPacketMeta,
-            TransportIpContext, DEFAULT_HOP_LIMITS,
+            testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId},
+            HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
+            DEFAULT_HOP_LIMITS,
         },
     };
 
@@ -871,18 +914,33 @@ pub(crate) mod testutil {
     pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<I, D>,
+    }
+
+    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<I, D>> for FakeIpSocketCtx<I, D> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<I, D> {
+            let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
+            ip_device_id_ctx
+        }
+    }
+
+    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<I, D>> for FakeIpSocketCtx<I, D> {
+        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<I, D> {
+            let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
+            ip_device_id_ctx
+        }
     }
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            DeviceId: IpDeviceId + 'static,
+            DeviceId: FakeStrongIpDeviceId + 'static,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
                 let hop_limit = self.get_device_state(device).default_hop_limit;
-                HopLimits { unicast: hop_limit, multicast: hop_limit }
+                HopLimits { unicast: hop_limit, multicast: DEFAULT_HOP_LIMITS.multicast }
             })
         }
 
@@ -896,28 +954,32 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: IpDeviceId + 'static> IpDeviceIdContext<I>
+    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongIpDeviceId + 'static> IpDeviceIdContext<I>
         for FakeIpSocketCtx<I, DeviceId>
     {
-        type DeviceId = DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
+        type DeviceId = <FakeIpDeviceIdCtx<I, DeviceId> as IpDeviceIdContext<I>>::DeviceId;
+        type WeakDeviceId = <FakeIpDeviceIdCtx<I, DeviceId> as IpDeviceIdContext<I>>::WeakDeviceId;
 
         fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
-            FakeWeakDeviceId(device_id.clone())
+            self.ip_device_id_ctx.downgrade_device_id(device_id)
         }
 
         fn upgrade_weak_device_id(
             &self,
-            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<DeviceId>,
+            device_id: &FakeWeakDeviceId<DeviceId>,
         ) -> Option<DeviceId> {
-            Some(device_id.clone())
+            self.ip_device_id_ctx.upgrade_weak_device_id(device_id)
+        }
+
+        fn is_device_installed(&self, device_id: &DeviceId) -> bool {
+            self.ip_device_id_ctx.is_device_installed(device_id)
         }
     }
 
     impl<
             I: IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            DeviceId: IpDeviceId + 'static,
+            DeviceId: FakeStrongIpDeviceId + 'static,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
@@ -927,9 +989,10 @@ pub(crate) mod testutil {
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
-            let FakeIpSocketCtx { device_state, table } = self;
-            let destination =
-                table.lookup(device, addr).ok_or(IpSockUnroutableError::NoRouteToRemoteAddr)?;
+            let FakeIpSocketCtx { device_state, table, ip_device_id_ctx } = self;
+            let destination = table
+                .lookup(ip_device_id_ctx, device, addr)
+                .ok_or(IpSockUnroutableError::NoRouteToRemoteAddr)?;
 
             let Destination { device, next_hop: _ } = &destination;
             local_ip
@@ -959,11 +1022,13 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            S: AsRef<FakeIpSocketCtx<I, DeviceId>> + AsMut<FakeIpSocketCtx<I, DeviceId>>,
+            S: AsRef<FakeIpSocketCtx<I, DeviceId>>
+                + AsMut<FakeIpSocketCtx<I, DeviceId>>
+                + AsRef<FakeIpDeviceIdCtx<I, DeviceId>>,
             Id,
             Meta,
             Event: Debug,
-            DeviceId: IpDeviceId + 'static,
+            DeviceId: FakeStrongIpDeviceId + 'static,
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<S, Meta, DeviceId>
@@ -982,7 +1047,9 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt + packet_formats::ip::IpExt,
             B: BufferMut,
-            S: AsRef<FakeIpSocketCtx<I, DeviceId>> + AsMut<FakeIpSocketCtx<I, DeviceId>>,
+            S: AsRef<FakeIpSocketCtx<I, DeviceId>>
+                + AsMut<FakeIpSocketCtx<I, DeviceId>>
+                + AsRef<FakeIpDeviceIdCtx<I, DeviceId>>,
             Id,
             Meta,
             Event: Debug,
@@ -1016,7 +1083,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D: IpDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D: FakeStrongIpDeviceId> FakeIpSocketCtx<I, D> {
         pub(crate) fn with_devices_state(
             devices: impl IntoIterator<
                 Item = (D, IpDeviceState<FakeInstant, I>, Vec<SpecifiedAddr<I::Addr>>),
@@ -1041,28 +1108,36 @@ pub(crate) mod testutil {
                 );
             }
 
-            FakeIpSocketCtx { table, device_state }
+            FakeIpSocketCtx { table, device_state, ip_device_id_ctx: Default::default() }
         }
 
         pub(crate) fn find_devices_with_addr(
             &self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> impl Iterator<Item = D> + '_ {
-            let Self { table: _, device_state } = self;
+            let Self { table: _, device_state, ip_device_id_ctx: _ } = self;
             Box::new(device_state.iter().filter_map(move |(device, state)| {
                 state.find_addr(&addr).map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
             }))
         }
 
         pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {
-            let Self { device_state, table: _ } = self;
+            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
+        }
+
+        pub(crate) fn get_device_state_mut(
+            &mut self,
+            device: &D,
+        ) -> &mut IpDeviceState<FakeInstant, I> {
+            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
+            device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device))
         }
 
         pub(crate) fn multicast_memberships(
             &self,
         ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
-            let Self { device_state, table: _ } = self;
+            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             device_state
                 .iter()
                 .flat_map(|(device, device_state)| {
@@ -1077,7 +1152,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            D: IpDeviceId + 'static,
+            D: FakeStrongIpDeviceId + 'static,
             C: RngContext + InstantContext<Instant = FakeInstant>,
         > MulticastMembershipHandler<I, C> for FakeIpSocketCtx<I, D>
     {
@@ -1087,7 +1162,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            let Self { device_state, table: _ } = self;
+            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
             state.multicast_groups.join_multicast_group(ctx, addr)
@@ -1099,7 +1174,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            let Self { device_state, table: _ } = self;
+            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
             state.multicast_groups.leave_multicast_group(addr)
@@ -1128,14 +1203,28 @@ pub(crate) mod testutil {
         }
     }
 
+    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<I, D> {
+            let this: &FakeIpSocketCtx<_, _> = self.as_ref();
+            this.as_ref()
+        }
+    }
+
+    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
+        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<I, D> {
+            let this: &mut FakeIpSocketCtx<_, _> = self.as_mut();
+            this.as_mut()
+        }
+    }
+
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            D: IpDeviceId + 'static,
+            D: FakeStrongIpDeviceId + 'static,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, Meta, D>
     where
-        Self: IpSocketContext<I, C, DeviceId = D>,
+        Self: IpSocketContext<I, C, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
         type DevicesWithAddrIter<'a> =
             <FakeIpSocketCtx<I, D> as TransportIpContext<I, C>>::DevicesWithAddrIter<'a>
@@ -1162,7 +1251,7 @@ pub(crate) mod testutil {
         pub(crate) remote_ips: Vec<SpecifiedAddr<A>>,
     }
 
-    impl<I: IpDeviceStateIpExt, D: IpDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D: FakeStrongIpDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx<Ipv6>` with the given device
         /// configs.
         pub(crate) fn new(devices: impl IntoIterator<Item = FakeDeviceConfig<D, I::Addr>>) -> Self {
@@ -1480,12 +1569,14 @@ mod tests {
         };
 
         let get_expected_result = |template| expected_result.map(|()| template);
-
+        let weak_local_device = local_device
+            .as_ref()
+            .map(|d| IpDeviceIdContext::<I>::downgrade_device_id(&sync_ctx, d));
         let template = IpSock {
             definition: IpSockDefinition {
                 remote_ip: to_ip,
                 local_ip: expected_from_ip,
-                device: local_device.clone(),
+                device: weak_local_device.clone(),
                 proto,
             },
             options: WithHopLimit(None),
@@ -1494,7 +1585,7 @@ mod tests {
         let res = IpSocketHandler::<I, _>::new_ip_socket(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            local_device.as_ref(),
+            weak_local_device.as_ref().map(EitherDeviceId::Weak),
             from_ip,
             to_ip,
             proto,
@@ -1509,7 +1600,7 @@ mod tests {
             IpSocketHandler::new_ip_socket(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                local_device.as_ref(),
+                weak_local_device.as_ref().map(EitherDeviceId::Weak),
                 from_ip,
                 to_ip,
                 proto,
@@ -1902,21 +1993,91 @@ mod tests {
     fn manipulate_options() {
         // The values here don't matter since we won't actually be using this
         // socket to send anything.
-        let definition = IpSockDefinition::<Ipv4, ()> {
-            remote_ip: Ipv4::LOOPBACK_ADDRESS,
-            local_ip: Ipv4::LOOPBACK_ADDRESS,
-            device: None,
-            proto: Ipv4Proto::Icmp,
-        };
-
         const START_OPTION: usize = 23;
         const DEFAULT_OPTION: usize = 0;
         const NEW_OPTION: usize = 55;
-        let mut socket = IpSock { definition, options: START_OPTION };
+        let mut socket = IpSock::<Ipv4, crate::ip::testutil::FakeDeviceId, _> {
+            definition: IpSockDefinition {
+                remote_ip: Ipv4::LOOPBACK_ADDRESS,
+                local_ip: Ipv4::LOOPBACK_ADDRESS,
+                device: None,
+                proto: Ipv4Proto::Icmp,
+            },
+            options: START_OPTION,
+        };
 
         assert_eq!(socket.take_options(), START_OPTION);
         assert_eq!(socket.replace_options(NEW_OPTION), DEFAULT_OPTION);
         assert_eq!(socket.options(), &NEW_OPTION);
         assert_eq!(socket.into_options(), NEW_OPTION);
+    }
+
+    #[ip_test]
+    #[test_case(true; "remove device")]
+    #[test_case(false; "dont remove device")]
+    fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
+    where
+        for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>
+            + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>
+            + DeviceIpSocketHandler<I, FakeNonSyncCtx>,
+    {
+        set_logger_for_test();
+
+        let FakeEventDispatcherConfig::<I::Addr> {
+            local_ip,
+            remote_ip: _,
+            local_mac,
+            subnet: _,
+            remote_mac: _,
+        } = I::FAKE_CONFIG;
+
+        let mut builder = FakeEventDispatcherBuilder::default();
+        let device_idx = builder.add_device(local_mac);
+        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
+        let device_id = &device_ids[device_idx];
+        let mut sync_ctx = &sync_ctx;
+        crate::device::add_ip_addr_subnet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            AddrSubnet::new(local_ip.get(), 16).unwrap(),
+        )
+        .unwrap();
+        crate::add_route(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            AddableEntryEither::without_gateway(I::MULTICAST_SUBNET.into(), device_id.clone()),
+        )
+        .unwrap();
+
+        let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            None,
+            None,
+            I::multicast_addr(1),
+            I::ICMP_IP_PROTO,
+            WithHopLimit(None),
+        )
+        .unwrap();
+
+        let expected = if remove_device {
+            crate::device::remove_device(&mut sync_ctx, &mut non_sync_ctx, device_id.clone());
+            Err(MmsError::NoDevice(IpSockRouteError::Unroutable(
+                IpSockUnroutableError::NoRouteToRemoteAddr,
+            )))
+        } else {
+            Ok(Mms::from_mtu::<I>(
+                IpDeviceContext::<I, _>::get_mtu(&mut sync_ctx, device_id),
+                0, /* no ip options/ext hdrs used */
+            )
+            .unwrap())
+        };
+
+        assert_eq!(
+            DeviceIpSocketHandler::get_mms(&mut sync_ctx, &mut non_sync_ctx, &ip_sock),
+            expected,
+        );
     }
 }

@@ -228,19 +228,26 @@ mod tests {
             testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
             InstantContext as _, SendFrameContext as _,
         },
-        ip::testutil::FakeDeviceId,
+        ip::testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
     };
 
     struct FakeDadContext {
         addr: UnicastAddr<Ipv6Addr>,
         state: AddressState,
         retrans_timer: Duration,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
     }
 
     #[derive(Debug)]
     struct DadMessageMeta {
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
+    }
+
+    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeDadContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+            &self.ip_device_id_ctx
+        }
     }
 
     type FakeNonSyncCtxImpl = FakeNonSyncCtx<DadTimerId<FakeDeviceId>, DadEvent<FakeDeviceId>, ()>;
@@ -257,7 +264,7 @@ mod tests {
             request_addr: UnicastAddr<Ipv6Addr>,
             cb: F,
         ) -> O {
-            let FakeDadContext { addr, state, retrans_timer } = self.get_mut();
+            let FakeDadContext { addr, state, retrans_timer, ip_device_id_ctx: _ } = self.get_mut();
             cb((*addr == request_addr).then(|| (state, *retrans_timer)))
         }
     }
@@ -288,6 +295,7 @@ mod tests {
                 addr: DAD_ADDRESS,
                 state: AddressState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: Duration::default(),
+                ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
             &mut sync_ctx,
@@ -305,6 +313,7 @@ mod tests {
                 addr: DAD_ADDRESS,
                 state: AddressState::Assigned,
                 retrans_timer: Duration::default(),
+                ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
             &mut sync_ctx,
@@ -321,6 +330,7 @@ mod tests {
                 addr: DAD_ADDRESS,
                 state: AddressState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: Duration::default(),
+                ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
             &mut sync_ctx,
@@ -328,7 +338,8 @@ mod tests {
             &FakeDeviceId,
             DAD_ADDRESS,
         );
-        let FakeDadContext { addr: _, state, retrans_timer: _ } = sync_ctx.get_ref();
+        let FakeDadContext { addr: _, state, retrans_timer: _, ip_device_id_ctx: _ } =
+            sync_ctx.get_ref();
         assert_eq!(*state, AddressState::Assigned);
         assert_eq!(
             non_sync_ctx.take_events(),
@@ -346,7 +357,8 @@ mod tests {
         dad_transmits_remaining: Option<NonZeroU8>,
         retrans_timer: Duration,
     ) {
-        let FakeDadContext { addr: _, state, retrans_timer: _ } = sync_ctx.get_ref();
+        let FakeDadContext { addr: _, state, retrans_timer: _, ip_device_id_ctx: _ } =
+            sync_ctx.get_ref();
         assert_eq!(*state, AddressState::Tentative { dad_transmits_remaining });
         let frames = sync_ctx.frames();
         assert_eq!(frames.len(), frames_len, "frames = {:?}", frames);
@@ -375,6 +387,7 @@ mod tests {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
                 retrans_timer: RETRANS_TIMER,
+                ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
             &mut sync_ctx,
@@ -396,7 +409,8 @@ mod tests {
                 Some(DAD_TIMER_ID)
             );
         }
-        let FakeDadContext { addr: _, state, retrans_timer: _ } = sync_ctx.get_ref();
+        let FakeDadContext { addr: _, state, retrans_timer: _, ip_device_id_ctx: _ } =
+            sync_ctx.get_ref();
         assert_eq!(*state, AddressState::Assigned);
         assert_eq!(
             non_sync_ctx.take_events(),
@@ -416,6 +430,7 @@ mod tests {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
                 retrans_timer: RETRANS_TIMER,
+                ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
             &mut sync_ctx,

@@ -27,7 +27,8 @@ use thiserror::Error;
 use crate::{
     ip::{
         socket::{DefaultSendOptions, DeviceIpSocketHandler, MmsError},
-        BufferIpTransportContext, BufferTransportIpContext, IpLayerIpExt, TransportReceiveError,
+        BufferIpTransportContext, BufferTransportIpContext, EitherDeviceId, IpLayerIpExt,
+        TransportReceiveError,
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
@@ -113,9 +114,9 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        let addrs_to_search = AddrVecIter::<IpPortSpec<I, SC::DeviceId>>::with_device(
+        let addrs_to_search = AddrVecIter::<IpPortSpec<I, SC::WeakDeviceId>>::with_device(
             conn_addr.into(),
-            device.clone(),
+            sync_ctx.downgrade_device_id(device),
         );
 
         sync_ctx.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
@@ -142,10 +143,10 @@ fn handle_incoming_packet<I, B, C, SC>(
     ctx: &mut C,
     ip_transport_ctx: &mut SC,
     isn: &IsnGenerator<C::Instant>,
-    sockets: &mut Sockets<I, SC::DeviceId, C>,
+    sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &SC::DeviceId,
-    mut addrs_to_search: AddrVecIter<IpPortSpec<I, SC::DeviceId>>,
+    mut addrs_to_search: AddrVecIter<IpPortSpec<I, SC::WeakDeviceId>>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
 ) where
@@ -256,8 +257,8 @@ fn handle_incoming_packet<I, B, C, SC>(
 fn try_handle_incoming_for_connection<I, SC, C, B>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
-    sockets: &mut Sockets<I, SC::DeviceId, C>,
-    conn_addr: ConnAddr<I::Addr, SC::DeviceId, NonZeroU16, NonZeroU16>,
+    sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
+    conn_addr: ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
     conn_id: MaybeClosedConnectionId<I>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
@@ -350,7 +351,7 @@ where
 fn try_handle_incoming_for_listener<I, SC, C, B>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
-    sockets: &mut Sockets<I, SC::DeviceId, C>,
+    sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
     isn: &IsnGenerator<C::Instant>,
     listener_id: MaybeListenerId<I>,
     incoming: Segment<&[u8]>,
@@ -396,11 +397,12 @@ where
     // the address for the connected socket.
     let bound_device = bound_device.as_ref();
     let bound_device = if crate::socket::must_have_zone(&remote_ip) {
-        Some(bound_device.unwrap_or(incoming_device))
+        Some(bound_device.map_or(EitherDeviceId::Strong(incoming_device), EitherDeviceId::Weak))
     } else {
-        bound_device
+        bound_device.map(EitherDeviceId::Weak)
     };
 
+    let bound_device = bound_device.as_ref().map(|d| d.as_ref());
     let ip_sock = match ip_transport_ctx.new_ip_socket(
         ctx,
         bound_device,
@@ -460,8 +462,8 @@ where
     if matches!(state, State::SynRcvd(_)) {
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
         let socket_options = socket_options.clone();
-        let bound_device = bound_device.cloned();
         let ListenerSharingState { sharing, listening: _ } = *sharing;
+        let bound_device = bound_device.map(|d| d.as_weak_ref(ip_transport_ctx).into_owned());
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
