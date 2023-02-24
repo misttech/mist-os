@@ -387,10 +387,10 @@ func TestInterfacesWatcher(t *testing.T) {
 	switch err := got.err.(type) {
 	case *zx.Error:
 		if err.Status != want {
-			t.Fatalf("unexpected zxStatus; got: %s, want: %s", err.Status, want)
+			t.Fatalf("watch canceled by channel closure error = %s, want %s", err, want)
 		}
 	default:
-		t.Fatalf("unexpected return value from Watch resolved due to channel closure; got: %#v, want: %s", got, want)
+		t.Fatalf("watch canceled by channel closure error = %#v, want %s", got, want)
 	}
 }
 
