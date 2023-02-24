@@ -29,3 +29,11 @@
 ##
 ## ARGS:
 ##     <input>    The bind program input file. This should be in the format described in //tools/bindc/README.md.
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
+
+set -e
+
+fx-config-read
+
+fx-command-run host-tool bindc "$@"
