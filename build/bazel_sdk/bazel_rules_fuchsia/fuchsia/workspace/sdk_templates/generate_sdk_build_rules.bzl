@@ -136,7 +136,7 @@ def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_c
         libs_base = meta["versions"][arch]["dist_dir"] + "/dist/lib/"
         for dist_lib in meta["versions"][arch]["dist_libs"]:
             variant, _, _ = dist_lib.removeprefix(libs_base).rpartition("/")
-            variant_config = _map_clang_variant()[arch][variant]
+            variant_config = _FUCHSIA_CLANG_VARIANT_MAP[variant]
             srcs.setdefault(variant_config, []).append("//:" + dist_lib)
         strip_prefix = "../%s/%s" % (ctx.attr.name, libs_base)
 
@@ -360,23 +360,19 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["headers"])
 
-def _map_clang_arch():
-    return {
-        "x64": "@fuchsia_clang//:x86_build",
-        "arm64": "@fuchsia_clang//:arm_build",
-    }
+# Maps a Fuchsia cpu name to the corresponding config_setting() label in
+# @fuchsia_sdk//fuchsia/constraints
+_FUCHSIA_CPU_CONSTRAINT_MAP = {
+    "x64": "@fuchsia_sdk//fuchsia/constraints:cpu_x64",
+    "arm64": "@fuchsia_sdk//fuchsia/constraints:cpu_arm64",
+}
 
-def _map_clang_variant():
-    return {
-        "x64": {
-            "": "@fuchsia_clang//:x86_novariant",
-            "asan": "@fuchsia_clang//:x86_asan_variant",
-        },
-        "arm64": {
-            "": "@fuchsia_clang//:arm_novariant",
-            "asan": "@fuchsia_clang//:arm_asan_variant",
-        },
-    }
+# Maps a variant name to the corresponding config_setting() label in
+# @fuchsia_clang
+_FUCHSIA_CLANG_VARIANT_MAP = {
+    "": "@fuchsia_clang//:novariant",
+    "asan": "@fuchsia_clang//:asan_variant",
+}
 
 def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._cc_prebuilt_library_template)
@@ -397,9 +393,9 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
 
     # add all supported architectures to the select, even if they are not available in the current SDK,
     # so that SDKs for different architectures can be composed by a simple directory merge.
-    for arch in _map_clang_arch().keys():
-        dist_select[_map_clang_arch()[arch]] = ["//%s/%s:dist" % (relative_dir, arch)]
-        prebuilt_select[_map_clang_arch()[arch]] = ["//%s/%s:prebuilts" % (relative_dir, arch)]
+    for arch, constraint in _FUCHSIA_CPU_CONSTRAINT_MAP.items():
+        dist_select[constraint] = ["//%s/%s:dist" % (relative_dir, arch)]
+        prebuilt_select[constraint] = ["//%s/%s:prebuilts" % (relative_dir, arch)]
 
     has_distlibs = False
 
