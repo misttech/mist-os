@@ -18,7 +18,7 @@ use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     dhcpv4, interfaces, ndp,
-    realms::{KnownServiceProvider, Netstack2, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 use packet_formats::{
@@ -48,14 +48,14 @@ enum IpSupported {
 #[test_case(IpSupported::Ipv6Only; "ipv6_only")]
 #[test_case(IpSupported::Ipv4Only; "ipv4_only")]
 #[test_case(IpSupported::DualStack; "dual_stack")]
-async fn interface_disruption(name: &str, ip_supported: IpSupported) {
+async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let client_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
         .expect("failed to create client netstack realm");
     let server_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_server", name),
             &[
                 KnownServiceProvider::DhcpServer { persistent: false },
