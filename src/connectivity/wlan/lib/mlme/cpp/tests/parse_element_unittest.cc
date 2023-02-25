@@ -8,6 +8,11 @@
 namespace wlan {
 namespace common {
 
+template <typename T>
+T AvoidReferenceBindingToMisalignedAddress(T t) {
+  return t;
+}
+
 TEST(ParseElement, Ssid) {
   const uint8_t raw_body[] = {'f', 'o', 'o'};
   std::optional<cpp20::span<const uint8_t>> ssid = ParseSsid(raw_body);
@@ -499,7 +504,7 @@ TEST(ParseElement, PreqMinimal) {
   EXPECT_EQ(0x02u, preq->header->hop_count);
 
   EXPECT_EQ(nullptr, preq->originator_external_addr);
-  EXPECT_EQ(0x1b1a1918u, preq->middle->lifetime);
+  EXPECT_EQ(0x1b1a1918u, AvoidReferenceBindingToMisalignedAddress(preq->middle->lifetime));
   EXPECT_EQ(0u, preq->per_target.size());
 }
 
@@ -535,7 +540,7 @@ TEST(ParseElement, PreqFull) {
   ASSERT_NE(nullptr, preq->originator_external_addr);
   EXPECT_EQ(MacAddr("16:17:18:19:1a:1b"), *preq->originator_external_addr);
 
-  EXPECT_EQ(0x1b1a1918u, preq->middle->lifetime);
+  EXPECT_EQ(0x1b1a1918u, AvoidReferenceBindingToMisalignedAddress(preq->middle->lifetime));
 
   ASSERT_EQ(2u, preq->per_target.size());
   ASSERT_EQ(MacAddr("bb:bb:bb:bb:bb:bb"), preq->per_target[1].target_addr);

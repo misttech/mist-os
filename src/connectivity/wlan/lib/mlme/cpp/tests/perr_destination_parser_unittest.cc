@@ -8,6 +8,11 @@
 namespace wlan {
 namespace common {
 
+template <typename T>
+T AvoidReferenceBindingToMisalignedAddress(T t) {
+  return t;
+}
+
 TEST(PerrDestinationParser, Empty) {
   PerrDestinationParser parser({});
   EXPECT_FALSE(parser.Next().has_value());
@@ -35,16 +40,16 @@ TEST(PerrDestinationParser, TwoDestinations) {
   {
     auto d = parser.Next();
     ASSERT_TRUE(d.has_value());
-    EXPECT_EQ(0x44332211u, d->header->hwmp_seqno);
+    EXPECT_EQ(0x44332211u, AvoidReferenceBindingToMisalignedAddress(d->header->hwmp_seqno));
     ASSERT_NE(nullptr, d->ext_addr);
     EXPECT_EQ(MacAddr("1a:2a:3a:4a:5a:6a"), *d->ext_addr);
-    EXPECT_EQ(0x6655u, d->tail->reason_code);
+    EXPECT_EQ(0x6655u, AvoidReferenceBindingToMisalignedAddress(d->tail->reason_code));
   }
   EXPECT_TRUE(parser.ExtraBytesLeft());
   {
     auto d = parser.Next();
     ASSERT_TRUE(d.has_value());
-    EXPECT_EQ(0xaa998877u, d->header->hwmp_seqno);
+    EXPECT_EQ(0xaa998877u, AvoidReferenceBindingToMisalignedAddress(d->header->hwmp_seqno));
     EXPECT_EQ(nullptr, d->ext_addr);
     EXPECT_EQ(0xccbbu, d->tail->reason_code);
   }

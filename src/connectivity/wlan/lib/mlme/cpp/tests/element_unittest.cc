@@ -18,6 +18,11 @@
 namespace wlan {
 namespace {
 
+template <typename T>
+T AvoidReferenceBindingToMisalignedAddress(T t) {
+  return t;
+}
+
 class Elements : public ::testing::Test {
  protected:
   Elements() { buf_offset_ = buf_; }
@@ -72,20 +77,25 @@ TEST_F(Elements, Tspec) {
   ASSERT_NE(nullptr, element);
   EXPECT_EQ(element->nominal_msdu_size.size(), nominal_msdu_size);
   EXPECT_EQ(element->nominal_msdu_size.fixed(), 0);
-  EXPECT_EQ(element->max_msdu_size, max_msdu_size);
-  EXPECT_EQ(element->min_service_interval, min_svc_interval);
-  EXPECT_EQ(element->max_service_interval, max_svc_interval);
-  EXPECT_EQ(element->inactivity_interval, inactivity_interval);
-  EXPECT_EQ(element->suspension_interval, suspension_interval);
-  EXPECT_EQ(element->service_start_time, svc_start_time);
-  EXPECT_EQ(element->min_data_rate, min_data_rate);
-  EXPECT_EQ(element->mean_data_rate, mean_data_rate);
-  EXPECT_EQ(element->peak_data_rate, peak_data_rate);
-  EXPECT_EQ(element->burst_size, burst_size);
-  EXPECT_EQ(element->delay_bound, delay_bound);
-  EXPECT_EQ(element->min_phy_rate, min_phy_rate);
-  EXPECT_EQ(element->surplus_bw_allowance, surplus_bw_allowance);
-  EXPECT_EQ(element->medium_time, medium_time);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->max_msdu_size), max_msdu_size);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->min_service_interval),
+            min_svc_interval);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->max_service_interval),
+            max_svc_interval);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->inactivity_interval),
+            inactivity_interval);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->suspension_interval),
+            suspension_interval);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->service_start_time), svc_start_time);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->min_data_rate), min_data_rate);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->mean_data_rate), mean_data_rate);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->peak_data_rate), peak_data_rate);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->burst_size), burst_size);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->delay_bound), delay_bound);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->min_phy_rate), min_phy_rate);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->surplus_bw_allowance),
+            surplus_bw_allowance);
+  EXPECT_EQ(AvoidReferenceBindingToMisalignedAddress(element->medium_time), medium_time);
 }
 
 TEST_F(Elements, TsInfoAggregation) {

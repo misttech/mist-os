@@ -10,6 +10,11 @@
 namespace wlan {
 namespace common {
 
+template <typename T>
+T AvoidReferenceBindingToMisalignedAddress(T t) {
+  return t;
+}
+
 TEST(ParseDataFrameHeader, Minimal) {
   // clang-format off
     const uint8_t data[] = {
@@ -236,7 +241,7 @@ TEST(ParseMeshDataHeader, Addr56Ext) {
   EXPECT_RANGES_EQ(
       std::vector<MacAddr>({MacAddr("55:55:55:55:55:55"), MacAddr("66:66:66:66:66:66")}),
       parsed->addr_ext);
-  EXPECT_EQ(0xddccbbaau, parsed->mesh_ctrl->seq);
+  EXPECT_EQ(0xddccbbaau, AvoidReferenceBindingToMisalignedAddress(parsed->mesh_ctrl->seq));
   EXPECT_EQ(0x3412u, parsed->llc->protocol_id_be);
   EXPECT_EQ(0u, r.RemainingBytes());
 }
