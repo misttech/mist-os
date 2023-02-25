@@ -30,7 +30,10 @@ legacy_cache_package_labels = []
 universe_package_labels = []
 legacy_universe_package_labels = []
 
-host_labels = [ "//tools/net/device-finder:host" ]
+host_labels = [
+  "//tools/bindc:host",
+  "//tools/net/device-finder:host",
+]
 
 package_flavor_selections = []
 
