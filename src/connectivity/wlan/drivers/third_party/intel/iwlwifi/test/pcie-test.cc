@@ -647,7 +647,9 @@ class TxTest : public PcieTest {
 
     auto& tb = tfd->tbs[tb_idx];
 
-    ASSERT_EQ(cpu_to_le32(expected_addr), tb.lo);
+    // Copy to avoid reference binding to misaligned address.
+    auto lo = tb.lo;
+    ASSERT_EQ(cpu_to_le32(expected_addr), lo);
 
     auto hi = tb.hi_n_len & TB_HI_N_LEN_ADDR_HI_MSK;
     auto len = (tb.hi_n_len & TB_HI_N_LEN_LEN_MSK) >> 4;
@@ -1032,7 +1034,6 @@ TEST_F(TxTest, ReclaimCmdQueueMultiReclaim) {
 // Ensure the hold NIC awake flag is set as appropriate.
 //
 TEST_F(TxTest, ReclaimCmdHoldNicAwakeFlag) {
-
   // Remove this workaround once we no longer use iwl7265_2ac_cfg in test/sim-trans.cc.
   base_params_.apmg_wake_up_wa = true;
 
