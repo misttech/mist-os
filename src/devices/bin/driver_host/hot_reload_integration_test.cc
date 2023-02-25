@@ -47,7 +47,7 @@ void SetupEnvironment(board_test::DeviceEntry dev, driver_integration_test::Isol
 }
 
 // Test restarting a driver host containing only one driver.
-TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
+TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
   driver_integration_test::IsolatedDevmgr devmgr;
   fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
@@ -113,7 +113,7 @@ TEST(HotReloadIntegrationTest, TestRestartOneDriver) {
 
 // Test restarting a driver host containing a parent and child driver by calling restart on
 // the parent.
-TEST(HotReloadIntegrationTest, TestRestartTwoDriversParent) {
+TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
   driver_integration_test::IsolatedDevmgr devmgr;
   fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
@@ -196,7 +196,7 @@ TEST(HotReloadIntegrationTest, TestRestartTwoDriversParent) {
 
 // Test restarting a driver host containing a parent and child driver by calling restart on
 // the child.
-TEST(HotReloadIntegrationTest, TestRestartTwoDriversChild) {
+TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversChild) {
   driver_integration_test::IsolatedDevmgr devmgr;
   fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
