@@ -2663,7 +2663,6 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
         }
     }
     const PORT: u16 = 80;
-    const NUM_BYTES: usize = 10;
 
     tcp_communicate_with_remote_with_zone::<N, _>(name, |realm, interface, peer_ip| {
         Box::pin(async move {
@@ -2690,7 +2689,6 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
 // fallible device access.
 async fn tcp_bind_with_zone_connect_unzoned<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
-    const NUM_BYTES: usize = 10;
 
     tcp_communicate_with_remote_with_zone::<N, _>(name, |realm, interface, peer_ip| {
         Box::pin(async move {

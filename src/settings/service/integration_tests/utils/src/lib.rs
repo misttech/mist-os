@@ -25,7 +25,6 @@ pub struct SettingsRealmInfo<'a> {
 
 pub async fn create_realm_basic(info: &SettingsRealmInfo<'_>) -> Result<(), Error> {
     const STORE_URL: &str = "stash#meta/stash.cm";
-    const COBALT_URL: &str = "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm";
 
     // setui_service needs to connect to fidl_fuchsia_stash to start its storage.
     let store = info.builder.add_child("store", STORE_URL, ChildOptions::new().eager()).await?;
