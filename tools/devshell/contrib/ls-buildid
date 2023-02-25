@@ -1,0 +1,122 @@
+#!/bin/bash
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Build
+### Find binaries among build directories, the checkout, and cloud storage
+### matching a given build ID.
+
+## usage: fx ls-buildid [--help|-h] [--verbose|-v] [--remote|-r] BUILD_ID
+##
+## Searches all build directories and the checkout - and optionally official
+## cloud storage - for binaries matching a given build ID. The search is
+## strictly local by default, and assumes that build directories are of the
+## form $FUCHSIA_DIR/out/foo.
+##
+##  --verbose|-v   Report the locations in which there was no match.
+##
+##  --remote|-r    Extend the search to cloud storage. This takes a dependency
+##                 on `gsutil`, which is expected to be on one's PATH. Further,
+##                 for access to non-public storage, it is assumed that the
+##                 user has already ran `gcloud auth login`.
+##
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
+fx-config-read
+
+# These are the standard buckets to which official Fuchsia infrastructure
+# uploads binaries.
+readonly GSUTIL_BUCKETS=(
+  fuchsia-artifacts
+  fuchsia-artifacts-internal
+  fuchsia-artifacts-release
+)
+
+id=""
+remote=false
+verbose=false
+while [[ $# -ne 0 ]]; do
+  case "$1" in
+  --help|-h)
+    fx-command-help
+    exit 0
+    ;;
+  --remote|-r)
+    if which gsutil &>/dev/null; then
+      remote=true
+    else
+      fx-warn "Option $1 requires gsutil to be on one's PATH. Proceeding with a strictly local search..."
+    fi
+    ;;
+  --verbose|-v)
+    verbose=true
+    ;;
+  -*)
+    fx-error "Unknown flag: $1"
+    fx-command-help
+    exit 1
+    ;;
+  *)
+    if [[ -z "${id}" ]]; then
+      id="$1"
+    else
+      fx-error "Unexpected argument: '$1'"
+      exit 1
+    fi
+    ;;
+  esac
+  shift
+done
+
+# Relativize against the current working directory on a best-effort basis,
+# because that makes for nicer output.
+readonly out_dir="${FUCHSIA_OUT_DIR#"$(pwd)"/}"
+prebuilt_dir="${FUCHSIA_DIR}/prebuilt"
+readonly prebuilt_dir="${prebuilt_dir#"$(pwd)"/}"
+
+# Aggregate all .build-id directories across the various build directories, as
+# well as those shipped with prebuilts in the checkout.
+build_id_dirs=("${out_dir}"/**/.build-id)
+build_id_dirs+=($(find "${prebuilt_dir}" -type d -name .build-id))
+
+for build_id_dir in "${build_id_dirs[@]}"; do
+  # The would-be entry in the .build-id directory.
+  dirent="${build_id_dir}/${id:0:2}/${id:2}"
+
+  # Whether the .build-id directory is in a build or prebuilt directory, the
+  # binaries it corresponds to should all lie within the parent.
+  search_dir="$(dirname "${build_id_dir}")"
+  if [[ -f "${dirent}" ]]; then
+      find "${search_dir}" -samefile "${dirent}"
+  elif $verbose; then
+      fx-info "No binaries with build ID \"${id}\" found locally under ${search_dir}/"
+  fi
+done
+
+if $remote ; then
+  for bucket in "${GSUTIL_BUCKETS[@]}"; do
+    # This gives the current GCS scheme for binaries indexed by build ID.
+    url="gs://$bucket/debug/${id}.debug"
+
+    # gsutil offers no convenient way to check whether the user has access to a
+    # given GCS bucket. Worse yet, in the case of a stat with insufficient
+    # privileges, the quiet, error suppression option `-q` is ignored - and the
+    # resulting error code cannot be differentiated from the case of a
+    # successful stat call reporting that the object does not exit. Putting all
+    # this together, the seemingly least worst way to check permissions is to
+    # see whether `gsutil -q stat ...` returns any output.
+    output=$(gsutil -q stat "${url}" 2>&1)
+    if [[ -n "${output}" ]]; then
+      if $verbose ; then
+        fx-warn "Insufficient privileges to access gs://${bucket}/. (Have you run \`gcloud auth login\`?)"
+      fi
+      continue
+    fi
+    if [[ $? == 0 ]]; then
+      echo "${url}"
+    elif $verbose ; then
+      fx-info "No binaries with build ID \"${id}\" found under gs://${bucket}/"
+    fi
+  done
+fi
