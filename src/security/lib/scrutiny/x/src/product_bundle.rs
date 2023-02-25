@@ -479,7 +479,9 @@ pub mod test {
         );
         SdkProductBundle::V2(SdkProductBundleV2 {
             product_name: String::default(),
+            product_version: String::default(),
             partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
             system_a: Some(vec![]),
             system_b: None,
             system_r: None,
@@ -516,7 +518,9 @@ pub mod test {
         );
         SdkProductBundle::V2(SdkProductBundleV2 {
             product_name: String::default(),
+            product_version: String::default(),
             partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
             system_a: Some(vec![]),
             system_b: Some(vec![]),
             system_r: Some(vec![]),

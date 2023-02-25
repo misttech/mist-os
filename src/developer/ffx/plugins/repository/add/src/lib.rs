@@ -117,7 +117,9 @@ mod tests {
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "test".into(),
+            product_version: "test-product-version".into(),
             partitions: PartitionsConfig::default(),
+            sdk_version: "test-sdk-version".into(),
             system_a: None,
             system_b: None,
             system_r: None,
@@ -184,7 +186,9 @@ mod tests {
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "test".into(),
+            product_version: "test-product-version".into(),
             partitions: PartitionsConfig::default(),
+            sdk_version: "test-sdk-version".into(),
             system_a: None,
             system_b: None,
             system_r: None,

@@ -8,9 +8,8 @@
 //! ```
 //! {
 //!   "schema_version": "1",
-//!   "abi": "0ABC1DEF",
-//!   "board": "qemu-x64",
-//!   "platform_version": "0.20221213.2.1",
+//!   "abi": "0ABC1DEF",  # not yet implemented.
+//!   "platform_version": "0.20221213.2.1",  # not yet implemented.
 //!   "product_name": "workstation",
 //!   "product_version": "2",
 //!   "sdk_version": "10.23434342",
@@ -65,6 +64,8 @@ impl GenerateProductDescription {
 
         let description = ProductDescription::V1(ProductDescriptionV1 {
             product_name: product_bundle.product_name.to_string(),
+            product_version: product_bundle.product_version.to_string(),
+            sdk_version: Some(product_bundle.sdk_version.to_string()),
             transfer_url: self.transfer_url.to_string(),
             ..Default::default()
         });
@@ -94,7 +95,9 @@ mod tests {
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "fake.pb-name".to_string(),
+            product_version: "fake.pb-version".to_string(),
             partitions: PartitionsConfig::default(),
+            sdk_version: "fake.sdk-version".to_string(),
             system_a: None,
             system_b: None,
             system_r: None,
@@ -123,8 +126,8 @@ mod tests {
                 platform_version: None,
                 product_name: "fake.pb-name".to_string(),
                 transfer_url: "gs://fake/path/to/transfer.json".to_string(),
-                product_version: None,
-                sdk_version: None,
+                product_version: "fake.pb-version".to_string(),
+                sdk_version: Some("fake.sdk-version".to_string()),
             }),
         );
     }

@@ -298,7 +298,9 @@ mod tests {
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: create_temp_file("zbi"), signed: false },
                 Image::FVM(create_temp_file("fvm")),

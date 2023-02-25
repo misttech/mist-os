@@ -37,8 +37,14 @@ pub struct ProductBundleV2 {
     /// The <product>.<board> for the product bundle.
     pub product_name: String,
 
+    /// Unique version of this <product>.<board>.
+    pub product_version: String,
+
     /// The physical partitions of the target to place images into.
     pub partitions: PartitionsConfig,
+
+    /// Fuchsia SDK version used to build this product bundle.
+    pub sdk_version: String,
 
     /// An assembled system that should be placed in slot A on the target.
     #[serde(default)]
@@ -251,6 +257,7 @@ mod tests {
     fn test_canonicalize_no_paths() {
         let mut pb = ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![],
                 bootloader_partitions: vec![],
@@ -258,6 +265,7 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec![],
             },
+            sdk_version: "".to_string(),
             system_a: None,
             system_b: None,
             system_r: None,
@@ -291,6 +299,7 @@ mod tests {
 
         let mut pb = ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![BootstrapPartition {
                     name: "bootstrap".into(),
@@ -310,6 +319,7 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec!["unlock_credentials".into()],
             },
+            sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: "zbi".into(), signed: false },
                 Image::VBMeta("vbmeta".into()),
@@ -329,6 +339,7 @@ mod tests {
     fn test_relativize_no_paths() {
         let mut pb = ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![],
                 bootloader_partitions: vec![],
@@ -336,6 +347,7 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec![],
             },
+            sdk_version: "".to_string(),
             system_a: None,
             system_b: None,
             system_r: None,
@@ -356,6 +368,7 @@ mod tests {
 
         let mut pb = ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig {
                 bootstrap_partitions: vec![BootstrapPartition {
                     name: "bootstrap".into(),
@@ -375,6 +388,7 @@ mod tests {
                 hardware_revision: "board".into(),
                 unlock_credentials: vec![tempdir.join("unlock_credentials")],
             },
+            sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: tempdir.join("zbi"), signed: false },
                 Image::VBMeta(tempdir.join("vbmeta")),
@@ -398,7 +412,9 @@ mod tests {
 
         let pb = ProductBundleV2 {
             product_name: "".to_string(),
+            product_version: "".to_string(),
             partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
             system_a: None,
             system_b: None,
             system_r: None,
@@ -428,7 +444,9 @@ mod tests {
     fn test_targets_path() {
         let pb = ProductBundleV2 {
             product_name: String::default(),
+            product_version: String::default(),
             partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
             system_a: None,
             system_b: None,
             system_r: None,

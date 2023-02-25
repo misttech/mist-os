@@ -6,6 +6,7 @@ import("//build/compiled_action.gni")
 import("//build/info/info.gni")
 import("//build/python/python_action.gni")
 import("//build/security/verifier/scrutiny_verifiers.gni")
+import("//sdk/config.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 # Generate a product bundle that can be used to flash, emulate, or update a
@@ -228,12 +229,24 @@ template("product_bundle") {
     ffx_tool = "//src/developer/ffx/plugins/product:ffx_product_tool_versioned"
     ffx_tool_output_name = "ffx-product"
 
+    # This value can be set (e.g. for testing) with `--args sdk_id=1234` on the
+    # `fx set` call.
+    sdk_version = sdk_id
+    if (sdk_version == "") {
+      sdk_version = "unversioned"
+    }
+
+    # In the future, the product bundles should be versioned independently of
+    # the sdk version. So far they have been the same value.
+    product_version = sdk_version
     product_name = "${build_info_product}.${build_info_board}"
     args = [
       "--config",
       "product.experimental=true",
       "product",
       "create",
+      "--product-version",
+      product_version,
       "--product-name",
       product_name,
       "--partitions",

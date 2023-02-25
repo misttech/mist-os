@@ -5,7 +5,7 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_tool::{SdkToolProvider, ToolProvider};
@@ -13,6 +13,7 @@ use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
+use ffx_config::sdk::SdkVersion;
 use ffx_core::ffx_plugin;
 use ffx_product_create_args::CreateCommand;
 use fuchsia_pkg::PackageManifest;
@@ -28,12 +29,26 @@ use tempfile::TempDir;
 /// Create a product bundle.
 #[ffx_plugin("product.experimental")]
 pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
+    let sdk = ffx_config::global_env_context()
+        .context("loading global environment context")?
+        .get_sdk()
+        .await
+        .context("getting sdk env context")?;
+    let sdk_version = match sdk.get_version() {
+        SdkVersion::Version(version) => version,
+        SdkVersion::InTree => "unversioned",
+        SdkVersion::Unknown => bail!("Unable to determine SDK version"),
+    };
     let sdk_tools = SdkToolProvider::try_new().context("getting sdk tools")?;
-    pb_create_with_tools(cmd, Box::new(sdk_tools)).await
+    pb_create_with_tools(cmd, sdk_version, Box::new(sdk_tools)).await
 }
 
 /// Create a product bundle using the provided `tools`.
-pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvider>) -> Result<()> {
+pub async fn pb_create_with_tools(
+    cmd: CreateCommand,
+    sdk_version: &str,
+    tools: Box<dyn ToolProvider>,
+) -> Result<()> {
     // We build an update package if `update_version_file` or `update_epoch` is provided.
     // If we decide to build an update package, we need to ensure that both of them
     // are provided.
@@ -191,10 +206,13 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
     };
 
     let product_name = cmd.product_name.to_owned();
+    let product_version = cmd.product_version.to_owned();
 
     let product_bundle = ProductBundleV2 {
         product_name,
+        product_version,
         partitions,
+        sdk_version: sdk_version.to_string(),
         system_a: system_a.map(|s| s.images),
         system_b: system_b.map(|s| s.images),
         system_r: system_r.map(|s| s.images),
@@ -393,6 +411,7 @@ mod test {
         pb_create_with_tools(
             CreateCommand {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -404,6 +423,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
+            /*sdk_version=*/ "",
             Box::new(tools),
         )
         .await
@@ -414,7 +434,9 @@ mod test {
             pb,
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: PartitionsConfig::default(),
+                sdk_version: String::default(),
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -442,6 +464,7 @@ mod test {
         pb_create_with_tools(
             CreateCommand {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: partitions_path,
                 system_a: Some(system_path.clone()),
                 system_b: None,
@@ -453,6 +476,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
+            /*sdk_version=*/ "",
             Box::new(tools),
         )
         .await
@@ -463,7 +487,9 @@ mod test {
             pb,
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: PartitionsConfig::default(),
+                sdk_version: String::default(),
                 system_a: Some(vec![]),
                 system_b: None,
                 system_r: Some(vec![]),
@@ -494,6 +520,7 @@ mod test {
         pb_create_with_tools(
             CreateCommand {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: partitions_path,
                 system_a: Some(system_path.clone()),
                 system_b: None,
@@ -505,6 +532,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
+            /*sdk_version=*/ "",
             Box::new(tools),
         )
         .await
@@ -515,7 +543,9 @@ mod test {
             pb,
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: PartitionsConfig::default(),
+                sdk_version: String::default(),
                 system_a: Some(AssemblyManifest::default().images),
                 system_b: None,
                 system_r: Some(AssemblyManifest::default().images),
@@ -551,6 +581,7 @@ mod test {
         pb_create_with_tools(
             CreateCommand {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -562,6 +593,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
+            /*sdk_version=*/ "",
             Box::new(tools),
         )
         .await
@@ -575,7 +607,9 @@ mod test {
             pb,
             ProductBundle::V2(ProductBundleV2 {
                 product_name: _,
+                product_version: _,
                 partitions,
+                sdk_version: _,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -613,6 +647,7 @@ mod test {
         pb_create_with_tools(
             CreateCommand {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: partitions_path,
                 system_a: None,
                 system_b: None,
@@ -624,6 +659,7 @@ mod test {
                 recommended_device: Some("device_2".to_string()),
                 out_dir: pb_dir.clone(),
             },
+            /*sdk_version=*/ "",
             Box::new(tools),
         )
         .await
@@ -634,7 +670,9 @@ mod test {
             pb,
             ProductBundle::V2(ProductBundleV2 {
                 product_name: String::default(),
+                product_version: String::default(),
                 partitions: PartitionsConfig::default(),
+                sdk_version: String::default(),
                 system_a: None,
                 system_b: None,
                 system_r: None,

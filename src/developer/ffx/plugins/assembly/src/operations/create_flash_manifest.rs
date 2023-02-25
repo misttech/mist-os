@@ -20,7 +20,9 @@ pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
     // Create a product bundle from the arguments.
     let product_bundle = ProductBundle::V2(ProductBundleV2 {
         product_name: "unused.product-name".to_string(),
+        product_version: "unused.product-version".to_string(),
         partitions: partitions_config,
+        sdk_version: "unused.sdk-version".to_string(),
         system_a: args
             .system_a
             .as_ref()

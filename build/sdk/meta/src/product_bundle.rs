@@ -150,6 +150,8 @@ mod tests {
             &json!({
                 "version": "2",
                 "product_name": "fake.pb-name",
+                "product_version": "fake.pb-version",
+                "sdk_version": "fake.sdk-version",
                 "partitions": {
                     "hardware_revision": "board",
                     "bootstrap_partitions": [],

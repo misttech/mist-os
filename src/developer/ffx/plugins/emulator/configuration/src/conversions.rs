@@ -455,7 +455,9 @@ mod tests {
 
         let mut pb = ProductBundleV2 {
             product_name: String::default(),
+            product_version: String::default(),
             partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
             system_a: Some(vec![
                 // By the time we call convert_, these should be canonicalized.
                 Image::ZBI { path: expected_zbi.clone(), signed: false },

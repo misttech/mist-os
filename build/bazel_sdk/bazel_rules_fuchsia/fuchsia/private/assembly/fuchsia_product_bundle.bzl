@@ -381,6 +381,11 @@ def _fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     product_name = "{}.{}".format(ctx.attr.product_name, ctx.attr.board_name)
+    sdk_version = fuchsia_toolchain.sdk_id if fuchsia_toolchain.sdk_id != "" else "unversioned"
+
+    # In the future, the product bundles should be versioned independently of
+    # the sdk version. So far they have been the same value.
+    product_version = sdk_version
 
     # Gather all the arguments to pass to ffx.
     ffx_invocation = [
@@ -391,6 +396,8 @@ def _fuchsia_product_bundle_impl(ctx):
         "create",
         "--product-name",
         product_name,
+        "--product-version",
+        product_version,
         "--partitions $ORIG_DIR/$PARTITIONS_PATH",
         "--system-a $ORIG_DIR/$SYSTEM_A_MANIFEST",
         "--out-dir $ORIG_DIR/$OUTDIR",

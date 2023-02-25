@@ -16,6 +16,7 @@ ffx_plugin("ffx_product_create") {
   args_deps = [ "//third_party/rust_crates:camino" ]
   deps = [
     "//build/sdk/meta:rust",
+    "//src/developer/ffx/config:lib",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/assembly/partitions_config",
     "//src/lib/assembly/tool",

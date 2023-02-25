@@ -37,8 +37,7 @@ pub struct ProductDescriptionV1 {
     pub product_name: String,
 
     /// The version of this product (independent of the sdk version).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub product_version: Option<String>,
+    pub product_version: String,
 
     /// The version of the SDK used to create this product.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -57,6 +56,7 @@ mod tests {
     fn test_deserialization() {
         let expected = ProductDescription::V1(ProductDescriptionV1 {
             product_name: "foo.bar".to_string(),
+            product_version: "blah".to_string(),
             transfer_url: "gs://fake-example/test.json".to_string(),
             abi: Some("fake_abi".to_string()),
             ..Default::default()
@@ -65,6 +65,7 @@ mod tests {
             "schema_version": "1",
             "abi": "fake_abi".to_string(),
             "product_name": "foo.bar".to_string(),
+            "product_version": "blah".to_string(),
             "transfer_url": "gs://fake-example/test.json".to_string(),
         });
         let manifest: ProductDescription = serde_json::from_value(value).unwrap();
