@@ -18,7 +18,15 @@ driver_bind_rules("ge2d_bind") {
   rules = "ge2d.bind"
   header_output = "bind.h"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.camerasensor2",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 source_set("lib") {

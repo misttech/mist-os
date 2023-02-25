@@ -321,7 +321,7 @@ __BEGIN_CDECLS
 #define PDEV_VID_ARM                0x12
 #define PDEV_PID_ARM_ISP            0x01
 // PDEV_PID_GDC was 0x02
-#define PDEV_PID_GE2D               0x03
+// PDEV_PID_GE2D was 0x03
 #define PDEV_PID_ACPI_BOARD         0x04
 #define PDEV_DID_ARM_MALI_IV009     0x01
 // PDEV_DID_ARM_MALI_IV010 was 0x02

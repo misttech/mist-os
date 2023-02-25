@@ -287,18 +287,6 @@ driver_bind_rules("sherlock-wifi-bind") {
   ]
 }
 
-driver_bind_rules("camera-ge2d-bind") {
-  rules = "bind/camera-ge2d.bind"
-  header_output = "camera-ge2d-bind.h"
-  bind_output = "camera-ge2d-bind.bc"
-  tests = "bind-tests/camera-ge2d-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.camerasensor2",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("camera-isp-bind") {
   rules = "bind/camera-isp.bind"
   header_output = "camera-isp-bind.h"
@@ -391,7 +379,6 @@ template("sherlock_driver") {
     ]
 
     deps = [
-      ":camera-ge2d-bind_header",
       ":camera-isp-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
@@ -514,7 +501,6 @@ sherlock_driver("sherlock-dai-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":camera-ge2d-bind_test",
     ":camera-isp-bind_test",
     ":sherlock-aml-usb-phy-v2-bind_test",
     ":sherlock-bind_test",

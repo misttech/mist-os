@@ -13,6 +13,7 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
@@ -34,7 +35,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/camera-ge2d-bind.h"
 #include "src/devices/board/drivers/sherlock/camera-isp-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -72,9 +72,9 @@ static const fpbus::Node ge2d_dev = []() {
   // GE2D
   fpbus::Node dev = {};
   dev.name() = "ge2d";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_GE2D;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_GE2D;
   dev.mmio() = ge2d_mmios;
   dev.bti() = ge2d_btis;
   dev.irq() = ge2d_irqs;
@@ -398,24 +398,52 @@ zx_status_t Sherlock::CameraInit() {
     return spec_result->error_value();
   }
 
-  fdf::WireUnownedResult result =
-      pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, ge2d_dev),
-                                        platform_bus_composite::MakeFidlFragment(
-                                            fidl_arena, ge2d_fragments, std::size(ge2d_fragments)),
-                                        "camera-sensor");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(ge2d_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+  auto ge2d_sensor_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+          },
+  }};
+
+  auto ge2d_canvas_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+          },
+  }};
+
+  composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "ge2d",
+      .parents = {{ge2d_sensor_node, ge2d_canvas_node}},
+  }};
+
+  spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, ge2d_dev),
+                                                          fidl::ToWire(fidl_arena, composite_spec));
+  if (!spec_result.ok()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(ge2d_dev) request failed: %s", __func__,
+           spec_result.FormatDescription().data());
+    return spec_result.status();
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(ge2d_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (spec_result->is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Camera(ge2d_dev) failed: %s", __func__,
+           zx_status_get_string(spec_result->error_value()));
+    return spec_result->error_value();
   }
 
   // Add a composite device for ARM ISP
-  result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddComposite(
       fidl::ToWire(fidl_arena, isp_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, isp_fragments, std::size(isp_fragments)),
       "camera-sensor");
