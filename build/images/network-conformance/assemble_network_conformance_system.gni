@@ -35,6 +35,7 @@ template("assemble_network_conformance_system") {
       "//src/developer/sshd-host:config",
       "//src/sys/process-resolver",
       "//src/connectivity/network",
+      "//src/connectivity/network:netstack",
       "//src/connectivity/network/mdns/bundles:config",
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",

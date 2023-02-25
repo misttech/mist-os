@@ -3,33 +3,21 @@
 _TODO(https://fxbug.dev/102863): Improve ergonomics of enabling tracing on the_
 _system netstack._
 
-You can enable tracing for the netstack by swapping out the network realm
-package included in your build for the network realm that has tracing enabled.
-You can do this by adding a couple lines to the args.gn file in your current
-build directory via `fx args`. Which package you swap in depends on whether you
-are tracing on a product that uses the default network realm, or the "basic" one
-which has advanced features disabled.
+You can enable tracing for the netstack by swapping out the component in the
+netstack package included in your build for the one that has tracing enabled.
+You can do this by replacing the deps for the
+"//src/connectivity/network:netstack2" rule:
 
-If you're tracing on a product that uses the default network realm (such as an
-emulator or workstation product), add:
-
-```
-legacy_base_package_labels -= [ "//src/connectivity/network" ]
-legacy_base_package_labels += [ "//src/connectivity/network:network-with-tracing" ]
+```diff
+ fuchsia_package("netstack2") {
+   package_name = "netstack"
+-  deps = [ "netstack:component" ]
++  deps = [ "netstack:component-with-tracing" ]
+ }
 ```
 
-If it's a product that uses the basic network realm (such as a smart display
-product), add:
-
-```
-legacy_base_package_labels -= [ "//src/connectivity/network:network-basic" ]
-legacy_base_package_labels += [ "//src/connectivity/network:network-with-tracing-basic" ]
-```
-
-Note that this change needs to be repeated after running commands that
-overwrite the args.gn file, such as `fx set`. Also, ensure that your `fx
-set` includes `--with-base //bundles/tools`, otherwise Netstack will fail
-to connect to `trace_manager` at initialization time.
+Ensure that your `fx set` includes `--with-base //bundles/tools`, otherwise
+Netstack will fail to connect to `trace_manager` at initialization time.
 
 Make sure to rebuild and reboot your emulator or OTA/flash your device to
 ensure the system picks up the changes.

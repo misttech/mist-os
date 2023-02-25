@@ -38,7 +38,9 @@ legacy_base_package_labels += [
   "//src/connectivity/network/mdns/bundles:services",
 
   # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  # assembly_input_bundle()
   "//src/connectivity/network",
+  "//src/connectivity/network:netstack",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/core:core_component_id_index",

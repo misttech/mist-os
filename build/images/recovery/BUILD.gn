@@ -125,6 +125,7 @@ if (is_fuchsia) {
                         ":build-info-recovery",
                         "//src/connectivity/location/regulatory_region:regulatory_region",
                         "//src/connectivity/network",
+                        "//src/connectivity/network:netstack",
                         "//src/connectivity/network/netcfg:config-default",
                         "//src/connectivity/wlan/wlancfg",
                         "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy",

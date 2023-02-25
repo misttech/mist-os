@@ -14,9 +14,9 @@ declare_args() {
 
 # TODO(https://fxbug.dev/85450): Convert this to a platform configuration
 # option in Product Assembly.
-_system_netstack_component = "netstack:component"
+_system_netstack_package = ":netstack2"
 if (use_netstack3) {
-  _system_netstack_component = "netstack3:component-dropin"
+  _system_netstack_package = ":netstack3"
 }
 
 fuchsia_component("component") {
@@ -37,9 +37,6 @@ fuchsia_component("component-basic") {
 #
 # Parameters
 #
-#   netstack_component:
-#     Required: Name of the Fuchsia component target that provides the netstack.
-#
 #   basic:
 #     Required: Use only the basic versions of components.
 #
@@ -55,7 +52,6 @@ template("network_package") {
       "dns:component",
       "http-client:component",
       "reachability:component",
-      invoker.netstack_component,
     ]
     if (invoker.basic) {
       deps += [
@@ -72,27 +68,27 @@ template("network_package") {
 }
 
 network_package("network") {
-  netstack_component = _system_netstack_component
   basic = false
 }
 
 network_package("network-basic") {
-  netstack_component = _system_netstack_component
   basic = true
 }
 
-# TODO(https://fxbug.dev/85450): use subassembly-based product assembly to
-# create this variant.
-network_package("network-with-tracing") {
-  netstack_component = "netstack:component-with-tracing"
-  basic = false
+fuchsia_package("netstack2") {
+  package_name = "netstack"
+  deps = [ "netstack:component" ]
+  visibility = [ ":*" ]
 }
 
-# TODO(https://fxbug.dev/85450): use subassembly-based product assembly to
-# create this variant.
-network_package("network-with-tracing-basic") {
-  netstack_component = "netstack:component-with-tracing"
-  basic = true
+fuchsia_package("netstack3") {
+  package_name = "netstack"
+  deps = [ "netstack3:component-dropin" ]
+  visibility = [ ":*" ]
+}
+
+group("netstack") {
+  deps = [ _system_netstack_package ]
 }
 
 core_shard("virtualization-core-shard") {
