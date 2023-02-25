@@ -132,17 +132,13 @@ impl BootfsSvc {
                 )
             })?;
 
-        BootfsSvc::create_dir_entry(child, executable, inode)
+        Ok(BootfsSvc::create_dir_entry(child, executable, inode))
     }
 
-    fn create_dir_entry(
-        vmo: zx::Vmo,
-        executable: bool,
-        inode: u64,
-    ) -> Result<Arc<dyn DirectoryEntry>, Error> {
-        Ok(vmo::VmoFile::new_with_inode(
+    fn create_dir_entry(vmo: zx::Vmo, executable: bool, inode: u64) -> Arc<dyn DirectoryEntry> {
+        vmo::VmoFile::new_with_inode(
             vmo, /*readable*/ true, /*writable*/ false, executable, inode,
-        ))
+        )
     }
 
     /// Read configs from the parsed bootfs image before the filesystem has been fully initialized.
@@ -285,20 +281,14 @@ impl BootfsSvc {
         let info = vmo.basic_info()?;
         let is_exec = info.rights.contains(zx::Rights::EXECUTE);
 
-        match BootfsSvc::create_dir_entry(
+        let dir_entry = BootfsSvc::create_dir_entry(
             vmo,
             is_exec,
             BootfsSvc::get_next_inode(&mut self.next_inode),
-        ) {
-            Ok(dir_entry) => {
-                self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(|error| {
-                    info!(%error, %path, "[BootfsSvc] Failed to publish kernel VMO to directory.");
-                });
-            }
-            Err(error) => {
-                return Err(anyhow!("Unable to create VMO for binary {}: {}", path, error));
-            }
-        }
+        );
+        self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(|error| {
+            info!(%error, %path, "[BootfsSvc] Failed to publish kernel VMO to directory.");
+        });
 
         Ok(self)
     }
