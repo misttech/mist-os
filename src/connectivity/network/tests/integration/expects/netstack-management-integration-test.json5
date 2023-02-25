@@ -1,0 +1,49 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                "test_oir_interface_name_conflict_netcfg_advanced_ns3",
+                "test_oir_interface_name_conflict_netcfg_basic_ns3",
+                "test_oir_netcfg_advanced_ns3",
+                "test_oir_netcfg_basic_ns3",
+                "test_prefix_provider_config_error_netcfg_advanced_ns3*",
+                "test_prefix_provider_config_error_netcfg_basic_ns3*",
+                "test_prefix_provider_double_watch_netcfg_basic_ns3",
+                "test_prefix_provider_double_watch_netcfg_advanced_ns3",
+                "test_prefix_provider_not_supported_netcfg_advanced_ns3",
+                "test_prefix_provider_not_supported_netcfg_basic_ns3",
+                "test_prefix_provider_already_acquiring_netcfg_basic_ns3",
+                "test_prefix_provider_already_acquiring_netcfg_advanced_ns3",
+                "test_prefix_provider_full_integration_netcfg_advanced_ns3",
+                "test_prefix_provider_full_integration_netcfg_basic_ns3",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "test_forwarding_netcfg_advanced_ns3",
+                "test_forwarding_netcfg_basic_ns3",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Hangs indefinitely.
+                "test_wlan_ap_dhcp_server_netcfg_advanced_ns3",
+                "test_wlan_ap_dhcp_server_netcfg_basic_ns3",
+                "virtualization::dhcpv4_client_started_ns3",
+                "virtualization::virtualization_ns3*",
+            ],
+        },
+    ],
+}

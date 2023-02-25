@@ -18,7 +18,7 @@ use net_declare::fidl_subnet;
 use netstack_testing_common::{
     interfaces, ping,
     realms::{
-        KnownServiceProvider, ManagementAgent, ManagerConfig, NetCfgVersion, Netstack2,
+        KnownServiceProvider, ManagementAgent, ManagerConfig, NetCfgVersion, Netstack,
         TestSandboxExt as _,
     },
 };
@@ -106,7 +106,7 @@ impl<'a> std::fmt::Debug for Guest<'a> {
 }
 
 impl<'a> Guest<'a> {
-    async fn new<S: Into<Cow<'a, str>>>(
+    async fn new<S: Into<Cow<'a, str>>, N: Netstack>(
         sandbox: &'a netemul::TestSandbox,
         network_proxy: &fnet_virtualization::NetworkProxy,
         realm_name: S,
@@ -114,7 +114,7 @@ impl<'a> Guest<'a> {
         ipv4_addr: fnet::Subnet,
     ) -> Guest<'a> {
         let realm = sandbox
-            .create_netstack_realm::<Netstack2, _>(realm_name)
+            .create_netstack_realm::<N, _>(realm_name)
             .expect("failed to create guest netstack realm");
         let net = sandbox
             .create_network(format!("net{}", interface))
@@ -264,11 +264,11 @@ fn create_bridged_network(
         Step::EnableUpstream,
     ];
     "disable_upstream")]
-async fn virtualization(name: &str, sub_name: &str, steps: &[Step]) {
+async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
     diagnostics_log::init!();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_{}_gateway", name, sub_name))
+        .create_netstack_realm::<N, _>(format!("{}_{}_gateway", name, sub_name))
         .expect("failed to create gateway netstack realm");
     let net_host_gateway = sandbox
         .create_network("net_host_gateway")
@@ -284,7 +284,7 @@ async fn virtualization(name: &str, sub_name: &str, steps: &[Step]) {
         .expect("configure address");
 
     let host_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_{}_host", name, sub_name),
             &[
                 KnownServiceProvider::Manager {
@@ -377,7 +377,7 @@ async fn virtualization(name: &str, sub_name: &str, steps: &[Step]) {
                     std::collections::hash_map::Entry::Vacant(vacant) => {
                         // Create a new netstack and a new network between it and the host.
                         let _: &mut Guest<'_> = vacant.insert(
-                            Guest::new(
+                            Guest::new::<_, N>(
                                 &sandbox,
                                 &network_proxy,
                                 format!("{}_{}_guest{}", name, sub_name, interface),
@@ -510,10 +510,10 @@ async fn virtualization(name: &str, sub_name: &str, steps: &[Step]) {
 }
 
 #[netstack_test]
-async fn dhcpv4_client_started(name: &str) {
+async fn dhcpv4_client_started<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let host_realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{}_host", name),
             &[
                 KnownServiceProvider::Manager {
@@ -538,9 +538,14 @@ async fn dhcpv4_client_started(name: &str) {
         .connect_to_protocol::<fnet_virtualization::ControlMarker>()
         .expect("failed to connect to fuchsia.net.virtualization/Control in host realm");
     let network_proxy = create_bridged_network(&virtualization_control);
-    let _guest =
-        Guest::new(&sandbox, &network_proxy, "guest", Interface::A, fidl_subnet!("192.168.1.1/16"))
-            .await;
+    let _guest = Guest::new::<_, N>(
+        &sandbox,
+        &network_proxy,
+        "guest",
+        Interface::A,
+        fidl_subnet!("192.168.1.1/16"),
+    )
+    .await;
 
     // Expect a DHCPv4 packet.
     fake_ep
