@@ -22,6 +22,8 @@
 #include <lib/stdcompat/span.h>
 #include <stdint.h>
 
+#include <ktl/iterator.h>
+
 // The shadow call stack grows up, so iterating over frames from innermost to
 // outermost has to go last to first.
 class ShadowCallStackBacktrace {
@@ -48,6 +50,8 @@ struct BootStack {
   // This considers the limit to be "on".
   bool IsOnStack(uintptr_t sp) const;
 
+  uintptr_t InitialSp() const { return reinterpret_cast<uintptr_t>(ktl::end(stack)); }
+
   alignas(BOOT_STACK_ALIGN) uint8_t stack[BOOT_STACK_SIZE];
   static_assert(BOOT_STACK_SIZE % BOOT_STACK_ALIGN == 0);
 };
@@ -57,6 +61,8 @@ struct NoStack {
   static constexpr bool kEnabled = false;
 
   bool IsOnStack(uintptr_t sp) const { return false; }
+
+  constexpr uintptr_t InitialSp() const { return 0; }
 
   ShadowCallStackBacktrace BackTrace(uintptr_t scsp = 0) const { return {}; }
 };
@@ -74,6 +80,8 @@ struct BootShadowCallStack {
   static constexpr bool kEnabled = true;
 
   bool IsOnStack(uintptr_t scsp) const;
+
+  uintptr_t StartScsp() const { return reinterpret_cast<uintptr_t>(ktl::end(shadow_call_stack)); }
 
   ShadowCallStackBacktrace BackTrace(uintptr_t scsp = GetShadowCallStackPointer()) const;
 

@@ -219,6 +219,7 @@ void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
 
 #elif defined(__x86_64__)
 
+  const auto& exc_arch = exc.exc.arch.u.x86_64;
   Printf("\n%s:  RAX: 0x%016" PRIx64 " RBX: 0x%016" PRIx64 " RCX: 0x%016" PRIx64
          " RDX: 0x%016" PRIx64 "\n",
          name_, exc.regs.rax, exc.regs.rbx, exc.regs.rcx, exc.regs.rdx);
@@ -234,8 +235,12 @@ void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
   Printf("%s:  RIP: 0x%016" PRIx64 " RFLAGS: 0x%08" PRIx64 " FS.BASE: 0x%016" PRIx64
          " GS.BASE: 0x%016" PRIx64 "\n",
          name_, exc.regs.rip, exc.regs.rflags, exc.regs.fs_base, exc.regs.gs_base);
-  Printf("%s:   V#: " PRIu64 "  ERR: %#" PRIx64 "  CR2: %016" PRIx64 "\n", name_,
-         exc.exc.arch.u.x86_64.vector, exc.exc.arch.u.x86_64.err_code, exc.exc.arch.u.x86_64.cr2);
+  Printf("%s:   V#: %" PRIu64 "  ERR: %#" PRIx64 "  CR2: 0x%016" PRIx64 "\n", name_,
+         exc_arch.vector, exc_arch.err_code, exc_arch.cr2);
+
+#else
+
+#warning "need register code dump for this architecture"
 
 #endif
 

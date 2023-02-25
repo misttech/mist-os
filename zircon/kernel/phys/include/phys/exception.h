@@ -37,7 +37,7 @@ struct alignas(BOOT_STACK_ALIGN) PhysExceptionState {
 #elif defined(__x86_64__)
 
   uint64_t pc() const { return regs.rip; }
-  uint64_t sp() const { return regs.rip; }
+  uint64_t sp() const { return regs.rsp; }
   uint64_t psr() const { return regs.rflags; }
   uint64_t fp() const { return regs.rbp; }
   uint64_t shadow_call_sp() const { return 0; }
@@ -58,6 +58,9 @@ struct alignas(BOOT_STACK_ALIGN) PhysExceptionState {
 #endif
 
   zx_thread_state_general_regs_t regs;
+#if __has_feature(safe_stack)
+  uint64_t unsafe_sp;
+#endif
   zx_exception_context_t exc;
 };
 
@@ -96,7 +99,7 @@ extern PhysHandledException gPhysHandledException;
 // and resume execution.  It always returns PHYS_EXCEPTION_RESUME.  A handler
 // that doesn't need to modify these special registers can just return
 // PHYS_EXCEPTION_RESUME directly after modifying other registers in regs.
-uint64_t PhysExceptionResume(PhysExceptionState& regs, uint64_t pc, uint64_t sp, uint64_t psr);
+uint64_t PhysExceptionResume(PhysExceptionState& state, uint64_t pc, uint64_t sp, uint64_t psr);
 
 #endif  // !__ASSEMBLER__
 

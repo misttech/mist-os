@@ -7,7 +7,9 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_DESCRIPTOR_H_
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_DESCRIPTOR_H_
 
+#include <lib/stdcompat/span.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <hwreg/bitfields.h>
 
@@ -148,6 +150,10 @@ struct SystemSegmentDesc64 {
   DEF_SUBFIELD(raw[0], 15, 0, limit_15_0);
   DEF_SUBFIELD(raw[0], 31, 16, base_15_0);
 
+  // INTERRUPT_GATE / TRAP_GATE view of word 0.
+  DEF_SUBFIELD(raw[0], 15, 0, offset_15_0);
+  DEF_SUBFIELD(raw[0], 31, 16, selector);
+
   // Word 1
   DEF_SUBFIELD(raw[1], 7, 0, base_23_16);
   DEF_ENUM_SUBFIELD(raw[1], SegmentType, 11, 8, type);
@@ -160,8 +166,14 @@ struct SystemSegmentDesc64 {
   DEF_SUBBIT(raw[1], 23, granularity);
   DEF_SUBFIELD(raw[1], 31, 24, base_31_24);
 
+  // In the INTERRUPT_GATE / TRAP_GATE view, bits [3,7] and 12 are MBZ;
+  // offset and ist replace base, limit, AVL and G.
+  DEF_SUBFIELD(raw[1], 31, 16, offset_31_16);
+  DEF_SUBFIELD(raw[1], 2, 0, ist);
+
   // Word 2
   DEF_SUBFIELD(raw[2], 31, 0, base_63_32);
+  DEF_SUBFIELD(raw[2], 31, 0, offset_63_32);  // INTERRUPT_GATE, TRAP_GATE
 
   // Word 3
   // Bits [31:0] of raw[3] reserved.
@@ -183,6 +195,17 @@ struct SystemSegmentDesc64 {
   constexpr uint64_t limit() const { return (limit_19_16() << 16) | limit_15_0(); }
   constexpr SystemSegmentDesc64& set_limit(uint64_t limit) {
     return set_limit_19_16((limit >> 16) & 0xff).set_limit_15_0(limit & 0xffff);
+  }
+
+  // INTERRUPT_GATE and TRAP_GATE descriptors have selector and offset rather
+  // than base and limit.
+  constexpr uint64_t offset() const {
+    return (static_cast<uint64_t>(offset_63_32()) << 32) | (offset_31_16() << 16) | offset_15_0();
+  }
+  constexpr SystemSegmentDesc64& set_offset(uint64_t offset) {
+    return set_offset_63_32(static_cast<uint32_t>(offset >> 32))
+        .set_offset_31_16((offset >> 16) & 0xffff)
+        .set_offset_15_0(offset & 0xffff);
   }
 };
 static_assert(sizeof(SystemSegmentDesc64) == 16);
@@ -211,6 +234,14 @@ struct SegmentSelector {
 // [intel/vol3]: Figure 2-6. Memory Management Registers
 // [amd/vol2]: Figure 4-8. GDTR and IDTR Format-Long Mode.
 struct GdtRegister64 {
+  template <typename T, size_t N>
+  static GdtRegister64 Make(cpp20::span<T, N> entries) {
+    return {
+        .limit = static_cast<uint16_t>(entries.size_bytes() - 1),
+        .base = reinterpret_cast<uintptr_t>(entries.data()),
+    };
+  }
+
   uint16_t limit;  // Size of the GDT in bytes, minus one.
   uint64_t base;   // Pointer to the GDT.
 } __PACKED __ALIGNED(2);
@@ -247,7 +278,11 @@ struct TaskStateSegment64 {
   uint32_t reserved2;
 
   // Interrupt stack table pointers.
-  static constexpr int kNumInterruptStackTables = 7;
+  //
+  // Note that ist[0] corresponds to IST1, i.e. the ist field in an
+  // INTERRUPT_GATE descriptor is 1-origin though this array is 0-origin.
+  // Descriptors with an ist field of zero do not use the IST at all.
+  static constexpr size_t kNumInterruptStackTables = 7;
   uint64_t ist[kNumInterruptStackTables];
 
   uint32_t reserved3;

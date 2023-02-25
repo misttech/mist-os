@@ -21,10 +21,7 @@ void X86StandardSegments::Init() {
 }
 
 arch::GdtRegister64 X86StandardSegments::gdt_pointer() {
-  return {
-      .limit = sizeof(gdt_) - 1,
-      .base = reinterpret_cast<uintptr_t>(&gdt_),
-  };
+  return GdtRegister64::Make(cpp20::span{&gdt_, 1});
 }
 
 #ifdef __x86_64__
@@ -62,6 +59,9 @@ void X86StandardSegments::Load(uintptr_t entry, uintptr_t arg) {
 
   // Install the new Task State Segment.
   arch::LoadTaskRegister64(kTr64);
+
+  // Clear %ss in case it refers to an old segment that's now invalid.
+  __asm__ volatile("mov %0, %%ss" : : [zero] "r"(0));
 
   // Do a far jump via far return since AMD processors don't handle 64-bit
   // offsets in ljmpq.  It's OK that this clobbers the stack because it never
@@ -114,6 +114,7 @@ void X86StandardSegments::Load(uintptr_t entry, uintptr_t arg) {
       ltr %w[tr]
       xor %%ebp, %%ebp
       xor %%esp, %%esp
+      mov %%ebp, %%ss
       jmp *%%rax
       .code32
       )"""

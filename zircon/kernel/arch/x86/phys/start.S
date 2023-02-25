@@ -116,6 +116,6 @@
 #if ZX_TLS_UNSAFE_SP_OFFSET < ZX_TLS_STACK_GUARD_OFFSET
   .error "TLS ABI layout??"
 #endif
-boot_thread_pointer:
+.label boot_thread_pointer, global
   .skip ZX_TLS_UNSAFE_SP_OFFSET + 8
 .end_object

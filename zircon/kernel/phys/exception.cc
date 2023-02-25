@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 
+#include <ktl/algorithm.h>
 #include <phys/exception.h>
 #include <phys/main.h>
 
@@ -15,8 +16,7 @@ PhysHandledException gPhysHandledException;
 extern "C" uint64_t PhysException(uint64_t vector, const char* vector_name,
                                   PhysExceptionState& state) {
   // Check for an installed handler, and always reset to no handler.
-  PhysHandledException handled = gPhysHandledException;
-  gPhysHandledException = {};
+  PhysHandledException handled = ktl::exchange(gPhysHandledException, {});
 
   // If the handler was expecting this PC to get an exception, it takes over.
   if (handled.pc != 0 && state.pc() == handled.pc) {

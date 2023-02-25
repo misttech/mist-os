@@ -45,6 +45,7 @@ if (current_toolchain == default_toolchain) {
       ]
       deps = [
         ":reset",
+        "//sdk/lib/fit",
         "//zircon/kernel/lib/arch",
         "//zircon/kernel/phys:main",
       ]

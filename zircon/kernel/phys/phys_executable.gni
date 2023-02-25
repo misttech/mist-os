@@ -77,6 +77,9 @@ template("phys_executable") {
       foreach(ldscript, _phys_linker_scripts) {
         ldflags += [ "-Wl,-T," + rebase_path(ldscript, root_build_dir) ]
       }
+      if (is_gcc) {
+        ldflags += [ "-Wl,--no-warn-rwx-segments" ]
+      }
     }
 
     # This is the main target of the template, a raw binary load image file.

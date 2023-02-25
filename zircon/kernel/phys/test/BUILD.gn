@@ -490,6 +490,7 @@ if (current_toolchain != default_toolchain) {
       ":zbi-decompress-test",
       ":zbi-handoff-entropy-test",
       ":zbi-memory-test",
+      ":zbi-phys-exception-test",
       ":zbi-physload-test",
       "code-patching",
       "elf-loading",
@@ -504,15 +505,12 @@ if (current_toolchain != default_toolchain) {
     if (current_cpu != "riscv64") {  # TODO(mcgrathr): kernel not ready
       deps += [ ":elf-physboot-core-tests" ]
     }
-    if (current_cpu == "x64") {
-      deps += [ ":qemu-memory-test" ]
-    }
-    if (current_cpu != "x64") {  # TODO(mcgrathr): support on x86
-      deps += [ ":zbi-phys-exception-test" ]
-    }
 
-    # x86 qemu is 32-bit and we don't do exceptions for 32-bit.
-    if (current_cpu != "x64") {
+    if (current_cpu == "x64") {
+      # Only x86 gets memory info directly from the legacy boot environments.
+      deps += [ ":qemu-memory-test" ]
+    } else {
+      # x86 qemu is 32-bit and we don't do exceptions for 32-bit.
       deps += [ ":qemu-phys-exception-test" ]
     }
   }

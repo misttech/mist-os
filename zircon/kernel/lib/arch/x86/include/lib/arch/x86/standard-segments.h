@@ -26,29 +26,41 @@ class X86StandardSegments {
   // (This is only provided on actual x86 hardware, both 64-bit and 32-bit.)
   [[noreturn]] void Load(uintptr_t entry, uintptr_t arg);
 
+  constexpr TaskStateSegment64& tss() { return tss_; }
+  constexpr const TaskStateSegment64& tss() const { return tss_; }
+
+  static constexpr SystemSegmentDesc64 MakeInterruptGate(uint64_t entry, uint8_t ist = 0) {
+    return SystemSegmentDesc64()
+        .set_present(true)
+        .set_type(SystemSegmentDesc64::SegmentType::INTERRUPT_GATE)
+        .set_selector(kCs64.raw)
+        .set_offset(entry)
+        .set_ist(ist);
+  }
+
  private:
   struct Gdt64 {
-    arch::Desc32 null;                // Null descriptor.
-    arch::Desc32 code64;              // 64-bit code descriptor.
-    arch::SystemSegmentDesc64 tss64;  // 64-bit TSS descriptor (double slot).
+    Desc32 null;                // Null descriptor.
+    Desc32 code64;              // 64-bit code descriptor.
+    SystemSegmentDesc64 tss64;  // 64-bit TSS descriptor (double slot).
   };
   static_assert(std::is_standard_layout_v<Gdt64>);
 
   // Return the %cs selector for 64-bit code.
   static constexpr auto kCs64 =
-      arch::SegmentSelector::FromGdtIndex(offsetof(Gdt64, code64) / sizeof(arch::Desc32));
+      SegmentSelector::FromGdtIndex(offsetof(Gdt64, code64) / sizeof(Desc32));
 
   // Return the TSS selector for LTR.
   static constexpr auto kTr64 =
-      arch::SegmentSelector::FromGdtIndex(offsetof(Gdt64, tss64) / sizeof(arch::Desc32));
+      SegmentSelector::FromGdtIndex(offsetof(Gdt64, tss64) / sizeof(Desc32));
 
   void Init();
 
   // Return the GDT pointer to load with LGDT.
-  arch::GdtRegister64 gdt_pointer();
+  GdtRegister64 gdt_pointer();
 
   Gdt64 gdt_{};
-  arch::TaskStateSegment64 tss_{};
+  TaskStateSegment64 tss_{};
 };
 
 }  // namespace arch

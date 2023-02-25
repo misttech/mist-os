@@ -36,6 +36,16 @@ inline void LoadGdt(const GdtRegister64& gdt) {
 }
 inline void LoadGdt(const AlignedGdtRegister64& gdt) { LoadGdt(gdt.reg); }
 
+// Load the x86-64 IDT register to the given value.
+inline void LoadIdt(const GdtRegister64& idt) {
+  __asm__ __volatile__("lidt %0"
+                       : /* no outputs */
+                       : "m"(idt)
+                       : "memory"  // Ensure compiler writes out changes to IDT.
+  );
+}
+inline void LoadIdt(const AlignedGdtRegister64& idt) { LoadIdt(idt.reg); }
+
 // Activate the given code selector and data selector.
 //
 // The two selectors should be indexes into the currently loaded GDT.
