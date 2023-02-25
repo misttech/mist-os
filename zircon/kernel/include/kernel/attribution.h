@@ -19,8 +19,7 @@
 class AttributionObject : public fbl::RefCounted<AttributionObject>,
                           public fbl::DoublyLinkedListable<AttributionObject*> {
  public:
-  explicit AttributionObject(zx_koid_t owning_koid) : owning_koid_(owning_koid) {}
-
+  AttributionObject() : owning_koid_(ZX_KOID_INVALID) {}
   ~AttributionObject();
 
   // No copy, move, or assignment.
@@ -68,6 +67,7 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>,
     }
   }
 
+  void SetOwningKoid(zx_koid_t owning_koid) { owning_koid_ = owning_koid; }
   zx_koid_t GetOwningKoid() const { return owning_koid_; }
 
  private:
@@ -84,7 +84,7 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>,
   // VmObjectPageds being attributed to owning_koid_.
   RelaxedAtomic<uint64_t> total_resident_pages_deallocated_{0};
   // The koid of the process that this attribution object is tracking.
-  const zx_koid_t owning_koid_;
+  zx_koid_t owning_koid_;
 
   DECLARE_SINGLETON_MUTEX(AllAttributionObjectsLock);
   static fbl::DoublyLinkedList<AttributionObject*> all_attribution_objects_

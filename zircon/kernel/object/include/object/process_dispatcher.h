@@ -310,7 +310,8 @@ class ProcessDispatcher final
   friend void DumpProcessMemoryUsage(const char* prefix, size_t min_pages);
 
   ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shared_state, fbl::RefPtr<JobDispatcher> job,
-                    ktl::string_view name, uint32_t flags);
+                    ktl::string_view name, uint32_t flags,
+                    fbl::RefPtr<AttributionObject> attribution_object);
 
   ProcessDispatcher(const ProcessDispatcher&) = delete;
   ProcessDispatcher& operator=(const ProcessDispatcher&) = delete;

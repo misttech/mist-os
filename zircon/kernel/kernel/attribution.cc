@@ -7,10 +7,11 @@
 
 fbl::DoublyLinkedList<AttributionObject*> AttributionObject::all_attribution_objects_;
 
-AttributionObject AttributionObject::kernel_attribution_{0};
+AttributionObject AttributionObject::kernel_attribution_;
 
 void AttributionObject::KernelAttributionInit() TA_NO_THREAD_SAFETY_ANALYSIS {
   AttributionObject::kernel_attribution_.Adopt();
+  AttributionObject::kernel_attribution_.SetOwningKoid(0);
   all_attribution_objects_.push_back(&AttributionObject::kernel_attribution_);
 }
 
