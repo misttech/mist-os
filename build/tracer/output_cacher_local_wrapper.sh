@@ -82,4 +82,5 @@ function cleanup() {
 
 trap cleanup EXIT
 
-"${rewrapper_command_prefix[@]}" --local_wrapper="$local_wrapper" -- "${primary_command[@]}"
+# Prefix the local-wrapper argument with a ./ to avoid looking in PATH.
+"${rewrapper_command_prefix[@]}" --local_wrapper=./"$local_wrapper" -- "${primary_command[@]}"
