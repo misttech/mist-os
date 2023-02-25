@@ -1193,11 +1193,18 @@ class MultiVmoTestInstance : public TestInstance {
       if (packet.key == 1) {
         ZX_ASSERT(solo_owner);
 
+        zx_pager_vmo_stats_t stats;
+        zx_status_t status = zx_pager_query_vmo_stats(
+            pager.get(), vmo.get(), ZX_PAGER_RESET_VMO_STATS, &stats, sizeof(stats));
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to query VMO stats %s\n",
+                      zx_status_get_string(status));
+        const bool was_modified = (stats.modified == ZX_PAGER_VMO_STATS_MODIFIED);
+
         // Writeback any dirty pages before exiting.
         zx_vmo_dirty_range_t ranges[10];
         size_t actual = 0, avail = 0;
         size_t vmo_size;
-        zx_status_t status = vmo.get_size(&vmo_size);
+        status = vmo.get_size(&vmo_size);
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO size %s\n", zx_status_get_string(status));
         uint64_t start = 0, len = vmo_size;
 
@@ -1231,6 +1238,13 @@ class MultiVmoTestInstance : public TestInstance {
         status = zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, vmo_size, nullptr, 0,
                                              nullptr, &avail);
         ZX_ASSERT_MSG(avail == 0, "Found %zu dirty ranges after writeback\n", avail);
+
+        // No one should have modified the VMO since the last time we reset modified.
+        status = zx_pager_query_vmo_stats(pager.get(), vmo.get(), ZX_PAGER_RESET_VMO_STATS, &stats,
+                                          sizeof(stats));
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to query VMO stats %s\n",
+                      zx_status_get_string(status));
+        ZX_ASSERT_MSG(stats.modified == 0, "VMO was modified (prev query: %d)\n", was_modified);
 
         // No children, and we have the only handle. Done.
         break;
@@ -1318,6 +1332,24 @@ class MultiVmoTestInstance : public TestInstance {
       if (info.handle_count == 2) {
         break;
       }
+
+      // Ensure we can query VMO stats successfully.
+      zx_pager_vmo_stats_t stats;
+      status = zx_pager_query_vmo_stats(pager, vmo.get(), 0, &stats, sizeof(stats));
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to query VMO stats %s\n",
+                    zx_status_get_string(status));
+      const bool was_modified = (stats.modified == ZX_PAGER_VMO_STATS_MODIFIED);
+      status = zx_pager_query_vmo_stats(pager, vmo.get(), ZX_PAGER_RESET_VMO_STATS, &stats,
+                                        sizeof(stats));
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to query VMO stats %s\n",
+                    zx_status_get_string(status));
+      // The first query did not request a reset, so if the VMO was modified before it should be
+      // modified now as well. If the VMO was not previously modified though, it's possible for it
+      // to have gotten modified between the two calls, so we cannot make any assertions in that
+      // case. For the same reason we cannot check that the modified state is cleared after the
+      // second query.
+      ZX_ASSERT_MSG(!was_modified || stats.modified == ZX_PAGER_VMO_STATS_MODIFIED,
+                    "VMO modified state: %u (prev: %d)\n", stats.modified, was_modified);
 
       zx_vmo_dirty_range_t ranges[10];
       size_t actual = 0, avail = 0;
