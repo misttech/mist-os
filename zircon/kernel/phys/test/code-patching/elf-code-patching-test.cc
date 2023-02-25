@@ -68,7 +68,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     }
 
     add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
-    unpatched = add_one.Load(false);
+    unpatched = add_one.Load({}, false);
     add_one.Relocate();
 
     printf("Calling %#" PRIx64 "...", add_one.entry());
@@ -89,7 +89,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     }
 
     add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
-    patched = add_one.Load(false);
+    patched = add_one.Load({}, false);
     add_one.Relocate();
 
     enum class ExpectedCase : uint32_t { kAddOne = kAddOneCaseId };
@@ -126,7 +126,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     }
 
     multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
-    patched_stub2 = multiply.Load(false);
+    patched_stub2 = multiply.Load({}, false);
     multiply.Relocate();
 
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };
@@ -164,7 +164,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     }
 
     multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
-    patched_stub10 = multiply.Load(false);
+    patched_stub10 = multiply.Load({}, false);
     multiply.Relocate();
 
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };

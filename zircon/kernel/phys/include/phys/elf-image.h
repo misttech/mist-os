@@ -54,15 +54,17 @@ class ElfImage {
 
   ktl::string_view name() const { return name_; }
 
-  LoadInfo& load() { return load_; }
-  const LoadInfo& load() const { return load_; }
+  LoadInfo& load_info() { return load_info_; }
+  const LoadInfo& load_info() const { return load_info_; }
 
   uint64_t load_bias() const {
     ZX_DEBUG_ASSERT(load_bias_);
     return *load_bias_;
   }
 
-  size_t size_bytes() const { return image_.image().size_bytes(); }
+  // Return the memory image within the current address space. Must be called
+  // after Init().
+  cpp20::span<const std::byte> memory_image() const { return image_.image(); }
 
   uint64_t entry() const { return entry_ + load_bias(); }
 
@@ -94,34 +96,35 @@ class ElfImage {
     return fit::ok();
   }
 
-  // Set the virtual address where the image will be loaded.
-  void SetLoadAddress(uint64_t address) {
-    ZX_DEBUG_ASSERT(!load_bias_);
-    ZX_ASSERT(address % ZX_PAGE_SIZE == 0);
-    load_bias_ = address - load_.vaddr_start();
-  }
-
-  uintptr_t LoadAddress() const {
-    ZX_DEBUG_ASSERT(load_bias_);
-    return static_cast<uintptr_t>(load_.vaddr_start() + *load_bias_);
-  }
-
   // Return true if the memory within the BOOTFS image for this file is
   // sufficient to be used in place as the load image.
   bool CanLoadInPlace() const {
-    return load_.vaddr_size() <= ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes());
+    return load_info_.vaddr_size() <= ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes());
   }
 
-  // Use the address of the file image inside the BOOTFS as the load address.
-  void LoadInPlace() {
-    uintptr_t address = reinterpret_cast<uintptr_t>(image_.image().data());
-    SetLoadAddress(address);
+  // Load in place if possible, or else copy into a new Allocation
+  // A virtual load address at which relocation is expected to occur may be
+  // provided; if not, the image will be loaded within the current address
+  // space.
+  // The Allocation returned is null if LoadInPlace was used; otherwise, it
+  // owns the memory backing the new load image and should be kept alive for
+  // the lifetime of the ElfImage. In general, the returned allocation should
+  // not be consulted for addresses within the load image; that is what
+  // memory_image() is for.
+  Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true);
+
+  // Returns the virtual address where the image will be loaded. Must be called
+  // after Load().
+  uintptr_t load_address() const {
+    ZX_DEBUG_ASSERT(load_bias_);
+    return static_cast<uintptr_t>(load_info_.vaddr_start() + *load_bias_);
   }
 
-  // Load in place if possible, or else copy into a new Allocation.
-  // On return, SetLoadAddress has been called.
-  // The Allocation returned is null if LoadInPlace was used.
-  Allocation Load(bool in_place_ok = true);
+  // Returns the physical address where the image will be loaded. Must be
+  // called after Load().
+  uintptr_t physical_load_address() const {
+    return reinterpret_cast<uintptr_t>(memory_image().data());
+  }
 
   // Apply relocations to the image in place after setting the load address.
   void Relocate();
@@ -141,7 +144,8 @@ class ElfImage {
   // markup output stream.
   template <class Writer>
   Writer& SymbolizerContext(Writer& writer, unsigned int id, ktl::string_view prefix = {}) const {
-    return load_.SymbolizerContext(writer, id, name(), build_id_->desc, LoadAddress(), prefix);
+    return load_info_.SymbolizerContext(writer, id, name(), build_id_->desc, load_address(),
+                                        prefix);
   }
 
   // Publish instrumentation VMOs for this module.  The argument is similar
@@ -194,6 +198,13 @@ class ElfImage {
   // instantiation inside this module.
   void PublishSelfLlvmProfdata(PublishSelfCallback publish) const;
 
+  // Set the virtual address where the image will be loaded.
+  void set_load_address(uint64_t address) {
+    ZX_DEBUG_ASSERT(!load_bias_);
+    ZX_ASSERT(address % ZX_PAGE_SIZE == 0);
+    load_bias_ = address - load_info_.vaddr_start();
+  }
+
   ktl::span<const code_patching::Directive> patches() const { return patcher_.patches(); }
 
   ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch,
@@ -201,7 +212,7 @@ class ElfImage {
 
   ktl::string_view name_;
   elfldltl::DirectMemory image_{{}};
-  LoadInfo load_;
+  LoadInfo load_info_;
   uint64_t entry_ = 0;
   ktl::span<const elfldltl::Elf<>::Dyn> dynamic_;
   ktl::optional<elfldltl::ElfNote> build_id_;

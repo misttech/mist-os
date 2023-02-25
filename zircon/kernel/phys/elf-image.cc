@@ -97,7 +97,7 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
 
   ktl::optional<elfldltl::Elf<>::Phdr> relro, dynamic, interp;
   elfldltl::DecodePhdrs(
-      diagnostics, phdrs, load_.GetPhdrObserver(ZX_PAGE_SIZE),
+      diagnostics, phdrs, load_info_.GetPhdrObserver(ZX_PAGE_SIZE),
       elfldltl::PhdrFileNoteObserver(elfldltl::Elf<>(), image_,
                                      elfldltl::NoArrayFromFile<ktl::byte>(),
                                      elfldltl::ObserveBuildIdNote(build_id_)),
@@ -105,14 +105,14 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
       elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dynamic),
       elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp));
 
-  image_.set_base(load_.vaddr_start());
+  image_.set_base(load_info_.vaddr_start());
   entry_ = ehdr.entry;
 
   if (relocated) {
     // In the phys context, all the relocations are done in place before the
     // image is considered "loaded".  Update the load segments to indicate
     // RELRO protections have already been applied.
-    load_.ApplyRelro(diagnostics, relro, ZX_PAGE_SIZE, true);
+    load_info_.ApplyRelro(diagnostics, relro, ZX_PAGE_SIZE, true);
   }
 
   if (dynamic) {
@@ -146,11 +146,16 @@ ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& p
   return file.subspan(static_cast<size_t>(patch.range_start - image_.base()), patch.range_size);
 }
 
-Allocation ElfImage::Load(bool in_place_ok) {
+Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_place_ok) {
   auto endof = [](const auto& last) { return last.offset() + last.filesz(); };
-  const uint64_t load_size = ktl::visit(endof, load_.segments().back());
+  const uint64_t load_size = ktl::visit(endof, load_info_.segments().back());
 
-  auto symbolize = fit::defer([this]() { gSymbolize->OnLoad(*this); });
+  auto update_load_address_and_symbolize = fit::defer([relocation_address, this]() {
+    // Update the load address before having emitting otherwise-misleading
+    // markup.
+    set_load_address(relocation_address.value_or(physical_load_address()));
+    gSymbolize->OnLoad(*this);
+  });
 
   if (in_place_ok && CanLoadInPlace()) {
     // TODO(fxbug.dev/113938): Could have a memalloc::Pool feature to
@@ -159,20 +164,18 @@ Allocation ElfImage::Load(bool in_place_ok) {
     // The full vaddr_size() fits in the pages the BOOTFS file occupies.  If
     // there is any bss (memsz > filesz), it may overlap with some nonzero file
     // contents and not just the BOOTFS page-alignment padding.  Zero it all.
-    ZX_DEBUG_ASSERT(ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes()) >= load_.vaddr_size());
+    ZX_DEBUG_ASSERT(ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes()) >= load_info_.vaddr_size());
     memset(image_.image().data() + load_size, 0,
-           static_cast<size_t>(load_.vaddr_size() - load_size));
-
-    LoadInPlace();
+           static_cast<size_t>(load_info_.vaddr_size() - load_size));
     return {};
   }
 
   fbl::AllocChecker ac;
   Allocation image =
-      Allocation::New(ac, memalloc::Type::kPhysElf, load_.vaddr_size(), ZX_PAGE_SIZE);
+      Allocation::New(ac, memalloc::Type::kPhysElf, load_info_.vaddr_size(), ZX_PAGE_SIZE);
   if (!ac.check()) {
     ZX_PANIC("cannot allocate phys ELF load image of %#zx bytes",
-             static_cast<size_t>(load_.vaddr_size()));
+             static_cast<size_t>(load_info_.vaddr_size()));
   }
 
   ZX_ASSERT_MSG(load_size <= image.size_bytes(), "load_size %#" PRIx64 " > allocation size %#zx",
@@ -185,9 +188,7 @@ Allocation ElfImage::Load(bool in_place_ok) {
   // following bss (memsz > filesz).
   const size_t copy = ktl::min(static_cast<size_t>(load_size), image_.image().size_bytes());
   memcpy(image.get(), image_.image().data(), copy);
-  memset(image.get() + copy, 0, load_.vaddr_size() - copy);
-
-  SetLoadAddress(reinterpret_cast<uintptr_t>(image.get()));
+  memset(image.get() + copy, 0, load_info_.vaddr_size() - copy);
 
   // Hereafter image_ refers to the now-loaded image, not the original file.
   image_.set_image(image.data());
@@ -198,7 +199,7 @@ Allocation ElfImage::Load(bool in_place_ok) {
   // elsewhere in physical memory.
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   arch::GlobalCacheConsistencyContext cache;
-  cache.SyncRange(LoadAddress(), load_.vaddr_size());
+  cache.SyncRange(physical_load_address(), load_info_.vaddr_size());
 
   return image;
 }
@@ -246,7 +247,7 @@ void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, u
   load_bias_ = load_bias;
 
   auto diag = elfldltl::PanicDiagnostics();
-  ZX_ASSERT(load_.AddSegment(diag, ZX_PAGE_SIZE, load_segment));
+  ZX_ASSERT(load_info_.AddSegment(diag, ZX_PAGE_SIZE, load_segment));
 
   elfldltl::ElfNoteSegment<> notes(build_id_note);
   ZX_DEBUG_ASSERT(notes.begin() != notes.end());
