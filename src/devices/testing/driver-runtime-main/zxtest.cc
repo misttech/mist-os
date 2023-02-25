@@ -14,6 +14,8 @@
 #include <zxtest/zxtest.h>
 
 __EXPORT int main(int argc, char** argv) {
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
   setlinebuf(stdout);
   if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
     return status;

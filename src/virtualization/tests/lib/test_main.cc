@@ -31,13 +31,9 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  // Switch to line buffering of stdout/stderr, so that we don't lose
-  // log lines if a test hangs.
-  //
-  // TODO(fxbug.dev/10218): Solve this globally for everyone, not just for this
-  // test suite.
-  std::setvbuf(stdout, nullptr, _IOLBF, BUFSIZ);
-  std::setvbuf(stderr, nullptr, _IOLBF, BUFSIZ);
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
+  setlinebuf(stdout);
 
   LoggerOutputListener listener;
 

@@ -93,6 +93,10 @@ class DeviceNameProviderServer final : public fidl::WireServer<fuchsia_device::N
 };
 
 int main(int argc, char** argv) {
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
+  setlinebuf(stdout);
+
   fdio_flat_namespace_t* ns;
   if (zx_status_t status = fdio_ns_export_root(&ns); status != ZX_OK) {
     printf("device-name-provider: FATAL: fdio_ns_export_root() = %s\n",

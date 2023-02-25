@@ -109,8 +109,9 @@ constexpr char zedboot_banner[] =
 
 int main(int argc, char** argv) {
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
-    setbuffer(stdout, nullptr, 0);
-    setbuffer(stderr, nullptr, 0);
+    // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+    // fools libc into block-buffering stdout.
+    setlinebuf(stdout);
     printf("Failed to redirect stdout to debuglog, assuming test environment and continuing: %s\n",
            zx_status_get_string(status));
   }

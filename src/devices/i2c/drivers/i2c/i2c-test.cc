@@ -144,6 +144,8 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
 int main(int argc, char** argv) {
   // This must be called exactly once before any test cases run.
   fdf_env_start();
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
   setlinebuf(stdout);
   return RUN_ALL_TESTS(argc, argv);
 }

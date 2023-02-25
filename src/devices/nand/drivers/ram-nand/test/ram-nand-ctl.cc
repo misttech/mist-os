@@ -131,6 +131,8 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Failed to open device file: %s\n", channel.status_string());
     return 1;
   }
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
   setlinebuf(stdout);
   return RUN_ALL_TESTS(argc, argv);
 }

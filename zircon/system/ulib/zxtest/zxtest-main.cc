@@ -10,6 +10,8 @@
 // Provides a default entry point to run all registered tests. If the main program provides its own
 // main, the library's main will be ignored.
 __WEAK int main(int argc, char** argv) {
+  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // fools libc into block-buffering stdout.
   setlinebuf(stdout);
   return RUN_ALL_TESTS(argc, argv);
 }
