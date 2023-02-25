@@ -563,6 +563,12 @@ config("default_warnings") {
     cflags_cc += [
       "-Wc++20-compat",
       "-Wno-error=c++20-compat",
+
+      # TODO(fxbug.dev/122568): The use of implicit capture of this via [=] has
+      # been deprecated in C++20, but we cannot address this because adding an
+      # explicit capture of 'this' to capture '*this' by reference is a C++20
+      # extension and not valid in C++17.
+      "-Wno-deprecated-this-capture",
     ]
   }
 
