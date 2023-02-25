@@ -64,8 +64,7 @@ fpromise::promise<> Speaker::SpeakNodePromise(
       screen_reader_message_generator_->DescribeNode(node, std::move(message_context));
   auto task = std::make_shared<SpeechTask>(std::move(utterances));
 
-  return PrepareTask(task, options.interrupt, options.save_utterance)
-      .and_then(DispatchUtterances(task, options.interrupt));
+  return PrepareTask(task, options.interrupt, options.save_utterance);
 }
 
 fpromise::promise<> Speaker::SpeakMessagePromise(Utterance utterance, Options options) {
@@ -75,8 +74,7 @@ fpromise::promise<> Speaker::SpeakMessagePromise(Utterance utterance, Options op
   utterances.push_back(std::move(utterance_and_context));
   auto task = std::make_shared<SpeechTask>(std::move(utterances));
 
-  return PrepareTask(task, options.interrupt, options.save_utterance)
-      .and_then(DispatchUtterances(task, options.interrupt));
+  return PrepareTask(task, options.interrupt, options.save_utterance);
 }
 
 fpromise::promise<> Speaker::SpeakMessageByIdPromise(fuchsia::intl::l10n::MessageIds message_id,
@@ -87,8 +85,7 @@ fpromise::promise<> Speaker::SpeakMessageByIdPromise(fuchsia::intl::l10n::Messag
   FX_DCHECK(!utterances.empty());
   auto task = std::make_shared<SpeechTask>(std::move(utterances));
 
-  return PrepareTask(task, options.interrupt, options.save_utterance)
-      .and_then(DispatchUtterances(task, options.interrupt));
+  return PrepareTask(task, options.interrupt, options.save_utterance);
 }
 
 fpromise::promise<> Speaker::SpeakNodeCanonicalizedLabelPromise(
@@ -100,32 +97,35 @@ fpromise::promise<> Speaker::SpeakNodeCanonicalizedLabelPromise(
   FX_DCHECK(!utterances.empty());
   auto task = std::make_shared<SpeechTask>(std::move(utterances));
 
-  return PrepareTask(task, options.interrupt, options.save_utterance)
-      .and_then(DispatchUtterances(task, options.interrupt));
+  return PrepareTask(task, options.interrupt, options.save_utterance);
 }
 
 fpromise::promise<> Speaker::PrepareTask(std::shared_ptr<SpeechTask> task, bool interrupt,
                                          bool save_utterance) {
   return fpromise::make_promise(
-      [this, task, interrupt, save_utterance]() mutable -> fpromise::promise<> {
-        if (save_utterance) {
-          last_utterance_ = ConcatenateUtterances(task->utterances);
-        }
-        if (interrupt) {
-          decltype(queue_) empty;
-          std::swap(empty, queue_);
-          queue_.push(std::move(task));
-          // This task trumps whatever is speaking and starts now, so it cancels any pending task.
-          return CancelTts();
-        }
-        // Even when not interrupting, the task needs to be part of the queue.
-        queue_.push(std::move(task));
-        if (queue_.size() == 1) {
-          // This is the only task in the queue, it can start right away.
-          return fpromise::make_ok_promise();
-        }
-        return WaitInQueue(std::weak_ptr(queue_.back()));
-      });
+             [this, task, interrupt, save_utterance]() mutable -> fpromise::promise<> {
+               if (save_utterance) {
+                 last_utterance_ = ConcatenateUtterances(task->utterances);
+               }
+               if (interrupt) {
+                 decltype(queue_) empty;
+                 std::swap(empty, queue_);
+                 queue_.push(std::move(task));
+                 // This task trumps whatever is speaking and starts now, so it cancels any pending
+                 // task.
+                 return CancelTts();
+               }
+               // Even when not interrupting, the task needs to be part of the queue.
+               queue_.push(std::move(task));
+               if (queue_.size() == 1) {
+                 // This is the only task in the queue, it can start right away.
+                 return fpromise::make_ok_promise();
+               }
+               return WaitInQueue(std::weak_ptr(queue_.back()));
+             })
+      .and_then(DispatchUtterances(task, interrupt))
+      .then(
+          [this, task](fpromise::result<>& result) { return EndSpeechTask(task, result.is_ok()); });
 }
 
 fpromise::promise<> Speaker::DispatchUtterances(std::shared_ptr<SpeechTask> task, bool interrupt) {
@@ -137,19 +137,19 @@ fpromise::promise<> Speaker::DispatchUtterances(std::shared_ptr<SpeechTask> task
           [this, weak_task = std::weak_ptr(task), interrupt]() mutable -> fpromise::promise<> {
             auto task = weak_task.lock();
             if (!task) {
-              return EndSpeechTask(std::move(weak_task), /*success=*/false);
+              return fpromise::make_error_promise();
             }
             if (static_cast<uint64_t>(task->utterance_index) < task->utterances.size()) {
               return DispatchUtterances(std::move(task), interrupt);
             }
-            return EndSpeechTask(std::move(weak_task), /*success=*/true);
+            return fpromise::make_ok_promise();
           });
 }
 
 fpromise::promise<> Speaker::DispatchSingleUtterance(std::weak_ptr<SpeechTask> weak_task) {
   auto task = weak_task.lock();
   if (!task) {
-    return EndSpeechTask(std::move(weak_task), /*success=*/false);
+    return fpromise::make_error_promise();
   }
 
   // Create a promise representing the (optional) delay, and chain the utterance dispatch off of it.
@@ -180,9 +180,6 @@ fpromise::promise<> Speaker::DispatchSingleUtterance(std::weak_ptr<SpeechTask> w
           return fpromise::make_error_promise();
         }
         return Speak();
-      })
-      .or_else([this, weak_task = std::weak_ptr(task)]() mutable {
-        return EndSpeechTask(std::move(weak_task), /*success=*/false);
       });
 }
 
@@ -195,30 +192,33 @@ fpromise::promise<> Speaker::CancelTts() {
 }
 
 fpromise::promise<> Speaker::EndSpeechTask(std::weak_ptr<SpeechTask> weak_task, bool success) {
-  // If the task no longer exists, this means that it has already been deleted by another task.
-  auto task = weak_task.lock();
-  if (!task) {
-    return fpromise::make_error_promise();
-  }
+  return fpromise::make_promise([this, weak_task, success]() mutable -> fpromise::promise<> {
+    // If the task no longer exists, this means that it has already been deleted by another
+    // task.
+    auto task = weak_task.lock();
+    if (!task) {
+      return fpromise::make_error_promise();
+    }
 
-  if (!queue_.empty() && queue_.front() == task) {
-    queue_.pop();
-  } else {
-    FX_LOGS(ERROR) << "Tried to invoke EndSpeechTask more than once for the same task."
-                      "Ignoring. We can recover, but this indicates a logic error elsewhere.";
-    FX_DCHECK(false);
-  }
+    if (!queue_.empty() && queue_.front() == task) {
+      queue_.pop();
+    } else {
+      FX_LOGS(ERROR) << "Tried to invoke EndSpeechTask more than once for the same task."
+                        "Ignoring. We can recover, but this indicates a logic error elsewhere.";
+      FX_DCHECK(false);
+    }
 
-  if (!queue_.empty()) {
-    // Informs the new first task of the queue that it can start running.
-    queue_.front()->starter.complete_ok();
-  }
+    if (!queue_.empty()) {
+      // Informs the new first task of the queue that it can start running.
+      queue_.front()->starter.complete_ok();
+    }
 
-  if (!success) {
-    return fpromise::make_error_promise();
-  }
+    if (!success) {
+      return fpromise::make_error_promise();
+    }
 
-  return fpromise::make_ok_promise();
+    return fpromise::make_ok_promise();
+  });
 }
 
 fpromise::promise<> Speaker::EnqueueUtterance(Utterance utterance) {
@@ -254,7 +254,7 @@ fpromise::promise<> Speaker::Speak() {
 fpromise::promise<> Speaker::WaitInQueue(std::weak_ptr<SpeechTask> weak_task) {
   auto task = weak_task.lock();
   if (!task) {
-    return EndSpeechTask(std::move(weak_task), /*success=*/false);
+    return fpromise::make_error_promise();
   }
   fpromise::bridge<> bridge;
   // This completer will be invoked once this task reaches the front of the queue of tasks, ending

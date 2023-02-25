@@ -207,8 +207,9 @@ TEST_F(SpeakerTest, TaskTrumpsOtherTasksWhenInterrupting) {
   // cancels the first, a Cancel() call is also made to the tts engine, which clears its internal
   // state for a new set of utterances.
   EXPECT_TRUE(mock_tts_engine_.ReceivedCancel());
-  ASSERT_EQ(mock_tts_engine_.ExamineUtterances().size(), 1u);
+  ASSERT_EQ(mock_tts_engine_.ExamineUtterances().size(), 2u);
   EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[0].message(), "bar");
+  EXPECT_EQ(mock_tts_engine_.ExamineUtterances()[1].message(), "button");
 }
 
 TEST_F(SpeakerTest, DropsTaskWhenEnqueueFails) {
