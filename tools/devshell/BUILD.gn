@@ -4,6 +4,45 @@
 
 import("//scripts/sdk/gn/test/build/host_script_test.gni")
 
+if (!is_host) {
+  group("fx") {
+    deps = []
+  }
+} else {
+  group("fx") {
+    deps = [
+      "//src/developer/ffx:host",
+      "//src/sys/pkg/bin/pm:host",
+      "//third_party/openssh-portable/fuchsia/developer-keys:ssh_config($default_toolchain)",
+      "//tools/bootserver_old:host",
+      "//tools/net/device-finder:host",
+      "//tools/symbolizer",
+
+      # For `fx format-code`.
+      "//build/tools/formatjson5",
+      "//tools/cmc",
+      "//tools/fidl/fidlc:fidl-format",
+      "//tools/fidl/gidl-format:host",
+
+      # For `fx klog`.
+      "//tools/loglistener:host",
+
+      # For `fx lint`.
+      "//tools/fidl/fidlc:fidl-lint",
+
+      # For `fx pretty_serial`.
+      "//tools/pretty_serial:install($host_toolchain)",
+
+      # For 'fx create'.
+      "//tools/create",
+
+      # For compiled dart commands.
+      "//scripts/fxtest:fxtest",
+      "//scripts/status:status",
+    ]
+  }
+}
+
 # Tests need to be in the default toolchain, because build_api_module only
 # collects metadata (into tests.json) from the default toolchain.
 group("tests") {
