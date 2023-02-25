@@ -677,20 +677,10 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
 /// Events observed at the IP layer.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum IpLayerEvent<DeviceId, I: Ip> {
-    /// A device route was added.
-    DeviceRouteAdded {
-        /// The resolved device.
-        device: DeviceId,
-        /// The destination subnet.
-        subnet: Subnet<I::Addr>,
-    },
-    /// A device route was removed.
-    DeviceRouteRemoved {
-        /// The resolved device.
-        device: DeviceId,
-        /// The destination subnet.
-        subnet: Subnet<I::Addr>,
-    },
+    /// A route was added.
+    RouteAdded(types::Entry<I::Addr, DeviceId>),
+    /// A route was removed.
+    RouteRemoved(types::Entry<I::Addr, DeviceId>),
 }
 
 /// The non-synchronized execution context for the IP layer.
@@ -2445,12 +2435,15 @@ pub(crate) fn add_route<
     SC: IpLayerContext<I, C>,
 >(
     sync_ctx: &mut SC,
-    _ctx: &mut C,
+    ctx: &mut C,
     subnet: Subnet<I::Addr>,
     next_hop: SpecifiedAddr<I::Addr>,
 ) -> Result<(), AddRouteError> {
-    sync_ctx
-        .with_ip_routing_table_mut(|sync_ctx, table| table.add_route(sync_ctx, subnet, next_hop))
+    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+        table
+            .add_route(sync_ctx, subnet, next_hop)
+            .map(|entry| ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
+    })
 }
 
 /// Add a device route to the forwarding table, returning `Err` if the
@@ -2466,8 +2459,8 @@ pub(crate) fn add_device_route<
     device: SC::DeviceId,
 ) -> Result<(), ExistsError> {
     sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.add_device_route(subnet, device.clone()).map(|()| {
-            ctx.on_event(IpLayerEvent::DeviceRouteAdded { device, subnet });
+        table.add_device_route(subnet, device.clone()).map(|entry| {
+            ctx.on_event(IpLayerEvent::RouteAdded(entry.clone()));
         })
     })
 }
@@ -2485,10 +2478,7 @@ pub(crate) fn del_route<
 ) -> Result<(), NotFoundError> {
     sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
         table.del_route(subnet).map(|removed| {
-            removed.into_iter().for_each(|types::Entry { subnet, device, gateway }| match gateway {
-                None => ctx.on_event(IpLayerEvent::DeviceRouteRemoved { device, subnet }),
-                Some(SpecifiedAddr { .. }) => (),
-            })
+            removed.into_iter().for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
         })
     })
 }
@@ -3120,7 +3110,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::{
         ethernet::Mac,
-        ip::{AddrSubnet, IpAddr, Ipv4Addr, Ipv6Addr},
+        ip::{AddrSubnet, GenericOverIp, IpAddr, IpInvariant, Ipv4Addr, Ipv6Addr},
         MulticastAddr, UnicastAddr,
     };
     use packet::{Buf, ParseBuffer};
@@ -3144,7 +3134,9 @@ mod tests {
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
         device::{receive_frame, testutil::receive_frame_or_panic, FrameDestination},
         ip::{
-            device::set_routing_enabled, testutil::is_in_ip_multicast, types::AddableEntryEither,
+            device::set_routing_enabled,
+            testutil::is_in_ip_multicast,
+            types::{AddableEntry, AddableEntryEither},
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
@@ -4947,5 +4939,103 @@ mod tests {
         });
 
         assert_eq!(result, expected_result);
+    }
+
+    #[ip_test]
+    fn add_remove_route_events<I: Ip + TestIpExt>() {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(crate::StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let device_id = sync_ctx.state.device.add_ethernet_device(
+            I::FAKE_CONFIG.local_mac,
+            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+        );
+
+        fn take_ip_layer_events<I: Ip>(
+            non_sync_ctx: &mut FakeNonSyncCtx,
+        ) -> Vec<IpLayerEvent<DeviceId<FakeInstant>, I>> {
+            non_sync_ctx
+                .take_events()
+                .into_iter()
+                .filter_map(|event| {
+                    use crate::testutil::DispatchedEvent;
+                    #[derive(GenericOverIp)]
+                    struct EventHolder<I: Ip>(IpLayerEvent<DeviceId<FakeInstant>, I>);
+                    let EventHolder(event) = I::map_ip(
+                        IpInvariant(event),
+                        |IpInvariant(event)| match event {
+                            DispatchedEvent::IpLayerIpv4(event) => EventHolder(event),
+                            _ => panic!("unexpected event: {:?}", event),
+                        },
+                        |IpInvariant(event)| match event {
+                            DispatchedEvent::IpLayerIpv6(event) => EventHolder(event),
+                            _ => panic!("unexpected event: {:?}", event),
+                        },
+                    );
+                    Some(event)
+                })
+                .collect()
+        }
+
+        assert_eq!(take_ip_layer_events::<I>(&mut non_sync_ctx)[..], []);
+        assert_eq!(
+            crate::add_route(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::without_gateway(
+                    I::FAKE_CONFIG.subnet.into(),
+                    device_id.clone()
+                ),
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
+            [IpLayerEvent::RouteAdded(types::Entry {
+                subnet: I::FAKE_CONFIG.subnet.into(),
+                device: device_id.clone(),
+                gateway: None
+            })]
+        );
+        assert_eq!(
+            crate::add_route(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntry::with_gateway(
+                    I::FAKE_CONFIG.subnet.into(),
+                    None,
+                    I::FAKE_CONFIG.remote_ip.into(),
+                )
+                .into()
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
+            [IpLayerEvent::RouteAdded(types::Entry {
+                subnet: I::FAKE_CONFIG.subnet.into(),
+                device: device_id.clone(),
+                gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+            })]
+        );
+        assert_eq!(
+            crate::del_route(&sync_ctx, &mut non_sync_ctx, I::FAKE_CONFIG.subnet.into()),
+            Ok(())
+        );
+        assert_eq!(
+            take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
+            [
+                IpLayerEvent::RouteRemoved(types::Entry {
+                    subnet: I::FAKE_CONFIG.subnet.into(),
+                    device: device_id.clone(),
+                    gateway: None
+                }),
+                IpLayerEvent::RouteRemoved(types::Entry {
+                    subnet: I::FAKE_CONFIG.subnet.into(),
+                    device: device_id.clone(),
+                    gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+                })
+            ]
+        );
     }
 }

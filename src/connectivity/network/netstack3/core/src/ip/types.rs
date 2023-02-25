@@ -7,7 +7,9 @@
 use core::fmt::Debug;
 
 use net_types::{
-    ip::{IpAddr, IpAddress, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
+    ip::{
+        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither,
+    },
     SpecifiedAddr,
 };
 
@@ -72,15 +74,16 @@ impl<D> AddableEntryEither<D> {
     }
 }
 
-impl<D> From<AddableEntry<Ipv4Addr, D>> for AddableEntryEither<D> {
-    fn from(entry: AddableEntry<Ipv4Addr, D>) -> AddableEntryEither<D> {
-        AddableEntryEither::V4(entry)
-    }
-}
-
-impl<D> From<AddableEntry<Ipv6Addr, D>> for AddableEntryEither<D> {
-    fn from(entry: AddableEntry<Ipv6Addr, D>) -> AddableEntryEither<D> {
-        AddableEntryEither::V6(entry)
+impl<A: IpAddress, D> From<AddableEntry<A, D>> for AddableEntryEither<D> {
+    fn from(entry: AddableEntry<A, D>) -> AddableEntryEither<D> {
+        #[derive(GenericOverIp)]
+        struct EntryHolder<I: Ip, D>(AddableEntry<I::Addr, D>);
+        let IpInvariant(entry_either) = A::Version::map_ip(
+            EntryHolder(entry),
+            |EntryHolder(entry)| IpInvariant(AddableEntryEither::V4(entry)),
+            |EntryHolder(entry)| IpInvariant(AddableEntryEither::V6(entry)),
+        );
+        entry_either
     }
 }
 

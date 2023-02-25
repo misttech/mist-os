@@ -432,21 +432,25 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<StackTime>, I
     for BindingsNonSyncCtxImpl
 {
     fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<StackTime>, I>) {
-        let (device, subnet, has_default_route) = match event {
-            netstack3_core::ip::IpLayerEvent::DeviceRouteAdded { device, subnet } => {
-                (device, subnet, true)
-            }
-            netstack3_core::ip::IpLayerEvent::DeviceRouteRemoved { device, subnet } => {
-                (device, subnet, false)
-            }
-        };
-        // We only care about the default route.
+        let (device, subnet, route_is_present) =
+            match event {
+                netstack3_core::ip::IpLayerEvent::RouteAdded(
+                    netstack3_core::ip::types::Entry { device, subnet, gateway: _ },
+                ) => (device, subnet, true),
+                netstack3_core::ip::IpLayerEvent::RouteRemoved(
+                    netstack3_core::ip::types::Entry { device, subnet, gateway: _ },
+                ) => (device, subnet, false),
+            };
+        // Interfaces watchers only care about the default route.
         if subnet.prefix() != 0 || subnet.network() != I::UNSPECIFIED_ADDRESS {
             return;
         }
         self.notify_interface_update(
             &device,
-            InterfaceUpdate::DefaultRouteChanged { version: I::VERSION, has_default_route },
+            InterfaceUpdate::DefaultRouteChanged {
+                version: I::VERSION,
+                has_default_route: route_is_present,
+            },
         );
     }
 }

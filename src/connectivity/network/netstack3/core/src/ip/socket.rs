@@ -1093,12 +1093,14 @@ pub(crate) mod testutil {
             let mut device_state = HashMap::default();
             for (device, state, addrs) in devices {
                 for ip in addrs {
+                    let subnet = Subnet::new(ip.get(), <I::Addr as IpAddress>::BYTES * 8).unwrap();
                     assert_eq!(
-                        table.add_device_route(
-                            Subnet::new(ip.get(), <I::Addr as IpAddress>::BYTES * 8).unwrap(),
-                            device.clone(),
-                        ),
-                        Ok(())
+                        table.add_device_route(subnet.clone(), device.clone(),),
+                        Ok(&crate::ip::types::Entry {
+                            subnet,
+                            device: device.clone(),
+                            gateway: None
+                        })
                     );
                 }
                 assert!(

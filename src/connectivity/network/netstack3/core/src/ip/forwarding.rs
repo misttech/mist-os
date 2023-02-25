@@ -77,10 +77,12 @@ impl<I: Ip, D> Default for ForwardingTable<I, D> {
 
 impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     /// Adds `entry` to the forwarding table if it does not already exist.
+    ///
+    /// On success, a reference to the inserted entry is returned.
     fn add_entry(
         &mut self,
         entry: ip::types::Entry<I::Addr, D>,
-    ) -> Result<(), crate::error::ExistsError> {
+    ) -> Result<&ip::types::Entry<I::Addr, D>, crate::error::ExistsError> {
         let Self { table } = self;
 
         if table.contains(&entry) {
@@ -93,21 +95,20 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         // subnet prefix length and local-ness.
         let ip::types::Entry { subnet, device: _, gateway: _ } = entry;
         let prefix = subnet.prefix();
-        table.insert(
-            table.partition_point(|ip::types::Entry { subnet, device: _, gateway }| {
-                let subnet_prefix = subnet.prefix();
-                subnet_prefix > prefix
-                    || (subnet_prefix == prefix
-                        && match gateway {
-                            Some(SpecifiedAddr { .. }) => false,
-                            // on-link routes have a higher preference.
-                            None => true,
-                        })
-            }),
-            entry,
-        );
+        let index = table.partition_point(|ip::types::Entry { subnet, device: _, gateway }| {
+            let subnet_prefix = subnet.prefix();
+            subnet_prefix > prefix
+                || (subnet_prefix == prefix
+                    && match gateway {
+                        Some(SpecifiedAddr { .. }) => false,
+                        // on-link routes have a higher preference.
+                        None => true,
+                    })
+        });
 
-        Ok(())
+        table.insert(index, entry);
+
+        Ok(&table[index])
     }
 
     // TODO(joshlf): Should `next_hop` actually be restricted even further,
@@ -118,12 +119,14 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     ///
     /// The egress device for the gateway is calculated before inserting the
     /// route to the forwarding table. Note that the gateway must be a neighbor.
+    ///
+    /// On success, a reference to the inserted entry is returned.
     pub(crate) fn add_route<SC: IpDeviceIdContext<I, DeviceId = D>>(
         &mut self,
         sync_ctx: &mut SC,
         subnet: Subnet<I::Addr>,
         gateway: SpecifiedAddr<I::Addr>,
-    ) -> Result<(), AddRouteError> {
+    ) -> Result<&ip::types::Entry<I::Addr, D>, AddRouteError> {
         debug!("adding route: {} -> {}", subnet, gateway);
 
         let device = self.lookup(sync_ctx, None, gateway).map_or(
@@ -138,18 +141,19 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 }
             },
         )?;
-
         self.add_entry(ip::types::Entry { subnet, device, gateway: Some(gateway) })
             .map_err(From::from)
     }
 
     /// Add a route to a destination subnet that lives on a link an interface is
     /// attached to.
+    ///
+    /// On success, a reference to the inserted entry is returned.
     pub(crate) fn add_device_route(
         &mut self,
         subnet: Subnet<I::Addr>,
         device: D,
-    ) -> Result<(), crate::error::ExistsError> {
+    ) -> Result<&ip::types::Entry<I::Addr, D>, crate::error::ExistsError> {
         debug!("adding device route: {} -> {:?}", subnet, device);
         self.add_entry(ip::types::Entry { subnet, device, gateway: None })
     }
@@ -350,36 +354,27 @@ mod tests {
         let (next_hop, next_hop_subnet) = I::next_hop_addr_sub(1, 1);
 
         // Should add the route successfully.
-        table.add_device_route(subnet, device.clone()).unwrap();
-        assert_eq!(
-            table.iter_table().collect::<Vec<_>>(),
-            &[&ip::types::Entry { subnet, device: device.clone(), gateway: None }]
-        );
+        let expected_entry = ip::types::Entry { subnet, device: device.clone(), gateway: None };
+        assert_eq!(table.add_device_route(subnet, device.clone()), Ok(&expected_entry));
+        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&expected_entry]);
 
         // Attempting to add the route again should fail.
         assert_eq!(
             table.add_device_route(subnet, device.clone()).unwrap_err(),
             crate::error::ExistsError
         );
-        assert_eq!(
-            table.iter_table().collect::<Vec<_>>(),
-            &[&ip::types::Entry { subnet, device: device.clone(), gateway: None }]
-        );
+        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&expected_entry]);
 
         // Add the route but as a next hop route.
-        table.add_device_route(next_hop_subnet, device.clone()).unwrap();
-        table.add_route(&mut sync_ctx, subnet, next_hop).unwrap();
+        let expected_entry2 =
+            ip::types::Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None };
+        assert_eq!(table.add_device_route(next_hop_subnet, device.clone()), Ok(&expected_entry2));
+        let expected_entry3 =
+            ip::types::Entry { subnet: subnet, device: device.clone(), gateway: Some(next_hop) };
+        assert_eq!(table.add_route(&mut sync_ctx, subnet, next_hop), Ok(&expected_entry3));
         assert_eq!(
             table.iter_table().collect::<HashSet<_>>(),
-            HashSet::from([
-                &ip::types::Entry { subnet, device: device.clone(), gateway: None },
-                &ip::types::Entry {
-                    subnet: next_hop_subnet,
-                    device: device.clone(),
-                    gateway: None
-                },
-                &ip::types::Entry { subnet, device: device.clone(), gateway: Some(next_hop) },
-            ])
+            HashSet::from([&expected_entry, &expected_entry2, &expected_entry3,])
         );
 
         // Attempting to add the route again should fail.
@@ -389,15 +384,7 @@ mod tests {
         );
         assert_eq!(
             table.iter_table().collect::<HashSet<_>>(),
-            HashSet::from([
-                &ip::types::Entry { subnet, device: device.clone(), gateway: None },
-                &ip::types::Entry {
-                    subnet: next_hop_subnet,
-                    device: device.clone(),
-                    gateway: None
-                },
-                &ip::types::Entry { subnet, device: device.clone(), gateway: Some(next_hop) },
-            ])
+            HashSet::from([&expected_entry, &expected_entry2, &expected_entry3,])
         );
 
         (sync_ctx, table, config, next_hop, next_hop_subnet, device)
@@ -469,7 +456,14 @@ mod tests {
         assert_eq!(table.lookup(&mut sync_ctx, None, config.remote_ip), None);
 
         // Make the subnet routable again but through a gateway.
-        table.add_route(&mut sync_ctx, config.subnet, next_hop).unwrap();
+        assert_eq!(
+            table.add_route(&mut sync_ctx, config.subnet, next_hop),
+            Ok(&ip::types::Entry {
+                subnet: config.subnet,
+                device: device.clone(),
+                gateway: Some(next_hop)
+            })
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, next_hop),
             Some(Destination { next_hop, device: device.clone() })
@@ -499,7 +493,10 @@ mod tests {
         // Our expected forwarding table should look like:
         //  sub1 -> device0
 
-        table.add_device_route(sub1, device0.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(sub1, device0.clone()),
+            Ok(&ip::types::Entry { subnet: sub1, device: device0.clone(), gateway: None })
+        );
         table.print_table();
         assert_eq!(
             table.lookup(&mut sync_ctx, None, addr1).unwrap(),
@@ -514,7 +511,14 @@ mod tests {
         //  default -> addr1 w/ device0
 
         let default_sub = Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap();
-        table.add_route(&mut sync_ctx, default_sub, addr1).unwrap();
+        assert_eq!(
+            table.add_route(&mut sync_ctx, default_sub, addr1),
+            Ok(&ip::types::Entry {
+                subnet: default_sub,
+                device: device0.clone(),
+                gateway: Some(addr1)
+            })
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, addr1).unwrap(),
             Destination { next_hop: addr1, device: device0.clone() }
@@ -543,7 +547,14 @@ mod tests {
             sub
         };
 
-        table.add_device_route(less_specific_sub, LESS_SPECIFIC_SUB_DEVICE.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(less_specific_sub, LESS_SPECIFIC_SUB_DEVICE.clone()),
+            Ok(&ip::types::Entry {
+                subnet: less_specific_sub,
+                device: LESS_SPECIFIC_SUB_DEVICE.clone(),
+                gateway: None
+            })
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, next_hop),
             Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() }),
@@ -560,7 +571,14 @@ mod tests {
             "no route with the specified device"
         );
 
-        table.add_device_route(more_specific_sub, MORE_SPECIFIC_SUB_DEVICE.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(more_specific_sub, MORE_SPECIFIC_SUB_DEVICE.clone()),
+            Ok(&ip::types::Entry {
+                subnet: more_specific_sub,
+                device: MORE_SPECIFIC_SUB_DEVICE.clone(),
+                gateway: None
+            })
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, next_hop).unwrap(),
             Destination { next_hop, device: MORE_SPECIFIC_SUB_DEVICE.clone() },
@@ -587,8 +605,14 @@ mod tests {
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
         let (next_hop, sub) = I::next_hop_addr_sub(1, 1);
 
-        table.add_device_route(sub, DEVICE1.clone()).unwrap();
-        table.add_device_route(sub, DEVICE2.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(sub, DEVICE1.clone()),
+            Ok(&ip::types::Entry { subnet: sub, device: DEVICE1.clone(), gateway: None })
+        );
+        assert_eq!(
+            table.add_device_route(sub, DEVICE2.clone()),
+            Ok(&ip::types::Entry { subnet: sub, device: DEVICE2.clone(), gateway: None })
+        );
         let lookup = table.lookup(&mut sync_ctx, None, next_hop);
         assert!(
             [
@@ -623,7 +647,14 @@ mod tests {
             sub
         };
 
-        table.add_device_route(less_specific_sub, LESS_SPECIFIC_SUB_DEVICE.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(less_specific_sub, LESS_SPECIFIC_SUB_DEVICE.clone()),
+            Ok(&ip::types::Entry {
+                subnet: less_specific_sub,
+                device: LESS_SPECIFIC_SUB_DEVICE.clone(),
+                gateway: None
+            })
+        );
         for (device_removed, expected) in [
             // If the device is removed, then we cannot use routes through it.
             (true, None),
@@ -641,7 +672,14 @@ mod tests {
             );
         }
 
-        table.add_device_route(more_specific_sub, MORE_SPECIFIC_SUB_DEVICE.clone()).unwrap();
+        assert_eq!(
+            table.add_device_route(more_specific_sub, MORE_SPECIFIC_SUB_DEVICE.clone()),
+            Ok(&ip::types::Entry {
+                subnet: more_specific_sub,
+                device: MORE_SPECIFIC_SUB_DEVICE.clone(),
+                gateway: None
+            })
+        );
         for (device_removed, expected) in [
             (false, Some(Destination { next_hop, device: MORE_SPECIFIC_SUB_DEVICE.clone() })),
             // If the device is removed, then we cannot use routes through it,
