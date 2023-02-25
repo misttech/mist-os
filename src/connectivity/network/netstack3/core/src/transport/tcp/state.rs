@@ -10,7 +10,7 @@
 use core::{
     convert::{Infallible, TryFrom as _},
     fmt::Debug,
-    num::{NonZeroU32, NonZeroUsize, TryFromIntError},
+    num::{NonZeroU32, NonZeroU8, NonZeroUsize, TryFromIntError},
     time::Duration,
 };
 
@@ -35,6 +35,12 @@ use crate::{
 ///       Maximum Segment Lifetime, the time a TCP segment can exist in
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
 const MSL: Duration = Duration::from_secs(2 * 60);
+// TODO(https://fxbug.dev/117955): With the current usage of netstack3 on mostly
+// link-local workloads, these values are large enough to accommodate most cases
+// so it can help us detect failure faster. We should make them agree with other
+// common implementations once we can configure them through socket options.
+const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
+const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-22):
 ///
@@ -519,6 +525,8 @@ struct Send<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 struct RetransTimer<I: Instant> {
+    start: I,
+    remaining_retries: Option<NonZeroU8>,
     at: I,
     rto: Duration,
 }
@@ -528,20 +536,25 @@ impl<I: Instant> RetransTimer<I> {
         let at = now.checked_add(rto).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", rto, now);
         });
-        Self { at, rto }
+        Self { at, rto, start: now, remaining_retries: Some(DEFAULT_MAX_RETRIES) }
     }
 
     fn backoff(&mut self, now: I) {
-        let Self { at, rto } = self;
-        *rto *= 2;
-        *at = now.checked_add(*rto).unwrap_or_else(|| {
+        let Self { at, rto, start, remaining_retries } = self;
+        *remaining_retries = remaining_retries.and_then(|r| NonZeroU8::new(r.get() - 1));
+        *rto = rto.saturating_mul(2);
+        let elapsed = now.duration_since(*start);
+        let remaining = DEFAULT_USER_TIMEOUT.saturating_sub(elapsed);
+        *at = now.checked_add(core::cmp::min(*rto, remaining)).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", rto, now);
         });
     }
 
     fn rearm(&mut self, now: I) {
-        let Self { at: _, rto } = *self;
-        *self = Self::new(now, rto);
+        let Self { at, rto, start: _, remaining_retries: _ } = self;
+        *at = now.checked_add(*rto).unwrap_or_else(|| {
+            panic!("clock wraps around when adding {:?} to {:?}", rto, now);
+        });
     }
 }
 
@@ -584,9 +597,14 @@ impl<I: Instant> KeepAliveTimer<I> {
 impl<I: Instant> SendTimer<I> {
     fn expiry(&self) -> I {
         match self {
-            SendTimer::Retrans(RetransTimer { at, rto: _ })
+            SendTimer::Retrans(RetransTimer { at, rto: _, start: _, remaining_retries: _ })
             | SendTimer::KeepAlive(KeepAliveTimer { at, already_sent: _ })
-            | SendTimer::ZeroWindowProbe(RetransTimer { at, rto: _ }) => *at,
+            | SendTimer::ZeroWindowProbe(RetransTimer {
+                at,
+                rto: _,
+                start: _,
+                remaining_retries: _,
+            }) => *at,
         }
     }
 }
@@ -640,12 +658,17 @@ pub(crate) struct Established<I: Instant, R: ReceiveBuffer, S: SendBuffer> {
 
 impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
     /// Returns true if the connection should still be alive per the send state.
-    fn still_alive(&self, keep_alive: &KeepAlive) -> bool {
+    fn still_alive(&self, now: I, keep_alive: &KeepAlive) -> bool {
         match self.timer {
             Some(SendTimer::KeepAlive(keep_alive_timer)) => {
                 !keep_alive.enabled || keep_alive_timer.already_sent < keep_alive.count.get()
             }
-            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) | None => true,
+            Some(SendTimer::Retrans(timer)) | Some(SendTimer::ZeroWindowProbe(timer)) => {
+                let RetransTimer { start, remaining_retries: remaining_retires, at: _, rto: _ } =
+                    timer;
+                remaining_retires.is_some() && now.duration_since(start) < DEFAULT_USER_TIMEOUT
+            }
+            None => true,
         }
     }
 
@@ -1713,15 +1736,15 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         SocketOptions { keep_alive, nagle_enabled: _ }: &SocketOptions,
     ) -> bool {
         let alive = match self {
-            State::Established(Established { snd, rcv: _ }) => snd.still_alive(keep_alive),
+            State::Established(Established { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                snd.still_alive(keep_alive)
+                snd.still_alive(now, keep_alive)
             }
             State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ })
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ }) => {
-                snd.still_alive(keep_alive)
+                snd.still_alive(now, keep_alive)
             }
-            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.still_alive(keep_alive),
+            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
             State::TimeWait(TimeWait { last_seq: _, last_ack: _, last_wnd: _, expiry }) => {
                 *expiry > now
             }
@@ -3365,7 +3388,12 @@ mod test {
             iss: ISS_1,
             irs: ISS_2,
             timestamp: None,
-            retrans_timer: RetransTimer { at: FakeInstant::default(), rto: Duration::new(0, 0) },
+            retrans_timer: RetransTimer {
+                at: FakeInstant::default(),
+                rto: Duration::new(0, 0),
+                start: FakeInstant::default(),
+                remaining_retries: Some(DEFAULT_MAX_RETRIES),
+            },
             simultaneous_open: Some(()),
             buffer_sizes: Default::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -3726,7 +3754,12 @@ mod test {
             iss: ISS_1,
             irs: ISS_2,
             timestamp: None,
-            retrans_timer: RetransTimer { at: FakeInstant::default(), rto: Duration::new(0, 0) },
+            retrans_timer: RetransTimer {
+                at: FakeInstant::default(),
+                rto: Duration::new(0, 0),
+                start: FakeInstant::default(),
+                remaining_retries: Some(DEFAULT_MAX_RETRIES),
+            },
             simultaneous_open: None,
             buffer_sizes: BufferSizes::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4253,5 +4286,65 @@ mod test {
                 SendPayload::Contiguous(&TEST_BYTES[..1]),
             ))
         );
+    }
+
+    // We can use a smaller and a larger RTT so that when using the smaller one,
+    // we can reach maximum retransmit retires and when using the larger one, we
+    // timeout before reaching maximum retries.
+    #[test_case(Duration::from_millis(1), false, true; "retrans_max_retries")]
+    #[test_case(Duration::from_secs(1), false, false; "retrans_no_max_retries")]
+    #[test_case(Duration::from_millis(1), true, true; "zwp_max_retries")]
+    #[test_case(Duration::from_secs(1), true, false; "zwp_no_max_retires")]
+    fn user_timeout(rtt: Duration, zero_window_probe: bool, max_retries: bool) {
+        let mut clock = FakeInstantCtx::default();
+        let mut send_buffer = RingBuffer::new(BUFFER_SIZE);
+        assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
+        // Set up the state machine to start with Established.
+        let mut state: State<_, _, _, ()> = State::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                buffer: send_buffer.clone(),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::Measured { srtt: rtt, rtt_var: Duration::ZERO },
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(
+                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                ),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                assembler: Assembler::new(ISS_2 + 1),
+            },
+        });
+        let mut times = 1;
+        let start = clock.now();
+        while let Some(seg) = state.poll_send_with_default_options(u32::MAX, clock.now()) {
+            if zero_window_probe {
+                let zero_window_ack = Segment::ack(seg.ack.unwrap(), seg.seq, WindowSize::ZERO);
+                assert_eq!(
+                    state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
+                        zero_window_ack,
+                        clock.now()
+                    ),
+                    (None, None)
+                );
+            }
+            let deadline = state.poll_send_at().expect("must have a retransmission timer");
+            clock.sleep(deadline.duration_since(clock.now()));
+            times += 1;
+        }
+        let elapsed = clock.now().duration_since(start);
+        assert_eq!(elapsed, DEFAULT_USER_TIMEOUT);
+        if max_retries {
+            assert_eq!(times, DEFAULT_MAX_RETRIES.get());
+        } else {
+            assert!(times < DEFAULT_MAX_RETRIES.get());
+        }
+        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }))
     }
 }
