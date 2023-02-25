@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2721,7 +2721,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2756,7 +2756,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3710,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3854,7 +3854,7 @@ If you add labels to this variable, these will be included in the 'host'
 artifact set, which represents an additional set of host-only software that
 is produced by the build.
 
-**Current value for `target_cpu = "arm64"`:** `["//tools/net/device-finder:host"]`
+**Current value for `target_cpu = "arm64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
 From //out/not-default/args.gn:16
 
@@ -3862,7 +3862,7 @@ From //out/not-default/args.gn:16
 
 From //BUILD.gn:79
 
-**Current value for `target_cpu = "x64"`:** `["//tools/net/device-finder:host"]`
+**Current value for `target_cpu = "x64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
 From //out/not-default/args.gn:16
 
@@ -5503,7 +5503,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:39
 
 **Overridden from the default:** `[]`
 
@@ -5511,7 +5511,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:35
+From //products/common/bringup.gni:39
 
 **Overridden from the default:** `[]`
 
@@ -5818,7 +5818,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:346
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:295
 
 ### pw_arduino_build_BOARD
 
@@ -6281,7 +6281,15 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_log_tokenized/BUILD.gn:28
+From //third_party/pigweed/src/pw_log_tokenized/BUILD.gn:30
+
+### pw_log_tokenized_HANDLER_BACKEND
+
+Backend for the pw_log_tokenized log handler.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_log_tokenized/backend.gni:17
 
 ### pw_module_docs
 
@@ -6645,22 +6653,18 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:32
-
-### pw_tokenizer_GLOBAL_HANDLER_BACKEND
-
-Backends for the pw_tokenizer:global_handler and
-pw_tokenizer:global_handler_with_payload facades.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_tokenizer/backend.gni:18
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:31
 
 ### pw_tokenizer_GLOBAL_HANDLER_WITH_PAYLOAD_BACKEND
 
+This variable is deprecated. It is only used for pw_log_tokenized, and is
+provided for backwards compatibility. Set pw_log_tokenized_HANDLER_BACKEND
+instead.
+TODO(hepler): Remove this variable after migrating projects.
+
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_tokenizer/backend.gni:19
+From //third_party/pigweed/src/pw_tokenizer/backend.gni:20
 
 ### pw_toolchain_CLANG_PREFIX
 
@@ -7424,7 +7428,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:37
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -7432,7 +7436,7 @@ From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:37
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -7936,7 +7940,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8182,10 +8186,10 @@ From //src/storage/fshost/generated_fshost_config.gni:42
 Use the physload ZBI kernel and the ELF physboot module rather than
 monolithic physboot ZBI kernel.
 
-**TODO(mcgrathr):** Eventually ELF physboot become the default and the old
-ZBI physboot will be removed.
+**TODO(mcgrathr):** This switch will be removed soon and the ELF-based
+physboot will be the only build.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //zircon/kernel/phys/BUILD.gn:24
 
@@ -8293,7 +8297,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
@@ -8349,7 +8353,7 @@ From //src/media/lib/ffmpeg/BUILD.gn:31
 If true, use scene_manager as the scene owner component (via ui.cml).
 Otherwise use root_presenter (via ui_with_root_presenter.cml).
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/ui/build_args.gni:8
 
