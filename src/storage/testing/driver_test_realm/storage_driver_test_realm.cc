@@ -31,9 +31,16 @@ int main() {
     return 1;
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl");
-  if (channel.is_error()) {
-    FX_SLOG(ERROR, "Failed to wait for ramctl", KV("status", channel.status_value()));
+  // Wait for ramctl and nand-ctl to be bound. Errors may be logged if the drivers are in the
+  // process of binding while the DriverTestRealm is shutting down which can trip the high-severity
+  // log checker in tests.
+  zx::result ramctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl");
+  if (ramctl.is_error()) {
+    FX_SLOG(ERROR, "Failed to wait for ramctl", KV("status", ramctl.status_value()));
+  }
+  zx::result nand_ctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2e/nand-ctl");
+  if (nand_ctl.is_error()) {
+    FX_SLOG(ERROR, "Failed to wait for nand-ctl", KV("status", nand_ctl.status_value()));
   }
   return 0;
 }
