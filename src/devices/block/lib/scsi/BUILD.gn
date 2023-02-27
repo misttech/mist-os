@@ -21,6 +21,7 @@ zx_library("scsi") {
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

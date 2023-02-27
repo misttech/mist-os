@@ -11,6 +11,8 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/devices/block/lib/common/include/common.h"
+
 namespace scsi {
 
 zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* controller,
@@ -74,6 +76,17 @@ zx_status_t Disk::AddDisk() {
     return status;
   }
 
+  if (max_transfer_bytes_ == BLOCK_MAX_TRANSFER_UNBOUNDED) {
+    max_transfer_blocks_ = UINT32_MAX;
+  } else {
+    if (max_transfer_bytes_ % block_size_bytes_ != 0) {
+      zxlogf(ERROR, "Max transfer size (%u bytes) is not a multiple of the block size (%u bytes).",
+             max_transfer_bytes_, block_size_bytes_);
+      return ZX_ERR_BAD_STATE;
+    }
+    max_transfer_blocks_ = max_transfer_bytes_ / block_size_bytes_;
+  }
+
   zxlogf(INFO, "%ld blocks of %d bytes", block_count_, block_size_bytes_);
 
   status = DdkAdd(DiskName().c_str());
@@ -107,6 +120,11 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
   switch (op_type) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE: {
+      if (zx_status_t status = block::CheckIoRange(op->rw, block_count_, max_transfer_blocks_);
+          status != ZX_OK) {
+        completion_cb(cookie, status, op);
+        return;
+      }
       const bool is_write = op_type == BLOCK_OP_WRITE;
       const bool is_fua = op->command & BLOCK_FL_FORCE_ACCESS;
       uint8_t cdb_buffer[16] = {};
@@ -139,6 +157,10 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       return;
     }
     case BLOCK_OP_FLUSH: {
+      if (zx_status_t status = block::CheckFlushValid(op->rw); status != ZX_OK) {
+        completion_cb(cookie, status, op);
+        return;
+      }
       if (!write_cache_enabled_) {
         completion_cb(cookie, ZX_OK, op);
         return;

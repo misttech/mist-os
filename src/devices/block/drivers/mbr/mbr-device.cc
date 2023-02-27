@@ -32,6 +32,7 @@
 
 #include "mbr.h"
 #include "src/devices/block/drivers/mbr/mbr_bind.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace {
 
@@ -136,12 +137,9 @@ void MbrDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callback 
   switch (operation->command & BLOCK_OP_MASK) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE: {
-      size_t blocks = operation->rw.length;
-      size_t max = partition_.num_sectors;
-
-      // Ensure that the request is in-bounds
-      if ((operation->rw.offset_dev >= max) || ((max - operation->rw.offset_dev) < blocks)) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, operation);
+      if (zx_status_t status = block::CheckIoRange(operation->rw, partition_.num_sectors);
+          status != ZX_OK) {
+        completion_cb(cookie, status, operation);
         return;
       }
 

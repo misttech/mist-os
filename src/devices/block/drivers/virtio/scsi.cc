@@ -161,7 +161,6 @@ static void DiskOpCompletionCb(void* cookie, zx_status_t status) {
 
 void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                      uint32_t block_size_bytes, scsi::DiskOp* disk_op) {
-  // TODO(fxbug.dev/121404): Check data arguments are cleared for flush commands.
   const block_read_write_t& rw = disk_op->op.rw;
   const zx_handle_t data_vmo = rw.vmo;
   const zx_off_t vmo_offset_bytes = rw.offset_vmo * block_size_bytes;

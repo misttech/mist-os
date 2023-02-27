@@ -29,6 +29,7 @@ fuchsia_driver("bootpart-driver") {
     ":bootpart_bind",
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",

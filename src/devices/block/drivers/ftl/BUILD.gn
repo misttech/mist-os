@@ -64,6 +64,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/lib/fdio",
     "//sdk/lib/fit-promise",
+    "//src/devices/block/lib/common",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/storage/lib/ftl",

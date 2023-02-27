@@ -479,19 +479,8 @@ zx_status_t UsbMassStorageDevice::DataTransfer(zx_handle_t vmo_handle, zx_off_t 
 
 zx_status_t UsbMassStorageDevice::DoTransaction(Transaction* txn, uint8_t flags, uint8_t ep_address,
                                                 const std::string& action) {
-  // TODO(fxbug.dev/121404): Consider moving this logic to scsi::Disk::BlockImplQueue().
   const block_op_t& op = txn->disk_op.op;
-  const zx_off_t block_offset = op.rw.offset_dev;
-  const uint32_t num_blocks = op.rw.length;
-  scsi::Disk* dev = block_devs_[txn->lun].get();
-  if ((block_offset >= dev->block_count()) || ((dev->block_count() - block_offset) < num_blocks)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-  const size_t num_bytes = num_blocks * txn->block_size_bytes;
-  if (num_bytes > max_transfer_bytes_) {
-    zxlogf(ERROR, "Request exceeding max transfer size.");
-    return ZX_ERR_INVALID_ARGS;
-  }
+  const size_t num_bytes = op.rw.length * txn->block_size_bytes;
 
   zx_status_t status =
       SendCbw(txn->lun, static_cast<uint32_t>(num_bytes), flags, txn->cdb_length, txn->cdb_buffer);

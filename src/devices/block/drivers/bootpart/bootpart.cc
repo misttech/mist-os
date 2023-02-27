@@ -21,6 +21,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/block/drivers/bootpart/bootpart_bind.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace bootpart {
 
@@ -44,10 +45,9 @@ void BootPartition::BlockImplQueue(block_op_t* bop, block_impl_queue_callback co
   switch (bop->command & BLOCK_OP_MASK) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE: {
-      // TODO(fxbug.dev/121404): Ensure that the request is in-bounds
-      if ((bop->rw.offset_dev >= block_info_.block_count) ||
-          ((block_info_.block_count - bop->rw.offset_dev) < bop->rw.length)) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, bop);
+      if (zx_status_t status = block::CheckIoRange(bop->rw, block_info_.block_count);
+          status != ZX_OK) {
+        completion_cb(cookie, status, bop);
         return;
       }
 

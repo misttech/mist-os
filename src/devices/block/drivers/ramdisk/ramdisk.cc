@@ -21,6 +21,7 @@
 
 #include <fbl/auto_lock.h>
 
+#include "src/devices/block/lib/common/include/common.h"
 #include "zircon/errors.h"
 
 namespace ramdisk {
@@ -124,9 +125,9 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
       __FALLTHROUGH;
     }
     case BLOCK_OP_WRITE: {
-      if ((txn.operation()->rw.offset_dev >= block_count_) ||
-          ((block_count_ - txn.operation()->rw.offset_dev) < txn.operation()->rw.length)) {
-        txn.Complete(ZX_ERR_OUT_OF_RANGE);
+      if (zx_status_t status = block::CheckIoRange(txn.operation()->rw, block_count_);
+          status != ZX_OK) {
+        txn.Complete(status);
         return;
       }
 

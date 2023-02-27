@@ -21,6 +21,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "controller.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace ahci {
 
@@ -222,15 +223,9 @@ static void sata_queue(void* ctx, block_op_t* bop, block_impl_queue_callback com
   switch (BLOCK_OP(bop->command)) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      // complete empty transactions immediately
-      if (bop->rw.length == 0) {
-        block_complete(txn, ZX_ERR_INVALID_ARGS);
-        return;
-      }
-      // transaction must fit within device
-      if ((bop->rw.offset_dev >= dev->info.block_count) ||
-          ((dev->info.block_count - bop->rw.offset_dev) < bop->rw.length)) {
-        block_complete(txn, ZX_ERR_OUT_OF_RANGE);
+      if (zx_status_t status = block::CheckIoRange(bop->rw, dev->info.block_count);
+          status != ZX_OK) {
+        block_complete(txn, status);
         return;
       }
 

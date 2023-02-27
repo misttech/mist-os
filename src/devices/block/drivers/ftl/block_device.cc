@@ -24,6 +24,7 @@
 #include "lib/inspect/cpp/vmo/types.h"
 #include "nand_driver.h"
 #include "src/devices/block/drivers/ftl/metrics.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace {
 
@@ -186,21 +187,20 @@ void BlockDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_o
 void BlockDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb,
                                  void* cookie) {
   zxlogf(DEBUG, "FTL: Queue");
-  uint32_t max_pages = params_.num_pages;
   switch (operation->command & BLOCK_OP_MASK) {
     case BLOCK_OP_WRITE:
     case BLOCK_OP_READ: {
-      if (operation->rw.offset_dev >= max_pages || !operation->rw.length ||
-          (max_pages - operation->rw.offset_dev) < operation->rw.length) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, operation);
+      if (zx_status_t status = block::CheckIoRange(operation->rw, params_.num_pages);
+          status != ZX_OK) {
+        completion_cb(cookie, status, operation);
         return;
       }
       break;
     }
     case BLOCK_OP_TRIM:
-      if (operation->trim.offset_dev >= max_pages || !operation->trim.length ||
-          (max_pages - operation->trim.offset_dev) < operation->trim.length) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, operation);
+      if (zx_status_t status = block::CheckIoRange(operation->trim, params_.num_pages);
+          status != ZX_OK) {
+        completion_cb(cookie, status, operation);
         return;
       }
       break;

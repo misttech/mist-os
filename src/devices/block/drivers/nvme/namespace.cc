@@ -16,6 +16,7 @@
 #include "src/devices/block/drivers/nvme/commands/identify.h"
 #include "src/devices/block/drivers/nvme/nvme.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace nvme {
 
@@ -178,22 +179,6 @@ void Namespace::BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_si
   *out_block_op_size = sizeof(IoCommand);
 }
 
-zx_status_t Namespace::IsValidIoRwCommand(const block_op_t& op) const {
-  if (op.rw.length == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (op.rw.length > max_transfer_blocks_) {
-    zxlogf(ERROR, "Request exceeding max transfer size.");
-    return ZX_ERR_INVALID_ARGS;
-  }
-  // IO address range must fit within device.
-  if ((op.rw.offset_dev >= block_info_.block_count) ||
-      (block_info_.block_count - op.rw.offset_dev < op.rw.length)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-  return ZX_OK;
-}
-
 void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callback, void* cookie) {
   IoCommand* io_cmd = containerof(op, IoCommand, op);
   io_cmd->completion_cb = callback;
@@ -205,7 +190,9 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
   switch (opcode) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      if (zx_status_t status = IsValidIoRwCommand(io_cmd->op); status != ZX_OK) {
+      if (zx_status_t status =
+              block::CheckIoRange(io_cmd->op.rw, block_info_.block_count, max_transfer_blocks_);
+          status != ZX_OK) {
         io_cmd->Complete(status);
         return;
       }

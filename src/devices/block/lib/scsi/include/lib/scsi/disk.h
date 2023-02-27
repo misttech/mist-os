@@ -50,6 +50,8 @@ class Disk : public DeviceType,
   // |controller| is a pointer to the scsi::Controller this disk is attached to.
   // |controller| must outlast Disk.
   // This disk does not take ownership of or any references on |controller|.
+  // A |max_transfer_bytes| value of BLOCK_MAX_TRANSFER_UNBOUNDED (UINT32_MAX) implies there is no
+  // limit on the transfer size.
   // Returns a Disk* to allow for removal of removable media disks.
   static zx::result<fbl::RefPtr<Disk>> Bind(zx_device_t* parent, Controller* controller,
                                             uint8_t target, uint16_t lun,
@@ -84,6 +86,7 @@ class Disk : public DeviceType,
   const uint8_t target_;
   const uint16_t lun_;
   const uint32_t max_transfer_bytes_;
+  uint32_t max_transfer_blocks_;
 
   bool removable_;
   bool write_protected_;

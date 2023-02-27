@@ -29,6 +29,7 @@
 
 #include "lib/ddk/driver.h"
 #include "src/devices/block/drivers/gpt/gpt_bind.h"
+#include "src/devices/block/lib/common/include/common.h"
 #include "zircon/errors.h"
 #include "zircon/status.h"
 
@@ -101,12 +102,10 @@ void PartitionDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback 
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE: {
       gpt_entry_t* entry = &gpt_entry_;
-      size_t blocks = bop->rw.length;
       size_t max = EntryBlockCount(entry).value();
 
-      // Ensure that the request is in-bounds
-      if ((bop->rw.offset_dev >= max) || ((max - bop->rw.offset_dev) < blocks)) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, bop);
+      if (zx_status_t status = block::CheckIoRange(bop->rw, max); status != ZX_OK) {
+        completion_cb(cookie, status, bop);
         return;
       }
 
@@ -116,11 +115,10 @@ void PartitionDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback 
     }
     case BLOCK_OP_TRIM: {
       gpt_entry_t* entry = &gpt_entry_;
-      size_t blocks = bop->trim.length;
       size_t max = EntryBlockCount(entry).value();
 
-      if ((bop->trim.offset_dev >= max) || ((max - bop->trim.offset_dev) < blocks)) {
-        completion_cb(cookie, ZX_ERR_OUT_OF_RANGE, bop);
+      if (zx_status_t status = block::CheckIoRange(bop->trim, max); status != ZX_OK) {
+        completion_cb(cookie, status, bop);
         return;
       }
 
