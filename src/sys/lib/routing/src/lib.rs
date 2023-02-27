@@ -1154,7 +1154,9 @@ where
     let allowed_sources =
         AllowedSourcesBuilder::new().framework(InternalCapability::Event).builtin();
     let mut state = EventState {
-        filter_state: WalkState::at(EventFilter::new(use_decl.filter.clone())),
+        filter_state: WalkState::at(EventFilter::new(
+            use_decl.filter.clone().map(|value| value.into_iter().collect()),
+        )),
         availability_state: AvailabilityState(use_decl.availability.clone().into()),
     };
 

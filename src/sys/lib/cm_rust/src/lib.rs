@@ -14,9 +14,10 @@ use {
     from_enum::FromEnum,
     lazy_static::lazy_static,
     std::collections::hash_map::Entry,
-    std::collections::HashMap,
+    std::collections::{BTreeMap, HashMap},
     std::convert::{From, TryFrom},
     std::fmt,
+    std::hash::Hash,
     std::path::PathBuf,
     std::str::FromStr,
     thiserror::Error,
@@ -220,7 +221,7 @@ impl ComponentDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Availability {
     Required,
     Optional,
@@ -341,7 +342,7 @@ pub struct UseEventDecl {
     pub source: UseSource,
     pub source_name: CapabilityName,
     pub target_name: CapabilityName,
-    pub filter: Option<HashMap<String, DictionaryValue>>,
+    pub filter: Option<BTreeMap<String, DictionaryValue>>,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -365,14 +366,14 @@ pub struct UseEventStreamDeprecatedDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq, Hash)]
 #[fidl_decl(fidl_table = "fdecl::UseEventStream")]
 pub struct UseEventStreamDecl {
     pub source_name: CapabilityName,
     pub source: UseSource,
     pub scope: Option<Vec<EventScope>>,
     pub target_path: CapabilityPath,
-    pub filter: Option<HashMap<String, DictionaryValue>>,
+    pub filter: Option<BTreeMap<String, DictionaryValue>>,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -535,7 +536,7 @@ pub struct OfferEventDecl {
     pub source_name: CapabilityName,
     pub target: OfferTarget,
     pub target_name: CapabilityName,
-    pub filter: Option<HashMap<String, DictionaryValue>>,
+    pub filter: Option<BTreeMap<String, DictionaryValue>>,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -1792,6 +1793,18 @@ impl NativeIntoFidl<fdata::Dictionary> for HashMap<String, DictionaryValue> {
     }
 }
 
+impl FidlIntoNative<BTreeMap<String, DictionaryValue>> for fdata::Dictionary {
+    fn fidl_into_native(self) -> BTreeMap<String, DictionaryValue> {
+        from_fidl_dict_btree(self)
+    }
+}
+
+impl NativeIntoFidl<fdata::Dictionary> for BTreeMap<String, DictionaryValue> {
+    fn native_into_fidl(self) -> fdata::Dictionary {
+        to_fidl_dict_btree(self)
+    }
+}
+
 impl FidlIntoNative<CapabilityPath> for String {
     fn fidl_into_native(self) -> CapabilityPath {
         self.as_str().parse().unwrap()
@@ -1816,7 +1829,7 @@ impl NativeIntoFidl<String> for PathBuf {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DictionaryValue {
     Str(String),
     StrVec(Vec<String>),
@@ -1868,8 +1881,26 @@ fn to_fidl_dict(dict: HashMap<String, DictionaryValue>) -> fdata::Dictionary {
     }
 }
 
+fn from_fidl_dict_btree(dict: fdata::Dictionary) -> BTreeMap<String, DictionaryValue> {
+    match dict.entries {
+        Some(entries) => entries.into_iter().map(|e| (e.key, e.value.fidl_into_native())).collect(),
+        _ => BTreeMap::new(),
+    }
+}
+
+fn to_fidl_dict_btree(dict: BTreeMap<String, DictionaryValue>) -> fdata::Dictionary {
+    fdata::Dictionary {
+        entries: Some(
+            dict.into_iter()
+                .map(|(key, value)| fdata::DictionaryEntry { key, value: value.native_into_fidl() })
+                .collect(),
+        ),
+        ..fdata::Dictionary::EMPTY
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UseSource {
     Parent,
     Framework,
@@ -1922,7 +1953,7 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventScope {
     Child(ChildRef),
     Collection(String),
@@ -2248,7 +2279,7 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_component_decl as fdecl, maplit::hashmap, std::convert::TryInto};
+    use {super::*, fidl_fuchsia_component_decl as fdecl, maplit::btreemap, std::convert::TryInto};
 
     macro_rules! test_try_from_decl {
         (
@@ -2922,7 +2953,10 @@ mod tests {
                             source: UseSource::Parent,
                             source_name: "directory_ready".into(),
                             target_name: "diagnostics_ready".into(),
-                            filter: Some(hashmap!{"path".to_string() =>  DictionaryValue::Str("/diagnostics".to_string())}),
+                            filter:
+                            Some(btreemap!{"path".to_string() =>
+                                DictionaryValue::Str("/diagnostics".to_string())
+                            }),
                             availability: Availability::Required,
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
@@ -3033,7 +3067,11 @@ mod tests {
                             source_name: "started".into(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "mystarted".into(),
-                            filter: Some(hashmap!{"path".to_string() => DictionaryValue::Str("/a".to_string())}),
+                            filter: Some(
+                                btreemap!{
+                                    "path".to_string() => DictionaryValue::Str("/a".to_string())
+                                }
+                            ),
                             availability: Availability::Optional,
                         }),
                         OfferDecl::Service(OfferServiceDecl {

@@ -77,9 +77,7 @@ impl EventSequence {
                 Err(e) => return Err(e.into()),
                 Ok(event) => {
                     let actual_event = EventDescriptor::try_from(&event)?;
-                    if actual_event.target_moniker != Some(".".to_string()) {
-                        let _ = self.next(&actual_event)?;
-                    }
+                    let _ = self.next(&actual_event)?;
                 }
             }
         }

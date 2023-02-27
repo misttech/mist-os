@@ -107,9 +107,11 @@ pub mod tests {
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
+        cm_rust::{Availability, CapabilityName, CapabilityPath, UseEventStreamDecl, UseSource},
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        std::str::FromStr,
         std::sync::Arc,
     };
 
@@ -211,7 +213,24 @@ pub mod tests {
             .await
             .unwrap();
         let event_stream = event_source
-            .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
+            .subscribe(
+                events
+                    .into_iter()
+                    .map(|event: CapabilityName| EventSubscription {
+                        event_name: UseEventStreamDecl {
+                            source_name: event,
+                            source: UseSource::Parent,
+                            scope: None,
+                            target_path: CapabilityPath::from_str(
+                                "/svc/fuchsia.component.EventStream",
+                            )
+                            .unwrap(),
+                            filter: None,
+                            availability: Availability::Required,
+                        },
+                    })
+                    .collect(),
+            )
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();

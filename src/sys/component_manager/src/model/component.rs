@@ -1881,7 +1881,7 @@ pub mod tests {
             Availability, CapabilityDecl, CapabilityPath, ChildRef, DependencyType, ExposeDecl,
             ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
             OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferTarget, ProtocolDecl,
-            UseProtocolDecl, UseSource,
+            UseEventStreamDecl, UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -1894,7 +1894,7 @@ pub mod tests {
         moniker::AbsoluteMoniker,
         routing_test_helpers::component_id_index::make_index_file,
         std::panic,
-        std::{boxed::Box, collections::HashMap, sync::Arc, task::Poll},
+        std::{boxed::Box, collections::HashMap, str::FromStr, sync::Arc, task::Poll},
     };
 
     #[fuchsia::test]
@@ -2357,7 +2357,17 @@ pub mod tests {
                     EventType::DebugStarted.into(),
                 ]
                 .into_iter()
-                .map(|event| EventSubscription::new(event))
+                .map(|event: CapabilityName| {
+                    EventSubscription::new(UseEventStreamDecl {
+                        source_name: event,
+                        source: UseSource::Parent,
+                        scope: None,
+                        target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                            .unwrap(),
+                        filter: None,
+                        availability: Availability::Required,
+                    })
+                })
                 .collect(),
             )
             .await
@@ -2411,7 +2421,15 @@ pub mod tests {
             .await
             .expect("failed creating event stream");
         let mut stop_event_stream = event_source
-            .subscribe(vec![EventSubscription::new(EventType::Stopped.into())])
+            .subscribe(vec![EventSubscription::new(UseEventStreamDecl {
+                source_name: EventType::Stopped.into(),
+                source: UseSource::Parent,
+                scope: None,
+                target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                    .unwrap(),
+                filter: None,
+                availability: Availability::Required,
+            })])
             .await
             .expect("couldn't susbscribe to event stream");
 

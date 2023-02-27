@@ -11,7 +11,7 @@ use {
     anyhow::{format_err, Error},
     cm_rust::DictionaryValue,
     futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
-    maplit::hashmap,
+    maplit::btreemap,
     moniker::{AbsoluteMonikerBase, ExtendedMoniker},
 };
 /// EventDispatcher and EventStream are two ends of a channel.
@@ -150,10 +150,10 @@ impl EventDispatcherScope {
         // TODO(fxbug/122227): Creating hashmaps on every lookup is not ideal, but in practice this
         // likely doesn't happen too often.
         let filterable_fields = match &event.payload {
-            EventPayload::CapabilityRequested { name, .. } => Some(hashmap! {
+            EventPayload::CapabilityRequested { name, .. } => Some(btreemap! {
                 "name".to_string() => DictionaryValue::Str(name.into())
             }),
-            EventPayload::DirectoryReady { name, .. } => Some(hashmap! {
+            EventPayload::DirectoryReady { name, .. } => Some(btreemap! {
                 "name".to_string() => DictionaryValue::Str(name.into())
             }),
             _ => None,

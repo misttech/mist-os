@@ -19,8 +19,8 @@ use {
     ::routing::config::RuntimeConfig,
     anyhow::{Context, Error},
     cm_rust::{
-        CapabilityDecl, CapabilityName, ChildDecl, ComponentDecl, EventStreamDecl, NativeIntoFidl,
-        RunnerDecl, ValuesData,
+        Availability, CapabilityDecl, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl,
+        EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource, ValuesData,
     },
     cm_types::Url,
     diagnostics_message::MonikerWithUrl,
@@ -39,6 +39,7 @@ use {
     moniker::{AbsoluteMoniker, ChildMoniker},
     std::collections::HashSet,
     std::default::Default,
+    std::str::FromStr,
     std::sync::Arc,
     vfs::{directory::entry::DirectoryEntry, service},
 };
@@ -544,7 +545,22 @@ pub async fn new_event_stream(
         .await
         .expect("created event source");
     let event_stream = event_source
-        .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
+        .subscribe(
+            events
+                .into_iter()
+                .map(|event| EventSubscription {
+                    event_name: UseEventStreamDecl {
+                        source_name: event,
+                        source: UseSource::Parent,
+                        scope: None,
+                        target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                            .unwrap(),
+                        filter: None,
+                        availability: Availability::Required,
+                    },
+                })
+                .collect(),
+        )
         .await
         .expect("subscribe to event stream");
     (event_source, event_stream)

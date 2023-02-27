@@ -5,31 +5,34 @@
 use {
     crate::{error::EventsRoutingError, walk_state::WalkStateUnit},
     cm_rust::{CapabilityName, DictionaryValue},
-    maplit::hashmap,
-    std::collections::HashMap,
+    maplit::btreemap,
+    std::collections::BTreeMap,
 };
 
-#[derive(Debug)]
-pub struct EventSubscription {
-    pub event_name: CapabilityName,
+#[derive(Debug, Clone)]
+pub struct EventSubscription<NameType = CapabilityName>
+where
+    NameType: Clone,
+{
+    pub event_name: NameType,
 }
 
-impl EventSubscription {
-    pub fn new(event_name: CapabilityName) -> Self {
+impl<T: Clone> EventSubscription<T> {
+    pub fn new(event_name: T) -> Self {
         Self { event_name }
     }
 }
 
-type OptionFilterMap = Option<HashMap<String, DictionaryValue>>;
+type OptionFilterMap = Option<BTreeMap<String, DictionaryValue>>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct EventFilter {
-    filter: Option<HashMap<String, DictionaryValue>>,
+    filter: Option<BTreeMap<String, DictionaryValue>>,
     is_debug: bool,
 }
 
 impl EventFilter {
-    pub fn new(filter: Option<HashMap<String, DictionaryValue>>) -> Self {
+    pub fn new(filter: Option<BTreeMap<String, DictionaryValue>>) -> Self {
         Self { filter, is_debug: false }
     }
 
@@ -47,7 +50,7 @@ impl EventFilter {
     }
 
     pub fn contains(&self, key: impl Into<String>, values: Vec<String>) -> bool {
-        self.has_fields(&Some(hashmap! {key.into() => DictionaryValue::StrVec(values)}))
+        self.has_fields(&Some(btreemap! {key.into() => DictionaryValue::StrVec(values)}))
     }
 
     fn validate_subset(
@@ -118,30 +121,30 @@ fn is_subset(prev_value: &DictionaryValue, next_value: &DictionaryValue) -> bool
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, maplit::hashmap};
+    use {super::*, assert_matches::assert_matches, maplit::btreemap};
 
     #[test]
     fn test_filter_walk_state() {
         let none_filter = EventFilter::new(None);
-        let empty_filter = EventFilter::new(Some(hashmap! {}));
-        let single_field_filter = EventFilter::new(Some(hashmap! {
+        let empty_filter = EventFilter::new(Some(btreemap! {}));
+        let single_field_filter = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::Str("/foo".to_string()),
         }));
-        let single_field_filter_2 = EventFilter::new(Some(hashmap! {
+        let single_field_filter_2 = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::Str("/bar".to_string()),
         }));
-        let multi_field_filter = EventFilter::new(Some(hashmap! {
+        let multi_field_filter = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::StrVec(vec![
                                     "/bar".to_string(), "/baz".to_string()])
         }));
-        let multi_field_filter_2 = EventFilter::new(Some(hashmap! {
+        let multi_field_filter_2 = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::StrVec(vec![
                                     "/bar".to_string(), "/baz".to_string(), "/foo".to_string()])
         }));
-        let multi_field_single = EventFilter::new(Some(hashmap! {
+        let multi_field_single = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string()])
         }));
-        let multi_field_empty = EventFilter::new(Some(hashmap! {
+        let multi_field_empty = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::StrVec(vec![])
         }));
 
@@ -203,7 +206,7 @@ mod tests {
 
     #[test]
     fn contains_filter() {
-        let filter = EventFilter::new(Some(hashmap! {
+        let filter = EventFilter::new(Some(btreemap! {
             "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string(), "/bar".to_string()]),
         }));
 

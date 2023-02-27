@@ -24,7 +24,8 @@ use {
         event::EventFilter, mapper::NoopRouteMapper, route_event_stream_capability,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, UseDecl, UseEventStreamDecl},
+    cm_rust::{CapabilityName, ChildRef, EventScope, UseDecl, UseEventStreamDecl},
+    flyweights::FlyStr,
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
     std::{
@@ -33,8 +34,7 @@ use {
     },
 };
 
-// TODO(https://fxbug.dev/61861): remove alias once the routing lib has a stable API.
-pub type EventSubscription = ::routing::event::EventSubscription;
+pub type EventSubscription = ::routing::event::EventSubscription<UseEventStreamDecl>;
 
 #[derive(Debug)]
 pub struct RoutedEvent {
@@ -107,7 +107,7 @@ pub struct EventRegistry {
 /// and filter events to only allowed components.
 #[derive(Debug, Clone)]
 pub struct ComponentEventRoute {
-    /// Component child name string. We don't yet
+    /// Component child reference. We don't yet
     /// know a stronger type during routing, and the type of
     /// the object could change during runtime in the case of dynamic
     /// collections. Examples of things this could be:
@@ -115,9 +115,9 @@ pub struct ComponentEventRoute {
     /// filtering is performed.
     /// * The name of a component relative to its parent
     /// * The name of a collection relative to its parent
-    pub component: String,
+    pub component: ChildRef,
     /// A list of scopes that this route applies to
-    pub scope: Option<Vec<String>>,
+    pub scope: Option<Vec<EventScope>>,
 }
 
 impl EventRegistry {
@@ -164,7 +164,9 @@ impl EventRegistry {
         let mut event_names = HashSet::new();
         for subscription in subscriptions {
             if !event_names.insert(subscription.event_name.clone()) {
-                return Err(EventsError::duplicate_event(subscription.event_name).into());
+                return Err(
+                    EventsError::duplicate_event(subscription.event_name.source_name).into()
+                );
             }
         }
 
@@ -172,7 +174,7 @@ impl EventRegistry {
             ExtendedMoniker::ComponentManager => event_names
                 .iter()
                 .map(|source_name| RoutedEvent {
-                    source_name: source_name.clone(),
+                    source_name: source_name.source_name.clone(),
                     scopes: vec![
                         EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()
                     ],
@@ -188,7 +190,8 @@ impl EventRegistry {
                 if total_scopes != event_names.len() {
                     let names = event_names
                         .into_iter()
-                        .filter(|event_name| !route_result.contains_event(&event_name))
+                        .filter(|event_name| !route_result.contains_event(&event_name.source_name))
+                        .map(|name| name.source_name)
                         .collect();
                     return Err(EventsError::not_available(names).into());
                 }
@@ -279,7 +282,7 @@ impl EventRegistry {
     pub async fn route_events(
         &self,
         target_moniker: &AbsoluteMoniker,
-        events: &HashSet<CapabilityName>,
+        events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
         let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
         let component = model.look_up(&target_moniker).await?;
@@ -305,7 +308,7 @@ impl EventRegistry {
         for use_decl in decl.uses {
             match use_decl {
                 UseDecl::EventStream(event_decl) => {
-                    if events.contains(&event_decl.source_name) {
+                    if events.iter().find(|value| *value == &event_decl).is_some() {
                         let (source_name, scope_moniker, route) =
                             Self::route_single_event(event_decl.clone(), &component).await?;
                         let mut scope = EventDispatcherScope::new(scope_moniker);
@@ -341,47 +344,32 @@ impl EventRegistry {
         let mut search_name: CapabilityName = event_decl.source_name;
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
-                component: moniker.to_string(),
-                scope: event_decl.scope.map_or(None, |scopes| {
-                    Some(
-                        scopes
-                            .iter()
-                            .map(|s| match s {
-                                cm_rust::EventScope::Child(child) => child.name.to_string(),
-                                cm_rust::EventScope::Collection(collection) => {
-                                    collection.to_string()
-                                }
-                            })
-                            .collect(),
-                    )
-                }),
+                component: ChildRef {
+                    name: FlyStr::new(moniker.name()),
+                    collection: moniker.collection().map(|value| FlyStr::new(value)),
+                },
+                scope: event_decl.scope,
             });
         }
         for component in components {
             let mut component_route = ComponentEventRoute {
                 component: if let Some(moniker) = component.component.child_moniker() {
-                    moniker.name().to_string()
+                    ChildRef {
+                        name: FlyStr::new(moniker.name.to_string()),
+                        collection: moniker
+                            .collection
+                            .as_ref()
+                            .map(|value| FlyStr::new(value.as_str())),
+                    }
                 } else {
-                    "<root>".to_string()
+                    ChildRef { name: FlyStr::new("<root>"), collection: None }
                 },
                 scope: None,
             };
             if let Some(stream) = component.offer {
                 if stream.target_name == search_name {
                     search_name = stream.source_name;
-                    if let Some(scopes) = stream.scope {
-                        component_route.scope = Some(
-                            scopes
-                                .iter()
-                                .map(|s| match s {
-                                    cm_rust::EventScope::Child(child) => child.name.to_string(),
-                                    cm_rust::EventScope::Collection(collection) => {
-                                        collection.to_string()
-                                    }
-                                })
-                                .collect(),
-                        );
-                    }
+                    component_route.scope = stream.scope;
                 }
             }
             route.push(component_route);
@@ -426,9 +414,11 @@ mod tests {
             testing::test_helpers::{TestModelResult, *},
         },
         assert_matches::assert_matches,
+        cm_rust::{Availability, CapabilityPath, UseSource},
         fuchsia_zircon as zx,
         futures::StreamExt,
         moniker::AbsoluteMoniker,
+        std::str::FromStr,
     };
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
@@ -461,11 +451,18 @@ mod tests {
         let event_registry = EventRegistry::new(Arc::downgrade(&model));
 
         assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
-
         let mut event_stream_a = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
-                vec![EventSubscription::new(EventType::Discovered.into())],
+                vec![EventSubscription::new(UseEventStreamDecl {
+                    source_name: EventType::Discovered.into(),
+                    source: UseSource::Parent,
+                    scope: None,
+                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                        .unwrap(),
+                    filter: None,
+                    availability: Availability::Required,
+                })],
             )
             .await
             .expect("subscribe succeeds");
@@ -475,7 +472,15 @@ mod tests {
         let mut event_stream_b = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
-                vec![EventSubscription::new(EventType::Discovered.into())],
+                vec![EventSubscription::new(UseEventStreamDecl {
+                    source_name: EventType::Discovered.into(),
+                    source: UseSource::Parent,
+                    scope: None,
+                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                        .unwrap(),
+                    filter: None,
+                    availability: Availability::Required,
+                })],
             )
             .await
             .expect("subscribe succeeds");
@@ -518,7 +523,15 @@ mod tests {
         let mut event_stream_a = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
-                vec![EventSubscription::new(EventType::CapabilityRequested.into())],
+                vec![EventSubscription::new(UseEventStreamDecl {
+                    source_name: EventType::CapabilityRequested.into(),
+                    source: UseSource::Parent,
+                    scope: None,
+                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                        .unwrap(),
+                    filter: None,
+                    availability: Availability::Required,
+                })],
             )
             .await
             .expect("subscribe succeeds");
@@ -531,7 +544,15 @@ mod tests {
         let mut event_stream_b = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
-                vec![EventSubscription::new(EventType::CapabilityRequested.into())],
+                vec![EventSubscription::new(UseEventStreamDecl {
+                    source_name: EventType::CapabilityRequested.into(),
+                    source: UseSource::Parent,
+                    scope: None,
+                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                        .unwrap(),
+                    filter: None,
+                    availability: Availability::Required,
+                })],
             )
             .await
             .expect("subscribe succeeds");

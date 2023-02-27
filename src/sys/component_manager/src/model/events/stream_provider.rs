@@ -14,7 +14,7 @@ use {
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     },
     async_trait::async_trait,
-    cm_rust::{ComponentDecl, UseDecl},
+    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -26,7 +26,7 @@ use {
 /// Contains the event stream and its name.
 pub struct EventStreamAttachment {
     /// The name of this event stream.
-    name: String,
+    name: UseEventStreamDecl,
     /// The server end of a component's event stream.
     server_end: Option<EventStream>,
 }
@@ -51,7 +51,8 @@ struct StreamState {
     /// Looks up subscriptions per component over a component's lifetime.
     /// This is used solely for removing subscriptions from the subscriptions HashMap when
     /// a component is purged.
-    subscription_component_lookup: HashMap<ExtendedMoniker, HashMap<AbsolutePath, Vec<String>>>,
+    subscription_component_lookup:
+        HashMap<ExtendedMoniker, HashMap<AbsolutePath, Vec<UseEventStreamDecl>>>,
 }
 
 /// Creates EventStreams on component resolution according to statically declared
@@ -86,7 +87,7 @@ impl EventStreamProvider {
         self: &Arc<Self>,
         target_moniker: ExtendedMoniker,
         path: String,
-    ) -> Option<Vec<String>> {
+    ) -> Option<Vec<UseEventStreamDecl>> {
         let state = self.state.lock().await;
         state
             .subscription_component_lookup
@@ -101,22 +102,23 @@ impl EventStreamProvider {
     pub async fn create_static_event_stream(
         self: &Arc<Self>,
         subscriber: &WeakExtendedInstance,
-        stream_name: String,
         subscription: EventSubscription,
         path: String,
     ) -> Result<(), ModelError> {
         let registry = self.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
-        let event_stream = registry.subscribe(subscriber, vec![subscription]).await?;
+        let event_stream = registry.subscribe(subscriber, vec![subscription.clone()]).await?;
         let subscriber_moniker = subscriber.extended_moniker();
         let absolute_path = AbsolutePath { target_moniker: subscriber_moniker.clone(), path };
         let mut state = self.state.lock().await;
         let subscriptions =
             state.subscription_component_lookup.entry(subscriber_moniker.clone()).or_default();
         let path_list = subscriptions.entry(absolute_path).or_default();
-        path_list.push(stream_name.clone());
+        path_list.push(subscription.event_name.clone());
         let event_streams = state.streams.entry(subscriber_moniker.clone()).or_default();
-        event_streams
-            .push(EventStreamAttachment { name: stream_name, server_end: Some(event_stream) });
+        event_streams.push(EventStreamAttachment {
+            name: subscription.event_name,
+            server_end: Some(event_stream),
+        });
         Ok(())
     }
 
@@ -126,14 +128,16 @@ impl EventStreamProvider {
     pub async fn take_static_event_stream(
         &self,
         target_moniker: &ExtendedMoniker,
-        stream_name: String,
+        stream_name: &EventSubscription,
     ) -> Option<EventStream> {
         let mut state = self.state.lock().await;
         state
             .streams
             .get_mut(&target_moniker)
             .and_then(|event_streams| {
-                event_streams.iter_mut().find(|event_stream| event_stream.name == stream_name)
+                event_streams
+                    .iter_mut()
+                    .find(|event_stream| event_stream.name == stream_name.event_name)
             })
             .and_then(|attachment| attachment.server_end.take())
     }
@@ -157,8 +161,7 @@ impl EventStreamProvider {
                 UseDecl::EventStream(decl) => {
                     self.create_static_event_stream(
                         target,
-                        decl.source_name.to_string(),
-                        EventSubscription { event_name: decl.source_name.clone() },
+                        EventSubscription::new(decl.clone()),
                         decl.target_path.to_string(),
                     )
                     .await?;

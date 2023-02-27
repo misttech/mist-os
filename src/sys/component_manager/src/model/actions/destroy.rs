@@ -144,13 +144,14 @@ pub mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::ComponentDecl,
+        cm_rust::{Availability, CapabilityPath, ComponentDecl, UseEventStreamDecl, UseSource},
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
         std::fmt::Debug,
+        std::str::FromStr,
         std::sync::atomic::Ordering,
     };
 
@@ -353,7 +354,18 @@ pub mod tests {
         test: &ActionsTest,
         event_types: Vec<EventType>,
     ) -> EventStream {
-        let events: Vec<_> = event_types.into_iter().map(|e| e.into()).collect();
+        let events: Vec<_> = event_types
+            .into_iter()
+            .map(|e| UseEventStreamDecl {
+                source_name: e.into(),
+                source: UseSource::Parent,
+                scope: None,
+                target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                    .unwrap(),
+                filter: None,
+                availability: Availability::Required,
+            })
+            .collect();
         let mut event_source = test
             .builtin_environment
             .lock()
@@ -363,7 +375,9 @@ pub mod tests {
             .await
             .unwrap();
         let event_stream = event_source
-            .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
+            .subscribe(
+                events.into_iter().map(|event| EventSubscription { event_name: event }).collect(),
+            )
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();

@@ -45,6 +45,16 @@ macro_rules! events {
             )*
         }
 
+        impl From<EventType> for CapabilityName {
+            fn from(event_type: EventType) -> CapabilityName {
+                match event_type {
+                    $(
+                        EventType::$name => CapabilityName::from(stringify!($string_name)),
+                    )*
+                }
+            }
+        }
+
         /// Transfers any move-only state out of self into a new event that is otherwise
         /// a clone.
         #[async_trait]
@@ -166,12 +176,6 @@ external_events!(
     DebugStarted,
     Unresolved
 );
-
-impl Into<CapabilityName> for EventType {
-    fn into(self) -> CapabilityName {
-        self.to_string().into()
-    }
-}
 
 /// The component manager calls out to objects that implement the `Hook` trait on registered
 /// component manager events. Hooks block the flow of a task, and can mutate, decorate and replace

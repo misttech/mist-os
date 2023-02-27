@@ -12,7 +12,11 @@
     },
     collections: [
         {
-            name: "test-collection",
+            name: "test-collection-0",
+            durability: "transient",
+        },
+        {
+            name: "test-collection-1",
             durability: "transient",
         },
     ],
@@ -24,18 +28,23 @@
             ],
             from: "parent",
             path: "/events/started_stopped",
+            scope: "#test-collection-1",
         },
         {
             event_stream: [ "stopped" ],
             from: "parent",
             path: "/events/stopped",
+            scope: "#test-collection-0",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: "#test-collection",
+            to: [
+                "#test-collection-0",
+                "#test-collection-1",
+            ],
         },
     ],
 }

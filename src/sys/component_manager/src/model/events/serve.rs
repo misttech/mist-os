@@ -7,17 +7,19 @@ use {
         events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
         hooks::{EventPayload, EventType, HasEventType},
     },
+    cm_rust::{ChildRef, EventScope},
     cm_util::io::clone_dir,
     fidl::endpoints::{Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
+    flyweights::FlyStr,
     fuchsia_zircon::{
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
     futures::{lock::Mutex, StreamExt},
     measure_tape_for_events::Measurable,
     moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, ExtendedMoniker,
-        RelativeMoniker, RelativeMonikerBase,
+        AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker, RelativeMoniker,
+        RelativeMonikerBase,
     },
     std::sync::Arc,
     tracing::{error, warn},
@@ -64,8 +66,25 @@ fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEv
     }
 }
 
-fn get_child_moniker_name(moniker: &ChildMoniker) -> &str {
-    moniker.collection().unwrap_or(moniker.name())
+// Returns true if the filter contains a specific Ref
+fn event_filter_contains_ref(
+    filter: &Option<Vec<EventScope>>,
+    name: &str,
+    collection: Option<&str>,
+) -> bool {
+    filter.as_ref().map_or(true, |value| {
+        value
+            .iter()
+            .map(|value| match value {
+                EventScope::Child(ChildRef { collection: child_coll, name: child_name }) => {
+                    collection == child_coll.as_ref().map(|str| str.as_str()) && child_name == name
+                }
+                EventScope::Collection(collection_name) => {
+                    Some(collection_name.as_str()) == collection
+                }
+            })
+            .any(|val| val)
+    })
 }
 
 /// Checks the specified instance against the specified route,
@@ -86,16 +105,16 @@ fn validate_component_instance(
     let mut active_scope = iter.next().unwrap().scope.clone();
     for component in iter {
         if let Some(event_part) = event_iter.next() {
-            match active_scope {
-                Some(ref scopes)
-                    if !scopes.contains(&get_child_moniker_name(&event_part).to_string()) =>
-                {
-                    // Reject due to scope mismatch
-                    return false;
-                }
-                _ => {}
+            if !event_filter_contains_ref(&active_scope, event_part.name(), event_part.collection())
+            {
+                // Reject due to scope mismatch
+                return false;
             }
-            if event_part.name() != component.component {
+            let child_ref = ChildRef {
+                name: FlyStr::new(event_part.name()),
+                collection: event_part.collection().map(|value| FlyStr::new(value)),
+            };
+            if child_ref != component.component {
                 // Reject due to path mismatch
                 return false;
             }
@@ -107,8 +126,11 @@ fn validate_component_instance(
     }
     match (active_scope, event_iter.next()) {
         (Some(scopes), Some(event)) => {
-            if !scopes.contains(&get_child_moniker_name(&event).to_string()) {
-                // Reject due to scope mismatch
+            if !event_filter_contains_ref(
+                &Some(scopes),
+                event.name(),
+                event.collection.as_ref().map(|value| value.as_str()),
+            ) {
                 return false;
             }
         }
@@ -429,6 +451,8 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
 mod tests {
     use crate::model::events::serve::validate_and_filter_event;
     use crate::model::events::serve::ComponentEventRoute;
+    use cm_rust::ChildRef;
+    use cm_rust::EventScope;
     use moniker::AbsoluteMoniker;
     use moniker::AbsoluteMonikerBase;
     use moniker::ChildMoniker;
@@ -446,16 +470,17 @@ mod tests {
             )
             .unwrap()]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
             ComponentEventRoute {
-                component: "root".to_string(),
-                scope: Some(vec!["coll".to_string()]),
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "root".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("coll".to_string())]),
             },
         ];
         assert!(!validate_and_filter_event(&mut moniker, &route));
     }
-
-    // Test validate_and_filter_event
 
     // Route: /<root>/core(test_manager)/test_manager
     // Event: /
@@ -464,12 +489,18 @@ mod tests {
     fn test_validate_and_filter_event_empty_moniker() {
         let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root());
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
             ComponentEventRoute {
-                component: "core".to_string(),
-                scope: Some(vec!["test_manager".to_string()]),
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
             },
-            ComponentEventRoute { component: "test_manager".to_string(), scope: None },
+            ComponentEventRoute {
+                component: ChildRef { name: "core".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("test_manager".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "test_manager".into(), collection: None },
+                scope: None,
+            },
         ];
         assert_eq!(validate_and_filter_event(&mut event, &route), false);
     }
@@ -485,10 +516,28 @@ mod tests {
             ChildMoniker::try_new("c", None).unwrap(),
         ]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
-            ComponentEventRoute { component: "a".to_string(), scope: Some(vec!["b".to_string()]) },
-            ComponentEventRoute { component: "b".to_string(), scope: Some(vec!["c".to_string()]) },
-            ComponentEventRoute { component: "c".to_string(), scope: None },
+            ComponentEventRoute {
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "a".into(), collection: None },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "b".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "b".into(), collection: None },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "c".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "c".into(), collection: None },
+                scope: None,
+            },
         ];
         assert!(super::validate_and_filter_event(&mut event, &route));
         assert_eq!(event, ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()));
@@ -506,10 +555,28 @@ mod tests {
             ChildMoniker::try_new("d", None).unwrap(),
         ]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
-            ComponentEventRoute { component: "a".to_string(), scope: Some(vec!["b".to_string()]) },
-            ComponentEventRoute { component: "b".to_string(), scope: Some(vec!["c".to_string()]) },
-            ComponentEventRoute { component: "c".to_string(), scope: None },
+            ComponentEventRoute {
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "a".into(), collection: None },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "b".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "b".into(), collection: None },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "c".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "c".into(), collection: None },
+                scope: None,
+            },
         ];
         assert!(super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
@@ -517,7 +584,7 @@ mod tests {
             ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
                 "d", None
             )
-            .unwrap(),]))
+            .unwrap()]))
         );
     }
 
@@ -532,10 +599,22 @@ mod tests {
             )
             .unwrap()]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
-            ComponentEventRoute { component: "a".to_string(), scope: Some(vec!["b".to_string()]) },
-            ComponentEventRoute { component: "b".to_string(), scope: Some(vec!["c".to_string()]) },
-            ComponentEventRoute { component: "c".to_string(), scope: None },
+            ComponentEventRoute {
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "a".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("b".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "b".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("c".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "c".into(), collection: None },
+                scope: None,
+            },
         ];
         assert!(!super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
@@ -543,7 +622,7 @@ mod tests {
             ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
                 "a", None
             )
-            .unwrap(),]))
+            .unwrap()]))
         );
     }
 
@@ -557,10 +636,22 @@ mod tests {
             ChildMoniker::try_new("i", None).unwrap(),
         ]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
-            ComponentEventRoute { component: "a".to_string(), scope: None },
-            ComponentEventRoute { component: "b".to_string(), scope: Some(vec!["c".to_string()]) },
-            ComponentEventRoute { component: "c".to_string(), scope: None },
+            ComponentEventRoute {
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "a".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "b".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("c".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "c".into(), collection: None },
+                scope: None,
+            },
         ];
         assert!(!super::validate_and_filter_event(&mut event, &route));
     }
@@ -575,18 +666,78 @@ mod tests {
             ChildMoniker::try_new("feedback", None).unwrap(),
         ]));
         let route = vec![
-            ComponentEventRoute { component: "<root>".to_string(), scope: None },
             ComponentEventRoute {
-                component: "core".to_string(),
-                scope: Some(vec!["test_manager".to_string()]),
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
             },
             ComponentEventRoute {
-                component: "test_manager".to_string(),
-                scope: Some(vec!["test_wrapper".to_string()]),
+                component: ChildRef { name: "core".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("test_manager".to_string())]),
             },
             ComponentEventRoute {
-                component: "test_wrapper".to_string(),
-                scope: Some(vec!["test_root".to_string()]),
+                component: ChildRef { name: "test_manager".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("test_wrapper".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "test_wrapper".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("test_root".to_string())]),
+            },
+        ];
+        assert_eq!(super::validate_and_filter_event(&mut event, &route), false);
+    }
+
+    // Route: /<root>/core(test_manager)/test_manager(col(tests))/auto-3fc01a79864c741:tests(test_wrapper)/test_wrapper(col(test),enclosing_env,hermetic_resolver)/test:test_root/archivist
+    // Event: /core/test_manager/tests:auto-3fc01a79864c741/test_wrapper/archivist
+    // Output: (rejected)
+    #[test]
+    fn test_validate_child_under_scoped_collection_is_root() {
+        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+            ChildMoniker::try_new("core", None).unwrap(),
+            ChildMoniker::try_new("test_manager", None).unwrap(),
+            ChildMoniker::try_new("auto-3fc01a79864c741", Some("tests")).unwrap(),
+            ChildMoniker::try_new("test_wrapper", None).unwrap(),
+            ChildMoniker::try_new("archivist", None).unwrap(),
+        ]));
+        let route = vec![
+            ComponentEventRoute {
+                component: ChildRef { name: "<root>".into(), collection: None },
+                scope: None,
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "core".into(), collection: None },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "test_manager".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "test_manager".into(), collection: None },
+                scope: Some(vec![EventScope::Collection("tests".to_string())]),
+            },
+            ComponentEventRoute {
+                component: ChildRef {
+                    name: "auto-3fc01a79864c741".into(),
+                    collection: Some("tests".into()),
+                },
+                scope: Some(vec![EventScope::Child(ChildRef {
+                    name: "test_wrapper".into(),
+                    collection: None,
+                })]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "test_wrapper".into(), collection: None },
+                scope: Some(vec![
+                    EventScope::Collection("test".to_string()),
+                    EventScope::Child(ChildRef { name: "enclosing_env".into(), collection: None }),
+                    EventScope::Child(ChildRef {
+                        name: "hermetic_resolver".into(),
+                        collection: None,
+                    }),
+                ]),
+            },
+            ComponentEventRoute {
+                component: ChildRef { name: "test_root".into(), collection: Some("test".into()) },
+                scope: None,
             },
         ];
         assert_eq!(super::validate_and_filter_event(&mut event, &route), false);

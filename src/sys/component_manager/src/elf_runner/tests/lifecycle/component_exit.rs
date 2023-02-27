@@ -17,7 +17,7 @@ use {
 #[fuchsia::test]
 async fn test_exit_detection() {
     let event_stream = EventStream::open_at_path("/events/stopped").await.unwrap();
-    let collection_name = String::from("test-collection");
+    let collection_name = String::from("test-collection-0");
 
     let instance = ScopedInstance::new(
         collection_name.clone(),
@@ -28,10 +28,10 @@ async fn test_exit_detection() {
 
     instance.connect_to_binder().unwrap();
 
-    let target_moniker = format!("./{}:{}", collection_name, instance.child_name());
+    let target_moniker = ".";
 
     EventSequence::new()
-        .then(EventMatcher::ok().r#type(events::Stopped::TYPE).moniker(&target_moniker))
+        .then(EventMatcher::ok().r#type(events::Stopped::TYPE).moniker(target_moniker))
         .expect(event_stream)
         .await
         .unwrap();
@@ -42,11 +42,9 @@ async fn test_exit_after_rendezvous() {
     // Get the event source, install our service injector, and then start the
     // component tree.
     let mut event_stream = EventStream::open_at_path("/events/started_stopped").await.unwrap();
-
     // Launch the component under test.
-    let collection_name = String::from("test-collection");
     let instance = ScopedInstance::new(
-        collection_name.clone(),
+        "test-collection-1".to_string(),
         String::from("#meta/rendezvous_exit_component.cm"),
     )
     .await
@@ -54,11 +52,11 @@ async fn test_exit_after_rendezvous() {
 
     instance.connect_to_binder().unwrap();
 
-    let target_moniker = format!("./{}:{}", collection_name, instance.child_name());
+    let target_moniker = ".";
 
     // First, ensure that component has started.
     EventMatcher::ok()
-        .moniker(&target_moniker)
+        .moniker(target_moniker)
         .wait::<events::Started>(&mut event_stream)
         .await
         .expect("failed to observe events");

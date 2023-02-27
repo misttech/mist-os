@@ -21,7 +21,10 @@ use {
     ::routing::{config::AllowlistEntryBuilder, policy::PolicyError},
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_rust::{CapabilityPath, ComponentDecl, RegistrationSource, RunnerDecl, RunnerRegistration},
+    cm_rust::{
+        Availability, CapabilityName, CapabilityPath, ComponentDecl, RegistrationSource,
+        RunnerDecl, RunnerRegistration, UseEventStreamDecl, UseSource,
+    },
     cm_rust_testing::*,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
@@ -30,7 +33,7 @@ use {
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
     std::sync::{Arc, Weak},
-    std::{collections::HashSet, convert::TryFrom},
+    std::{collections::HashSet, convert::TryFrom, str::FromStr},
 };
 
 async fn new_model(
@@ -420,7 +423,22 @@ async fn bind_action_sequence() {
         .await
         .unwrap();
     let mut event_stream = event_source
-        .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
+        .subscribe(
+            events
+                .into_iter()
+                .map(|event: CapabilityName| EventSubscription {
+                    event_name: UseEventStreamDecl {
+                        source_name: event,
+                        source: UseSource::Parent,
+                        scope: None,
+                        target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                            .unwrap(),
+                        filter: None,
+                        availability: Availability::Required,
+                    },
+                })
+                .collect(),
+        )
         .await
         .expect("subscribe to event stream");
 

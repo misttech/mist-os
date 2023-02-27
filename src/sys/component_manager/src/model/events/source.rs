@@ -85,16 +85,15 @@ impl EventSource {
         let subscriber_moniker = self.subscriber.extended_moniker();
         if let Some(stream_provider) = self.stream_provider.upgrade() {
             for request in requests {
-                if let Some(res) = stream_provider
-                    .take_static_event_stream(&subscriber_moniker, request.event_name.to_string())
-                    .await
+                if let Some(res) =
+                    stream_provider.take_static_event_stream(&subscriber_moniker, &request).await
                 {
                     static_streams.push(res);
                 } else {
                     // Subscribe to events in the registry, discarding prior events
                     // from before this subscribe call if this is the second
                     // time opening the event stream.
-                    if request.event_name.to_string() == "capability_requested" {
+                    if request.event_name.source_name.to_string() == "capability_requested" {
                         // Don't support creating a new capability_requested stream.
                         return Err(ModelError::unsupported(
                             "capability_requested cannot be taken twice.",
@@ -106,7 +105,8 @@ impl EventSource {
             }
         }
         // Create an event stream for the given events
-        let mut stream = registry.subscribe(&self.subscriber, vec![]).await?;
+        let subscriptions: Vec<EventSubscription> = vec![];
+        let mut stream = registry.subscribe(&self.subscriber, subscriptions).await?;
         for mut request in static_streams {
             let mut tx = stream.sender();
             stream.tasks.push(fuchsia_async::Task::spawn(async move {
@@ -132,7 +132,7 @@ impl EventSource {
             if let Some(event_names) = stream_provider.take_events(subscriber_moniker, path).await {
                 let subscriptions = event_names
                     .into_iter()
-                    .map(|name| EventSubscription { event_name: CapabilityName::from(name) })
+                    .map(|name| EventSubscription { event_name: name })
                     .collect();
                 return Ok(Some(self.subscribe(subscriptions).await?));
             }

@@ -46,15 +46,14 @@ use {
             pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_explorer::RealmExplorer,
             realm_query::RealmQuery, route_validator::RouteValidator,
         },
+        model::events::registry::EventSubscription,
         model::{
             component::ComponentManagerInstance,
             environment::Environment,
             event_logger::EventLogger,
             events::{
-                registry::{EventRegistry, EventSubscription},
-                serve::serve_event_stream_as_stream,
-                source_factory::EventSourceFactory,
-                stream_provider::EventStreamProvider,
+                registry::EventRegistry, serve::serve_event_stream_as_stream,
+                source_factory::EventSourceFactory, stream_provider::EventStreamProvider,
             },
             hooks::EventType,
             model::{Model, ModelParams},
@@ -68,7 +67,10 @@ use {
         environment::{DebugRegistry, RunnerRegistry},
     },
     anyhow::{format_err, Context as _, Error},
-    cm_rust::{CapabilityName, RunnerRegistration},
+    cm_rust::{
+        Availability, CapabilityName, CapabilityPath, RunnerRegistration, UseEventStreamDecl,
+        UseSource,
+    },
     fidl::{
         endpoints::{create_proxy, ServerEnd},
         AsHandleRef,
@@ -84,7 +86,7 @@ use {
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    std::{collections::HashMap, sync::Arc},
+    std::{collections::HashMap, str::FromStr, sync::Arc},
     thiserror::Error,
     tracing::{info, warn},
 };
@@ -1021,19 +1023,83 @@ impl BuiltinEnvironment {
                     serve_event_stream_as_stream(
                         event_source
                             .subscribe(vec![
-                                EventSubscription { event_name: CapabilityName::from("started") },
-                                EventSubscription { event_name: CapabilityName::from("stopped") },
                                 EventSubscription {
-                                    event_name: CapabilityName::from("capability_routed"),
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Started),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
                                 },
-                                EventSubscription { event_name: CapabilityName::from("running") },
-                                EventSubscription { event_name: CapabilityName::from("destroyed") },
                                 EventSubscription {
-                                    event_name: CapabilityName::from("discovered"),
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Stopped),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
                                 },
-                                EventSubscription { event_name: CapabilityName::from("resolved") },
                                 EventSubscription {
-                                    event_name: CapabilityName::from("unresolved"),
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Destroyed),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Discovered),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Resolved),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: CapabilityName::from(EventType::Unresolved),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: CapabilityPath::from_str(
+                                            "/svc/fuchsia.component.EventStream",
+                                        )
+                                        .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
                                 },
                             ])
                             .await

@@ -46,7 +46,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     fuchsia_zircon as zx,
     futures::{channel::oneshot, join, lock::Mutex, StreamExt, TryStreamExt},
-    maplit::hashmap,
+    maplit::btreemap,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
@@ -247,7 +247,9 @@ async fn capability_requested_event_at_parent() {
                     source_name: "capability_requested".into(),
                     scope: None,
                     target_path: CapabilityPath::try_from("/events/capability_requested").unwrap(),
-                    filter: Some(hashmap!{"name".to_string() => DictionaryValue::Str("foo_svc".to_string())}),
+                    filter: Some(btreemap! {
+                        "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
+                    }),
                     availability: Availability::Required,
                 }))
                 .add_lazy_child("b")
