@@ -26,7 +26,6 @@ ffx_plugin("ffx_assembly") {
     "src/fvm.rs",
     "src/lib.rs",
     "src/operations.rs",
-    "src/operations/create_flash_manifest.rs",
     "src/operations/create_system.rs",
     "src/operations/create_update.rs",
     "src/operations/product.rs",
@@ -51,9 +50,7 @@ ffx_plugin("ffx_assembly") {
     "//third_party/rust_crates:camino",
   ]
   deps = [
-    "//build/sdk/meta:rust",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/fastboot",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
     "//src/lib/assembly/assembly_manifest",

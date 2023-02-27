@@ -8,7 +8,6 @@ Image Assembly is responsible for taking prebuilt artifacts and generating
 images that can be used to update or flash a Fuchsia device. The FFX plugin has
 three subcommands: [`create-system`](#create_system),
 [`create-update`](#create_update), and
-[`create-flash-manifest`](#create_flash_manifest).
 
 ![Command Flow](images/commands.png)
 
@@ -88,33 +87,6 @@ input                   | format                                                
 output       | format                                          | description
 ------------ | ----------------------------------------------- | ---------------
 `update.far` | [Format](/docs/concepts/packages/update_pkg.md) | Update package.
-
-# create-flash-manifest
-
-Create a manifest file that describes how to flash images onto a Fuchsia device.
-
-```bash
-ffx assembly create-flash-manifest \
-  --partitions partitions.json     \
-  --system-a images.json           \
-  --system-b images.json           \
-  --system-r recovery_images.json  \
-  --outdir <output-directory>
-```
-
-## Arguments
-
-| input | format | description |
-| --- | --- | --- |
-| `--partitions` | [Partitions Config](#partitions-config) | Where in the partition table the images are put. |
-| `--system-[a,b,r]` | [Images Manifest](#images-manifest) | The system to place in the slot. |
-| `--outdir` | path | Directory to write outputs. |
-
-## Output
-
-output       | format                                                                                       | description
------------- | -------------------------------------------------------------------------------------------- | -----------
-`flash.json` | [RFC-0100](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0100_product_metadata) | Flash manifest that specifies which images to flash to which partitions.
 
 # Image Assembly Config
 

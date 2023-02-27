@@ -27,7 +27,6 @@ pub struct AssemblyCommand {
 pub enum OperationClass {
     CreateSystem(CreateSystemArgs),
     CreateUpdate(CreateUpdateArgs),
-    CreateFlashManifest(CreateFlashManifestArgs),
     Product(ProductArgs),
     SizeCheck(SizeCheckArgs),
 }
@@ -144,32 +143,6 @@ pub struct CreateUpdateArgs {
     /// directory to write intermediate files.
     #[argh(option)]
     pub gendir: Option<Utf8PathBuf>,
-}
-
-/// construct a flash manifest.
-#[derive(Debug, FromArgs, PartialEq)]
-#[argh(subcommand, name = "create-flash-manifest")]
-pub struct CreateFlashManifestArgs {
-    /// path to a partitions config, which specifies where in the partition
-    /// table the images are put.
-    #[argh(option)]
-    pub partitions: Utf8PathBuf,
-
-    /// path to an images manifest, which specifies images to put in slot A.
-    #[argh(option)]
-    pub system_a: Option<Utf8PathBuf>,
-
-    /// path to an images manifest, which specifies images to put in slot B.
-    #[argh(option)]
-    pub system_b: Option<Utf8PathBuf>,
-
-    /// path to an images manifest, which specifies images to put in slot R.
-    #[argh(option)]
-    pub system_r: Option<Utf8PathBuf>,
-
-    /// directory to write the UpdatePackage.
-    #[argh(option)]
-    pub outdir: Utf8PathBuf,
 }
 
 /// Perform size checks (on packages or product based on the sub-command).

@@ -47,10 +47,6 @@ impl FfxMain for AssemblyTool {
             OperationClass::CreateUpdate(args) => {
                 operations::create_update::create_update(args).context("Create Update Package")
             }
-            OperationClass::CreateFlashManifest(args) => {
-                operations::create_flash_manifest::create_flash_manifest(args)
-                    .context("Create Flash Manifest")
-            }
             OperationClass::Product(args) => {
                 operations::product::assemble(args).context("Product Assembly")
             }
