@@ -2,44 +2,82 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/device-protocol/pdev.h>
 
 #include <zxtest/zxtest.h>
 
 #include "zircon/errors.h"
 
-namespace ddk {
+constexpr uint32_t kVid = 1;
+constexpr uint32_t kPid = 1;
 
-class PDevTest : public PDev {
+namespace fhpd = fuchsia_hardware_platform_device;
+
+TEST(PDevTest, GetInterrupt) {
+  constexpr zx_handle_t kFakeHandle = 3;
+  pdev_protocol_ops_t fake_ops{
+      .get_interrupt =
+          [](void* ctx, uint32_t index, uint32_t flags, zx_handle_t* out_irq) {
+            *out_irq = kFakeHandle;
+            return ZX_OK;
+          },
+  };
+
+  pdev_protocol_t fake_proto{
+      .ops = &fake_ops,
+      .ctx = nullptr,
+  };
+
+  ddk::PDev pdev(&fake_proto);
+  zx::interrupt out;
+  ASSERT_OK(pdev.GetInterrupt(0, 0, &out));
+  ASSERT_EQ(out.get(), kFakeHandle);
+}
+
+class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
  public:
-  explicit PDevTest(pdev_protocol_t* proto) : PDev(proto) {}
+  zx_status_t Connect(fidl::ServerEnd<fhpd::Device> request) {
+    if (binding_.has_value()) {
+      return ZX_ERR_ALREADY_BOUND;
+    }
+    binding_.emplace(async_get_default_dispatcher(), std::move(request), this,
+                     fidl::kIgnoreBindingClosure);
+    return ZX_OK;
+  }
+
+ private:
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::BoardInfo::Builder(arena)
+                               .vid(kVid)
+                               .pid(kPid)
+                               .Build());
+  }
+  std::optional<fidl::ServerBinding<fuchsia_hardware_platform_device::Device>> binding_;
 };
 
-// Fake functions
-zx_status_t mmio_fn(void* ctx, uint32_t index, pdev_mmio_t* out_mmio) { return ZX_OK; }
-zx_status_t interrupt_fn(void* ctx, uint32_t index, uint32_t flags, zx_handle_t* out_irq) {
-  return ZX_OK;
+TEST(PDevFidlTest, GetBoardInfo) {
+  async::Loop server_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  server_loop.StartThread("fidl-thread");
+
+  async_patterns::TestDispatcherBound<DeviceServer> server{server_loop.dispatcher(), std::in_place};
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
+  ASSERT_OK(endpoints);
+  ASSERT_OK(server.SyncCall(&DeviceServer::Connect, std::move(endpoints->server)));
+
+  ddk::PDevFidl pdev{std::move(endpoints->client)};
+  pdev_board_info_t board_info;
+  ASSERT_OK(pdev.GetBoardInfo(&board_info));
+  ASSERT_EQ(kPid, board_info.pid);
+  ASSERT_EQ(kVid, board_info.vid);
 }
-zx_status_t bti_fn(void* ctx, uint32_t index, zx_handle_t* out_bti) { return ZX_OK; }
-zx_status_t smc_fn(void* ctx, uint32_t index, zx_handle_t* out_smc) { return ZX_OK; }
-zx_status_t device_info_fn(void* ctx, pdev_device_info_t* out_info) { return ZX_OK; }
-zx_status_t board_info_fn(void* ctx, pdev_board_info_t* out_info) { return ZX_OK; }
-
-TEST(DdkTest, GetInterrupt) {
-  auto fake_ops = pdev_protocol_ops_t{.get_mmio = &mmio_fn,
-                                      .get_interrupt = &interrupt_fn,
-                                      .get_bti = &bti_fn,
-                                      .get_smc = &smc_fn,
-                                      .get_device_info = &device_info_fn,
-                                      .get_board_info = &board_info_fn};
-
-  auto fake_proto = pdev_protocol_t{.ops = &fake_ops, .ctx = nullptr};
-
-  PDevTest pdev(&fake_proto);
-  zx::interrupt out;
-  EXPECT_OK(pdev.GetInterrupt(0, 0, &out));
-}
-
-}  // namespace ddk
-
-int main(int argc, char** argv) { return RUN_ALL_TESTS(argc, argv); }
