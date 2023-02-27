@@ -331,6 +331,9 @@ impl InputPipeline {
             {
                 Ok(()) => {}
                 Err(err) => {
+                    // This error is usually benign in tests: it means that the setup does not
+                    // support dynamic device discovery. Almost no tests support dynamic
+                    // device discovery, and they also do not need those.
                     fx_log_err!(
                         "Input pipeline is unable to watch for new input devices: {:?}",
                         err
