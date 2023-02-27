@@ -18,7 +18,9 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
                                              std::unique_ptr<SysmemDeviceWrapper> sysmem,
                                              bool start_vsync)
     : mock_root_(mock_root), sysmem_(std::move(sysmem)) {
-  pdev_fidl_.UseFakeBti();
+  pdev_fidl_.SetConfig({
+      .use_fake_bti = true,
+  });
   pdev_banjo_.UseFakeBti();
   mock_root_->SetMetadata(SYSMEM_METADATA_TYPE, &sysmem_metadata_, sizeof(sysmem_metadata_));
 

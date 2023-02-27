@@ -9,9 +9,12 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/device-protocol/pdev.h>
+#include <lib/fake-bti/bti.h>
+#include <lib/fake-resource/resource.h>
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "zircon/errors.h"
 
 constexpr uint32_t kVid = 1;
@@ -65,17 +68,156 @@ class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_platfor
   std::optional<fidl::ServerBinding<fuchsia_hardware_platform_device::Device>> binding_;
 };
 
+class FakePDevFidlWithThread {
+ public:
+  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> Start(
+      fake_pdev::FakePDevFidl::Config config) {
+    loop_.StartThread("pdev-fidl-thread");
+    if (zx_status_t status =
+            server.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    if (zx_status_t status =
+            server.SyncCall(&fake_pdev::FakePDevFidl::Connect, std::move(endpoints->server));
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(endpoints->client));
+  }
+
+ private:
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> server{loop_.dispatcher(),
+                                                                      std::in_place};
+};
+
+TEST(PDevFidlTest, GetMmios) {
+  constexpr uint32_t kMmioId = 5;
+  constexpr zx_off_t kMmioOffset = 10;
+  constexpr size_t kMmioSize = 11;
+  std::map<uint32_t, fake_pdev::MmioInfo> mmios;
+  {
+    fake_pdev::MmioInfo mmio{
+        .offset = kMmioOffset,
+        .size = kMmioSize,
+    };
+    ASSERT_OK(zx::vmo::create(0, 0, &mmio.vmo));
+    mmios[kMmioId] = std::move(mmio);
+  }
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .mmios = std::move(mmios),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  pdev_mmio_t mmio;
+  ASSERT_OK(pdev.GetMmio(kMmioId, &mmio));
+  ASSERT_EQ(kMmioOffset, mmio.offset);
+  ASSERT_EQ(kMmioSize, mmio.size);
+
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4, &mmio));
+}
+
+TEST(PDevFidlTest, GetIrqs) {
+  constexpr uint32_t kIrqId = 5;
+  std::map<uint32_t, zx::interrupt> irqs;
+  {
+    zx::interrupt irq;
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    irqs[kIrqId] = std::move(irq);
+  }
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .irqs = std::move(irqs),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  zx::interrupt irq;
+  ASSERT_OK(pdev.GetInterrupt(kIrqId, 0, &irq));
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt(4, 0, &irq));
+}
+
+TEST(PDevFidlTest, GetBtis) {
+  constexpr uint32_t kBtiId = 5;
+  std::map<uint32_t, zx::bti> btis;
+  {
+    zx::bti bti;
+    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
+    btis[kBtiId] = std::move(bti);
+  }
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .btis = std::move(btis),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  zx::bti bti;
+  ASSERT_OK(pdev.GetBti(kBtiId, &bti));
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetBti(4, &bti));
+}
+
+TEST(PDevFidlTest, GetSmc) {
+  constexpr uint32_t kSmcId = 5;
+  std::map<uint32_t, zx::resource> smcs;
+  {
+    zx::resource smc;
+    ASSERT_OK(fake_root_resource_create(smc.reset_and_get_address()));
+    smcs[kSmcId] = std::move(smc);
+  }
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .smcs = std::move(smcs),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  zx::resource smc;
+  ASSERT_OK(pdev.GetSmc(kSmcId, &smc));
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetSmc(4, &smc));
+}
+
+TEST(PDevFidlTest, GetDeviceInfo) {
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .device_info =
+          pdev_device_info_t{
+              .vid = kVid,
+              .pid = kPid,
+          },
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  pdev_device_info_t device_info;
+  ASSERT_OK(pdev.GetDeviceInfo(&device_info));
+  ASSERT_EQ(kPid, device_info.pid);
+  ASSERT_EQ(kVid, device_info.vid);
+}
+
 TEST(PDevFidlTest, GetBoardInfo) {
-  async::Loop server_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  server_loop.StartThread("fidl-thread");
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .board_info =
+          pdev_board_info_t{
+              .vid = kVid,
+              .pid = kPid,
+          },
+  });
+  ASSERT_OK(client_channel);
 
-  async_patterns::TestDispatcherBound<DeviceServer> server{server_loop.dispatcher(), std::in_place};
-
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
-  ASSERT_OK(endpoints);
-  ASSERT_OK(server.SyncCall(&DeviceServer::Connect, std::move(endpoints->server)));
-
-  ddk::PDevFidl pdev{std::move(endpoints->client)};
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
   pdev_board_info_t board_info;
   ASSERT_OK(pdev.GetBoardInfo(&board_info));
   ASSERT_EQ(kPid, board_info.pid);

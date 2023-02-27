@@ -177,8 +177,10 @@ class FakeDdkSysmem : public zxtest::Test {
   FakeDdkSysmem() : outgoing_(pdev_loop_.dispatcher()) {}
 
   void SetUp() override {
+    pdev_.SetConfig({
+        .use_fake_bti = true,
+    });
     EXPECT_OK(pdev_loop_.StartThread());
-    pdev_.UseFakeBti();
     auto device_handler =
         [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
           fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_);

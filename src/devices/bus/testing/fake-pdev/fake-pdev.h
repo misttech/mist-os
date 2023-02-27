@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <lib/async/default.h>
 
 #include <atomic>
 #include <map>
@@ -88,24 +89,47 @@ class FakePDev : public ddk::PDevProtocol<FakePDev> {
   std::optional<pdev_board_info_t> board_info_ __TA_GUARDED(lock_);
 };
 
-class FakePDevFidl : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
+class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
  public:
-  // Generates a fake bti lazily if true.
-  void UseFakeBti(bool use_fake_bti = true) { use_fake_bti_ = use_fake_bti; }
+  struct Config {
+    // If true, a bti will be generated lazily if it does not exist.
+    bool use_fake_bti = false;
 
-  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override;
+    // If true, a smc will be generated lazily if it does not exist.
+    bool use_fake_smc = false;
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    ZX_DEBUG_ASSERT(false);
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    std::map<uint32_t, MmioInfo> mmios;
+    std::map<uint32_t, zx::interrupt> irqs;
+    std::map<uint32_t, zx::bti> btis;
+    std::map<uint32_t, zx::resource> smcs;
+
+    std::optional<pdev_device_info_t> device_info;
+    std::optional<pdev_board_info_t> board_info;
+  };
+
+  FakePDevFidl() = default;
+
+  zx_status_t Connect(fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
+    binding_group_.AddBinding(async_get_default_dispatcher(), std::move(request), this,
+                              fidl::kIgnoreBindingClosure);
+    return ZX_OK;
+  }
+  zx_status_t SetConfig(Config config) {
+    config_ = std::move(config);
+    return ZX_OK;
   }
 
  private:
-  fbl::Mutex lock_;
+  void GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) override;
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override;
+  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override;
+  void GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) override;
+  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
+  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
 
-  std::map<uint32_t, zx::bti> btis_ __TA_GUARDED(lock_);
-
-  std::atomic<bool> use_fake_bti_ = false;
+  Config config_;
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
 };
 
 }  // namespace fake_pdev
