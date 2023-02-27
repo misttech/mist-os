@@ -22,22 +22,23 @@ assumptions about the type of performance test being written.
 
 *   **Dart:**
 
-    *   **High level:** You can use the Dart `trace_processing`
-        library to extract performance metrics from Fuchsia
-        traces. This approach is useful if you have an existing
-        correctness test and you want to extend it to also produce
-        performance results. In that case, it is common to modify the
-        software-under-test to generate extra trace events.
+    *   **High level:** You can use the Dart [`trace_processing`
+        library][trace_processing] to extract performance metrics from
+        Fuchsia traces. This approach is useful if you have an
+        existing correctness test and you want to extend it to also
+        produce performance results. In that case, it is common to
+        modify the software-under-test to generate extra trace events.
 
         An example is
         [`flatland_benchmarks_test.dart`](/src/tests/end_to_end/perf/test/flatland_benchmarks_test.dart),
         which uses the `trace_processing` library by defining a
         `MetricsSpecSet`.
 
-    *   **Low level:** You can use the `TestCaseResults` class to
-        generate entries for `fuchsiaperf.json` files. This is
-        commonly used with the `trace_processing` library, but it can
-        also be used separately.
+    *   **Low level:** You can use the [`TestCaseResults`
+        class][metrics_results] to generate entries for
+        `fuchsiaperf.json` files. This is commonly used with the
+        `trace_processing` library, but it can also be used
+        separately.
 
     *   **High or low level:** From Dart, you can run a subprocess
         that generates a `fuchsiaperf.json` file. The subprocess can
@@ -62,7 +63,7 @@ assumptions about the type of performance test being written.
     *   **High level:** You can use the [fuchsia-criterion Rust
         library] to create microbenchmarks.
 
-    *   **Low level:** You can use [Fuchsiaperf Rust library] to
+    *   **Low level:** You can use the [Fuchsiaperf Rust library] to
         generate `fuchsiaperf.json` files.
 
 *   **Go:**
@@ -72,6 +73,8 @@ assumptions about the type of performance test being written.
 
 
 [dart-wrappers]: /src/tests/end_to_end/perf/test/
+[trace_processing]: /sdk/testing/sl4f/client/lib/src/trace_processing/
+[metrics_results]: /sdk/testing/sl4f/client/lib/src/trace_processing/metrics_results.dart
 [perftest C++ library]: /zircon/system/ulib/perftest/
 [perftest.h]: /zircon/system/ulib/perftest/include/perftest/perftest.h
 [perftest/results.h]: /zircon/system/ulib/perftest/include/perftest/results.h

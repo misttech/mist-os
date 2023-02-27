@@ -5,23 +5,7 @@
 This document describes the JSON schema that Fuchsia benchmark results must
 follow in order to be uploaded to the performance dashboard.
 
-## Helper Libraries
-
-You can use the existing Fuchsia libraries for your language for emitting
-the JSON data:
-
-* [C++]
-* [Go]
-* [Dart]
-* Rust - [Fuchsia Criterion], [Fuchsiaperf struct]
-
-[C++]: /zircon/system/ulib/perftest
-[Go]: /src/lib/go-benchmarking
-[Dart]: /sdk/testing/sl4f/client/lib/src/trace_processing/metrics_results.dart
-[Fuchsia Criterion]: /src/developer/fuchsia-criterion
-[Fuchsiaperf struct]: /src/performance/lib/fuchsiaperf/src/lib.rs
-
-## JSON Description
+## JSON description
 
 ```json
 [
@@ -37,7 +21,7 @@ the JSON data:
 ]
 ```
 
-### Supported Units
+### Supported units
 
 In order to convert benchmark results to the format required by the performance
 dashboard, `unit` must be one of the following strings, which describe the units
@@ -67,3 +51,10 @@ of the result's `values`.
     }
 ]
 ```
+
+## See also
+
+*   [Fuchsiaperf producers](fuchsiaperf_producers.md): Libraries for
+    producing `fuchsiaperf` files.
+*   [Fuchsiaperf consumers](fuchsiaperf_consumers.md): Systems that
+    consume `fuchsiaperf` files.
