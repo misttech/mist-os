@@ -186,7 +186,7 @@ mod tests {
             fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
         let controller = client_end.into_proxy().unwrap();
         controller
-            .rebind("gpt.cm")
+            .rebind("gpt.so")
             .await
             .expect("rebind request OK")
             .map_err(zx::Status::from_raw)

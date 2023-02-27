@@ -40,7 +40,7 @@ using driver_integration_test::IsolatedDevmgr;
 auto BRead = block_client::SingleReadBytes;
 auto BWrite = block_client::SingleWriteBytes;
 
-const char* kDriverLib = "block-verity.cm";
+const char* kDriverLib = "/boot/driver/block-verity.so";
 
 // Bind the block verity driver to the ramdisk.
 zx_status_t BindVerityDriver(fidl::UnownedClientEnd<fuchsia_device::Controller> channel) {

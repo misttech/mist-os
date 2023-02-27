@@ -94,7 +94,7 @@ void CompositeNodeSpecV1::SetupCompositeDevice(
 
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {
-      .driver = driver_loader_.LoadDriverUrl(std::string(fidl_driver_info.url().get())),
+      .driver = driver_loader_.LoadDriverUrl(std::string(fidl_driver_info.driver_url().get())),
       .colocate = fidl_driver_info.has_colocate() && fidl_driver_info.colocate(),
   };
 

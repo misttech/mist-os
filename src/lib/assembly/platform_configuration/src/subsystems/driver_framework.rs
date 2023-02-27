@@ -33,6 +33,12 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("bind_eager", driver_framework_config.eager_drivers.clone())?
             .field("disabled_drivers", disabled_drivers)?;
 
+        let root_driver = if use_dfv2 {
+            "fuchsia-boot:///#meta/platform-bus.cm"
+        } else {
+            "fuchsia-boot:///#driver/platform-bus.so"
+        };
+
         let driver_host_crash_policy = driver_framework_config
             .driver_host_crash_policy
             .as_ref()
@@ -47,7 +53,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("verbose", false)?
             .field("use_driver_framework_v2", use_dfv2)?
             .field("driver_host_crash_policy", format!("{driver_host_crash_policy}"))?
-            .field("root_driver", "fuchsia-boot:///#meta/platform-bus.cm")?;
+            .field("root_driver", root_driver)?;
 
         Ok(())
     }

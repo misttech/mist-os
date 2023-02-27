@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef},
 };
 
-const FVM_DRIVER_PATH: &str = "fvm.cm";
+const FVM_DRIVER_PATH: &str = "fvm.so";
 
 #[link(name = "fvm")]
 extern "C" {

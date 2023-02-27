@@ -119,19 +119,13 @@ driver_bind_rules("bind") {
   rules = "block-verity.bind"
   header_output = "block-verity-bind.h"
   bind_output = "block-verity.bindbc"
-  deps = [
-    "//src/devices/bind/fuchsia.compat",
-    "//src/devices/bind/fuchsia.hardware.block",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
 }
 
 bind_test("block-verity-bind-test") {
   rules = "block-verity.bind"
   tests = "bind-tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.compat",
-    "//src/devices/bind/fuchsia.hardware.block",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
 }
 
 fuchsia_driver("block-verity-driver") {

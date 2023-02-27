@@ -71,8 +71,6 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
       } else {
         driver_info.driver_url(
             fidl::ObjectView<fidl::StringView>(allocator, allocator, driver.driver_url));
-        driver_info.url(
-            fidl::ObjectView<fidl::StringView>(allocator, allocator, driver.driver_url));
       }
       driver_info.package_type(driver.package_type);
       driver_info.is_fallback(driver.is_fallback);
@@ -118,8 +116,8 @@ class DriverLoaderTest : public zxtest::Test {
 };
 
 TEST_F(DriverLoaderTest, TestFallbackGetsRemoved) {
-  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.cm";
-  std::string fallback_libname = "fuchsia_boot:///#fallback.cm";
+  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.so";
+  std::string fallback_libname = "fuchsia_boot:///#fallback.so";
 
   driver_index_server.fake_drivers.emplace_back(not_fallback_libname,
                                                 fdi::wire::DriverPackageType::kBoot);
@@ -148,8 +146,8 @@ TEST_F(DriverLoaderTest, TestFallbackGetsRemoved) {
 }
 
 TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
-  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.cm";
-  std::string fallback_libname = "fuchsia_boot:///#fallback.cm";
+  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.so";
+  std::string fallback_libname = "fuchsia_boot:///#fallback.so";
 
   driver_index_server.fake_drivers.emplace_back(not_fallback_libname,
                                                 fdi::wire::DriverPackageType::kBoot);
@@ -185,8 +183,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
 }
 
 TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
-  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.cm";
-  std::string fallback_libname = "fuchsia_boot:///#fallback.cm";
+  std::string not_fallback_libname = "fuchsia_boot:///#not_fallback.so";
+  std::string fallback_libname = "fuchsia_boot:///#fallback.so";
 
   driver_index_server.fake_drivers.emplace_back(not_fallback_libname,
                                                 fdi::wire::DriverPackageType::kBoot);
@@ -217,8 +215,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
 }
 
 TEST_F(DriverLoaderTest, TestLibname) {
-  std::string name1 = "fuchsia-boot:///#driver1.cm";
-  std::string name2 = "fuchsia-boot:///#driver2.cm";
+  std::string name1 = "fuchsia-boot:///#driver1.so";
+  std::string name2 = "fuchsia-boot:///#driver2.so";
 
   driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kBoot);
   driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBoot);
@@ -245,8 +243,8 @@ TEST_F(DriverLoaderTest, TestLibname) {
 }
 
 TEST_F(DriverLoaderTest, TestRelativeLibname) {
-  std::string name1 = "fuchsia-boot:///#driver1.cm";
-  std::string name2 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver2.cm";
+  std::string name1 = "fuchsia-boot:///#driver1.so";
+  std::string name2 = "fuchsia-pkg://fuchsia.com/my-package#driver/#driver2.so";
 
   driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kBoot);
   driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBase);
@@ -265,7 +263,7 @@ TEST_F(DriverLoaderTest, TestRelativeLibname) {
 
   {
     DriverLoader::MatchDeviceConfig config;
-    config.libname = "driver1.cm";
+    config.libname = "driver1.so";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
     auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
 
@@ -275,7 +273,7 @@ TEST_F(DriverLoaderTest, TestRelativeLibname) {
 
   {
     DriverLoader::MatchDeviceConfig config;
-    config.libname = "driver2.cm";
+    config.libname = "driver2.so";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
     auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
 
@@ -285,7 +283,7 @@ TEST_F(DriverLoaderTest, TestRelativeLibname) {
 }
 
 TEST_F(DriverLoaderTest, TestTooLongRelativeLibname) {
-  std::string name1 = "fuchsia-boot:///#driver1.cm";
+  std::string name1 = "fuchsia-boot:///#driver1.so";
   // The characters of `libname` do not matter so long as the size of `libname`
   // is longer than `name1`.
   std::string long_name = std::string(name1.length() + 1, 'a');
@@ -309,8 +307,8 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeLibname) {
 }
 
 TEST_F(DriverLoaderTest, TestLibnameConvertToPath) {
-  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver1.cm";
-  std::string name2 = "fuchsia-boot:///#meta/driver2.cm";
+  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#driver/#driver1.so";
+  std::string name2 = "fuchsia-boot:///#driver/driver2.so";
 
   driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kBase);
   driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBoot);
@@ -329,7 +327,7 @@ TEST_F(DriverLoaderTest, TestLibnameConvertToPath) {
 
   // We can also match libname by the path that the URL turns into.
   DriverLoader::MatchDeviceConfig config;
-  config.libname = "/boot/meta/driver2.cm";
+  config.libname = "/boot/driver/driver2.so";
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
 
@@ -338,9 +336,9 @@ TEST_F(DriverLoaderTest, TestLibnameConvertToPath) {
 }
 
 TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
-  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver1.cm";
-  std::string name2 = "fuchsia-boot:///#meta/driver2.cm";
-  std::string name3 = "fuchsia-boot:///#meta/driver3.cm";
+  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#driver/#driver1.so";
+  std::string name2 = "fuchsia-boot:///#driver/driver2.so";
+  std::string name3 = "fuchsia-boot:///#driver/driver3.so";
 
   driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kBase);
   driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBoot);
@@ -436,7 +434,7 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
   parent_spec.specs(specs);
 
-  auto driver_name = "fuchsia_boot:///#driver.cm";
+  auto driver_name = "fuchsia_boot:///#driver.so";
   driver_index_server.specs.push_back(parent_spec.Build());
   driver_index_server.fake_drivers.emplace_back(driver_name, fdi::wire::DriverPackageType::kBoot);
 
@@ -544,8 +542,8 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
 }
 
 TEST_F(DriverLoaderTest, TestEphemeralDriver) {
-  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver1.cm";
-  std::string name2 = "fuchsia-boot:///#meta/driver2.cm";
+  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#driver/#driver1.so";
+  std::string name2 = "fuchsia-boot:///#driver/driver2.so";
 
   driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kUniverse);
   driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBoot);

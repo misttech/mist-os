@@ -17,6 +17,7 @@ use {
 const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///#meta/sample-driver.cm";
 const SAMPLE_DRIVER_LIBNAME: &str = "fuchsia-boot:///#driver/sample-driver.so";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///#meta/test-parent-sys.cm";
+const PARENT_DRIVER_LIBNAME: &str = "fuchsia-boot:///#driver/test-parent-sys.so";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///#meta/driver-test-realm-fake-driver.cm";
 
 fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
@@ -131,7 +132,7 @@ async fn set_up_test_driver_realm(
     let mut realm_args = fdt::RealmArgs::EMPTY;
     realm_args.use_driver_framework_v2 = Some(use_dfv2);
     if use_dfv2 {
-        // DriverTestRealm attempts to bind the .cm of test-parent-sys if not explicitly requested otherwise.
+        // DriverTestRealm attempts to bind the .so of test-parent-sys if not explicitly requested otherwise.
         realm_args.root_driver = Some(ROOT_DRIVER_DFV2_URL.to_owned());
     }
     instance.driver_test_realm_start(realm_args).await?;
@@ -314,7 +315,7 @@ async fn test_get_device_info_no_filter_dfv1() -> Result<()> {
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
-        PARENT_DRIVER_URL
+        PARENT_DRIVER_LIBNAME
     );
     assert_eq!(root_sys_test.num_children, 1);
     assert_eq!(root_sys_test.child_nodes.len(), 1);
@@ -332,7 +333,7 @@ async fn test_get_device_info_no_filter_dfv1() -> Result<()> {
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
-        SAMPLE_DRIVER_URL
+        SAMPLE_DRIVER_LIBNAME
     );
     assert_eq!(sample_driver.num_children, 0);
     assert!(sample_driver.child_nodes.is_empty());
@@ -363,7 +364,7 @@ async fn test_get_device_info_with_filter_dfv1() -> Result<()> {
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
-        PARENT_DRIVER_URL
+        PARENT_DRIVER_LIBNAME
     );
     assert_eq!(sys_test.num_children, 1);
     assert!(sys_test.child_nodes.is_empty());
@@ -394,7 +395,7 @@ async fn test_get_device_info_with_duplicate_filter_dfv1() -> Result<()> {
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
-        SAMPLE_DRIVER_URL
+        SAMPLE_DRIVER_LIBNAME
     );
     assert!(sample_driver.child_nodes.is_empty());
 
@@ -411,7 +412,7 @@ async fn test_get_device_info_with_duplicate_filter_dfv1() -> Result<()> {
             .bound_driver_libname
             .as_ref()
             .expect("DFv1 driver missing bound driver libname"),
-        SAMPLE_DRIVER_URL
+        SAMPLE_DRIVER_LIBNAME
     );
     assert_eq!(sample_driver.num_children, 0);
     assert!(sample_driver.child_nodes.is_empty());

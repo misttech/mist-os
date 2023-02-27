@@ -31,7 +31,7 @@ void StartDriverTestRealm() {
     return;
   }
   args.set_boot(std::move(interface));
-  args.set_root_driver("#meta/test-parent-sys.cm");
+  args.set_root_driver("#driver/test-parent-sys.so");
 
   fuchsia::driver::test::Realm_Start_Result result;
   auto call_result = client->Start(std::move(args), &result);

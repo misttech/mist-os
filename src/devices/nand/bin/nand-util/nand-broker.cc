@@ -196,7 +196,7 @@ zx::result<fidl::ClientEnd<fuchsia_nand::Broker>> NandBroker::LoadBroker() {
       return controller_channel.take_error();
     }
 
-    const char kBroker[] = "/boot/meta/nand-broker.cm";
+    const char kBroker[] = "/boot/driver/nand-broker.so";
     auto resp = fidl::WireCall(controller_channel.value())->Bind(kBroker);
     zx_status_t call_status = ZX_OK;
     auto status = resp.status();

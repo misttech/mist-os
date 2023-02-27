@@ -132,8 +132,8 @@ protocol Controller {
         server zx.handle:CHANNEL;
     });
 
-    /// Attempt to bind the requested driver to this device. This should be the name of the
-    /// component manifest for the driver e.g. "fvm.cm". A full path can be specified but this is
+    /// Attempt to bind the requested driver to this device. This should just be the name of the
+    /// shared object for the driver e.g. "fvm.so". A full path can be specified but this is
     /// deprecated.
     Bind(struct {
         driver string:MAX_DRIVER_PATH_LEN;

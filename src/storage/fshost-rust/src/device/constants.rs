@@ -22,11 +22,11 @@ pub const FVM_LEGACY_TYPE_GUID: [u8; 16] = [
 ];
 
 // -- Driver paths (to be used to attach devices)
-pub const FVM_DRIVER_PATH: &str = "fvm.cm";
-pub const GPT_DRIVER_PATH: &str = "gpt.cm";
-pub const MBR_DRIVER_PATH: &str = "mbr.cm";
-pub const BOOTPART_DRIVER_PATH: &str = "bootpart.cm";
-// pub const BLOCK_VERITY_DRIVER_PATH: &str = "block-verity.cm";
-pub const NAND_BROKER_DRIVER_PATH: &str = "nand-broker.cm";
+pub const FVM_DRIVER_PATH: &str = "fvm.so";
+pub const GPT_DRIVER_PATH: &str = "gpt.so";
+pub const MBR_DRIVER_PATH: &str = "mbr.so";
+pub const BOOTPART_DRIVER_PATH: &str = "bootpart.so";
+// pub const BLOCK_VERITY_DRIVER_PATH: &str = "block-verity.so";
+pub const NAND_BROKER_DRIVER_PATH: &str = "nand-broker.so";
 
 pub const DEFAULT_F2FS_MIN_BYTES: u64 = 100 * 1024 * 1024;

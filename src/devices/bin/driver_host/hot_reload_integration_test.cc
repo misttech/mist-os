@@ -25,11 +25,11 @@ using driver_integration_test::IsolatedDevmgr;
 using fuchsia_device_restarttest::TestDevice;
 
 constexpr std::string_view kDriverRestartUrl =
-    "fuchsia-boot:///#meta/driver-host-restart-driver.cm";
+    "fuchsia-boot:///#driver/driver-host-restart-driver.so";
 constexpr std::string_view kTestDriverRestartUrl =
-    "fuchsia-boot:///#meta/driver-host-test-driver.cm";
+    "fuchsia-boot:///#driver/driver-host-test-driver.so";
 constexpr std::string_view kChildDriverRestartUrl =
-    "fuchsia-boot:///#meta/driver-host-test-child-driver.cm";
+    "fuchsia-boot:///#driver/driver-host-test-child-driver.so";
 
 void SetupEnvironment(board_test::DeviceEntry dev, driver_integration_test::IsolatedDevmgr* devmgr,
                       fuchsia::driver::development::DriverDevelopmentSyncPtr* development_) {

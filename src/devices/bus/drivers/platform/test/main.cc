@@ -36,7 +36,7 @@ TEST(PbusTest, Enumeration) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   zx::result devmgr = IsolatedDevmgr::Create(
       {
-          .root_device_driver = "fuchsia-boot:///#meta/platform-bus.cm",
+          .root_device_driver = "fuchsia-boot:///#driver/platform-bus.so",
       },
       loop.dispatcher());
   ASSERT_OK(devmgr.status_value());

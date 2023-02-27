@@ -266,7 +266,7 @@ impl DiskManager for DevDiskManager {
             let DevBlockDevice(controller) = block_dev;
             // Bind the zxcrypt driver to the block device, which will result in
             // a zxcrypt subdirectory appearing under the block.
-            match controller.bind("zxcrypt.cm").await?.map_err(zx::Status::from_raw) {
+            match controller.bind("zxcrypt.so").await?.map_err(zx::Status::from_raw) {
                 Ok(()) | Err(zx::Status::ALREADY_BOUND) => {}
                 Err(s) => return Err(DiskError::BindZxcryptDriverFailed(s)),
             }
@@ -588,7 +588,7 @@ pub mod test {
                         }
 
                         VolumeAndNodeRequest::Bind { driver, responder } => {
-                            assert_eq!(driver, "zxcrypt.cm");
+                            assert_eq!(driver, "zxcrypt.so");
                             let zxcrypt_dir = simple::simple();
                             let mut resp = self
                                 .block_dir

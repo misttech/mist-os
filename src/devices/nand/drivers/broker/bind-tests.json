@@ -2,7 +2,7 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.nand.BIND_PROTOCOL.DEVICE",
-            "fuchsia.compat.LIBNAME": "\"nand-broker.cm\""
+            "fuchsia.compat.LIBNAME": "\"nand-broker.so\""
         },
         "expected": "match",
         "name": "Match"

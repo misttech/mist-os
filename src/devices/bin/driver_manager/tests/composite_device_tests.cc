@@ -20,7 +20,7 @@ namespace fio = fuchsia_io;
 
 namespace {
 
-const std::string kFakeDriverUrl = "#meta/mock-device.cm";
+const std::string kFakeDriverUrl = "#driver/mock-device.so";
 
 // Matches |args| to the fake driver if it follows the bind rules:
 // fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.DEVICE.

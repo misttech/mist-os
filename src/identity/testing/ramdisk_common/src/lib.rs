@@ -139,7 +139,7 @@ pub async fn setup_ramdisk(
 pub async fn format_zxcrypt(ramdisk: &RamdiskClient, name: &str, controller: ControllerProxy) {
     // Bind the zxcrypt driver to the block device
     controller
-        .bind("zxcrypt.cm")
+        .bind("zxcrypt.so")
         .await
         .expect("Could not send request to bind zxcrypt driver")
         .expect("Could not bind zxcrypt driver");

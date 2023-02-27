@@ -55,7 +55,7 @@ namespace {
 const zx::duration kTimeout = zx::sec(3);
 
 // FVM driver library
-const char* kFvmDriver = "fvm.cm";
+const char* kFvmDriver = "fvm.so";
 
 }  // namespace
 

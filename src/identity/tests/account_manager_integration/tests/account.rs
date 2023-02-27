@@ -340,7 +340,7 @@ async fn create_account_manager() -> Result<Arc<Mutex<NestedAccountManagerProxy>
     let instance = builder.build().await?;
 
     let args = fidl_fuchsia_driver_test::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///#driver/platform-bus.so".to_string()),
         ..fidl_fuchsia_driver_test::RealmArgs::EMPTY
     };
     instance.driver_test_realm_start(args).await?;

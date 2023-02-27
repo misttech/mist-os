@@ -41,7 +41,7 @@ std::string PathToUrl(std::string_view path) {
 __EXPORT
 devmgr_launcher::Args IsolatedDevmgr::DefaultArgs() {
   devmgr_launcher::Args args;
-  args.root_device_driver = "/boot/meta/sysdev.cm";
+  args.root_device_driver = "/boot/driver/sysdev.so";
   return args;
 }
 

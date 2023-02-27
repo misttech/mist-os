@@ -2095,7 +2095,7 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     fidl::UnownedClientEnd block_interface = gpt_dev->block_interface();
     auto result = fidl::WireCall(
                       fidl::UnownedClientEnd<fuchsia_device::Controller>(block_interface.channel()))
-                      ->Rebind(fidl::StringView("gpt.cm"));
+                      ->Rebind(fidl::StringView("gpt.so"));
     ASSERT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
   }

@@ -31,7 +31,7 @@
 namespace zxcrypt {
 
 // The zxcrypt driver
-const char* kDriverLib = "zxcrypt.cm";
+const char* kDriverLib = "zxcrypt.so";
 
 namespace {
 

@@ -26,7 +26,7 @@ constexpr uuid::Uuid kTestUniqueGUID = {0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06
                                         0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
 
 zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device) {
-  auto resp = fidl::WireCall(device)->Bind("fvm.cm");
+  auto resp = fidl::WireCall(device)->Bind("fvm.so");
   auto status = zx::make_result(resp.status());
   if (status.is_ok()) {
     if (resp->is_error()) {

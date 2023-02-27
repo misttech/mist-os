@@ -5,5 +5,5 @@
 using fuchsia.compat;
 using fuchsia.nand;
 
-fuchsia.compat.LIBNAME == "nand-broker.cm";
+fuchsia.compat.LIBNAME == "nand-broker.so";
 fuchsia.BIND_PROTOCOL == fuchsia.nand.BIND_PROTOCOL.DEVICE;

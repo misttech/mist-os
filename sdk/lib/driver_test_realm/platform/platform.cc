@@ -19,7 +19,7 @@ int main() {
 
   fidl::Arena arena;
   fuchsia_driver_test::wire::RealmArgs args(arena);
-  args.set_root_driver(arena, fidl::StringView("fuchsia-boot:///#meta/platform-bus.cm"));
+  args.set_root_driver(arena, fidl::StringView("fuchsia-boot:///#driver/platform-bus.so"));
   auto wire_result = client->Start(std::move(args));
   if (wire_result.status() != ZX_OK) {
     FX_SLOG(ERROR, "Failed to call to Realm:Start", KV("error", wire_result.status()));
