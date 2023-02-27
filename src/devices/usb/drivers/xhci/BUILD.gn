@@ -70,12 +70,11 @@ fuchsia_driver("xhci-driver") {
 fuchsia_driver_component("xhci") {
   info = "xhci-info.json"
   component_name = "xhci"
+  manifest = "meta/xhci.cml"
   deps = [
     ":usb_xhci_bind",
     ":xhci-driver",
   ]
-  uses_profiles = true
-  colocate = false
 }
 
 source_set("test-libs") {
