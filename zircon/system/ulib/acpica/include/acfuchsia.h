@@ -25,7 +25,7 @@
 
 extern zx_handle_t root_resource_handle;
 
-#if ACPI_CA_VERSION > 0x20200110
+#ifndef ACPI_OFFSET
 #define ACPI_OFFSET(d, f) offsetof(d, f)
 #endif
 
