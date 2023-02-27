@@ -16,6 +16,7 @@ if (is_host) {
       "//src/connectivity/overnet/lib/hoist",
       "//src/developer/ffx/lib/buildid:lib",
       "//src/developer/ffx/lib/errors:lib",
+      "//src/developer/ffx/lib/logging:lib",
       "//src/developer/ffx/lib/sdk:lib",
       "//src/developer/ffx/lib/version:lib",
       "//src/lib/analytics/rust:lib",
@@ -24,7 +25,6 @@ if (is_host) {
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:async-lock",
       "//third_party/rust_crates:base64",
-      "//third_party/rust_crates:chrono",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:home",
       "//third_party/rust_crates:lazy_static",
@@ -37,7 +37,6 @@ if (is_host) {
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:tracing",
-      "//third_party/rust_crates:tracing-log",
       "//third_party/rust_crates:tracing-subscriber",
     ]
 
