@@ -68,6 +68,7 @@ fuchsia_unittest_package("simple-display-test") {
 #     Type: boolean
 #     Default: false
 template("simple_fuchsia_driver") {
+  not_needed(invoker, "*")
   driver_name = target_name
   driver_bind_rules("simple-${driver_name}-bind") {
     rules = "simple-${driver_name}.bind"
@@ -99,42 +100,25 @@ template("simple_fuchsia_driver") {
     ]
   }
 
-  is_fallback = false
-  if (defined(invoker.is_fallback)) {
-    is_fallback = invoker.is_fallback
-  }
   fuchsia_driver_component("simple.${driver_name}") {
     component_name = "simple.${driver_name}"
     deps = [ ":simple.${driver_name}-driver" ]
     info = "simple.${driver_name}-info.json"
-    root_resource = true
-    fallback = is_fallback
-    colocate = false
-
-    if (driver_name == "intel") {
-      # TODO(fxbug.dev/93333): remove this once DFv2 is stabilised.
-      default_dispatcher_opts = [ "allow_sync_calls" ]
-    }
+    manifest = "meta/${driver_name}.cml"
   }
 }
 
 simple_fuchsia_driver("amd-kaveri") {
-  is_fallback = false
 }
 simple_fuchsia_driver("bochs") {
-  is_fallback = false
 }
 simple_fuchsia_driver("gga") {
-  is_fallback = false
 }
 simple_fuchsia_driver("intel") {
-  is_fallback = true
 }
 simple_fuchsia_driver("nv") {
-  is_fallback = false
 }
 simple_fuchsia_driver("vmware") {
-  is_fallback = false
 }
 
 group("tests") {

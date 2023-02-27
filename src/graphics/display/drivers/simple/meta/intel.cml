@@ -1,0 +1,22 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/driver/compat/compat.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        bind: "meta/bind/simple-intel-bind.bindbc",
+        compat: "driver/simple.intel.so",
+
+        // TODO(fxbug.dev/93333): remove this once DFv2 is stabilised.
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+    },
+    use: [
+        { protocol: "fuchsia.kernel.RootResource" },
+        { service: "fuchsia.hardware.pci.Service" },
+    ],
+}
