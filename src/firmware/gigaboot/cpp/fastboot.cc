@@ -8,16 +8,21 @@
 #include <lib/abr/abr.h>
 #include <lib/fastboot/fastboot_base.h>
 #include <lib/zircon_boot/zircon_boot.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <xefi.h>
 
-#include <algorithm>
 #include <string>
 
+#include <efi/types.h>
 #include <fbl/vector.h>
 #include <phys/efi/main.h>
+#include <pretty/hexdump.h>
 
 #include "boot_zbi_items.h"
 #include "gpt.h"
+#include "lib/zx/result.h"
 #include "utils.h"
 
 namespace gigaboot {
@@ -81,6 +86,10 @@ cpp20::span<Fastboot::CommandCallbackEntry> Fastboot::GetCommandCallbackTable() 
       {"set_active", &Fastboot::SetActive},
       {"oem gpt-init", &Fastboot::GptInit},
       {"oem add-staged-bootloader-file", &Fastboot::OemAddStagedBootloaderFile},
+      {"oem efi-getvarinfo", &Fastboot::EfiGetVarInfo},
+      {"oem efi-getvarnames", &Fastboot::EfiGetVarNames},
+      {"oem efi-getvar", &Fastboot::EfiGetVar},
+      {"oem efi-dumpvars", &Fastboot::EfiDumpVars},
   };
 
   return cmd_entries;
@@ -319,6 +328,160 @@ zx::result<> Fastboot::GptInit(std::string_view cmd, fastboot::Transport *transp
     return SendResponse(ResponseType::kFail, "Failed to reinitialize partiions", transport,
                         zx::error(ZX_ERR_INTERNAL));
   }
+
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+zx::result<> Fastboot::EfiGetVarInfo(std::string_view cmd, fastboot::Transport *transport) {
+  auto info = efi_variables_->EfiQueryVariableInfo();
+  if (info.is_error()) {
+    return SendResponse(ResponseType::kFail, "QueryVariableInfo() failed", transport);
+  }
+
+  printer_(
+      "\n"
+      "  Max Storage Size: %" PRIu64
+      "\n"
+      "  Remaining Variable Storage Size: %" PRIu64
+      "\n"
+      "  Max Variable Size: %" PRIu64 "\n",
+      info.value().max_var_storage_size, info.value().remaining_var_storage_size,
+      info.value().max_var_size);
+
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+zx::result<> Fastboot::EfiGetVarNames(std::string_view cmd, fastboot::Transport *transport) {
+  for (auto v_id : *efi_variables_) {
+    if (!v_id.IsValid()) {
+      return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
+    }
+
+    auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
+    if (v_id_utf8.is_error()) {
+      printer_(xefi_strerror(v_id_utf8.error_value()));
+      continue;
+    }
+    const auto &guid = v_id.vendor_guid;
+    printer_("%s %s\n", ToStr(guid).data(), v_id_utf8.value().data());
+  }
+  printer_("\n");
+
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+void hexdump_printer_printf(void *printf_arg, const char *fmt, ...) {
+  Fastboot *obj = static_cast<Fastboot *>(printf_arg);
+  va_list args;
+  va_start(args, fmt);
+  obj->vprinter_(fmt, args);
+  va_end(args);
+}
+
+// This function expects `cmd` in following format:
+// oem efi-getvar <var_name> [<guid>]
+//
+// E.g.
+//  oem efi-getvar BootOrder
+//  oem efi-getvar BootOrder 8be4df61-93ca-11d2-aa0d-00e098032b8c
+zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *transport) {
+  CommandArgs args;
+  ExtractCommandArgs(cmd, " ", args);
+
+  if (args.num_args < 3 || args.num_args > 4) {
+    return SendResponse(ResponseType::kFail,
+                        "Bad number of arguments."
+                        " Expected format: oem efi-getvar <var_name> [<guid>]",
+                        transport);
+  }
+
+  const std::string_view in_var_name = args.args[2];
+  auto res_var_name = efi_variables_->StrToUcs2(in_var_name);
+  if (res_var_name.is_error()) {
+    printer_("UTF8->UC2 convertion failed for variable name: '%s'\n", in_var_name.data());
+    return SendResponse(ResponseType::kFail, "UTF8->UC2 convertion failed for variable name",
+                        transport);
+  }
+  std::u16string &var_name = res_var_name.value();
+
+  efi_guid guid;
+  if (args.num_args == 4) {
+    std::string_view guid_str = args.args[3];
+    auto res_guid = ToGuid(guid_str);
+    if (res_guid.is_error()) {
+      printer_("Vendor GUID parsing failed (%s) for: '%s'\n", xefi_strerror(res_guid.error_value()),
+               guid_str.data());
+      return SendResponse(ResponseType::kFail, "Vendor GUID parsing failed", transport);
+    }
+    guid = res_guid.value();
+  } else if (args.num_args == 3) {
+    auto res_guid = efi_variables_->GetGuid(var_name);
+    if (res_guid.is_error()) {
+      printer_("Vendor GUID search failed (%s) for: '%s'\n", xefi_strerror(res_guid.error_value()),
+               in_var_name.data());
+      if (res_guid.error_value() == EFI_INVALID_PARAMETER) {
+        return SendResponse(ResponseType::kFail,
+                            "Multiple entries found with specified name. Please provide GUID",
+                            transport);
+      } else {
+        return SendResponse(ResponseType::kFail, "Vendor GUID search failed", transport);
+      }
+    }
+    guid = res_guid.value();
+  }
+
+  // Print VariableName
+  EfiVariables::EfiVariableId v_id{var_name, guid};
+  auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
+  if (v_id_utf8.is_error()) {
+    const auto err_str = "Failed to convert UCS2 variable name to UTF8\n";
+    printer_(err_str);
+    return SendResponse(ResponseType::kFail, err_str, transport);
+  }
+  printer_("%s %s:\n", ToStr(guid).data(), v_id_utf8.value().data());
+
+  // Get and print Value
+  auto res_get_var = efi_variables_->EfiGetVariable(v_id);
+  if (res_get_var.is_error()) {
+    return SendResponse(ResponseType::kFail, "GetVariable() failed", transport);
+  }
+  hexdump8_very_ex(res_get_var.value().data(), res_get_var.value().size(), 0,
+                   hexdump_printer_printf, this);
+
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+int Fastboot::printer_(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  int res = vprinter_(fmt, args);
+  va_end(args);
+  return res;
+}
+
+zx::result<> Fastboot::EfiDumpVars(std::string_view cmd, fastboot::Transport *transport) {
+  for (const auto &v_id : *efi_variables_) {
+    if (!v_id.IsValid())
+      return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
+
+    auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
+    if (v_id_utf8.is_error()) {
+      printer_("Failed to convert UCS2 variable name to UTF8\n");
+      continue;
+    }
+    const auto &guid = v_id.vendor_guid;
+    printer_("%s %s:\n", ToStr(guid).data(), v_id_utf8.value().data());
+
+    auto res = efi_variables_->EfiGetVariable(v_id);
+    if (res.is_error()) {
+      printer_("Failed to get variable\n");
+      continue;
+    }
+
+    auto &val = res.value();
+    hexdump8_very_ex(val.data(), val.size(), 0, hexdump_printer_printf, this);
+  }
+  printer_("\n");
 
   return SendResponse(ResponseType::kOkay, "", transport);
 }

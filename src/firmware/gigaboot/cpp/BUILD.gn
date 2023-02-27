@@ -13,6 +13,8 @@ source_set("lib") {
     "boot_zbi_items.h",
     "device_path.cc",
     "device_path.h",
+    "efi_variables.cc",
+    "efi_variables.h",
     "fastboot.cc",
     "fastboot.h",
     "gpt.cc",
@@ -38,6 +40,7 @@ source_set("lib") {
     "//zircon/kernel/phys/efi:main",
     "//zircon/kernel/phys/efi:protocol",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/pretty",
     "//zircon/third_party/ulib/cksum",
   ]
 

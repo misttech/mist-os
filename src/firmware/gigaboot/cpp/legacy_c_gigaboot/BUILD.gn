@@ -45,7 +45,6 @@ source_set("legacy_c_gigaboot") {
     "$dir_gigaboot/src/netifc.c",
     "$dir_gigaboot/src/pci.c",
     "$dir_gigaboot/src/tcp.c",
-    "$dir_gigaboot/src/utf_conversion.c",
     "$dir_gigaboot/src/util.c",
     "$dir_gigaboot/src/variable.c",
     "$dir_gigaboot/src/zircon.c",

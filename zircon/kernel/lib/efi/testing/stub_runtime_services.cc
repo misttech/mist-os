@@ -136,6 +136,7 @@ efi_status StubRuntimeServices::GetNextVariableName(size_t* var_name_size, char1
   it_var_name.copy(var_name, it_var_name.size());
   var_name[it_var_name.size()] = u'\0';
   *vendor_guid = it->first.guid;
+  *var_name_size = it_var_name_size;
   var_it_ = it;
 
   return EFI_SUCCESS;

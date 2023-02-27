@@ -10,22 +10,30 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zircon_boot/zircon_boot.h>
 
-#include <optional>
+#include <memory>
 #include <string_view>
-#include <variant>
-
-#include <fbl/vector.h>
 
 #include "backends.h"
+#include "efi_variables.h"
 #include "utils.h"
 
 namespace gigaboot {
 
 class Fastboot : public fastboot::FastbootBase {
  public:
-  Fastboot(cpp20::span<uint8_t> download_buffer, ZirconBootOps zb_ops)
-      : download_buffer_(download_buffer), zb_ops_(zb_ops) {}
+  Fastboot(cpp20::span<uint8_t> download_buffer, ZirconBootOps zb_ops,
+           EfiVariables *efi_variables = nullptr)
+      : download_buffer_(download_buffer), zb_ops_(zb_ops), efi_variables_(efi_variables) {
+    if (!efi_variables_) {
+      owned_efi_variables_ = std::make_unique<EfiVariables>();
+      efi_variables_ = owned_efi_variables_.get();
+    }
+  }
   bool IsContinue() { return continue_; }
+
+  // 'printf' signature for output testing.
+  using VPrintFunction = int (*)(const char *fmt, va_list ap);
+  void SetVPrintFunction(VPrintFunction vprint_function) { vprinter_ = vprint_function; }
 
  private:
   zx::result<> ProcessCommand(std::string_view cmd, fastboot::Transport *transport) override;
@@ -70,12 +78,25 @@ class Fastboot : public fastboot::FastbootBase {
   zx::result<> SetActive(std::string_view cmd, fastboot::Transport *transport);
   zx::result<> OemAddStagedBootloaderFile(std::string_view cmd, fastboot::Transport *transport);
 
+  zx::result<> EfiGetVarInfo(std::string_view cmd, fastboot::Transport *transport);
+  zx::result<> EfiGetVarNames(std::string_view cmd, fastboot::Transport *transport);
+  zx::result<> EfiGetVar(std::string_view cmd, fastboot::Transport *transport);
+  zx::result<> EfiDumpVars(std::string_view cmd, fastboot::Transport *transport);
+
   // OEM commands
   zx::result<> GptInit(std::string_view cmd, fastboot::Transport *transport);
+
+  // Print function for testing
+  VPrintFunction vprinter_ = vprintf;
+  int printer_(const char *fmt, ...);
+  friend void hexdump_printer_printf(void *printf_arg, const char *fmt, ...);
 
   cpp20::span<uint8_t> download_buffer_;
   ZirconBootOps zb_ops_;
   bool continue_ = false;
+
+  std::unique_ptr<EfiVariables> owned_efi_variables_;
+  EfiVariables *efi_variables_;
 };
 
 // APIs for fastboot over tcp.

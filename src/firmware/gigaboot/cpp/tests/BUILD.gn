@@ -7,20 +7,24 @@ import("//build/test.gni")
 test("gigaboot_unittests") {
   sources = [
     "boot_zbi_items_tests.cc",
+    "efi_variables_test.cc",
     "fastboot_test.cc",
     "gpt_tests.cc",
     "mock_boot_service.cc",
     "mock_boot_service.h",
+    "mock_efi_variables.h",
     "tss2_uefi_tests.cc",
     "utils_test.cc",
   ]
   public_deps = [
     "..:lib",
     "//sdk/lib/fit",
+    "//src/firmware/gigaboot/lib:shared",
     "//src/firmware/lib/abr:in_tree",
     "//src/firmware/lib/fastboot/test:utils",
     "//src/firmware/lib/zircon_boot:in_tree",
     "//src/firmware/lib/zircon_boot/test:mock_zircon_boot_lib",
+    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/zbitl",
     "//zircon/kernel/lib/efi",

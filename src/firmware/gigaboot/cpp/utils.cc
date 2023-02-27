@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #include <bootbyte.h>
+#include <ctype.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
 #include <zircon/hw/gpt.h>
@@ -13,6 +14,7 @@
 
 #include <efi/global-variable.h>
 #include <efi/types.h>
+#include <fbl/string_printf.h>
 
 #include "gpt.h"
 
@@ -225,6 +227,136 @@ std::optional<RebootMode> GetRebootMode() {
   }
 
   return ParseByteToRebootMode(bootbyte);
+}
+
+// See `ToStr()` for format details
+// Expected input string should be in following format: "aabbccdd-eeff-gghh-iijj-kkllmmnnoopp"
+fit::result<efi_status, efi_guid> ToGuid(std::string_view guid_str) {
+  efi_guid guid;
+
+  auto ParseByte = [](std::string_view& str, uint8_t& output) -> bool {
+    if (str.size() < kByteToHexLen) {
+      return false;
+    }
+
+    if (!std::all_of(str.begin(), str.begin() + kByteToHexLen, isxdigit)) {
+      return false;
+    }
+
+    char c_str[kByteToHexLen + 1];
+    str.copy(c_str, kByteToHexLen);
+    c_str[kByteToHexLen] = '\0';
+    output = static_cast<uint8_t>(strtoul(c_str, nullptr, 16));
+    str = str.substr(kByteToHexLen);
+    return true;
+  };
+
+  auto ParseDash = [](std::string_view& str) -> bool {
+    constexpr size_t kInputLen = 1;
+    if (str.size() < kInputLen) {
+      return false;
+    }
+    if (str[0] != '-') {
+      return false;
+    }
+    str = str.substr(kInputLen);
+    return true;
+  };
+
+  cpp20::span<uint8_t> buf(reinterpret_cast<uint8_t*>(&guid), sizeof(guid));
+  if (ParseByte(guid_str, buf[3]) &&   // |   aa   |    3      |
+      ParseByte(guid_str, buf[2]) &&   // |   bb   |    2      |
+      ParseByte(guid_str, buf[1]) &&   // |   cc   |    1      |
+      ParseByte(guid_str, buf[0]) &&   // |   dd   |    0      |
+      ParseDash(guid_str) &&           // |   -    |    -      |
+      ParseByte(guid_str, buf[5]) &&   // |   ee   |    5      |
+      ParseByte(guid_str, buf[4]) &&   // |   ff   |    4      |
+      ParseDash(guid_str) &&           // |   -    |    -      |
+      ParseByte(guid_str, buf[7]) &&   // |   gg   |    7      |
+      ParseByte(guid_str, buf[6]) &&   // |   hh   |    6      |
+      ParseDash(guid_str) &&           // |   -    |    -      |
+      ParseByte(guid_str, buf[8]) &&   // |   ii   |    8      |
+      ParseByte(guid_str, buf[9]) &&   // |   jj   |    9      |
+      ParseDash(guid_str) &&           // |   -    |    -      |
+      ParseByte(guid_str, buf[10]) &&  // |   kk   |   10      |
+      ParseByte(guid_str, buf[11]) &&  // |   ll   |   11      |
+      ParseByte(guid_str, buf[12]) &&  // |   mm   |   12      |
+      ParseByte(guid_str, buf[13]) &&  // |   nn   |   13      |
+      ParseByte(guid_str, buf[14]) &&  // |   oo   |   14      |
+      ParseByte(guid_str, buf[15]) &&  // |   pp   |   15      |
+      guid_str.empty()) {
+    return fit::ok(guid);
+  }
+
+  return fit::error(EFI_INVALID_PARAMETER);
+}
+
+// String format is specified at https://www.rfc-editor.org/rfc/rfc4122
+// And also described here: https://uefi.org/specs/UEFI/2.10/Apx_A_GUID_and_Time_Formats.html
+// This specification also defines a standard text representation of the GUID. This format is also
+// sometimes called the “registry format”. It consists of 36 characters, as follows:
+//
+//  `aabbccdd-eeff-gghh-iijj-kkllmmnnoopp`
+//
+// The pairs aa - pp are two characters in the range ‘0’ -‘9’, ‘a’ -‘f’ or ‘A’ - F’, with each pair
+// representing a single byte hexadecimal value.
+//
+// The following table describes the relationship between the text representation and a 16 - byte
+// buffer, the structure defined in EFI GUID Format and the EFI_GUID structure.
+//
+// +--------+-----------+--------------------------------+-----------------+
+// | String | Offset In | Relationship to EFI GUID       | Relationship To |
+// |        | Buffer    | Format                         | EFI_GUID        |
+// +--------+-----------+--------------------------------+-----------------+
+// |   aa   |    3      | TimeLow[24:31]                 | Data1[24:31]    |
+// |   bb   |    2      | TimeLow[16:23]                 | Data1[16:23]    |
+// |   cc   |    1      | TimeLow[8:15]                  | Data1[8:15]     |
+// |   dd   |    0      | TimeLow[0:7]                   | Data1[0:7]      |
+// |   ee   |    5      | TimeMid[8:15]                  | Data2[8:15]     |
+// |   ff   |    4      | TimeMid[0:7]                   | Data2[0:7]      |
+// |   gg   |    7      | TimeHigh And Version[8:15]     | Data3[8:15]     |
+// |   hh   |    6      | TimeHigh And Version[0:7]      | Data3[0:7]      |
+// |   ii   |    8      | ClockSeqHigh And Reserved[0:7] | Data4[0:7]      |
+// |   jj   |    9      | ClockSeqLow[0:7]               | Data4[8:15]     |
+// |   kk   |   10      | Node[0:7]                      | Data4[16:23]    |
+// |   ll   |   11      | Node[8:15]                     | Data4[24:31]    |
+// |   mm   |   12      | Node[16:23]                    | Data4[32:39]    |
+// |   nn   |   13      | Node[24:31]                    | Data4[40:47]    |
+// |   oo   |   14      | Node[32:39]                    | Data4[48:55]    |
+// |   pp   |   15      | Node[40:47]                    | Data4[56:63]    |
+// +--------+-----------+--------------------------------+-----------------+
+//
+// First 4 blocks are in little endian.
+fbl::Vector<char> ToStr(const efi_guid& g) {
+  fbl::Vector<char> res;
+  res.resize(kEfiGuidStrLen + 1);
+
+  cpp20::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&g), sizeof(g));
+
+  snprintf(res.data(), res.size(),
+           "%02x%02x%02x%02x-"          // aabbccdd-
+           "%02x%02x-"                  // eeff-
+           "%02x%02x-"                  // gghh-
+           "%02x%02x-"                  // iijj-
+           "%02x%02x%02x%02x%02x%02x",  // kkllmmnnoopp
+           buf[3],                      // |   aa   |    3      |
+           buf[2],                      // |   bb   |    2      |
+           buf[1],                      // |   cc   |    1      |
+           buf[0],                      // |   dd   |    0      |
+           buf[5],                      // |   ee   |    5      |
+           buf[4],                      // |   ff   |    4      |
+           buf[7],                      // |   gg   |    7      |
+           buf[6],                      // |   hh   |    6      |
+           buf[8],                      // |   ii   |    8      |
+           buf[9],                      // |   jj   |    9      |
+           buf[10],                     // |   kk   |   10      |
+           buf[11],                     // |   ll   |   11      |
+           buf[12],                     // |   mm   |   12      |
+           buf[13],                     // |   nn   |   13      |
+           buf[14],                     // |   oo   |   14      |
+           buf[15]);                    // |   pp   |   15      |
+
+  return res;
 }
 
 }  // namespace gigaboot

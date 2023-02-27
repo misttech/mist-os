@@ -9,8 +9,11 @@
 #include <efi/types.h>
 #include <gtest/gtest.h>
 
+#include "gmock/gmock.h"
 #include "gpt.h"
 #include "mock_boot_service.h"
+
+using ::testing::ContainerEq;
 
 namespace gigaboot {
 namespace {
@@ -133,6 +136,93 @@ INSTANTIATE_TEST_SUITE_P(
       std::replace(name.begin(), name.end(), '-', '_');
       return name + "_" + std::string(name == info.param.partition_name ? "modern" : "legacy");
     });
+
+struct EfiGuidStr {
+  efi_guid guid;
+  std::string_view str;
+};
+
+class EfiGuidTest : public testing::TestWithParam<EfiGuidStr> {};
+
+TEST_P(EfiGuidTest, ToString) {
+  const EfiGuidStr& p = GetParam();
+  EXPECT_EQ(std::string(ToStr(p.guid).data()), p.str);
+  // EXPECT_THAT(p.str, ContainerEq(ToStr(p.guid)));
+}
+
+TEST_P(EfiGuidTest, ToGuid) {
+  const EfiGuidStr& p = GetParam();
+  auto res = ToGuid(p.str);
+  ASSERT_TRUE(res.is_ok());
+  EXPECT_EQ(res.value(), p.guid);
+}
+
+// Some EFI_GUID fields are in little endian according to spec:
+// https://uefi.org/specs/UEFI/2.10/Apx_A_GUID_and_Time_Formats.html
+// Assume it doesn't change on different architectures.
+INSTANTIATE_TEST_SUITE_P(
+    SuccessConvert, EfiGuidTest,
+    testing::Values(
+        EfiGuidStr{
+            .guid{0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+            .str{"00000000-0000-0000-0000-000000000000"}},
+        EfiGuidStr{
+            .guid{0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}},
+            .str{"00000000-0000-0000-0000-000000000001"}},
+        EfiGuidStr{
+            .guid{0x00000000, 0x0000, 0x0000, {0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+            .str{"00000000-0000-0000-0001-000000000000"}},
+        EfiGuidStr{
+            .guid{0x00000000, 0x0000, 0x0001, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+            .str{"00000000-0000-0001-0000-000000000000"}},
+        EfiGuidStr{
+            .guid{0x00000000, 0x0001, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+            .str{"00000000-0001-0000-0000-000000000000"}},
+        EfiGuidStr{
+            .guid{0x00000001, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+            .str{"00000001-0000-0000-0000-000000000000"}},
+        EfiGuidStr{
+            .guid{0x01020304, 0x0506, 0x0708, {0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}},
+            .str{"01020304-0506-0708-090a-0b0c0d0e0f10"}},
+        EfiGuidStr{
+            .guid{0xffffffff, 0xffff, 0xffff, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
+            .str{"ffffffff-ffff-ffff-ffff-ffffffffffff"}}));
+
+class EfiGuidStrTest : public testing::TestWithParam<std::string_view> {};
+
+TEST_P(EfiGuidStrTest, ParseFail) {
+  auto& str = GetParam();
+  auto res = ToGuid(str);
+  ASSERT_TRUE(res.is_error());
+  EXPECT_EQ(res.error_value(), EFI_INVALID_PARAMETER);
+}
+
+INSTANTIATE_TEST_SUITE_P(BadLength, EfiGuidStrTest,
+                         testing::Values("",                                      // empty
+                                         "00000000-0000-0000-0000-00000000000",   // too short
+                                         "00000000-0000-0000-0000-0000000000000"  // too long
+                                         ));
+
+INSTANTIATE_TEST_SUITE_P(BadSymbol, EfiGuidStrTest,
+                         testing::Values("g0000000-0000-0000-0000-000000000000",
+                                         "00000000-.000-0000-0000-000000000000",
+                                         "00000000-0000-*000-0000-000000000000",
+                                         "00000000-0000-0000-(000-000000000000"));
+
+INSTANTIATE_TEST_SUITE_P(BadDashLocation, EfiGuidStrTest,
+                         testing::Values("-000000000000-0000-0000-000000000000",
+                                         "00000000-000000-00-0000-000000000000",
+                                         "000000000000000000000000000000000000",
+                                         "------------------------------------"));
+
+TEST(EfiGuidTest, Endianness) {
+  const efi_guid guid{0x03020100, 0x0504, 0x0706, {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}};
+  cpp20::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&guid), sizeof(guid));
+
+  for (size_t i = 0; i < sizeof(guid); i++) {
+    EXPECT_EQ(buf[i], i);
+  }
+}
 
 }  // namespace
 }  // namespace gigaboot

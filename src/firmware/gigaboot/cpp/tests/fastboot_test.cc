@@ -15,17 +15,30 @@
 #include <algorithm>
 #include <vector>
 
+#include <fbl/vector.h>
 #include <gtest/gtest.h>
 
 #include "backends.h"
 #include "boot_zbi_items.h"
+#include "gmock/gmock.h"
 #include "gpt.h"
+#include "lib/fit/internal/result.h"
+#include "lib/fit/result.h"
 #include "mock_boot_service.h"
+#include "mock_efi_variables.h"
 #include "partition.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "utils.h"
 
 // For "ABC"sv literal string view operator
 using namespace std::literals;
+
+using ::testing::_;
+using ::testing::DoAll;
+using ::testing::IsEmpty;
+using ::testing::Return;
+using ::testing::SetArgReferee;
+using ::testing::StrEq;
 
 namespace gigaboot {
 
@@ -1138,6 +1151,355 @@ TEST_F(FastbootFlashTest, AddBootloaderFileTooLarge) {
   auto sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
+}
+
+// Fake printer for test to capture dump output. Class wrapper is
+// to ensure that the capture doesn't leak between tests since we
+// need to use a global singleton to hook into the raw C function.
+class PrintCapture {
+ public:
+  static std::unique_ptr<PrintCapture> Create() {
+    if (PrintCapture::instance_) {
+      ADD_FAILURE() << "Can't create 2 PrintCapture objects at a time";
+      return nullptr;
+    }
+
+    PrintCapture::instance_ = new PrintCapture();
+    return std::unique_ptr<PrintCapture>(PrintCapture::instance_);
+  }
+
+  ~PrintCapture() { instance_ = nullptr; }
+
+  static int PrintFunction(const char* fmt, ...) {
+    if (!instance_) {
+      ADD_FAILURE() << "No PrintCapture exists";
+      return -1;
+    }
+
+    va_list ap;
+    va_start(ap, fmt);
+    VPrintFunction(fmt, ap);
+    va_end(ap);
+
+    return 0;
+  }
+
+  static int VPrintFunction(const char* fmt, va_list ap) {
+    if (!instance_) {
+      ADD_FAILURE() << "No PrintCapture exists";
+      return -1;
+    }
+
+    fxl::StringVAppendf(&instance_->contents(), fmt, ap);
+    return 0;
+  }
+
+  std::string& contents() { return contents_; }
+
+  std::string dump_contents() {
+    std::string ret(std::move(contents_));
+    contents_.clear();
+    return ret;
+  }
+
+ private:
+  // Private constructor to prevent instantiating 2 at once.
+  PrintCapture() = default;
+
+  // Singleton to dispatch calls to.
+  static PrintCapture* instance_;
+
+  std::string contents_;
+};
+PrintCapture* PrintCapture::instance_;
+
+class FastbootEfiVarTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    capture = PrintCapture::Create();
+    fastboot.SetVPrintFunction(PrintCapture::VPrintFunction);
+  }
+
+  void TearDown() override { capture.reset(); }
+
+  std::unique_ptr<PrintCapture> capture;
+  fastboot::TestTransport transport;
+  MockZirconBootOps mock_zb_ops;
+  MockEfiVariables mock_efi_variables;
+  Fastboot fastboot =
+      Fastboot(download_buffer, mock_zb_ops.GetZirconBootOps(), &mock_efi_variables);
+};
+
+TEST_F(FastbootEfiVarTest, EfiGetVarInfo_Error) {
+  EXPECT_CALL(mock_efi_variables, EfiQueryVariableInfo())
+      .WillOnce(Return(fit::error(EFI_NOT_FOUND)));
+
+  transport.AddInPacket(std::string("oem efi-getvarinfo"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_THAT(capture->dump_contents(), IsEmpty());
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"FAILQueryVariableInfo() failed"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarInfo_Ok) {
+  EXPECT_CALL(mock_efi_variables, EfiQueryVariableInfo())
+      .WillOnce(Return(fit::success(EfiVariables::EfiVariableInfo{0, 1, 2})));
+  constexpr auto expected_output =
+      "\n  Max Storage Size: 0\n  Remaining Variable Storage Size: 1\n  Max Variable Size: 2\n";
+
+  transport.AddInPacket(std::string("oem efi-getvarinfo"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarNames_Error) {
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(Return(fit::error(EFI_INVALID_PARAMETER)));
+
+  transport.AddInPacket(std::string("oem efi-getvarnames"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_THAT(capture->dump_contents(), IsEmpty());
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"FAILEfiVariableName iteration failed"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarNames_Empty) {
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(Return(fit::error(EFI_NOT_FOUND)));
+  const auto expected_output = "\n";
+
+  transport.AddInPacket(std::string("oem efi-getvarnames"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+constexpr efi_guid kGuid[] = {
+    {0x0, 0x0, 0x0, {0x0}},
+    {0x1, 0x1, 0x1, {0x1}},
+    {0x00010203, 0x0405, 0x0607, {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}},
+};
+constexpr size_t kVariableIdSize = std::size(kGuid);
+
+const std::array<EfiVariables::EfiVariableId, kVariableIdSize>& VariableIds() {
+  static std::array<EfiVariables::EfiVariableId, kVariableIdSize>* variable_id =
+      new std::array<EfiVariables::EfiVariableId, kVariableIdSize>{
+          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_0").value(), kGuid[0]},
+          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_1").value(), kGuid[1]},
+          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_2").value(), kGuid[2]},
+      };
+  return *variable_id;
+}
+
+const std::array<std::vector<uint8_t>, kVariableIdSize>& VariableValues() {
+  static std::array<std::vector<uint8_t>, kVariableIdSize>* values =
+      new std::array<std::vector<uint8_t>, kVariableIdSize>{
+          std::vector<uint8_t>{0x00},
+          std::vector<uint8_t>{0x01, 0x02},
+          std::vector<uint8_t>{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+                               0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+                               0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f},
+      };
+  return *values;
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarNames_Values) {
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[0]), Return(fit::success())))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[1]), Return(fit::success())))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[2]), Return(fit::success())))
+      .WillOnce(Return(fit::error(EFI_NOT_FOUND)));
+  const auto expected_output =
+      "00000000-0000-0000-0000-000000000000 var_0\n"
+      "00000001-0001-0001-0100-000000000000 var_1\n"
+      "00010203-0405-0607-0809-0a0b0c0d0e0f var_2\n"
+      "\n";
+
+  transport.AddInPacket(std::string("oem efi-getvarnames"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithGuid) {
+  fbl::Vector<uint8_t> kVal;
+  kVal.resize(VariableValues()[2].size());
+  std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
+  const auto expected_output =
+      "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
+      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
+      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n";
+
+  EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[2]))
+      .WillOnce(Return(fit::success(std::move(kVal))));
+
+  transport.AddInPacket(std::string("oem efi-getvar var_2 00010203-0405-0607-0809-0a0b0c0d0e0f"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithoutGuid) {
+  fbl::Vector<uint8_t> kVal;
+  kVal.resize(VariableValues()[2].size());
+  std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
+  const auto expected_output =
+      "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
+      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
+      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n";
+
+  EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[2]))
+      .WillOnce(Return(fit::success(std::move(kVal))));
+  EXPECT_CALL(mock_efi_variables, GetGuid(_)).WillOnce(Return(fit::success(kGuid[2])));
+
+  transport.AddInPacket(std::string("oem efi-getvar var_2"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithGuidError) {
+  fbl::Vector<uint8_t> kVal;
+  kVal.resize(VariableValues()[2].size());
+  std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
+  const auto expected_output = "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n";
+
+  EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[2]))
+      .WillOnce(Return(fit::error(EFI_INVALID_PARAMETER)));
+
+  transport.AddInPacket(std::string("oem efi-getvar var_2 00010203-0405-0607-0809-0a0b0c0d0e0f"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"FAILGetVariable() failed"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithoutGuidError) {
+  fbl::Vector<uint8_t> kVal;
+  kVal.resize(VariableValues()[2].size());
+  std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
+  const auto expected_output = "Vendor GUID search failed (EFI_INVALID_PARAMETER) for: 'var_2'\n";
+
+  EXPECT_CALL(mock_efi_variables, GetGuid(_)).WillOnce(Return(fit::error(EFI_INVALID_PARAMETER)));
+
+  transport.AddInPacket(std::string("oem efi-getvar var_2"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {
+      "FAILMultiple entries found with specified name. Please provide G"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiDumpVars_Multiple) {
+  fbl::Vector<uint8_t> kVal[kVariableIdSize];
+  for (size_t i = 0; i < kVariableIdSize; i++) {
+    kVal[i].resize(VariableValues()[i].size());
+    std::copy(VariableValues()[i].begin(), VariableValues()[i].end(), kVal[i].begin());
+  }
+  const auto expected_output =
+      "00000000-0000-0000-0000-000000000000 var_0:\n"
+      "0x00000000: 00                                              |.\n"
+      "00000001-0001-0001-0100-000000000000 var_1:\n"
+      "0x00000000: 01 02                                           |..\n"
+      "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
+      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
+      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n"
+      "\n";
+
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[0]), Return(fit::success())))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[1]), Return(fit::success())))
+      .WillOnce(DoAll(SetArgReferee<0>(VariableIds()[2]), Return(fit::success())))
+      .WillOnce(Return(fit::error(EFI_NOT_FOUND)));
+
+  for (size_t i = 0; i < kVariableIdSize; i++) {
+    EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[i]))
+        .WillOnce(Return(fit::success(std::move(kVal[i]))));
+  }
+
+  transport.AddInPacket(std::string("oem efi-dumpvars"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiDumpVars_Empty) {
+  const auto expected_output = "\n";
+
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(Return(fit::error(EFI_NOT_FOUND)));
+
+  transport.AddInPacket(std::string("oem efi-dumpvars"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_EQ(capture->dump_contents(), expected_output);
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"OKAY"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+TEST_F(FastbootEfiVarTest, EfiDumpVars_Error) {
+  EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
+      .WillOnce(Return(fit::error(EFI_INVALID_PARAMETER)));
+
+  transport.AddInPacket(std::string("oem efi-dumpvars"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  EXPECT_THAT(capture->dump_contents(), IsEmpty());
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
+  fastboot::Packets expected_packets = {"FAILEfiVariableName iteration failed"};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
 
 }  // namespace

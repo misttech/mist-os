@@ -16,6 +16,7 @@
 #include <efi/protocol/graphics-output.h>
 #include <efi/protocol/tcg2.h>
 #include <efi/types.h>
+#include <fbl/vector.h>
 #include <phys/efi/protocol.h>
 
 #include "phys/efi/main.h"
@@ -129,6 +130,17 @@ bool SetRebootMode(RebootMode mode);
 // Get reboot mode.
 // Returns std::nullopt on failure
 std::optional<RebootMode> GetRebootMode();
+
+// Convert hex string to `efi_guid`
+// Input string should be in RFC4122 "registry format"
+//  `aabbccdd-eeff-gghh-iijj-kkllmmnnoopp`
+fit::result<efi_status, efi_guid> ToGuid(std::string_view guid_str);
+
+// Convert `efi_guid` to string according to https://www.rfc-editor.org/rfc/rfc4122
+// Return value is '\0' terminated.
+constexpr size_t kByteToHexLen = 2;
+constexpr size_t kEfiGuidStrLen = (sizeof(efi_guid) * kByteToHexLen + 4 /*dashes*/);
+fbl::Vector<char> ToStr(const efi_guid& g);
 
 }  // namespace gigaboot
 
