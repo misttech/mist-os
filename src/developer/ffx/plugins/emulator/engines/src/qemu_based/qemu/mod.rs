@@ -35,7 +35,9 @@ impl QemuEngine {
     }
 
     fn validate_configuration(&self) -> Result<()> {
-        if self.data.get_emulator_configuration().device.pointing_device == PointingDevice::Touch {
+        if self.data.get_emulator_configuration().device.pointing_device == PointingDevice::Touch
+            && !self.data.get_emulator_configuration().runtime.headless
+        {
             eprintln!("Touchscreen as a pointing device is not available on Qemu.");
             eprintln!(
                 "If you encounter errors, try changing the pointing device to 'mouse' in the \
