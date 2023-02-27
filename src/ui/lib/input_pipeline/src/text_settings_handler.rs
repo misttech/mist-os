@@ -111,6 +111,10 @@ impl TextSettingsHandler {
     pub fn serve(self: Rc<Self>, proxy: fsettings::KeyboardProxy) {
         fasync::Task::local(
             async move { self.process_keymap_configuration_from(proxy).await }
+                // In most tests, this message is not fatal. It indicates that keyboard
+                // settings won't run, but that only means you can't configure keyboard
+                // settings. If your tests does not need to change keymaps, or adjust
+                // key autorepeat rates, these are not relevant.
                 .unwrap_or_else(|e: anyhow::Error| fx_log_err!("can't run: {:?}", e)),
         )
         .detach();
