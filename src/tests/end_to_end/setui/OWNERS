@@ -1,6 +1,5 @@
 include /src/settings/OWNERS
 
 liyl@google.com
-yuanzhi@google.com
 
 # COMPONENT: SettingsSetupUI
