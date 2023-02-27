@@ -6,7 +6,6 @@ use crate::event;
 use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
-use crate::policy;
 use crate::tests::message_utils::verify_payload;
 use fuchsia_zircon::DurationNum;
 use futures::future::BoxFuture;
@@ -45,7 +44,6 @@ static BROADCAST: &crate::Payload = &test_message::BAZ;
 static REPLY: &crate::Payload = &test_message::BAR;
 
 const ROLE_1: crate::Role = crate::Role::Event(event::Role::Sink);
-const ROLE_2: crate::Role = crate::Role::Policy(policy::Role::PolicyHandler);
 
 mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
@@ -803,52 +801,6 @@ async fn test_roles_membership() {
     // Verify payload received by role members.
     verify_payload(message.clone(), &mut foo_role_receptor, None).await;
     verify_payload(message, &mut foo_role_receptor_2, None).await;
-}
-
-// Ensures roles don't receive each other's messages.
-#[fuchsia::test(allow_stalls = false)]
-async fn test_roles_exclusivity() {
-    // Prepare a message hub.
-    let delegate = test::MessageHub::create();
-
-    // Create messengers who participate in roles
-    let (_, mut foo_role_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(ROLE_1)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
-    let (_, mut bar_role_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(ROLE_2)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
-
-    // Create messenger to send a message to the given participant.
-    let (sender, _) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("sending messenger should be created");
-
-    // Send messages to roles.
-    {
-        let message = test_message::BAR.clone();
-        let audience = Audience::Role(ROLE_2);
-        let _ = sender.message(message.clone(), audience);
-
-        // Verify payload received by role members.
-        verify_payload(message.clone(), &mut bar_role_receptor, None).await;
-    }
-    {
-        let message = test_message::FOO.clone();
-        let audience = Audience::Role(ROLE_1);
-        let _ = sender.message(message.clone(), audience);
-
-        // Verify payload received by role members.
-        verify_payload(message, &mut foo_role_receptor, None).await;
-    }
 }
 
 // Ensures only role members receive messages directed to the role.

@@ -101,7 +101,6 @@ mod job;
 mod keyboard;
 mod light;
 mod night_mode;
-mod policy;
 mod privacy;
 mod service;
 mod setup;

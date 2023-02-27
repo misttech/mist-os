@@ -29,7 +29,6 @@ use crate::job;
 #[cfg(test)]
 use crate::message::base::MessengerType;
 use crate::message::message_hub;
-use crate::policy;
 use crate::storage;
 
 pub struct MessageHub;
@@ -124,7 +123,6 @@ pub(crate) trait TryFromWithClient<T>: Sized {
 /// enumerations, details about each role should be defined near to the domain.
 #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
 pub enum Role {
-    Policy(policy::Role),
     Event(event::Role),
 }
 
