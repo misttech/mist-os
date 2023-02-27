@@ -133,12 +133,14 @@ type Target string
 type targetList struct {
 	AArch64 Target
 	X86_64  Target
+	RiscV64 Target
 }
 
 // TargetEnum provides accessors to valid QEMU target strings.
 var TargetEnum = &targetList{
 	AArch64: "aarch64",
 	X86_64:  "x86_64",
+	RiscV64: "rv64",
 }
 
 type uefiVolumes struct {
@@ -212,6 +214,13 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 			q.SetFlag("-enable-kvm")
 		} else {
 			q.SetFlag("-cpu", "Skylake-Client,-check")
+		}
+	case TargetEnum.RiscV64:
+		if kvm {
+			q.recordError(fmt.Errorf("KVM is not supported for RISC-V 64 bit yet"))
+		} else {
+			q.SetFlag("-cpu", "rv64")
+			q.SetFlag("-machine", "virt")
 		}
 	default:
 		q.recordError(fmt.Errorf("invalid target: %q", target))

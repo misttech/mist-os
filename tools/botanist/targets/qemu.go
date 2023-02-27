@@ -62,8 +62,9 @@ const (
 
 // qemuTargetMapping maps the Fuchsia target name to the name recognized by QEMU.
 var qemuTargetMapping = map[string]qemu.Target{
-	"x64":   qemu.TargetEnum.X86_64,
-	"arm64": qemu.TargetEnum.AArch64,
+	"x64":     qemu.TargetEnum.X86_64,
+	"arm64":   qemu.TargetEnum.AArch64,
+	"riscv64": qemu.TargetEnum.RiscV64,
 }
 
 // MinFS is the configuration for the MinFS filesystem image.
