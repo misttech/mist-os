@@ -117,18 +117,10 @@ RunnerPtr LibFuzzerRunner::MakePtr(ExecutorPtr executor) {
 
 LibFuzzerRunner::LibFuzzerRunner(ExecutorPtr executor)
     : Runner(executor), process_(executor), workflow_(this) {
+  options_ = Runner::options();
+  options_->set_detect_exits(true);
   CreateDirectory(kSeedCorpusPath);
   CreateDirectory(kLiveCorpusPath);
-}
-
-void LibFuzzerRunner::OverrideDefaults(Options* options) { options->set_detect_exits(true); }
-
-ZxPromise<> LibFuzzerRunner::Configure(const OptionsPtr& options) {
-  return fpromise::make_promise([this, options]() -> ZxResult<> {
-           options_ = options;
-           return fpromise::ok();
-         })
-      .wrap_with(workflow_);
 }
 
 ///////////////////////////////////////////////////////////////

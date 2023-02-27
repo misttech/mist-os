@@ -46,12 +46,10 @@ class Runner {
 
   // Accessors.
   const ExecutorPtr& executor() const { return executor_; }
+  const OptionsPtr& options() const { return options_; }
 
-  // Hook to allow runners to override default option values with runner-specific default values.
-  virtual void OverrideDefaults(Options* options) {}
-
-  // Sets the options.
-  virtual ZxPromise<> Configure(const OptionsPtr& options) = 0;
+  // Examines the options, and prepares the runner for fuzzing given their values.
+  virtual ZxPromise<> Configure();
 
   // Add an input to the specified corpus. Returns ZX_ERR_INVALID_ARGS if |corpus_type| is
   // unrecognized.
@@ -88,6 +86,8 @@ class Runner {
   virtual ZxPromise<> Stop() = 0;
 
  protected:
+  void set_options(Options options) { *options_ = std::move(options); }
+
   // Represents a single fuzzing workflow, e.g. |TryOne|, |Minimize|, etc. It holds a pointer to
   // the object that created it, but this is safe: it cannot outlive the object it is a part of.
   // It should be used in the normal way, e.g. using |wrap_with|.
@@ -140,6 +140,7 @@ class Runner {
   void FinishMonitoring();
 
   ExecutorPtr executor_;
+  OptionsPtr options_;
   MonitorClients monitors_;
   Scope scope_;
 

@@ -70,7 +70,6 @@ class ControllerImpl : public Controller {
   fidl::Binding<Controller> binding_;
   ExecutorPtr executor_;
   RunnerPtr runner_;
-  OptionsPtr options_;
   bool initialized_ = false;
   Artifact artifact_;
   Scope scope_;

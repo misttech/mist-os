@@ -17,17 +17,15 @@ static constexpr size_t kNumReplacements = 2;
 
 void RunnerTest::SetUp() {
   AsyncTest::SetUp();
-  options_ = MakeOptions();
-  options_->set_seed(1);
   handler_ = [](const Input& input) { return FuzzResult::NO_ERRORS; };
 }
 
-void RunnerTest::Configure(const OptionsPtr& options) {
-  options_ = options;
-  if (options_->seed() == kDefaultSeed) {
-    options_->set_seed(1);
-  }
-  FUZZING_EXPECT_OK(runner()->Configure(options_));
+void RunnerTest::Configure(const OptionsPtr& overrides) {
+  auto runner = this->runner();
+  options_ = runner->options();
+  SetOptions(options_.get(), *overrides);
+  options_->set_seed(1);
+  FUZZING_EXPECT_OK(runner->Configure());
   RunUntilIdle();
 }
 

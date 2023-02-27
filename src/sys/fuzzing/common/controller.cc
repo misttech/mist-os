@@ -20,9 +20,7 @@ namespace fuzzing {
 using ::fuchsia::fuzzer::DONE_MARKER;
 
 ControllerImpl::ControllerImpl(ExecutorPtr executor)
-    : binding_(this), executor_(std::move(executor)) {
-  options_ = MakeOptions();
-}
+    : binding_(this), executor_(std::move(executor)) {}
 
 void ControllerImpl::Bind(fidl::InterfaceRequest<Controller> request) {
   FX_DCHECK(runner_);
@@ -31,27 +29,17 @@ void ControllerImpl::Bind(fidl::InterfaceRequest<Controller> request) {
 
 void ControllerImpl::SetRunner(RunnerPtr runner) {
   runner_ = std::move(runner);
-  runner_->OverrideDefaults(options_.get());
   initialized_ = false;
 }
 
 ZxPromise<> ControllerImpl::Initialize() {
   FX_CHECK(runner_);
-  artifact_ = Artifact();
-  return fpromise::make_promise(
-             [this, configure = ZxFuture<>()](Context& context) mutable -> ZxResult<> {
-               if (initialized_) {
-                 return fpromise::ok();
-               }
-               if (!configure) {
-                 configure = runner_->Configure(options_);
-               }
-               if (!configure(context)) {
-                 return fpromise::pending();
-               }
-               initialized_ = true;
-               return configure.result();
-             })
+  return runner_->Configure()
+      .and_then([this]() -> ZxResult<> {
+        artifact_ = Artifact();
+        initialized_ = true;
+        return fpromise::ok();
+      })
       .wrap_with(scope_);
 }
 
@@ -65,20 +53,25 @@ void ControllerImpl::Finish() {
 // FIDL methods.
 
 void ControllerImpl::Configure(Options options, ConfigureCallback callback) {
-  SetOptions(options_.get(), options);
-  if (options_->seed() == kDefaultSeed) {
-    options_->set_seed(static_cast<uint32_t>(zx::ticks::now().get()));
-  }
-  auto task = runner_->Configure(options_)
-                  .then([this, callback = std::move(callback)](const ZxResult<>& result) {
-                    callback(result.is_ok() ? ZX_OK : result.error());
-                    initialized_ = true;
-                  })
-                  .wrap_with(scope_);
+  auto task =
+      fpromise::make_promise([this, overrides = std::move(options)]() mutable -> ZxResult<> {
+        auto options = runner_->options();
+        SetOptions(options.get(), overrides);
+        return fpromise::ok();
+      })
+          .and_then(runner_->Configure())
+          .then([this, callback = std::move(callback)](const ZxResult<>& result) {
+            callback(result.is_ok() ? ZX_OK : result.error());
+            initialized_ = true;
+          })
+          .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
 
-void ControllerImpl::GetOptions(GetOptionsCallback callback) { callback(CopyOptions(*options_)); }
+void ControllerImpl::GetOptions(GetOptionsCallback callback) {
+  const auto& options = runner_->options();
+  callback(CopyOptions(*options));
+}
 
 void ControllerImpl::AddToCorpus(CorpusType corpus_type, FidlInput fidl_input,
                                  AddToCorpusCallback callback) {

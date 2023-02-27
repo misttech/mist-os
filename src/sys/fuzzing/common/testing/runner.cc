@@ -43,14 +43,6 @@ FakeRunner::FakeRunner(ExecutorPtr executor) : Runner(executor), workflow_(this)
   live_corpus_.emplace_back(Input());
 }
 
-ZxPromise<> FakeRunner::Configure(const OptionsPtr& options) {
-  return fpromise::make_promise([this, options]() -> ZxResult<> {
-           options_ = options;
-           return fpromise::ok();
-         })
-      .wrap_with(workflow_);
-}
-
 zx_status_t FakeRunner::AddToCorpus(CorpusType corpus_type, Input input) {
   auto* corpus = corpus_type == CorpusType::SEED ? &seed_corpus_ : &live_corpus_;
   corpus->emplace_back(std::move(input));
@@ -85,7 +77,7 @@ ZxPromise<Artifact> FakeRunner::Fuzz() {
         }
         // If no result was set up, sequentially increment each byte until it matches |kCrash|.
         char input[kCrashLen + 1] = {0};
-        auto max_runs = options_->runs();
+        auto max_runs = options()->runs();
         uint32_t runs = 1;
         zx::duration elapsed(0);
         status_.set_running(true);

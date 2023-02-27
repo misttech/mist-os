@@ -49,18 +49,18 @@ zx_status_t RealmFuzzerRunner::BindCoverageDataProvider(zx::channel provider) {
   return provider_.Bind(std::move(provider));
 }
 
-ZxPromise<> RealmFuzzerRunner::Configure(const OptionsPtr& options) {
-  return fpromise::make_promise([this, options]() -> ZxResult<> {
-           options_ = options;
-           seed_corpus_->Configure(options_);
-           live_corpus_->Configure(options_);
-           mutagen_.Configure(options_);
-           adapter_.Configure(options_);
-           for (auto& [target_id, process_proxy] : process_proxies_) {
-             process_proxy->Configure(options_);
-           }
-           return fpromise::ok();
-         })
+ZxPromise<> RealmFuzzerRunner::Configure() {
+  return Runner::Configure()
+      .and_then([this]() -> ZxResult<> {
+        seed_corpus_->Configure(options());
+        live_corpus_->Configure(options());
+        mutagen_.Configure(options());
+        adapter_.Configure(options());
+        for (auto& [target_id, process_proxy] : process_proxies_) {
+          process_proxy->Configure(options());
+        }
+        return fpromise::ok();
+      })
       .and_then(adapter_.GetParameters().or_else([] {
         FX_LOGS(WARNING) << "Failed to load seed corpora.";
         return fpromise::error(ZX_ERR_CANCELED);
@@ -105,7 +105,7 @@ std::vector<Input> RealmFuzzerRunner::GetCorpus(CorpusType corpus_type) {
 
 zx_status_t RealmFuzzerRunner::ParseDictionary(const Input& input) {
   Dictionary dict;
-  dict.Configure(options_);
+  dict.Configure(options());
   if (!dict.Parse(input)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -119,7 +119,7 @@ Input RealmFuzzerRunner::GetDictionaryAsInput() const { return mutagen_.dictiona
 // Asynchronous workflows.
 
 ZxPromise<Artifact> RealmFuzzerRunner::Fuzz() {
-  return FuzzInputs(/* backlog= */ options_->mutation_depth()).wrap_with(workflow_);
+  return FuzzInputs(/* backlog= */ options()->mutation_depth()).wrap_with(workflow_);
 }
 
 ZxPromise<FuzzResult> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
@@ -149,8 +149,8 @@ ZxPromise<FuzzResult> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
 }
 
 ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
-  auto corpus = live_corpus_;
-  auto options = CopyOptions(*options_);
+  auto orig_corpus = live_corpus_;
+  auto orig_options = CopyOptions(options());
   // Check that the input can be minimized, and that minimizationis bounded.
   return TestOneAsync(std::move(input), kNoPostProcessing)
       .or_else([](const zx_status_t& status) {
@@ -161,10 +161,10 @@ ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
         return fpromise::error(status);
       })
       .and_then([this](Artifact& artifact) -> ZxResult<Artifact> {
-        if (!options_->has_runs() && !options_->has_max_total_time()) {
+        if (!options()->has_runs() && !options()->has_max_total_time()) {
           FX_LOGS(INFO)
               << "'max_total_time' and 'runs' are both not set. Defaulting to 10 minutes.";
-          options_->set_max_total_time(zx::min(10).get());
+          options()->set_max_total_time(zx::min(10).get());
         }
         return fpromise::ok(std::move(artifact));
       })
@@ -185,10 +185,10 @@ ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
             }
             auto next_input = input.Duplicate();
             next_input.Truncate(input.size() - 1);
-            options_->set_max_input_size(next_input.size());
+            options()->set_max_input_size(next_input.size());
             // Start each fuzzing pass using the seed corpus and the minimized input.
             live_corpus_ = Corpus::MakePtr();
-            live_corpus_->Configure(options_);
+            live_corpus_->Configure(options());
             auto status = live_corpus_->Add(std::move(next_input));
             if (status != ZX_OK) {
               FX_LOGS(ERROR) << "Failed to reset corpus: " << zx_status_get_string(status);
@@ -220,12 +220,13 @@ ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
           input = artifact.take_input();
         }
       })
-      .then([this, corpus, options = std::move(options)](ZxResult<Input>& result) mutable {
-        pool_->Clear();
-        live_corpus_ = corpus;
-        *options_ = std::move(options);
-        return std::move(result);
-      })
+      .then(
+          [this, orig_corpus, options = std::move(orig_options)](ZxResult<Input>& result) mutable {
+            pool_->Clear();
+            live_corpus_ = orig_corpus;
+            set_options(std::move(options));
+            return std::move(result);
+          })
       .wrap_with(workflow_);
 }
 
@@ -329,7 +330,7 @@ ZxPromise<> RealmFuzzerRunner::Merge() {
           // measured inputs.
           auto unmeasured = live_corpus_;
           live_corpus_ = Corpus::MakePtr();
-          live_corpus_->Configure(options_);
+          live_corpus_->Configure(options());
           return TestCorpusAsync(unmeasured, kMeasureCoverageAndKeepInputs, collect_errors);
         });
       })
@@ -347,7 +348,7 @@ ZxPromise<> RealmFuzzerRunner::Merge() {
           // kept.
           auto measured = live_corpus_;
           live_corpus_ = Corpus::MakePtr();
-          live_corpus_->Configure(options_);
+          live_corpus_->Configure(options());
           return TestCorpusAsync(measured, kAccumulateCoverageAndKeepInputs);
         });
       })
@@ -465,10 +466,10 @@ void RealmFuzzerRunner::FinishWorkflow() {
 
 ZxPromise<> RealmFuzzerRunner::GenerateInputs(size_t num_inputs, size_t backlog) {
   // Set up parameters for determining what inputs to generate and for how long.
-  auto max_size = options_->max_input_size();
-  auto max_time = zx::duration(options_->max_total_time());
+  auto max_size = options()->max_input_size();
+  auto max_time = zx::duration(options()->max_total_time());
   auto deadline = max_time.get() ? zx::deadline_after(max_time) : zx::time::infinite();
-  auto mutation_depth = options_->mutation_depth();
+  auto mutation_depth = options()->mutation_depth();
   return fpromise::make_promise([this, backlog, max_size]() -> ZxResult<> {
            // "Precycle" some inputs by making it look like they are ready for reuse.
            for (size_t i = 0; i <= backlog; i++) {
@@ -607,7 +608,7 @@ Promise<> RealmFuzzerRunner::GenerateCleanInputs(AsyncReceiverPtr<Artifact> rece
 // Methods to perform a sequence of fuzzing runs.
 
 ZxPromise<Artifact> RealmFuzzerRunner::FuzzInputs(size_t backlog) {
-  auto num_inputs = options_->runs();
+  auto num_inputs = options()->runs();
   if (num_inputs != 0) {
     // Adjust for fixed inputs tested first. Be careful not to double count the empty input.
     num_inputs -= (seed_corpus_->num_inputs() + live_corpus_->num_inputs() - 1);
@@ -701,7 +702,7 @@ ZxPromise<Artifact> RealmFuzzerRunner::TestCorpusAsync(CorpusPtr corpus, PostPro
 
 ZxPromise<Artifact> RealmFuzzerRunner::TestInputs(PostProcessing mode, InputsPtr collect_errors) {
   constexpr size_t kMaxLeakDetectionAttempts = 1000;
-  auto leak_detections = options_->detect_leaks() ? kMaxLeakDetectionAttempts : 0;
+  auto leak_detections = options()->detect_leaks() ? kMaxLeakDetectionAttempts : 0;
   return fpromise::make_promise(
       [this, mode, collect_errors, input = Input(), leak_detections, detect_leaks = false,
        prepare = ZxFuture<Input>(),
@@ -811,7 +812,7 @@ ZxPromise<Input> RealmFuzzerRunner::Prepare(bool detect_leaks) {
 }
 
 Promise<bool, FuzzResult> RealmFuzzerRunner::RunOne(const Input& input) {
-  return fpromise::make_promise([this, &input, run_limit = options_->run_limit(),
+  return fpromise::make_promise([this, &input, run_limit = options()->run_limit(),
                                  timeout = Future<>(),
                                  first = true](Context& context) mutable -> Result<bool, uint64_t> {
            // Create a future for the per-run timeout. If this completes, it's an error.
@@ -864,7 +865,7 @@ Promise<bool, FuzzResult> RealmFuzzerRunner::RunOne(const Input& input) {
 
 void RealmFuzzerRunner::ConnectProcess(InstrumentedProcess& instrumented) {
   auto process_proxy = std::make_unique<ProcessProxy>(executor(), pool_);
-  process_proxy->Configure(options_);
+  process_proxy->Configure(options());
   if (auto status = process_proxy->Connect(instrumented); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to add process: " << zx_status_get_string(status);
     return;
@@ -931,7 +932,7 @@ Promise<bool, FuzzResult> RealmFuzzerRunner::GetFuzzResult(uint64_t target_id) {
           return fpromise::ok(false);
         }
         // If it's an ignored exit(),just remove that one process_proxy and treat it like a success.
-        if (fuzz_result == FuzzResult::EXIT && !options_->detect_exits()) {
+        if (fuzz_result == FuzzResult::EXIT && !options()->detect_exits()) {
           return fpromise::ok(false);
         }
         // Otherwise, it's really an error. Remove the target adapter and all proxies.

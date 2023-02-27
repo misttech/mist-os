@@ -168,9 +168,6 @@ zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
   corpus_.emplace_back(Input());
   FX_LOGS(INFO) << "Testing with " << corpus_.size() << " inputs.";
 
-  auto options = MakeOptions();
-  runner->OverrideDefaults(options.get());
-
   // TODO(fxbug.dev/109100): Rarely, spawned process output may be truncated. `LibFuzzerRunner`
   // needs to return `ZX_ERR_IO_INVALID` in this case. By retying several times, the probability of
   // the underlying flake failing a test drops to almost zero.
@@ -180,7 +177,7 @@ zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
   // repeatedly calls |RunUntilIdle| until it has set an exit code. This allows this method to be
   // called as part of a gTest as well as by the elf_test_runner.
   zx_status_t exitcode = ZX_ERR_NEXT;
-  auto task = runner->Configure(options)
+  auto task = runner->Configure()
                   .and_then([runner, corpus = std::move(corpus_), fut = ZxFuture<FuzzResult>(),
                              attempts = 0U](Context& context) mutable -> ZxResult<FuzzResult> {
                     while (attempts < kFuzzerTestRetries) {

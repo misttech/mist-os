@@ -35,6 +35,8 @@ Options CopyOptions(const Options& options) {
   return copy;
 }
 
+Options CopyOptions(const OptionsPtr& options) { return CopyOptions(*options); }
+
 void SetOptions(Options* options, const Options& overrides) {
   // First, create a mutable copy that can be validated.
   Options valid;

@@ -11,7 +11,18 @@
 
 namespace fuzzing {
 
-Runner::Runner(ExecutorPtr executor) : executor_(executor), monitors_(executor) {}
+Runner::Runner(ExecutorPtr executor) : executor_(executor), monitors_(executor) {
+  options_ = MakeOptions();
+}
+
+ZxPromise<> Runner::Configure() {
+  return fpromise::make_promise([this]() -> ZxResult<> {
+    if (options_->seed() == kDefaultSeed) {
+      options_->set_seed(static_cast<uint32_t>(zx::ticks::now().get()));
+    }
+    return fpromise::ok();
+  });
+}
 
 ///////////////////////////////////////////////////////////////
 // Workflow methods

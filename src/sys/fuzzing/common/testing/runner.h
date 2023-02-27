@@ -44,7 +44,6 @@ class FakeRunner final : public Runner {
   // |Runner| methods. Since this runner does not have a "real" fuzzer engine, these use the
   // object's local variables to simulate the responses for the various `fuchsia.fuzzer.Controller`
   // methods, e.g. |TryOne| returns whatever was passed to |set_result|.
-  ZxPromise<> Configure(const OptionsPtr& options) override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;
   __WARN_UNUSED_RESULT zx_status_t ParseDictionary(const Input& input) override;
@@ -67,7 +66,6 @@ class FakeRunner final : public Runner {
   ZxPromise<Artifact> Run();
 
   zx_status_t error_ = ZX_OK;
-  OptionsPtr options_;
   std::vector<Input> inputs_;
   FuzzResult result_ = FuzzResult::NO_ERRORS;
   Input result_input_;

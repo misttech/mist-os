@@ -29,6 +29,7 @@ OptionsPtr MakeOptions();
 // Provides the ability to copy Options, as the FIDL-generated struct implicitly deletes the
 // copy-constructor.
 Options CopyOptions(const Options& options);
+Options CopyOptions(const OptionsPtr& options);
 
 // Applies any set values in |overrides| to the given set of |options|.
 void SetOptions(Options* options, const Options& overrides);

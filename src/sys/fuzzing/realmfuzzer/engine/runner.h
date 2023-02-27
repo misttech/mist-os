@@ -44,7 +44,7 @@ class RealmFuzzerRunner final : public Runner {
   __WARN_UNUSED_RESULT zx_status_t BindCoverageDataProvider(zx::channel provider);
 
   // |Runner| method implementations.
-  ZxPromise<> Configure(const OptionsPtr& options) override;
+  ZxPromise<> Configure() override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;
   __WARN_UNUSED_RESULT zx_status_t ParseDictionary(const Input& input) override;
@@ -188,7 +188,6 @@ class RealmFuzzerRunner final : public Runner {
   void Reset();
 
   // General configuration.
-  OptionsPtr options_;
   uint32_t run_ = 0;
 
   // Time at which a workflow starts.
