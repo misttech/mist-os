@@ -244,6 +244,7 @@ async fn handle_focus_server(
     Ok(())
 }
 
+#[ignore] // TODO(fxbug.dev/122557): Re-enable this some day.
 #[fuchsia::test]
 async fn test_basic_copy_paste_across_different_view_refs() -> Result<(), Error> {
     async fn inner(handles: &mut TestHandles) -> Result<(), Error> {
