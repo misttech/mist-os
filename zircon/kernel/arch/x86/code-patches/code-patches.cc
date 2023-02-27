@@ -18,113 +18,63 @@
 #include <arch/x86/retpoline/selection.h>
 #include <arch/x86/user-copy/selection.h>
 #include <hwreg/x86msr.h>
-#include <phys/symbolize.h>
-
-namespace {
-
-// A succeed-or-die wrapper of Patcher::PatchWithAlternative.
-void PatchWithAlternative(code_patching::Patcher& patcher, ktl::span<ktl::byte> instructions,
-                          ktl::string_view alternative) {
-  auto result = patcher.PatchWithAlternative(instructions, alternative);
-  if (result.is_error()) {
-    printf("%s: code-patching: failed to patch with alternative \"%.*s\": ", ProgramName(),
-           static_cast<int>(alternative.size()), alternative.data());
-    code_patching::PrintPatcherError(result.error_value());
-    abort();
-  }
-}
-
-void PrintCaseInfo(const code_patching::Directive& patch, const char* fmt, ...) {
-  printf("%s: code-patching: ", ProgramName());
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
-  printf(": [%#lx, %#lx)\n", patch.range_start, patch.range_start + patch.range_size);
-}
-
-}  // namespace
 
 // Declared in <lib/code-patching/code-patches.h>.
-void ArchPatchCode(code_patching::Patcher patcher, ktl::span<ktl::byte> patchee,
-                   uint64_t patchee_load_bias) {
+bool ArchPatchCode(code_patching::Patcher& patcher, ktl::span<ktl::byte> insns, CodePatchId case_id,
+                   fit::inline_function<void(ktl::initializer_list<ktl::string_view>)> print) {
   arch::BootCpuidIo cpuid;
   hwreg::X86MsrIo msr;
 
-  bool performed = false;
-  for (const code_patching::Directive& patch : patcher.patches()) {
-    ZX_ASSERT(patch.range_start >= patchee_load_bias);
-    ZX_ASSERT(patch.range_size <= patchee.size());
-    ZX_ASSERT(patchee.size() - patch.range_size >= patch.range_start - patchee_load_bias);
+  auto do_alternative = [&patcher, insns, &print](ktl::string_view name,
+                                                  ktl::string_view alternative) {
+    patcher.MandatoryPatchWithAlternative(insns, alternative);
+    print({"using ", name, " alternative \"", alternative, "\""});
+    return true;
+  };
 
-    ktl::span<ktl::byte> insns =
-        patchee.subspan(patch.range_start - patchee_load_bias, patch.range_size);
-
-    switch (patch.id) {
-      case CASE_ID_SELF_TEST:
+  switch (case_id) {
+    case CodePatchId::kSelfTest:
+      patcher.NopFill(insns);
+      print({"'smoke test' trap patched"});
+      return true;
+    case CodePatchId::kSwapgsMitigation: {
+      // `nop` out the mitigation if the bug is not present, if we could not
+      // mitigate it even if it was, or if we generally want mitigations off.
+      const bool present = arch::HasX86SwapgsBug(cpuid);
+      if (!present || gBootOptions->x86_disable_spec_mitigations) {
         patcher.NopFill(insns);
-        PrintCaseInfo(patch, "'smoke test' trap patched");
-        performed = true;
-        break;
-      case CASE_ID_SWAPGS_MITIGATION: {
-        // `nop` out the mitigation if the bug is not present, if we could not
-        // mitigate it even if it was, or if we generally want mitigations off.
-        const bool present = arch::HasX86SwapgsBug(cpuid);
-        if (!present || gBootOptions->x86_disable_spec_mitigations) {
-          patcher.NopFill(insns);
-          ktl::string_view qualifier = !present ? "bug not present" : "all mitigations disabled";
-          PrintCaseInfo(patch, "swapgs bug mitigation disabled (%V)", qualifier);
-          break;
-        }
-        PrintCaseInfo(patch, "swapgs bug mitigation enabled");
-        break;
+        ktl::string_view qualifier = !present ? "bug not present"sv : "all mitigations disabled"sv;
+        print({"swapgs bug mitigation disabled (", qualifier, ")"});
+      } else {
+        print({"swapgs bug mitigation enabled"});
       }
-      case CASE_ID_MDS_TAA_MITIGATION: {
-        // `nop` out the mitigation if the bug is not present, if we could not
-        // mitigate it even if it was, or if we generally want mitigations off.
-        const bool present = arch::HasX86MdsTaaBugs(cpuid, msr);
-        const bool can_mitigate = arch::CanMitigateX86MdsTaaBugs(cpuid);
-        if (!present || !can_mitigate || gBootOptions->x86_disable_spec_mitigations) {
-          patcher.NopFill(insns);
-          ktl::string_view qualifier = !present        ? "bug not present"
-                                       : !can_mitigate ? "unable to mitigate"
-                                                       : "all mitigations disabled";
-          PrintCaseInfo(patch, "MDS/TAA bug mitigation disabled (%V)", qualifier);
-          break;
-        }
-        PrintCaseInfo(patch, "MDS/TAA bug mitigation enabled");
-        break;
-      }
-      case CASE_ID__X86_COPY_TO_OR_FROM_USER: {
-        ktl::string_view alternative = SelectX86UserCopyAlternative(cpuid);
-        PatchWithAlternative(patcher, insns, alternative);
-        PrintCaseInfo(patch, "using user-copy alternative \"%V\"", alternative);
-        break;
-      }
-      case CASE_ID___X86_INDIRECT_THUNK_R11: {
-        ktl::string_view alternative = SelectX86RetpolineAlternative(cpuid, msr, *gBootOptions);
-        PatchWithAlternative(patcher, insns, alternative);
-        PrintCaseInfo(patch, "using retpoline alternative \"%V\"", alternative);
-        break;
-      }
-      case CASE_ID___UNSANITIZED_MEMCPY: {
-        ktl::string_view alternative = SelectX86MemcpyAlternative(cpuid);
-        PatchWithAlternative(patcher, insns, alternative);
-        PrintCaseInfo(patch, "using memcpy alternative \"%V\"", alternative);
-        break;
-      }
-      case CASE_ID___UNSANITIZED_MEMSET: {
-        ktl::string_view alternative = SelectX86MemsetAlternative(cpuid);
-        PatchWithAlternative(patcher, insns, alternative);
-        PrintCaseInfo(patch, "using memset alternative \"%V\"", alternative);
-        break;
-      }
-      default:
-        ZX_PANIC("%s: code-patching: unrecognized patch case ID: %u: [%#lx, %#lx)", ProgramName(),
-                 patch.id, patch.range_start, patch.range_start + patch.range_size);
+      return true;
     }
+    case CodePatchId::kMdsTaaMitigation: {
+      // `nop` out the mitigation if the bug is not present, if we could not
+      // mitigate it even if it was, or if we generally want mitigations off.
+      const bool present = arch::HasX86MdsTaaBugs(cpuid, msr);
+      const bool can_mitigate = arch::CanMitigateX86MdsTaaBugs(cpuid);
+      if (!present || !can_mitigate || gBootOptions->x86_disable_spec_mitigations) {
+        patcher.NopFill(insns);
+        ktl::string_view qualifier = !present        ? "bug not present"
+                                     : !can_mitigate ? "unable to mitigate"
+                                                     : "all mitigations disabled";
+        print({"MDS/TAA bug mitigation disabled (", qualifier, ")"});
+      } else {
+        print({"MDS/TAA bug mitigation enabled"});
+      }
+      return true;
+    }
+    case CodePatchId::k_X86CopyToOrFromUser:
+      return do_alternative("user-copy", SelectX86UserCopyAlternative(cpuid));
+    case CodePatchId::k__X86IndirectThunkR11:
+      return do_alternative("retpoline", SelectX86RetpolineAlternative(cpuid, msr, *gBootOptions));
+    case CodePatchId::k__UnsanitizedMemcpy:
+      return do_alternative("memcpy", SelectX86MemcpyAlternative(cpuid));
+    case CodePatchId::k__UnsanitizedMemset:
+      return do_alternative("memset", SelectX86MemsetAlternative(cpuid));
   }
-  if (!performed) {
-    ZX_PANIC("%s: code-patching: failed to patch the kernel", ProgramName());
-  }
+
+  return false;
 }

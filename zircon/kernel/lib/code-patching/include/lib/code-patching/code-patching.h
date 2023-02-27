@@ -85,6 +85,10 @@ class Patcher {
   fit::result<Error> PatchWithAlternative(ktl::span<ktl::byte> instructions,
                                           ktl::string_view alternative);
 
+  // Calls PatchWithAlternative and panics if it fails.
+  void MandatoryPatchWithAlternative(ktl::span<ktl::byte> instructions,
+                                     ktl::string_view alternative);
+
   // Overwrites a range of instuctions with the minimal number of `nop`
   // instructions.
   void NopFill(ktl::span<ktl::byte> instructions);

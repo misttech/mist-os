@@ -40,12 +40,12 @@ std::string AsmHeader::Output(std::string_view include_name) {
   guard += '_';
 
   std::string contents("// This file is generated.  DO NOT EDIT!\n\n");
-  contents += "#ifndef " + guard + "\n";
+  contents += "#ifndef " + guard + '\n';
   contents += "#define " + guard + " 1\n";
-  contents += "\n";
+  contents += '\n';
   contents += body_;
-  contents += "\n";
-  contents += "#endif  // " + guard + "\n";
+  contents += '\n';
+  contents += "#endif  // " + guard + '\n';
 
   return contents;
 }
@@ -80,12 +80,20 @@ int AsmHeader::Output(const char* filename, std::string_view include_name) {
   return errno;
 }
 
+AsmHeader& AsmHeader::Line(std::initializer_list<std::string_view> strings) {
+  for (std::string_view str : strings) {
+    body_ += str;
+  }
+  body_ += '\n';
+  return *this;
+}
+
 AsmHeader& AsmHeader::Macro(std::string_view name, std::string_view value) {
   body_ += "#define ";
   body_ += name;
-  body_ += " ";
+  body_ += ' ';
   body_ += value;
-  body_ += "\n";
+  body_ += '\n';
   return *this;
 }
 

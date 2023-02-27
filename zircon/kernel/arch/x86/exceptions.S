@@ -8,7 +8,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <arch/asm_macros.h>
-#include <arch/code-patches/case-id.h>
+#include <arch/code-patches/case-id-asm.h>
 #include <arch/regs.h>
 #include <arch/x86/descriptor.h>
 #include <arch/x86/mp.h>

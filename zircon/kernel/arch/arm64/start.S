@@ -8,7 +8,7 @@
 #include <arch/arm64/mmu.h>
 #include <arch/arm64.h>
 #include <arch/asm_macros.h>
-#include <arch/code-patches/case-id.h>
+#include <arch/code-patches/case-id-asm.h>
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 #include <lib/code-patching/asm.h>

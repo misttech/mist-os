@@ -11,6 +11,7 @@
 
 #include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <phys/main.h>
 
 #include <ktl/enforce.h>
 
@@ -60,6 +61,17 @@ fit::result<Patcher::Error> Patcher::PatchWithAlternative(ktl::span<ktl::byte> i
   memcpy(instructions.data(), bytes.data(), bytes.size());
   sync_(instructions);
   return fit::ok();
+}
+
+void Patcher::MandatoryPatchWithAlternative(ktl::span<ktl::byte> instructions,
+                                            ktl::string_view alternative) {
+  auto result = PatchWithAlternative(instructions, alternative);
+  if (result.is_error()) {
+    printf("%s: code-patching: failed to patch with alternative \"%.*s\": ", ProgramName(),
+           static_cast<int>(alternative.size()), alternative.data());
+    code_patching::PrintPatcherError(result.error_value());
+    abort();
+  }
 }
 
 void Patcher::NopFill(ktl::span<ktl::byte> instructions) {

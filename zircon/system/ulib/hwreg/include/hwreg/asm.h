@@ -5,6 +5,7 @@
 #ifndef HWREG_ASM_H_
 #define HWREG_ASM_H_
 
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -37,6 +38,9 @@ using EnableAsmGeneration = EnablePrinter;
 
 class AsmHeader {
  public:
+  // Emit a raw line to the header by concatenating the strings.
+  AsmHeader& Line(std::initializer_list<std::string_view> strings);
+
   // Emit a fixed macro definition.
   AsmHeader& Macro(std::string_view name, std::string_view value);
 

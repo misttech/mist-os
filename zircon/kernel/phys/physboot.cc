@@ -75,7 +75,32 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
     abort();
   }
   debugf("%s: Applying %zu patches...\n", gSymbolize->name(), patcher.patches().size());
-  ArchPatchCode(ktl::move(patcher), kernel_bytes, KERNEL_LINK_ADDRESS);
+
+  // There's always the self-test patch, so there should never be none.
+  ZX_ASSERT(!patcher.patches().empty());
+  for (const code_patching::Directive& patch : patcher.patches()) {
+    ZX_ASSERT(patch.range_start >= KERNEL_LINK_ADDRESS);
+    ZX_ASSERT(patch.range_size <= kernel_bytes.size());
+    ZX_ASSERT(kernel_bytes.size() - patch.range_size >= patch.range_start - KERNEL_LINK_ADDRESS);
+
+    ktl::span<ktl::byte> insns =
+        kernel_bytes.subspan(patch.range_start - KERNEL_LINK_ADDRESS, patch.range_size);
+
+    auto print = [patch](ktl::initializer_list<ktl::string_view> strings) {
+      printf("%s: code-patching: ", ProgramName());
+      for (ktl::string_view str : strings) {
+        stdout->Write(str);
+      }
+      printf(": [%#" PRIx64 ", %#" PRIx64 ")\n", patch.range_start,
+             patch.range_start + patch.range_size);
+    };
+
+    if (!ArchPatchCode(patcher, insns, static_cast<CodePatchId>(patch.id), print)) {
+      ZX_PANIC("%s: code-patching: unrecognized patch case ID: %" PRIu32 ": [%#" PRIx64
+               ", %#" PRIx64 ")",
+               ProgramName(), patch.id, patch.range_start, patch.range_start + patch.range_size);
+    }
+  }
 
   debugf("%s: Examining ZBI...\n", gSymbolize->name());
   BootZbi::InputZbi kernel_zbi(kernel_bytes);

@@ -8,7 +8,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <asm.h>
-#include <arch/code-patches/case-id.h>
+#include <arch/code-patches/case-id-asm.h>
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 #include <arch/x86/asm.h>

@@ -327,7 +327,7 @@ template("code_patching_hermetic_stub") {
     }
 
     if (!defined(case_id_header)) {
-      case_id_header = "arch/code-patches/case-id.h"
+      case_id_header = "arch/code-patches/case-id-asm.h"
 
       # Public to propagate to :main_target.
       public_deps = [ "//zircon/kernel/arch/$zircon_cpu/code-patches:headers" ]

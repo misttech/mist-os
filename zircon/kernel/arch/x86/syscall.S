@@ -8,7 +8,7 @@
 #include <asm.h>
 #include <arch/x86/mp.h>
 #include <lib/code-patching/asm.h>
-#include <arch/code-patches/case-id.h>
+#include <arch/code-patches/case-id-asm.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
 
 #define DW_REG_rsp        0x7
