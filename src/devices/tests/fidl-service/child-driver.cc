@@ -45,22 +45,34 @@ class Device : public DeviceParent {
 
     fidl::WireSyncClient client{std::move(*echo_client)};
 
-    constexpr std::string_view kInput = "Test String";
+    constexpr char kInput[] = "Test String";
 
-    auto result = client->EchoString(fidl::StringView::FromExternal(cpp17::string_view(kInput)));
+    auto result = client->EchoString(kInput);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to call EchoString");
       return result.status();
     }
     if (result.value().response.get() != kInput) {
-      zxlogf(ERROR, "Unexpected response: Actual: \"%.*s\", Expected: \"%.*s\"",
+      zxlogf(ERROR, "Unexpected response: Actual: \"%.*s\", Expected: \"%s\"",
              static_cast<int>(result.value().response.size()), result.value().response.data(),
-             static_cast<int>(kInput.size()), kInput.data());
+             kInput);
       return ZX_ERR_INTERNAL;
     }
 
     zxlogf(INFO, "Recieved: %.*s", (int)result.value().response.size(),
            result.value().response.data());
+
+    auto echo_client2 = DdkConnectFidlProtocol<fidl_examples_echo::EchoService2::Echo>();
+    // DFv1 should fail here.
+    if (echo_client2.is_ok()) {
+      auto result = fidl::WireCall(*echo_client2)->EchoString(kInput);
+      // DFv2 should fail here.
+      if (result.ok()) {
+        zxlogf(ERROR, "Incorrectly able to access %s despite lacking use in manfiest",
+               fidl_examples_echo::EchoService2::Name);
+        return ZX_ERR_INTERNAL;
+      }
+    }
 
     return ZX_OK;
   }

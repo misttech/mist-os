@@ -28,7 +28,7 @@ fuchsia_driver("parent_driver") {
 
 fuchsia_driver_component("parent_component") {
   component_name = "zircon_transport_parent"
-  colocate = false
+  manifest = "meta/parent-driver.cml"
   deps = [ ":parent_driver" ]
   info = "component-info.json"
 }
@@ -54,7 +54,7 @@ fuchsia_driver("child_driver") {
 
 fuchsia_driver_component("child_component") {
   component_name = "zircon_transport_child"
-  colocate = false
+  manifest = "meta/child-driver.cml"
   deps = [ ":child_driver" ]
   info = "component-info.json"
 }

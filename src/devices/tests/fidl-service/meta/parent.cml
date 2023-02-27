@@ -15,10 +15,15 @@
     },
     capabilities: [
         { service: "fidl.examples.echo.EchoService" },
+        { service: "fidl.examples.echo.EchoService2" },
     ],
     expose: [
         {
             service: "fidl.examples.echo.EchoService",
+            from: "self",
+        },
+        {
+            service: "fidl.examples.echo.EchoService2",
             from: "self",
         },
     ],
