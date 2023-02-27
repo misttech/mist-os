@@ -29,6 +29,7 @@ use zerocopy::ByteSlice;
 /// crate.
 #[derive(Arbitrary)]
 enum DhcpPacketType {
+    Dhcpv4Message,
     Dhcpv6Message,
 }
 
@@ -173,6 +174,12 @@ fn fuzz_parse_packet(input: &[u8]) {
         SupportedPacketType::DhcpPacket(dhcp_type) => match dhcp_type {
             DhcpPacketType::Dhcpv6Message => {
                 Dhcpv6Message::parse_and_ignore(&mut input, ());
+            }
+            DhcpPacketType::Dhcpv4Message => {
+                // TODO(https://fxbug.dev/122602): Migrate dhcp_protocol to packet-formats APIs
+                // and make this use `parse_and_ignore` instead.
+                let _: Result<dhcp_protocol::Message, dhcp_protocol::ProtocolError> =
+                    dhcp_protocol::Message::from_buffer(input);
             }
         },
         SupportedPacketType::MdnsPacket(mdns_type) => match mdns_type {
