@@ -111,15 +111,16 @@ declare_args() {
   # The images config information used for zedboot images.
   zedboot_images_config_label = false
 
-  # TODO(jayzhuang): Remove recovery_fdr_images_config_label.
-  recovery_fdr_images_config_label = false
-
   # The images config information used for recovery images, including
-  # recovery-fdr and recovery-ota, and potentially other recovery images.
+  # recovery-fdr and recovery-ota.
   #
-  # Only one recovery image can be selected for a build configuration, so it's
-  # OK to share the same arg for different images.
-  recovery_images_config_label = false
+  # NOTE: Only one recovery image can be selected for a build configuration.
+  # However, images config is selected based on board, while recovery images are
+  # selected based on product, so the build system doesn't always have full
+  # information to match them. Also this is expected to be temporary until we
+  # fully migrate assembly to Bazel.
+  recovery_fdr_images_config_label = false
+  recovery_ota_images_config_label = false
 
   # The partitions config information used to create an update package and
   # product bundle.
